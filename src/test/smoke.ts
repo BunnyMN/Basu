@@ -14,6 +14,13 @@ import '../env.js';
 
 const BASE = process.env['SMOKE_BASE'] ?? 'http://localhost:3000';
 
+/**
+ * A key of this run's own. Reusing one across runs would test that yesterday's
+ * answer is still cached, which is not the property anybody wants — a retry is
+ * a retry of *this* attempt.
+ */
+const RUN = `smoke-${Date.now().toString(36)}`;
+
 let failures = 0;
 let checks = 0;
 
@@ -45,7 +52,12 @@ async function call<T = any>(
     ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
   });
   const text = await response.text();
-  return { status: response.status, body: text ? JSON.parse(text) : (null as T) };
+  // Not everything here is JSON — the dish drawings are SVG.
+  const json = response.headers.get('content-type')?.includes('json') ?? false;
+  return {
+    status: response.status,
+    body: (json && text ? JSON.parse(text) : text) as T,
+  };
 }
 
 const clockTo = (label: string) => call('/dev/clock', { method: 'POST', body: { to: label } });
@@ -103,20 +115,39 @@ async function main(): Promise<void> {
     '/v1/restaurants',
   );
   const open = listed.body.restaurants.filter((r) => r.accepting_orders);
-  // Two tablets are watching; the third restaurant has none and cannot be
-  // ordered from — which is the point of the check, not an accident of setup.
   check(
-    `${listed.body.restaurants.length} ресторан, ${open.length} нь нээлттэй`,
-    open.length === 2,
+    `${listed.body.restaurants.length} ресторан, ${open.length} нь захиалга авна`,
+    listed.body.restaurants.length >= 3 && open.length > 0,
   );
+  // Prefer the venue whose tablet we hold, so the kitchen checks below have a
+  // board to look at; anything open will do if that one is not taking orders.
   const venue = open.find((r) => r.id === device0.restaurant_id) ?? open[0]!;
 
-  const menu = await call<{ items: Array<{ id: string; name: string; price_mnt: number }> }>(
-    `/v1/restaurants/${venue.id}/menu`,
+  const menu = await call<{
+    items: Array<{
+      id: string;
+      name: string;
+      price_mnt: number;
+      image_url: string | null;
+      prep_minutes: number;
+    }>;
+  }>(`/v1/restaurants/${venue.id}/menu`);
+  // Whatever this kitchen actually cooks — naming a dish here would only test
+  // that the seed still spells it the same way.
+  const dish = menu.body.items[0];
+  check(`${venue.name}: ${menu.body.items.length} хоолтой цэс`, Boolean(dish), menu.body);
+  if (!dish) return;
+
+  check(
+    'хоол бүр зурагтай',
+    menu.body.items.every((i) => Boolean(i.image_url)),
+    menu.body.items.filter((i) => !i.image_url).map((i) => i.name),
   );
-  const tsuivan = menu.body.items.find((i) => i.name === 'Цуйван');
-  check('цэс ирлээ', Boolean(tsuivan), menu.body);
-  if (!tsuivan) return;
+  const picture = await call<string>(String(dish.image_url));
+  check(
+    `зураг ирлээ (${dish.image_url})`,
+    picture.status === 200 && picture.body.startsWith('<svg'),
+  );
 
   const slots = await call<{ slots: Array<{ label: string; starts_at: string; available: boolean }> }>(
     `/v1/restaurants/${venue.id}/slots`,
@@ -130,26 +161,26 @@ async function main(): Promise<void> {
   const created = await call<{ id: string; code: string; total_mnt: number }>('/v1/orders', {
     method: 'POST',
     token: guest,
-    key: 'smoke-order-1',
+    key: RUN,
     body: {
       restaurant_id: venue.id,
       slot_starts_at: slot.starts_at,
       party_size: 2,
-      items: [{ menu_item_id: tsuivan.id, qty: 2 }],
+      items: [{ menu_item_id: dish.id, qty: 2 }],
     },
   });
-  check(`№${created.body.code} үүслээ`, created.status === 201, created.body);
+  check(`№${created.body.code} үүслээ (${dish.name} ×2)`, created.status === 201, created.body);
   const orderId = created.body.id;
 
   const retry = await call<{ id: string }>('/v1/orders', {
     method: 'POST',
     token: guest,
-    key: 'smoke-order-1',
+    key: RUN,
     body: {
       restaurant_id: venue.id,
       slot_starts_at: slot.starts_at,
       party_size: 2,
-      items: [{ menu_item_id: tsuivan.id, qty: 2 }],
+      items: [{ menu_item_id: dish.id, qty: 2 }],
     },
   });
   check('давхар дарахад нэг л захиалга', retry.body.id === orderId);

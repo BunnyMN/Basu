@@ -209,6 +209,10 @@ describe('ordering over HTTP', () => {
   });
 
   it('turns away an order for a restaurant with no tablet watching', async () => {
+    // Production behaviour: demo mode ignores this, because a walkthrough that
+    // needs a second tab open before the first one works is a puzzle.
+    const before = process.env['BASU_MODE'];
+    process.env['BASU_MODE'] = 'production';
     const guest = await signIn();
     const response = await app.inject({
       method: 'POST',
@@ -221,6 +225,9 @@ describe('ordering over HTTP', () => {
         items: [{ menu_item_id: venue.menuIds['tsuivan'], qty: 1 }],
       },
     });
+    if (before === undefined) delete process.env['BASU_MODE'];
+    else process.env['BASU_MODE'] = before;
+
     expect(response.statusCode).toBe(503);
     expect(response.json().error.code).toBe('RESTAURANT_OFFLINE');
   });
@@ -267,6 +274,10 @@ describe('ordering over HTTP', () => {
 
     expect(first.json().id).toBe(second.json().id);
     expect(second.headers['idempotent-replay']).toBe('true');
+    // The content type travels with the body. Without it the replay went out
+    // as text/plain and a client parsing by content-type got a string where
+    // the first attempt had handed it an object.
+    expect(second.headers['content-type']).toContain('application/json');
 
     const { rows } = await pool().query<{ n: number }>(
       'SELECT count(*)::int AS n FROM dining_order',

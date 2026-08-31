@@ -1,52 +1,43 @@
 import '../env.js';
 import { closePool, getPool } from '../db/pool.js';
-import { PILOT_KITCHEN, PILOT_MENU } from '../domain/fixtures.js';
 import { DEMO_START, DemoClock } from '../demoClock.js';
 import { createPairingCode, pairDevice } from '../services/auth.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
+import { DISHES, STATIONS, VENUES } from './catalogue.js';
 
 /**
  * A pilot lunch service you can click through.
  *
- * Three restaurants rather than one, because a guest browsing a single-venue
- * app tells you nothing about whether the list reads well, and because the
- * cross-restaurant isolation is easier to see than to take on trust.
+ * Ten venues rather than one, because a guest browsing a single-restaurant app
+ * tells you nothing about whether the map reads well — and because each kitchen
+ * here has a different bottleneck, so the fire planner visibly behaves
+ * differently at each. See src/seed/catalogue.ts.
  */
-
-/**
- * Three venues around the Shangri-La office towers, which is the pilot's
- * setting: everything within a ten-minute walk of the same lobby, because the
- * density is the point (§01 of the ops playbook).
- */
-const VENUES = [
-  { name: 'Модерн Номадс', tin: '1234567', travel: 5, lat: 47.913_8, lon: 106.916_5 },
-  { name: 'Хаан Буузны Газар', tin: '2345678', travel: 8, lat: 47.915_5, lon: 106.921_5 },
-  { name: 'Ногоон Байшин', tin: '3456789', travel: 10, lat: 47.910_5, lon: 106.924_3 },
-];
 
 const SERVICE = ['11:30', '11:45', '12:00', '12:15', '12:30', '12:45', '13:00', '13:15', '13:30'];
 
 /** Deliberately low. The simulator showed 5 per slot buries a two-lane grill. */
 const MAX_ORDERS_PER_SLOT = 3;
 
+/** The demo clock jumps hours; pairing codes have to outlive that. */
+const PAIRING_TTL_MINUTES = 8 * 60;
+
 function todayAt(hhmm: string): Date {
   const [h, m] = hhmm.split(':').map(Number);
-  const now = new Date();
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Ulaanbaatar',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(now);
+  }).format(new Date());
   return new Date(`${parts}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+08:00`);
 }
-
-/** The demo clock jumps hours; codes have to outlive that. */
-const PAIRING_TTL_MINUTES = 8 * 60;
 
 export async function seedDemo(): Promise<{
   pairingCodes: Array<{ name: string; code: string }>;
   paired: string;
+  venues: number;
+  dishes: number;
 }> {
   const db = getPool();
   // Same instant the API boots to, so the pairing codes below are still live
@@ -65,53 +56,58 @@ export async function seedDemo(): Promise<{
     TRUNCATE outbox, notification, ebarimt_receipt, payment, order_event, fire_job,
              arrival_signal, table_hold, order_line, station_reservation, dining_order,
              slot, dining_table, menu_item, station, trust_profile, guest_session,
-             guest, kds_device, otp_challenge, restaurant
+             guest, kds_device, otp_challenge, idempotency_key, restaurant
     RESTART IDENTITY CASCADE
   `);
 
   const pairingCodes: Array<{ name: string; code: string }> = [];
+  let dishes = 0;
 
   for (const venue of VENUES) {
     const { rows } = await db.query<{ id: string }>(
       `INSERT INTO restaurant
          (name, plating_buffer_min, travel_minutes, ebarimt_merchant_tin, lat, lon)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-      [
-        venue.name,
-        PILOT_KITCHEN.platingBufferMinutes,
-        venue.travel,
-        venue.tin,
-        venue.lat,
-        venue.lon,
-      ],
+       VALUES ($1, 1, $2, $3, $4, $5) RETURNING id`,
+      [venue.name, venue.travel, venue.tin, venue.lat, venue.lon],
     );
     const restaurantId = rows[0]!.id;
 
+    // Only the stations this kitchen actually has. A venue with no grill
+    // cannot be asked to fire something grilled, and the planner says so.
     const stationIds: Record<string, string> = {};
-    for (const station of Object.values(PILOT_KITCHEN.stations)) {
-      const res = await db.query<{ id: string }>(
+    for (const [code, lanes] of Object.entries(venue.lanes)) {
+      const station = await db.query<{ id: string }>(
         `INSERT INTO station (restaurant_id, code, display_name, parallel_lanes)
          VALUES ($1, $2, $3, $4) RETURNING id`,
-        [restaurantId, station.code, station.displayName, station.parallelLanes],
+        [restaurantId, code, STATIONS[code as keyof typeof STATIONS], lanes],
       );
-      stationIds[station.code] = res.rows[0]!.id;
+      stationIds[code] = station.rows[0]!.id;
     }
 
-    for (const item of Object.values(PILOT_MENU)) {
+    for (const key of venue.menu) {
+      const dish = DISHES[key];
+      if (!dish) throw new Error(`${venue.name}: unknown dish ${String(key)}`);
+      const stationId = stationIds[dish.station];
+      if (!stationId) {
+        throw new Error(`${venue.name} serves ${dish.name} but has no ${dish.station} station`);
+      }
       await db.query(
         `INSERT INTO menu_item
            (restaurant_id, station_id, name, price_mnt, prep_minutes,
-            hold_tolerance_minutes, preorder_enabled)
-         VALUES ($1, $2, $3, $4, $5, $6, true)`,
+            hold_tolerance_minutes, preorder_enabled, image_url, description)
+         VALUES ($1, $2, $3, $4, $5, $6, true, $7, $8)`,
         [
           restaurantId,
-          stationIds[item.station],
-          item.name,
-          item.priceMnt,
-          item.prepMinutes,
-          item.holdToleranceMinutes,
+          stationId,
+          dish.name,
+          dish.price,
+          dish.prep,
+          dish.hold,
+          `/dishes/${dish.slug}.svg`,
+          dish.note ?? null,
         ],
       );
+      dishes++;
     }
 
     for (let i = 1; i <= 10; i++) {
@@ -140,14 +136,19 @@ export async function seedDemo(): Promise<{
     pairingCodes.push({ name: venue.name, code });
   }
 
-  // One venue opens for service straight away. A guest list where every
-  // restaurant is shut is technically correct and completely useless as a
-  // starting point — and the second and third stay dark, which is what makes
-  // "this kitchen is not watching" visible rather than theoretical.
+  // One venue has its tablet on from the start, so the kitchen screen has
+  // something to show. In demo mode the rest take orders anyway: the
+  // is-anyone-watching guard is production behaviour, and here it only turns
+  // a walkthrough into a puzzle.
   const first = pairingCodes[0]!;
   await pairDevice(ctx, first.code);
 
-  return { pairingCodes: pairingCodes.slice(1), paired: first.name };
+  return {
+    pairingCodes: pairingCodes.slice(1),
+    paired: first.name,
+    venues: VENUES.length,
+    dishes,
+  };
 }
 
 /** True when this file was run directly — same answer as .ts or compiled .js. */
@@ -157,17 +158,19 @@ const isEntrypoint = (() => {
   const stem = (s: string) => s.split('/').pop()!.replace(/\.[cm]?[jt]s$/, '');
   return stem(import.meta.url) === stem(invoked);
 })();
+
 if (isEntrypoint) {
   try {
-    const { pairingCodes, paired } = await seedDemo();
-    console.log('Демо өгөгдөл бэлэн.\n');
-    console.log(`  ${paired} — таблет холбогдсон, захиалга авч байна.`);
-    console.log('  Бусад нь хаалттай (тогооч харахгүй бол захиалга явуулахгүй).\n');
-    console.log('Хүсвэл өөр ресторан холбох код:');
+    const { pairingCodes, paired, venues, dishes } = await seedDemo();
+    const base = process.env['BASU_URL'] ?? `http://localhost:${process.env['PORT'] ?? 3000}`;
+
+    console.log(`Демо өгөгдөл бэлэн — ${venues} ресторан, ${dishes} хоол.\n`);
+    console.log(`  ${paired} — таблет холбогдсон.`);
+    console.log('  Бусад нь демо горимд бас захиалга авна.\n');
+    console.log('Өөр ресторанны таблет холбох код:');
     for (const { name, code } of pairingCodes) {
       console.log(`  ${name.padEnd(24)} ${code}`);
     }
-    const base = process.env['BASU_URL'] ?? `http://localhost:${process.env['PORT'] ?? 3000}`;
     console.log(`\n  Зочин:  ${base}/`);
     console.log(`  Тогооч: ${base}/kds`);
   } catch (error) {

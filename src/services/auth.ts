@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { getPool, tx } from '../db/pool.js';
 import { addMinutes } from '../domain/time.js';
+import { mode } from '../mode.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -250,12 +251,21 @@ export async function revokeDevice(deviceId: string, at: Date): Promise<void> {
   ]);
 }
 
-/** A restaurant nobody is watching cannot be sent new orders. */
+/**
+ * A restaurant nobody is watching cannot be sent new orders.
+ *
+ * In production this is load-bearing: taking money for food when no tablet is
+ * on to cook it is the worst thing the system can do. In demo mode it is only
+ * in the way — the point of the demo is to walk the ordering flow, and needing
+ * a second tab open before the first one works turns a guard into a puzzle.
+ */
 export async function isRestaurantOnline(
   ctx: Ctx,
   restaurantId: string,
   staleSeconds = 90,
 ): Promise<boolean> {
+  if (mode() === 'demo') return true;
+
   const { rows } = await getPool().query<{ online: boolean }>(
     `SELECT EXISTS (
        SELECT 1 FROM kds_device

@@ -29,6 +29,7 @@ import {
 import { enqueueNotification } from '../services/notifications.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import { registerMapRoutes } from './tiles.js';
+import { registerDishRoutes } from './dishes.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -48,22 +49,10 @@ declare module 'fastify' {
 }
 
 /**
- * Idempotency, because a phone on a patchy connection retries and a guest
- * double-taps. Same key, same answer — never a second order.
+ * How long a phone might plausibly still be retrying the same request.
+ * Older than this and the same key means a new intention, not a repeat.
  */
-const idempotency = new Map<string, { status: number; body: unknown; at: number }>();
-const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
-
-function rememberedResponse(key: string | undefined, now: number) {
-  if (!key) return undefined;
-  const hit = idempotency.get(key);
-  if (!hit) return undefined;
-  if (now - hit.at > IDEMPOTENCY_TTL_MS) {
-    idempotency.delete(key);
-    return undefined;
-  }
-  return hit;
-}
+const IDEMPOTENCY_TTL_HOURS = 24;
 
 function bearer(request: FastifyRequest): string | undefined {
   const header = request.headers.authorization;
@@ -87,6 +76,8 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
   // Tiles and glyphs, same-origin. See src/api/tiles.ts for why they are
   // proxied rather than fetched straight from the tile host.
   await registerMapRoutes(app);
+  // Illustrations for the menu, drawn on demand. See src/api/dishes.ts.
+  await registerDishRoutes(app);
 
   /* ── who is calling ─────────────────────────────────────────────── */
 
@@ -124,31 +115,57 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     return (rows[0]?.n ?? 0) > 0;
   };
 
+  /**
+   * Idempotency, because a phone on a patchy connection retries and a guest
+   * double-taps. Same key, same answer — never a second order.
+   *
+   * Kept in Postgres rather than in this process: two API instances behind one
+   * address do not share memory, and a retry landing on the other one would
+   * order lunch twice, which is precisely what the key is for.
+   */
   app.addHook('onSend', async (request, reply, payload) => {
     const key = request.headers['idempotency-key'];
     // Only successful responses are remembered. The key exists to stop a
     // retried request buying lunch twice — not to make a failure permanent.
     // Caching a 401 would mean a client that signs in and tries again gets
     // handed the same rejection forever.
-    if (typeof key === 'string' && request.method === 'POST' && reply.statusCode < 400) {
-      idempotency.set(key, {
-        status: reply.statusCode,
-        body: payload,
-        at: ctx.clock.now().getTime(),
-      });
+    if (typeof key !== 'string' || request.method !== 'POST' || reply.statusCode >= 400) {
+      return payload;
     }
+    await db
+      .query(
+        `INSERT INTO idempotency_key (key, status, content_type, body, created_at)
+         VALUES ($1, $2, $3, $4, $5) ON CONFLICT (key) DO NOTHING`,
+        [
+          key,
+          reply.statusCode,
+          reply.getHeader('content-type') ?? null,
+          typeof payload === 'string' ? payload : JSON.stringify(payload),
+          ctx.clock.now(),
+        ],
+      )
+      .catch(() => {});
     return payload;
   });
 
   app.addHook('preHandler', async (request, reply) => {
     const key = request.headers['idempotency-key'];
-    if (typeof key !== 'string' || request.method !== 'POST') return;
-    const hit = rememberedResponse(key, ctx.clock.now().getTime());
-    if (hit) {
-      reply.header('idempotent-replay', 'true');
-      return reply.status(hit.status).send(hit.body);
-    }
-    return undefined;
+    if (typeof key !== 'string' || request.method !== 'POST') return undefined;
+
+    const { rows } = await db.query<{ status: number; content_type: string | null; body: string }>(
+      `SELECT status, content_type, body FROM idempotency_key
+        WHERE key = $1 AND created_at > $2::timestamptz - make_interval(hours => $3)`,
+      [key, ctx.clock.now(), IDEMPOTENCY_TTL_HOURS],
+    );
+    const hit = rows[0];
+    if (!hit) return undefined;
+
+    reply.header('idempotent-replay', 'true');
+    // The content type travels with the body. Without it the replay went out
+    // as text/plain and a client parsing by content-type got a string where
+    // the first attempt had given it an object.
+    if (hit.content_type) reply.header('content-type', hit.content_type);
+    return reply.status(hit.status).send(hit.body);
   });
 
   /* ── health ─────────────────────────────────────────────────────── */
@@ -229,11 +246,12 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
 
   app.get<{ Params: { id: string } }>('/v1/restaurants/:id/menu', async (request) => {
     const { rows } = await db.query(
-      `SELECT m.id, m.name, m.price_mnt, m.prep_minutes, s.display_name AS station,
+      `SELECT m.id, m.name, m.price_mnt, m.prep_minutes, m.image_url, m.description,
+              s.display_name AS station,
               (m.sold_out_until IS NOT NULL) AS sold_out
          FROM menu_item m JOIN station s ON s.id = m.station_id
         WHERE m.restaurant_id = $1 AND m.active AND m.preorder_enabled
-        ORDER BY m.name`,
+        ORDER BY m.price_mnt DESC, m.name`,
       [request.params.id],
     );
     return { items: rows };
@@ -450,13 +468,15 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
               o.ready_at, o.eta_at, o.seated_at, o.order_prep_minutes,
               g.name AS guest_name, t.code AS table_code,
               COALESCE(
-                json_agg(json_build_object('name', l.name, 'qty', l.qty, 'station', l.station_code)
+                json_agg(json_build_object('name', l.name, 'qty', l.qty,
+                                           'station', l.station_code, 'image', mi.image_url)
                          ORDER BY l.name) FILTER (WHERE l.id IS NOT NULL),
                 '[]'
               ) AS lines
          FROM dining_order o
          JOIN guest g ON g.id = o.guest_id
          LEFT JOIN order_line l ON l.order_id = o.id AND l.cancelled_at IS NULL
+         LEFT JOIN menu_item mi ON mi.id = l.menu_item_id
          LEFT JOIN table_hold h ON h.order_id = o.id AND h.released_at IS NULL
          LEFT JOIN dining_table t ON t.id = h.table_id
         WHERE o.restaurant_id = $1

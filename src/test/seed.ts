@@ -23,7 +23,7 @@ export async function truncateAll(db: Db = getPool()): Promise<void> {
     TRUNCATE outbox, notification, ebarimt_receipt, payment, order_event, fire_job,
              arrival_signal, table_hold, order_line, station_reservation, dining_order,
              slot, dining_table, menu_item, station, trust_profile, guest_session,
-             guest, kds_device, otp_challenge, restaurant
+             guest, kds_device, otp_challenge, idempotency_key, restaurant
     RESTART IDENTITY CASCADE
   `);
 }

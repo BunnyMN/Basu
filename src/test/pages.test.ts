@@ -31,6 +31,7 @@ let base: string;
 let clock: DemoClock;
 let notifier: FakeNotifier;
 let pairedVenue: string;
+let seeded: Awaited<ReturnType<typeof seedDemo>>;
 
 /**
  * One store for every page, the way a browser keeps one per origin. Handing
@@ -215,17 +216,16 @@ beforeAll(async () => {
     tax: new FakeTaxProvider(),
     notifier,
   };
-  await seedDemo();
+  seeded = await seedDemo();
   app = await buildServer(ctx, { dev: true });
   await app.listen({ port: 0, host: '127.0.0.1' });
   const address = app.server.address();
   base = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
 
-  // A venue is set up before service, not while a guest is looking at the list.
-  // Storing the token is what a real tablet does once, at pairing time.
-  const paired = await pairFirstVenue();
-  pairedVenue = paired.name;
-  storage.setItem('basu.device', paired.token);
+  // The seed opens one venue for service and hands back its name; take a
+  // tablet for that same one, which is what a kitchen does before opening.
+  pairedVenue = seeded.paired;
+  storage.setItem('basu.device', await tabletFor(pairedVenue));
 });
 
 afterEach(async () => {
@@ -274,7 +274,7 @@ async function orderFromMap(
   dish: string,
   slot: string,
 ): Promise<void> {
-  await until(dom, 'pins on the map', () => pins(dom).length >= 3);
+  await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
   tapPin(dom, venue);
   await until(dom, 'the menu', (d) => d.querySelectorAll('.item').length > 3);
   const row = [...dom.window.document.querySelectorAll('.item')].find((r) =>
@@ -292,24 +292,34 @@ async function orderFromMap(
 }
 
 describe('the guest app', () => {
-  it('draws every restaurant, and says which are taking orders', async () => {
+  it('draws every restaurant on the map', async () => {
     const dom = await openPage('index.html');
-    await until(dom, 'pins on the map', (d) => {
-      void d;
-      return pins(dom).length >= 3;
-    });
+    await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
 
     const drawn = pins(dom);
-    expect(drawn).toHaveLength(3);
-    // Two kitchens are watching and the third is dark; the pin carries that
-    // distinction, because it is the one thing to know before tapping.
-    expect(drawn.filter((f) => f.properties['open']).length).toBe(2);
-    expect(text(dom)).toContain('2/3 ресторан захиалга авч байна');
+    expect(drawn).toHaveLength(seeded.venues);
+    expect(drawn.every((f) => f.properties['label'])).toBe(true);
+    expect(text(dom)).toContain(`${seeded.venues}/${seeded.venues} ресторан`);
+  });
+
+  it('shows a dish with its picture, its station and how long it takes', async () => {
+    const dom = await openPage('index.html');
+    await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
+    tapPin(dom, pairedVenue);
+    await until(dom, 'the menu', (d) => d.querySelectorAll('.item').length > 3);
+
+    // A menu is chosen with the eyes: every row carries a picture, and the two
+    // numbers the kitchen runs on are on the row rather than hidden.
+    for (const row of dom.window.document.querySelectorAll('.item')) {
+      expect(row.querySelector('img')?.getAttribute('src')).toMatch(/^\/dishes\/\w+\.svg$/);
+      expect(row.querySelector('.meta')?.textContent).toMatch(/\d+ мин/);
+      expect(row.querySelector('.price')?.textContent).toMatch(/₮/);
+    }
   });
 
   it('walks a person from a pin to a paid order', async () => {
     const dom = await openPage('index.html');
-    await until(dom, 'pins on the map', () => pins(dom).length >= 3);
+    await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
 
     tapPin(dom, pairedVenue);
     await until(dom, 'the menu', (d) => d.querySelectorAll('.item').length > 3);
@@ -350,16 +360,19 @@ describe('the guest app', () => {
   });
 
   it('explains a dark kitchen instead of offering its menu', async () => {
-    const dom = await openPage('index.html');
-    await until(dom, 'pins on the map', () => pins(dom).length >= 3);
+    await inProduction(async () => {
+      const dom = await openPage('index.html');
+      await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
 
-    const shut = pins(dom).find((f) => !f.properties['open'])!;
-    tapPin(dom, String(shut.properties['label']));
+      const shut = pins(dom).find((f) => !f.properties['open']);
+      expect(shut, 'every venue was open — the guard was not on').toBeTruthy();
+      tapPin(dom, String(shut!.properties['label']));
 
-    await until(dom, 'the explanation', (d) => Boolean(d.querySelector('.sheet .note')));
-    expect(text(dom)).toContain('захиалга авахгүй байна');
-    // And no menu was offered.
-    expect(dom.window.document.querySelectorAll('.sheet .item')).toHaveLength(0);
+      await until(dom, 'the explanation', (d) => Boolean(d.querySelector('.sheet .note')));
+      expect(text(dom)).toContain('захиалга авахгүй байна');
+      // And no menu was offered.
+      expect(dom.window.document.querySelectorAll('.sheet .item')).toHaveLength(0);
+    });
   });
 
   it('recovers from a session that outlived its server', async () => {
@@ -368,7 +381,7 @@ describe('the guest app', () => {
     storage.setItem('basu.guest', 'stale-token-from-a-previous-life');
 
     const dom = await openPage('index.html');
-    await until(dom, 'pins on the map', () => pins(dom).length >= 3);
+    await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
     tapPin(dom, pairedVenue);
     await until(dom, 'the menu', (d) => d.querySelectorAll('.item').length > 3);
 
@@ -394,13 +407,15 @@ describe('the guest app', () => {
     // pins with no explanation is a dead end for whoever is looking.
     await getPool().query(`UPDATE kds_device SET last_seen_at = now() - interval '1 day'`);
     try {
-      const dom = await openPage('index.html');
-      await until(dom, 'the explanation', (d) => Boolean(d.querySelector('#map .note')));
-      expect(text(dom)).toContain('нэг ч гал тогоо холбогдоогүй');
-      expect(dom.window.document.querySelector('.note a')?.getAttribute('href')).toBe('/kds');
-      // The pins are still drawn — the map is not the thing that failed.
-      expect(pins(dom).length).toBe(3);
-      expect(pins(dom).every((f) => !f.properties['open'])).toBe(true);
+      await inProduction(async () => {
+        const dom = await openPage('index.html');
+        await until(dom, 'the explanation', (d) => Boolean(d.querySelector('#map .note')));
+        expect(text(dom)).toContain('нэг ч гал тогоо холбогдоогүй');
+        expect(dom.window.document.querySelector('.note a')?.getAttribute('href')).toBe('/kds');
+        // The pins are still drawn — the map is not the thing that failed.
+        expect(pins(dom).length).toBe(seeded.venues);
+        expect(pins(dom).every((f) => !f.properties['open'])).toBe(true);
+      });
     } finally {
       await getPool().query(`UPDATE kds_device SET last_seen_at = now()
                               WHERE paired_at IS NOT NULL AND revoked_at IS NULL`);
@@ -532,22 +547,35 @@ describe('the kitchen display', () => {
   });
 });
 
-/**
- * Pair one restaurant's tablet, leaving the other two dark — which is what
- * makes the "this venue is not taking orders" path visible in the guest list.
- */
-async function pairFirstVenue(): Promise<{ name: string; token: string }> {
-  const { rows } = await getPool().query<{ code: string; name: string }>(
-    `SELECT d.pairing_code AS code, r.name
-       FROM kds_device d JOIN restaurant r ON r.id = d.restaurant_id
-      WHERE d.paired_at IS NULL ORDER BY r.name LIMIT 1`,
+/** A tablet token for a named restaurant, the way the demo hands one out. */
+async function tabletFor(name: string): Promise<string> {
+  const { rows } = await getPool().query<{ id: string }>(
+    'SELECT id FROM restaurant WHERE name = $1',
+    [name],
   );
-  const device = rows[0]!;
-  const response = await fetch(`${base}/v1/kds/pair`, {
+  const response = await fetch(`${base}/dev/kds-token`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ pairing_code: device.code }),
+    body: JSON.stringify({ restaurant_id: rows[0]!.id }),
   });
   const { token } = (await response.json()) as { token: string };
-  return { name: device.name, token };
+  return token;
+}
+
+/**
+ * Run something with the is-anyone-watching guard switched on.
+ *
+ * The guard is production behaviour: demo mode ignores it, because a
+ * walkthrough that needs a second tab open before the first one works is a
+ * puzzle rather than a demo. These tests are about the guard itself.
+ */
+async function inProduction<T>(fn: () => Promise<T>): Promise<T> {
+  const before = process.env['BASU_MODE'];
+  process.env['BASU_MODE'] = 'production';
+  try {
+    return await fn();
+  } finally {
+    if (before === undefined) delete process.env['BASU_MODE'];
+    else process.env['BASU_MODE'] = before;
+  }
 }
