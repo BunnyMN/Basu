@@ -121,7 +121,10 @@ function stubMapLibre(window: JSDOM['window']): void {
     clickLayer(layer: string, event: unknown) {
       this.#fire(`click:${layer}`, event);
     }
-    addControl() {}
+    readonly controls: unknown[] = [];
+    addControl(control: unknown) {
+      this.controls.push(control);
+    }
     addImage(id: string) {
       this.images.push(id);
     }
@@ -142,7 +145,9 @@ function stubMapLibre(window: JSDOM['window']): void {
   }
 
   class StubGeolocate {
+    constructor(readonly options: Record<string, unknown>) {}
     on() {}
+    trigger() {}
   }
 
   const global = window as unknown as Record<string, unknown>;
@@ -398,6 +403,25 @@ describe('the guest app', () => {
       // A literal array, or a zoom expression. Never a data one.
       expect(Array.isArray(dash) && dash.every((v) => typeof v === 'number'), layer.id).toBe(true);
     }
+  });
+
+  it('keeps the tilt when the locate control frames a position', async () => {
+    // MapLibre's GeolocateControl fits the accuracy circle, and fitBounds
+    // resets pitch to zero unless told otherwise — so locating yourself
+    // flattened the city into a plan. The buildings are how somebody
+    // recognises where they are, so the tilt is not decoration.
+    const dom = await openPage('index.html');
+    await until(dom, 'the map', () =>
+      Boolean((dom.window as unknown as Record<string, unknown>)['__map']),
+    );
+    const map = (dom.window as unknown as Record<string, unknown>)['__map'] as {
+      controls: unknown[];
+    };
+    const located = map.controls.find(
+      (c): c is { options?: { fitBoundsOptions?: { pitch?: number } } } =>
+        typeof c === 'object' && c !== null && 'options' in c,
+    );
+    expect(located?.options?.fitBoundsOptions?.pitch).toBeGreaterThan(0);
   });
 
   it('explains a dark kitchen instead of offering its menu', async () => {

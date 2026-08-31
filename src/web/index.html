@@ -199,6 +199,21 @@ body{display:flex;flex-direction:column}
 
 .said{padding:12px 18px;border-top:1px solid var(--line)}
 .said > .lab{margin-bottom:8px}
+/* The average and the timing share sit together, because they answer
+   different questions and a guest weighs both. */
+.said .summary{
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  padding-bottom:10px;margin-bottom:4px;border-bottom:1px solid var(--line);
+  font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--ink-3);
+}
+.said .summary .big{
+  font-family:"Golos Text",sans-serif;font-size:1.35rem;font-weight:800;
+  letter-spacing:-.03em;color:var(--ink);
+}
+.said .summary .big i{color:#E8A13A;font-style:normal;font-size:1.1rem;margin-right:2px}
+.said .summary .pct{color:var(--hold)}
+.said .summary .pct[data-good="true"]{color:var(--ready)}
+.said .none{color:var(--ink-3);font-size:.84rem;padding:6px 0}
 .said .one{padding:9px 0;border-bottom:1px solid var(--line)}
 .said .one:last-child{border-bottom:none}
 .said .who{display:flex;align-items:center;gap:8px;font-size:.76rem;color:var(--ink-3);margin-bottom:3px}
@@ -333,6 +348,17 @@ async function guestApi(path, options = {}) {
 
 /* ── the map ─────────────────────────────────────────────────────── */
 
+/**
+ * The camera the map is meant to look like.
+ *
+ * Kept as values rather than left implicit because several things move the
+ * camera and one of them flattens it: MapLibre's GeolocateControl frames the
+ * accuracy circle with a fitBounds, and fitBounds resets pitch to zero unless
+ * told otherwise. The tilt is not decoration — the buildings are how somebody
+ * recognises where they are — so it is restored after anything that drops it.
+ */
+const CAMERA = { zoom: 15.4, pitch: 55, bearing: -17 };
+
 const style = mapStyle();
 // Named for the same reason as __map below: the tile URLs are a thing worth
 // asserting about from outside, and a relative one silently blanks the map.
@@ -345,9 +371,9 @@ const map = new maplibregl.Map({
   // Tilted, because the buildings are the landmark. A guest deciding between
   // two lunches five minutes apart recognises the tower they work in long
   // before they recognise a street name, and the tiles carry building heights.
-  zoom: 15.4,
-  pitch: 55,
-  bearing: -17,
+  zoom: CAMERA.zoom,
+  pitch: CAMERA.pitch,
+  bearing: CAMERA.bearing,
   attributionControl: { compact: true, customAttribution: '© OpenStreetMap' },
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
@@ -375,8 +401,17 @@ const geolocate = new maplibregl.GeolocateControl({
   positionOptions: { enableHighAccuracy: true },
   trackUserLocation: true,
   showUserLocation: true,
+  // Without this it fits the accuracy circle, which on a good fix means
+  // street level and on a poor one means the whole district.
+  fitBoundsOptions: { maxZoom: 16.4, pitch: CAMERA.pitch, bearing: CAMERA.bearing },
 });
 map.addControl(geolocate, 'bottom-right');
+
+/** Put the tilt back if something flattened it. */
+function keepTilt() {
+  if (Math.abs(map.getPitch() - CAMERA.pitch) < 2) return;
+  map.easeTo({ pitch: CAMERA.pitch, bearing: CAMERA.bearing, duration: 500 });
+}
 
 geolocate.on('geolocate', (position) => {
   const { latitude: lat, longitude: lon } = position.coords;
@@ -386,7 +421,9 @@ geolocate.on('geolocate', (position) => {
   void reportProximity();
   // A venue may already be open; the walk to it is now answerable.
   if (state.venue) void drawWalk(state.venue);
-  if (first && !state.venue) map.easeTo({ center: [lon, lat], duration: 700 });
+  // The control has just moved the camera; make sure it left the tilt alone.
+  setTimeout(keepTilt, 600);
+  void first;
 });
 
 /**
@@ -466,12 +503,20 @@ async function drawWalk(venue) {
       (route.kind === 'direct' ? '<span class="guess">ойролцоогоор</span>' : '');
   }
 
-  // Show both ends of the walk at once.
-  const bounds = route.line.reduce(
-    (box, point) => box.extend(point),
-    new maplibregl.LngLatBounds(route.line[0], route.line[0]),
-  );
-  map.fitBounds(bounds, { padding: { top: 70, bottom: 340, left: 50, right: 50 }, duration: 700 });
+  // Pan, do not reframe.
+  //
+  // Fitting both ends of a 1.2 km walk means zooming out until the tilt
+  // flattens and the buildings — the thing that makes this map legible — turn
+  // back into a plan. The distance and the time are already written above; the
+  // camera's job is to keep the guest and the road in front of them in view.
+  const middle = route.line[Math.floor(route.line.length / 2)] ?? route.line[0];
+  map.easeTo({
+    center: middle,
+    zoom: Math.max(map.getZoom(), CAMERA.zoom),
+    pitch: CAMERA.pitch,
+    bearing: CAMERA.bearing,
+    duration: 700,
+  });
 }
 
 async function reportProximity() {
@@ -760,9 +805,27 @@ async function appendComments(venueId) {
   } catch {
     return;
   }
-  if (state.venue?.id !== venueId || !data.comments.length) return;
+  if (state.venue?.id !== venueId || !data.rating?.count) return;
 
-  const said = el('<div class="said"><div class="lab">Хоолтой хүмүүс юу гэсэн бэ</div></div>');
+  const rating = data.rating;
+  const said = el(`
+    <div class="said">
+      <div class="lab">Хоолтой хүмүүс юу гэсэн бэ</div>
+      <div class="summary">
+        <span class="big"><i>★</i>${rating.stars.toFixed(1)}</span>
+        <span>${rating.count} үнэлгээ</span>
+        ${
+          rating.onTimeShare === null
+            ? ''
+            : `<span class="pct" data-good="${rating.onTimeShare >= 0.8}">${Math.round(
+                rating.onTimeShare * 100,
+              )}% цагтаа ирсэн</span>`
+        }
+      </div>
+    </div>`);
+  if (!data.comments.length) {
+    said.append(el('<div class="none">Одоогоор бичсэн сэтгэгдэл алга.</div>'));
+  }
   for (const c of data.comments) {
     said.append(
       el(`<div class="one">

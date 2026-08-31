@@ -4,6 +4,7 @@ import { DEMO_START, DemoClock } from '../demoClock.js';
 import { createPairingCode, pairDevice } from '../services/auth.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { DISHES, STATIONS, VENUES } from './catalogue.js';
+import { seedHistory } from './history.js';
 
 /**
  * A pilot lunch service you can click through.
@@ -38,6 +39,7 @@ export async function seedDemo(): Promise<{
   paired: string;
   venues: number;
   dishes: number;
+  reviews: number;
 }> {
   const db = getPool();
   // Same instant the API boots to, so the pairing codes below are still live
@@ -61,6 +63,7 @@ export async function seedDemo(): Promise<{
   `);
 
   const pairingCodes: Array<{ name: string; code: string }> = [];
+  const venueIds = new Map<string, string>();
   let dishes = 0;
 
   for (const venue of VENUES) {
@@ -71,6 +74,7 @@ export async function seedDemo(): Promise<{
       [venue.name, venue.travel, venue.tin, venue.lat, venue.lon],
     );
     const restaurantId = rows[0]!.id;
+    venueIds.set(venue.name, restaurantId);
 
     // Only the stations this kitchen actually has. A venue with no grill
     // cannot be asked to fire something grilled, and the planner says so.
@@ -143,11 +147,17 @@ export async function seedDemo(): Promise<{
   const first = pairingCodes[0]!;
   await pairDevice(ctx, first.code);
 
+  // Yesterday's lunches and what people thought of them. A map of ten venues
+  // all reading "үнэлгээ алга" shows the shape of the feature and none of
+  // its point.
+  const history = await seedHistory(db, venueIds);
+
   return {
     pairingCodes: pairingCodes.slice(1),
     paired: first.name,
     venues: VENUES.length,
     dishes,
+    reviews: history.reviews,
   };
 }
 
@@ -161,10 +171,12 @@ const isEntrypoint = (() => {
 
 if (isEntrypoint) {
   try {
-    const { pairingCodes, paired, venues, dishes } = await seedDemo();
+    const { pairingCodes, paired, venues, dishes, reviews } = await seedDemo();
     const base = process.env['BASU_URL'] ?? `http://localhost:${process.env['PORT'] ?? 3000}`;
 
-    console.log(`Демо өгөгдөл бэлэн — ${venues} ресторан, ${dishes} хоол.\n`);
+    console.log(
+      `Демо өгөгдөл бэлэн — ${venues} ресторан, ${dishes} хоол, ${reviews} үнэлгээ.\n`,
+    );
     console.log(`  ${paired} — таблет холбогдсон.`);
     console.log('  Бусад нь демо горимд бас захиалга авна.\n');
     console.log('Өөр ресторанны таблет холбох код:');
