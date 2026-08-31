@@ -66,12 +66,15 @@ apiProcess.stdout.on('data', (chunk) => (serverLog += chunk));
 apiProcess.stderr.on('data', (chunk) => (serverLog += chunk));
 
 const port = process.env.PORT ?? '3000';
-const up = await waitForServer(`http://localhost:${port}/health`);
+const baseUrl = `http://localhost:${port}`;
+// The smoke test talks to whatever port we just started, not a hardcoded one.
+process.env.SMOKE_BASE = baseUrl;
+const up = await waitForServer(`${baseUrl}/health`);
 if (!up) {
   console.error('Сервер асаагүй:\n' + serverLog);
   stages.push({ label: 'Сервер', ok: false });
 } else {
-  console.log(`  http://localhost:${port} бэлэн`);
+  console.log(`  ${baseUrl} бэлэн`);
   run('Бүтэн урсгалын шалгалт', 'npx', ['tsx', 'src/test/smoke.ts']);
 }
 
