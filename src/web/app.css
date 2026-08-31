@@ -1,0 +1,105 @@
+/* Basu — shared visual system.
+   Same palette and type as the specification documents, so the running product
+   and the documents that argue for it read as one thing. */
+
+:root{
+  --bg:#E9EBEC; --surface:#FFFFFF; --surface-2:#F3F5F6; --sunk:#DFE3E4;
+  --ink:#14181B; --ink-2:#4A555C; --ink-3:#78868E;
+  --line:#D2D8DA; --line-2:#C0C8CB;
+  --accent:#C64E08; --accent-ink:#C64E08; --accent-soft:#FAE7DA; --accent-line:#E9B893;
+  --route:#1B5B8F; --route-soft:#DFEAF3; --route-line:#A8C6DE;
+  --ready:#136A4B; --ready-soft:#DCEDE6; --ready-line:#9CCBB7;
+  --hold:#7E6113; --hold-soft:#F1E9D2; --hold-line:#D9C48A;
+  --stop:#9B2226; --stop-soft:#F7DEDE; --stop-line:#E0A9A9;
+  --shadow:0 1px 2px rgba(20,24,27,.06), 0 8px 24px -12px rgba(20,24,27,.18);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1315; --surface:#161D20; --surface-2:#1C2428; --sunk:#0A0E10;
+    --ink:#E7ECED; --ink-2:#A2B0B6; --ink-3:#6E7E85;
+    --line:#283236; --line-2:#374348;
+    --accent:#FF8A3D; --accent-ink:#FF9B57; --accent-soft:#33200F; --accent-line:#5E3A1B;
+    --route:#78B0E0; --route-soft:#16242F; --route-line:#2E4A61;
+    --ready:#57C295; --ready-soft:#0F2620; --ready-line:#1F4A3A;
+    --hold:#DAB65A; --hold-soft:#2A2312; --hold-line:#4E4222;
+    --stop:#F08A8D; --stop-soft:#2E1416; --stop-line:#5A2A2C;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -14px rgba(0,0,0,.7);
+  }
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Golos Text","Helvetica Neue",Arial,sans-serif;
+  font-size:16px; line-height:1.5; -webkit-font-smoothing:antialiased;
+}
+.mono,code,.tick,.chip,.lab,.btn,input,button{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace}
+h1,h2,h3,h4{margin:0;letter-spacing:-.02em;text-wrap:balance}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+
+.lab{
+  font-family:"IBM Plex Mono",monospace;font-size:.66rem;text-transform:uppercase;
+  letter-spacing:.14em;color:var(--ink-3);
+}
+.mn{font-variant-numeric:tabular-nums}
+
+/* ── the demo clock strip ─────────────────────────────────────────── */
+.clockbar{
+  position:sticky;top:0;z-index:50;background:var(--sunk);
+  border-bottom:1px solid var(--line);display:flex;align-items:center;
+  gap:10px;padding:7px 14px;flex-wrap:wrap;
+}
+.clockbar .now{
+  font-family:"IBM Plex Mono",monospace;font-size:.95rem;font-weight:600;
+  font-variant-numeric:tabular-nums;color:var(--ink);
+}
+.clockbar .lab{margin-right:auto}
+.clockbar button{
+  font-size:.68rem;letter-spacing:.04em;padding:4px 9px;border-radius:2px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);
+}
+.clockbar button:hover{border-color:var(--ink-3);color:var(--ink)}
+.clockbar button[data-hot]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+
+/* ── buttons ──────────────────────────────────────────────────────── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  font-size:.78rem;letter-spacing:.03em;padding:9px 14px;border-radius:3px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);
+}
+.btn:hover{border-color:var(--ink-3);color:var(--ink)}
+.btn[data-v="primary"]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn[data-v="primary"]:hover{filter:brightness(1.08)}
+.btn[data-v="danger"]{color:var(--stop);border-color:var(--stop-line)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn[data-size="lg"]{width:100%;padding:14px;font-size:.88rem}
+
+/* ── state chips ──────────────────────────────────────────────────── */
+.chip{
+  display:inline-block;font-size:.64rem;font-weight:500;letter-spacing:.05em;
+  padding:3px 8px;border-radius:2px;border:1px solid var(--line-2);
+  background:var(--surface-2);color:var(--ink-2);white-space:nowrap;
+}
+.chip[data-s="PLACED"],.chip[data-s="ACCEPTED"],.chip[data-s="SCHEDULED"]{
+  border-color:var(--route-line);color:var(--route);background:var(--route-soft)}
+.chip[data-s="ARMED"]{border-color:var(--hold-line);color:var(--hold);background:var(--hold-soft)}
+.chip[data-s="HELD"]{border-color:var(--stop);color:var(--stop);background:var(--stop-soft)}
+.chip[data-s="FIRED"],.chip[data-s="COOKING"]{
+  border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft);font-weight:600}
+.chip[data-s="READY"],.chip[data-s="SERVED"],.chip[data-s="CLOSED"]{
+  border-color:var(--ready-line);color:var(--ready);background:var(--ready-soft)}
+.chip[data-s="CANCELLED"],.chip[data-s="REFUNDED"],.chip[data-s="NO_SHOW"],.chip[data-s="REJECTED"]{
+  color:var(--ink-3)}
+
+/* ── toast ────────────────────────────────────────────────────────── */
+#toast{
+  position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(140%);
+  background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:3px;
+  font-size:.82rem;max-width:min(420px,92vw);z-index:100;box-shadow:var(--shadow);
+  transition:transform .22s cubic-bezier(.2,.8,.3,1);
+}
+#toast[data-show]{transform:translateX(-50%) translateY(0)}
+#toast[data-kind="bad"]{background:var(--stop);color:#fff}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}

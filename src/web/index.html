@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Basu — үдийн хоол</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+<style>
+.shell{max-width:520px;margin:0 auto;padding:0 16px 90px}
+header.hero{padding:26px 0 18px}
+header.hero h1{font-size:1.7rem;font-weight:900;letter-spacing:-.035em}
+header.hero p{margin:6px 0 0;color:var(--ink-2);font-size:.9rem}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:4px;margin-bottom:10px}
+.card > button, .rowbtn{
+  width:100%;text-align:left;background:none;border:none;padding:14px 16px;
+  display:flex;align-items:center;gap:12px;color:inherit;
+}
+.card h3{font-size:1rem;font-weight:700}
+.card .sub{font-size:.78rem;color:var(--ink-3);margin-top:2px;font-family:"IBM Plex Mono",monospace}
+.card .go{margin-left:auto;color:var(--line-2)}
+.card[data-off]{opacity:.55}
+
+/* menu */
+.item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:none}
+.item .name{font-weight:600;font-size:.94rem}
+.item .meta{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--ink-3);margin-top:2px}
+.item .price{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.84rem;font-variant-numeric:tabular-nums}
+.qty{display:flex;align-items:center;gap:0;border:1px solid var(--line-2);border-radius:3px;overflow:hidden}
+.qty button{width:30px;height:30px;background:var(--surface);border:none;color:var(--ink-2);font-size:1rem;line-height:1}
+.qty button:hover{background:var(--surface-2);color:var(--ink)}
+.qty span{width:26px;text-align:center;font-family:"IBM Plex Mono",monospace;font-size:.82rem;font-variant-numeric:tabular-nums}
+.item[data-sold] .name{color:var(--ink-3);text-decoration:line-through}
+
+/* slots */
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:7px;padding:14px 16px}
+.slot{
+  font-family:"IBM Plex Mono",monospace;font-size:.86rem;padding:11px 4px;border-radius:3px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);
+  font-variant-numeric:tabular-nums;
+}
+.slot:hover:not([disabled]){border-color:var(--accent-line);color:var(--accent-ink)}
+.slot[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.slot[disabled]{opacity:.35;cursor:not-allowed;text-decoration:line-through}
+
+/* the bar that carries the promise */
+.paybar{
+  position:fixed;left:0;right:0;bottom:0;background:var(--surface);
+  border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));
+  box-shadow:0 -8px 24px -18px rgba(0,0,0,.4);
+}
+.paybar .inner{max-width:520px;margin:0 auto}
+.paybar .terms{
+  font-size:.74rem;color:var(--ink-2);text-align:center;margin:0 0 9px;line-height:1.45;
+}
+.paybar .terms b{color:var(--accent-ink)}
+
+/* status */
+.status{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:20px 18px;text-align:center}
+.status .big{font-size:2.3rem;font-weight:900;letter-spacing:-.04em;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;line-height:1}
+.status .cap{font-size:.8rem;color:var(--ink-3);margin-top:6px}
+.status[data-s="FIRED"] .big,.status[data-s="COOKING"] .big{color:var(--accent-ink)}
+.status[data-s="READY"] .big,.status[data-s="SERVED"] .big{color:var(--ready)}
+
+.timeline{list-style:none;margin:14px 0 0;padding:0;text-align:left}
+.timeline li{display:grid;grid-template-columns:3.4rem 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.timeline .t{font-family:"IBM Plex Mono",monospace;font-size:.8rem;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.timeline .w{font-size:.86rem}
+.timeline li[data-done] .w{color:var(--ink)}
+.timeline li:not([data-done]) .w{color:var(--ink-3)}
+
+.back{
+  background:none;border:none;color:var(--ink-3);font-size:.74rem;letter-spacing:.06em;
+  text-transform:uppercase;padding:14px 0 4px;font-family:"IBM Plex Mono",monospace;
+}
+.empty{padding:28px 16px;text-align:center;color:var(--ink-3);font-size:.86rem}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="hero">
+    <h1 id="title">Үдийн хоол</h1>
+    <p id="subtitle">Ирэхээс чинь өмнө гал тавина.</p>
+  </header>
+  <main id="view"></main>
+</div>
+
+<script type="module">
+import { api, store, toast, mountClock, mnt, hhmm } from '/api.js';
+
+const view = document.getElementById('view');
+const title = document.getElementById('title');
+const subtitle = document.getElementById('subtitle');
+
+const state = {
+  screen: 'venues',
+  venues: [],
+  venue: null,
+  menu: [],
+  slots: [],
+  cart: new Map(),
+  slot: null,
+  orderId: null,
+};
+
+/* Signing in is a dev shortcut here; the real OTP flow lives in the API and is
+   what the tests drive. Nobody demos a product by waiting for an SMS. */
+async function ensureSignedIn() {
+  if (store.guestToken) return;
+  const { token } = await api('/dev/login', { method: 'POST', body: {} });
+  store.guestToken = token;
+}
+
+const el = (html) => {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+};
+
+/* ── screens ─────────────────────────────────────────────────────── */
+
+async function showVenues() {
+  state.screen = 'venues';
+  title.textContent = 'Үдийн хоол';
+  subtitle.textContent = 'Ирэхээс чинь өмнө гал тавина.';
+
+  const { restaurants } = await api('/v1/restaurants');
+  state.venues = restaurants;
+  view.replaceChildren();
+
+  if (!restaurants.length) {
+    view.append(el('<p class="empty">Ресторан алга. <code>npm run seed</code> ажиллуулна уу.</p>'));
+    return;
+  }
+
+  for (const venue of restaurants) {
+    const card = el(`
+      <div class="card"${venue.accepting_orders ? '' : ' data-off'}>
+        <button type="button">
+          <div>
+            <h3>${venue.name}</h3>
+            <div class="sub">${venue.walk_minutes} мин алхаад · ${
+              venue.accepting_orders ? 'захиалга авч байна' : 'одоогоор хаалттай'
+            }</div>
+          </div>
+          <span class="go">→</span>
+        </button>
+      </div>`);
+    card.querySelector('button').addEventListener('click', () => {
+      if (!venue.accepting_orders) {
+        toast('Энэ ресторан одоогоор захиалга авахгүй байна.', 'bad');
+        return;
+      }
+      showMenu(venue);
+    });
+    view.append(card);
+  }
+}
+
+async function showMenu(venue) {
+  state.screen = 'menu';
+  state.venue = venue;
+  state.cart = new Map();
+  state.slot = null;
+  title.textContent = venue.name;
+  subtitle.textContent = `${venue.walk_minutes} минутын алхалт`;
+
+  const [{ items }, { slots }] = await Promise.all([
+    api(`/v1/restaurants/${venue.id}/menu`),
+    api(`/v1/restaurants/${venue.id}/slots`),
+  ]);
+  state.menu = items;
+  state.slots = slots;
+  renderMenu();
+}
+
+function renderMenu() {
+  view.replaceChildren();
+
+  const back = el('<button class="back" type="button">← Бүх ресторан</button>');
+  back.addEventListener('click', showVenues);
+  view.append(back);
+
+  const list = el('<div class="card"></div>');
+  for (const item of state.menu) {
+    const qty = state.cart.get(item.id) ?? 0;
+    const row = el(`
+      <div class="item"${item.sold_out ? ' data-sold' : ''}>
+        <div>
+          <div class="name">${item.name}</div>
+          <div class="meta">${item.station} · ${item.prep_minutes} мин</div>
+        </div>
+        <div class="price">${mnt(item.price_mnt)}</div>
+      </div>`);
+
+    if (item.sold_out) {
+      row.append(el('<span class="chip">Дууссан</span>'));
+    } else {
+      const stepper = el(`
+        <div class="qty">
+          <button type="button" data-d="-1" aria-label="Хасах">−</button>
+          <span>${qty}</span>
+          <button type="button" data-d="1" aria-label="Нэмэх">+</button>
+        </div>`);
+      stepper.addEventListener('click', (event) => {
+        const button = event.target.closest('button');
+        if (!button) return;
+        const next = Math.max(0, (state.cart.get(item.id) ?? 0) + Number(button.dataset.d));
+        if (next === 0) state.cart.delete(item.id);
+        else state.cart.set(item.id, next);
+        renderMenu();
+      });
+      row.append(stepper);
+    }
+    list.append(row);
+  }
+  view.append(list);
+
+  const slotCard = el('<div class="card"><div class="slots"></div></div>');
+  const slotBox = slotCard.querySelector('.slots');
+  for (const slot of state.slots) {
+    const button = el(
+      `<button class="slot" type="button" aria-pressed="${
+        state.slot === slot.starts_at
+      }"${slot.available ? '' : ' disabled'}>${slot.label}</button>`,
+    );
+    button.addEventListener('click', () => {
+      state.slot = slot.starts_at;
+      renderMenu();
+    });
+    slotBox.append(button);
+  }
+  slotCard.prepend(el('<div class="item"><div><div class="name">Хэдэн цагт ирэх вэ?</div></div></div>'));
+  view.append(slotCard);
+
+  renderPayBar();
+}
+
+function renderPayBar() {
+  document.querySelector('.paybar')?.remove();
+  const total = [...state.cart].reduce((sum, [id, qty]) => {
+    const item = state.menu.find((m) => m.id === id);
+    return sum + (item ? item.price_mnt * qty : 0);
+  }, 0);
+  if (total === 0) return;
+
+  const ready = Boolean(state.slot);
+  const bar = el(`
+    <div class="paybar"><div class="inner">
+      <p class="terms">Хоол <b>гал дээр гарахаас өмнө</b> үнэгүй цуцална.</p>
+      <button class="btn" data-v="primary" data-size="lg" type="button"${ready ? '' : ' disabled'}>
+        ${ready ? `${mnt(total)} төлөх` : 'Цагаа сонгоно уу'}
+      </button>
+    </div></div>`);
+  bar.querySelector('button').addEventListener('click', placeOrder);
+  document.body.append(bar);
+}
+
+async function placeOrder() {
+  const button = document.querySelector('.paybar button');
+  button.disabled = true;
+  button.textContent = 'Түр хүлээнэ үү…';
+  try {
+    await ensureSignedIn();
+    const order = await api('/v1/orders', {
+      method: 'POST',
+      token: store.guestToken,
+      // A phone on a patchy connection retries; the same key must not buy lunch twice.
+      idempotencyKey: `order-${state.venue.id}-${state.slot}-${[...state.cart].join(',')}`,
+      body: {
+        restaurant_id: state.venue.id,
+        slot_starts_at: state.slot,
+        party_size: 2,
+        items: [...state.cart].map(([menu_item_id, qty]) => ({ menu_item_id, qty })),
+      },
+    });
+    await api(`/v1/orders/${order.id}/pay`, { method: 'POST', token: store.guestToken });
+    document.querySelector('.paybar')?.remove();
+    state.orderId = order.id;
+    showStatus();
+  } catch (error) {
+    toast(error.message, 'bad');
+    renderPayBar();
+  }
+}
+
+const STEPS = [
+  { key: 'placed', word: 'Захиалга баталгаажлаа' },
+  { key: 'accepted', word: 'Ресторан хүлээн авлаа' },
+  { key: 'fired', word: 'Гал дээр гарлаа' },
+  { key: 'ready', word: 'Хоол бэлэн' },
+  { key: 'served', word: 'Ширээн дээр' },
+];
+
+async function showStatus() {
+  state.screen = 'status';
+  const order = await api(`/v1/orders/${state.orderId}`, { token: store.guestToken });
+
+  title.textContent = `№${order.code}`;
+  subtitle.textContent = order.table ? `Ширээ ${order.table}` : 'Ширээ хуваарилагдаж байна';
+
+  const headline = {
+    PLACED: ['Хүлээгдэж байна', 'Ресторан хараахан хараагүй'],
+    ACCEPTED: ['Баталгаажлаа', 'Гал тавих цаг тооцоологдож байна'],
+    SCHEDULED: [hhmm(order.fire_at), 'Энэ цагт гал дээр гарна'],
+    ARMED: [hhmm(order.fire_at), 'Та замд гарсан уу?'],
+    HELD: ['Хүлээж байна', 'Гал тогоо ачаалалтай байна'],
+    FIRED: ['Гал дээр', 'Хоол хийгдэж эхэллээ'],
+    COOKING: ['Гал дээр', `${hhmm(order.ready_at)}-д бэлэн болно`],
+    READY: ['Бэлэн', 'Ширээндээ хүрч ирлээ'],
+    SERVED: ['Сайхан хооллоорой', ''],
+    CLOSED: ['Дууслаа', 'Баярлалаа'],
+    CANCELLED: ['Цуцлагдлаа', 'Мөнгө буцаагдана'],
+    REFUNDED: ['Буцаагдлаа', 'Мөнгө таны данс руу очлоо'],
+    NO_SHOW: ['Ирээгүй', 'Хоол хадгалагдаагүй'],
+    REJECTED: ['Татгалзсан', 'Мөнгө бүтэн буцаагдана'],
+  }[order.state] ?? [order.state, ''];
+
+  view.replaceChildren();
+
+  const card = el(`
+    <div class="status" data-s="${order.state}">
+      <div class="lab">${order.state}</div>
+      <div class="big">${headline[0]}</div>
+      <div class="cap">${headline[1]}</div>
+    </div>`);
+
+  const done = {
+    placed: true,
+    accepted: !['PLACED'].includes(order.state),
+    fired: ['FIRED', 'COOKING', 'READY', 'SERVED', 'CLOSED'].includes(order.state),
+    ready: ['READY', 'SERVED', 'CLOSED'].includes(order.state),
+    served: ['SERVED', 'CLOSED'].includes(order.state),
+  };
+  const times = {
+    placed: order.slot_starts_at,
+    accepted: null,
+    fired: order.fire_at,
+    ready: order.ready_at,
+    served: null,
+  };
+
+  const timeline = el('<ul class="timeline"></ul>');
+  for (const step of STEPS) {
+    timeline.append(
+      el(`<li${done[step.key] ? ' data-done' : ''}>
+            <span class="t">${times[step.key] ? hhmm(times[step.key]) : '·'}</span>
+            <span class="w">${step.word}</span>
+          </li>`),
+    );
+  }
+  card.append(timeline);
+  view.append(card);
+
+  if (order.can_cancel) {
+    const cancel = el(
+      `<button class="btn" data-v="danger" data-size="lg" type="button" style="margin-top:10px">
+         Үнэгүй цуцлах${order.free_cancel_until ? ` — ${hhmm(order.free_cancel_until)} хүртэл` : ''}
+       </button>`,
+    );
+    cancel.addEventListener('click', async () => {
+      try {
+        await api(`/v1/orders/${state.orderId}/cancel`, {
+          method: 'POST',
+          token: store.guestToken,
+        });
+        toast('Цуцлагдлаа. Мөнгө буцаагдана.');
+        showStatus();
+      } catch (error) {
+        toast(error.message, 'bad');
+        showStatus();
+      }
+    });
+    view.append(cancel);
+  }
+
+  if (order.state === 'ARMED' || order.state === 'SCHEDULED') {
+    const otw = el('<button class="btn" data-size="lg" type="button" style="margin-top:8px">Хөдөллөө</button>');
+    otw.addEventListener('click', async () => {
+      await api(`/v1/orders/${state.orderId}/signal`, {
+        method: 'POST',
+        token: store.guestToken,
+        body: { type: 'on_my_way' },
+      });
+      toast('Мэдэгдлээ. Гал тавих цаг шинэчлэгдэнэ.');
+      await api('/dev/tick', { method: 'POST' });
+      showStatus();
+    });
+    view.append(otw);
+  }
+
+  if (order.receipt) {
+    view.append(
+      el(`<div class="card" style="margin-top:10px;padding:14px 16px">
+            <div class="lab">Е-баримт</div>
+            <div class="sub" style="margin-top:4px">Сугалаа ${order.receipt.lottery}</div>
+          </div>`),
+    );
+  }
+
+  const again = el('<button class="back" type="button">← Шинэ захиалга</button>');
+  again.addEventListener('click', showVenues);
+  view.append(again);
+}
+
+/* ── boot ────────────────────────────────────────────────────────── */
+
+const refresh = mountClock(() => {
+  if (state.screen === 'status') showStatus().catch(() => {});
+});
+
+showVenues().catch((error) => toast(error.message, 'bad'));
+// The status screen is the one that changes without the guest touching anything.
+setInterval(() => {
+  if (state.screen === 'status') showStatus().catch(() => {});
+}, 4000);
+void refresh;
+</script>
+</body>
+</html>

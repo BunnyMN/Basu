@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Гал тогоо — Basu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+<style>
+/* A tool, not a document: scanned from two metres away with wet hands, so
+   everything is bigger than a web app would normally be and state is carried
+   by colour and position as well as by words. */
+body{background:var(--sunk)}
+.top{
+  display:flex;align-items:baseline;gap:14px;padding:12px 18px;
+  border-bottom:1px solid var(--line);background:var(--bg);flex-wrap:wrap;
+}
+.top h1{font-size:1rem;font-weight:700}
+.top .clock{
+  font-family:"IBM Plex Mono",monospace;font-size:1.15rem;font-weight:600;
+  font-variant-numeric:tabular-nums;margin-left:auto;
+}
+.top .conn{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ready)}
+.top .conn[data-stale]{color:var(--stop)}
+
+.board{
+  display:grid;grid-template-columns:repeat(3,minmax(250px,1fr));gap:12px;
+  padding:14px;align-items:start;
+}
+@media(max-width:820px){.board{grid-template-columns:1fr}}
+
+.lane{background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:11px;min-height:120px}
+.lane > h2{
+  font-family:"IBM Plex Mono",monospace;font-size:.68rem;text-transform:uppercase;
+  letter-spacing:.14em;color:var(--ink-3);display:flex;justify-content:space-between;
+  font-weight:500;margin-bottom:10px;
+}
+.lane .stack{display:flex;flex-direction:column;gap:9px;min-width:0}
+.lane .none{color:var(--line-2);font-size:.8rem;text-align:center;padding:14px 0}
+
+.ticket{
+  border:1px solid var(--line);border-left:3px solid var(--line-2);border-radius:3px;
+  padding:11px 12px;background:var(--surface-2);min-width:0;
+}
+.ticket .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:0;border:none;background:none;margin-bottom:3px}
+.ticket .id{font-family:"IBM Plex Mono",monospace;font-size:.86rem;font-weight:600}
+.ticket .cd{font-family:"IBM Plex Mono",monospace;font-size:1.15rem;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.ticket .meta{font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--ink-3);margin-bottom:7px;overflow-wrap:anywhere}
+.ticket .lines{font-size:.92rem;line-height:1.5;margin-bottom:10px;overflow-wrap:anywhere}
+.ticket .lines b{font-weight:700}
+.ticket .btns{display:flex;gap:6px;flex-wrap:wrap}
+.ticket .btns .btn{flex:1;min-width:88px;padding:9px 8px}
+
+.ticket[data-lane="incoming"]{border-left-color:var(--route)}
+.ticket[data-lane="incoming"] .cd{color:var(--route)}
+.ticket[data-lane="cooking"]{border-left-color:var(--accent);background:var(--accent-soft)}
+.ticket[data-lane="cooking"] .cd{color:var(--accent-ink)}
+.ticket[data-lane="ready"]{border-left-color:var(--ready)}
+.ticket[data-lane="ready"] .cd{color:var(--ready)}
+
+/* Late and held have to be visible across the room, not read. */
+.ticket[data-late]{box-shadow:inset 0 0 0 1px var(--accent-line)}
+.ticket[data-late] .cd{color:var(--accent-ink)}
+.ticket[data-attention]{
+  border-left-color:var(--stop);background:var(--stop-soft);
+  box-shadow:inset 0 0 0 1px var(--stop-line);
+}
+.ticket[data-attention] .why{
+  font-family:"IBM Plex Mono",monospace;font-size:.66rem;color:var(--stop);
+  letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;
+}
+
+.pair{max-width:380px;margin:60px auto;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:26px 24px;text-align:center}
+.pair h2{font-size:1.1rem;margin-bottom:6px}
+.pair p{color:var(--ink-2);font-size:.86rem;margin:0 0 18px}
+.pair input{
+  width:100%;text-align:center;font-size:1.5rem;letter-spacing:.28em;padding:12px;
+  border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);
+  color:var(--ink);margin-bottom:12px;font-variant-numeric:tabular-nums;
+}
+.pair .hint{font-size:.74rem;color:var(--ink-3);margin-top:14px;line-height:1.5}
+.pair .hint code{background:var(--surface-2);padding:1px 5px;border-radius:2px;border:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="module">
+import { api, store, toast, mountClock, hhmm } from '/api.js';
+
+const root = document.getElementById('root');
+const el = (html) => {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+};
+
+/* ── pairing ─────────────────────────────────────────────────────── */
+
+async function showPairing() {
+  const { devices } = await api('/dev/pairing-codes').catch(() => ({ devices: [] }));
+  root.replaceChildren();
+
+  const card = el(`
+    <div class="pair">
+      <h2>Таблетаа холбоно уу</h2>
+      <p>Менежерээс авсан 8 оронтой кодоо оруулна уу.</p>
+      <input inputmode="numeric" maxlength="8" placeholder="········" aria-label="Холбох код">
+      <button class="btn" data-v="primary" data-size="lg" type="button">Холбох</button>
+    </div>`);
+
+  const input = card.querySelector('input');
+  const submit = async () => {
+    try {
+      const { token } = await api('/v1/kds/pair', {
+        method: 'POST',
+        body: { pairing_code: input.value.trim() },
+      });
+      store.deviceToken = token;
+      boot();
+    } catch (error) {
+      toast(error.message, 'bad');
+      input.select();
+    }
+  };
+  card.querySelector('button').addEventListener('click', submit);
+  input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+
+  if (devices.length) {
+    const hint = el('<div class="hint">Демо кодууд:<br></div>');
+    for (const device of devices) {
+      const link = el(`<code>${device.code}</code> ${device.name}<br>`);
+      hint.append(link);
+    }
+    card.append(hint);
+    input.value = devices[0].code;
+  } else {
+    card.append(el('<div class="hint">Код алга. <code>npm run seed</code> ажиллуулна уу.</div>'));
+  }
+
+  root.append(card);
+  input.focus();
+}
+
+/* ── the board ───────────────────────────────────────────────────── */
+
+const LANES = [
+  { key: 'incoming', title: 'Ирж явна' },
+  { key: 'cooking', title: 'Гал дээр' },
+  { key: 'ready', title: 'Бэлэн' },
+];
+
+let lastSeen = 0;
+
+function renderBoard(data) {
+  const existing = document.querySelector('.board');
+  const scroll = window.scrollY;
+
+  const frame = el(`
+    <div>
+      <div class="top">
+        <h1 id="venue">Гал тогоо</h1>
+        <span class="conn" id="conn">холбогдсон</span>
+        <span class="clock mn">${data.now}</span>
+      </div>
+      <div class="board"></div>
+    </div>`);
+
+  const board = frame.querySelector('.board');
+  for (const lane of LANES) {
+    const tickets = data.lanes[lane.key] ?? [];
+    const column = el(`
+      <section class="lane">
+        <h2><span>${lane.title}</span><span>${tickets.length}</span></h2>
+        <div class="stack"></div>
+      </section>`);
+    const stack = column.querySelector('.stack');
+
+    if (!tickets.length) stack.append(el('<div class="none">—</div>'));
+    for (const ticket of tickets) stack.append(renderTicket(ticket, lane.key));
+    board.append(column);
+  }
+
+  root.replaceChildren(frame);
+  window.scrollTo(0, scroll);
+  lastSeen = Date.now();
+}
+
+function renderTicket(ticket, lane) {
+  const countdown =
+    lane === 'ready'
+      ? '✓'
+      : ticket.countdown_minutes === null
+        ? ticket.due_at
+        : ticket.countdown_minutes <= 0
+          ? 'ОДОО'
+          : `${ticket.countdown_minutes} мин`;
+
+  const node = el(`
+    <article class="ticket" data-lane="${lane}"${
+      ticket.needs_attention ? ' data-attention' : ''
+    }${ticket.countdown_minutes !== null && ticket.countdown_minutes <= 0 && lane !== 'ready' ? ' data-late' : ''}>
+      <div class="top">
+        <span class="id">№${ticket.code}</span>
+        <span class="cd">${countdown}</span>
+      </div>
+      ${ticket.needs_attention ? '<div class="why">Багтаамж дүүрсэн — гараар шийд</div>' : ''}
+      <div class="meta">${ticket.due_at} · ${ticket.party_size} хүн${
+        ticket.table ? ` · Ширээ ${ticket.table}` : ''
+      }${ticket.guest ? ` · ${ticket.guest}` : ''}${ticket.seated ? ' · СУУСАН' : ''}</div>
+      <div class="lines">${ticket.lines
+        .map((l) => `${l.name} <b>×${l.qty}</b>`)
+        .join('<br>')}</div>
+      <div class="btns"></div>
+    </article>`);
+
+  const buttons = node.querySelector('.btns');
+  const add = (label, action, variant) => {
+    const button = el(
+      `<button class="btn" type="button"${variant ? ` data-v="${variant}"` : ''}>${label}</button>`,
+    );
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        await api(`/v1/kds/tickets/${ticket.id}/${action}`, {
+          method: 'POST',
+          token: store.deviceToken,
+          body: {},
+        });
+        await refreshBoard();
+      } catch (error) {
+        toast(error.message, 'bad');
+        button.disabled = false;
+      }
+    });
+    buttons.append(button);
+  };
+
+  if (ticket.state === 'PLACED') {
+    add('Хүлээн авах', 'accept', 'primary');
+    add('Татгалзах', 'reject', 'danger');
+  } else if (lane === 'incoming') {
+    // «Одоо тавь» is never taken away, whatever the model thinks.
+    add('Одоо тавь', 'fire-now', 'primary');
+    add('+5 мин', 'hold');
+  } else if (lane === 'cooking') {
+    add('Бэлэн боллоо', 'ready', 'primary');
+  } else {
+    add('Гардуулсан', 'served', 'primary');
+  }
+
+  return node;
+}
+
+async function refreshBoard() {
+  try {
+    const data = await api('/v1/kds/tickets', { token: store.deviceToken });
+    renderBoard(data);
+  } catch (error) {
+    if (error.status === 401) {
+      store.deviceToken = null;
+      showPairing();
+      return;
+    }
+    // A tablet that cannot reach us keeps showing the last board it had, and
+    // says so — a blank screen mid-service is worse than a stale one.
+    const conn = document.getElementById('conn');
+    if (conn) {
+      conn.textContent = 'холболт тасарсан';
+      conn.dataset.stale = '1';
+    }
+  }
+}
+
+/* ── boot ────────────────────────────────────────────────────────── */
+
+function boot() {
+  if (!store.deviceToken) {
+    showPairing();
+    return;
+  }
+  refreshBoard();
+}
+
+mountClock(() => {
+  if (store.deviceToken) refreshBoard();
+});
+
+boot();
+setInterval(() => store.deviceToken && refreshBoard(), 3000);
+void hhmm;
+void lastSeen;
+</script>
+</body>
+</html>
