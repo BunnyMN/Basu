@@ -946,3 +946,56 @@ describe('reviews', () => {
     expect(mine?.rating).toMatchObject({ stars: 5, count: 1, onTimeShare: 1 });
   });
 });
+
+describe('the walk', () => {
+  it('accepts the precision a phone actually reports', async () => {
+    // A real fix carries ten to fifteen decimal places. An earlier version
+    // capped the fraction at seven, so the endpoint refused exactly the
+    // coordinates it exists to serve — and the only place it worked was a
+    // test that had typed four decimals by hand.
+    const response = await app.inject({
+      method: 'GET',
+      url: '/v1/route?from=106.91052341234567,47.92051234567891&to=106.9231,47.9209',
+    });
+    expect(response.statusCode, response.body).toBe(200);
+    expect(response.json().metres).toBeGreaterThan(0);
+    expect(response.json().minutes).toBeGreaterThan(0);
+    expect(response.json().line.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('turns away coordinates that are not on the planet', async () => {
+    for (const query of [
+      'from=1000,47.9&to=106.9,47.9',
+      'from=106.9,999&to=106.9,47.9',
+      'from=abc&to=106.9,47.9',
+      'from=106.9&to=106.9,47.9',
+      'to=106.9,47.9',
+    ]) {
+      const response = await app.inject({ method: 'GET', url: `/v1/route?${query}` });
+      expect(response.statusCode, query).toBe(400);
+    }
+  });
+
+  it('answers with something walkable even when the router does not', async () => {
+    const before = process.env['ROUTER_URL'];
+    // Somewhere nothing is listening: the straight line still answers the
+    // question well enough to decide where to have lunch.
+    process.env['ROUTER_URL'] = 'http://127.0.0.1:9';
+    try {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/route?from=106.9165,47.9138&to=106.9243,47.9105',
+      });
+      expect(response.statusCode).toBe(200);
+      const route = response.json();
+      // Marked as a guess, so the client can draw it dashed rather than let it
+      // pass for something somebody surveyed.
+      expect(route.kind).toBe('direct');
+      expect(route.line).toHaveLength(2);
+      expect(route.metres).toBeGreaterThan(0);
+    } finally {
+      if (before === undefined) delete process.env['ROUTER_URL'];
+      else process.env['ROUTER_URL'] = before;
+    }
+  });
+});

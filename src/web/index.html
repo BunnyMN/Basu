@@ -426,12 +426,21 @@ async function drawWalk(venue) {
     return;
   }
 
-  const from = `${state.here.lon},${state.here.lat}`;
-  const to = `${venue.lon},${venue.lat}`;
+  // Six places is about eleven centimetres, which is finer than any phone
+  // knows and keeps the URL — and the cache key — from churning on noise.
+  const at = (lon, lat) => `${lon.toFixed(6)},${lat.toFixed(6)}`;
+  const from = at(state.here.lon, state.here.lat);
+  const to = at(venue.lon, venue.lat);
+
   let route;
   try {
     route = await api(`/v1/route?from=${from}&to=${to}`);
-  } catch {
+  } catch (error) {
+    // Silence here hid a real failure for a whole round of debugging: the
+    // endpoint was refusing genuine GPS precision and the map simply drew
+    // nothing, with no way to tell that from "no position yet".
+    console.warn('[route]', error.message);
+    if (walk) walk.textContent = '';
     return;
   }
   // The guest may have closed the sheet or opened another one meanwhile.

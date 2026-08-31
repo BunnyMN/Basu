@@ -22,8 +22,10 @@ await context.overridePermissions(BASE, ['geolocation']);
 
 const page = await browser.newPage();
 await page.setViewport({ width: 900, height: 780 });
-// A few hundred metres from the cluster: a real walk, not a teleport.
-await page.setGeolocation({ latitude: 47.9205, longitude: 106.9105 });
+// A few hundred metres from the cluster: a real walk, not a teleport — and at
+// the precision a phone actually reports. Four tidy decimals passed a check
+// that every real fix failed.
+await page.setGeolocation({ latitude: 47.92051234567, longitude: 106.91052341234 });
 
 const calls = [];
 const errors = [];

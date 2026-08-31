@@ -41,7 +41,25 @@ export interface Route {
   line: Array<[number, number]>;
 }
 
-const COORD = /^-?\d{1,3}(\.\d{1,7})?,-?\d{1,2}(\.\d{1,7})?$/;
+/**
+ * Parse `lon,lat`.
+ *
+ * Checked by range rather than by counting digits. The first version capped
+ * the fraction at seven places, which every real GPS fix exceeds — a phone
+ * reports ten to fifteen — so the endpoint refused exactly the coordinates it
+ * exists to serve, and the only place it worked was a test that had typed
+ * four decimals by hand.
+ */
+function parseCoord(value: string | undefined): [number, number] | null {
+  if (!value) return null;
+  const parts = value.split(',');
+  if (parts.length !== 2) return null;
+  const lon = Number(parts[0]);
+  const lat = Number(parts[1]);
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) return null;
+  if (lon < -180 || lon > 180 || lat < -90 || lat > 90) return null;
+  return [lon, lat];
+}
 
 export function walkMinutes(metres: number): number {
   return Math.max(1, Math.round(metres / METRES_PER_MINUTE));
@@ -95,18 +113,18 @@ function direct(from: [number, number], to: [number, number]): Route {
 
 export async function registerRouteRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: { from?: string; to?: string } }>('/v1/route', async (request, reply) => {
-    const { from, to } = request.query;
-    if (!from || !to || !COORD.test(from) || !COORD.test(to)) {
+    const from = parseCoord(request.query.from);
+    const to = parseCoord(request.query.to);
+    if (!from || !to) {
       return reply.status(400).send({
         error: {
           code: 'BAD_COORDS',
           message_mn: 'Байршил танигдсангүй.',
-          message_en: 'from and to must be lon,lat',
+          message_en: 'from and to must be lon,lat within range',
         },
       });
     }
-    const parse = (s: string) => s.split(',').map(Number) as [number, number];
-    const route = await findRoute(parse(from), parse(to));
+    const route = await findRoute(from, to);
     // Roads do not move; a browser may keep this for the walk itself.
     return reply.header('cache-control', 'public, max-age=300').send(route);
   });
