@@ -27,6 +27,13 @@ import {
   rejectOrder,
 } from '../services/orders.js';
 import { enqueueNotification } from '../services/notifications.js';
+import {
+  dishRatings,
+  findReview,
+  leaveReview,
+  recentComments,
+  restaurantRatings,
+} from '../services/reviews.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import { registerMapRoutes } from './tiles.js';
 import { registerDishRoutes } from './dishes.js';
@@ -226,6 +233,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     const { rows } = await db.query(
       `SELECT id, name, travel_minutes, lat, lon FROM restaurant WHERE active ORDER BY name`,
     );
+    const ratings = await restaurantRatings(db);
     const out = [];
     for (const r of rows as Array<{
       id: string;
@@ -240,6 +248,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
         walk_minutes: r.travel_minutes,
         lat: r.lat === null ? null : Number(r.lat),
         lon: r.lon === null ? null : Number(r.lon),
+        rating: ratings.get(r.id) ?? null,
         // A kitchen nobody is watching cannot take an order (§08).
         accepting_orders: await isRestaurantOnline(ctx, r.id),
       });
@@ -257,7 +266,22 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
         ORDER BY m.price_mnt DESC, m.name`,
       [request.params.id],
     );
-    return { items: rows };
+    const ratings = await dishRatings(db, request.params.id);
+    return {
+      items: (rows as Array<{ id: string }>).map((item) => ({
+        ...item,
+        rating: ratings.get(item.id) ?? null,
+      })),
+    };
+  });
+
+  /** What people said. Only reviews from orders they actually ate. */
+  app.get<{ Params: { id: string } }>('/v1/restaurants/:id/reviews', async (request) => {
+    const [comments, ratings] = await Promise.all([
+      recentComments(db, request.params.id),
+      restaurantRatings(db),
+    ]);
+    return { rating: ratings.get(request.params.id) ?? null, comments };
   });
 
   app.get<{ Params: { id: string }; Querystring: { date?: string } }>(
@@ -422,7 +446,21 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
         | undefined;
       if (!order) return sendError(reply, new OrderError('NOT_FOUND', 'no such order'));
 
+      // The lines are what a review is left against, so they travel with it.
+      const { rows: lines } = await db.query(
+        `SELECT l.menu_item_id, l.name, l.qty, m.image_url
+           FROM order_line l
+           LEFT JOIN menu_item m ON m.id = l.menu_item_id
+          WHERE l.order_id = $1 AND l.cancelled_at IS NULL
+          ORDER BY l.name`,
+        [request.params.id],
+      );
+      const review = await findReview(db, request.params.id);
+
       return reply.send({
+        lines,
+        review,
+        can_review: ['SERVED', 'CLOSED'].includes(order.state),
         id: order.id,
         code: order.code,
         state: order.state,
@@ -440,6 +478,35 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
       });
     },
   );
+
+  app.post<{
+    Params: { id: string };
+    Body: {
+      stars?: number;
+      on_time?: boolean;
+      comment?: string;
+      dishes?: Array<{ menu_item_id: string; stars: number }>;
+    };
+  }>('/v1/orders/:id/review', { preHandler: requireGuest }, async (request, reply) => {
+    const body = request.body ?? {};
+    if (typeof body.stars !== 'number') {
+      return badRequest(reply, 'Хэдэн од өгөхөө сонгоно уу.', 'stars is required');
+    }
+    try {
+      const review = await leaveReview(ctx, request.params.id, request.guestId!, {
+        stars: body.stars,
+        ...(body.on_time === undefined ? {} : { onTime: body.on_time }),
+        ...(body.comment === undefined ? {} : { comment: body.comment }),
+        dishes: (body.dishes ?? []).map((d) => ({
+          menuItemId: d.menu_item_id,
+          stars: d.stars,
+        })),
+      });
+      return reply.send({ review });
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
 
   /* ── the kitchen ────────────────────────────────────────────────── */
 

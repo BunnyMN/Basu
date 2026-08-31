@@ -151,6 +151,60 @@ body{display:flex;flex-direction:column}
 .note span{font-size:.8rem;color:var(--ink-2);line-height:1.5}
 .note a{color:var(--accent-ink)}
 .empty{padding:26px 18px;text-align:center;color:var(--ink-3);font-size:.86rem}
+
+/* ── stars ──────────────────────────────────────────────────────── */
+/* A row of five buttons rather than a slider or a select: the whole gesture
+   is one tap, and the answer is visible without opening anything. */
+.stars{display:flex;gap:2px}
+.stars button{
+  background:none;border:none;padding:2px;line-height:1;font-size:1.5rem;
+  color:var(--line-2);
+}
+.stars button[data-on]{color:#E8A13A}
+.stars button:hover{color:#E8A13A}
+.stars[data-size="sm"] button{font-size:1.05rem;padding:1px}
+
+.rating{
+  display:inline-flex;align-items:center;gap:4px;
+  font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--ink-2);
+}
+.rating i{color:#E8A13A;font-style:normal}
+.rating em{color:var(--ink-3);font-style:normal}
+
+.review{padding:16px 18px;border-top:1px solid var(--line)}
+.review h3{font-size:.95rem;font-weight:700;margin-bottom:3px}
+.review p.lead{font-size:.82rem;color:var(--ink-2);margin:0 0 12px}
+.review .row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+.review .row:last-of-type{border-bottom:none}
+.review .row img{width:34px;height:34px;border-radius:3px;border:1px solid var(--line);flex:none}
+.review .row .n{flex:1;font-size:.88rem;min-width:0;overflow-wrap:anywhere}
+.review textarea{
+  width:100%;min-height:70px;resize:vertical;margin-top:10px;padding:10px 11px;
+  border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);
+  color:var(--ink);font-family:inherit;font-size:.88rem;line-height:1.45;
+}
+.review textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+
+/* The timing question is the product's own metric and is asked separately:
+   a four-star lunch that came late is a success by one measure and a failure
+   by the other, and one score would hide exactly that. */
+.ontime{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+.ontime span{font-size:.86rem;flex:1;min-width:140px}
+.ontime button{
+  font-family:"IBM Plex Mono",monospace;font-size:.74rem;padding:7px 14px;border-radius:3px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);
+}
+.ontime button[data-on="yes"]{background:var(--ready-soft);border-color:var(--ready);color:var(--ready);font-weight:600}
+.ontime button[data-on="no"]{background:var(--stop-soft);border-color:var(--stop);color:var(--stop);font-weight:600}
+
+.said{padding:12px 18px;border-top:1px solid var(--line)}
+.said > .lab{margin-bottom:8px}
+.said .one{padding:9px 0;border-bottom:1px solid var(--line)}
+.said .one:last-child{border-bottom:none}
+.said .who{display:flex;align-items:center;gap:8px;font-size:.76rem;color:var(--ink-3);margin-bottom:3px}
+.said .who b{color:var(--ink-2);font-weight:600}
+.said .txt{font-size:.87rem;line-height:1.5;overflow-wrap:anywhere}
+.said .late{color:var(--hold);font-family:"IBM Plex Mono",monospace;font-size:.68rem}
 </style>
 </head>
 <body>
@@ -199,6 +253,43 @@ const LAYER = 'venue-pin';
 const ROUTE = 'walk';
 
 const emptyLine = () => ({ type: 'FeatureCollection', features: [] });
+
+/**
+ * Five tappable stars that keep their own state.
+ *
+ * They redraw themselves rather than asking the form to rebuild: rebuilding
+ * the block would take the caret out of the comment box somebody was typing in.
+ */
+function starPicker(value, onPick, size) {
+  const box = el(`<div class="stars"${size ? ` data-size="${size}"` : ''}></div>`);
+  let picked = value;
+
+  const paint = () => {
+    box.replaceChildren();
+    for (let n = 1; n <= 5; n++) {
+      const star = el(
+        `<button type="button" aria-label="${n} од"${n <= picked ? ' data-on' : ''}>★</button>`,
+      );
+      star.addEventListener('click', () => {
+        picked = n;
+        paint();
+        onPick(n);
+      });
+      box.append(star);
+    }
+  };
+
+  paint();
+  return box;
+}
+
+/** A rating as one line: ★ 4.6 (12). Null reads as "nobody has said yet". */
+function ratingLine(rating) {
+  if (!rating?.count) return el('<span class="rating"><em>үнэлгээ алга</em></span>');
+  return el(
+    `<span class="rating"><i>★</i>${rating.stars.toFixed(1)}<em>(${rating.count})</em></span>`,
+  );
+}
 
 const state = {
   venues: [],
@@ -307,6 +398,26 @@ geolocate.on('geolocate', (position) => {
  * geometry. When the router cannot be reached it answers with a straight line
  * marked `direct`, and the layer above draws that dashed.
  */
+/**
+ * Ask for the guest's position, once.
+ *
+ * Deliberately not on page load: a permission prompt before anybody has
+ * chosen anything is a prompt most people refuse. Asked here it has an
+ * obvious answer to give — the way to the food they just bought.
+ */
+let asked = false;
+function askWhereYouAre() {
+  if (asked || state.here) return;
+  asked = true;
+  try {
+    geolocate.trigger();
+  } catch {
+    // Denied, unavailable, or not yet ready. The order works without it;
+    // only the route is missing, and the walk estimate falls back to the
+    // restaurant's own on-foot minutes.
+  }
+}
+
 async function drawWalk(venue) {
   const walk = document.getElementById('sheet-walk');
   if (!state.here || !venue?.lat) {
@@ -518,9 +629,13 @@ async function openVenue(venue) {
     : venue.walk_minutes;
 
   $('sheet-name').textContent = venue.name;
-  $('sheet-sub').textContent = `${walk} мин алхаад · ${
-    venue.accepting_orders ? 'захиалга авч байна' : 'одоогоор хаалттай'
-  }`;
+  const sub = $('sheet-sub');
+  sub.replaceChildren(
+    document.createTextNode(
+      `${walk} мин алхаад · ${venue.accepting_orders ? 'захиалга авч байна' : 'хаалттай'} · `,
+    ),
+    ratingLine(venue.rating),
+  );
   $('sheet-body').replaceChildren(el('<p class="empty">Цэс ачаалж байна…</p>'));
   $('sheet-foot').replaceChildren();
   $('sheet').dataset.open = '1';
@@ -564,7 +679,9 @@ function renderSheet() {
         <div class="who">
           <div class="name">${item.name}</div>
           ${item.description ? `<div class="desc">${item.description}</div>` : ''}
-          <div class="meta">${item.station} · ${item.prep_minutes} мин</div>
+          <div class="meta">${item.station} · ${item.prep_minutes} мин${
+            item.rating?.count ? ` · ★ ${item.rating.stars.toFixed(1)}` : ''
+          }</div>
         </div>
         <div class="price">${mnt(item.price_mnt)}</div>
       </div>`);
@@ -607,6 +724,45 @@ function renderSheet() {
   }
   body.append(grid);
   renderFoot();
+  void appendComments(state.venue.id);
+}
+
+/**
+ * What people who ate here said.
+ *
+ * Loaded after the menu rather than with it: the menu is what somebody came
+ * for, and it should not wait on a second query to appear.
+ */
+async function appendComments(venueId) {
+  let data;
+  try {
+    data = await api(`/v1/restaurants/${venueId}/reviews`);
+  } catch {
+    return;
+  }
+  if (state.venue?.id !== venueId || !data.comments.length) return;
+
+  const said = el('<div class="said"><div class="lab">Хоолтой хүмүүс юу гэсэн бэ</div></div>');
+  for (const c of data.comments) {
+    said.append(
+      el(`<div class="one">
+            <div class="who">
+              <b>${c.by}</b>
+              <span class="rating"><i>${'★'.repeat(c.stars)}</i></span>
+              ${c.onTime === false ? '<span class="late">цагтаа ирээгүй</span>' : ''}
+            </div>
+            <div class="txt">${escapeHtml(c.comment)}</div>
+          </div>`),
+    );
+  }
+  $('sheet-body').append(said);
+}
+
+/** Guest text goes into the DOM as text, never as markup. */
+function escapeHtml(value) {
+  const node = document.createElement('span');
+  node.textContent = value;
+  return node.innerHTML;
 }
 
 function renderFoot() {
@@ -664,6 +820,14 @@ const STEPS = [
   ['ready', 'Хоол бэлэн'],
   ['served', 'Ширээн дээр'],
 ];
+
+/**
+ * The states with a walk in front of them.
+ *
+ * From the moment the kitchen accepts until the food is on the table, the
+ * guest's job is to get there — so that is when the map carries a route.
+ */
+const WALKING = ['ACCEPTED', 'SCHEDULED', 'ARMED', 'HELD', 'FIRED', 'COOKING', 'READY'];
 
 const HEADLINE = {
   PLACED: ['Хүлээгдэж байна', 'Ресторан хараахан хараагүй'],
@@ -740,8 +904,13 @@ async function showStatus() {
   card.append(timeline);
   body.append(card);
 
-  // The walk is still the thing being watched, so keep it fresh and on the map.
-  if (state.here && state.venue?.lat) void drawWalk(state.venue);
+  // Once the kitchen has taken the order there is a walk to make, so the map
+  // shows it — and this is the moment to ask where the guest is, rather than
+  // on page load when the answer is not yet useful for anything.
+  if (WALKING.includes(order.state)) {
+    if (state.here && state.venue?.lat) void drawWalk(state.venue);
+    else askWhereYouAre();
+  }
 
   const foot = $('sheet-foot');
   foot.replaceChildren();
@@ -786,6 +955,8 @@ async function showStatus() {
     );
   }
 
+  if (order.can_review) appendReview(body, order);
+
   // Once there is nothing left to watch, let go of the order and the route.
   if (['SERVED', 'CLOSED', 'REFUNDED', 'CANCELLED', 'NO_SHOW', 'REJECTED'].includes(order.state)) {
     const again = el('<button class="btn" data-size="lg" type="button" style="margin-top:8px">Шинэ захиалга</button>');
@@ -798,6 +969,117 @@ async function showStatus() {
     });
     foot.append(again);
   }
+}
+
+/**
+ * The review, once the food has been handed over.
+ *
+ * Two questions, deliberately not merged. Stars are for the next guest — was
+ * it good. `on_time` is for us: a four-star lunch that arrived ten minutes
+ * late is a success by one measure and a failure by the other, and one score
+ * would hide exactly the thing this product is judged on.
+ *
+ * Nothing is required. A guest who taps three stars and closes the sheet has
+ * told us something useful, and demanding a comment first would lose it.
+ */
+function appendReview(body, order) {
+  const existing = order.review;
+  const draft = {
+    stars: existing?.stars ?? 0,
+    onTime: existing?.onTime ?? null,
+    comment: existing?.comment ?? '',
+    dishes: new Map((existing?.dishes ?? []).map((d) => [d.menuItemId, d.stars])),
+  };
+
+  const box = el(`
+    <div class="review">
+      <h3>${existing ? 'Таны үнэлгээ' : 'Хоол ямар байв?'}</h3>
+      <p class="lead">${
+        existing ? 'Өөрчилж болно.' : 'Дараагийн хүнд тусална. Заавал биш.'
+      }</p>
+    </div>`);
+
+  const send = el(
+    `<button class="btn" data-v="primary" data-size="lg" type="button" style="margin-top:12px"${
+      draft.stars ? '' : ' disabled'
+    }>${existing ? 'Шинэчлэх' : 'Илгээх'}</button>`,
+  );
+
+  box.append(
+    starPicker(draft.stars, (n) => {
+      draft.stars = n;
+      send.disabled = false;
+    }),
+  );
+
+  for (const line of order.lines ?? []) {
+    const row = el(`
+      <div class="row">
+        ${line.image_url ? `<img src="${line.image_url}" alt="">` : ''}
+        <div class="n">${line.name}${line.qty > 1 ? ` ×${line.qty}` : ''}</div>
+      </div>`);
+    row.append(
+      starPicker(
+        draft.dishes.get(line.menu_item_id) ?? 0,
+        (n) => draft.dishes.set(line.menu_item_id, n),
+        'sm',
+      ),
+    );
+    box.append(row);
+  }
+
+  const timing = el(`
+    <div class="ontime">
+      <span>Хоол цагтаа ирсэн үү?</span>
+      <button type="button" data-a="yes">Тийм</button>
+      <button type="button" data-a="no">Үгүй</button>
+    </div>`);
+  const paintTiming = () => {
+    for (const button of timing.querySelectorAll('button')) {
+      const chosen =
+        (button.dataset.a === 'yes' && draft.onTime === true) ||
+        (button.dataset.a === 'no' && draft.onTime === false);
+      if (chosen) button.dataset.on = button.dataset.a;
+      else delete button.dataset.on;
+    }
+  };
+  timing.addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    draft.onTime = button.dataset.a === 'yes';
+    paintTiming();
+  });
+  paintTiming();
+  box.append(timing);
+
+  const note = el(
+    `<textarea maxlength="500" placeholder="Сэтгэгдэл (заавал биш)">${draft.comment}</textarea>`,
+  );
+  note.addEventListener('input', () => (draft.comment = note.value));
+  box.append(note);
+
+  send.addEventListener('click', async () => {
+    send.disabled = true;
+    send.textContent = 'Илгээж байна…';
+    try {
+      await guestApi(`/v1/orders/${state.orderId}/review`, {
+        method: 'POST',
+        body: {
+          stars: draft.stars,
+          on_time: draft.onTime ?? undefined,
+          comment: draft.comment,
+          dishes: [...draft.dishes].map(([menu_item_id, stars]) => ({ menu_item_id, stars })),
+        },
+      });
+      toast('Баярлалаа. Үнэлгээ хадгалагдлаа.');
+      void showStatus();
+    } catch (error) {
+      toast(error.message, 'bad');
+      void showStatus();
+    }
+  });
+  box.append(send);
+  body.append(box);
 }
 
 /* ── boot ───────────────────────────────────────────────────────── */

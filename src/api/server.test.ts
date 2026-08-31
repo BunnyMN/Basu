@@ -740,3 +740,209 @@ function mvtLayerNames(buffer: Buffer): string[] {
   }
   return names;
 }
+
+describe('reviews', () => {
+  /** Carry an order all the way to served, which is the only reviewable state. */
+  async function anEatenOrder(guest: string, tablet: string) {
+    const order = await placeAndPay(guest, venue.restaurantId, venue.menuIds['tsuivan']!);
+    await app.inject({
+      method: 'POST',
+      url: `/v1/kds/tickets/${order.id}/accept`,
+      headers: auth(tablet),
+    });
+    clock.set(at('12:22'));
+    await tick(ctx, { spacingMs: 0 });
+    await app.inject({
+      method: 'POST',
+      url: `/v1/kds/tickets/${order.id}/ready`,
+      headers: auth(tablet),
+    });
+    await app.inject({
+      method: 'POST',
+      url: `/v1/kds/tickets/${order.id}/served`,
+      headers: auth(tablet),
+    });
+    return order;
+  }
+
+  it('takes stars, a comment and the timing answer, and shows them back', async () => {
+    const guest = await signIn();
+    const tablet = await pairTablet(venue.restaurantId);
+    const order = await anEatenOrder(guest, tablet);
+
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/v1/orders/${order.id}`,
+      headers: auth(guest),
+    });
+    expect(detail.json().can_review).toBe(true);
+    expect(detail.json().review).toBeNull();
+    const line = detail.json().lines[0];
+
+    const left = await app.inject({
+      method: 'POST',
+      url: `/v1/orders/${order.id}/review`,
+      headers: auth(guest),
+      payload: {
+        stars: 5,
+        on_time: false,
+        comment: 'Цуйван нь сайхан, гэхдээ жаахан хоцорлоо.',
+        dishes: [{ menu_item_id: line.menu_item_id, stars: 4 }],
+      },
+    });
+    expect(left.statusCode, left.body).toBe(200);
+
+    // The two answers stay apart: five stars and "no, it was late" is a
+    // coherent thing to say, and one score would lose half of it.
+    expect(left.json().review).toMatchObject({ stars: 5, onTime: false });
+    expect(left.json().review.dishes).toEqual([{ menuItemId: line.menu_item_id, stars: 4 }]);
+
+    const after = await app.inject({
+      method: 'GET',
+      url: `/v1/orders/${order.id}`,
+      headers: auth(guest),
+    });
+    expect(after.json().review.comment).toContain('хоцорлоо');
+  });
+
+  it('lets a guest change their mind without leaving two reviews', async () => {
+    const guest = await signIn();
+    const tablet = await pairTablet(venue.restaurantId);
+    const order = await anEatenOrder(guest, tablet);
+
+    for (const stars of [2, 4]) {
+      await app.inject({
+        method: 'POST',
+        url: `/v1/orders/${order.id}/review`,
+        headers: auth(guest),
+        payload: { stars },
+      });
+    }
+
+    const summary = await app.inject({
+      method: 'GET',
+      url: `/v1/restaurants/${venue.restaurantId}/reviews`,
+    });
+    expect(summary.json().rating).toMatchObject({ stars: 4, count: 1 });
+  });
+
+  it('will not take a review for food that has not been served', async () => {
+    const guest = await signIn();
+    await pairTablet(venue.restaurantId);
+    const order = await placeAndPay(guest, venue.restaurantId, venue.menuIds['tsuivan']!);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/orders/${order.id}/review`,
+      headers: auth(guest),
+      payload: { stars: 5 },
+    });
+    expect(response.statusCode).toBe(409);
+  });
+
+  it('will not let one guest review another guest’s meal', async () => {
+    const alice = await signIn('+97699003333');
+    const tablet = await pairTablet(venue.restaurantId);
+    const order = await anEatenOrder(alice, tablet);
+
+    const mallory = await signIn('+97699004444');
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/orders/${order.id}/review`,
+      headers: auth(mallory),
+      payload: { stars: 1, comment: 'муу' },
+    });
+    // 404, not 403: a 403 would confirm the order exists.
+    expect(response.statusCode).toBe(404);
+
+    const summary = await app.inject({
+      method: 'GET',
+      url: `/v1/restaurants/${venue.restaurantId}/reviews`,
+    });
+    expect(summary.json().comments).toEqual([]);
+  });
+
+  it('ignores stars for a dish that was not on the ticket', async () => {
+    const guest = await signIn();
+    const tablet = await pairTablet(venue.restaurantId);
+    const order = await anEatenOrder(guest, tablet);
+
+    const left = await app.inject({
+      method: 'POST',
+      url: `/v1/orders/${order.id}/review`,
+      headers: auth(guest),
+      payload: {
+        stars: 5,
+        // Rating something you did not order is either a mistake or an attempt
+        // to move an average.
+        dishes: [{ menu_item_id: venue.menuIds['steak'], stars: 1 }],
+      },
+    });
+    expect(left.json().review.dishes).toEqual([]);
+
+    const menu = await app.inject({
+      method: 'GET',
+      url: `/v1/restaurants/${venue.restaurantId}/menu`,
+    });
+    const steak = (menu.json().items as Array<{ name: string; rating: unknown }>).find(
+      (i) => i.name === 'Стейк',
+    );
+    expect(steak?.rating).toBeNull();
+  });
+
+  it('rejects a rating outside one to five', async () => {
+    const guest = await signIn();
+    const tablet = await pairTablet(venue.restaurantId);
+    const order = await anEatenOrder(guest, tablet);
+
+    for (const stars of [0, 6, 2.5]) {
+      const response = await app.inject({
+        method: 'POST',
+        url: `/v1/orders/${order.id}/review`,
+        headers: auth(guest),
+        payload: { stars },
+      });
+      expect(response.statusCode, String(stars)).toBeGreaterThanOrEqual(400);
+    }
+  });
+
+  it('never puts a phone number next to a comment', async () => {
+    const phone = '+97699005555';
+    const guest = await signIn(phone);
+    const tablet = await pairTablet(venue.restaurantId);
+    const order = await anEatenOrder(guest, tablet);
+    await app.inject({
+      method: 'POST',
+      url: `/v1/orders/${order.id}/review`,
+      headers: auth(guest),
+      payload: { stars: 4, comment: 'Сайхан байлаа' },
+    });
+
+    const summary = await app.inject({
+      method: 'GET',
+      url: `/v1/restaurants/${venue.restaurantId}/reviews`,
+    });
+    const body = summary.body;
+    expect(body).toContain('Сайхан байлаа');
+    expect(body).not.toContain(phone);
+    expect(body).not.toContain('99005555');
+  });
+
+  it('shows a restaurant’s rating on the list a guest browses', async () => {
+    const guest = await signIn();
+    const tablet = await pairTablet(venue.restaurantId);
+    const order = await anEatenOrder(guest, tablet);
+    await app.inject({
+      method: 'POST',
+      url: `/v1/orders/${order.id}/review`,
+      headers: auth(guest),
+      payload: { stars: 5, on_time: true },
+    });
+
+    const list = await app.inject({ method: 'GET', url: '/v1/restaurants' });
+    const mine = (list.json().restaurants as Array<{ id: string; rating: never }>).find(
+      (r) => r.id === venue.restaurantId,
+    );
+    expect(mine?.rating).toMatchObject({ stars: 5, count: 1, onTimeShare: 1 });
+  });
+});
