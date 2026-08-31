@@ -550,6 +550,48 @@ describe('the kitchen display', () => {
     expect(text(kds)).toContain('Ирж явна');
   });
 
+  it('names the kitchen it is watching, and lets the chef change it', async () => {
+    // These pages share one store, the way one browser origin does, and the
+    // pairing tests move the token about. Start from a tablet we chose.
+    storage.setItem('basu.device', await tabletFor(pairedVenue));
+
+    const kds = await openPage('kds.html');
+    await until(kds, 'the board', (d) => d.querySelectorAll('.lane').length === 3);
+
+    // An unnamed empty board looks the same whether nothing has been ordered
+    // or the tablet is watching somebody else's kitchen.
+    expect(kds.window.document.querySelector('#venue')?.textContent).toBe(pairedVenue);
+
+    // A tablet paired to the wrong kitchen must have a way back that is not
+    // "clear your browser storage".
+    (kds.window.document.querySelector('#swap') as HTMLElement).click();
+    await until(kds, 'the pairing screen', (d) => Boolean(d.querySelector('.pair')));
+    expect(text(kds)).toContain('Таблетаа холбоно уу');
+
+    // …and picking the all-kitchens view from there works.
+    clickText(kds, '.venues button', 'Бүх гал тогоо');
+    await until(kds, 'the merged board', (d) => d.querySelectorAll('.lane').length === 3);
+    expect(kds.window.document.querySelector('#venue')?.textContent).toBe('Бүх гал тогоо');
+
+    // Put the storage back the way the other tests expect to find it.
+    storage.setItem('basu.device', await tabletFor(pairedVenue));
+  });
+
+  it('shows every kitchen at once when asked to', async () => {
+    // The isolation is real and tested elsewhere; this is the demo view that
+    // exists because a walkthrough moves between ten venues and orders placed
+    // at nine of them would otherwise be invisible.
+    const before = storage.getItem('basu.device');
+    storage.setItem('basu.device', 'all-kitchens');
+    try {
+      const kds = await openPage('kds.html');
+      await until(kds, 'the merged board', (d) => d.querySelectorAll('.lane').length === 3);
+      expect(kds.window.document.querySelector('#venue')?.textContent).toBe('Бүх гал тогоо');
+    } finally {
+      if (before) storage.setItem('basu.device', before);
+    }
+  });
+
   it('sends a revoked tablet back to the pairing screen', async () => {
     const kds = await openPage('kds.html');
     await until(kds, 'the board', (d) => d.querySelectorAll('.lane').length === 3);

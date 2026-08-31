@@ -469,6 +469,16 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
    * see the note on /dev/kds/tickets.
    */
   const board = async (restaurantId: string | null) => {
+    // Which kitchen this is. A chef needs to see at a glance that they are on
+    // the right board — an unnamed empty board looks the same whether nothing
+    // has been ordered or the tablet is watching somebody else's kitchen.
+    const named = restaurantId
+      ? await db.query<{ name: string }>('SELECT name FROM restaurant WHERE id = $1', [
+          restaurantId,
+        ])
+      : null;
+    const watching = named?.rows[0]?.name ?? null;
+
     const { rows } = await db.query(
       `SELECT o.id, o.code, o.state, o.party_size, o.slot_starts_at, o.fire_at,
               o.ready_at, o.eta_at, o.seated_at, o.order_prep_minutes,
@@ -536,7 +546,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
       else lanes.incoming.push(ticket);
     }
 
-    return { now: hhmm(now), lanes };
+    return { now: hhmm(now), watching, lanes };
   };
 
   app.get('/v1/kds/tickets', { preHandler: requireDevice }, async (request) =>

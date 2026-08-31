@@ -22,6 +22,14 @@ body{background:var(--sunk)}
   font-family:"IBM Plex Mono",monospace;font-size:1.15rem;font-weight:600;
   font-variant-numeric:tabular-nums;margin-left:auto;
 }
+/* A tablet paired to the wrong kitchen had no way back to the pairing screen
+   except clearing its storage. This is that way back. */
+.top .swap{
+  font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3);background:none;
+  border:1px solid var(--line-2);border-radius:2px;padding:3px 8px;
+}
+.top .swap:hover{color:var(--ink);border-color:var(--ink-3)}
 .top .conn{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ready)}
 .top .conn[data-stale]{color:var(--stop)}
 
@@ -240,7 +248,8 @@ function renderBoard(data) {
   const frame = el(`
     <div>
       <div class="top">
-        <h1 id="venue">${watchingAll() ? 'Бүх гал тогоо' : 'Гал тогоо'}</h1>
+        <h1 id="venue">${watchingAll() ? 'Бүх гал тогоо' : (data.watching ?? 'Гал тогоо')}</h1>
+        <button class="swap" type="button" id="swap">Солих</button>
         <span class="conn" id="conn">холбогдсон</span>
         <span class="clock mn">${data.now}</span>
       </div>
@@ -258,9 +267,15 @@ function renderBoard(data) {
     const stack = column.querySelector('.stack');
 
     if (!tickets.length) stack.append(el('<div class="none">—</div>'));
+
     for (const ticket of tickets) stack.append(renderTicket(ticket, lane.key));
     board.append(column);
   }
+
+  frame.querySelector('#swap').addEventListener('click', () => {
+    store.deviceToken = null;
+    showPairing();
+  });
 
   root.replaceChildren(frame);
   window.scrollTo(0, scroll);
