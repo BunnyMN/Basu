@@ -13,10 +13,15 @@ import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '..
  * cross-restaurant isolation is easier to see than to take on trust.
  */
 
+/**
+ * Three venues around the Shangri-La office towers, which is the pilot's
+ * setting: everything within a ten-minute walk of the same lobby, because the
+ * density is the point (§01 of the ops playbook).
+ */
 const VENUES = [
-  { name: 'Модерн Номадс', tin: '1234567', travel: 5 },
-  { name: 'Хаан Буузны Газар', tin: '2345678', travel: 8 },
-  { name: 'Ногоон Байшин', tin: '3456789', travel: 10 },
+  { name: 'Модерн Номадс', tin: '1234567', travel: 5, lat: 47.913_8, lon: 106.916_5 },
+  { name: 'Хаан Буузны Газар', tin: '2345678', travel: 8, lat: 47.915_5, lon: 106.921_5 },
+  { name: 'Ногоон Байшин', tin: '3456789', travel: 10, lat: 47.910_5, lon: 106.924_3 },
 ];
 
 const SERVICE = ['11:30', '11:45', '12:00', '12:15', '12:30', '12:45', '13:00', '13:15', '13:30'];
@@ -68,9 +73,17 @@ export async function seedDemo(): Promise<{
 
   for (const venue of VENUES) {
     const { rows } = await db.query<{ id: string }>(
-      `INSERT INTO restaurant (name, plating_buffer_min, travel_minutes, ebarimt_merchant_tin)
-       VALUES ($1, $2, $3, $4) RETURNING id`,
-      [venue.name, PILOT_KITCHEN.platingBufferMinutes, venue.travel, venue.tin],
+      `INSERT INTO restaurant
+         (name, plating_buffer_min, travel_minutes, ebarimt_merchant_tin, lat, lon)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [
+        venue.name,
+        PILOT_KITCHEN.platingBufferMinutes,
+        venue.travel,
+        venue.tin,
+        venue.lat,
+        venue.lon,
+      ],
     );
     const restaurantId = rows[0]!.id;
 

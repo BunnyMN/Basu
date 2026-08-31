@@ -63,15 +63,98 @@ async function openPage(file: string): Promise<JSDOM> {
     fetch(new URL(String(input), base).toString(), init)) as typeof fetch;
   Object.defineProperty(window, 'localStorage', { value: storage, writable: true });
 
-  const shared = (await readFile(join(WEB, 'api.js'), 'utf8')).replace(/\bexport\s+/g, '');
+  // Every local module the page imports, inlined. jsdom cannot resolve module
+  // specifiers, so the pieces are concatenated and run as one script — the same
+  // code the browser loads, minus the plumbing.
+  const strip = (source: string) => source.replace(/\bexport\s+/g, '');
+  const shared = strip(await readFile(join(WEB, 'api.js'), 'utf8'));
+  const mapLib = strip(await readFile(join(WEB, 'mapStyle.js'), 'utf8'));
   const inline = /<script type="module">([\s\S]*?)<\/script>/.exec(html)?.[1] ?? '';
-  const page = inline.replace(/import\s*\{[^}]*\}\s*from\s*'\/api\.js';?/, '');
+  const page = inline.replace(/^\s*import[\s\S]*?from\s*'\/[\w.]+';?$/gm, '');
 
-  // The page module and its helper, concatenated and run as one script — the
-  // same code the browser loads, minus the module plumbing jsdom lacks.
-  window.eval(`(async () => { ${shared}\n${page} })().catch(e => { window.__err = e; });`);
+  stubMapLibre(window);
+  window.eval(
+    `(async () => { ${shared}\n${mapLib}\n${page} })().catch(e => { window.__err = e; });`,
+  );
   open.push(dom);
   return dom;
+}
+
+/**
+ * Just enough MapLibre for the page to run.
+ *
+ * The real library needs WebGL, which jsdom has none of. Stubbing it keeps the
+ * sheet, the menu and the ordering flow under test — the parts a person
+ * actually operates — and doubles as a list of what the page depends on: a
+ * method that disappears from this stub is a method the page should stop
+ * calling.
+ */
+function stubMapLibre(window: JSDOM['window']): void {
+  const canvas = { style: {} as Record<string, string> };
+
+  class StubMap {
+    #handlers = new Map<string, Array<(event: unknown) => void>>();
+    #sources = new Map<string, { setData: (data: unknown) => void; data: unknown }>();
+    readonly layers: string[] = [];
+    readonly images: string[] = [];
+
+    constructor() {
+      (window as unknown as Record<string, unknown>)['__map'] = this;
+      // 'load' is what gates the page's first paint, so it has to arrive.
+      setTimeout(() => this.#fire('load', {}), 0);
+    }
+    on(event: string, second: unknown, third?: unknown) {
+      const handler = (typeof second === 'function' ? second : third) as (e: unknown) => void;
+      const key = typeof second === 'string' ? `${event}:${second}` : event;
+      const list = this.#handlers.get(key) ?? [];
+      list.push(handler);
+      this.#handlers.set(key, list);
+    }
+    #fire(key: string, event: unknown) {
+      for (const handler of this.#handlers.get(key) ?? []) handler(event);
+    }
+    /** Tests use this to click a pin. */
+    clickLayer(layer: string, event: unknown) {
+      this.#fire(`click:${layer}`, event);
+    }
+    addControl() {}
+    addImage(id: string) {
+      this.images.push(id);
+    }
+    addSource(id: string, source: { data: unknown }) {
+      const entry = { data: source.data, setData: (data: unknown) => (entry.data = data) };
+      this.#sources.set(id, entry);
+    }
+    getSource(id: string) {
+      return this.#sources.get(id);
+    }
+    addLayer(layer: { id: string }) {
+      this.layers.push(layer.id);
+    }
+    easeTo() {}
+    getCanvas() {
+      return canvas;
+    }
+  }
+
+  class StubGeolocate {
+    on() {}
+  }
+
+  const global = window as unknown as Record<string, unknown>;
+  global['maplibregl'] = {
+    Map: StubMap,
+    NavigationControl: class {},
+    GeolocateControl: StubGeolocate,
+  };
+  global['__StubMap'] = StubMap;
+
+  // pinImage draws on a canvas; jsdom has no 2D context, so give it a sink.
+  const sink = new Proxy(
+    { getImageData: () => ({ data: new Uint8ClampedArray(4) }) },
+    { get: (target, key) => (key in target ? (target as never)[key] : () => {}) },
+  );
+  window.HTMLCanvasElement.prototype.getContext = (() => sink) as never;
 }
 
 function memoryStorage() {
@@ -151,52 +234,123 @@ afterAll(async () => {
   await closePool();
 });
 
+/** The pins the map is currently drawing. */
+function pins(dom: JSDOM): Array<{ properties: Record<string, unknown> }> {
+  const map = (dom.window as unknown as Record<string, unknown>)['__map'] as
+    | { getSource: (id: string) => { data: { features: Array<{ properties: Record<string, unknown> }> } } | undefined }
+    | undefined;
+  return map?.getSource('venues')?.data.features ?? [];
+}
+
+/** Tap a restaurant pin, the way a thumb does. */
+function tapPin(dom: JSDOM, name: string): void {
+  const pin = pins(dom).find((f) => f.properties['label'] === name);
+  if (!pin) {
+    throw new Error(
+      `no pin for "${name}" — saw ${pins(dom)
+        .map((f) => String(f.properties['label']))
+        .join(', ')}`,
+    );
+  }
+  const map = (dom.window as unknown as Record<string, unknown>)['__map'] as {
+    clickLayer: (layer: string, event: unknown) => void;
+  };
+  map.clickLayer('venue-pin', { features: [{ properties: pin.properties }] });
+}
+
+/** Place and pay for an order through the guest page, from a pin. */
+async function orderFromMap(
+  dom: JSDOM,
+  venue: string,
+  dish: string,
+  slot: string,
+): Promise<void> {
+  await until(dom, 'pins on the map', () => pins(dom).length >= 3);
+  tapPin(dom, venue);
+  await until(dom, 'the menu', (d) => d.querySelectorAll('.item').length > 3);
+  const row = [...dom.window.document.querySelectorAll('.item')].find((r) =>
+    r.textContent?.includes(dish),
+  );
+  if (!row) throw new Error(`no menu row for ${dish}`);
+  (row.querySelector('button[data-d="1"]') as HTMLElement).click();
+  await until(dom, 'the pay button', (d) => Boolean(d.querySelector('.sheet footer button')));
+  clickText(dom, '.slot', slot);
+  await until(dom, 'a price', (d) =>
+    (d.querySelector('.sheet footer button')?.textContent ?? '').includes('төлөх'),
+  );
+  (dom.window.document.querySelector('.sheet footer button') as HTMLElement).click();
+  await until(dom, 'the status screen', (d) => Boolean(d.querySelector('.status')));
+}
+
 describe('the guest app', () => {
-  it('walks a person from the venue list to a paid order', async () => {
+  it('draws every restaurant, and says which are taking orders', async () => {
     const dom = await openPage('index.html');
+    await until(dom, 'pins on the map', (d) => {
+      void d;
+      return pins(dom).length >= 3;
+    });
 
-    await until(dom, 'the venue list', (d) => d.querySelectorAll('.card').length >= 3);
-    expect(text(dom)).toContain('Модерн Номадс');
-    // The clock strip is what makes lunch demonstrable at any hour.
-    expect(dom.window.document.querySelector('.clockbar .now')?.textContent).toBe('11:40');
+    const drawn = pins(dom);
+    expect(drawn).toHaveLength(3);
+    // Two kitchens are watching and the third is dark; the pin carries that
+    // distinction, because it is the one thing to know before tapping.
+    expect(drawn.filter((f) => f.properties['open']).length).toBe(2);
+    expect(text(dom)).toContain('2/3 ресторан захиалга авч байна');
+  });
 
-    // Only the paired restaurant takes orders, and the list says which.
-    expect(text(dom)).toContain('одоогоор хаалттай');
+  it('walks a person from a pin to a paid order', async () => {
+    const dom = await openPage('index.html');
+    await until(dom, 'pins on the map', () => pins(dom).length >= 3);
 
-    clickText(dom, '.card button', pairedVenue);
-
+    tapPin(dom, pairedVenue);
     await until(dom, 'the menu', (d) => d.querySelectorAll('.item').length > 3);
+    expect(dom.window.document.querySelector('.sheet')?.hasAttribute('data-open')).toBe(true);
     expect(text(dom)).toContain('Цуйван');
-    expect(text(dom)).toContain('Хуушуур');
+    expect(text(dom)).toContain('мин алхаад');
 
-    // Two цуйван.
     const rows = [...dom.window.document.querySelectorAll('.item')];
     const tsuivan = rows.find((r) => r.textContent?.includes('Цуйван'))!;
     const plus = tsuivan.querySelector('button[data-d="1"]') as HTMLElement;
     plus.click();
     plus.click();
 
-    await until(dom, 'the pay bar', (d) => Boolean(d.querySelector('.paybar')));
+    await until(dom, 'the pay button', (d) => Boolean(d.querySelector('.sheet footer button')));
     // Cancellation terms sit next to the money, never buried.
     expect(text(dom)).toContain('гал дээр гарахаас өмнө');
-    expect(dom.window.document.querySelector('.paybar button')?.textContent).toContain(
+    expect(dom.window.document.querySelector('.sheet footer button')?.textContent).toContain(
       'Цагаа сонгоно уу',
     );
 
     clickText(dom, '.slot', '12:30');
-    await until(dom, 'the price on the button', (d) =>
-      (d.querySelector('.paybar button')?.textContent ?? '').includes('төлөх'),
+    await until(dom, 'a price', (d) =>
+      (d.querySelector('.sheet footer button')?.textContent ?? '').includes('төлөх'),
     );
-    expect(dom.window.document.querySelector('.paybar button')?.textContent).toContain('28,000₮');
+    expect(dom.window.document.querySelector('.sheet footer button')?.textContent).toContain(
+      '28,000₮',
+    );
 
-    (dom.window.document.querySelector('.paybar button') as HTMLElement).click();
+    (dom.window.document.querySelector('.sheet footer button') as HTMLElement).click();
 
     await until(dom, 'the status screen', (d) => Boolean(d.querySelector('.status')));
     expect(text(dom)).toMatch(/№\d{4}/);
     expect(text(dom)).toContain('Ширээ');
     expect(text(dom)).toContain('Үнэгүй цуцлах');
-    // The whole journey is visible, not just the current step.
     expect(dom.window.document.querySelectorAll('.timeline li')).toHaveLength(5);
+    // The sheet is out of the way once the order exists.
+    expect(dom.window.document.querySelector('.sheet')?.hasAttribute('data-open')).toBe(false);
+  });
+
+  it('explains a dark kitchen instead of offering its menu', async () => {
+    const dom = await openPage('index.html');
+    await until(dom, 'pins on the map', () => pins(dom).length >= 3);
+
+    const shut = pins(dom).find((f) => !f.properties['open'])!;
+    tapPin(dom, String(shut.properties['label']));
+
+    await until(dom, 'the explanation', (d) => Boolean(d.querySelector('.sheet .note')));
+    expect(text(dom)).toContain('захиалга авахгүй байна');
+    // And no menu was offered.
+    expect(dom.window.document.querySelectorAll('.sheet .item')).toHaveLength(0);
   });
 
   it('recovers from a session that outlived its server', async () => {
@@ -205,20 +359,20 @@ describe('the guest app', () => {
     storage.setItem('basu.guest', 'stale-token-from-a-previous-life');
 
     const dom = await openPage('index.html');
-    await until(dom, 'the venue list', (d) => d.querySelectorAll('.card').length >= 3);
-    clickText(dom, '.card button', pairedVenue);
+    await until(dom, 'pins on the map', () => pins(dom).length >= 3);
+    tapPin(dom, pairedVenue);
     await until(dom, 'the menu', (d) => d.querySelectorAll('.item').length > 3);
 
     const salad = [...dom.window.document.querySelectorAll('.item')].find((r) =>
       r.textContent?.includes('Салат'),
     )!;
     (salad.querySelector('button[data-d="1"]') as HTMLElement).click();
-    await until(dom, 'the pay bar', (d) => Boolean(d.querySelector('.paybar')));
+    await until(dom, 'the pay button', (d) => Boolean(d.querySelector('.sheet footer button')));
     clickText(dom, '.slot', '13:15');
     await until(dom, 'a price', (d) =>
-      (d.querySelector('.paybar button')?.textContent ?? '').includes('төлөх'),
+      (d.querySelector('.sheet footer button')?.textContent ?? '').includes('төлөх'),
     );
-    (dom.window.document.querySelector('.paybar button') as HTMLElement).click();
+    (dom.window.document.querySelector('.sheet footer button') as HTMLElement).click();
 
     // Signed in again behind the scenes; the order goes through.
     await until(dom, 'the status screen', (d) => Boolean(d.querySelector('.status')));
@@ -227,54 +381,28 @@ describe('the guest app', () => {
   });
 
   it('says what to do when no kitchen is watching at all', async () => {
-    // Every tablet has gone quiet — the guard is working, but a list of three
-    // shut restaurants with no explanation is a dead end for whoever is looking.
+    // Every tablet has gone quiet — the guard is working, but a map of grey
+    // pins with no explanation is a dead end for whoever is looking.
     await getPool().query(`UPDATE kds_device SET last_seen_at = now() - interval '1 day'`);
     try {
       const dom = await openPage('index.html');
-      await until(dom, 'the explanation', (d) => Boolean(d.querySelector('.note')));
+      await until(dom, 'the explanation', (d) => Boolean(d.querySelector('#map .note')));
       expect(text(dom)).toContain('нэг ч гал тогоо холбогдоогүй');
       expect(dom.window.document.querySelector('.note a')?.getAttribute('href')).toBe('/kds');
+      // The pins are still drawn — the map is not the thing that failed.
+      expect(pins(dom).length).toBe(3);
+      expect(pins(dom).every((f) => !f.properties['open'])).toBe(true);
     } finally {
       await getPool().query(`UPDATE kds_device SET last_seen_at = now()
                               WHERE paired_at IS NOT NULL AND revoked_at IS NULL`);
     }
-  });
-
-  it('refuses a restaurant with no tablet watching, and says why', async () => {
-    const dom = await openPage('index.html');
-    await until(dom, 'the venue list', (d) => d.querySelectorAll('.card').length >= 3);
-
-    const closed = [...dom.window.document.querySelectorAll('.card')].find((c) =>
-      c.textContent?.includes('одоогоор хаалттай'),
-    )!;
-    (closed.querySelector('button') as HTMLElement).click();
-
-    await until(dom, 'the explanation', (d) =>
-      (d.querySelector('#toast')?.textContent ?? '').includes('захиалга авахгүй'),
-    );
-    // And it did not navigate away from the list.
-    expect(dom.window.document.querySelectorAll('.card').length).toBeGreaterThanOrEqual(3);
   });
 });
 
 describe('the kitchen display', () => {
   it('shows the ticket a guest just placed', async () => {
     const guest = await openPage('index.html');
-    await until(guest, 'the venue list', (d) => d.querySelectorAll('.card').length >= 3);
-    clickText(guest, '.card button', pairedVenue);
-    await until(guest, 'the menu', (d) => d.querySelectorAll('.item').length > 3);
-    const rows = [...guest.window.document.querySelectorAll('.item')];
-    (rows
-      .find((r) => r.textContent?.includes('Хуушуур'))!
-      .querySelector('button[data-d="1"]') as HTMLElement).click();
-    await until(guest, 'the pay bar', (d) => Boolean(d.querySelector('.paybar')));
-    clickText(guest, '.slot', '12:45');
-    await until(guest, 'a price', (d) =>
-      (d.querySelector('.paybar button')?.textContent ?? '').includes('төлөх'),
-    );
-    (guest.window.document.querySelector('.paybar button') as HTMLElement).click();
-    await until(guest, 'the status screen', (d) => Boolean(d.querySelector('.status')));
+    await orderFromMap(guest, pairedVenue, 'Хуушуур', '12:45');
 
     /* now the kitchen */
     const kds = await openPage('kds.html');

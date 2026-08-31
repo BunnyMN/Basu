@@ -28,6 +28,7 @@ import {
 } from '../services/orders.js';
 import { enqueueNotification } from '../services/notifications.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
+import { registerMapRoutes } from './tiles.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -82,6 +83,10 @@ export interface ServerOptions {
 export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? false });
   const db = getPool();
+
+  // Tiles and glyphs, same-origin. See src/api/tiles.ts for why they are
+  // proxied rather than fetched straight from the tile host.
+  await registerMapRoutes(app);
 
   /* ── who is calling ─────────────────────────────────────────────── */
 
@@ -199,14 +204,22 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
 
   app.get('/v1/restaurants', async () => {
     const { rows } = await db.query(
-      `SELECT id, name, travel_minutes FROM restaurant WHERE active ORDER BY name`,
+      `SELECT id, name, travel_minutes, lat, lon FROM restaurant WHERE active ORDER BY name`,
     );
     const out = [];
-    for (const r of rows as Array<{ id: string; name: string; travel_minutes: number }>) {
+    for (const r of rows as Array<{
+      id: string;
+      name: string;
+      travel_minutes: number;
+      lat: number | null;
+      lon: number | null;
+    }>) {
       out.push({
         id: r.id,
         name: r.name,
         walk_minutes: r.travel_minutes,
+        lat: r.lat === null ? null : Number(r.lat),
+        lon: r.lon === null ? null : Number(r.lon),
         // A kitchen nobody is watching cannot take an order (§08).
         accepting_orders: await isRestaurantOnline(ctx, r.id),
       });
