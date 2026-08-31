@@ -27,6 +27,14 @@ body{display:flex;flex-direction:column}
 .badge b{display:block;font-size:.92rem;font-weight:800;letter-spacing:-.02em}
 .badge span{font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--ink-3)}
 
+/* The walk, when a venue is open and we know where the guest is. */
+.walk{
+  display:flex;align-items:center;gap:8px;margin-top:6px;
+  font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--route);
+}
+.walk b{font-weight:600;font-variant-numeric:tabular-nums}
+.walk .guess{color:var(--ink-3)}
+
 /* ── the sheet a pin opens ──────────────────────────────────────── */
 .scrim{
   position:fixed;inset:0;z-index:20;background:rgba(10,14,16,.45);
@@ -97,11 +105,26 @@ body{display:flex;flex-direction:column}
 .slot[disabled]{opacity:.32;cursor:not-allowed;text-decoration:line-through}
 
 /* ── status, once an order exists ────────────────────────────────── */
-.statuswrap{position:fixed;inset:0;z-index:30;background:var(--bg);overflow-y:auto;padding:0 16px 40px;display:none}
-.statuswrap[data-open]{display:block}
-.statuswrap .inner{max-width:520px;margin:0 auto}
-.statuswrap h1{font-size:1.5rem;font-weight:900;letter-spacing:-.035em;padding:24px 0 2px}
-.statuswrap .who{font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--ink-3);margin-bottom:14px}
+/* A guest walking to the restaurant wants the progress and the route at the
+   same time, so this is a sheet over the map rather than a page instead of it.
+   Dismissing it leaves a bar at the bottom to bring it back. */
+.orderbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:22;
+  background:var(--surface);border-top:1px solid var(--line);
+  padding:11px 16px calc(12px + env(safe-area-inset-bottom));
+  display:none;align-items:center;gap:12px;text-align:left;width:100%;
+  box-shadow:0 -8px 24px -18px rgba(0,0,0,.45);color:inherit;border-left:none;border-right:none;
+}
+.orderbar[data-open]{display:flex}
+@media(min-width:640px){
+  .orderbar{left:50%;right:auto;width:520px;transform:translateX(-50%);border-radius:8px 8px 0 0;border:1px solid var(--line);border-bottom:none}
+}
+.orderbar .code{font-family:"IBM Plex Mono",monospace;font-size:.86rem;font-weight:600}
+.orderbar .what{font-size:.82rem;color:var(--ink-2);margin-top:1px}
+.orderbar .when{
+  margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:1.05rem;font-weight:600;
+  font-variant-numeric:tabular-nums;color:var(--accent-ink);
+}
 .status{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:20px 18px;text-align:center}
 .status .big{font-size:2.2rem;font-weight:900;letter-spacing:-.04em;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;line-height:1}
 .status .cap{font-size:.8rem;color:var(--ink-3);margin-top:6px}
@@ -143,6 +166,7 @@ body{display:flex;flex-direction:column}
     <div>
       <h2 id="sheet-name">—</h2>
       <div class="sub" id="sheet-sub"></div>
+      <div class="walk" id="sheet-walk"></div>
     </div>
     <button class="x" type="button" id="sheet-close" aria-label="Хаах">✕</button>
   </header>
@@ -150,11 +174,13 @@ body{display:flex;flex-direction:column}
   <footer id="sheet-foot"></footer>
 </section>
 
-<div class="statuswrap" id="statuswrap"><div class="inner">
-  <h1 id="st-code">—</h1>
-  <div class="who" id="st-where"></div>
-  <div id="st-body"></div>
-</div></div>
+<button class="orderbar" id="orderbar" type="button">
+  <div>
+    <div class="code" id="ob-code">—</div>
+    <div class="what" id="ob-what"></div>
+  </div>
+  <div class="when" id="ob-when"></div>
+</button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
 <script type="module">
@@ -170,6 +196,9 @@ const el = (html) => {
 
 const SOURCE = 'venues';
 const LAYER = 'venue-pin';
+const ROUTE = 'walk';
+
+const emptyLine = () => ({ type: 'FeatureCollection', features: [] });
 
 const state = {
   venues: [],
@@ -180,6 +209,7 @@ const state = {
   slot: null,
   orderId: null,
   here: null,
+  route: null,
   /** Geofence bands already reported for the current order. */
   sent: new Set(),
 };
@@ -221,7 +251,12 @@ const map = new maplibregl.Map({
   container: 'map',
   style,
   center: [ULAANBAATAR.lon, ULAANBAATAR.lat],
-  zoom: 15.2,
+  // Tilted, because the buildings are the landmark. A guest deciding between
+  // two lunches five minutes apart recognises the tower they work in long
+  // before they recognise a street name, and the tiles carry building heights.
+  zoom: 15.4,
+  pitch: 55,
+  bearing: -17,
   attributionControl: { compact: true, customAttribution: '© OpenStreetMap' },
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
@@ -255,9 +290,69 @@ map.addControl(geolocate, 'bottom-right');
 geolocate.on('geolocate', (position) => {
   const { latitude: lat, longitude: lon } = position.coords;
   if (!isCovered(lat, lon)) return; // outside the tiles, and outside the pilot
+  const first = !state.here;
   state.here = { lat, lon };
   void reportProximity();
+  // A venue may already be open; the walk to it is now answerable.
+  if (state.venue) void drawWalk(state.venue);
+  if (first && !state.venue) map.easeTo({ center: [lon, lat], duration: 700 });
 });
+
+/**
+ * The walk from here to a restaurant: the road somebody would take, how far it
+ * is, and how long it takes on foot.
+ *
+ * The straight line between two points in a city is short by about a third —
+ * buildings are in the way — so this asks the server, which has the road
+ * geometry. When the router cannot be reached it answers with a straight line
+ * marked `direct`, and the layer above draws that dashed.
+ */
+async function drawWalk(venue) {
+  const walk = document.getElementById('sheet-walk');
+  if (!state.here || !venue?.lat) {
+    map.getSource(ROUTE)?.setData(emptyLine());
+    if (walk) walk.textContent = '';
+    return;
+  }
+
+  const from = `${state.here.lon},${state.here.lat}`;
+  const to = `${venue.lon},${venue.lat}`;
+  let route;
+  try {
+    route = await api(`/v1/route?from=${from}&to=${to}`);
+  } catch {
+    return;
+  }
+  // The guest may have closed the sheet or opened another one meanwhile.
+  if (state.venue?.id !== venue.id) return;
+  state.route = route;
+
+  map.getSource(ROUTE)?.setData({
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: route.line },
+        properties: { direct: route.kind === 'direct' },
+      },
+    ],
+  });
+
+  const km = route.metres >= 1000 ? `${(route.metres / 1000).toFixed(1)} км` : `${route.metres} м`;
+  const sub = document.getElementById('sheet-walk');
+  if (sub) {
+    sub.innerHTML =
+      `<span>🚶</span><b>${km}</b><span>·</span><b>${route.minutes} мин</b>` +
+      (route.kind === 'direct' ? '<span class="guess">ойролцоогоор</span>' : '');
+  }
+
+  // Show both ends of the walk at once.
+  const bounds = route.line.reduce(
+    (box, point) => box.extend(point),
+    new maplibregl.LngLatBounds(route.line[0], route.line[0]),
+  );
+  map.fitBounds(bounds, { padding: { top: 70, bottom: 340, left: 50, right: 50 }, duration: 700 });
+}
 
 async function reportProximity() {
   if (!state.orderId || !state.here || !state.venue?.lat) return;
@@ -281,6 +376,29 @@ let ready = false;
 map.on('load', () => {
   map.addImage('pin-open', pinImage('#C64E08', false), { pixelRatio: 2 });
   map.addImage('pin-shut', pinImage('#78868E', true), { pixelRatio: 2 });
+
+  // The walk, under the pins so a pin is never hidden by its own route.
+  map.addSource(ROUTE, { type: 'geojson', data: emptyLine() });
+  map.addLayer({
+    id: 'route-casing',
+    type: 'line',
+    source: ROUTE,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-opacity': 0.9 },
+  });
+  map.addLayer({
+    id: 'route-line',
+    type: 'line',
+    source: ROUTE,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: {
+      'line-color': '#1B5B8F',
+      'line-width': 5,
+      // Dashed when it is a straight line rather than a surveyed route, so a
+      // guess never draws itself as something somebody measured.
+      'line-dasharray': ['case', ['get', 'direct'], ['literal', [1.4, 1.2]], ['literal', [1, 0]]],
+    },
+  });
 
   map.addSource(SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({
@@ -370,11 +488,27 @@ async function loadVenues() {
 function closeSheet() {
   $('sheet').removeAttribute('data-open');
   $('scrim').removeAttribute('data-open');
+
+  if (state.orderId) {
+    // The order is still live: keep its route on the map and leave a bar to
+    // bring the detail back. Someone walking there wants to see both.
+    $('orderbar').dataset.open = '1';
+    return;
+  }
+  // No order — the route belonged to a venue nobody chose.
+  map.getSource(ROUTE)?.setData(emptyLine());
+  state.venue = null;
+  state.route = null;
 }
 $('sheet-close').addEventListener('click', closeSheet);
 $('scrim').addEventListener('click', closeSheet);
+$('orderbar').addEventListener('click', () => {
+  $('orderbar').removeAttribute('data-open');
+  void showStatus();
+});
 
 async function openVenue(venue) {
+  $('orderbar').removeAttribute('data-open');
   state.venue = venue;
   state.cart = new Map();
   state.slot = null;
@@ -392,8 +526,14 @@ async function openVenue(venue) {
   $('sheet').dataset.open = '1';
   $('scrim').dataset.open = '1';
 
-  // Lift the pin above the sheet rather than leaving it hidden behind it.
-  map.easeTo({ center: [venue.lon, venue.lat], zoom: 16.4, offset: [0, -120], duration: 500 });
+  document.getElementById('sheet-walk').textContent = '';
+  if (state.here) {
+    // The walk answers "is this worth it" before the menu does.
+    void drawWalk(venue);
+  } else {
+    // Lift the pin above the sheet rather than leaving it hidden behind it.
+    map.easeTo({ center: [venue.lon, venue.lat], zoom: 16.6, offset: [0, -120], duration: 500 });
+  }
 
   if (!venue.accepting_orders) {
     $('sheet-body').replaceChildren(
@@ -508,7 +648,6 @@ async function placeOrder() {
     await guestApi(`/v1/orders/${order.id}/pay`, { method: 'POST' });
     state.orderId = order.id;
     state.sent = new Set();
-    closeSheet();
     await showStatus();
   } catch (error) {
     toast(error.message, 'bad');
@@ -544,12 +683,6 @@ async function showStatus() {
   if (!state.orderId) return;
   const order = await guestApi(`/v1/orders/${state.orderId}`);
 
-  $('statuswrap').dataset.open = '1';
-  $('st-code').textContent = `№${order.code}`;
-  $('st-where').textContent = [state.venue?.name, order.table && `Ширээ ${order.table}`]
-    .filter(Boolean)
-    .join(' · ');
-
   // The states that carry a time say it; the rest carry a word.
   const [word, cap] = HEADLINE[order.state] ?? [null, ''];
   const big = word ?? hhmm(order.fire_at);
@@ -563,7 +696,20 @@ async function showStatus() {
           ? `${hhmm(order.ready_at)}-д бэлэн болно`
           : '');
 
-  const body = $('st-body');
+  // The collapsed bar carries the same answer in one line.
+  $('ob-code').textContent = `№${order.code}`;
+  $('ob-what').textContent = sub || String(word ?? '');
+  $('ob-when').textContent = HEADLINE[order.state]?.[0] ?? hhmm(order.fire_at);
+
+  $('orderbar').removeAttribute('data-open');
+  $('sheet').dataset.open = '1';
+  $('scrim').dataset.open = '1';
+  $('sheet-name').textContent = `№${order.code}`;
+  $('sheet-sub').textContent = [state.venue?.name, order.table && `Ширээ ${order.table}`]
+    .filter(Boolean)
+    .join(' · ');
+
+  const body = $('sheet-body');
   body.replaceChildren();
 
   const card = el(`
@@ -594,18 +740,15 @@ async function showStatus() {
   card.append(timeline);
   body.append(card);
 
-  if (state.here && state.venue?.lat) {
-    const metres = Math.round(
-      metresBetween(state.here, { lat: state.venue.lat, lon: state.venue.lon }),
-    );
-    body.append(
-      el(`<div class="near">Ресторанаас ${metres}м · ${walkMinutes(metres)} мин алхаад</div>`),
-    );
-  }
+  // The walk is still the thing being watched, so keep it fresh and on the map.
+  if (state.here && state.venue?.lat) void drawWalk(state.venue);
+
+  const foot = $('sheet-foot');
+  foot.replaceChildren();
 
   if (order.can_cancel) {
     const cancel = el(
-      `<button class="btn" data-v="danger" data-size="lg" type="button" style="margin-top:10px">
+      `<button class="btn" data-v="danger" data-size="lg" type="button">
          Үнэгүй цуцлах${order.free_cancel_until ? ` — ${hhmm(order.free_cancel_until)} хүртэл` : ''}
        </button>`,
     );
@@ -618,7 +761,7 @@ async function showStatus() {
       }
       void showStatus();
     });
-    body.append(cancel);
+    foot.append(cancel);
   }
 
   if (order.state === 'ARMED' || order.state === 'SCHEDULED') {
@@ -634,23 +777,27 @@ async function showStatus() {
       await api('/dev/tick', { method: 'POST' }).catch(() => {});
       void showStatus();
     });
-    body.append(otw);
+    foot.append(otw);
   }
 
   if (order.receipt) {
     body.append(
-      el(`<div class="note" style="margin:10px 0 0"><b>Е-баримт</b>
-            <span>Сугалаа ${order.receipt.lottery}</span></div>`),
+      el(`<div class="note"><b>Е-баримт</b><span>Сугалаа ${order.receipt.lottery}</span></div>`),
     );
   }
 
-  const again = el('<button class="back" type="button">← Газрын зураг руу</button>');
-  again.addEventListener('click', () => {
-    $('statuswrap').removeAttribute('data-open');
-    state.orderId = null;
-    void loadVenues();
-  });
-  body.append(again);
+  // Once there is nothing left to watch, let go of the order and the route.
+  if (['SERVED', 'CLOSED', 'REFUNDED', 'CANCELLED', 'NO_SHOW', 'REJECTED'].includes(order.state)) {
+    const again = el('<button class="btn" data-size="lg" type="button" style="margin-top:8px">Шинэ захиалга</button>');
+    again.addEventListener('click', () => {
+      state.orderId = null;
+      state.route = null;
+      map.getSource(ROUTE)?.setData(emptyLine());
+      closeSheet();
+      void loadVenues();
+    });
+    foot.append(again);
+  }
 }
 
 /* ── boot ───────────────────────────────────────────────────────── */

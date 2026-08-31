@@ -355,8 +355,23 @@ describe('the guest app', () => {
     expect(text(dom)).toContain('Ширээ');
     expect(text(dom)).toContain('Үнэгүй цуцлах');
     expect(dom.window.document.querySelectorAll('.timeline li')).toHaveLength(5);
-    // The sheet is out of the way once the order exists.
-    expect(dom.window.document.querySelector('.sheet')?.hasAttribute('data-open')).toBe(false);
+
+    // The status stays over the map rather than replacing it: someone walking
+    // to the restaurant is watching the progress and the route at once.
+    expect(dom.window.document.querySelector('.sheet')?.hasAttribute('data-open')).toBe(true);
+    expect(dom.window.document.querySelector('#map canvas, #map')).toBeTruthy();
+
+    // Dismissing it leaves a bar carrying the same answer in one line.
+    (dom.window.document.querySelector('#sheet-close') as HTMLElement).click();
+    await until(dom, 'the order bar', (d) =>
+      Boolean(d.querySelector('#orderbar')?.hasAttribute('data-open')),
+    );
+    expect(dom.window.document.querySelector('#ob-code')?.textContent).toMatch(/^№\d{4}$/);
+
+    // And tapping it brings the detail back.
+    (dom.window.document.querySelector('#orderbar') as HTMLElement).click();
+    await until(dom, 'the status again', (d) => Boolean(d.querySelector('.status')));
+    expect(dom.window.document.querySelector('#orderbar')?.hasAttribute('data-open')).toBe(false);
   });
 
   it('explains a dark kitchen instead of offering its menu', async () => {

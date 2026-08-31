@@ -69,6 +69,10 @@ body{background:var(--sunk)}
   border-left-color:var(--stop);background:var(--stop-soft);
   box-shadow:inset 0 0 0 1px var(--stop-line);
 }
+.ticket .where{
+  font-family:"Golos Text",sans-serif;font-size:.74rem;font-weight:700;
+  letter-spacing:-.01em;color:var(--ink-2);margin-bottom:3px;overflow-wrap:anywhere;
+}
 .ticket[data-attention] .why{
   font-family:"IBM Plex Mono",monospace;font-size:.66rem;color:var(--stop);
   letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;
@@ -163,6 +167,20 @@ async function showPairing() {
   if (venues.length) {
     card.append(el('<div class="or">эсвэл демо горимоор</div>'));
     const list = el('<div class="venues"></div>');
+
+    // First, because it is what a walkthrough actually needs: orders placed at
+    // any of the ten venues land on one screen instead of nine of them being
+    // invisible.
+    const all = el(`
+      <button type="button" data-watched>
+        Бүх гал тогоо
+        <span class="tag">${venues.length} ресторан</span>
+      </button>`);
+    all.addEventListener('click', () => {
+      store.deviceToken = ALL;
+      boot();
+    });
+    list.append(all);
     for (const venue of venues) {
       const button = el(`
         <button type="button"${venue.watched ? ' data-watched' : ''}>
@@ -202,6 +220,17 @@ const LANES = [
   { key: 'ready', title: 'Бэлэн' },
 ];
 
+/**
+ * Which board this screen is showing.
+ *
+ * A real tablet is paired to one restaurant and sees that one — the token says
+ * so and the API enforces it. A walkthrough moves between ten venues, and
+ * orders placed at nine of them would be invisible on a screen paired to the
+ * tenth, so the demo can watch every kitchen at once.
+ */
+const ALL = 'all-kitchens';
+const watchingAll = () => store.deviceToken === ALL;
+
 let lastSeen = 0;
 
 function renderBoard(data) {
@@ -211,7 +240,7 @@ function renderBoard(data) {
   const frame = el(`
     <div>
       <div class="top">
-        <h1 id="venue">Гал тогоо</h1>
+        <h1 id="venue">${watchingAll() ? 'Бүх гал тогоо' : 'Гал тогоо'}</h1>
         <span class="conn" id="conn">холбогдсон</span>
         <span class="clock mn">${data.now}</span>
       </div>
@@ -257,6 +286,7 @@ function renderTicket(ticket, lane) {
         <span class="cd">${countdown}</span>
       </div>
       ${ticket.needs_attention ? '<div class="why">Багтаамж дүүрсэн — гараар шийд</div>' : ''}
+      ${watchingAll() && ticket.restaurant ? `<div class="where">${ticket.restaurant}</div>` : ''}
       <div class="meta">${ticket.due_at} · ${ticket.party_size} хүн${
         ticket.table ? ` · Ширээ ${ticket.table}` : ''
       }${ticket.guest ? ` · ${ticket.guest}` : ''}${ticket.seated ? ' · СУУСАН' : ''}</div>
@@ -277,16 +307,17 @@ function renderTicket(ticket, lane) {
     button.addEventListener('click', async () => {
       button.disabled = true;
       try {
-        await api(`/v1/kds/tickets/${ticket.id}/${action}`, {
-          method: 'POST',
-          token: store.deviceToken,
-          body: {},
-        });
+        await api(
+          watchingAll()
+            ? `/dev/kds/tickets/${ticket.id}/${action}`
+            : `/v1/kds/tickets/${ticket.id}/${action}`,
+          { method: 'POST', token: watchingAll() ? undefined : store.deviceToken, body: {} },
+        );
         await refreshBoard();
       } catch (error) {
         // A revoked or stale tablet must go back to pairing, not sit there
         // showing "please sign in" over buttons that no longer do anything.
-        if (error.status === 401) {
+        if (error.status === 401 && !watchingAll()) {
           store.deviceToken = null;
           showPairing();
           return;
@@ -316,10 +347,12 @@ function renderTicket(ticket, lane) {
 
 async function refreshBoard() {
   try {
-    const data = await api('/v1/kds/tickets', { token: store.deviceToken });
+    const data = watchingAll()
+      ? await api('/dev/kds/tickets')
+      : await api('/v1/kds/tickets', { token: store.deviceToken });
     renderBoard(data);
   } catch (error) {
-    if (error.status === 401) {
+    if (error.status === 401 && !watchingAll()) {
       store.deviceToken = null;
       showPairing();
       return;

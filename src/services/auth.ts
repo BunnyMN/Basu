@@ -139,6 +139,24 @@ export async function verifyOtp(ctx: Ctx, phone: string, code: string): Promise<
     throw new AuthError('INVALID_CODE', 'that code is not right');
   }
 
+  return startSession(ctx, phone);
+}
+
+/**
+ * Mint a session for a phone number, creating the guest on first sight.
+ *
+ * There is no sign-up step: asking someone to register before they have seen a
+ * menu is the single biggest drop-off in the funnel. The number becomes an
+ * account the first time it proves it can receive a code.
+ *
+ * Separate from `verifyOtp` because the demo needs a session without an SMS
+ * round trip, and the OTP rate limit — three codes an hour, which is there to
+ * stop somebody running up an SMS bill — has no business blocking a
+ * walkthrough.
+ */
+export async function startSession(ctx: Ctx, phone: string): Promise<GuestSession> {
+  const now = ctx.clock.now();
+
   return tx(async (client) => {
     const guest = await client.query<{ id: string }>(
       `INSERT INTO guest (phone_e164) VALUES ($1)

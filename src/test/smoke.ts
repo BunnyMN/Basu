@@ -183,7 +183,11 @@ async function main(): Promise<void> {
       items: [{ menu_item_id: dish.id, qty: 2 }],
     },
   });
-  check('давхар дарахад нэг л захиалга', retry.body.id === orderId);
+  check(
+    'давхар дарахад нэг л захиалга',
+    Boolean(orderId) && retry.body.id === orderId,
+    { first: orderId, retry: retry.body.id },
+  );
 
   const paid = await call<{ state: string }>(`/v1/orders/${orderId}/pay`, {
     method: 'POST',

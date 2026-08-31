@@ -30,6 +30,7 @@ import { enqueueNotification } from '../services/notifications.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import { registerMapRoutes } from './tiles.js';
 import { registerDishRoutes } from './dishes.js';
+import { registerRouteRoutes } from './route.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -78,6 +79,8 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
   await registerMapRoutes(app);
   // Illustrations for the menu, drawn on demand. See src/api/dishes.ts.
   await registerDishRoutes(app);
+  // How far the walk is, and how long it takes. See src/api/route.ts.
+  await registerRouteRoutes(app);
 
   /* ── who is calling ─────────────────────────────────────────────── */
 
@@ -461,12 +464,15 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
    * Deliberately a poll rather than a socket for v1: a tablet that reloads gets
    * the truth, and there is no replay window to get wrong. The websocket
    * gateway can subscribe to the same outbox topic later without changing this.
+   *
+   * `restaurantId` of null means every kitchen, which only the demo asks for —
+   * see the note on /dev/kds/tickets.
    */
-  app.get('/v1/kds/tickets', { preHandler: requireDevice }, async (request) => {
+  const board = async (restaurantId: string | null) => {
     const { rows } = await db.query(
       `SELECT o.id, o.code, o.state, o.party_size, o.slot_starts_at, o.fire_at,
               o.ready_at, o.eta_at, o.seated_at, o.order_prep_minutes,
-              g.name AS guest_name, t.code AS table_code,
+              g.name AS guest_name, t.code AS table_code, r.name AS restaurant,
               COALESCE(
                 json_agg(json_build_object('name', l.name, 'qty', l.qty,
                                            'station', l.station_code, 'image', mi.image_url)
@@ -475,15 +481,16 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
               ) AS lines
          FROM dining_order o
          JOIN guest g ON g.id = o.guest_id
+         JOIN restaurant r ON r.id = o.restaurant_id
          LEFT JOIN order_line l ON l.order_id = o.id AND l.cancelled_at IS NULL
          LEFT JOIN menu_item mi ON mi.id = l.menu_item_id
          LEFT JOIN table_hold h ON h.order_id = o.id AND h.released_at IS NULL
          LEFT JOIN dining_table t ON t.id = h.table_id
-        WHERE o.restaurant_id = $1
+        WHERE ($1::uuid IS NULL OR o.restaurant_id = $1::uuid)
           AND o.state IN ('PLACED','ACCEPTED','SCHEDULED','ARMED','HELD','FIRED','COOKING','READY')
-        GROUP BY o.id, g.name, t.code
+        GROUP BY o.id, g.name, t.code, r.name
         ORDER BY COALESCE(o.fire_at, o.slot_starts_at)`,
-      [request.device!.restaurantId],
+      [restaurantId],
     );
 
     const now = ctx.clock.now();
@@ -500,6 +507,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
       seated_at: Date | null;
       guest_name: string | null;
       table_code: string | null;
+      restaurant: string;
       lines: Array<{ name: string; qty: number }>;
     }>) {
       const ticket = {
@@ -509,6 +517,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
         party_size: row.party_size,
         guest: row.guest_name,
         table: row.table_code,
+        restaurant: row.restaurant,
         seated: row.seated_at !== null,
         lines: row.lines,
         // Minutes, signed: negative means this ticket is already late.
@@ -528,7 +537,11 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     }
 
     return { now: hhmm(now), lanes };
-  });
+  };
+
+  app.get('/v1/kds/tickets', { preHandler: requireDevice }, async (request) =>
+    board(request.device!.restaurantId),
+  );
 
   /**
    * Every tablet action shares the same three steps: check the ticket is this
@@ -656,7 +669,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
 
   /* ── development only ───────────────────────────────────────────── */
 
-  if (options.dev) await mountDevRoutes(app, ctx);
+  if (options.dev) await mountDevRoutes(app, ctx, board);
 
   void enqueueNotification;
   return app;
@@ -670,7 +683,12 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
  * at the right hour or waiting around. Being able to jump to 12:14 and step
  * forward a minute at a time is what makes the whole thing demonstrable.
  */
-async function mountDevRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> {
+async function mountDevRoutes(
+  app: FastifyInstance,
+  ctx: Ctx,
+  /** The same board `/v1/kds/tickets` serves, but for every kitchen at once. */
+  board: (restaurantId: string | null) => Promise<unknown>,
+): Promise<void> {
   const staticPlugin = await import('@fastify/static');
   const { fileURLToPath } = await import('node:url');
   const { dirname, join } = await import('node:path');
@@ -708,10 +726,16 @@ async function mountDevRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> {
    */
   app.post<{ Body: { phone?: string } }>('/dev/login', async (request, reply) => {
     const phone = request.body?.phone ?? '+97699001122';
-    const { requestOtp: ask, verifyOtp: verify } = await import('../services/auth.js');
-    const { code } = await ask(ctx, phone);
-    const session = await verify(ctx, phone, code);
-    return reply.send({ token: session.token, guest_id: session.guestId, phone });
+    try {
+      // Straight to a session. Going through the OTP path would put a
+      // walkthrough behind the three-codes-an-hour limit, which exists to stop
+      // somebody running up an SMS bill and has nothing to say about a demo.
+      const { startSession } = await import('../services/auth.js');
+      const session = await startSession(ctx, phone);
+      return reply.send({ token: session.token, guest_id: session.guestId, phone });
+    } catch (error) {
+      return sendError(reply, error);
+    }
   });
 
   /** The pairing codes the seed just printed, so the tablet can self-pair. */
@@ -724,6 +748,56 @@ async function mountDevRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> {
     );
     return { devices: rows };
   });
+
+  /**
+   * Every kitchen's board on one screen.
+   *
+   * A tablet sees its own restaurant and nothing else — that isolation is the
+   * point of the token and `/v1/kds/tickets` keeps it. But a walkthrough moves
+   * between ten venues, and orders placed at nine of them would be invisible on
+   * a screen paired to the tenth. So the demo gets a view across all of them,
+   * with each ticket labelled by kitchen.
+   *
+   * It lives under /dev for the same reason the clock control does: this whole
+   * surface exists only in demo mode, and none of it is reachable in production.
+   */
+  app.get('/dev/kds/tickets', async () => board(null));
+
+  /** The same tablet actions, without needing that restaurant's own token. */
+  app.post<{ Params: { id: string; action: string }; Body: { minutes?: number; reason?: string } }>(
+    '/dev/kds/tickets/:id/:action',
+    async (request, reply) => {
+      const { id, action } = request.params;
+      const body = request.body ?? {};
+      try {
+        switch (action) {
+          case 'accept':
+            await acceptOrder(ctx, id, 'kds:demo');
+            break;
+          case 'reject':
+            await rejectOrder(ctx, id, body.reason ?? 'demo');
+            break;
+          case 'fire-now':
+            await fireNow(ctx, id, 'kds:demo');
+            break;
+          case 'hold':
+            await holdFor(ctx, id, body.minutes ?? 5);
+            break;
+          case 'ready':
+            await markReady(ctx, id, 'kds:demo');
+            break;
+          case 'served':
+            await markServed(ctx, id, 'kds:demo');
+            break;
+          default:
+            return badRequest(reply, 'Ийм үйлдэл алга.', `unknown action ${action}`);
+        }
+        return reply.send({ ok: true });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
 
   /** Every restaurant, and whether a tablet is currently watching it. */
   app.get('/dev/venues', async () => {
