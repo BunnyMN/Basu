@@ -1,6 +1,6 @@
 import '../env.js';
 import { closePool } from '../db/pool.js';
-import { systemClock } from '../domain/time.js';
+import { buildClock, mode } from '../mode.js';
 import { run } from '../scheduler/runner.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 
@@ -11,12 +11,18 @@ import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '..
  * because its failure is the quiet one. An API outage shows the guest an error;
  * this going down means nothing happens at all and a table sits waiting. It
  * gets its own deploy and its own alert for that reason.
- *
- * The providers below are still the fakes. Swapping in QPay, the PosAPI and an
- * SMS gateway is a change to this file and nothing else.
  */
+if (mode() === 'demo') {
+  // Two processes cannot each hold their own demo clock: they drift apart, and
+  // this one would fire a lunch hours early and then call the guests no-shows.
+  // In demo mode ticks come from the API, on the clock the page is driving.
+  console.error('[scheduler] demo mode — ticks come from POST /dev/tick, not from here.');
+  console.error('[scheduler] set BASU_MODE=production to run on the system clock.');
+  process.exit(0);
+}
+
 const ctx: Ctx = {
-  clock: systemClock,
+  clock: buildClock(),
   payments: new FakePaymentProvider(),
   tax: new FakeTaxProvider(),
   notifier: new FakeNotifier(),

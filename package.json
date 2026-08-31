@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Dine-in pre-order — fire timing engine",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && cp -R src/web dist/web",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -15,7 +15,11 @@
     "seed": "tsx src/seed/demo.ts",
     "dev": "npm run db:migrate && npm run seed && npm run api",
     "smoke": "tsx src/test/smoke.ts",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "start": "node dist/entry/api.js",
+    "start:scheduler": "node dist/entry/scheduler.js",
+    "db:migrate:dist": "node dist/db/migrate.js",
+    "seed:dist": "node dist/seed/demo.js"
   },
   "type": "module",
   "private": true,

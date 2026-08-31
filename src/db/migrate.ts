@@ -57,7 +57,13 @@ export async function reset(): Promise<void> {
   await getPool().query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
 }
 
-const isEntrypoint = process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()!);
+/** True when this file was run directly — same answer as .ts or compiled .js. */
+const isEntrypoint = (() => {
+  const invoked = process.argv[1];
+  if (!invoked) return false;
+  const stem = (s: string) => s.split('/').pop()!.replace(/\.[cm]?[jt]s$/, '');
+  return stem(import.meta.url) === stem(invoked);
+})();
 
 if (isEntrypoint) {
   const wantsReset = process.argv.includes('--reset');

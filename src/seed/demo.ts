@@ -137,7 +137,13 @@ export async function seedDemo(): Promise<{
   return { pairingCodes: pairingCodes.slice(1), paired: first.name };
 }
 
-const isEntrypoint = process.argv[1]?.endsWith('demo.ts');
+/** True when this file was run directly — same answer as .ts or compiled .js. */
+const isEntrypoint = (() => {
+  const invoked = process.argv[1];
+  if (!invoked) return false;
+  const stem = (s: string) => s.split('/').pop()!.replace(/\.[cm]?[jt]s$/, '');
+  return stem(import.meta.url) === stem(invoked);
+})();
 if (isEntrypoint) {
   try {
     const { pairingCodes, paired } = await seedDemo();
@@ -148,8 +154,9 @@ if (isEntrypoint) {
     for (const { name, code } of pairingCodes) {
       console.log(`  ${name.padEnd(24)} ${code}`);
     }
-    console.log('\n  Зочин:  http://localhost:3000/');
-    console.log('  Тогооч: http://localhost:3000/kds');
+    const base = process.env['BASU_URL'] ?? `http://localhost:${process.env['PORT'] ?? 3000}`;
+    console.log(`\n  Зочин:  ${base}/`);
+    console.log(`  Тогооч: ${base}/kds`);
   } catch (error) {
     console.error((error as Error).message);
     process.exitCode = 1;
