@@ -274,6 +274,38 @@ describe('ordering over HTTP', () => {
     expect(rows[0]!.n).toBe(1);
   });
 
+  it('lets a client retry a failed call with the same idempotency key', async () => {
+    await pairTablet(venue.restaurantId);
+    const payload = {
+      restaurant_id: venue.restaurantId,
+      slot_starts_at: at('12:30').toISOString(),
+      party_size: 2,
+      items: [{ menu_item_id: venue.menuIds['tsuivan'], qty: 1 }],
+    };
+    const key = { 'idempotency-key': 'retry-after-auth' };
+
+    // A stored session that has expired: the call fails before it does anything.
+    const rejected = await app.inject({
+      method: 'POST',
+      url: '/v1/orders',
+      headers: { authorization: 'Bearer long-dead-token', ...key },
+      payload,
+    });
+    expect(rejected.statusCode).toBe(401);
+
+    // Signing in and trying again must work. Remembering the rejection would
+    // make the key a permanent tombstone rather than a duplicate guard.
+    const guest = await signIn();
+    const accepted = await app.inject({
+      method: 'POST',
+      url: '/v1/orders',
+      headers: { ...auth(guest), ...key },
+      payload,
+    });
+    expect(accepted.statusCode, accepted.body).toBe(201);
+    expect(accepted.headers['idempotent-replay']).toBeUndefined();
+  });
+
   it('stops accepting a cancellation once the food is on the stove', async () => {
     const guest = await signIn();
     const tablet = await pairTablet(venue.restaurantId);

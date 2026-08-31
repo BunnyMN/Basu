@@ -279,6 +279,13 @@ function renderTicket(ticket, lane) {
         });
         await refreshBoard();
       } catch (error) {
+        // A revoked or stale tablet must go back to pairing, not sit there
+        // showing "please sign in" over buttons that no longer do anything.
+        if (error.status === 401) {
+          store.deviceToken = null;
+          showPairing();
+          return;
+        }
         toast(error.message, 'bad');
         button.disabled = false;
       }

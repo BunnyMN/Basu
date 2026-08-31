@@ -119,11 +119,15 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     return (rows[0]?.n ?? 0) > 0;
   };
 
-  app.addHook('onSend', async (request, _reply, payload) => {
+  app.addHook('onSend', async (request, reply, payload) => {
     const key = request.headers['idempotency-key'];
-    if (typeof key === 'string' && request.method === 'POST') {
+    // Only successful responses are remembered. The key exists to stop a
+    // retried request buying lunch twice — not to make a failure permanent.
+    // Caching a 401 would mean a client that signs in and tries again gets
+    // handed the same rejection forever.
+    if (typeof key === 'string' && request.method === 'POST' && reply.statusCode < 400) {
       idempotency.set(key, {
-        status: _reply.statusCode,
+        status: reply.statusCode,
         body: payload,
         at: ctx.clock.now().getTime(),
       });

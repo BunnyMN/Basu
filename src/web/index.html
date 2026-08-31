@@ -116,10 +116,33 @@ const state = {
 
 /* Signing in is a dev shortcut here; the real OTP flow lives in the API and is
    what the tests drive. Nobody demos a product by waiting for an SMS. */
-async function ensureSignedIn() {
-  if (store.guestToken) return;
+async function signIn() {
   const { token } = await api('/dev/login', { method: 'POST', body: {} });
   store.guestToken = token;
+  return token;
+}
+
+async function ensureSignedIn() {
+  return store.guestToken ?? (await signIn());
+}
+
+/**
+ * Every call that needs a guest goes through here.
+ *
+ * A stored token outlives the thing it points at: sessions expire, get
+ * revoked, or vanish when the demo database is reseeded. Treating that as an
+ * error leaves someone staring at "please sign in" on a button that does
+ * nothing, so a 401 means sign in again and retry — once.
+ */
+async function guestApi(path, options = {}) {
+  const token = await ensureSignedIn();
+  try {
+    return await api(path, { ...options, token });
+  } catch (error) {
+    if (error.status !== 401) throw error;
+    store.guestToken = null;
+    return api(path, { ...options, token: await signIn() });
+  }
 }
 
 const el = (html) => {
@@ -287,10 +310,8 @@ async function placeOrder() {
   button.disabled = true;
   button.textContent = 'Түр хүлээнэ үү…';
   try {
-    await ensureSignedIn();
-    const order = await api('/v1/orders', {
+    const order = await guestApi('/v1/orders', {
       method: 'POST',
-      token: store.guestToken,
       // A phone on a patchy connection retries; the same key must not buy lunch twice.
       idempotencyKey: `order-${state.venue.id}-${state.slot}-${[...state.cart].join(',')}`,
       body: {
@@ -300,7 +321,7 @@ async function placeOrder() {
         items: [...state.cart].map(([menu_item_id, qty]) => ({ menu_item_id, qty })),
       },
     });
-    await api(`/v1/orders/${order.id}/pay`, { method: 'POST', token: store.guestToken });
+    await guestApi(`/v1/orders/${order.id}/pay`, { method: 'POST' });
     document.querySelector('.paybar')?.remove();
     state.orderId = order.id;
     showStatus();
@@ -320,7 +341,7 @@ const STEPS = [
 
 async function showStatus() {
   state.screen = 'status';
-  const order = await api(`/v1/orders/${state.orderId}`, { token: store.guestToken });
+  const order = await guestApi(`/v1/orders/${state.orderId}`);
 
   title.textContent = `№${order.code}`;
   subtitle.textContent = order.table ? `Ширээ ${order.table}` : 'Ширээ хуваарилагдаж байна';
@@ -386,10 +407,7 @@ async function showStatus() {
     );
     cancel.addEventListener('click', async () => {
       try {
-        await api(`/v1/orders/${state.orderId}/cancel`, {
-          method: 'POST',
-          token: store.guestToken,
-        });
+        await guestApi(`/v1/orders/${state.orderId}/cancel`, { method: 'POST' });
         toast('Цуцлагдлаа. Мөнгө буцаагдана.');
         showStatus();
       } catch (error) {
@@ -403,9 +421,8 @@ async function showStatus() {
   if (order.state === 'ARMED' || order.state === 'SCHEDULED') {
     const otw = el('<button class="btn" data-size="lg" type="button" style="margin-top:8px">Хөдөллөө</button>');
     otw.addEventListener('click', async () => {
-      await api(`/v1/orders/${state.orderId}/signal`, {
+      await guestApi(`/v1/orders/${state.orderId}/signal`, {
         method: 'POST',
-        token: store.guestToken,
         body: { type: 'on_my_way' },
       });
       toast('Мэдэгдлээ. Гал тавих цаг шинэчлэгдэнэ.');

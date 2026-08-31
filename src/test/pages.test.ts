@@ -98,8 +98,11 @@ async function until(
     if (predicate(dom.window.document)) return;
     await new Promise((r) => setTimeout(r, 60));
   }
+  const toast = dom.window.document.getElementById('toast')?.textContent;
   throw new Error(
-    `timed out waiting for ${label}\n--- body ---\n${dom.window.document.body.textContent?.slice(0, 900)}`,
+    `timed out waiting for ${label}` +
+      (toast ? `\n--- toast --- ${toast}` : '') +
+      `\n--- body ---\n${dom.window.document.body.textContent?.slice(0, 900)}`,
   );
 }
 
@@ -194,6 +197,33 @@ describe('the guest app', () => {
     expect(text(dom)).toContain('Үнэгүй цуцлах');
     // The whole journey is visible, not just the current step.
     expect(dom.window.document.querySelectorAll('.timeline li')).toHaveLength(5);
+  });
+
+  it('recovers from a session that outlived its server', async () => {
+    // What a browser holds after the demo database is reseeded, or after a
+    // session is revoked: a token that looks fine and is worth nothing.
+    storage.setItem('basu.guest', 'stale-token-from-a-previous-life');
+
+    const dom = await openPage('index.html');
+    await until(dom, 'the venue list', (d) => d.querySelectorAll('.card').length >= 3);
+    clickText(dom, '.card button', pairedVenue);
+    await until(dom, 'the menu', (d) => d.querySelectorAll('.item').length > 3);
+
+    const salad = [...dom.window.document.querySelectorAll('.item')].find((r) =>
+      r.textContent?.includes('Салат'),
+    )!;
+    (salad.querySelector('button[data-d="1"]') as HTMLElement).click();
+    await until(dom, 'the pay bar', (d) => Boolean(d.querySelector('.paybar')));
+    clickText(dom, '.slot', '13:15');
+    await until(dom, 'a price', (d) =>
+      (d.querySelector('.paybar button')?.textContent ?? '').includes('төлөх'),
+    );
+    (dom.window.document.querySelector('.paybar button') as HTMLElement).click();
+
+    // Signed in again behind the scenes; the order goes through.
+    await until(dom, 'the status screen', (d) => Boolean(d.querySelector('.status')));
+    expect(text(dom)).not.toContain('Нэвтэрч орно уу');
+    expect(storage.getItem('basu.guest')).not.toBe('stale-token-from-a-previous-life');
   });
 
   it('says what to do when no kitchen is watching at all', async () => {
