@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Dine-in pre-order — fire timing engine",
   "scripts": {
-    "build": "tsc -p tsconfig.json && cp -R src/web dist/web",
+    "build": "tsc -p tsconfig.json && mkdir -p dist/web && cp -R src/web/. dist/web/",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
