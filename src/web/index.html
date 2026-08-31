@@ -206,14 +206,31 @@ async function guestApi(path, options = {}) {
 
 /* ── the map ─────────────────────────────────────────────────────── */
 
+const style = mapStyle();
+// Named for the same reason as __map below: the tile URLs are a thing worth
+// asserting about from outside, and a relative one silently blanks the map.
+window.__style = style;
+
 const map = new maplibregl.Map({
   container: 'map',
-  style: mapStyle(),
+  style,
   center: [ULAANBAATAR.lon, ULAANBAATAR.lat],
   zoom: 15.2,
   attributionControl: { compact: true, customAttribution: '© OpenStreetMap' },
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+
+// Named so scripts/inspect.mjs can ask the map what it thinks happened. A
+// tile can be byte-perfect at the proxy and still never be requested, and
+// nothing outside the browser can see that.
+window.__map = map;
+
+map.on('error', (event) => {
+  // MapLibre reports a missing tile, a bad style and a dead source the same
+  // way — quietly, on this channel. Left unhandled it is a blank map with no
+  // explanation anywhere.
+  console.error('[map]', event?.error?.message ?? event?.error ?? event);
+});
 
 /**
  * Where the guest is, and what that means for the order.
@@ -637,11 +654,20 @@ mountClock(() => {
 
 void loadVenues();
 
-// The status screen is the one that changes without the guest touching anything.
-setInterval(() => {
+/**
+ * The status screen changes without the guest touching anything, so it polls.
+ *
+ * It stops when the page goes away. A browser tearing a page down makes this
+ * moot, but a page kept alive in the background — or embedded in a test — that
+ * keeps asking the server for orders it will never draw is doing work for
+ * nobody.
+ */
+const poll = setInterval(() => {
+  if (document.hidden) return;
   if (state.orderId) void showStatus();
   else void loadVenues();
 }, 4000);
+addEventListener('pagehide', () => clearInterval(poll));
 </script>
 </body>
 </html>

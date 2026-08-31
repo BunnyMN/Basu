@@ -344,7 +344,13 @@ mountClock(() => {
 });
 
 boot();
-setInterval(() => store.deviceToken && refreshBoard(), 3000);
+
+// The board is the kitchen's only view of what is coming, so it polls — and
+// stops when the page goes away rather than asking on behalf of nobody.
+const poll = setInterval(() => {
+  if (!document.hidden && store.deviceToken) void refreshBoard();
+}, 3000);
+addEventListener('pagehide', () => clearInterval(poll));
 void hhmm;
 void lastSeen;
 </script>

@@ -100,8 +100,11 @@ function stubMapLibre(window: JSDOM['window']): void {
 
     constructor() {
       (window as unknown as Record<string, unknown>)['__map'] = this;
-      // 'load' is what gates the page's first paint, so it has to arrive.
-      setTimeout(() => this.#fire('load', {}), 0);
+      // 'load' is what gates the page's first paint, so it has to arrive — but
+      // not after the window is gone: the handler builds pin images against a
+      // document that would no longer exist.
+      const timer = setTimeout(() => this.#fire('load', {}), 0);
+      window.addEventListener('pagehide', () => clearTimeout(timer));
     }
     on(event: string, second: unknown, third?: unknown) {
       const handler = (typeof second === 'function' ? second : third) as (e: unknown) => void;
@@ -225,8 +228,14 @@ beforeAll(async () => {
   storage.setItem('basu.device', paired.token);
 });
 
-afterEach(() => {
-  for (const dom of open.splice(0)) dom.window.close();
+afterEach(async () => {
+  const closing = open.splice(0);
+  // A browser fires this on the way out and pages use it to stop polling.
+  // Without it a torn-down page keeps calling into a dead document.
+  for (const dom of closing) dom.window.dispatchEvent(new dom.window.Event('pagehide'));
+  // Let requests already in flight land while their document still exists.
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  for (const dom of closing) dom.window.close();
 });
 
 afterAll(async () => {
@@ -395,6 +404,30 @@ describe('the guest app', () => {
     } finally {
       await getPool().query(`UPDATE kds_device SET last_seen_at = now()
                               WHERE paired_at IS NOT NULL AND revoked_at IS NULL`);
+    }
+  });
+});
+
+describe('the map', () => {
+  it('gives the tile worker an absolute URL', async () => {
+    // MapLibre fetches tiles from a Web Worker, which has no document to
+    // resolve a relative path against: '/tiles/{z}/{x}/{y}' reaches
+    // `new Request()` unchanged and throws "Failed to parse URL". The map then
+    // draws its background colour with the markers still on top, so it reads
+    // as a styling problem rather than the transport one it is.
+    const dom = await openPage('index.html');
+    await until(dom, 'the style', () =>
+      Boolean((dom.window as unknown as Record<string, unknown>)['__style']),
+    );
+    const style = (dom.window as unknown as Record<string, unknown>)['__style'] as {
+      sources: { base: { tiles: string[] } };
+      glyphs: string;
+    };
+
+    for (const url of [...style.sources.base.tiles, style.glyphs]) {
+      expect(url, url).toMatch(/^https?:\/\//);
+      // …and still on this origin, which is the whole reason for the proxy.
+      expect(new URL(url).origin).toBe(new URL(base).origin);
     }
   });
 });

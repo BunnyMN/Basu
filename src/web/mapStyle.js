@@ -10,8 +10,21 @@
  * src/api/tiles.ts says why.
  */
 
-export const TILE_URL = '/tiles/{z}/{x}/{y}';
-export const GLYPHS_URL = '/fonts/{fontstack}/{range}.pbf';
+/**
+ * Absolute, not relative — and this is not a style preference.
+ *
+ * MapLibre fetches tiles from a Web Worker, which has no document to resolve a
+ * relative path against, so `/tiles/{z}/{x}/{y}` reaches `new Request()` as-is
+ * and throws "Failed to parse URL". The failure is reported on the map's error
+ * channel and nowhere else: the map draws its background colour with the
+ * markers still on top, which looks like a styling problem and is a transport
+ * one. Building the URL from `location.origin` keeps it same-origin — the whole
+ * reason the tiles are proxied — while giving the worker something it can parse.
+ */
+const origin = typeof location === 'undefined' ? '' : location.origin;
+
+export const TILE_URL = `${origin}/tiles/{z}/{x}/{y}`;
+export const GLYPHS_URL = `${origin}/fonts/{fontstack}/{range}.pbf`;
 
 /** Sükhbaatar Square — where the map opens when we have nothing better. */
 export const ULAANBAATAR = { lat: 47.9185, lon: 106.9175 };

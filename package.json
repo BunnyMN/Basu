@@ -19,7 +19,8 @@
     "start": "node dist/entry/api.js",
     "start:scheduler": "node dist/entry/scheduler.js",
     "db:migrate:dist": "node dist/db/migrate.js",
-    "seed:dist": "node dist/seed/demo.js"
+    "seed:dist": "node dist/seed/demo.js",
+    "inspect": "node scripts/inspect.mjs"
   },
   "type": "module",
   "private": true,
@@ -32,6 +33,8 @@
     "@types/pg": "^8.23.1",
     "concurrently": "^10.0.5",
     "jsdom": "^29.1.1",
+    "pngjs": "^7.0.0",
+    "puppeteer-core": "^25.9.0",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2",
     "vitest": "^4.1.11"
