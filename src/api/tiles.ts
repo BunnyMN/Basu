@@ -81,9 +81,12 @@ async function pipe(path: string, reply: FastifyReply) {
   reply.header('cache-control', CACHE_CONTROL);
   const type = response.headers.get('content-type');
   if (type) reply.header('content-type', type);
-  const encoding = response.headers.get('content-encoding');
-  // The tiles arrive gzipped and are passed through still gzipped; re-encoding
-  // them would cost CPU on every request for no benefit.
-  if (encoding) reply.header('content-encoding', encoding);
+
+  // `content-encoding` is deliberately not forwarded. fetch negotiates gzip and
+  // decodes the body before handing it over, but the response headers still
+  // describe the encoding it removed. Passing that along tells the browser to
+  // gunzip plain protobuf: it fails, every tile is discarded, and the map draws
+  // its background colour with the markers still on top — so the failure looks
+  // like a styling problem rather than a transport one.
   return reply.send(body);
 }

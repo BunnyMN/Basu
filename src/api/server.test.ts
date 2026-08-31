@@ -614,3 +614,118 @@ describe('the lunchtime watch', () => {
     expect(health.json().offline).toBeGreaterThan(0);
   });
 });
+
+describe('the map', () => {
+  /** The vector-tile layers the style asks for by name. */
+  const NEEDED = ['water', 'landuse', 'transportation', 'building', 'place', 'poi'];
+
+  it('serves a tile the browser can actually read', async () => {
+    const response = await app.inject({ method: 'GET', url: '/tiles/14/13057/5700' });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-type']).toContain('protobuf');
+
+    // The upstream sends plain protobuf and fetch decodes anything it does
+    // compress, so claiming an encoding here would have the browser try to
+    // gunzip plain bytes — every tile silently discarded, map drawn empty.
+    expect(response.headers['content-encoding']).toBeUndefined();
+
+    const body = response.rawPayload;
+    expect(body.length).toBeGreaterThan(1000);
+    expect(body.subarray(0, 2).toString('hex')).not.toBe('1f8b'); // not gzip
+
+    // And it holds the layers the style names. A tile that parses but carries
+    // a different schema draws nothing, which looks identical to this bug.
+    const layers = mvtLayerNames(body);
+    for (const name of NEEDED) expect(layers, name).toContain(name);
+  });
+
+  it('serves label glyphs', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/fonts/Noto%20Sans%20Regular/0-255.pbf',
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.rawPayload.length).toBeGreaterThan(1000);
+  });
+
+  it('turns away anything that is not a tile path', async () => {
+    for (const url of ['/tiles/14/13057/../../etc', '/tiles/abc/1/1', '/fonts/../../etc/passwd']) {
+      const response = await app.inject({ method: 'GET', url });
+      expect(response.statusCode, url).toBeGreaterThanOrEqual(400);
+    }
+  });
+
+  it('gives every restaurant a coordinate the map can place', async () => {
+    const response = await app.inject({ method: 'GET', url: '/v1/restaurants' });
+    for (const venue of response.json().restaurants as Array<{ lat: number; lon: number }>) {
+      // Ulaanbaatar, generously bounded. The schema enforces this too.
+      expect(venue.lat).toBeGreaterThan(47.7);
+      expect(venue.lat).toBeLessThan(48.1);
+      expect(venue.lon).toBeGreaterThan(106.6);
+      expect(venue.lon).toBeLessThan(107.3);
+    }
+  });
+});
+
+/** Layer names inside a Mapbox Vector Tile: Tile.layers[].name. */
+function mvtLayerNames(buffer: Buffer): string[] {
+  const names: string[] = [];
+  const varint = (at: number): [number, number] => {
+    let result = 0;
+    let shift = 0;
+    let i = at;
+    for (;;) {
+      const byte = buffer[i++]!;
+      result |= (byte & 0x7f) << shift;
+      if ((byte & 0x80) === 0) return [result, i];
+      shift += 7;
+    }
+  };
+
+  let i = 0;
+  while (i < buffer.length) {
+    const [key, afterKey] = varint(i);
+    i = afterKey;
+    const field = key >> 3;
+    const wire = key & 7;
+    if (wire !== 2) {
+      if (wire === 0) [, i] = varint(i);
+      else break;
+      continue;
+    }
+    const [length, afterLength] = varint(i);
+    const chunk = buffer.subarray(afterLength, afterLength + length);
+    i = afterLength + length;
+    if (field !== 3) continue;
+
+    // Inside a Layer, name is field 1.
+    let j = 0;
+    while (j < chunk.length) {
+      let result = 0;
+      let shift = 0;
+      for (;;) {
+        const byte = chunk[j++]!;
+        result |= (byte & 0x7f) << shift;
+        if ((byte & 0x80) === 0) break;
+        shift += 7;
+      }
+      const innerWire = result & 7;
+      if (innerWire !== 2) break;
+      let len = 0;
+      shift = 0;
+      for (;;) {
+        const byte = chunk[j++]!;
+        len |= (byte & 0x7f) << shift;
+        if ((byte & 0x80) === 0) break;
+        shift += 7;
+      }
+      const value = chunk.subarray(j, j + len);
+      j += len;
+      if (result >> 3 === 1) {
+        names.push(value.toString('utf8'));
+        break;
+      }
+    }
+  }
+  return names;
+}

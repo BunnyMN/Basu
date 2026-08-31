@@ -29,10 +29,18 @@ export async function truncateAll(db: Db = getPool()): Promise<void> {
 }
 
 export async function seedRestaurant(db: Db = getPool()): Promise<SeededRestaurant> {
+  // Around the Shangri-La towers, nudged apart per venue so two seeded
+  // restaurants never land on the same pixel.
+  const nth = ++seq;
   const { rows } = await db.query<{ id: string }>(
-    `INSERT INTO restaurant (name, plating_buffer_min, travel_minutes)
-     VALUES ($1, $2, 7) RETURNING id`,
-    [`Модерн Номадс ${++seq}`, PILOT_KITCHEN.platingBufferMinutes],
+    `INSERT INTO restaurant (name, plating_buffer_min, travel_minutes, lat, lon)
+     VALUES ($1, $2, 7, $3, $4) RETURNING id`,
+    [
+      `Модерн Номадс ${nth}`,
+      PILOT_KITCHEN.platingBufferMinutes,
+      47.9138 + (nth % 10) * 0.001,
+      106.9165 + (nth % 10) * 0.001,
+    ],
   );
   const restaurantId = rows[0]!.id;
 
