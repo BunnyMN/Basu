@@ -477,7 +477,7 @@ async function reportProximity() {
     await guestApi(`/v1/orders/${state.orderId}/signal`, { method: 'POST', body: { type: band } });
     toast(`${Math.round(metres)}м зайд ирлээ — гал тавих цаг шинэчлэгдэнэ.`);
     await api('/dev/tick', { method: 'POST' }).catch(() => {});
-    void showStatus();
+    void showStatus(true);
   } catch {
     state.sent.delete(band); // let the next fix try again
   }
@@ -497,18 +497,29 @@ map.on('load', () => {
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-opacity': 0.9 },
   });
+  // Two layers, not one with a data-driven dash.
+  //
+  // `line-dasharray` accepts zoom expressions and nothing else: a `case` on a
+  // feature property is invalid, and MapLibre answers by not drawing the layer
+  // at all — no thrown error, no console message, just an empty map with the
+  // distance label sitting there saying the route had been found. A filter is
+  // the supported way to say the same thing.
   map.addLayer({
     id: 'route-line',
     type: 'line',
     source: ROUTE,
+    filter: ['!', ['get', 'direct']],
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: {
-      'line-color': '#1B5B8F',
-      'line-width': 5,
-      // Dashed when it is a straight line rather than a surveyed route, so a
-      // guess never draws itself as something somebody measured.
-      'line-dasharray': ['case', ['get', 'direct'], ['literal', [1.4, 1.2]], ['literal', [1, 0]]],
-    },
+    paint: { 'line-color': '#1B5B8F', 'line-width': 5 },
+  });
+  map.addLayer({
+    id: 'route-guess',
+    type: 'line',
+    source: ROUTE,
+    // A straight line drawn dashed, so a guess never looks surveyed.
+    filter: ['get', 'direct'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#1B5B8F', 'line-width': 5, 'line-dasharray': [1.4, 1.2] },
   });
 
   map.addSource(SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
@@ -615,7 +626,7 @@ $('sheet-close').addEventListener('click', closeSheet);
 $('scrim').addEventListener('click', closeSheet);
 $('orderbar').addEventListener('click', () => {
   $('orderbar').removeAttribute('data-open');
-  void showStatus();
+  void showStatus(true);
 });
 
 async function openVenue(venue) {
@@ -804,7 +815,8 @@ async function placeOrder() {
     await guestApi(`/v1/orders/${order.id}/pay`, { method: 'POST' });
     state.orderId = order.id;
     state.sent = new Set();
-    await showStatus();
+    rendered = null;
+    await showStatus(true);
   } catch (error) {
     toast(error.message, 'bad');
     renderFoot();
@@ -843,9 +855,31 @@ const HEADLINE = {
   REJECTED: ['Татгалзсан', 'Мөнгө бүтэн буцаагдана'],
 };
 
-async function showStatus() {
+/**
+ * What the last render was of, so a poll that found no news changes nothing.
+ *
+ * The status sheet refreshes every few seconds to catch the kitchen accepting
+ * or firing. Rebuilding it unconditionally destroyed whatever the guest was
+ * doing inside it — a comment being typed vanished a word or two in, which is
+ * the sort of thing that makes an app feel broken rather than busy.
+ */
+let rendered = null;
+
+async function showStatus(force) {
   if (!state.orderId) return;
   const order = await guestApi(`/v1/orders/${state.orderId}`);
+
+  // Everything the sheet draws. Same signature, same picture — so leave it.
+  const signature = [
+    order.state,
+    order.fire_at,
+    order.ready_at,
+    order.table,
+    order.review ? 'reviewed' : '',
+  ].join('|');
+  const open = $('sheet').hasAttribute('data-open');
+  if (!force && open && signature === rendered) return;
+  rendered = signature;
 
   // The states that carry a time say it; the rest carry a word.
   const [word, cap] = HEADLINE[order.state] ?? [null, ''];
@@ -928,7 +962,7 @@ async function showStatus() {
       } catch (error) {
         toast(error.message, 'bad');
       }
-      void showStatus();
+      void showStatus(true);
     });
     foot.append(cancel);
   }
@@ -944,7 +978,7 @@ async function showStatus() {
       });
       toast('Мэдэгдлээ. Гал тавих цаг шинэчлэгдэнэ.');
       await api('/dev/tick', { method: 'POST' }).catch(() => {});
-      void showStatus();
+      void showStatus(true);
     });
     foot.append(otw);
   }
@@ -1072,10 +1106,10 @@ function appendReview(body, order) {
         },
       });
       toast('Баярлалаа. Үнэлгээ хадгалагдлаа.');
-      void showStatus();
+      void showStatus(true);
     } catch (error) {
       toast(error.message, 'bad');
-      void showStatus();
+      void showStatus(true);
     }
   });
   box.append(send);
@@ -1086,7 +1120,7 @@ function appendReview(body, order) {
 
 mountClock(() => {
   void loadVenues();
-  if (state.orderId) void showStatus();
+  if (state.orderId) void showStatus(true);
 });
 
 void loadVenues();

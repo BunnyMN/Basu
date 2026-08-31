@@ -261,6 +261,16 @@ Tile нь MapLibre GL + өөрсдийн вектор tile. FuelNet төслий
 ## Браузерыг асуух
 
 ```bash
+npm run probe:route                          # захиалга → маршрут, бүтнээр
+npm run probe:route -- https://host shot.png
+```
+
+Бодит байршил өгсөн Chrome-оор зочны урсгалыг бүтнээр гүйлгэж, маршрут
+**гуйгдсан эсэх**, эх сурвалжид **орсон эсэх**, дэлгэц дээр **зурагдсан эсэх**
+гурвыг тусад нь хэлнэ. Гурав нь салж байсан: эх сурвалж дүүрэн, дэлгэц хоосон.
+
+
+```bash
 npm run inspect                          # локал зочны хуудас
 npm run inspect -- https://host/kds 10   # хаанаас ч, 10 секунд
 npm run inspect -- http://localhost:3000/ 8 shot.png

@@ -96,7 +96,7 @@ function stubMapLibre(window: JSDOM['window']): void {
   class StubMap {
     #handlers = new Map<string, Array<(event: unknown) => void>>();
     #sources = new Map<string, { setData: (data: unknown) => void; data: unknown }>();
-    readonly layers: string[] = [];
+    readonly layers: Array<{ id: string; paint?: Record<string, unknown> }> = [];
     readonly images: string[] = [];
 
     constructor() {
@@ -133,7 +133,7 @@ function stubMapLibre(window: JSDOM['window']): void {
       return this.#sources.get(id);
     }
     addLayer(layer: { id: string }) {
-      this.layers.push(layer.id);
+      this.layers.push(layer);
     }
     easeTo() {}
     getCanvas() {
@@ -372,6 +372,32 @@ describe('the guest app', () => {
     (dom.window.document.querySelector('#orderbar') as HTMLElement).click();
     await until(dom, 'the status again', (d) => Boolean(d.querySelector('.status')));
     expect(dom.window.document.querySelector('#orderbar')?.hasAttribute('data-open')).toBe(false);
+  });
+
+  it('draws the walk with layers MapLibre can actually paint', async () => {
+    // `line-dasharray` takes zoom expressions and nothing else. A `case` on a
+    // feature property is invalid, and MapLibre answers by not drawing the
+    // layer at all — no error, no warning, an empty map and a distance label
+    // sitting next to it saying the route had been found. Filters are the
+    // supported way to say the same thing.
+    const dom = await openPage('index.html');
+    const mapOf = () =>
+      (dom.window as unknown as Record<string, unknown>)['__map'] as
+        | { layers: Array<{ id: string; paint?: Record<string, unknown> }> }
+        | undefined;
+    // Layers are added on 'load', not at construction.
+    await until(dom, 'the route layers', () =>
+      (mapOf()?.layers ?? []).some((l) => l.id.startsWith('route-')),
+    );
+
+    const route = mapOf()!.layers.filter((l) => l.id.startsWith('route-'));
+    expect(route.length, 'the walk needs a casing and two states').toBeGreaterThanOrEqual(3);
+    for (const layer of route) {
+      const dash = layer.paint?.['line-dasharray'];
+      if (dash === undefined) continue;
+      // A literal array, or a zoom expression. Never a data one.
+      expect(Array.isArray(dash) && dash.every((v) => typeof v === 'number'), layer.id).toBe(true);
+    }
   });
 
   it('explains a dark kitchen instead of offering its menu', async () => {

@@ -20,7 +20,8 @@
     "start:scheduler": "node dist/entry/scheduler.js",
     "db:migrate:dist": "node dist/db/migrate.js",
     "seed:dist": "node dist/seed/demo.js",
-    "inspect": "node scripts/inspect.mjs"
+    "inspect": "node scripts/inspect.mjs",
+    "probe:route": "node scripts/probe-route.mjs"
   },
   "type": "module",
   "private": true,
