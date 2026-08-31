@@ -80,8 +80,26 @@ body{background:var(--sunk)}
   border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);
   color:var(--ink);margin-bottom:12px;font-variant-numeric:tabular-nums;
 }
-.pair .hint{font-size:.74rem;color:var(--ink-3);margin-top:14px;line-height:1.5}
+.pair .hint{font-size:.74rem;color:var(--ink-3);margin-top:16px;line-height:1.5;text-align:left}
 .pair .hint code{background:var(--surface-2);padding:1px 5px;border-radius:2px;border:1px solid var(--line)}
+.pair .or{
+  display:flex;align-items:center;gap:10px;margin:20px 0 14px;
+  font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-3);
+}
+.pair .or::before,.pair .or::after{content:"";flex:1;height:1px;background:var(--line)}
+.venues{display:flex;flex-direction:column;gap:6px}
+.venues button{
+  width:100%;text-align:left;display:flex;align-items:center;gap:10px;
+  font-family:"Golos Text",sans-serif;font-size:.86rem;padding:11px 13px;border-radius:3px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink);
+}
+.venues button:hover{border-color:var(--accent-line);background:var(--accent-soft)}
+.venues .tag{
+  margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.62rem;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);
+}
+.venues button[data-watched] .tag{color:var(--ready)}
 </style>
 </head>
 <body>
@@ -100,7 +118,10 @@ const el = (html) => {
 /* ── pairing ─────────────────────────────────────────────────────── */
 
 async function showPairing() {
-  const { devices } = await api('/dev/pairing-codes').catch(() => ({ devices: [] }));
+  const [{ devices }, { venues }] = await Promise.all([
+    api('/dev/pairing-codes').catch(() => ({ devices: [] })),
+    api('/dev/venues').catch(() => ({ venues: [] })),
+  ]);
   root.replaceChildren();
 
   const card = el(`
@@ -129,15 +150,42 @@ async function showPairing() {
   input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
 
   if (devices.length) {
-    const hint = el('<div class="hint">Демо кодууд:<br></div>');
-    for (const device of devices) {
-      const link = el(`<code>${device.code}</code> ${device.name}<br>`);
-      hint.append(link);
-    }
-    card.append(hint);
     input.value = devices[0].code;
-  } else {
-    card.append(el('<div class="hint">Код алга. <code>npm run seed</code> ажиллуулна уу.</div>'));
+    const hint = el('<div class="hint">Холбоогүй ресторанны кодууд:<br></div>');
+    for (const device of devices) hint.append(el(`<code>${device.code}</code> ${device.name}<br>`));
+    card.append(hint);
+  }
+
+  // The demo clock moves in hours and pairing codes expire in minutes, so
+  // typing one is not always possible. Picking a kitchen always is.
+  if (venues.length) {
+    card.append(el('<div class="or">эсвэл демо горимоор</div>'));
+    const list = el('<div class="venues"></div>');
+    for (const venue of venues) {
+      const button = el(`
+        <button type="button"${venue.watched ? ' data-watched' : ''}>
+          ${venue.name}
+          <span class="tag">${venue.watched ? 'захиалга авч байна' : 'хаалттай'}</span>
+        </button>`);
+      button.addEventListener('click', async () => {
+        try {
+          const { token } = await api('/dev/kds-token', {
+            method: 'POST',
+            body: { restaurant_id: venue.id },
+          });
+          store.deviceToken = token;
+          boot();
+        } catch (error) {
+          toast(error.message, 'bad');
+        }
+      });
+      list.append(button);
+    }
+    card.append(list);
+  }
+
+  if (!devices.length && !venues.length) {
+    card.append(el('<div class="hint">Ресторан алга. <code>npm run seed</code> ажиллуулна уу.</div>'));
   }
 
   root.append(card);

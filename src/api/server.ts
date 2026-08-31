@@ -688,6 +688,35 @@ async function mountDevRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> {
     return { devices: rows };
   });
 
+  /** Every restaurant, and whether a tablet is currently watching it. */
+  app.get('/dev/venues', async () => {
+    const { rows } = await getPool().query(
+      `SELECT r.id, r.name,
+              EXISTS (SELECT 1 FROM kds_device d
+                       WHERE d.restaurant_id = r.id AND d.revoked_at IS NULL
+                         AND d.paired_at IS NOT NULL) AS watched
+         FROM restaurant r WHERE r.active ORDER BY r.name`,
+    );
+    return { venues: rows };
+  });
+
+  /**
+   * Hand this browser a tablet for a restaurant, no code typing.
+   *
+   * The real flow is a manager reading an eight-digit code off a screen, and
+   * that is what the tests exercise. But the demo clock jumps hours, codes
+   * expire, and someone walking through the product should not be locked out
+   * of the kitchen because they pressed "12:21 гал" first.
+   */
+  app.post<{ Body: { restaurant_id?: string } }>('/dev/kds-token', async (request, reply) => {
+    const restaurantId = request.body?.restaurant_id;
+    if (!restaurantId) return badRequest(reply, 'Ресторан заана уу.', 'restaurant_id required');
+    const { createPairingCode, pairDevice } = await import('../services/auth.js');
+    const code = await createPairingCode(ctx, restaurantId, 'Демо таблет', 60);
+    const session = await pairDevice(ctx, code);
+    return reply.send({ token: session.token, restaurant_id: session.restaurantId });
+  });
+
   /** Run one scheduler pass on demand, so a page can step time forward. */
   app.post('/dev/tick', async () => {
     const { tick } = await import('../scheduler/runner.js');

@@ -2,7 +2,7 @@ import '../env.js';
 import { closePool, getPool } from '../db/pool.js';
 import { PILOT_KITCHEN, PILOT_MENU } from '../domain/fixtures.js';
 import { DEMO_START, DemoClock } from '../demoClock.js';
-import { createPairingCode } from '../services/auth.js';
+import { createPairingCode, pairDevice } from '../services/auth.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 
 /**
@@ -36,7 +36,13 @@ function todayAt(hhmm: string): Date {
   return new Date(`${parts}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+08:00`);
 }
 
-export async function seedDemo(): Promise<{ pairingCodes: Array<{ name: string; code: string }> }> {
+/** The demo clock jumps hours; codes have to outlive that. */
+const PAIRING_TTL_MINUTES = 8 * 60;
+
+export async function seedDemo(): Promise<{
+  pairingCodes: Array<{ name: string; code: string }>;
+  paired: string;
+}> {
   const db = getPool();
   // Same instant the API boots to, so the pairing codes below are still live
   // when someone types one into a tablet.
@@ -112,19 +118,33 @@ export async function seedDemo(): Promise<{ pairingCodes: Array<{ name: string; 
       );
     }
 
-    const code = await createPairingCode(ctx, restaurantId, 'Гал тогооны таблет');
+    const code = await createPairingCode(
+      ctx,
+      restaurantId,
+      'Гал тогооны таблет',
+      PAIRING_TTL_MINUTES,
+    );
     pairingCodes.push({ name: venue.name, code });
   }
 
-  return { pairingCodes };
+  // One venue opens for service straight away. A guest list where every
+  // restaurant is shut is technically correct and completely useless as a
+  // starting point — and the second and third stay dark, which is what makes
+  // "this kitchen is not watching" visible rather than theoretical.
+  const first = pairingCodes[0]!;
+  await pairDevice(ctx, first.code);
+
+  return { pairingCodes: pairingCodes.slice(1), paired: first.name };
 }
 
 const isEntrypoint = process.argv[1]?.endsWith('demo.ts');
 if (isEntrypoint) {
   try {
-    const { pairingCodes } = await seedDemo();
+    const { pairingCodes, paired } = await seedDemo();
     console.log('Демо өгөгдөл бэлэн.\n');
-    console.log('Таблет холбох кодууд (10 минут хүчинтэй):');
+    console.log(`  ${paired} — таблет холбогдсон, захиалга авч байна.`);
+    console.log('  Бусад нь хаалттай (тогооч харахгүй бол захиалга явуулахгүй).\n');
+    console.log('Хүсвэл өөр ресторан холбох код:');
     for (const { name, code } of pairingCodes) {
       console.log(`  ${name.padEnd(24)} ${code}`);
     }

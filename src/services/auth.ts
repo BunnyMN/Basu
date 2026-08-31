@@ -174,18 +174,25 @@ export async function resolveGuest(ctx: Ctx, token: string): Promise<string | nu
 
 /* ── tablets ───────────────────────────────────────────────────────── */
 
-/** Ops generates this; the manager types it into the tablet once. */
+/**
+ * Ops generates this; the manager types it into the tablet once.
+ *
+ * `ttlMinutes` is a parameter because the demo drives the clock forward by
+ * hours, and a ten-minute code minted at 11:40 is useless by 12:22 — which is
+ * exactly when someone following the walkthrough tries to use it.
+ */
 export async function createPairingCode(
   ctx: Ctx,
   restaurantId: string,
   label: string,
+  ttlMinutes = PAIRING_TTL_MINUTES,
 ): Promise<string> {
   const now = ctx.clock.now();
   const code = String(randomInt(0, 100_000_000)).padStart(8, '0');
   await getPool().query(
     `INSERT INTO kds_device (restaurant_id, label, pairing_code, pairing_expires_at)
      VALUES ($1, $2, $3, $4)`,
-    [restaurantId, label, code, addMinutes(now, PAIRING_TTL_MINUTES)],
+    [restaurantId, label, code, addMinutes(now, ttlMinutes)],
   );
   return code;
 }

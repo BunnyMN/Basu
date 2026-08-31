@@ -196,6 +196,21 @@ describe('the guest app', () => {
     expect(dom.window.document.querySelectorAll('.timeline li')).toHaveLength(5);
   });
 
+  it('says what to do when no kitchen is watching at all', async () => {
+    // Every tablet has gone quiet — the guard is working, but a list of three
+    // shut restaurants with no explanation is a dead end for whoever is looking.
+    await getPool().query(`UPDATE kds_device SET last_seen_at = now() - interval '1 day'`);
+    try {
+      const dom = await openPage('index.html');
+      await until(dom, 'the explanation', (d) => Boolean(d.querySelector('.note')));
+      expect(text(dom)).toContain('нэг ч гал тогоо холбогдоогүй');
+      expect(dom.window.document.querySelector('.note a')?.getAttribute('href')).toBe('/kds');
+    } finally {
+      await getPool().query(`UPDATE kds_device SET last_seen_at = now()
+                              WHERE paired_at IS NOT NULL AND revoked_at IS NULL`);
+    }
+  });
+
   it('refuses a restaurant with no tablet watching, and says why', async () => {
     const dom = await openPage('index.html');
     await until(dom, 'the venue list', (d) => d.querySelectorAll('.card').length >= 3);
@@ -283,6 +298,19 @@ describe('the kitchen display', () => {
       t.textContent?.includes('Бэлэн боллоо'),
     )!;
     expect(cooking.getAttribute('data-lane')).toBe('cooking');
+  });
+
+  it('lets a demo tablet pick its kitchen when codes have expired', async () => {
+    storage.removeItem('basu.device');
+    const kds = await openPage('kds.html');
+    await until(kds, 'the pairing form', (d) => d.querySelectorAll('.venues button').length > 0);
+
+    // One of them is already watched — the seed opens a venue for service.
+    expect(text(kds)).toContain('захиалга авч байна');
+
+    clickText(kds, '.venues button', pairedVenue);
+    await until(kds, 'the board', (d) => d.querySelectorAll('.lane').length === 3);
+    expect(text(kds)).toContain('Ирж явна');
   });
 
   it('walks a fresh tablet through pairing', async () => {

@@ -82,27 +82,33 @@ async function main(): Promise<void> {
   check('таблет холбогдлоо', paired.status === 200, paired.body);
   const tablet = paired.body.token;
 
-  // Pair the second restaurant now too, while its code is still fresh — the
-  // isolation checks at the end run on a clock that has moved past lunch, and
-  // in a real venue every tablet is paired before service anyway.
-  const rivalDevice = codes.body.devices[1];
-  const rivalPaired = rivalDevice
-    ? await call<{ token: string }>('/v1/kds/pair', {
+  // The seed already opens one venue for service. Take a tablet for it too, so
+  // the isolation checks at the end have a second kitchen to be excluded from —
+  // and so they do not depend on a pairing code surviving the clock jumps below.
+  const venues = await call<{ venues: Array<{ id: string; name: string; watched: boolean }> }>(
+    '/dev/venues',
+  );
+  const seeded = venues.body.venues.find((v) => v.watched && v.id !== device0.restaurant_id);
+  const rivalPaired = seeded
+    ? await call<{ token: string }>('/dev/kds-token', {
         method: 'POST',
-        body: { pairing_code: rivalDevice.code },
+        body: { restaurant_id: seeded.id },
       })
     : null;
   check('хоёр дахь таблет холбогдлоо', rivalPaired?.status === 200, rivalPaired?.body);
 
   /* ── browsing ──────────────────────────────────────────────────── */
   console.log('\nЗочин цэс үзэв');
-  const venues = await call<{ restaurants: Array<{ id: string; name: string; accepting_orders: boolean }> }>(
+  const listed = await call<{ restaurants: Array<{ id: string; name: string; accepting_orders: boolean }> }>(
     '/v1/restaurants',
   );
-  const open = venues.body.restaurants.filter((r) => r.accepting_orders);
+  const open = listed.body.restaurants.filter((r) => r.accepting_orders);
   // Two tablets are watching; the third restaurant has none and cannot be
   // ordered from — which is the point of the check, not an accident of setup.
-  check(`${venues.body.restaurants.length} ресторан, ${open.length} нь нээлттэй`, open.length === 2);
+  check(
+    `${listed.body.restaurants.length} ресторан, ${open.length} нь нээлттэй`,
+    open.length === 2,
+  );
   const venue = open.find((r) => r.id === device0.restaurant_id) ?? open[0]!;
 
   const menu = await call<{ items: Array<{ id: string; name: string; price_mnt: number }> }>(

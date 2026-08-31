@@ -78,6 +78,13 @@ header.hero p{margin:6px 0 0;color:var(--ink-2);font-size:.9rem}
   text-transform:uppercase;padding:14px 0 4px;font-family:"IBM Plex Mono",monospace;
 }
 .empty{padding:28px 16px;text-align:center;color:var(--ink-3);font-size:.86rem}
+.note{
+  background:var(--hold-soft);border:1px solid var(--hold-line);border-left:3px solid var(--hold);
+  border-radius:3px;padding:14px 16px;margin-bottom:12px;
+}
+.note b{display:block;font-size:.9rem;color:var(--ink);margin-bottom:4px}
+.note span{font-size:.82rem;color:var(--ink-2);line-height:1.5}
+.note a{color:var(--accent-ink)}
 </style>
 </head>
 <body>
@@ -135,6 +142,21 @@ async function showVenues() {
   if (!restaurants.length) {
     view.append(el('<p class="empty">Ресторан алга. <code>npm run seed</code> ажиллуулна уу.</p>'));
     return;
+  }
+
+  // A list of shut restaurants with no explanation is a dead end. A kitchen
+  // goes dark ninety seconds after its tablet stops checking in — which is the
+  // guard working, but the guest still deserves to be told what that means.
+  if (!restaurants.some((r) => r.accepting_orders)) {
+    view.append(
+      el(`<div class="note">
+            <b>Одоогоор нэг ч гал тогоо холбогдоогүй байна</b>
+            <span>Тогооч дэлгэцээ нээгээгүй бол захиалга хүлээж авах хүнгүй.
+            Демо үзэж байгаа бол <a href="/kds">гал тогооны дэлгэцийг</a> нээж
+            гал тогоогоо сонгоно уу — тэр таб нээлттэй байх үед ресторан
+            захиалга авна.</span>
+          </div>`),
+    );
   }
 
   for (const venue of restaurants) {
