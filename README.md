@@ -6,6 +6,9 @@
 - **02 Техник** — [Галлах хөдөлгүүр](https://claude.ai/code/artifact/25e998b3-c0fb-46f0-a2ed-e36ace0127a0)
 - **03 Зах зээл ба ажиллагаа** — [Эхний арван ресторан](https://claude.ai/code/artifact/c6b35c47-3409-4109-bbce-9cb867ac5ed0)
 
+Шинээр нэгдэж байгаа бол [CONTRIBUTING.md](CONTRIBUTING.md) — эхлүүлэлт,
+гурван дүрэм, тестийн давхаргууд.
+
 ## Ажиллуулах
 
 ```bash
