@@ -9,6 +9,12 @@ import SwiftUI
 
  The strip appears only when the server answers `/dev/clock` — that is, only in
  demo mode. In production the route is not mounted and this draws nothing.
+
+ It sits on the dine screens and nowhere else. The launcher, the wallet, the
+ inbox and the profile are the shell, they are drawn to a design that has no
+ such strip in it, and a developer's control bar across the top of the first
+ screen anybody sees is not what that design says. Time is a control where time
+ is the product — inside the app that fires a kitchen.
  */
 struct DemoClockBar: View {
   @Environment(AppModel.self) private var model

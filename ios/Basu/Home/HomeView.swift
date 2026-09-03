@@ -51,7 +51,6 @@ struct HomeView: View {
     }
     .scrollIndicators(.hidden)
     .background(LinearGradient.ground)
-    .safeAreaInset(edge: .top) { DemoClockBar() }
     .toolbarVisibility(.hidden, for: .navigationBar)
     .sheet(isPresented: $signingIn) { SignInSheet() }
     .refreshable {
