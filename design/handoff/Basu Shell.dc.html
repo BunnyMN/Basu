@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#8f989c;font-family:-apple-system,"SF Pro Text","IBM Plex Sans",sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#C64E08}a:hover{color:#9c3d06}
+@keyframes steam{0%,100%{transform:translateY(0);opacity:.55}50%{transform:translateY(-1.4px);opacity:1}}
+</style>
+</helmet>
+
+<section style="background:#f3f5f6;padding:56px 56px 52px;border-bottom:1px solid #c0c8cb">
+<div style="max-width:960px;display:flex;flex-direction:column;gap:18px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#78868e">BASU · SHELL · IOS 18 · 402×874PT</div>
+<h1 style="margin:0;font:600 34px/1.1 -apple-system,'IBM Plex Sans',sans-serif;letter-spacing:-.02em;color:#14181B">The launcher and its three shell screens</h1>
+<p style="margin:0;font:400 15px/1.55 -apple-system,'IBM Plex Sans',sans-serif;color:#4A555C;max-width:62ch;text-wrap:pretty">Fourteen artboards: the launcher at one, four and nine icons in both themes; wallet, notifications (list and empty) and profile in both themes; the icon-system sheet; six avatar marks; the bell badge at 1, 9 and 99+. Tokens, radii and the mono-numbers rule are used as given — nothing new was invented.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin-top:6px">
+<div style="background:rgba(255,255,255,.62);backdrop-filter:blur(8px) saturate(1.05);-webkit-backdrop-filter:blur(8px) saturate(1.05);border:1px solid #D2D8DA;border-radius:4px;padding:14px 16px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#78868e;margin-bottom:8px">ONE ICON</div>
+<p style="margin:0;font:400 13px/1.5 -apple-system,'IBM Plex Sans',sans-serif;color:#14181B;text-wrap:pretty">The wallet and LIVE carry it, and they are enough — but only because the live row is allowed to be taller when it is alone, adding the fire time. What is coming next is one line of type under the grid, not a card. Nothing is padded.</p>
+</div>
+<div style="background:rgba(255,255,255,.62);backdrop-filter:blur(8px) saturate(1.05);-webkit-backdrop-filter:blur(8px) saturate(1.05);border:1px solid #D2D8DA;border-radius:4px;padding:14px 16px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#78868e;margin-bottom:8px">NINE ICONS</div>
+<p style="margin:0;font:400 13px/1.5 -apple-system,'IBM Plex Sans',sans-serif;color:#14181B;text-wrap:pretty">No folders and no most-recently-used float: a grid that moves under your thumb cannot be learned. Two editorial bands set by the product, and a filter field that appears at seven. Recency is LIVE's job, and LIVE is already above the grid.</p>
+</div>
+<div style="background:rgba(255,255,255,.62);backdrop-filter:blur(8px) saturate(1.05);-webkit-backdrop-filter:blur(8px) saturate(1.05);border:1px solid #D2D8DA;border-radius:4px;padding:14px 16px">
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#78868e;margin-bottom:8px">GLASS · REVISION</div>
+<p style="margin:0 0 16px;font:400 13px/1.5 -apple-system,'IBM Plex Sans',sans-serif;color:#14181B;text-wrap:pretty">Surfaces are now 62% translucent over an 8px backdrop blur — SwiftUI <span style="font-family:'IBM Plex Mono',monospace;font-size:12px">.ultraThinMaterial</span>. The hairline, the 4pt radius, the 18pt icon radius and the flame orange are untouched, and the ground carries a slight tonal wash so the translucency has something to work against. No tint, no second colour, no gradient on a card.</p>
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#78868e;margin-bottom:8px">TAB BAR · REVISION</div>
+<p style="margin:0 0 16px;font:400 13px/1.5 -apple-system,'IBM Plex Sans',sans-serif;color:#14181B;text-wrap:pretty">Нүүр / Түрийвч / Профайл, glass over the scrolling content. It has one consequence worth naming: the launcher's wallet strip and the wallet tab were the same tap twice, and at nine icons there was no room for both, so the strip came off. The balance is now one tap away rather than visible on arrival — a trade against the brief's «visible before any app is opened». Apps stay icons; the bar carries only the shell.</p>
+<div style="font:600 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#78868e;margin-bottom:8px">ASSUMPTIONS</div>
+<p style="margin:0;font:400 13px/1.5 -apple-system,'IBM Plex Sans',sans-serif;color:#14181B;text-wrap:pretty">1pt = 1px here. SF Pro and SF Mono are not on the web, so IBM Plex Sans / Plex Mono stand in — they carry Cyrillic and the same proportions; ship with SF. Bell, chevron and magnifier are drawn to SF Symbols' metrics.</p>
+</div>
+</div>
+</div>
+</section>
+
+<sc-for list="{{ themes }}" as="t" hint-placeholder-count="1">
+<section style="{{ t.section }}">
+<div style="{{ t.heading }}">{{ t.name }}</div>
+
+<div style="display:flex;gap:36px;align-items:flex-start;flex-wrap:wrap">
+<sc-for list="{{ growth }}" as="g" hint-placeholder-count="3">
+<div style="width:402px;flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="{{ t.label }}">{{ g.label }}</div>
+<div style="width:402px;height:874px;border-radius:42px;overflow:hidden;background:var(--ground);border:1px solid var(--line2);position:relative;display:flex;flex-direction:column">
+
+<div style="height:54px;flex:none;display:flex;align-items:flex-end;justify-content:space-between;padding:0 30px 6px">
+<div style="font:600 15px/1 'IBM Plex Mono',monospace;color:var(--ink);font-variant-numeric:tabular-nums">12:21</div>
+<div style="display:flex;align-items:center;gap:6px">
+<div style="display:flex;align-items:flex-end;gap:2px"><div style="width:3px;height:4px;border-radius:1px;background:var(--ink)"></div><div style="width:3px;height:6px;border-radius:1px;background:var(--ink)"></div><div style="width:3px;height:8px;border-radius:1px;background:var(--ink)"></div><div style="width:3px;height:10px;border-radius:1px;background:var(--ink)"></div></div>
+<div style="width:22px;height:11px;border:1px solid var(--ink);border-radius:3px;padding:1.5px;box-sizing:border-box"><div style="width:70%;height:100%;border-radius:1.5px;background:var(--ink)"></div></div>
+</div>
+</div>
+
+<div style="flex:1;padding:6px 20px 82px;display:flex;flex-direction:column;gap:9px;overflow:hidden">
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+<div style="display:flex;flex-direction:column;gap:5px">
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:var(--ink3)">УЛААНБААТАР</div>
+<div style="font:600 27px/1 -apple-system,'IBM Plex Sans',sans-serif;letter-spacing:-.025em;color:var(--ink)">Basu</div>
+</div>
+<div style="display:flex;align-items:center;gap:14px;padding-top:4px">
+<div style="position:relative;width:26px;height:26px">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--ink)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.4V11a5 5 0 0 1 10 0v5.4"></path><path d="M5.4 16.4h13.2"></path><path d="M10.2 19a2 2 0 0 0 3.6 0"></path></svg>
+<div style="position:absolute;top:-3px;right:-5px;min-width:15px;height:15px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:var(--accent);color:var(--onAccent);display:flex;align-items:center;justify-content:center;font:600 9.5px/1 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">{{ unread }}</div>
+</div>
+<div style="width:30px;height:30px;display:grid;grid-template-columns:repeat(4,1fr);gap:9%;padding:12%;box-sizing:border-box;background:var(--surface2);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--line);border-radius:28%">
+<sc-for list="{{ me.cells }}" as="c" hint-placeholder-count="16"><div style="{{ c }}"></div></sc-for>
+</div>
+</div>
+</div>
+<div style="font:400 17px/1.35 -apple-system,'IBM Plex Sans',sans-serif;color:var(--ink2);text-wrap:pretty">Сайн байна уу, Батаа</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:7px">
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:var(--ink3)">ИДЭВХТЭЙ</div>
+<div style="display:flex;flex-direction:column;gap:6px">
+<sc-for list="{{ g.live }}" as="r" hint-placeholder-count="1">
+<div style="background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--line);border-radius:4px;padding:9px 14px;display:flex;flex-direction:column;gap:9px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:14px">
+<div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;min-width:0">
+<div style="{{ r.dot }}"></div>
+<div style="font:500 9.5px/1.2 'IBM Plex Mono',monospace;letter-spacing:.14em;color:var(--ink3)">{{ r.src }}</div>
+<div style="font:600 15.5px/1.25 -apple-system,'IBM Plex Sans',sans-serif;color:var(--ink);text-wrap:pretty">{{ r.name }}</div>
+<div style="font:400 11.5px/1.3 'IBM Plex Mono',monospace;color:var(--ink3);text-wrap:pretty">{{ r.meta }}</div>
+</div>
+<div style="display:flex;align-items:baseline;gap:6px;flex:none">
+<div style="font:500 9px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:var(--ink3)">{{ r.timeLabel }}</div>
+<div style="font:600 23px/1 'IBM Plex Mono',monospace;color:var(--ink);font-variant-numeric:tabular-nums">{{ r.time }}</div>
+</div>
+</div>
+<sc-if value="{{ r.extra }}">
+<div style="border-top:1px solid var(--line);padding-top:9px;display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+<div style="font:400 12.5px/1.4 -apple-system,'IBM Plex Sans',sans-serif;color:var(--ink2);text-wrap:pretty">{{ r.extra }}</div>
+<div style="font:600 12.5px/1 'IBM Plex Mono',monospace;color:var(--accent);flex:none;font-variant-numeric:tabular-nums">{{ r.extraTime }}</div>
+</div>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:9px">
+<sc-for list="{{ g.groups }}" as="grp" hint-placeholder-count="1">
+<div style="display:flex;flex-direction:column;gap:9px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:22px">
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:var(--ink3)">{{ grp.label }}</div>
+<sc-if value="{{ grp.search }}">
+<div style="display:flex;align-items:center;gap:8px;background:var(--surface2);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--line);border-radius:4px;padding:5px 9px">
+<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="1.8" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="M15.4 15.4 20 20"></path></svg>
+<span style="font:400 12px/1 'IBM Plex Mono',monospace;color:var(--ink3)">Хайх</span>
+</div>
+</sc-if>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:10px 14px">
+<sc-for list="{{ grp.apps }}" as="app" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+<div style="width:100%;aspect-ratio:1;max-width:92px;background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--line);border-radius:18px;box-shadow:0 1px 2px var(--shadow);display:flex;align-items:center;justify-content:center">
+<sc-if value="{{ app.food }}">
+<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="14.6" r="6.4"></circle><circle cx="12" cy="14.6" r="2.6"></circle><g style="animation:steam 3s ease-in-out infinite;transform-origin:12px 5px"><path d="M9.6 6.4c1.2-1-1.2-2 0-3.2"></path><path d="M14.4 6.4c1.2-1-1.2-2 0-3.2"></path></g></svg>
+</sc-if>
+<sc-if value="{{ app.taxi }}">
+<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="10.4" width="17.6" height="6.2" rx="1.6"></rect><path d="M9.6 10.4V7.2h4.8v3.2"></path><circle cx="7.6" cy="18.4" r="1.4"></circle><circle cx="16.4" cy="18.4" r="1.4"></circle></svg>
+</sc-if>
+<sc-if value="{{ app.del }}">
+<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5.4" y="7.6" width="13.4" height="12" rx="1.4"></rect><path d="M12.1 7.6v12"></path><path d="M1.8 10.6h2.2M1.8 14.6h2.2"></path></svg>
+</sc-if>
+<sc-if value="{{ app.tick }}">
+<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="6.4" width="17.6" height="11.2" rx="1.4"></rect><path d="M14.4 6.4v11.2" stroke-dasharray="1.2 2.4"></path><path d="M7.2 12h3.4"></path></svg>
+</sc-if>
+<sc-if value="{{ app.bill }}">
+<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3.6" width="12" height="16.8" rx="1.4"></rect><path d="M9.2 9.2h5.6M9.2 12.8h5.6M9.2 16.4h3.2"></path></svg>
+</sc-if>
+<sc-if value="{{ app.shop }}">
+<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 9.6h15.2v10.8H4.4z"></path><path d="M4.4 9.6 6.4 5.2h11.2l2 4.4"></path></svg>
+</sc-if>
+<sc-if value="{{ app.net }}">
+<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><path d="M4 12h16"></path><path d="M12 4c3 3.6 3 12.4 0 16-3-3.6-3-12.4 0-16z"></path></svg>
+</sc-if>
+<sc-if value="{{ app.med }}">
+<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="M12 8.4v7.2M8.4 12h7.2"></path></svg>
+</sc-if>
+<sc-if value="{{ app.cafe }}">
+<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 8.4h11.2v5.4a5.6 5.6 0 0 1-11.2 0z"></path><path d="M16.8 9.6h1.6a2 2 0 0 1 0 4h-1.6"></path><path d="M5.2 19.6h12"></path></svg>
+</sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:2px">
+<div style="font:600 13px/1.25 -apple-system,'IBM Plex Sans',sans-serif;color:var(--ink);text-wrap:pretty">{{ app.name }}</div>
+<div style="font:400 9.5px/1.3 'IBM Plex Mono',monospace;color:var(--ink3);text-wrap:pretty">{{ app.tag }}</div>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+</sc-for>
+<sc-if value="{{ g.soon }}">
+<div style="border-top:1px solid var(--line);padding-top:12px;font:400 11.5px/1.5 'IBM Plex Mono',monospace;color:var(--ink3);text-wrap:pretty">Такси, хүргэлт, тасалбар — 2026 оны төгсгөлд</div>
+</sc-if>
+</div>
+
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:78px;background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border-top:1px solid var(--line);display:flex;align-items:flex-start;padding:10px 8px 0">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--accent)">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.6 12 4.4l8 6.2"></path><path d="M6.2 12.2v7.4h11.6v-7.4"></path></svg>
+<span style="font:600 10px/1.2 -apple-system,'IBM Plex Sans',sans-serif">Нүүр</span>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--ink3)">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="6.6" width="17.2" height="10.8" rx="1.6"></rect><path d="M15.2 12h3.4"></path></svg>
+<span style="font:500 10px/1.2 -apple-system,'IBM Plex Sans',sans-serif">Түрийвч</span>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--ink3)">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="3.4"></circle><path d="M5.8 19.4c1.2-3.2 3.6-4.8 6.2-4.8s5 1.6 6.2 4.8"></path></svg>
+<span style="font:500 10px/1.2 -apple-system,'IBM Plex Sans',sans-serif">Профайл</span>
+</div>
+</div>
+<div style="position:absolute;left:50%;bottom:9px;transform:translateX(-50%);width:140px;height:5px;border-radius:3px;background:var(--ink);opacity:.28"></div>
+</div>
+<sc-if value="{{ notes }}"><div style="{{ t.note }}">{{ g.note }}</div></sc-if>
+</div>
+</sc-for>
+</div>
+
+<div style="display:flex;gap:36px;align-items:flex-start;flex-wrap:wrap;margin-top:48px">
+
+<div style="width:402px;flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="{{ t.label }}">Wallet · {{ t.short }}</div>
+<div style="width:402px;height:874px;border-radius:42px;overflow:hidden;background:var(--ground);border:1px solid var(--line2);position:relative;display:flex;flex-direction:column">
+<div style="height:54px;flex:none;display:flex;align-items:flex-end;padding:0 30px 6px"><div style="font:600 15px/1 'IBM Plex Mono',monospace;color:var(--ink);font-variant-numeric:tabular-nums">12:21</div></div>
+<div style="flex:none;display:flex;align-items:center;gap:6px;padding:6px 18px 14px">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+<span style="font:500 15px/1 -apple-system,'IBM Plex Sans',sans-serif;color:var(--accent)">Basu</span>
+</div>
+<div style="flex:1;padding:0 20px 88px;display:flex;flex-direction:column;gap:26px;overflow:hidden">
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:var(--ink3)">ТҮРИЙВЧ</div>
+<div style="font:600 48px/1 'IBM Plex Mono',monospace;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums">70,000<span style="font-family:-apple-system,'IBM Plex Sans',sans-serif;padding-left:.08em">₮</span></div>
+<div style="font:400 13.5px/1.5 -apple-system,'IBM Plex Sans',sans-serif;color:var(--ink2);max-width:30ch;text-wrap:pretty">Хоолны төлбөр эндээс хасагдана. Дутвал зөрүүг нь л асууна.</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:11px">
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:var(--ink3)">ЦЭНЭГЛЭХ</div>
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+<sc-for list="{{ topups }}" as="v" hint-placeholder-count="3">
+<div style="background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--line2);border-radius:4px;padding:15px 6px;text-align:center;font:600 14px/1 'IBM Plex Mono',monospace;color:var(--ink);font-variant-numeric:tabular-nums">{{ v }}<span style="font-family:-apple-system,'IBM Plex Sans',sans-serif;padding-left:.1em">₮</span></div>
+</sc-for>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:var(--ink3);padding-bottom:8px">ГҮЙЛГЭЭ</div>
+<sc-for list="{{ tx }}" as="row" hint-placeholder-count="3">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:14px 0;border-top:1px solid var(--line)">
+<div style="display:flex;flex-direction:column;gap:5px;min-width:0">
+<div style="font:500 15px/1.25 -apple-system,'IBM Plex Sans',sans-serif;color:var(--ink);text-wrap:pretty">{{ row.kind }}</div>
+<div style="font:400 11.5px/1.4 'IBM Plex Mono',monospace;color:var(--ink3);text-wrap:pretty">{{ row.from }}</div>
+</div>
+<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:none">
+<div style="{{ row.amountStyle }}">{{ row.amount }}<span style="font-family:-apple-system,'IBM Plex Sans',sans-serif;padding-left:.1em">₮</span></div>
+<div style="font:400 11px/1 'IBM Plex Mono',monospace;color:var(--ink3);font-variant-numeric:tabular-nums">{{ row.time }}</div>
+</div>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:78px;background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border-top:1px solid var(--line);display:flex;align-items:flex-start;padding:10px 8px 0">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--ink3)">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.6 12 4.4l8 6.2"></path><path d="M6.2 12.2v7.4h11.6v-7.4"></path></svg>
+<span style="font:600 10px/1.2 -apple-system,'IBM Plex Sans',sans-serif">Нүүр</span>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--accent)">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="6.6" width="17.2" height="10.8" rx="1.6"></rect><path d="M15.2 12h3.4"></path></svg>
+<span style="font:500 10px/1.2 -apple-system,'IBM Plex Sans',sans-serif">Түрийвч</span>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--ink3)">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="3.4"></circle><path d="M5.8 19.4c1.2-3.2 3.6-4.8 6.2-4.8s5 1.6 6.2 4.8"></path></svg>
+<span style="font:500 10px/1.2 -apple-system,'IBM Plex Sans',sans-serif">Профайл</span>
+</div>
+</div>
+<div style="position:absolute;left:50%;bottom:9px;transform:translateX(-50%);width:140px;height:5px;border-radius:3px;background:var(--ink);opacity:.28"></div>
+</div>
+<sc-if value="{{ notes }}"><div style="{{ t.note }}">One number, then only what explains it. The sentence under the balance sits on its own — swapping it for a generic line changes nothing else. Amounts are a mono column with a real minus sign; the app each row came from is printed on the row, not implied.</div></sc-if>
+</div>
+
+<div style="width:402px;flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="{{ t.label }}">Notifications · {{ t.short }}</div>
+<div style="width:402px;height:874px;border-radius:42px;overflow:hidden;background:var(--ground);border:1px solid var(--line2);position:relative;display:flex;flex-direction:column">
+<div style="height:54px;flex:none;display:flex;align-items:flex-end;padding:0 30px 6px"><div style="font:600 15px/1 'IBM Plex Mono',monospace;color:var(--ink);font-variant-numeric:tabular-nums">12:21</div></div>
+<div style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 20px 16px">
+<div style="display:flex;align-items:center;gap:6px">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+<span style="font:500 15px/1 -apple-system,'IBM Plex Sans',sans-serif;color:var(--accent)">Basu</span>
+</div>
+<span style="font:500 13px/1 -apple-system,'IBM Plex Sans',sans-serif;color:var(--accent)">Бүгдийг уншсан</span>
+</div>
+<div style="flex:1;padding:0 20px 88px;display:flex;flex-direction:column;overflow:hidden">
+<div style="font:600 28px/1.15 -apple-system,'IBM Plex Sans',sans-serif;letter-spacing:-.02em;color:var(--ink);padding-bottom:18px">Мэдэгдэл</div>
+<sc-for list="{{ notifs }}" as="n" hint-placeholder-count="3">
+<div style="display:flex;gap:12px;padding:16px 0;border-top:1px solid var(--line)">
+<div style="{{ n.dot }}"></div>
+<div style="display:flex;flex-direction:column;gap:7px;min-width:0;flex:1">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="font:500 9.5px/1 'IBM Plex Mono',monospace;letter-spacing:.14em;color:var(--ink3)">{{ n.src }}</span>
+<span style="{{ n.chanStyle }}">{{ n.chan }}</span>
+</div>
+<span style="font:400 11px/1 'IBM Plex Mono',monospace;color:var(--ink3);flex:none;font-variant-numeric:tabular-nums">{{ n.time }}</span>
+</div>
+<div style="{{ n.titleStyle }}">{{ n.title }}</div>
+<div style="font:400 13px/1.5 -apple-system,'IBM Plex Sans',sans-serif;color:var(--ink2);text-wrap:pretty">{{ n.body }}</div>
+</div>
+</div>
+</sc-for>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:78px;background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border-top:1px solid var(--line);display:flex;align-items:flex-start;padding:10px 8px 0">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--accent)">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.6 12 4.4l8 6.2"></path><path d="M6.2 12.2v7.4h11.6v-7.4"></path></svg>
+<span style="font:600 10px/1.2 -apple-system,'IBM Plex Sans',sans-serif">Нүүр</span>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--ink3)">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="6.6" width="17.2" height="10.8" rx="1.6"></rect><path d="M15.2 12h3.4"></path></svg>
+<span style="font:500 10px/1.2 -apple-system,'IBM Plex Sans',sans-serif">Түрийвч</span>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--ink3)">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="3.4"></circle><path d="M5.8 19.4c1.2-3.2 3.6-4.8 6.2-4.8s5 1.6 6.2 4.8"></path></svg>
+<span style="font:500 10px/1.2 -apple-system,'IBM Plex Sans',sans-serif">Профайл</span>
+</div>
+</div>
+<div style="position:absolute;left:50%;bottom:9px;transform:translateX(-50%);width:140px;height:5px;border-radius:3px;background:var(--ink);opacity:.28"></div>
+</div>
+<sc-if value="{{ notes }}"><div style="{{ t.note }}">Unread is a 6pt accent mark plus a heavier title — no tinted blocks. Source and channel are two separate facts on every row: where it came from, and where to look for it.</div></sc-if>
+</div>
+
+<div style="width:402px;flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="{{ t.label }}">Notifications · empty · {{ t.short }}</div>
+<div style="width:402px;height:874px;border-radius:42px;overflow:hidden;background:var(--ground);border:1px solid var(--line2);position:relative;display:flex;flex-direction:column">
+<div style="height:54px;flex:none;display:flex;align-items:flex-end;padding:0 30px 6px"><div style="font:600 15px/1 'IBM Plex Mono',monospace;color:var(--ink);font-variant-numeric:tabular-nums">12:21</div></div>
+<div style="flex:none;display:flex;align-items:center;gap:6px;padding:6px 20px 16px">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+<span style="font:500 15px/1 -apple-system,'IBM Plex Sans',sans-serif;color:var(--accent)">Basu</span>
+</div>
+<div style="flex:1;padding:0 20px 88px;display:flex;flex-direction:column;overflow:hidden">
+<div style="font:600 28px/1.15 -apple-system,'IBM Plex Sans',sans-serif;letter-spacing:-.02em;color:var(--ink);padding-bottom:18px">Мэдэгдэл</div>
+<div style="border-top:1px solid var(--line);padding-top:26px;max-width:32ch">
+<p style="margin:0;font:400 14px/1.6 -apple-system,'IBM Plex Sans',sans-serif;color:var(--ink2);text-wrap:pretty">Мэдэгдэл алга. Захиалга өгмөгц гал тавих цаг, ширээний мэдээллийг энд бичнэ.</p>
+</div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:78px;background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border-top:1px solid var(--line);display:flex;align-items:flex-start;padding:10px 8px 0">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--accent)">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.6 12 4.4l8 6.2"></path><path d="M6.2 12.2v7.4h11.6v-7.4"></path></svg>
+<span style="font:600 10px/1.2 -apple-system,'IBM Plex Sans',sans-serif">Нүүр</span>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--ink3)">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="6.6" width="17.2" height="10.8" rx="1.6"></rect><path d="M15.2 12h3.4"></path></svg>
+<span style="font:500 10px/1.2 -apple-system,'IBM Plex Sans',sans-serif">Түрийвч</span>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--ink3)">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="3.4"></circle><path d="M5.8 19.4c1.2-3.2 3.6-4.8 6.2-4.8s5 1.6 6.2 4.8"></path></svg>
+<span style="font:500 10px/1.2 -apple-system,'IBM Plex Sans',sans-serif">Профайл</span>
+</div>
+</div>
+<div style="position:absolute;left:50%;bottom:9px;transform:translateX(-50%);width:140px;height:5px;border-radius:3px;background:var(--ink);opacity:.28"></div>
+</div>
+<sc-if value="{{ notes }}"><div style="{{ t.note }}">Empty is a paragraph on the ground colour under the same hairline. No illustration, no card, no button.</div></sc-if>
+</div>
+
+<div style="width:402px;flex:none;display:flex;flex-direction:column;gap:10px">
+<div style="{{ t.label }}">Profile · {{ t.short }}</div>
+<div style="width:402px;height:874px;border-radius:42px;overflow:hidden;background:var(--ground);border:1px solid var(--line2);position:relative;display:flex;flex-direction:column">
+<div style="height:54px;flex:none;display:flex;align-items:flex-end;padding:0 30px 6px"><div style="font:600 15px/1 'IBM Plex Mono',monospace;color:var(--ink);font-variant-numeric:tabular-nums">12:21</div></div>
+<div style="flex:none;display:flex;align-items:center;gap:6px;padding:6px 20px 16px">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"></path></svg>
+<span style="font:500 15px/1 -apple-system,'IBM Plex Sans',sans-serif;color:var(--accent)">Basu</span>
+</div>
+<div style="flex:1;padding:0 20px 88px;display:flex;flex-direction:column;gap:26px;overflow:hidden">
+<div style="display:flex;align-items:center;gap:16px">
+<div style="width:54px;height:54px;flex:none;display:grid;grid-template-columns:repeat(4,1fr);gap:9%;padding:12%;box-sizing:border-box;background:var(--surface2);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--line);border-radius:28%">
+<sc-for list="{{ me.cells }}" as="c" hint-placeholder-count="16"><div style="{{ c }}"></div></sc-for>
+</div>
+<div style="display:flex;flex-direction:column;gap:5px;min-width:0">
+<div style="font:600 24px/1.15 -apple-system,'IBM Plex Sans',sans-serif;letter-spacing:-.02em;color:var(--ink);text-wrap:pretty">Батаа</div>
+<div style="font:400 14px/1.2 'IBM Plex Mono',monospace;color:var(--ink2);font-variant-numeric:tabular-nums">+976 9900 1122</div>
+<div style="font:400 11.5px/1.35 -apple-system,'IBM Plex Sans',sans-serif;color:var(--ink3);text-wrap:pretty">Basu-д 2026 оны 8-р сараас хойш · 3f8c1a92</div>
+</div>
+</div>
+<div style="background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--line);border-radius:4px">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px">
+<span style="font:400 15px/1.3 -apple-system,'IBM Plex Sans',sans-serif;color:var(--ink2)">Нэр</span>
+<div style="display:flex;align-items:center;gap:6px"><span style="font:500 15px/1.3 -apple-system,'IBM Plex Sans',sans-serif;color:var(--ink)">Батаа</span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg></div>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-top:1px solid var(--line)">
+<span style="font:400 15px/1.3 -apple-system,'IBM Plex Sans',sans-serif;color:var(--ink2)">Хэл</span>
+<div style="display:flex;align-items:center;gap:6px"><span style="font:500 15px/1.3 -apple-system,'IBM Plex Sans',sans-serif;color:var(--ink)">Монгол</span><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"></path></svg></div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:11px">
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:var(--ink3)">МЭДЭГДЭЛ</div>
+<div style="background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--line);border-radius:4px">
+<sc-for list="{{ prefs }}" as="p" hint-placeholder-count="3">
+<div style="{{ p.rowStyle }}">
+<span style="font:400 15px/1.35 -apple-system,'IBM Plex Sans',sans-serif;color:var(--ink);text-wrap:pretty">{{ p.name }}</span>
+<div style="{{ p.trackStyle }}"><div style="{{ p.knobStyle }}"></div></div>
+</div>
+</sc-for>
+</div>
+<p style="margin:0;font:400 12px/1.55 -apple-system,'IBM Plex Sans',sans-serif;color:var(--ink3);text-wrap:pretty">Захиалгын явцын мэдэгдлийг унтраах боломжгүй — гал тавих мөчийг мэдэхгүй бол урьдчилсан захиалга утгагүй болно.</p>
+</div>
+<div style="background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--line);border-radius:4px;padding:15px;text-align:center;font:500 15px/1 -apple-system,'IBM Plex Sans',sans-serif;color:var(--stop)">Гарах</div>
+</div>
+<div style="position:absolute;left:0;right:0;bottom:0;height:78px;background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border-top:1px solid var(--line);display:flex;align-items:flex-start;padding:10px 8px 0">
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--ink3)">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.6 12 4.4l8 6.2"></path><path d="M6.2 12.2v7.4h11.6v-7.4"></path></svg>
+<span style="font:600 10px/1.2 -apple-system,'IBM Plex Sans',sans-serif">Нүүр</span>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--ink3)">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="6.6" width="17.2" height="10.8" rx="1.6"></rect><path d="M15.2 12h3.4"></path></svg>
+<span style="font:500 10px/1.2 -apple-system,'IBM Plex Sans',sans-serif">Түрийвч</span>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--accent)">
+<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="9" r="3.4"></circle><path d="M5.8 19.4c1.2-3.2 3.6-4.8 6.2-4.8s5 1.6 6.2 4.8"></path></svg>
+<span style="font:500 10px/1.2 -apple-system,'IBM Plex Sans',sans-serif">Профайл</span>
+</div>
+</div>
+<div style="position:absolute;left:50%;bottom:9px;transform:translateX(-50%);width:140px;height:5px;border-radius:3px;background:var(--ink);opacity:.28"></div>
+</div>
+<sc-if value="{{ notes }}"><div style="{{ t.note }}">Four facts, two fields, three switches, one exit. The avatar is drawn from the account's eight hex characters, so there is no upload, no storage and no moderation queue.</div></sc-if>
+</div>
+
+</div>
+</section>
+</sc-for>
+
+<section style="background:linear-gradient(176deg,#EFF1F2 0%,#E9EBEC 46%,#DFE3E4 100%);padding:56px;border-top:1px solid #c0c8cb">
+<div style="--ground:#E9EBEC;--surface:#FFFFFF;--surface2:#F3F5F6;--ink:#14181B;--ink2:#4A555C;--ink3:#78868E;--line:#D2D8DA;--line2:#C0C8CB;--accent:#C64E08;--shadow:rgba(20,24,27,.05);display:flex;flex-direction:column;gap:40px;max-width:1180px">
+
+<div style="display:flex;flex-direction:column;gap:6px">
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#78868e">ICON SYSTEM</div>
+<div style="font:600 26px/1.2 -apple-system,'IBM Plex Sans',sans-serif;letter-spacing:-.02em;color:#14181B">Six glyphs, and how to draw the seventh</div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:26px">
+<sc-for list="{{ sheetApps }}" as="app" hint-placeholder-count="6">
+<div style="display:flex;flex-direction:column;gap:10px;align-items:flex-start">
+<div style="position:relative;width:92px;height:92px;background:rgba(255,255,255,.62);backdrop-filter:blur(8px) saturate(1.05);-webkit-backdrop-filter:blur(8px) saturate(1.05);border:1px solid #D2D8DA;border-radius:18px;box-shadow:0 1px 2px rgba(20,24,27,.05);display:flex;align-items:center;justify-content:center">
+<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:66px;height:66px;border:1px dashed rgba(198,78,8,.28);border-radius:50%"></div></div>
+<sc-if value="{{ app.food }}">
+<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#C64E08" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="14.6" r="6.4"></circle><circle cx="12" cy="14.6" r="2.6"></circle><g style="animation:steam 3s ease-in-out infinite;transform-origin:12px 5px"><path d="M9.6 6.4c1.2-1-1.2-2 0-3.2"></path><path d="M14.4 6.4c1.2-1-1.2-2 0-3.2"></path></g></svg>
+</sc-if>
+<sc-if value="{{ app.taxi }}">
+<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#C64E08" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="10.4" width="17.6" height="6.2" rx="1.6"></rect><path d="M9.6 10.4V7.2h4.8v3.2"></path><circle cx="7.6" cy="18.4" r="1.4"></circle><circle cx="16.4" cy="18.4" r="1.4"></circle></svg>
+</sc-if>
+<sc-if value="{{ app.del }}">
+<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#C64E08" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5.4" y="7.6" width="13.4" height="12" rx="1.4"></rect><path d="M12.1 7.6v12"></path><path d="M1.8 10.6h2.2M1.8 14.6h2.2"></path></svg>
+</sc-if>
+<sc-if value="{{ app.tick }}">
+<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#C64E08" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="6.4" width="17.6" height="11.2" rx="1.4"></rect><path d="M14.4 6.4v11.2" stroke-dasharray="1.2 2.4"></path><path d="M7.2 12h3.4"></path></svg>
+</sc-if>
+<sc-if value="{{ app.bill }}">
+<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#C64E08" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3.6" width="12" height="16.8" rx="1.4"></rect><path d="M9.2 9.2h5.6M9.2 12.8h5.6M9.2 16.4h3.2"></path></svg>
+</sc-if>
+<sc-if value="{{ app.shop }}">
+<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#C64E08" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 9.6h15.2v10.8H4.4z"></path><path d="M4.4 9.6 6.4 5.2h11.2l2 4.4"></path></svg>
+</sc-if>
+<sc-if value="{{ app.net }}">
+<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#C64E08" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><path d="M4 12h16"></path><path d="M12 4c3 3.6 3 12.4 0 16-3-3.6-3-12.4 0-16z"></path></svg>
+</sc-if>
+<sc-if value="{{ app.med }}">
+<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#C64E08" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="M12 8.4v7.2M8.4 12h7.2"></path></svg>
+</sc-if>
+<sc-if value="{{ app.cafe }}">
+<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#C64E08" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5.6 8.4h11.2v5.4a5.6 5.6 0 0 1-11.2 0z"></path><path d="M16.8 9.6h1.6a2 2 0 0 1 0 4h-1.6"></path><path d="M5.2 19.6h12"></path></svg>
+</sc-if>
+</div>
+<div style="display:flex;flex-direction:column;gap:3px">
+<div style="font:600 13px/1.25 -apple-system,'IBM Plex Sans',sans-serif;color:#14181B">{{ app.name }}</div>
+<div style="font:400 9.5px/1.3 'IBM Plex Mono',monospace;color:#78868E">{{ app.tag }}</div>
+<div style="font:400 9.5px/1.3 'IBM Plex Mono',monospace;color:#C0C8CB">{{ app.parts }}</div>
+</div>
+</div>
+</sc-for>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
+<div style="background:rgba(255,255,255,.62);backdrop-filter:blur(8px) saturate(1.05);-webkit-backdrop-filter:blur(8px) saturate(1.05);border:1px solid #D2D8DA;border-radius:4px;padding:20px">
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#78868E;margin-bottom:14px">STROKE RULES</div>
+<div style="display:flex;flex-direction:column;gap:9px">
+<sc-for list="{{ strokeRules }}" as="r" hint-placeholder-count="6">
+<div style="display:flex;gap:14px;font:400 12.5px/1.45 'IBM Plex Mono',monospace;color:#14181B"><span style="color:#78868E;flex:none;width:104px">{{ r.k }}</span><span style="text-wrap:pretty">{{ r.v }}</span></div>
+</sc-for>
+</div>
+</div>
+<div style="background:rgba(255,255,255,.62);backdrop-filter:blur(8px) saturate(1.05);-webkit-backdrop-filter:blur(8px) saturate(1.05);border:1px solid #D2D8DA;border-radius:4px;padding:20px">
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#78868E;margin-bottom:14px">GRID METRICS</div>
+<div style="display:flex;gap:22px;align-items:flex-start">
+<div style="flex:none;display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+<div style="position:relative;width:92px;height:92px;border:1px solid #C0C8CB;border-radius:18px;background:#F3F5F6">
+<div style="position:absolute;inset:13px;border:1px dashed rgba(198,78,8,.4);border-radius:9px"></div>
+<div style="position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(20,24,27,.12)"></div>
+<div style="position:absolute;top:0;bottom:0;left:50%;width:1px;background:rgba(20,24,27,.12)"></div>
+</div>
+<div style="font:400 9.5px/1.3 'IBM Plex Mono',monospace;color:#78868E">92 × 92 · r18 · glyph 34</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:9px;min-width:0">
+<sc-for list="{{ gridRules }}" as="r" hint-placeholder-count="5">
+<div style="display:flex;gap:12px;font:400 12.5px/1.45 'IBM Plex Mono',monospace;color:#14181B"><span style="color:#78868E;flex:none;width:96px">{{ r.k }}</span><span style="text-wrap:pretty">{{ r.v }}</span></div>
+</sc-for>
+</div>
+</div>
+</div>
+<div style="background:rgba(255,255,255,.62);backdrop-filter:blur(8px) saturate(1.05);-webkit-backdrop-filter:blur(8px) saturate(1.05);border:1px solid #D2D8DA;border-radius:4px;padding:20px">
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#78868E;margin-bottom:14px">DRAWING THE SEVENTH</div>
+<div style="display:flex;flex-direction:column;gap:11px">
+<sc-for list="{{ seventh }}" as="s" hint-placeholder-count="6">
+<div style="display:flex;gap:12px"><span style="font:600 12px/1.5 'IBM Plex Mono',monospace;color:#C64E08;flex:none">—</span><span style="font:400 13px/1.5 -apple-system,'IBM Plex Sans',sans-serif;color:#14181B;text-wrap:pretty">{{ s }}</span></div>
+</sc-for>
+</div>
+</div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
+<div style="background:rgba(255,255,255,.62);backdrop-filter:blur(8px) saturate(1.05);-webkit-backdrop-filter:blur(8px) saturate(1.05);border:1px solid #D2D8DA;border-radius:4px;padding:20px">
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#78868E;margin-bottom:16px">AVATAR MARKS · SIX SEEDS · 54PT</div>
+<div style="display:flex;gap:20px;flex-wrap:wrap">
+<sc-for list="{{ avatars }}" as="a" hint-placeholder-count="6">
+<div style="display:flex;flex-direction:column;gap:8px;align-items:center">
+<div style="width:54px;height:54px;display:grid;grid-template-columns:repeat(4,1fr);gap:9%;padding:12%;box-sizing:border-box;background:rgba(243,245,246,.55);backdrop-filter:blur(8px) saturate(1.05);-webkit-backdrop-filter:blur(8px) saturate(1.05);border:1px solid #D2D8DA;border-radius:28%">
+<sc-for list="{{ a.cells }}" as="c" hint-placeholder-count="16"><div style="{{ c }}"></div></sc-for>
+</div>
+<div style="font:400 10px/1 'IBM Plex Mono',monospace;color:#78868E">{{ a.seed }}</div>
+</div>
+</sc-for>
+</div>
+<p style="margin:16px 0 0;font:400 12.5px/1.5 -apple-system,'IBM Plex Sans',sans-serif;color:#4A555C;max-width:52ch;text-wrap:pretty">Four rows of four cells, the right half mirrored, one cell per hex character. A character divisible by three leaves its cell empty; odd characters are round, even ones square; ink or ink2 for tone, and at most one cell takes the accent. Symmetry keeps it from reading as noise at 54pt; the empty cells are what make two accounts tellable apart.</p>
+</div>
+<div style="background:rgba(255,255,255,.62);backdrop-filter:blur(8px) saturate(1.05);-webkit-backdrop-filter:blur(8px) saturate(1.05);border:1px solid #D2D8DA;border-radius:4px;padding:20px">
+<div style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:.16em;color:#78868E;margin-bottom:16px">BELL BADGE · 1 / 9 / 99+</div>
+<div style="display:flex;gap:34px;align-items:flex-start">
+<sc-for list="{{ badges }}" as="b" hint-placeholder-count="3">
+<div style="display:flex;flex-direction:column;gap:10px;align-items:center">
+<div style="position:relative;width:26px;height:26px">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#14181B" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.4V11a5 5 0 0 1 10 0v5.4"></path><path d="M5.4 16.4h13.2"></path><path d="M10.2 19a2 2 0 0 0 3.6 0"></path></svg>
+<div style="position:absolute;top:-3px;right:-5px;min-width:15px;height:15px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:#C64E08;color:#fff;display:flex;align-items:center;justify-content:center;font:600 9.5px/1 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums">{{ b }}</div>
+</div>
+<div style="font:400 10px/1 'IBM Plex Mono',monospace;color:#78868E">{{ b }}</div>
+</div>
+</sc-for>
+</div>
+<p style="margin:18px 0 0;font:400 12.5px/1.5 -apple-system,'IBM Plex Sans',sans-serif;color:#4A555C;max-width:52ch;text-wrap:pretty">The badge is a 15pt pill, not a circle: it grows to the right of its own left edge, so the bell never shifts. Three digits become 99+ rather than a wider pill. Mono numerals, and the only place the accent appears in the header.</p>
+</div>
+</div>
+
+</div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;notes&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Sheet&quot;},&quot;liveTaxi&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Launcher&quot;},&quot;unread&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;1&quot;,&quot;2&quot;,&quot;9&quot;,&quot;99+&quot;],&quot;default&quot;:&quot;2&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Launcher&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const L = {'--ground':'linear-gradient(176deg,#EFF1F2 0%,#E9EBEC 46%,#DFE3E4 100%)','--surface':'rgba(255,255,255,.62)','--surface2':'rgba(243,245,246,.55)','--glass':'blur(8px) saturate(1.05)','--sunk':'#DFE3E4','--ink':'#14181B','--ink2':'#4A555C','--ink3':'#78868E','--line':'#D2D8DA','--line2':'#C0C8CB','--accent':'#C64E08','--accentSoft':'#FAE7DA','--ready':'#136A4B','--hold':'#7E6113','--stop':'#9B2226','--route':'#1B5B8F','--shadow':'rgba(20,24,27,.05)','--onAccent':'#FFFFFF'};
+    const D = {'--ground':'linear-gradient(176deg,#141B1E 0%,#0E1315 46%,#0A0E10 100%)','--surface':'rgba(22,29,32,.58)','--surface2':'rgba(28,36,40,.5)','--glass':'blur(8px) saturate(1.05)','--sunk':'#0A0E10','--ink':'#E7ECED','--ink2':'#A2B0B6','--ink3':'#6E7E85','--line':'#283236','--line2':'#374348','--accent':'#FF8A3D','--accentSoft':'#33200F','--ready':'#57C295','--hold':'#DAB65A','--stop':'#F08A8D','--route':'#78B0E0','--shadow':'rgba(0,0,0,.4)','--onAccent':'#160B03'};
+
+    const sec = (vars, bg, fg) => Object.assign({}, vars, {background: bg, padding: '56px 56px 64px'});
+    const label = c => ({font:"500 11px/1.3 'IBM Plex Mono',monospace",letterSpacing:'.14em',textTransform:'uppercase',color:c});
+    const note = c => ({font:"400 12.5px/1.55 -apple-system,'IBM Plex Sans',sans-serif",color:c,maxWidth:'402px',textWrap:'pretty',marginTop:'2px'});
+
+    const A = (name, tag, k, parts) => ({name, tag, parts, food:k==='food', taxi:k==='taxi', del:k==='del', tick:k==='tick', bill:k==='bill', shop:k==='shop', net:k==='net', med:k==='med', cafe:k==='cafe'});
+    const food = A('Хоол','урьдчилсан','food','4 elements · 1 animated');
+    const taxi = A('Такси','дуудлага','taxi','4 elements');
+    const del  = A('Хүргэлт','30 минут','del','3 elements');
+    const tick = A('Тасалбар','театр, кино','tick','3 elements');
+    const bill = A('Төлбөр','нэхэмжлэх','bill','2 elements');
+    const shop = A('Дэлгүүр','ойрхон','shop','2 elements');
+    const net  = A('Интернэт','дата','net','3 elements');
+    const med  = A('Эмийн сан','24 цаг','med','2 elements');
+    const cafe = A('Кофе','авч явах','cafe','3 elements');
+
+    const dot = c => ({width:'6px',height:'6px',borderRadius:'50%',background:c,flex:'none'});
+    const liveFood = expanded => ({src:'ХООЛ', name:'Алтан Тавган', meta:'№0971 · Хүлээгдэж байна', time:'11:30', timeLabel:'СУУХ', dot: dot('var(--hold)'), extra: expanded ? 'Гал тавих цаг' : null, extraTime: '11:15'});
+    const liveTaxi = {src:'ТАКСИ', name:'Чингисийн өргөн чөлөө', meta:'UBA-1234 · 4 минутын дараа', time:'12:25', timeLabel:'ИРЭХ', dot: dot('var(--route)'), extra:null, extraTime:null};
+
+    const showTaxi = this.props.liveTaxi ?? true;
+    const growth = [
+      {label:'Launcher · 1 icon · today', live:[liveFood(true)], groups:[{label:'АППУУД', apps:[food]}], soon:true, search:false,
+       note:'One icon, and the screen still reads as finished: the live row is allowed a second line when it is the only thing running, so the fire time appears here instead of inside the app. What is coming is a line of type under a hairline — never an empty card.'},
+      {label:'Launcher · 4 icons · +6 months', live: showTaxi ? [liveTaxi, liveFood(false)] : [liveFood(false)], groups:[{label:'АППУУД', apps:[food,taxi,del,tick]}], soon:false, search:false,
+       note:'The second row begins and nothing above it moves. The taxi enters LIVE as another row, ordered by the moment that matters, not by which app it came from.'},
+      {label:'Launcher · 9 icons · +2 years', live: showTaxi ? [liveTaxi, liveFood(false)] : [liveFood(false)], groups:[{label:'ӨДӨР ТУТАМ', apps:[food,taxi,del], search:true},{label:'БУСАД', apps:[tick,bill,shop,net,med,cafe], search:false}], soon:false, search:true,
+       note:'Nine icons: two editorial bands fixed by the product, and a filter field that appears at seven. No folders, no most-recently-used float — a grid that rearranges itself cannot be learned by thumb. Recency stays in LIVE.'}
+    ];
+
+    const amount = (v, kind) => ({font:"600 15px/1 'IBM Plex Mono',monospace", color: kind==='in' ? 'var(--ready)' : 'var(--ink)', fontVariantNumeric:'tabular-nums'});
+    const tx = [
+      {kind:'Цэнэглэлт', from:'Basu', time:'11:47', amount:'+50,000', amountStyle: amount(0,'in')},
+      {kind:'Захиалга', from:'Хоол · Модерн Номадс №0971', time:'12:22', amount:'−18,500', amountStyle: amount(0,'out')},
+      {kind:'Буцаалт', from:'Хоол · цуцалсан', time:'9/1', amount:'+12,000', amountStyle: amount(0,'in')}
+    ];
+
+    const chan = on => ({font:"500 9px/1 'IBM Plex Mono',monospace", letterSpacing:'.12em', color:'var(--ink2)', border:'1px solid var(--line2)', borderRadius:'2px', padding:'3px 5px'});
+    const nTitle = unread => ({font:(unread?'600':'400')+" 15.5px/1.35 -apple-system,'IBM Plex Sans',sans-serif", color: unread?'var(--ink)':'var(--ink2)', textWrap:'pretty'});
+    const nDot = unread => unread ? {width:'6px',height:'6px',borderRadius:'50%',background:'var(--accent)',flex:'none',marginTop:'8px'} : {width:'6px',flex:'none'};
+    const notifs = [
+      {src:'ХООЛ', chan:'SMS', chanStyle:chan(), time:'12:14', title:'Та замд гарсан уу?', body:'«1 = Тийм · 2 = 10 минут хойшлуул»', dot:nDot(true), titleStyle:nTitle(true)},
+      {src:'ХООЛ', chan:'АПП', chanStyle:chan(), time:'12:21', title:'Гал дээр гарлаа', body:'«Цуцлах боломжгүй боллоо.»', dot:nDot(true), titleStyle:nTitle(true)},
+      {src:'BASU', chan:'АПП', chanStyle:chan(), time:'8/29', title:'Basu-д тавтай морил', body:'«Түрийвчээ цэнэглээрэй.»', dot:nDot(false), titleStyle:nTitle(false)}
+    ];
+
+    const prefRow = first => ({display:'flex',alignItems:'center',justifyContent:'space-between',gap:'14px',padding:'13px 16px',borderTop: first?'none':'1px solid var(--line)'});
+    const track = on => ({width:'51px',height:'31px',flex:'none',borderRadius:'16px',background: on?'var(--accent)':'var(--line2)',padding:'2px',boxSizing:'border-box',display:'flex',justifyContent: on?'flex-end':'flex-start'});
+    const knob = {width:'27px',height:'27px',borderRadius:'50%',background:'#fff',boxShadow:'0 1px 2px rgba(0,0,0,.2)'};
+    const prefs = [
+      {name:'Аппаар', rowStyle:prefRow(true), trackStyle:track(true), knobStyle:knob},
+      {name:'Мессежээр', rowStyle:prefRow(false), trackStyle:track(true), knobStyle:knob},
+      {name:'Урамшуулал', rowStyle:prefRow(false), trackStyle:track(false), knobStyle:knob}
+    ];
+
+    const avatar = seed => {
+      const chars = String(seed).slice(0,8).split('');
+      let accentUsed = false;
+      const cell = ch => {
+        const v = parseInt(ch, 16);
+        if (isNaN(v) || v % 3 === 0) return {aspectRatio:'1', background:'transparent'};
+        let color = v >= 8 ? 'var(--ink)' : 'var(--ink2)';
+        if (v >= 13 && !accentUsed) { color = 'var(--accent)'; accentUsed = true; }
+        return {aspectRatio:'1', background:color, borderRadius: v % 2 ? '50%' : '1px'};
+      };
+      const cells = [];
+      for (let r = 0; r < 4; r++) {
+        const a = cell(chars[r*2]), b = cell(chars[r*2+1]);
+        cells.push(a, b, Object.assign({}, b), Object.assign({}, a));
+      }
+      return {seed, cells};
+    };
+
+    return {
+      themes: [
+        {name:'ХӨНГӨН · LIGHT', short:'light', section: sec(L, '#b9c0c3'), heading: Object.assign(label('#31383b'), {marginBottom:'26px',fontSize:'13px'}), label: label('#3c4448'), note: note('#3c4448')},
+        {name:'ХАР · DARK', short:'dark', section: sec(D, '#06090b'), heading: Object.assign(label('#8d999f'), {marginBottom:'26px',fontSize:'13px'}), label: label('#7d8a90'), note: note('#8d999f')}
+      ],
+      growth,
+      unread: this.props.unread ?? '2',
+      notes: this.props.notes ?? true,
+      me: avatar('3f8c1a92'),
+      avatars: ['3f8c1a92','a17b04ce','9d2f7e10','c0ffee42','5b8a3d67','e91c2b04'].map(avatar),
+      badges: ['1','9','99+'],
+      topups: ['20,000','50,000','100,000'],
+      tx, notifs, prefs,
+      sheetApps: [food, taxi, del, tick, bill, shop, net, med, cafe],
+      strokeRules: [
+        {k:'viewBox', v:'24 × 24, optical padding 2 — the mark lives inside a Ø18 keyline circle'},
+        {k:'stroke', v:'1.6, round caps, round joins, no fills, no gradients'},
+        {k:'colour', v:'accent only (#C64E08 / #FF8A3D). Never two colours in one glyph'},
+        {k:'elements', v:'2 to 4. Five means the idea is wrong, not the drawing'},
+        {k:'motion', v:'at most one element may move, ±1.4pt over 3s, opacity .55→1'},
+        {k:'geometry', v:'plan view or elevation, pick one per glyph; no perspective'}
+      ],
+      gridRules: [
+        {k:'tile', v:'92 × 92 min, r18 continuous, surface, 1pt line, shadow y1 b2'},
+        {k:'column', v:'adaptive, minmax(92, 1fr) — three on 402pt'},
+        {k:'gap', v:'18 horizontal and vertical'},
+        {k:'name', v:'13 semibold ink, wraps at Dynamic Type, never truncates'},
+        {k:'tag', v:'mono 9.5 ink3, one word, lower case'}
+      ],
+      seventh: [
+        'Name the object, not the action: a bowl, a roof sign, a box. If the noun cannot be drawn in four strokes, the app has the wrong icon.',
+        'Start from the Ø18 keyline circle. A round glyph touches it; a square one stops 1pt inside it, so the two read the same weight.',
+        'Draw at 24 and check at 34 and 44. If a detail closes up at 34, remove it — do not thin the stroke.',
+        'Motion is reserved for a state the app is in, not for delight. The steam moves because a kitchen is hot. A parked taxi does not move.',
+        'Test it beside the bowl and one other glyph. New glyphs fail next to their neighbours, not on their own.',
+        'The tag under the tile carries the specificity. If the glyph needs a second element to say «pre-order», the tag was doing its job already.'
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

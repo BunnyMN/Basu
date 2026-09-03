@@ -287,6 +287,7 @@ async function holdTable(
  * after a timeout and the redelivered callback all buy exactly one lunch.
  */
 export async function payOrder(ctx: Ctx, orderId: string): Promise<void> {
+  const billed = await billingFacts(orderId);
   const { rows } = await getPool().query<{ total_mnt: number; state: string; guest_id: string }>(
     'SELECT total_mnt, state, guest_id FROM dine.dining_order WHERE id = $1',
     [orderId],
@@ -302,6 +303,9 @@ export async function payOrder(ctx: Ctx, orderId: string): Promise<void> {
       amountMnt: order.total_mnt,
       subject: 'order',
       subjectId: orderId,
+      // The memo is what the guest reads in their statement, so the vertical
+      // names itself here — the ledger must never learn that an order is lunch.
+      memo: billed ? `Хоол · ${billed.restaurant} №${billed.code}` : 'Хоол',
       idempotencyKey: `order:${orderId}:purchase`,
     });
   } catch (error) {
@@ -596,7 +600,7 @@ async function refund(ctx: Ctx, orderId: string, reason: string): Promise<void> 
     amountMnt: billed.amountMnt,
     subject: 'order',
     subjectId: orderId,
-    memo: reason,
+    memo: `Хоол · ${reason}`,
     idempotencyKey: `order:${orderId}:refund`,
   });
 
@@ -628,6 +632,7 @@ async function billingFacts(orderId: string): Promise<
   | {
       guestId: string;
       code: string;
+      restaurant: string;
       amountMnt: number;
       merchantTin: string;
       transferId: string | null;
@@ -637,12 +642,13 @@ async function billingFacts(orderId: string): Promise<
   const { rows } = await getPool().query<{
     guest_id: string;
     code: string;
+    restaurant: string;
     total_mnt: number;
     tin: string | null;
     ledger_transfer_id: string | null;
   }>(
     `SELECT o.guest_id, o.code, o.total_mnt, o.ledger_transfer_id,
-            r.ebarimt_merchant_tin AS tin
+            r.name AS restaurant, r.ebarimt_merchant_tin AS tin
        FROM dine.dining_order o
        JOIN dine.restaurant r ON r.id = o.restaurant_id
       WHERE o.id = $1`,
@@ -653,6 +659,7 @@ async function billingFacts(orderId: string): Promise<
   return {
     guestId: row.guest_id,
     code: row.code,
+    restaurant: row.restaurant,
     amountMnt: row.total_mnt,
     merchantTin: row.tin ?? 'UNSET',
     transferId: row.ledger_transfer_id,

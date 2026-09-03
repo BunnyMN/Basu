@@ -1,11 +1,18 @@
 import SwiftUI
 
 /**
- The Basu home screen.
+ The launcher.
 
- It owns no domain logic: everything here is a name, a glyph and a link — plus
- whatever of the guest's is currently running, because a launcher that cannot
- tell you your lunch is on the fire is only a menu of links.
+ It owns no domain logic: a header, whatever of the guest's is running, and a
+ grid of icons. The second app inside Basu is one entry in `AppCatalogue` and
+ nothing on this screen moves.
+
+ Two rules are load-bearing and easy to erode later:
+
+ - **The grid never rearranges itself.** No folders, no most-recently-used
+   float. A grid that moves under the thumb cannot be learned, and recency
+   already has a home one section higher.
+ - **Bands are editorial**, fixed by the product, not derived from usage.
  */
 struct HomeView: View {
   let open: (Destination) -> Void
@@ -14,59 +21,36 @@ struct HomeView: View {
   @Environment(Session.self) private var session
   @Environment(Platform.self) private var platform
   @State private var signingIn = false
+  @State private var query = ""
 
-  /// Everything inside Basu, in the order it appears. A list rather than
-  /// markup because this is the part that will grow: the second app is a new
-  /// entry here and nothing else.
-  private var apps: [(name: String, tag: String, destination: Destination)] {
-    [("Хоол", "урьдчилсан", .dine(orderId: nil))]
+  private var bands: [AppBand] { AppCatalogue.bands(count: AppCatalogue.installedCount) }
+  private var iconCount: Int { bands.reduce(0) { $0 + $1.apps.count } }
+
+  private var live: [LiveItem] {
+    let orders = model.live
+    return orders.map { $0.asLiveItem(expanded: orders.count == 1) }
   }
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 0) {
+      VStack(alignment: .leading, spacing: 9) {
         header
 
         if model.offline {
           OfflineBanner { await model.retry() }
-            .padding(.bottom, 20)
+            .padding(.top, 8)
         }
 
-        // The wallet sits above the apps because it is the thing that decides
-        // whether any of them will work. A launcher that makes you open an app
-        // to find out you have no money is a launcher that wasted a tap.
-        if session.isSignedIn {
-          Button { open(.wallet) } label: { WalletStrip(balanceMnt: platform.balanceMnt) }
-            .buttonStyle(.plain)
-            .padding(.bottom, 26)
-        }
-
-        if !model.live.isEmpty {
-          SectionLabel("Идэвхтэй")
-            .padding(.bottom, 10)
-          VStack(spacing: 8) {
-            ForEach(model.live) { order in
-              Button { open(.dine(orderId: order.id)) } label: { LiveOrderCard(order: order) }
-                .buttonStyle(.plain)
-            }
-          }
-          .padding(.bottom, 26)
-        }
-
-        SectionLabel("Аппууд")
-          .padding(.bottom, 10)
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 10, alignment: .top)], alignment: .leading, spacing: 14) {
-          ForEach(apps, id: \.name) { app in
-            AppTile(name: app.name, tag: app.tag) { open(app.destination) }
-          }
-        }
-        .padding(.bottom, 26)
+        if !live.isEmpty { liveSection }
+        grid
       }
-      .padding(.horizontal, 18)
-      .padding(.top, 12)
+      .padding(.horizontal, 20)
+      .padding(.top, 6)
+      .padding(.bottom, 82)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .background(Color.bg)
+    .scrollIndicators(.hidden)
+    .background(LinearGradient.ground)
     .safeAreaInset(edge: .top) { DemoClockBar() }
     .toolbarVisibility(.hidden, for: .navigationBar)
     .sheet(isPresented: $signingIn) { SignInSheet() }
@@ -80,138 +64,230 @@ struct HomeView: View {
     }
   }
 
+  // MARK: - header
+
   private var header: some View {
-    VStack(alignment: .leading, spacing: 2) {
-      HStack(alignment: .firstTextBaseline, spacing: 10) {
-        Text("Basu")
-          .font(.system(size: 30, weight: .black))
-          .kerning(-1.2)
-          .foregroundStyle(Color.accentInk)
-        Text("УЛААНБААТАР")
-          .font(.mono(10))
-          .tracking(2)
-          .foregroundStyle(Color.ink3)
-        Spacer()
-        if session.isSignedIn {
-          Button { open(.inbox) } label: {
-            Image(systemName: "bell")
-              .font(.system(size: 20))
-              .foregroundStyle(Color.ink3)
-              .overlay(alignment: .topTrailing) {
-                // A count, not a dot: three messages waiting and one waiting
-                // are different amounts of "later".
-                if platform.unread > 0 {
-                  Text("\(min(platform.unread, 99))")
-                    .font(.mono(9, .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(Color.accent, in: Capsule())
-                    .offset(x: 7, y: -5)
-                }
-              }
-          }
-          .accessibilityIdentifier("home.inbox")
-          .padding(.trailing, 4)
+    VStack(alignment: .leading, spacing: 10) {
+      HStack(alignment: .top, spacing: 16) {
+        VStack(alignment: .leading, spacing: 5) {
+          SectionLabel("Улаанбаатар")
+          Text("Basu")
+            .font(.system(size: 27, weight: .semibold))
+            .kerning(-0.675)
+            .foregroundStyle(Color.ink)
         }
-        Button {
-          if session.isSignedIn { open(.profile) } else { signingIn = true }
-        } label: {
-          Image(systemName: session.isSignedIn ? "person.crop.circle.fill" : "person.crop.circle")
-            .font(.system(size: 22))
-            .foregroundStyle(session.isSignedIn ? Color.accentInk : Color.ink3)
+        Spacer(minLength: 8)
+        HStack(spacing: 14) {
+          if session.isSignedIn { bell }
+          account
         }
-        .accessibilityIdentifier("home.account")
+        .padding(.top, 4)
       }
-      Text(session.isSignedIn ? (platform.me?.greeting ?? "Өнөөдөр юу хийх вэ?") : "Сайн байна уу. Өнөөдөр юу хийх вэ?")
-        .font(.system(size: 15))
+
+      Text(greeting)
+        .font(.system(size: 17))
         .foregroundStyle(Color.ink2)
-        .padding(.bottom, 22)
     }
+  }
+
+  private var greeting: String {
+    guard session.isSignedIn else { return "Сайн байна уу. Өнөөдөр юу хийх вэ?" }
+    return platform.me?.greeting ?? "Өнөөдөр юу хийх вэ?"
+  }
+
+  private var bell: some View {
+    Button {
+      open(.inbox)
+    } label: {
+      ShellGlyph(mark: .bell, size: 26)
+        .foregroundStyle(Color.ink)
+        .overlay(alignment: .topTrailing) {
+          if platform.unread > 0 {
+            UnreadBadge(count: platform.unread).offset(x: 5, y: -3)
+          }
+        }
+        .frame(width: 44, height: 44, alignment: .center)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier("home.inbox")
+    .accessibilityLabel("Мэдэгдэл")
+    .accessibilityValue(platform.unread > 0 ? "\(platform.unread) уншаагүй" : "уншаагүй алга")
+  }
+
+  private var account: some View {
+    Button {
+      if !session.isSignedIn { signingIn = true }
+    } label: {
+      Group {
+        if session.isSignedIn {
+          SeedAvatar(seed: platform.me?.avatarSeed ?? "00000000", size: 30)
+        } else {
+          ShellGlyph(mark: .profile, size: 26).foregroundStyle(Color.ink3)
+        }
+      }
+      .frame(width: 44, height: 44)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    // Signed in, the avatar is decoration — the profile is a tab. Signed out,
+    // it is the way in, and the only control on the screen that does anything.
+    .disabled(session.isSignedIn)
+    .accessibilityIdentifier("home.account")
+    .accessibilityLabel(session.isSignedIn ? "Бүртгэл" : "Нэвтрэх")
+  }
+
+  // MARK: - what is running
+
+  private var liveSection: some View {
+    VStack(alignment: .leading, spacing: 7) {
+      SectionLabel("Идэвхтэй")
+      VStack(spacing: 6) {
+        ForEach(live) { item in
+          Button {
+            if let destination = item.destination { open(destination) }
+          } label: {
+            LiveRow(item: item)
+          }
+          .buttonStyle(.plain)
+        }
+      }
+    }
+  }
+
+  // MARK: - the grid
+
+  private var grid: some View {
+    VStack(alignment: .leading, spacing: 9) {
+      ForEach(bands) { band in
+        VStack(alignment: .leading, spacing: 9) {
+          HStack(spacing: 12) {
+            SectionLabel(band.label)
+            Spacer(minLength: 8)
+            // Under seven icons a filter is slower than looking.
+            if band.id == bands.first?.id, iconCount >= AppCatalogue.searchThreshold {
+              SearchField(query: $query)
+            }
+          }
+          .frame(minHeight: 22)
+
+          LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 92), spacing: 14, alignment: .topLeading)],
+            alignment: .leading,
+            spacing: 10,
+          ) {
+            ForEach(matching(band.apps)) { app in
+              AppTile(app: app) {
+                if let destination = app.destination { open(destination) }
+              }
+            }
+          }
+        }
+      }
+
+      if iconCount == 1 {
+        // A hairline and a sentence. Never a placeholder tile — that promises
+        // a tap which does nothing.
+        VStack(alignment: .leading, spacing: 0) {
+          Hairline()
+          Text(AppCatalogue.comingSoon)
+            .font(.mono(11.5))
+            .foregroundStyle(Color.ink3)
+            .padding(.top, 12)
+        }
+      }
+    }
+  }
+
+  private func matching(_ apps: [LauncherApp]) -> [LauncherApp] {
+    let needle = query.trimmingCharacters(in: .whitespaces)
+    guard !needle.isEmpty else { return apps }
+    return apps.filter { $0.name.localizedCaseInsensitiveContains(needle) }
   }
 }
 
-/// One live order, as one line: where, what state, and the moment that matters.
-struct LiveOrderCard: View {
-  let order: LiveOrder
+/// The filter. It appears at seven icons and is hidden below that.
+struct SearchField: View {
+  @Binding var query: String
 
   var body: some View {
-    HStack(spacing: 12) {
-      VStack(alignment: .leading, spacing: 2) {
-        Text(order.restaurant.name)
-          .font(.system(size: 15, weight: .bold))
-          .foregroundStyle(Color.ink)
-        if let sub = order.state.subtitle, !sub.isEmpty {
-          Text(sub)
-            .font(.system(size: 12.5))
-            .foregroundStyle(Color.ink2)
-        }
-        HStack(spacing: 6) {
-          Text("№\(order.code)")
-            .font(.mono(10))
-            .foregroundStyle(Color.ink3)
-          StateChip(state: order.state, label: order.state.word)
-        }
-        .padding(.top, 3)
-      }
-      Spacer(minLength: 8)
-      VStack(alignment: .trailing, spacing: 1) {
-        Text(Format.hhmm(order.moment.time))
-          .font(.mono(17, .semibold))
-          .foregroundStyle(Color.accentInk)
-        Text(order.moment.label.uppercased())
-          .font(.mono(8))
-          .tracking(1)
-          .foregroundStyle(Color.ink3)
-      }
+    HStack(spacing: 8) {
+      ShellGlyph(mark: .magnifier, size: 13, lineWidth: 1.8)
+        .foregroundStyle(Color.ink3)
+      TextField("Хайх", text: $query)
+        .font(.mono(12))
+        .foregroundStyle(Color.ink)
+        .textFieldStyle(.plain)
+        .frame(width: 74)
     }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 12)
-    .frame(maxWidth: .infinity)
-    .background(Color.surface, in: RoundedRectangle(cornerRadius: 4))
-    .overlay(alignment: .leading) { Rectangle().fill(Color.accent).frame(width: 3) }
-    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.line, lineWidth: 1))
-    .clipShape(RoundedRectangle(cornerRadius: 4))
-    .accessibilityIdentifier("live.\(order.code)")
+    .padding(.horizontal, 9)
+    .padding(.vertical, 5)
+    .glassWell()
+    .accessibilityIdentifier("home.search")
   }
 }
-
 
 /**
- The balance, on the launcher.
+ One live thing, as one row.
 
- One line because that is all it is worth here: the number, and a word saying
- what to do if it is too small. The statement is a screen away, and nobody
- needed it to decide whether to order lunch.
+ The header run wraps: dot, source, title and meta sit on one line when they fit
+ and fall onto the next when they do not, which is why «Чингисийн өргөн чөлөө»
+ and «Алтан Тавган» both read without either being truncated.
  */
-struct WalletStrip: View {
-  let balanceMnt: Int
+struct LiveRow: View {
+  let item: LiveItem
 
   var body: some View {
-    HStack(spacing: 12) {
-      VStack(alignment: .leading, spacing: 1) {
-        SectionLabel("Түрийвч")
-        Text(Format.mnt(balanceMnt))
-          .font(.mono(20, .semibold))
-          .foregroundStyle(Color.ink)
-          .contentTransition(.numericText())
+    VStack(alignment: .leading, spacing: 9) {
+      HStack(alignment: .center, spacing: 14) {
+        FlowLayout(spacing: CGSize(width: 8, height: 4)) {
+          Circle()
+            .fill(item.status.tint)
+            .frame(width: 6, height: 6)
+          SourceLabel(text: item.source)
+          Text(item.title)
+            .font(.system(size: 15.5, weight: .semibold))
+            .foregroundStyle(Color.ink)
+          Text(item.meta)
+            .font(.mono(11.5))
+            .foregroundStyle(Color.ink3)
+        }
+        Spacer(minLength: 0)
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          Text(item.timeLabel)
+            .font(.mono(9, .medium))
+            .tracking(1.26)
+            .foregroundStyle(Color.ink3)
+          Text(Format.hhmm(item.time))
+            .font(.mono(23, .semibold))
+            .monospacedDigit()
+            .foregroundStyle(Color.ink)
+        }
+        .fixedSize()
       }
-      Spacer(minLength: 8)
-      Text(balanceMnt > 0 ? "Дэлгэрэнгүй" : "Цэнэглэх")
-        .font(.system(size: 13, weight: .medium))
-        .foregroundStyle(Color.accentInk)
-      Image(systemName: "chevron.right")
-        .font(.system(size: 11, weight: .semibold))
-        .foregroundStyle(Color.ink3)
+
+      if let extra = item.extra {
+        VStack(spacing: 0) {
+          Hairline()
+          HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(extra.label)
+              .font(.system(size: 12.5))
+              .foregroundStyle(Color.ink2)
+            Spacer(minLength: 0)
+            Text(Format.hhmm(extra.time))
+              .font(.mono(12.5, .semibold))
+              .monospacedDigit()
+              .foregroundStyle(Color.accent)
+          }
+          .padding(.top, 9)
+        }
+      }
     }
     .padding(.horizontal, 14)
-    .padding(.vertical, 13)
-    .frame(maxWidth: .infinity)
-    .background(Color.surface, in: RoundedRectangle(cornerRadius: 4))
-    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.line, lineWidth: 1))
-    // One element, not five: a strip whose every label carries the same
-    // identifier is read out as that identifier five times over.
+    .padding(.vertical, 9)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .glassCard()
     .accessibilityElement(children: .combine)
-    .accessibilityIdentifier("home.wallet")
+    .accessibilityIdentifier("live.\(item.id)")
   }
 }

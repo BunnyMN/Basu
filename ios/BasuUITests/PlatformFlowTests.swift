@@ -42,21 +42,19 @@ final class PlatformFlowTests: XCTestCase {
     let demo = app.buttons["signin.demo"]
     if demo.waitForExistence(timeout: 5) {
       demo.tap()
-    } else {
-      // Already signed in: the account button opened the profile instead.
-      app.navigationBars.buttons.firstMatch.tap()
     }
+    // Already signed in, the account button is inert and no sheet opens — the
+    // profile is a tab now, so there is nothing to back out of.
 
-    // ── the balance is on the launcher, before any app is opened ──────
-    let strip = app.buttons["home.wallet"]
+    // ── the launcher, signed in ───────────────────────────────────────
     XCTAssertTrue(
-      strip.waitForExistence(timeout: 10),
-      "a signed-in guest should see their balance without opening anything",
+      app.buttons["app.Хоол"].waitForExistence(timeout: 10),
+      "the launcher should be showing its one app",
     )
-    shot("1-launcher-with-wallet")
+    shot("1-launcher")
 
-    // ── the wallet ────────────────────────────────────────────────────
-    strip.tap()
+    // ── the wallet, from the tab bar ──────────────────────────────────
+    app.buttons["tab.wallet"].tap()
     let balance = app.staticTexts["wallet.balance"]
     XCTAssertTrue(balance.waitForExistence(timeout: 10), "the wallet should show a balance")
     let before = money(balance.label)
@@ -75,8 +73,8 @@ final class PlatformFlowTests: XCTestCase {
     XCTAssertEqual(money(balance.label), before + 20_000, "topping up 20 000₮ should add 20 000₮")
     shot("3-wallet-topped-up")
 
-    // ── the inbox ─────────────────────────────────────────────────────
-    app.navigationBars.buttons.firstMatch.tap()
+    // ── the inbox, from the bell ──────────────────────────────────────
+    app.buttons["shell.back"].tap()
     XCTAssertTrue(app.buttons["home.inbox"].waitForExistence(timeout: 10))
     app.buttons["home.inbox"].tap()
 
@@ -95,11 +93,13 @@ final class PlatformFlowTests: XCTestCase {
       )
     }
 
-    // ── the profile ───────────────────────────────────────────────────
-    app.navigationBars.buttons.firstMatch.tap()
-    app.buttons["home.account"].firstMatch.tap()
-    let name = app.textFields["profile.name"]
-    XCTAssertTrue(name.waitForExistence(timeout: 10), "the profile should be editable")
+    // ── the profile, from the tab bar ─────────────────────────────────
+    app.buttons["shell.back"].tap()
+    app.buttons["tab.profile"].tap()
+    XCTAssertTrue(
+      app.buttons["profile.name"].waitForExistence(timeout: 10),
+      "the profile should offer the name for editing",
+    )
     XCTAssertTrue(
       app.buttons["profile.signout"].exists,
       "signing out has to be reachable without hunting for it",

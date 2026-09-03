@@ -210,7 +210,9 @@ export async function settleTopup(ctx: Ctx, topupId: string): Promise<number> {
       to: wallet,
       subject: 'topup',
       subjectId: topupId,
-      memo: topup.provider,
+      // No memo: which provider moved the money is the payment record's
+      // business. A statement line reading «qpay» tells the guest nothing
+      // they did not already know from tapping the QPay button.
       idempotencyKey: `topup:${topupId}`,
     });
     await client.query(

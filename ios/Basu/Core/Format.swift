@@ -1,4 +1,4 @@
-import Foundation
+import SwiftUI
 
 /**
  Money and time, said the way Ulaanbaatar says them.
@@ -25,7 +25,12 @@ enum Format {
   }()
 
   static func mnt(_ value: Int) -> String {
-    "\(tugrik.string(from: NSNumber(value: value)) ?? "\(value)")₮"
+    "\(grouped(value))₮"
+  }
+
+  /// Just the digits, grouped. The ₮ is set separately — see `mntText`.
+  static func grouped(_ value: Int) -> String {
+    tugrik.string(from: NSNumber(value: value)) ?? "\(value)"
   }
 
   static func hhmm(_ date: Date?) -> String {
@@ -33,7 +38,24 @@ enum Format {
     return clock.string(from: date)
   }
 
-  /// Signed money, for a statement: `+50 000₮` / `−18 500₮`.
+  /**
+   Money, set the way the design asks: mono digits, sans tugrik.
+
+   SF Mono has no ₮, so a monospaced amount falls back mid-string and the sign
+   collides with the last digit. Setting it in the sans face fixes both, and the
+   hair spaces put back the sliver of air the fallback used to provide.
+   */
+  static func mntText(_ value: Int, size: CGFloat, weight: Font.Weight = .semibold) -> Text {
+    signedText(grouped(value), size: size, weight: weight)
+  }
+
+  /// The same, for an already-signed string such as `+50,000` or `−18,500`.
+  static func signedText(_ digits: String, size: CGFloat, weight: Font.Weight = .semibold) -> Text {
+    Text(digits).font(.mono(size, weight)).monospacedDigit()
+      + Text("\u{200A}\u{200A}₮").font(.system(size: size, weight: weight))
+  }
+
+  /// Signed money as a plain string: `+50 000₮` / `−18 500₮`.
   ///
   /// A real minus sign rather than a hyphen, because the two sit at different
   /// heights and a column of amounts is read down, not across.
@@ -53,12 +75,13 @@ enum Format {
     let f = DateFormatter()
     f.locale = Locale(identifier: "mn_MN")
     f.timeZone = TimeZone(identifier: "Asia/Ulaanbaatar")
-    f.dateFormat = "yyyy 'оны' M'-р сар'"
+    f.dateFormat = "yyyy 'оны' M'-р сараас'"
     return f
   }()
 
   /// When something started, at the precision that kind of fact has. Nobody
-  /// joined Basu at 11:47 — they joined in a month.
+  /// joined Basu at 11:47 — they joined in a month. Carries its own case
+  /// ending, because «9-р сар-аас» is not Mongolian.
   static func since(_ date: Date) -> String { month.string(from: date) }
 
   /// The time if it happened today, the date if it did not. What a list of

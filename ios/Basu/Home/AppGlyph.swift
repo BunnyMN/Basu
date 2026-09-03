@@ -1,12 +1,11 @@
 import SwiftUI
 
 /**
- The bowl on the first icon: the whole product in one glyph.
+ The bowl, seen from the side.
 
- Drawn rather than shipped as an asset, and drawn from the same coordinates as
- the web launcher's SVG, so the two home screens carry the same mark. A bowl
- read from above is recognisable at the size an icon gets; a three-quarter view
- of the same bowl is a smudge.
+ Kept for the dine screens, which had it first. The launcher's food icon is the
+ same object read from above — see `GlyphKind.food` — because a three-quarter
+ bowl at 34 points is a smudge, and the two views are not interchangeable.
  */
 struct BowlGlyph: Shape {
   func path(in rect: CGRect) -> Path {
@@ -43,34 +42,45 @@ struct BowlGlyph: Shape {
   }
 }
 
-/// One tile on the launcher: the glyph, the name, and one word about it.
+/**
+ One tile on the launcher: the glyph, the name, and one word about it.
+
+ The tag under the tile carries the specificity so the glyph does not have to.
+ If a mark needs a second element to say «pre-order», the tag was already doing
+ that job — which is rule six of the icon system.
+ */
 struct AppTile: View {
-  let name: String
-  let tag: String
+  let app: LauncherApp
   let action: () -> Void
 
   var body: some View {
     Button(action: action) {
-      VStack(spacing: 7) {
-        BowlGlyph()
-          .stroke(Color.accent, style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
-          .padding(19)
+      VStack(alignment: .leading, spacing: 6) {
+        Glyph(kind: app.glyph, size: 34)
           .frame(width: 92, height: 92)
-          .background(Color.surface, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-          .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.line, lineWidth: 1),
-          )
-          .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
+          .glassCard(radius: 18)
+          .shadow(color: .tileShadow, radius: 2, y: 1)
 
-        Text(name)
+        Text(app.name)
           .font(.system(size: 13, weight: .semibold))
           .foregroundStyle(Color.ink)
-        Text(tag)
+          // Wraps rather than truncates: at larger Dynamic Type a clipped app
+          // name is an app somebody cannot find.
+          .fixedSize(horizontal: false, vertical: true)
+          .multilineTextAlignment(.leading)
+        Text(app.tag)
           .font(.mono(9.5))
           .foregroundStyle(Color.ink3)
+          .fixedSize(horizontal: false, vertical: true)
+          .multilineTextAlignment(.leading)
       }
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .contentShape(Rectangle())
+      .opacity(app.isLive ? 1 : 0.55)
     }
     .buttonStyle(.plain)
-    .accessibilityIdentifier("app.\(name)")
+    .disabled(!app.isLive)
+    .accessibilityIdentifier("app.\(app.name)")
+    .accessibilityLabel("\(app.name), \(app.tag)")
   }
 }

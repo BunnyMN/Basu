@@ -11,6 +11,9 @@ import SwiftUI
  */
 extension Color {
   static let bg = dynamic(light: 0xE9EBEC, dark: 0x0E1315)
+
+  /// White on an accent fill — the badge count, and nothing else yet.
+  static let onAccent = dynamic(light: 0xFFFFFF, dark: 0x160B03)
   static let surface = dynamic(light: 0xFFFFFF, dark: 0x161D20)
   static let surface2 = dynamic(light: 0xF3F5F6, dark: 0x1C2428)
   static let sunk = dynamic(light: 0xDFE3E4, dark: 0x0A0E10)
@@ -42,6 +45,16 @@ extension Color {
   static let stop = dynamic(light: 0x9B2226, dark: 0xF08A8D)
   static let stopSoft = dynamic(light: 0xF7DEDE, dark: 0x2E1416)
   static let stopLine = dynamic(light: 0xE0A9A9, dark: 0x5A2A2C)
+
+  /// The shadow under an icon tile. Barely there by design: one point down,
+  /// two of blur, and it is the only shadow in the shell.
+  static var tileShadow: Color {
+    Color(uiColor: UIColor { traits in
+      traits.userInterfaceStyle == .dark
+        ? UIColor(white: 0, alpha: 0.4)
+        : UIColor(red: 20 / 255, green: 24 / 255, blue: 27 / 255, alpha: 0.05)
+    })
+  }
 
   static func dynamic(light: UInt32, dark: UInt32) -> Color {
     Color(uiColor: UIColor { traits in
@@ -76,5 +89,63 @@ extension Font {
   /// Numbers, codes and labels — the parts that must line up in a column.
   static func mono(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
     .system(size: size, weight: weight, design: .monospaced)
+  }
+}
+
+
+/**
+ The ground, and the glass that sits on it.
+
+ Surfaces in the shell are translucent — `.ultraThinMaterial` over a background
+ that is not flat. The wash is 176°, three stops, and it exists for exactly one
+ reason: translucency needs something to be translucent against. On a single
+ flat colour the material has nothing to pick up and reads as dirty grey.
+ */
+extension ShapeStyle where Self == LinearGradient {
+  static var ground: LinearGradient {
+    LinearGradient(
+      stops: [
+        .init(color: .dynamic(light: 0xEFF1F2, dark: 0x141B1E), location: 0),
+        .init(color: .dynamic(light: 0xE9EBEC, dark: 0x0E1315), location: 0.46),
+        .init(color: .dynamic(light: 0xDFE3E4, dark: 0x0A0E10), location: 1),
+      ],
+      // 176° in CSS is very nearly straight down, leaning a touch left.
+      startPoint: UnitPoint(x: 0.535, y: 0),
+      endPoint: UnitPoint(x: 0.465, y: 1),
+    )
+  }
+}
+
+extension View {
+  /**
+   A card: glass, a hairline, four points of radius.
+
+   The hairline sits *on top* of the blur rather than under it. That is what
+   keeps an edge legible when the thing behind the card is the same tone as the
+   card — without it a translucent surface dissolves at exactly the moment it
+   needs to be a surface.
+   */
+  func glassCard(radius: CGFloat = 4, stroke: Color = .line) -> some View {
+    background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+      .overlay(
+        RoundedRectangle(cornerRadius: radius, style: .continuous)
+          .strokeBorder(stroke, lineWidth: 1),
+      )
+  }
+
+  /// The sunken variant: the search field and the avatar plate.
+  func glassWell(radius: CGFloat = 4) -> some View {
+    background(.thinMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+      .overlay(
+        RoundedRectangle(cornerRadius: radius, style: .continuous)
+          .strokeBorder(Color.line, lineWidth: 1),
+      )
+  }
+}
+
+/// The 1pt rule that separates rows inside a list. Always `line`, always 1px.
+struct Hairline: View {
+  var body: some View {
+    Rectangle().fill(Color.line).frame(height: 1)
   }
 }

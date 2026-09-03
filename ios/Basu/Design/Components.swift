@@ -170,3 +170,99 @@ struct Banner: View {
       .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.stopLine, lineWidth: 1))
   }
 }
+
+/**
+ A run of things that wraps, the way a paragraph does.
+
+ The live row needs it: a status dot, a source label, a title and a meta line
+ sit on one line when they fit and fall onto the next when they do not, so a
+ restaurant called «Алтан Тавган» and one called «Чингисийн өргөн чөлөө» both
+ read correctly without either being truncated or given its own layout.
+ */
+struct FlowLayout: Layout {
+  var spacing: CGSize = CGSize(width: 8, height: 4)
+  var alignment: VerticalAlignment = .center
+
+  func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+    let width = proposal.width ?? .infinity
+    let rows = rows(subviews, in: width)
+    let height = rows.reduce(0) { $0 + $1.height } + spacing.height * CGFloat(max(0, rows.count - 1))
+    let widest = rows.map(\.width).max() ?? 0
+    return CGSize(width: min(width, widest), height: height)
+  }
+
+  func placeSubviews(
+    in bounds: CGRect,
+    proposal: ProposedViewSize,
+    subviews: Subviews,
+    cache: inout (),
+  ) {
+    var y = bounds.minY
+    for row in rows(subviews, in: bounds.width) {
+      var x = bounds.minX
+      for index in row.indices {
+        let size = subviews[index].sizeThatFits(.unspecified)
+        let dy = alignment == .center ? (row.height - size.height) / 2 : 0
+        subviews[index].place(
+          at: CGPoint(x: x, y: y + dy),
+          proposal: ProposedViewSize(size),
+        )
+        x += size.width + spacing.width
+      }
+      y += row.height + spacing.height
+    }
+  }
+
+  private struct Row {
+    var indices: [Int] = []
+    var width: CGFloat = 0
+    var height: CGFloat = 0
+  }
+
+  private func rows(_ subviews: Subviews, in width: CGFloat) -> [Row] {
+    var rows: [Row] = []
+    var row = Row()
+    for index in subviews.indices {
+      let size = subviews[index].sizeThatFits(.unspecified)
+      let needed = row.indices.isEmpty ? size.width : row.width + spacing.width + size.width
+      if !row.indices.isEmpty, needed > width {
+        rows.append(row)
+        row = Row()
+      }
+      row.width = row.indices.isEmpty ? size.width : row.width + spacing.width + size.width
+      row.height = max(row.height, size.height)
+      row.indices.append(index)
+    }
+    if !row.indices.isEmpty { rows.append(row) }
+    return rows
+  }
+}
+
+/// The count on the bell. A pill rather than a circle, so it grows rightward
+/// from its own left edge and the bell underneath never shifts.
+struct UnreadBadge: View {
+  let count: Int
+
+  var body: some View {
+    Text(count > 99 ? "99+" : "\(count)")
+      .font(.mono(9.5, .semibold))
+      .monospacedDigit()
+      .foregroundStyle(Color.onAccent)
+      .padding(.horizontal, 4)
+      .frame(minWidth: 15, minHeight: 15)
+      .background(Color.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+  }
+}
+
+/// The tracked mono label that names which app a row came from.
+struct SourceLabel: View {
+  let text: String
+  var size: CGFloat = 9.5
+
+  var body: some View {
+    Text(text)
+      .font(.mono(size, .medium))
+      .tracking(size * 0.14)
+      .foregroundStyle(Color.ink3)
+  }
+}

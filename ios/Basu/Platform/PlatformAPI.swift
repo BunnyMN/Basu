@@ -76,6 +76,15 @@ struct WalletLine: Decodable, Sendable, Identifiable, Equatable {
     case subjectId = "subject_id"
   }
 
+  /**
+   Which app the movement came from.
+
+   The vertical writes its own label into the memo when it asks to be paid, so
+   the shell never has to know that «order» means lunch. A movement with no
+   memo is the platform's own — a top-up.
+   */
+  var source: String { memo?.isEmpty == false ? memo! : "Basu" }
+
   /// The ledger's word for it, in the language of the person reading it.
   var title: String {
     switch kind {

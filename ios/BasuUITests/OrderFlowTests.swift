@@ -53,11 +53,9 @@ final class OrderFlowTests: XCTestCase {
     } else if app.buttons["Хаах"].firstMatch.waitForExistence(timeout: 2) {
       // Already signed in from an earlier run; close the sheet and carry on.
       app.buttons["Хаах"].firstMatch.tap()
-    } else {
-      // Signed in already, so the account button opened the profile rather
-      // than the sheet. Back out and carry on.
-      app.navigationBars.buttons.firstMatch.tap()
     }
+    // Otherwise the guest was already signed in, the account button is inert,
+    // and no sheet opened — nothing to dismiss.
 
     // ── the map ──────────────────────────────────────────────────────
     XCTAssertTrue(dine.waitForExistence(timeout: 10))
