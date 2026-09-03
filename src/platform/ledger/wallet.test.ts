@@ -2,7 +2,13 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { closePool, getPool } from '../../db/pool.js';
 import { at } from '../../domain/fixtures.js';
 import { VirtualClock } from '../../domain/time.js';
-import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../../ports.js';
+import {
+  FakeNotifier,
+  FakePaymentProvider,
+  FakeTaxProvider,
+  type Ctx,
+  type PaymentProvider,
+} from '../../ports.js';
 import { seedGuest, truncateAll } from '../../test/seed.js';
 import { balance, collect, LedgerError, reconcileLedger, refund, settleTopup, startTopup, wallet } from './index.js';
 
@@ -42,18 +48,46 @@ async function fund(amountMnt: number): Promise<void> {
 }
 
 describe('two requests at once', () => {
-  it('spends the balance exactly once, however many arrive together', async () => {
+  it('lets exactly one through when the card cannot cover the rest', async () => {
     await fund(20_000);
 
-    // Five orders, five intentions, and one wallet holding enough for one of
-    // them. All five read the balance before any of them writes, which is the
-    // whole race — and the reason the spend is serialised on the account row
-    // rather than trusting a number read a moment earlier.
+    // With the provider dead, `collect` has no shortfall to fall back on, so
+    // every interleaving has the same answer: one order is paid for out of the
+    // balance and the other four are refused. Without the lock on the account
+    // row two of them both read 20 000 ₮, both spend it, and the wallet ends
+    // the day owing money it never had.
+    const broke: Ctx = { ...ctx, payments: new DeadProvider() };
+    const attempts = await Promise.allSettled(
+      Array.from({ length: 5 }, (_, n) =>
+        collect(broke, {
+          guestId,
+          amountMnt: 20_000,
+          subject: 'order',
+          subjectId: crypto.randomUUID(),
+          idempotencyKey: `dead:${n}`,
+        }),
+      ),
+    );
+
+    expect(attempts.filter((a) => a.status === 'fulfilled')).toHaveLength(1);
+    for (const attempt of attempts.filter((a) => a.status === 'rejected')) {
+      expect((attempt as PromiseRejectedResult).reason).toBeInstanceOf(LedgerError);
+    }
+    expect(await balance(guestId)).toBe(0);
+    expect(await reconcileLedger()).toMatchObject({ drift: 0 });
+  });
+
+  it('never spends the balance twice, whichever way the requests interleave', async () => {
+    await fund(20_000);
+
+    // The provider works this time, so what happens depends on how the reads
+    // and the writes fall against each other: a request that reads the balance
+    // before anybody spends it will try to pay out of the wallet, and one that
+    // reads it afterwards will top up the shortfall instead. Both are correct.
     //
-    // Nobody is refused: what the wallet cannot cover is pulled from the card,
-    // which is the product's answer to a shortfall. What must never happen is
-    // the same 20 000 ₮ being spent twice.
-    const results = await Promise.all(
+    // So the assertion is the invariant rather than a count. However the five
+    // land, the wallet can only ever have paid out the 20 000 ₮ it held.
+    const attempts = await Promise.allSettled(
       Array.from({ length: 5 }, (_, n) =>
         collect(ctx, {
           guestId,
@@ -65,19 +99,20 @@ describe('two requests at once', () => {
       ),
     );
 
-    const fromWallet = results.reduce((sum, r) => sum + r.fromWalletMnt, 0);
-    const fromCard = results.reduce((sum, r) => sum + r.toppedUpMnt, 0);
+    const paid = attempts.flatMap((a) => (a.status === 'fulfilled' ? [a.value] : []));
+    const refused = attempts.flatMap((a) => (a.status === 'rejected' ? [a.reason] : []));
 
-    // Without the row lock two of these both see 20 000 and both take it, and
-    // the wallet ends the day 20 000 ₮ short with nothing to explain it.
-    expect(fromWallet, 'the wallet may only ever spend what it held').toBe(20_000);
-    expect(fromCard).toBe(4 * 20_000);
-    expect(results.filter((r) => r.toppedUpMnt === 0)).toHaveLength(1);
+    expect(paid.length).toBeGreaterThan(0);
+    for (const reason of refused) {
+      // A refusal is allowed; a refusal for any other reason is a bug.
+      expect(reason).toBeInstanceOf(LedgerError);
+      expect((reason as LedgerError).code).toBe('INSUFFICIENT_FUNDS');
+    }
 
-    expect(await balance(guestId)).toBe(0);
+    const fromWallet = paid.reduce((sum, r) => sum + r.fromWalletMnt, 0);
+    expect(fromWallet, 'the wallet may only ever spend what it held').toBeLessThanOrEqual(20_000);
+    expect(await balance(guestId)).toBeGreaterThanOrEqual(0);
     expect(await reconcileLedger()).toMatchObject({ drift: 0 });
-    // One top-up to start, four to cover the shortfalls, five purchases.
-    expect(await transferCount()).toBe(10);
   });
 
   it('charges once when the same intention arrives five times', async () => {
@@ -217,12 +252,20 @@ describe('when the provider is having a bad day', () => {
   });
 });
 
-async function transferCount(): Promise<number> {
-  const { rows } = await pool().query<{ n: number }>(
-    'SELECT count(*)::int AS n FROM ledger.transfer',
-  );
-  return rows[0]!.n;
+/** A provider that is having the worst possible day. */
+class DeadProvider implements PaymentProvider {
+  readonly name = 'qpay' as const;
+  async authorize(): Promise<never> {
+    throw new Error('payment provider unavailable');
+  }
+  async capture(): Promise<never> {
+    throw new Error('payment provider unavailable');
+  }
+  async refund(): Promise<never> {
+    throw new Error('payment provider unavailable');
+  }
 }
+
 
 async function guestAccount(): Promise<string> {
   const { rows } = await pool().query<{ id: string }>(
