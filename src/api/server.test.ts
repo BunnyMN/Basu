@@ -2,9 +2,10 @@ import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { closePool, getPool } from '../db/pool.js';
 import { at, PILOT_MENU } from '../domain/fixtures.js';
+import { DRAWN_DISHES } from './dishes.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
-import { createPairingCode } from '../services/auth.js';
+import { createPairingCode } from '../services/devices.js';
 import { tick } from '../scheduler/runner.js';
 import {
   FakeNotifier,
@@ -103,7 +104,7 @@ beforeEach(async () => {
   app = await buildServer(ctx);
   venue = await seedRestaurant();
   await pool().query(
-    `INSERT INTO slot (restaurant_id, starts_at, ends_at, max_orders, max_covers)
+    `INSERT INTO dine.slot (restaurant_id, starts_at, ends_at, max_orders, max_covers)
      VALUES ($1, $2::timestamptz, $2::timestamptz + interval '15 minutes', 3, 12)`,
     [venue.restaurantId, at('12:30')],
   );
@@ -280,7 +281,7 @@ describe('ordering over HTTP', () => {
     expect(second.headers['content-type']).toContain('application/json');
 
     const { rows } = await pool().query<{ n: number }>(
-      'SELECT count(*)::int AS n FROM dining_order',
+      'SELECT count(*)::int AS n FROM dine.dining_order',
     );
     expect(rows[0]!.n).toBe(1);
   });
@@ -315,6 +316,32 @@ describe('ordering over HTTP', () => {
     });
     expect(accepted.statusCode, accepted.body).toBe(201);
     expect(accepted.headers['idempotent-replay']).toBeUndefined();
+  });
+
+  it('answers “what of mine is happening” with the live orders and nothing else', async () => {
+    const guest = await signIn();
+    await pairTablet(venue.restaurantId);
+    const order = await placeAndPay(guest, venue.restaurantId, venue.menuIds['tsuivan']!);
+
+    const listed = await app.inject({ method: 'GET', url: '/v1/orders', headers: auth(guest) });
+    expect(listed.statusCode, listed.body).toBe(200);
+    const [live] = listed.json().orders as Array<Record<string, unknown>>;
+    expect(live).toMatchObject({ id: order.id, code: order.code, state: 'PLACED' });
+    // The home screen names the restaurant without having asked which one it
+    // was, so the list has to carry it.
+    expect(live!['restaurant']).toMatchObject({ id: venue.restaurantId });
+    expect(live!['slot_starts_at']).toBe(at('12:30').toISOString());
+
+    // A cancelled lunch is over: it stops being something to walk to.
+    const cancelled = await app.inject({
+      method: 'POST',
+      url: `/v1/orders/${order.id}/cancel`,
+      headers: auth(guest),
+    });
+    expect(cancelled.statusCode, cancelled.body).toBe(200);
+
+    const after = await app.inject({ method: 'GET', url: '/v1/orders', headers: auth(guest) });
+    expect(after.json().orders).toEqual([]);
   });
 
   it('stops accepting a cancellation once the food is on the stove', async () => {
@@ -423,7 +450,7 @@ describe('the kitchen display', () => {
     expect((await tick(ctx, { spacingMs: 0 })).fired).toBe(0);
 
     const { rows } = await pool().query<{ fired_by: string }>(
-      'SELECT fired_by FROM dining_order WHERE id = $1',
+      'SELECT fired_by FROM dine.dining_order WHERE id = $1',
       [order.id],
     );
     expect(rows[0]!.fired_by).toMatch(/^kds:/);
@@ -459,10 +486,21 @@ describe('the kitchen display', () => {
 
 describe('nobody sees what is not theirs', () => {
   it('turns away a caller with no token', async () => {
-    for (const url of ['/v1/orders/any', '/v1/kds/tickets']) {
+    for (const url of ['/v1/orders', '/v1/orders/any', '/v1/kds/tickets']) {
       const response = await app.inject({ method: 'GET', url });
       expect(response.statusCode, url).toBe(401);
     }
+  });
+
+  it('never puts one guest’s order in another guest’s list', async () => {
+    const alice = await signIn('+97699001111');
+    await pairTablet(venue.restaurantId);
+    await placeAndPay(alice, venue.restaurantId, venue.menuIds['tsuivan']!);
+
+    const mallory = await signIn('+97699002222');
+    const listed = await app.inject({ method: 'GET', url: '/v1/orders', headers: auth(mallory) });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json().orders).toEqual([]);
   });
 
   it('will not let one guest read another guest’s order', async () => {
@@ -487,7 +525,7 @@ describe('nobody sees what is not theirs', () => {
     expect(meddle.statusCode).toBe(403);
 
     const { rows } = await pool().query<{ state: string }>(
-      'SELECT state FROM dining_order WHERE id = $1',
+      'SELECT state FROM dine.dining_order WHERE id = $1',
       [order.id],
     );
     expect(rows[0]!.state).toBe('PLACED');
@@ -540,7 +578,7 @@ describe('nobody sees what is not theirs', () => {
     expect(attempt.statusCode).toBe(403);
 
     const { rows } = await pool().query<{ sold_out_until: Date | null }>(
-      'SELECT sold_out_until FROM menu_item WHERE id = $1',
+      'SELECT sold_out_until FROM dine.menu_item WHERE id = $1',
       [venue.menuIds['khuushuur']],
     );
     expect(rows[0]!.sold_out_until).toBeNull();
@@ -572,7 +610,7 @@ describe('nobody sees what is not theirs', () => {
         .statusCode,
     ).toBe(200);
 
-    await pool().query(`UPDATE kds_device SET revoked_at = now(), token_hash = NULL`);
+    await pool().query(`UPDATE dine.kds_device SET revoked_at = now(), token_hash = NULL`);
 
     expect(
       (await app.inject({ method: 'GET', url: '/v1/kds/tickets', headers: auth(tablet) }))
@@ -664,6 +702,28 @@ describe('the map', () => {
       const response = await app.inject({ method: 'GET', url });
       expect(response.statusCode, url).toBeGreaterThanOrEqual(400);
     }
+  });
+
+  it('hands a client the numbers a dish is drawn from', async () => {
+    const response = await app.inject({ method: 'GET', url: '/v1/dishes' });
+    expect(response.statusCode).toBe(200);
+    const { dishes, fallback } = response.json() as {
+      dishes: Record<string, { form: string; fill: string; detail: string; ground: string }>;
+      fallback: { form: string };
+    };
+
+    // Every dish the seed can draw is in the table, with a form and colours a
+    // renderer that has never seen an SVG can use.
+    for (const slug of DRAWN_DISHES) {
+      const dish = dishes[slug];
+      expect(dish, slug).toBeTruthy();
+      expect(dish!.form).toMatch(/^(soup|dumpling|fried|noodle|grill|salad|drink|rice|skewer)$/);
+      for (const colour of [dish!.fill, dish!.detail, dish!.ground]) {
+        expect(colour, `${slug} ${colour}`).toMatch(/^#[0-9A-Fa-f]{6}$/);
+      }
+    }
+    // …and a dish nobody drew still has something to show.
+    expect(fallback.form).toBe('soup');
   });
 
   it('gives every restaurant a coordinate the map can place', async () => {

@@ -2,6 +2,7 @@ import { getPool, tx, type Db } from '../db/pool.js';
 import { appendEvent } from '../db/events.js';
 import { OrderError } from './orders.js';
 import type { Ctx } from '../ports.js';
+import { displayNamesFor } from '../platform/identity/index.js';
 
 /**
  * What the guest thought.
@@ -47,7 +48,7 @@ export async function leaveReview(
 
   return tx(async (client) => {
     const { rows } = await client.query<{ state: string; restaurant_id: string }>(
-      'SELECT state, restaurant_id FROM dining_order WHERE id = $1 AND guest_id = $2',
+      'SELECT state, restaurant_id FROM dine.dining_order WHERE id = $1 AND guest_id = $2',
       [orderId, guestId],
     );
     const order = rows[0];
@@ -59,7 +60,7 @@ export async function leaveReview(
     // Upsert rather than insert-once: a guest is allowed to change their mind,
     // and a form that silently refuses the second attempt teaches nothing.
     await client.query(
-      `INSERT INTO order_review
+      `INSERT INTO dine.order_review
          (order_id, guest_id, restaurant_id, stars, on_time, comment, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
        ON CONFLICT (order_id) DO UPDATE
@@ -79,16 +80,16 @@ export async function leaveReview(
     // Only dishes that were on this ticket. Rating something you did not order
     // is either a mistake or an attempt to move an average.
     const { rows: ordered } = await client.query<{ menu_item_id: string }>(
-      'SELECT DISTINCT menu_item_id FROM order_line WHERE order_id = $1',
+      'SELECT DISTINCT menu_item_id FROM dine.order_line WHERE order_id = $1',
       [orderId],
     );
     const allowed = new Set(ordered.map((r) => r.menu_item_id));
 
-    await client.query('DELETE FROM dish_review WHERE order_id = $1', [orderId]);
+    await client.query('DELETE FROM dine.dish_review WHERE order_id = $1', [orderId]);
     for (const dish of input.dishes ?? []) {
       if (!allowed.has(dish.menuItemId) || !validStars(dish.stars)) continue;
       await client.query(
-        `INSERT INTO dish_review (order_id, menu_item_id, stars, created_at)
+        `INSERT INTO dine.dish_review (order_id, menu_item_id, stars, created_at)
          VALUES ($1, $2, $3, $4)`,
         [orderId, dish.menuItemId, dish.stars, now],
       );
@@ -110,12 +111,12 @@ export async function readReview(db: Db, orderId: string): Promise<Review> {
     stars: number;
     on_time: boolean | null;
     comment: string | null;
-  }>('SELECT stars, on_time, comment FROM order_review WHERE order_id = $1', [orderId]);
+  }>('SELECT stars, on_time, comment FROM dine.order_review WHERE order_id = $1', [orderId]);
   const review = rows[0];
   if (!review) throw new OrderError('NOT_FOUND', 'no review on that order');
 
   const { rows: dishes } = await db.query<{ menu_item_id: string; stars: number }>(
-    'SELECT menu_item_id, stars FROM dish_review WHERE order_id = $1',
+    'SELECT menu_item_id, stars FROM dine.dish_review WHERE order_id = $1',
     [orderId],
   );
 
@@ -158,25 +159,26 @@ export async function recentComments(
     comment: string;
     on_time: boolean | null;
     created_at: Date;
-    name: string | null;
-    phone: string;
+    guest_id: string;
   }>(
-    `SELECT v.stars, v.comment, v.on_time, v.created_at, g.name, g.phone_e164 AS phone
-       FROM order_review v JOIN guest g ON g.id = v.guest_id
+    `SELECT v.stars, v.comment, v.on_time, v.created_at, v.guest_id
+       FROM dine.order_review v
       WHERE v.restaurant_id = $1 AND v.comment IS NOT NULL
       ORDER BY v.created_at DESC
       LIMIT $2`,
     [restaurantId, limit],
   );
 
+  // Never the phone number, and not our rule to make: identity decides what a
+  // person is called in public, so every surface calls them the same thing.
+  const names = await displayNamesFor(rows.map((r) => r.guest_id));
+
   return rows.map((r) => ({
     stars: r.stars,
     comment: r.comment,
     onTime: r.on_time,
     at: r.created_at.toISOString(),
-    // Never the phone number. A first name, or the last four digits, is all
-    // the identity a lunch review needs.
-    by: r.name?.split(' ')[0] ?? `···${r.phone.slice(-4)}`,
+    by: names.get(r.guest_id) ?? '···',
   }));
 }
 
@@ -198,7 +200,7 @@ export async function restaurantRatings(db: Db = getPool()): Promise<Map<string,
     `SELECT restaurant_id, avg(stars)::numeric(3,2) AS avg, count(*)::int AS n,
             count(*) FILTER (WHERE on_time)::int AS on_time,
             count(*) FILTER (WHERE on_time IS NOT NULL)::int AS asked
-       FROM order_review GROUP BY restaurant_id`,
+       FROM dine.order_review GROUP BY restaurant_id`,
   );
   return new Map(
     rows.map((r) => [
@@ -215,7 +217,7 @@ export async function restaurantRatings(db: Db = getPool()): Promise<Map<string,
 export async function dishRatings(db: Db, restaurantId: string): Promise<Map<string, Rating>> {
   const { rows } = await db.query<{ menu_item_id: string; avg: string; n: number }>(
     `SELECT d.menu_item_id, avg(d.stars)::numeric(3,2) AS avg, count(*)::int AS n
-       FROM dish_review d JOIN menu_item m ON m.id = d.menu_item_id
+       FROM dine.dish_review d JOIN dine.menu_item m ON m.id = d.menu_item_id
       WHERE m.restaurant_id = $1
       GROUP BY d.menu_item_id`,
     [restaurantId],

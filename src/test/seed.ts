@@ -20,12 +20,19 @@ export interface SeededRestaurant {
  */
 export async function truncateAll(db: Db = getPool()): Promise<void> {
   await db.query(`
-    TRUNCATE outbox, notification, ebarimt_receipt, payment, order_event, fire_job,
-             arrival_signal, table_hold, order_line, station_reservation, dining_order,
-             slot, dining_table, menu_item, station, trust_profile, guest_session,
-             guest, kds_device, otp_challenge, idempotency_key, restaurant
+    TRUNCATE outbox, idempotency_key,
+             notify.message, notify.device, notify.preference,
+             ledger.ebarimt_receipt, ledger.payment, ledger.topup, ledger.entry, ledger.transfer,
+             dine.order_event, dine.fire_job, dine.arrival_signal, dine.table_hold,
+             dine.order_line, dine.station_reservation, dine.dish_review, dine.order_review,
+             dine.dining_order, dine.slot, dine.dining_table, dine.menu_item, dine.station,
+             dine.trust_profile, dine.kds_device, dine.restaurant,
+             identity.profile, identity.guest_session, identity.guest, identity.otp_challenge
     RESTART IDENTITY CASCADE
   `);
+  // The house accounts are reference data the migration created; only the
+  // guests' wallets are test residue.
+  await db.query(`DELETE FROM ledger.account WHERE kind = 'guest'`);
 }
 
 export async function seedRestaurant(db: Db = getPool()): Promise<SeededRestaurant> {
@@ -33,7 +40,7 @@ export async function seedRestaurant(db: Db = getPool()): Promise<SeededRestaura
   // restaurants never land on the same pixel.
   const nth = ++seq;
   const { rows } = await db.query<{ id: string }>(
-    `INSERT INTO restaurant (name, plating_buffer_min, travel_minutes, lat, lon)
+    `INSERT INTO dine.restaurant (name, plating_buffer_min, travel_minutes, lat, lon)
      VALUES ($1, $2, 7, $3, $4) RETURNING id`,
     [
       `Модерн Номадс ${nth}`,
@@ -47,7 +54,7 @@ export async function seedRestaurant(db: Db = getPool()): Promise<SeededRestaura
   const stationIds: Record<string, string> = {};
   for (const station of Object.values(PILOT_KITCHEN.stations)) {
     const res = await db.query<{ id: string }>(
-      `INSERT INTO station (restaurant_id, code, display_name, parallel_lanes)
+      `INSERT INTO dine.station (restaurant_id, code, display_name, parallel_lanes)
        VALUES ($1, $2, $3, $4) RETURNING id`,
       [restaurantId, station.code, station.displayName, station.parallelLanes],
     );
@@ -57,7 +64,7 @@ export async function seedRestaurant(db: Db = getPool()): Promise<SeededRestaura
   const menuIds: Record<string, string> = {};
   for (const item of Object.values(PILOT_MENU)) {
     const res = await db.query<{ id: string }>(
-      `INSERT INTO menu_item
+      `INSERT INTO dine.menu_item
          (restaurant_id, station_id, name, price_mnt, prep_minutes,
           hold_tolerance_minutes, preorder_enabled)
        VALUES ($1, $2, $3, $4, $5, $6, true) RETURNING id`,
@@ -76,7 +83,7 @@ export async function seedRestaurant(db: Db = getPool()): Promise<SeededRestaura
   const tableIds: string[] = [];
   for (let i = 1; i <= 8; i++) {
     const res = await db.query<{ id: string }>(
-      `INSERT INTO dining_table (restaurant_id, code, seats) VALUES ($1, $2, 4) RETURNING id`,
+      `INSERT INTO dine.dining_table (restaurant_id, code, seats) VALUES ($1, $2, 4) RETURNING id`,
       [restaurantId, `T${i}`],
     );
     tableIds.push(res.rows[0]!.id);
@@ -90,11 +97,11 @@ export async function seedGuest(
   tier: 'NEW' | 'AUTO' | 'CONFIRM' | 'BLOCKED' = 'AUTO',
 ): Promise<string> {
   const { rows } = await db.query<{ id: string }>(
-    `INSERT INTO guest (phone_e164, name) VALUES ($1, $2) RETURNING id`,
+    `INSERT INTO identity.guest (phone_e164, name) VALUES ($1, $2) RETURNING id`,
     [`+9769900${String(++seq).padStart(4, '0')}`, 'Тест зочин'],
   );
   const guestId = rows[0]!.id;
-  await db.query(`INSERT INTO trust_profile (guest_id, tier) VALUES ($1, $2)`, [guestId, tier]);
+  await db.query(`INSERT INTO dine.trust_profile (guest_id, tier) VALUES ($1, $2)`, [guestId, tier]);
   return guestId;
 }
 
@@ -113,7 +120,7 @@ export async function seedOrder(
 ): Promise<{ orderId: string; code: string }> {
   const code = String(1000 + ++seq);
   const { rows } = await db.query<{ id: string }>(
-    `INSERT INTO dining_order
+    `INSERT INTO dine.dining_order
        (code, restaurant_id, guest_id, state, party_size, slot_starts_at, ready_at, total_mnt)
      VALUES ($1, $2, $3, $4, $5, $6, $7, 18000) RETURNING id`,
     [

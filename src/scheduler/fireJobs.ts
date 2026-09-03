@@ -41,7 +41,7 @@ export async function scheduleFire(
   const planJson = plan ? JSON.stringify(serialisePlan(plan)) : null;
 
   const updated = await db.query<{ id: string }>(
-    `UPDATE fire_job
+    `UPDATE dine.fire_job
         SET run_at = $2, plan = COALESCE($3::jsonb, plan), updated_at = now()
       WHERE order_id = $1 AND state = 'pending'
       RETURNING id`,
@@ -50,7 +50,7 @@ export async function scheduleFire(
   if (updated.rows[0]) return updated.rows[0].id;
 
   const inserted = await db.query<{ id: string }>(
-    `INSERT INTO fire_job (order_id, run_at, plan) VALUES ($1, $2, $3::jsonb) RETURNING id`,
+    `INSERT INTO dine.fire_job (order_id, run_at, plan) VALUES ($1, $2, $3::jsonb) RETURNING id`,
     [orderId, runAt, planJson],
   );
   return inserted.rows[0]!.id;
@@ -58,7 +58,7 @@ export async function scheduleFire(
 
 export async function cancelFire(db: Db, orderId: string): Promise<void> {
   await db.query(
-    `UPDATE fire_job SET state = 'cancelled', updated_at = now()
+    `UPDATE dine.fire_job SET state = 'cancelled', updated_at = now()
       WHERE order_id = $1 AND state = 'pending'`,
     [orderId],
   );
@@ -77,13 +77,13 @@ export async function claimDueJobs(
 ): Promise<FireJobRow[]> {
   const { workerId, now, batch = 50, leaseSeconds = 30 } = opts;
   const { rows } = await db.query<FireJobRow>(
-    `UPDATE fire_job
+    `UPDATE dine.fire_job
         SET locked_by = $1,
             locked_until = $2::timestamptz + make_interval(secs => $3),
             attempt = attempt + 1,
             updated_at = now()
       WHERE id IN (
-        SELECT id FROM fire_job
+        SELECT id FROM dine.fire_job
          WHERE state = 'pending'
            AND run_at <= $2::timestamptz
            AND (locked_until IS NULL OR locked_until < $2::timestamptz)
@@ -115,7 +115,7 @@ export async function fireOne(
   try {
     return await tx(async (client) => {
       const claimed = await client.query(
-        `UPDATE dining_order
+        `UPDATE dine.dining_order
             SET state = 'FIRED', fired_at = $2, fired_by = $3,
                 version = version + 1, updated_at = $2
           WHERE id = $1 AND state = ANY($4::text[])
@@ -125,17 +125,22 @@ export async function fireOne(
 
       if (claimed.rowCount === 0) {
         await client.query(
-          `UPDATE fire_job SET state = 'cancelled', updated_at = now() WHERE id = $1`,
+          `UPDATE dine.fire_job SET state = 'cancelled', updated_at = now() WHERE id = $1`,
           [job.id],
         );
         return { result: 'superseded', orderId: job.order_id, jobId: job.id } as const;
       }
 
-      await client.query(`UPDATE fire_job SET state = 'done', updated_at = now() WHERE id = $1`, [
+      await client.query(`UPDATE dine.fire_job SET state = 'done', updated_at = now() WHERE id = $1`, [
         job.id,
       ]);
 
       const lateSeconds = Math.max(0, (now.getTime() - job.run_at.getTime()) / 1000);
+
+      const { rows: owner } = await client.query<{ guest_id: string }>(
+        'SELECT guest_id FROM dine.dining_order WHERE id = $1',
+        [job.order_id],
+      );
 
       await appendEvent(client, job.order_id, 'FIRED', actor, {
         scheduledFor: job.run_at.toISOString(),
@@ -151,7 +156,14 @@ export async function fireOne(
            ('guest.notify.cooking', $2::jsonb)`,
         [
           JSON.stringify({ orderId: job.order_id, firedAt: now.toISOString(), plan: job.plan }),
-          JSON.stringify({ orderId: job.order_id, template: 'order.cooking' }),
+          // The guest travels with the message: notify is addressed to people,
+          // and the relay must not have to join back into the dining tables to
+          // find out who this was for.
+          JSON.stringify({
+            orderId: job.order_id,
+            guestId: owner[0]?.guest_id ?? null,
+            template: 'order.cooking',
+          }),
         ],
       );
 
@@ -168,7 +180,7 @@ async function recordFailure(jobId: string, message: string): Promise<void> {
   const { getPool } = await import('../db/pool.js');
   await getPool()
     .query(
-      `UPDATE fire_job
+      `UPDATE dine.fire_job
           SET last_error = $2, locked_by = NULL, locked_until = NULL, updated_at = now()
         WHERE id = $1`,
       [jobId, message.slice(0, 2000)],
@@ -190,7 +202,7 @@ export async function findOverdue(
   const { now, graceSeconds = 30 } = opts;
   const { rows } = await db.query<FireJobRow>(
     `SELECT id, order_id, run_at, state, attempt, plan
-       FROM fire_job
+       FROM dine.fire_job
       WHERE state = 'pending'
         AND run_at < $1::timestamptz - make_interval(secs => $2)
       ORDER BY run_at`,

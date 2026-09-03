@@ -30,6 +30,26 @@ export const FIREABLE_STATES: readonly OrderState[] = ['SCHEDULED', 'ARMED', 'HE
 
 export const TERMINAL_STATES: readonly OrderState[] = ['CLOSED'];
 
+/**
+ * The states with something still ahead of them — a walk, a kitchen, a table,
+ * or a review nobody has left yet.
+ *
+ * This is the list the home screen asks for: "what of mine is still going on".
+ * SERVED belongs in it because the meal is over but the guest's part is not.
+ */
+export const LIVE_STATES: readonly OrderState[] = [
+  'PLACED',
+  'ACCEPTED',
+  'SCHEDULED',
+  'ARMED',
+  'HELD',
+  'RESLOTTED',
+  'FIRED',
+  'COOKING',
+  'READY',
+  'SERVED',
+];
+
 export function canTransition(from: OrderState, to: OrderState): boolean {
   return ALLOWED[from].includes(to);
 }
@@ -75,4 +95,8 @@ export function isCommitted(state: OrderState): boolean {
 
 export function isTerminal(state: OrderState): boolean {
   return TERMINAL_STATES.includes(state);
+}
+
+export function isLive(state: OrderState): boolean {
+  return LIVE_STATES.includes(state);
 }

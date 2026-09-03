@@ -3,7 +3,7 @@ import { closePool, getPool } from '../db/pool.js';
 import { at, PILOT_MENU } from '../domain/fixtures.js';
 import { VirtualClock, addMinutes, hhmm } from '../domain/time.js';
 import { occupancyAt } from '../db/stationLoad.js';
-import { reconcile } from './ebarimt.js';
+import { balance, reconcile, reconcileLedger } from '../platform/ledger/index.js';
 import {
   acceptOrder,
   cancelOrder,
@@ -51,7 +51,7 @@ async function readOrder(orderId: string) {
   const { rows } = await pool().query(
     `SELECT state, fire_at, ready_at, fired_at, fired_by, seated_at, served_at,
             closed_at, eta_confidence, fire_mode, order_prep_minutes, total_mnt
-       FROM dining_order WHERE id = $1`,
+       FROM dine.dining_order WHERE id = $1`,
     [orderId],
   );
   return rows[0] as Record<string, never> & {
@@ -72,7 +72,7 @@ async function readOrder(orderId: string) {
 
 async function eventTypes(orderId: string): Promise<string[]> {
   const { rows } = await pool().query<{ type: string }>(
-    'SELECT type FROM order_event WHERE order_id = $1 ORDER BY seq',
+    'SELECT type FROM dine.order_event WHERE order_id = $1 ORDER BY seq',
     [orderId],
   );
   return rows.map((r) => r.type);
@@ -111,7 +111,7 @@ beforeEach(async () => {
   notifier = new FakeNotifier();
   ctx = { clock, payments, tax, notifier };
   venue = await seedRestaurant();
-  await pool().query(`UPDATE restaurant SET ebarimt_merchant_tin = '1234567' WHERE id = $1`, [
+  await pool().query(`UPDATE dine.restaurant SET ebarimt_merchant_tin = '1234567' WHERE id = $1`, [
     venue.restaurantId,
   ]);
   guestId = await seedGuest(pool(), 'AUTO');
@@ -223,12 +223,12 @@ describe('the whole journey', () => {
 
     // The table is handed back and nothing is left holding kitchen capacity.
     const holds = await pool().query(
-      `SELECT release_reason FROM table_hold WHERE order_id = $1 AND released_at IS NOT NULL`,
+      `SELECT release_reason FROM dine.table_hold WHERE order_id = $1 AND released_at IS NOT NULL`,
       [orderId],
     );
     expect(holds.rows[0]).toEqual({ release_reason: 'closed' });
     const reservations = await pool().query(
-      'SELECT count(*)::int AS n FROM station_reservation WHERE order_id = $1',
+      'SELECT count(*)::int AS n FROM dine.station_reservation WHERE order_id = $1',
       [orderId],
     );
     expect(reservations.rows[0]).toEqual({ n: 0 });
@@ -247,11 +247,14 @@ describe('the ways it goes wrong', () => {
 
     const order = await readOrder(orderId);
     expect(order.state).toBe('REFUNDED');
-    expect(payments.refunded).toHaveLength(1);
+    // The money comes back to the wallet, not to the card: instant instead of
+    // three days, and the guest can spend it on lunch somewhere else today.
+    expect(await balance(guestId)).toBe(order.total_mnt);
+    expect(await reconcileLedger()).toMatchObject({ drift: 0 });
 
     // The slot, the table and the kitchen minutes all come back.
     const slot = await pool().query<{ taken_orders: number }>(
-      'SELECT taken_orders FROM slot WHERE restaurant_id = $1',
+      'SELECT taken_orders FROM dine.slot WHERE restaurant_id = $1',
       [venue.restaurantId],
     );
     expect(slot.rows[0]!.taken_orders).toBe(0);
@@ -312,8 +315,9 @@ describe('the ways it goes wrong', () => {
     await payOrder(ctx, orderId);
     await rejectOrder(ctx, orderId, 'станц ажиллахгүй байна');
 
-    expect((await readOrder(orderId)).state).toBe('REFUNDED');
-    expect(payments.refunded).toHaveLength(1);
+    const rejected = await readOrder(orderId);
+    expect(rejected.state).toBe('REFUNDED');
+    expect(await balance(guestId)).toBe(rejected.total_mnt);
     expect(await eventTypes(orderId)).toContain('REJECTED');
   });
 
@@ -331,7 +335,7 @@ describe('the ways it goes wrong', () => {
 
     expect((await readOrder(orderId)).state).toBe('NO_SHOW');
     const trust = await pool().query<{ tier: string; no_shows: number }>(
-      'SELECT tier, no_shows FROM trust_profile WHERE guest_id = $1',
+      'SELECT tier, no_shows FROM dine.trust_profile WHERE guest_id = $1',
       [guestId],
     );
     expect(trust.rows[0]).toEqual({ tier: 'CONFIRM', no_shows: 1 });

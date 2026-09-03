@@ -1,5 +1,6 @@
 import type { FastifyReply } from 'fastify';
-import { AuthError } from '../services/auth.js';
+import { AuthError } from '../platform/identity/index.js';
+import { LedgerError } from '../platform/ledger/index.js';
 import { OrderError, type OrderErrorCode } from '../services/orders.js';
 
 /**
@@ -67,7 +68,28 @@ const AUTH_ERRORS: Record<AuthError['code'], Spec> = {
   UNAUTHORIZED: { status: 401, mn: 'Нэвтэрч орно уу.' },
 };
 
+const LEDGER_ERRORS: Record<LedgerError['code'], Spec> = {
+  INSUFFICIENT_FUNDS: {
+    status: 402,
+    // Says what to do about it, because there is something to do about it.
+    mn: 'Түрийвчинд хүрэлцэхгүй байна. Цэнэглээд дахин оролдоно уу.',
+  },
+  TOPUP_FAILED: {
+    status: 402,
+    mn: 'Цэнэглэлт амжилтгүй боллоо. Дахин оролдоно уу.',
+  },
+  PAYMENT_FAILED: {
+    status: 402,
+    mn: 'Төлбөр амжилтгүй боллоо. Дахин оролдоно уу.',
+  },
+  NOT_FOUND: { status: 404, mn: 'Ийм гүйлгээ олдсонгүй.' },
+};
+
 export function sendError(reply: FastifyReply, error: unknown): FastifyReply {
+  if (error instanceof LedgerError) {
+    const spec = LEDGER_ERRORS[error.code];
+    return reply.status(spec.status).send(envelope(error.code, spec.mn, error.message));
+  }
   if (error instanceof OrderError) {
     const spec = ORDER_ERRORS[error.code];
     return reply.status(spec.status).send(envelope(error.code, spec.mn, error.message));

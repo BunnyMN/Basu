@@ -7,8 +7,8 @@ import type { OrderState } from '../domain/types.js';
 import type { SignalType } from '../domain/eta.js';
 import { cancelFire } from '../scheduler/fireJobs.js';
 import { planAndSchedule } from './planning.js';
-import { enqueueNotification } from './notifications.js';
-import { queueReceipt } from './ebarimt.js';
+import { enqueue } from '../platform/notify/index.js';
+import { collect, queueReceipt, refund as refundToWallet } from '../platform/ledger/index.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -58,7 +58,7 @@ async function transition(
   const keys = Object.keys(patch);
   const sets = keys.map((k, i) => `${k} = $${i + 4}`);
   const { rowCount } = await db.query(
-    `UPDATE dining_order
+    `UPDATE dine.dining_order
         SET state = $2, version = version + 1, updated_at = now()
             ${sets.length ? `, ${sets.join(', ')}` : ''}
       WHERE id = $1 AND state = ANY($3::text[])`,
@@ -69,7 +69,7 @@ async function transition(
 
 async function requireState(db: Db, orderId: string): Promise<{ state: OrderState; code: string }> {
   const { rows } = await db.query<{ state: OrderState; code: string }>(
-    'SELECT state, code FROM dining_order WHERE id = $1',
+    'SELECT state, code FROM dine.dining_order WHERE id = $1',
     [orderId],
   );
   const row = rows[0];
@@ -100,8 +100,14 @@ export async function createOrder(ctx: Ctx, input: CreateOrderInput): Promise<Cr
   const now = ctx.clock.now();
 
   return tx(async (client) => {
+    // Identity creates the person; the dining record of how they behave is
+    // ours, and starts the first time they order something.
+    await client.query(
+      `INSERT INTO dine.trust_profile (guest_id) VALUES ($1) ON CONFLICT DO NOTHING`,
+      [input.guestId],
+    );
     const trust = await client.query<{ tier: string }>(
-      'SELECT tier FROM trust_profile WHERE guest_id = $1',
+      'SELECT tier FROM dine.trust_profile WHERE guest_id = $1',
       [input.guestId],
     );
     if (trust.rows[0]?.tier === 'BLOCKED') {
@@ -112,7 +118,7 @@ export async function createOrder(ctx: Ctx, input: CreateOrderInput): Promise<Cr
     const code = await nextOrderCode(client);
 
     const { rows } = await client.query<{ id: string }>(
-      `INSERT INTO dining_order
+      `INSERT INTO dine.dining_order
          (code, restaurant_id, guest_id, slot_id, state, party_size, slot_starts_at, created_at, updated_at)
        VALUES ($1, $2, $3, $4, 'DRAFT', $5, $6, $7, $7)
        RETURNING id`,
@@ -121,7 +127,7 @@ export async function createOrder(ctx: Ctx, input: CreateOrderInput): Promise<Cr
     const orderId = rows[0]!.id;
 
     const totalMnt = await addLines(client, orderId, input);
-    await client.query('UPDATE dining_order SET total_mnt = $2 WHERE id = $1', [orderId, totalMnt]);
+    await client.query('UPDATE dine.dining_order SET total_mnt = $2 WHERE id = $1', [orderId, totalMnt]);
 
     const tableId = await holdTable(client, {
       orderId,
@@ -143,7 +149,7 @@ export async function createOrder(ctx: Ctx, input: CreateOrderInput): Promise<Cr
 async function nextOrderCode(db: Db): Promise<string> {
   const { rows } = await db.query<{ code: string }>(
     `SELECT lpad(((COALESCE(max(code::int), 1041) + 1))::text, 4, '0') AS code
-       FROM dining_order WHERE code ~ '^[0-9]+$'`,
+       FROM dine.dining_order WHERE code ~ '^[0-9]+$'`,
   );
   return rows[0]!.code;
 }
@@ -153,7 +159,7 @@ async function reserveSlot(db: Db, input: CreateOrderInput, now: Date): Promise<
   const endsAt = addMinutes(input.slotStartsAt, 15);
 
   await db.query(
-    `INSERT INTO slot (restaurant_id, starts_at, ends_at, max_orders, max_covers)
+    `INSERT INTO dine.slot (restaurant_id, starts_at, ends_at, max_orders, max_covers)
      VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (restaurant_id, starts_at) DO NOTHING`,
     [input.restaurantId, input.slotStartsAt, endsAt, cap, cap * 4],
@@ -161,7 +167,7 @@ async function reserveSlot(db: Db, input: CreateOrderInput, now: Date): Promise<
 
   // The CHECK on the table does the enforcing; we just read the outcome.
   const { rows } = await db.query<{ id: string }>(
-    `UPDATE slot
+    `UPDATE dine.slot
         SET taken_orders = taken_orders + 1, taken_covers = taken_covers + $3
       WHERE restaurant_id = $1 AND starts_at = $2
         AND NOT closed
@@ -192,7 +198,7 @@ async function addLines(db: Db, orderId: string, input: CreateOrderInput): Promi
     }>(
       `SELECT m.id, m.name, m.price_mnt, m.prep_minutes, m.hold_tolerance_minutes,
               s.code, m.sold_out_until, m.preorder_enabled
-         FROM menu_item m JOIN station s ON s.id = m.station_id
+         FROM dine.menu_item m JOIN dine.station s ON s.id = m.station_id
         WHERE m.id = $1 AND m.active`,
       [item.menuItemId],
     );
@@ -206,7 +212,7 @@ async function addLines(db: Db, orderId: string, input: CreateOrderInput): Promi
 
     // Copied, not joined: tomorrow's price change must not rewrite this ticket.
     await db.query(
-      `INSERT INTO order_line
+      `INSERT INTO dine.order_line
          (order_id, menu_item_id, qty, name, unit_price_mnt, prep_minutes,
           hold_tolerance_minutes, station_code, notes)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
@@ -241,7 +247,7 @@ async function holdTable(
   const until = addMinutes(input.slotStartsAt, TABLE_HOLD_AFTER);
 
   const { rows } = await db.query<{ id: string }>(
-    `SELECT id FROM dining_table
+    `SELECT id FROM dine.dining_table
       WHERE restaurant_id = $1 AND seats >= $2
       ORDER BY seats, code`,
     [input.restaurantId, input.partySize],
@@ -251,7 +257,7 @@ async function holdTable(
     try {
       await db.query('SAVEPOINT try_table');
       await db.query(
-        `INSERT INTO table_hold (order_id, table_id, hold_from, hold_until)
+        `INSERT INTO dine.table_hold (order_id, table_id, hold_from, hold_until)
          VALUES ($1, $2, $3, $4)`,
         [input.orderId, table.id, from, until],
       );
@@ -269,40 +275,50 @@ async function holdTable(
 /* ── money in ──────────────────────────────────────────────────────── */
 
 /**
- * Full amount up front. Authorising and capturing together is right for QPay,
- * where the guest has already pushed the money; a card flow would capture at
- * ACCEPTED instead, before the auth hold expires.
+ * Full amount up front, out of the guest's wallet.
+ *
+ * Dine no longer talks to QPay. It says "collect 18 500 ₮ from this guest for
+ * this order" and the ledger decides whether that comes out of a balance they
+ * already have or has to be pulled from a card first — which is the difference
+ * between a guest with money in Basu tapping once and being sent to a payment
+ * app they have to come back from.
+ *
+ * The idempotency key is the order, so the double-tapped Pay button, the retry
+ * after a timeout and the redelivered callback all buy exactly one lunch.
  */
 export async function payOrder(ctx: Ctx, orderId: string): Promise<void> {
-  const now = ctx.clock.now();
-  const { rows } = await getPool().query<{ total_mnt: number; state: string }>(
-    'SELECT total_mnt, state FROM dining_order WHERE id = $1',
+  const { rows } = await getPool().query<{ total_mnt: number; state: string; guest_id: string }>(
+    'SELECT total_mnt, state, guest_id FROM dine.dining_order WHERE id = $1',
     [orderId],
   );
   const order = rows[0];
   if (!order) throw new OrderError('NOT_FOUND', 'no such order');
   if (order.state !== 'DRAFT') throw new OrderError('WRONG_STATE', `cannot pay in ${order.state}`);
 
-  let intent;
+  let collected;
   try {
-    intent = await ctx.payments.authorize({ orderId, amountMnt: order.total_mnt });
-    await ctx.payments.capture(intent.providerRef);
+    collected = await collect(ctx, {
+      guestId: order.guest_id,
+      amountMnt: order.total_mnt,
+      subject: 'order',
+      subjectId: orderId,
+      idempotencyKey: `order:${orderId}:purchase`,
+    });
   } catch (error) {
     throw new OrderError('PAYMENT_FAILED', (error as Error).message);
   }
 
   await tx(async (client) => {
-    await client.query(
-      `INSERT INTO payment (order_id, provider, provider_ref, amount_mnt, state, authorized_at, captured_at)
-       VALUES ($1, $2, $3, $4, 'captured', $5, $5)
-       ON CONFLICT (provider, provider_ref) DO NOTHING`,
-      [orderId, ctx.payments.name, intent.providerRef, order.total_mnt, now],
-    );
+    await client.query('UPDATE dine.dining_order SET ledger_transfer_id = $2 WHERE id = $1', [
+      orderId,
+      collected.transferId,
+    ]);
     const moved = await transition(client, orderId, ['DRAFT'], 'PLACED');
     if (!moved) throw new OrderError('WRONG_STATE', 'order left DRAFT while paying');
     await appendEvent(client, orderId, 'PAID', `guest:${orderId}`, {
       amountMnt: order.total_mnt,
-      provider: ctx.payments.name,
+      fromWalletMnt: collected.fromWalletMnt,
+      toppedUpMnt: collected.toppedUpMnt,
     });
   });
 }
@@ -345,7 +361,7 @@ export async function recordSignal(
 ): Promise<void> {
   const when = at ?? ctx.clock.now();
   await getPool().query(
-    'INSERT INTO arrival_signal (order_id, type, at) VALUES ($1, $2, $3)',
+    'INSERT INTO dine.arrival_signal (order_id, type, at) VALUES ($1, $2, $3)',
     [orderId, type, when],
   );
 }
@@ -360,9 +376,19 @@ export async function armOrder(ctx: Ctx, orderId: string): Promise<boolean> {
   });
   if (!armed) return false;
 
-  await enqueueNotification(ctx, {
-    orderId,
+  const { rows } = await getPool().query<{ guest_id: string }>(
+    'SELECT guest_id FROM dine.dining_order WHERE id = $1',
+    [orderId],
+  );
+  const guestId = rows[0]?.guest_id;
+  if (!guestId) return true;
+
+  await enqueue(ctx, {
+    guestId,
+    subject: 'order',
+    subjectId: orderId,
     template: 'arrival.arm',
+    title: 'Та замд гарсан уу?',
     body: 'Та замд гарсан уу? 1 = Тийм · 2 = 10 минут хойшлуул',
     // SMS first: iOS web push only reaches guests who added us to the home
     // screen, and the whole fire decision hangs off this reply.
@@ -375,7 +401,7 @@ export async function checkIn(ctx: Ctx, orderId: string): Promise<void> {
   const now = ctx.clock.now();
   await recordSignal(ctx, orderId, 'checkin', now);
   await getPool().query(
-    'UPDATE dining_order SET seated_at = COALESCE(seated_at, $2), updated_at = $2 WHERE id = $1',
+    'UPDATE dine.dining_order SET seated_at = COALESCE(seated_at, $2), updated_at = $2 WHERE id = $1',
     [orderId, now],
   );
   await appendEvent(getPool(), orderId, 'SEATED', `guest:${orderId}`);
@@ -409,7 +435,7 @@ export async function holdFor(ctx: Ctx, orderId: string, minutes = 5): Promise<v
   const now = ctx.clock.now();
   await tx(async (client) => {
     const { rows } = await client.query<{ fire_at: Date | null }>(
-      'SELECT fire_at FROM dining_order WHERE id = $1',
+      'SELECT fire_at FROM dine.dining_order WHERE id = $1',
       [orderId],
     );
     const fireAt = rows[0]?.fire_at;
@@ -418,11 +444,11 @@ export async function holdFor(ctx: Ctx, orderId: string, minutes = 5): Promise<v
     // Recorded as a floor, not just a new time: the planner re-runs every tick
     // and would otherwise recompute the ideal minute and undo the chef.
     await client.query(
-      `UPDATE dining_order SET fire_at = $2, fire_not_before = $2, updated_at = $3 WHERE id = $1`,
+      `UPDATE dine.dining_order SET fire_at = $2, fire_not_before = $2, updated_at = $3 WHERE id = $1`,
       [orderId, next, now],
     );
     await client.query(
-      `UPDATE fire_job SET run_at = $2, updated_at = now()
+      `UPDATE dine.fire_job SET run_at = $2, updated_at = now()
         WHERE order_id = $1 AND state = 'pending'`,
       [orderId, next],
     );
@@ -463,13 +489,23 @@ export async function closeOrder(ctx: Ctx, orderId: string): Promise<void> {
     if (!ok) throw new OrderError('WRONG_STATE', 'this order cannot be closed yet');
     await releaseReservation(client, orderId);
     await client.query(
-      `UPDATE table_hold SET released_at = $2, release_reason = 'closed'
+      `UPDATE dine.table_hold SET released_at = $2, release_reason = 'closed'
         WHERE order_id = $1 AND released_at IS NULL`,
       [orderId, now],
     );
     await appendEvent(client, orderId, 'CLOSED', 'system:ops');
   });
-  await queueReceipt(orderId, 'SALE');
+
+  const billed = await billingFacts(orderId);
+  if (billed?.transferId) {
+    await queueReceipt({
+      transferId: billed.transferId,
+      kind: 'SALE',
+      merchantTin: billed.merchantTin,
+      orderCode: billed.code,
+      amountMnt: billed.amountMnt,
+    });
+  }
 }
 
 export async function cancelOrder(
@@ -494,13 +530,13 @@ export async function cancelOrder(
     await cancelFire(client, orderId);
     await releaseReservation(client, orderId);
     await client.query(
-      `UPDATE table_hold SET released_at = $2, release_reason = 'cancelled'
+      `UPDATE dine.table_hold SET released_at = $2, release_reason = 'cancelled'
         WHERE order_id = $1 AND released_at IS NULL`,
       [orderId, now],
     );
     await client.query(
-      `UPDATE slot SET taken_orders = greatest(taken_orders - 1, 0)
-        WHERE id = (SELECT slot_id FROM dining_order WHERE id = $1)`,
+      `UPDATE dine.slot SET taken_orders = greatest(taken_orders - 1, 0)
+        WHERE id = (SELECT slot_id FROM dine.dining_order WHERE id = $1)`,
       [orderId],
     );
     await appendEvent(client, orderId, 'CANCELLED', actor);
@@ -526,60 +562,107 @@ export async function markNoShow(ctx: Ctx, orderId: string): Promise<void> {
     if (!ok) return;
     await releaseReservation(client, orderId);
     await client.query(
-      `UPDATE table_hold SET released_at = $2, release_reason = 'no_show'
+      `UPDATE dine.table_hold SET released_at = $2, release_reason = 'no_show'
         WHERE order_id = $1 AND released_at IS NULL`,
       [orderId, now],
     );
     await appendEvent(client, orderId, 'NO_SHOW', 'system:scheduler');
     await client.query(
-      `UPDATE trust_profile
+      `UPDATE dine.trust_profile
           SET no_shows = no_shows + 1,
               consecutive_no_shows = consecutive_no_shows + 1,
               last_no_show_at = $2::timestamptz,
               tier = CASE WHEN consecutive_no_shows + 1 >= 2 THEN 'BLOCKED' ELSE 'CONFIRM' END,
               tier_until = $2::timestamptz + interval '60 days'
-        WHERE guest_id = (SELECT guest_id FROM dining_order WHERE id = $1)`,
+        WHERE guest_id = (SELECT guest_id FROM dine.dining_order WHERE id = $1)`,
       [orderId, now],
     );
   });
 }
 
+/**
+ * Money goes back to the wallet, not to the card.
+ *
+ * Instant instead of the three to five days a QPay reversal takes, and it is
+ * the same two accounts the purchase used, so the pair nets to zero and reads
+ * as one line of story rather than two unrelated events.
+ */
 async function refund(ctx: Ctx, orderId: string, reason: string): Promise<void> {
-  const { rows } = await getPool().query<{
-    id: string;
-    provider_ref: string;
-    amount_mnt: number;
-  }>(
-    `SELECT id, provider_ref, amount_mnt FROM payment
-      WHERE order_id = $1 AND state = 'captured'`,
-    [orderId],
-  );
-  const payment = rows[0];
-  if (!payment) return; // never paid — nothing to give back
+  const billed = await billingFacts(orderId);
+  if (!billed?.transferId) return; // never paid — nothing to give back
 
-  await ctx.payments.refund({
-    providerRef: payment.provider_ref,
-    amountMnt: payment.amount_mnt,
+  const transferId = await refundToWallet({
+    guestId: billed.guestId,
+    amountMnt: billed.amountMnt,
+    subject: 'order',
+    subjectId: orderId,
+    memo: reason,
+    idempotencyKey: `order:${orderId}:refund`,
   });
 
   await tx(async (client) => {
-    await client.query(
-      `UPDATE payment SET state = 'refunded', refunded_mnt = amount_mnt WHERE id = $1`,
-      [payment.id],
-    );
     await transition(client, orderId, ['CANCELLED', 'REJECTED'], 'REFUNDED');
     await appendEvent(client, orderId, 'REFUNDED', 'system:payments', {
-      amountMnt: payment.amount_mnt,
+      amountMnt: billed.amountMnt,
       reason,
     });
   });
-  await queueReceipt(orderId, 'RETURN');
+  await queueReceipt({
+    transferId,
+    kind: 'RETURN',
+    merchantTin: billed.merchantTin,
+    orderCode: billed.code,
+    amountMnt: billed.amountMnt,
+  });
+  void ctx;
+}
+
+/**
+ * The four facts a receipt needs, plus who to give money back to.
+ *
+ * All of it lives in dine's own tables — the transfer id included, because the
+ * ledger handed it back when it took the money. Nothing here reads a ledger
+ * table, which is what lets the ledger move house later.
+ */
+async function billingFacts(orderId: string): Promise<
+  | {
+      guestId: string;
+      code: string;
+      amountMnt: number;
+      merchantTin: string;
+      transferId: string | null;
+    }
+  | null
+> {
+  const { rows } = await getPool().query<{
+    guest_id: string;
+    code: string;
+    total_mnt: number;
+    tin: string | null;
+    ledger_transfer_id: string | null;
+  }>(
+    `SELECT o.guest_id, o.code, o.total_mnt, o.ledger_transfer_id,
+            r.ebarimt_merchant_tin AS tin
+       FROM dine.dining_order o
+       JOIN dine.restaurant r ON r.id = o.restaurant_id
+      WHERE o.id = $1`,
+    [orderId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    guestId: row.guest_id,
+    code: row.code,
+    amountMnt: row.total_mnt,
+    merchantTin: row.tin ?? 'UNSET',
+    transferId: row.ledger_transfer_id,
+  };
 }
 
 /** Guests who never appeared and whose table has long since been let go. */
 export async function findAbandoned(db: Db, now: Date, afterMinutes = 30): Promise<string[]> {
   const { rows } = await db.query<{ id: string }>(
-    `SELECT id FROM dining_order
+    `SELECT id FROM dine.dining_order
       WHERE state IN ('ARMED','HELD','FIRED','COOKING','READY')
         AND seated_at IS NULL
         AND slot_starts_at < $1::timestamptz - make_interval(mins => $2)`,
