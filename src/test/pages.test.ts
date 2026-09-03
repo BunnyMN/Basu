@@ -48,11 +48,17 @@ const storage = memoryStorage();
  */
 const open: JSDOM[] = [];
 
-/** Load a page into jsdom, wire fetch to the live server, run its script. */
-async function openPage(file: string): Promise<JSDOM> {
+/**
+ * Load a page into jsdom, wire fetch to the live server, run its script.
+ *
+ * `search` is how a deep link is opened: the home screen sends people into
+ * the dine-in app at `/dine?order=…`, and a page that reads location has to
+ * be given one that says something.
+ */
+async function openPage(file: string, search = ''): Promise<JSDOM> {
   const html = await readFile(join(WEB, file), 'utf8');
   const dom = new JSDOM(html, {
-    url: base,
+    url: `${base}/${file.replace(/\.html$/, '')}${search}`,
     runScripts: 'outside-only',
     pretendToBeVisual: true,
   });
@@ -298,7 +304,7 @@ async function orderFromMap(
 
 describe('the guest app', () => {
   it('draws every restaurant on the map', async () => {
-    const dom = await openPage('index.html');
+    const dom = await openPage('dine.html');
     await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
 
     const drawn = pins(dom);
@@ -308,7 +314,7 @@ describe('the guest app', () => {
   });
 
   it('shows a dish with its picture, its station and how long it takes', async () => {
-    const dom = await openPage('index.html');
+    const dom = await openPage('dine.html');
     await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
     tapPin(dom, pairedVenue);
     await until(dom, 'the menu', (d) => d.querySelectorAll('.item').length > 3);
@@ -323,7 +329,7 @@ describe('the guest app', () => {
   });
 
   it('walks a person from a pin to a paid order', async () => {
-    const dom = await openPage('index.html');
+    const dom = await openPage('dine.html');
     await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
 
     tapPin(dom, pairedVenue);
@@ -385,7 +391,7 @@ describe('the guest app', () => {
     // layer at all — no error, no warning, an empty map and a distance label
     // sitting next to it saying the route had been found. Filters are the
     // supported way to say the same thing.
-    const dom = await openPage('index.html');
+    const dom = await openPage('dine.html');
     const mapOf = () =>
       (dom.window as unknown as Record<string, unknown>)['__map'] as
         | { layers: Array<{ id: string; paint?: Record<string, unknown> }> }
@@ -410,7 +416,7 @@ describe('the guest app', () => {
     // resets pitch to zero unless told otherwise — so locating yourself
     // flattened the city into a plan. The buildings are how somebody
     // recognises where they are, so the tilt is not decoration.
-    const dom = await openPage('index.html');
+    const dom = await openPage('dine.html');
     await until(dom, 'the map', () =>
       Boolean((dom.window as unknown as Record<string, unknown>)['__map']),
     );
@@ -426,7 +432,7 @@ describe('the guest app', () => {
 
   it('explains a dark kitchen instead of offering its menu', async () => {
     await inProduction(async () => {
-      const dom = await openPage('index.html');
+      const dom = await openPage('dine.html');
       await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
 
       const shut = pins(dom).find((f) => !f.properties['open']);
@@ -445,7 +451,7 @@ describe('the guest app', () => {
     // session is revoked: a token that looks fine and is worth nothing.
     storage.setItem('basu.guest', 'stale-token-from-a-previous-life');
 
-    const dom = await openPage('index.html');
+    const dom = await openPage('dine.html');
     await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
     tapPin(dom, pairedVenue);
     await until(dom, 'the menu', (d) => d.querySelectorAll('.item').length > 3);
@@ -470,10 +476,10 @@ describe('the guest app', () => {
   it('says what to do when no kitchen is watching at all', async () => {
     // Every tablet has gone quiet — the guard is working, but a map of grey
     // pins with no explanation is a dead end for whoever is looking.
-    await getPool().query(`UPDATE kds_device SET last_seen_at = now() - interval '1 day'`);
+    await getPool().query(`UPDATE dine.kds_device SET last_seen_at = now() - interval '1 day'`);
     try {
       await inProduction(async () => {
-        const dom = await openPage('index.html');
+        const dom = await openPage('dine.html');
         await until(dom, 'the explanation', (d) => Boolean(d.querySelector('#map .note')));
         expect(text(dom)).toContain('нэг ч гал тогоо холбогдоогүй');
         expect(dom.window.document.querySelector('.note a')?.getAttribute('href')).toBe('/kds');
@@ -482,7 +488,7 @@ describe('the guest app', () => {
         expect(pins(dom).every((f) => !f.properties['open'])).toBe(true);
       });
     } finally {
-      await getPool().query(`UPDATE kds_device SET last_seen_at = now()
+      await getPool().query(`UPDATE dine.kds_device SET last_seen_at = now()
                               WHERE paired_at IS NOT NULL AND revoked_at IS NULL`);
     }
   });
@@ -495,7 +501,7 @@ describe('the map', () => {
     // `new Request()` unchanged and throws "Failed to parse URL". The map then
     // draws its background colour with the markers still on top, so it reads
     // as a styling problem rather than the transport one it is.
-    const dom = await openPage('index.html');
+    const dom = await openPage('dine.html');
     await until(dom, 'the style', () =>
       Boolean((dom.window as unknown as Record<string, unknown>)['__style']),
     );
@@ -512,9 +518,61 @@ describe('the map', () => {
   });
 });
 
+describe('the Basu home screen', () => {
+  it('names what is inside Basu and links into it', async () => {
+    // Nobody signed in: a launcher opened by a stranger shows the apps and
+    // nothing of anybody's.
+    storage.removeItem('basu.guest');
+    const home = await openPage('index.html');
+    await until(home, 'the app grid', (d) => d.querySelectorAll('.app').length > 0);
+
+    const dine = home.window.document.querySelector('.app[data-app="dine"]') as HTMLAnchorElement;
+    expect(dine.getAttribute('href')).toBe('/dine');
+    expect(dine.textContent).toContain('Хоол');
+    // Every tile draws its own glyph; a launcher waiting on the network to
+    // show its icons is a launcher that looks broken on a slow morning.
+    expect(dine.querySelector('.tile svg')).toBeTruthy();
+    expect(home.window.document.querySelectorAll('.card')).toHaveLength(0);
+  });
+
+  it('carries a live order home, and opens it again from there', async () => {
+    // A guest of this test's own, so the strip holds one order and it is ours.
+    await ownGuest('+97699003001');
+    const guest = await openPage('dine.html');
+    // Its own slot: three orders fill one, and the other tests have theirs.
+    await orderFromMap(guest, pairedVenue, 'Хуушуур', '13:00');
+
+    const home = await openPage('index.html');
+    await until(home, 'the order on the home screen', (d) => d.querySelectorAll('.card').length > 0);
+
+    const card = home.window.document.querySelector('.card') as HTMLAnchorElement;
+    expect(card.textContent).toContain(pairedVenue);
+    const href = card.getAttribute('href') ?? '';
+    expect(href).toMatch(/^\/dine\?order=[0-9a-f-]{36}$/);
+
+    // …and following it lands on that order's status, not on an empty map.
+    const back = await openPage('dine.html', href.slice('/dine'.length));
+    await until(back, 'the status screen', (d) => Boolean(d.querySelector('.status')));
+    expect(back.window.document.querySelector('#sheet-sub')?.textContent).toContain(pairedVenue);
+  });
+
+  it('brings a reloaded guest back to their lunch', async () => {
+    await ownGuest('+97699003002');
+    const guest = await openPage('dine.html');
+    await orderFromMap(guest, pairedVenue, 'Хуушуур', '13:30');
+    const code = guest.window.document.querySelector('#sheet-name')?.textContent;
+
+    // Same browser, same guest, no deep link: the order is the server's to
+    // remember, so a reload finds it again.
+    const again = await openPage('dine.html');
+    await until(again, 'the status screen', (d) => Boolean(d.querySelector('.status')));
+    expect(again.window.document.querySelector('#sheet-name')?.textContent).toBe(code);
+  });
+});
+
 describe('the kitchen display', () => {
   it('shows the ticket a guest just placed', async () => {
-    const guest = await openPage('index.html');
+    const guest = await openPage('dine.html');
     await orderFromMap(guest, pairedVenue, 'Хуушуур', '12:45');
 
     /* now the kitchen */
@@ -647,17 +705,34 @@ describe('the kitchen display', () => {
     await until(kds, 'the board', (d) => d.querySelectorAll('.lane').length === 3);
 
     // The manager revoked this tablet — it must stop showing tickets at once.
-    await getPool().query(`UPDATE kds_device SET revoked_at = now(), token_hash = NULL`);
+    await getPool().query(`UPDATE dine.kds_device SET revoked_at = now(), token_hash = NULL`);
 
     await until(kds, 'the pairing screen', (d) => Boolean(d.querySelector('.pair')), 12_000);
     expect(text(kds)).toContain('Таблетаа холбоно уу');
   });
 });
 
+/**
+ * Sign in as somebody nobody else is using.
+ *
+ * The demo login hands every page the same person, which is right for a
+ * walkthrough and wrong for a test about "my orders": one guest's list would
+ * carry every other test's lunch.
+ */
+async function ownGuest(phone: string): Promise<void> {
+  const response = await fetch(`${base}/dev/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ phone }),
+  });
+  const { token } = (await response.json()) as { token: string };
+  storage.setItem('basu.guest', token);
+}
+
 /** A tablet token for a named restaurant, the way the demo hands one out. */
 async function tabletFor(name: string): Promise<string> {
   const { rows } = await getPool().query<{ id: string }>(
-    'SELECT id FROM restaurant WHERE name = $1',
+    'SELECT id FROM dine.restaurant WHERE name = $1',
     [name],
   );
   const response = await fetch(`${base}/dev/kds-token`, {

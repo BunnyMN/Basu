@@ -1,0 +1,60 @@
+# What `npm run verify` does on a laptop, on every push.
+#
+# One step on purpose: verify already runs the stages in the order that makes a
+# failure easy to read — arithmetic, then a whole simulated service, then the
+# real database, then a live server over HTTP — and starts and stops the API
+# itself. Splitting it here would only mean two places to keep in step.
+#
+# The iOS half is not here. It needs a macOS runner and a booted simulator,
+# which is minutes of billed time on every push for a suite that only breaks
+# when somebody touches Swift. Run `npm run ios:test` before opening a PR that
+# does; CONTRIBUTING.md says so too.
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # The major version the pilot runs. Three of the guarantees live in the
+        # schema — a gist exclusion constraint on table holds, a partial unique
+        # index on fire jobs, a deferred trigger on the ledger — and none of
+        # them exist on a lighter stand-in.
+        image: postgres:16
+        env:
+          POSTGRES_USER: basu
+          POSTGRES_PASSWORD: basu
+          POSTGRES_DB: basu_dev
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgres://basu:basu@localhost:5432/basu_dev
+      TEST_DATABASE_URL: postgres://basu:basu@localhost:5432/basu_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Tests own their own database so a broken run can never touch the demo
+      # data the smoke test walks through.
+      - name: Create the test database
+        run: PGPASSWORD=basu createdb -h localhost -U basu basu_test
+
+      - run: npm ci
+
+      - run: npm run verify

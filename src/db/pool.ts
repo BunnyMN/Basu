@@ -25,8 +25,21 @@ export function databaseUrl(): string {
   return url;
 }
 
+/**
+ * `search_path` is pinned to public on purpose.
+ *
+ * Every module's tables live in its own schema (migration 010), so an
+ * unqualified `FROM dining_order` no longer resolves to anything. That is the
+ * point: a query that forgets which module it is reaching into fails loudly on
+ * the first request rather than quietly working until the day that module
+ * moves out of this process.
+ */
 export function getPool(): pg.Pool {
-  pool ??= new Pool({ connectionString: databaseUrl(), max: 10 });
+  pool ??= new Pool({
+    connectionString: databaseUrl(),
+    max: 10,
+    options: '-c search_path=public',
+  });
   return pool;
 }
 

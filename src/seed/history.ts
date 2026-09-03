@@ -75,14 +75,14 @@ export async function seedHistory(db: Db, venueIds: Map<string, string>): Promis
   const guests: string[] = [];
   for (let i = 0; i < NAMES.length; i++) {
     const { rows } = await db.query<{ id: string }>(
-      `INSERT INTO guest (phone_e164, name) VALUES ($1, $2)
+      `INSERT INTO identity.guest (phone_e164, name) VALUES ($1, $2)
        ON CONFLICT (phone_e164) DO UPDATE SET name = EXCLUDED.name
        RETURNING id`,
       [`+9769${String(500_000 + i).padStart(7, '0')}`, NAMES[i]],
     );
     const id = rows[0]!.id;
     await db.query(
-      `INSERT INTO trust_profile (guest_id, tier, completed_visits)
+      `INSERT INTO dine.trust_profile (guest_id, tier, completed_visits)
        VALUES ($1, 'AUTO', 4) ON CONFLICT (guest_id) DO NOTHING`,
       [id],
     );
@@ -102,7 +102,7 @@ export async function seedHistory(db: Db, venueIds: Map<string, string>): Promis
     const howMany = rng.int(4, 9);
 
     const { rows: menu } = await db.query<{ id: string; name: string }>(
-      'SELECT id, name FROM menu_item WHERE restaurant_id = $1',
+      'SELECT id, name FROM dine.menu_item WHERE restaurant_id = $1',
       [restaurantId],
     );
     if (menu.length === 0) continue;
@@ -124,7 +124,7 @@ export async function seedHistory(db: Db, venueIds: Map<string, string>): Promis
       const total = (priced?.price ?? 12_000) * rng.int(1, 2);
 
       const { rows: made } = await db.query<{ id: string }>(
-        `INSERT INTO dining_order
+        `INSERT INTO dine.dining_order
            (code, restaurant_id, guest_id, state, party_size, slot_starts_at,
             fire_at, ready_at, fired_at, fired_by, cooked_ready_at, seated_at,
             served_at, closed_at, total_mnt, created_at, updated_at)
@@ -148,12 +148,12 @@ export async function seedHistory(db: Db, venueIds: Map<string, string>): Promis
       orders++;
 
       await db.query(
-        `INSERT INTO order_line
+        `INSERT INTO dine.order_line
            (order_id, menu_item_id, qty, name, unit_price_mnt, prep_minutes,
             hold_tolerance_minutes, station_code)
          SELECT $1, m.id, 1, m.name, m.price_mnt, m.prep_minutes,
                 m.hold_tolerance_minutes, s.code
-           FROM menu_item m JOIN station s ON s.id = m.station_id
+           FROM dine.menu_item m JOIN dine.station s ON s.id = m.station_id
           WHERE m.id = $2`,
         [orderId, dish.id],
       );
@@ -163,7 +163,7 @@ export async function seedHistory(db: Db, venueIds: Map<string, string>): Promis
       if (!rng.chance(0.8)) continue;
 
       await db.query(
-        `INSERT INTO order_review
+        `INSERT INTO dine.order_review
            (order_id, guest_id, restaurant_id, stars, on_time, comment, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $7)`,
         [orderId, guestId, restaurantId, voice.stars, voice.onTime, voice.comment, readyAt],
@@ -174,7 +174,7 @@ export async function seedHistory(db: Db, venueIds: Map<string, string>): Promis
       // like the place and be unimpressed by what they happened to order.
       const dishStars = Math.min(5, Math.max(1, voice.stars + rng.int(-1, 1)));
       await db.query(
-        `INSERT INTO dish_review (order_id, menu_item_id, stars, created_at)
+        `INSERT INTO dine.dish_review (order_id, menu_item_id, stars, created_at)
          VALUES ($1, $2, $3, $4)`,
         [orderId, dish.id, dishStars, readyAt],
       );

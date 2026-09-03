@@ -1,0 +1,1246 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<title>Basu — үдийн хоол</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.css">
+<link rel="stylesheet" href="/app.css">
+<style>
+html,body{height:100%;overflow:hidden}
+body{display:flex;flex-direction:column}
+
+/* The map is the page: the product is "which lunch is five minutes away",
+   and that is a question about a place before it is one about a menu. */
+#map{flex:1;min-height:0;position:relative;background:#f5f3ef}
+#map .maplibregl-ctrl-group{border-radius:3px;box-shadow:var(--shadow)}
+#map .maplibregl-ctrl-attrib{font-size:10px}
+
+.badge{
+  position:absolute;top:12px;left:12px;z-index:5;
+  background:var(--surface);border:1px solid var(--line);border-radius:3px;
+  padding:8px 12px;box-shadow:var(--shadow);max-width:calc(100% - 24px);
+}
+.badge b{display:block;font-size:.92rem;font-weight:800;letter-spacing:-.02em}
+
+/* The way out. This app is one icon inside Basu, so there is always a page
+   above it — and on a phone the browser's back button is not always there. */
+.home{
+  position:absolute;top:12px;right:12px;z-index:5;
+  background:var(--surface);border:1px solid var(--line);border-radius:3px;
+  padding:7px 11px;box-shadow:var(--shadow);text-decoration:none;
+  font-family:"IBM Plex Mono",monospace;font-size:.7rem;font-weight:600;
+  letter-spacing:.02em;color:var(--accent-ink);
+}
+.home:hover{border-color:var(--accent-line)}
+.badge span{font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--ink-3)}
+
+/* The walk, when a venue is open and we know where the guest is. */
+.walk{
+  display:flex;align-items:center;gap:8px;margin-top:6px;
+  font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--route);
+}
+.walk b{font-weight:600;font-variant-numeric:tabular-nums}
+.walk .guess{color:var(--ink-3)}
+
+/* ── the sheet a pin opens ──────────────────────────────────────── */
+.scrim{
+  position:fixed;inset:0;z-index:20;background:rgba(10,14,16,.45);
+  opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.scrim[data-open]{opacity:1;pointer-events:auto}
+
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:25;
+  background:var(--surface);border-top:1px solid var(--line);
+  border-radius:10px 10px 0 0;box-shadow:0 -12px 34px -18px rgba(0,0,0,.5);
+  max-height:86vh;display:flex;flex-direction:column;
+  transform:translateY(100%);transition:transform .26s cubic-bezier(.2,.8,.25,1);
+}
+.sheet[data-open]{transform:translateY(0)}
+@media (prefers-reduced-motion:reduce){.sheet,.scrim{transition:none}}
+@media(min-width:640px){
+  .sheet{left:50%;right:auto;width:520px;transform:translate(-50%,100%)}
+  .sheet[data-open]{transform:translate(-50%,0)}
+}
+
+.grip{display:flex;justify-content:center;padding:8px 0 2px;flex:none}
+.grip i{width:38px;height:4px;border-radius:99px;background:var(--line-2)}
+
+.sheet header{
+  display:flex;align-items:flex-start;gap:12px;padding:6px 18px 14px;
+  border-bottom:1px solid var(--line);flex:none;
+}
+.sheet header h2{font-size:1.15rem;font-weight:800;letter-spacing:-.03em}
+.sheet header .sub{font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--ink-3);margin-top:3px}
+.sheet header .x{
+  margin-left:auto;background:none;border:none;color:var(--ink-3);font-size:1.2rem;
+  line-height:1;padding:4px 2px;flex:none;
+}
+.sheet .body{overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch}
+.sheet footer{border-top:1px solid var(--line);padding:12px 18px calc(14px + env(safe-area-inset-bottom));flex:none}
+.sheet footer:empty{display:none}
+.sheet footer .terms{font-size:.74rem;color:var(--ink-2);text-align:center;margin:0 0 9px;line-height:1.45}
+.sheet footer .terms b{color:var(--accent-ink)}
+
+/* ── menu ───────────────────────────────────────────────────────── */
+.item{display:flex;align-items:center;gap:12px;padding:10px 18px;border-bottom:1px solid var(--line)}
+.item:last-child{border-bottom:none}
+.item img{
+  width:56px;height:56px;border-radius:4px;flex:none;object-fit:cover;
+  background:var(--surface-2);border:1px solid var(--line);
+}
+.item .who{min-width:0;flex:1}
+.item .name{font-weight:600;font-size:.94rem;overflow-wrap:anywhere}
+.item .desc{font-size:.76rem;color:var(--ink-2);margin-top:1px;overflow-wrap:anywhere}
+.item .meta{font-family:"IBM Plex Mono",monospace;font-size:.66rem;color:var(--ink-3);margin-top:3px}
+.item .price{font-family:"IBM Plex Mono",monospace;font-size:.82rem;font-variant-numeric:tabular-nums;flex:none}
+.qty{display:flex;border:1px solid var(--line-2);border-radius:3px;overflow:hidden;flex:none}
+.qty button{width:32px;height:32px;background:var(--surface);border:none;color:var(--ink-2);font-size:1.05rem;line-height:1}
+.qty button:hover{background:var(--surface-2);color:var(--ink)}
+.qty span{width:26px;line-height:32px;text-align:center;font-family:"IBM Plex Mono",monospace;font-size:.82rem;font-variant-numeric:tabular-nums}
+.item[data-sold] .name{color:var(--ink-3);text-decoration:line-through}
+
+.slothead{padding:14px 18px 0;font-family:"IBM Plex Mono",monospace;font-size:.66rem;text-transform:uppercase;letter-spacing:.14em;color:var(--ink-3)}
+.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:7px;padding:10px 18px 16px}
+.slot{
+  font-family:"IBM Plex Mono",monospace;font-size:.86rem;padding:11px 4px;border-radius:3px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);
+  font-variant-numeric:tabular-nums;
+}
+.slot:hover:not([disabled]){border-color:var(--accent-line);color:var(--accent-ink)}
+.slot[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.slot[disabled]{opacity:.32;cursor:not-allowed;text-decoration:line-through}
+
+/* ── status, once an order exists ────────────────────────────────── */
+/* A guest walking to the restaurant wants the progress and the route at the
+   same time, so this is a sheet over the map rather than a page instead of it.
+   Dismissing it leaves a bar at the bottom to bring it back. */
+.orderbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:22;
+  background:var(--surface);border-top:1px solid var(--line);
+  padding:11px 16px calc(12px + env(safe-area-inset-bottom));
+  display:none;align-items:center;gap:12px;text-align:left;width:100%;
+  box-shadow:0 -8px 24px -18px rgba(0,0,0,.45);color:inherit;border-left:none;border-right:none;
+}
+.orderbar[data-open]{display:flex}
+@media(min-width:640px){
+  .orderbar{left:50%;right:auto;width:520px;transform:translateX(-50%);border-radius:8px 8px 0 0;border:1px solid var(--line);border-bottom:none}
+}
+.orderbar .code{font-family:"IBM Plex Mono",monospace;font-size:.86rem;font-weight:600}
+.orderbar .what{font-size:.82rem;color:var(--ink-2);margin-top:1px}
+.orderbar .when{
+  margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:1.05rem;font-weight:600;
+  font-variant-numeric:tabular-nums;color:var(--accent-ink);
+}
+.status{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:20px 18px;text-align:center}
+.status .big{font-size:2.2rem;font-weight:900;letter-spacing:-.04em;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;line-height:1}
+.status .cap{font-size:.8rem;color:var(--ink-3);margin-top:6px}
+.status[data-s="FIRED"] .big,.status[data-s="COOKING"] .big{color:var(--accent-ink)}
+.status[data-s="READY"] .big,.status[data-s="SERVED"] .big{color:var(--ready)}
+.timeline{list-style:none;margin:14px 0 0;padding:0;text-align:left}
+.timeline li{display:grid;grid-template-columns:3.4rem 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.timeline .t{font-family:"IBM Plex Mono",monospace;font-size:.8rem;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.timeline .w{font-size:.86rem}
+.timeline li[data-done] .w{color:var(--ink)}
+.timeline li:not([data-done]) .w{color:var(--ink-3)}
+.near{
+  font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--route);
+  background:var(--route-soft);border:1px solid var(--route-line);border-radius:3px;
+  padding:8px 12px;margin-top:10px;text-align:center;
+}
+.back{background:none;border:none;color:var(--ink-3);font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;padding:16px 0 4px;font-family:"IBM Plex Mono",monospace}
+
+.note{
+  background:var(--hold-soft);border:1px solid var(--hold-line);border-left:3px solid var(--hold);
+  border-radius:3px;padding:12px 14px;margin:14px 18px;
+}
+.note b{display:block;font-size:.88rem;color:var(--ink);margin-bottom:3px}
+.note span{font-size:.8rem;color:var(--ink-2);line-height:1.5}
+.note a{color:var(--accent-ink)}
+.empty{padding:26px 18px;text-align:center;color:var(--ink-3);font-size:.86rem}
+
+/* ── stars ──────────────────────────────────────────────────────── */
+/* A row of five buttons rather than a slider or a select: the whole gesture
+   is one tap, and the answer is visible without opening anything. */
+.stars{display:flex;gap:2px}
+.stars button{
+  background:none;border:none;padding:2px;line-height:1;font-size:1.5rem;
+  color:var(--line-2);
+}
+.stars button[data-on]{color:#E8A13A}
+.stars button:hover{color:#E8A13A}
+.stars[data-size="sm"] button{font-size:1.05rem;padding:1px}
+
+.rating{
+  display:inline-flex;align-items:center;gap:4px;
+  font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--ink-2);
+}
+.rating i{color:#E8A13A;font-style:normal}
+.rating em{color:var(--ink-3);font-style:normal}
+
+.review{padding:16px 18px;border-top:1px solid var(--line)}
+.review h3{font-size:.95rem;font-weight:700;margin-bottom:3px}
+.review p.lead{font-size:.82rem;color:var(--ink-2);margin:0 0 12px}
+.review .row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+.review .row:last-of-type{border-bottom:none}
+.review .row img{width:34px;height:34px;border-radius:3px;border:1px solid var(--line);flex:none}
+.review .row .n{flex:1;font-size:.88rem;min-width:0;overflow-wrap:anywhere}
+.review textarea{
+  width:100%;min-height:70px;resize:vertical;margin-top:10px;padding:10px 11px;
+  border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);
+  color:var(--ink);font-family:inherit;font-size:.88rem;line-height:1.45;
+}
+.review textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+
+/* The timing question is the product's own metric and is asked separately:
+   a four-star lunch that came late is a success by one measure and a failure
+   by the other, and one score would hide exactly that. */
+.ontime{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
+.ontime span{font-size:.86rem;flex:1;min-width:140px}
+.ontime button{
+  font-family:"IBM Plex Mono",monospace;font-size:.74rem;padding:7px 14px;border-radius:3px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);
+}
+.ontime button[data-on="yes"]{background:var(--ready-soft);border-color:var(--ready);color:var(--ready);font-weight:600}
+.ontime button[data-on="no"]{background:var(--stop-soft);border-color:var(--stop);color:var(--stop);font-weight:600}
+
+.said{padding:12px 18px;border-top:1px solid var(--line)}
+.said > .lab{margin-bottom:8px}
+/* The average and the timing share sit together, because they answer
+   different questions and a guest weighs both. */
+.said .summary{
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
+  padding-bottom:10px;margin-bottom:4px;border-bottom:1px solid var(--line);
+  font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--ink-3);
+}
+.said .summary .big{
+  font-family:"Golos Text",sans-serif;font-size:1.35rem;font-weight:800;
+  letter-spacing:-.03em;color:var(--ink);
+}
+.said .summary .big i{color:#E8A13A;font-style:normal;font-size:1.1rem;margin-right:2px}
+.said .summary .pct{color:var(--hold)}
+.said .summary .pct[data-good="true"]{color:var(--ready)}
+.said .none{color:var(--ink-3);font-size:.84rem;padding:6px 0}
+.said .one{padding:9px 0;border-bottom:1px solid var(--line)}
+.said .one:last-child{border-bottom:none}
+.said .who{display:flex;align-items:center;gap:8px;font-size:.76rem;color:var(--ink-3);margin-bottom:3px}
+.said .who b{color:var(--ink-2);font-weight:600}
+.said .txt{font-size:.87rem;line-height:1.5;overflow-wrap:anywhere}
+.said .late{color:var(--hold);font-family:"IBM Plex Mono",monospace;font-size:.68rem}
+</style>
+</head>
+<body>
+<div id="map">
+  <div class="badge" id="badge"><b>Үдийн хоол</b><span>Ирэхээс чинь өмнө гал тавина</span></div>
+  <a class="home" href="/" id="home" aria-label="Basu нүүр">‹ Basu</a>
+</div>
+
+<div class="scrim" id="scrim"></div>
+
+<section class="sheet" id="sheet" aria-label="Ресторан">
+  <div class="grip"><i></i></div>
+  <header>
+    <div>
+      <h2 id="sheet-name">—</h2>
+      <div class="sub" id="sheet-sub"></div>
+      <div class="walk" id="sheet-walk"></div>
+    </div>
+    <button class="x" type="button" id="sheet-close" aria-label="Хаах">✕</button>
+  </header>
+  <div class="body" id="sheet-body"></div>
+  <footer id="sheet-foot"></footer>
+</section>
+
+<button class="orderbar" id="orderbar" type="button">
+  <div>
+    <div class="code" id="ob-code">—</div>
+    <div class="what" id="ob-what"></div>
+  </div>
+  <div class="when" id="ob-when"></div>
+</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
+<script type="module">
+import { api, store, toast, mountClock, mnt, hhmm, HEADLINE } from '/api.js';
+import { mapStyle, pinImage, ULAANBAATAR, isCovered, metresBetween, walkMinutes } from '/mapStyle.js';
+
+const $ = (id) => document.getElementById(id);
+const el = (html) => {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+};
+
+const SOURCE = 'venues';
+const LAYER = 'venue-pin';
+const ROUTE = 'walk';
+
+const emptyLine = () => ({ type: 'FeatureCollection', features: [] });
+
+/**
+ * Five tappable stars that keep their own state.
+ *
+ * They redraw themselves rather than asking the form to rebuild: rebuilding
+ * the block would take the caret out of the comment box somebody was typing in.
+ */
+function starPicker(value, onPick, size) {
+  const box = el(`<div class="stars"${size ? ` data-size="${size}"` : ''}></div>`);
+  let picked = value;
+
+  const paint = () => {
+    box.replaceChildren();
+    for (let n = 1; n <= 5; n++) {
+      const star = el(
+        `<button type="button" aria-label="${n} од"${n <= picked ? ' data-on' : ''}>★</button>`,
+      );
+      star.addEventListener('click', () => {
+        picked = n;
+        paint();
+        onPick(n);
+      });
+      box.append(star);
+    }
+  };
+
+  paint();
+  return box;
+}
+
+/** A rating as one line: ★ 4.6 (12). Null reads as "nobody has said yet". */
+function ratingLine(rating) {
+  if (!rating?.count) return el('<span class="rating"><em>үнэлгээ алга</em></span>');
+  return el(
+    `<span class="rating"><i>★</i>${rating.stars.toFixed(1)}<em>(${rating.count})</em></span>`,
+  );
+}
+
+const state = {
+  venues: [],
+  venue: null,
+  menu: [],
+  slots: [],
+  cart: new Map(),
+  slot: null,
+  orderId: null,
+  here: null,
+  route: null,
+  /** Geofence bands already reported for the current order. */
+  sent: new Set(),
+};
+
+/* ── signing in ──────────────────────────────────────────────────── */
+
+async function signIn() {
+  const { token } = await api('/dev/login', { method: 'POST', body: {} });
+  store.guestToken = token;
+  return token;
+}
+
+/**
+ * Every call that needs a guest goes through here.
+ *
+ * A stored token outlives the thing it points at: sessions expire, get
+ * revoked, or vanish when the demo database is reseeded. So a 401 means sign
+ * in again and retry — once — rather than a dead end.
+ */
+async function guestApi(path, options = {}) {
+  const token = store.guestToken ?? (await signIn());
+  try {
+    return await api(path, { ...options, token });
+  } catch (error) {
+    if (error.status !== 401) throw error;
+    store.guestToken = null;
+    return api(path, { ...options, token: await signIn() });
+  }
+}
+
+/* ── the map ─────────────────────────────────────────────────────── */
+
+/**
+ * The camera the map is meant to look like.
+ *
+ * Kept as values rather than left implicit because several things move the
+ * camera and one of them flattens it: MapLibre's GeolocateControl frames the
+ * accuracy circle with a fitBounds, and fitBounds resets pitch to zero unless
+ * told otherwise. The tilt is not decoration — the buildings are how somebody
+ * recognises where they are — so it is restored after anything that drops it.
+ */
+const CAMERA = { zoom: 15.4, pitch: 55, bearing: -17 };
+
+const style = mapStyle();
+// Named for the same reason as __map below: the tile URLs are a thing worth
+// asserting about from outside, and a relative one silently blanks the map.
+window.__style = style;
+
+const map = new maplibregl.Map({
+  container: 'map',
+  style,
+  center: [ULAANBAATAR.lon, ULAANBAATAR.lat],
+  // Tilted, because the buildings are the landmark. A guest deciding between
+  // two lunches five minutes apart recognises the tower they work in long
+  // before they recognise a street name, and the tiles carry building heights.
+  zoom: CAMERA.zoom,
+  pitch: CAMERA.pitch,
+  bearing: CAMERA.bearing,
+  attributionControl: { compact: true, customAttribution: '© OpenStreetMap' },
+});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+
+// Named so scripts/inspect.mjs can ask the map what it thinks happened. A
+// tile can be byte-perfect at the proxy and still never be requested, and
+// nothing outside the browser can see that.
+window.__map = map;
+
+map.on('error', (event) => {
+  // MapLibre reports a missing tile, a bad style and a dead source the same
+  // way — quietly, on this channel. Left unhandled it is a blank map with no
+  // explanation anywhere.
+  console.error('[map]', event?.error?.message ?? event?.error ?? event);
+});
+
+/**
+ * Where the guest is, and what that means for the order.
+ *
+ * The ETA model already reasons about 800m and 300m bands, but nothing could
+ * ever emit them because nothing knew where anybody was. This closes that
+ * loop: crossing a band reports it once and the planner moves the fire time.
+ */
+const geolocate = new maplibregl.GeolocateControl({
+  positionOptions: { enableHighAccuracy: true },
+  trackUserLocation: true,
+  showUserLocation: true,
+  // Without this it fits the accuracy circle, which on a good fix means
+  // street level and on a poor one means the whole district.
+  fitBoundsOptions: { maxZoom: 16.4, pitch: CAMERA.pitch, bearing: CAMERA.bearing },
+});
+map.addControl(geolocate, 'bottom-right');
+
+/** Put the tilt back if something flattened it. */
+function keepTilt() {
+  if (Math.abs(map.getPitch() - CAMERA.pitch) < 2) return;
+  map.easeTo({ pitch: CAMERA.pitch, bearing: CAMERA.bearing, duration: 500 });
+}
+
+geolocate.on('geolocate', (position) => {
+  const { latitude: lat, longitude: lon } = position.coords;
+  if (!isCovered(lat, lon)) return; // outside the tiles, and outside the pilot
+  const first = !state.here;
+  state.here = { lat, lon };
+  void reportProximity();
+  // A venue may already be open; the walk to it is now answerable.
+  if (state.venue) void drawWalk(state.venue);
+  // The control has just moved the camera; make sure it left the tilt alone.
+  setTimeout(keepTilt, 600);
+  void first;
+});
+
+/**
+ * The walk from here to a restaurant: the road somebody would take, how far it
+ * is, and how long it takes on foot.
+ *
+ * The straight line between two points in a city is short by about a third —
+ * buildings are in the way — so this asks the server, which has the road
+ * geometry. When the router cannot be reached it answers with a straight line
+ * marked `direct`, and the layer above draws that dashed.
+ */
+/**
+ * Ask for the guest's position, once.
+ *
+ * Deliberately not on page load: a permission prompt before anybody has
+ * chosen anything is a prompt most people refuse. Asked here it has an
+ * obvious answer to give — the way to the food they just bought.
+ */
+let asked = false;
+function askWhereYouAre() {
+  if (asked || state.here) return;
+  asked = true;
+  try {
+    geolocate.trigger();
+  } catch {
+    // Denied, unavailable, or not yet ready. The order works without it;
+    // only the route is missing, and the walk estimate falls back to the
+    // restaurant's own on-foot minutes.
+  }
+}
+
+async function drawWalk(venue) {
+  const walk = document.getElementById('sheet-walk');
+  if (!state.here || !venue?.lat) {
+    map.getSource(ROUTE)?.setData(emptyLine());
+    if (walk) walk.textContent = '';
+    return;
+  }
+
+  // Six places is about eleven centimetres, which is finer than any phone
+  // knows and keeps the URL — and the cache key — from churning on noise.
+  const at = (lon, lat) => `${lon.toFixed(6)},${lat.toFixed(6)}`;
+  const from = at(state.here.lon, state.here.lat);
+  const to = at(venue.lon, venue.lat);
+
+  let route;
+  try {
+    route = await api(`/v1/route?from=${from}&to=${to}`);
+  } catch (error) {
+    // Silence here hid a real failure for a whole round of debugging: the
+    // endpoint was refusing genuine GPS precision and the map simply drew
+    // nothing, with no way to tell that from "no position yet".
+    console.warn('[route]', error.message);
+    if (walk) walk.textContent = '';
+    return;
+  }
+  // The guest may have closed the sheet or opened another one meanwhile.
+  if (state.venue?.id !== venue.id) return;
+  state.route = route;
+
+  map.getSource(ROUTE)?.setData({
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: route.line },
+        properties: { direct: route.kind === 'direct' },
+      },
+    ],
+  });
+
+  const km = route.metres >= 1000 ? `${(route.metres / 1000).toFixed(1)} км` : `${route.metres} м`;
+  const sub = document.getElementById('sheet-walk');
+  if (sub) {
+    sub.innerHTML =
+      `<span>🚶</span><b>${km}</b><span>·</span><b>${route.minutes} мин</b>` +
+      (route.kind === 'direct' ? '<span class="guess">ойролцоогоор</span>' : '');
+  }
+
+  // Pan, do not reframe.
+  //
+  // Fitting both ends of a 1.2 km walk means zooming out until the tilt
+  // flattens and the buildings — the thing that makes this map legible — turn
+  // back into a plan. The distance and the time are already written above; the
+  // camera's job is to keep the guest and the road in front of them in view.
+  const middle = route.line[Math.floor(route.line.length / 2)] ?? route.line[0];
+  map.easeTo({
+    center: middle,
+    zoom: Math.max(map.getZoom(), CAMERA.zoom),
+    pitch: CAMERA.pitch,
+    bearing: CAMERA.bearing,
+    duration: 700,
+  });
+}
+
+async function reportProximity() {
+  if (!state.orderId || !state.here || !state.venue?.lat) return;
+
+  const metres = metresBetween(state.here, { lat: state.venue.lat, lon: state.venue.lon });
+  const band = metres <= 300 ? 'geofence_300' : metres <= 800 ? 'geofence_800' : null;
+  if (!band || state.sent.has(band)) return;
+
+  state.sent.add(band);
+  try {
+    await guestApi(`/v1/orders/${state.orderId}/signal`, { method: 'POST', body: { type: band } });
+    toast(`${Math.round(metres)}м зайд ирлээ — гал тавих цаг шинэчлэгдэнэ.`);
+    await api('/dev/tick', { method: 'POST' }).catch(() => {});
+    void showStatus(true);
+  } catch {
+    state.sent.delete(band); // let the next fix try again
+  }
+}
+
+let ready = false;
+map.on('load', () => {
+  map.addImage('pin-open', pinImage('#C64E08', false), { pixelRatio: 2 });
+  map.addImage('pin-shut', pinImage('#78868E', true), { pixelRatio: 2 });
+
+  // The walk, under the pins so a pin is never hidden by its own route.
+  map.addSource(ROUTE, { type: 'geojson', data: emptyLine() });
+  map.addLayer({
+    id: 'route-casing',
+    type: 'line',
+    source: ROUTE,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-opacity': 0.9 },
+  });
+  // Two layers, not one with a data-driven dash.
+  //
+  // `line-dasharray` accepts zoom expressions and nothing else: a `case` on a
+  // feature property is invalid, and MapLibre answers by not drawing the layer
+  // at all — no thrown error, no console message, just an empty map with the
+  // distance label sitting there saying the route had been found. A filter is
+  // the supported way to say the same thing.
+  map.addLayer({
+    id: 'route-line',
+    type: 'line',
+    source: ROUTE,
+    filter: ['!', ['get', 'direct']],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#1B5B8F', 'line-width': 5 },
+  });
+  map.addLayer({
+    id: 'route-guess',
+    type: 'line',
+    source: ROUTE,
+    // A straight line drawn dashed, so a guess never looks surveyed.
+    filter: ['get', 'direct'],
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-color': '#1B5B8F', 'line-width': 5, 'line-dasharray': [1.4, 1.2] },
+  });
+
+  map.addSource(SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: LAYER,
+    type: 'symbol',
+    source: SOURCE,
+    layout: {
+      'icon-image': ['case', ['get', 'open'], 'pin-open', 'pin-shut'],
+      'icon-size': 0.5,
+      'icon-anchor': 'bottom',
+      'icon-allow-overlap': true,
+      'text-field': ['get', 'label'],
+      'text-font': ['Noto Sans Regular'],
+      'text-size': 11,
+      'text-offset': [0, 0.7],
+      'text-anchor': 'top',
+      'text-allow-overlap': true,
+    },
+    paint: {
+      'text-color': ['case', ['get', 'open'], '#14181B', '#78868E'],
+      'text-halo-color': '#ffffff',
+      'text-halo-width': 1.8,
+    },
+  });
+
+  map.on('mouseenter', LAYER, () => (map.getCanvas().style.cursor = 'pointer'));
+  map.on('mouseleave', LAYER, () => (map.getCanvas().style.cursor = ''));
+  map.on('click', LAYER, (event) => {
+    const id = event.features?.[0]?.properties?.id;
+    const venue = state.venues.find((v) => v.id === id);
+    if (venue) void openVenue(venue);
+  });
+
+  ready = true;
+  paintVenues();
+});
+
+function paintVenues() {
+  if (!ready) return;
+  const features = state.venues
+    .filter((v) => Number.isFinite(v.lat) && Number.isFinite(v.lon))
+    .map((v) => ({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [v.lon, v.lat] },
+      properties: { id: v.id, open: v.accepting_orders, label: v.name },
+    }));
+  map.getSource(SOURCE)?.setData({ type: 'FeatureCollection', features });
+}
+
+/* ── loading venues ─────────────────────────────────────────────── */
+
+async function loadVenues() {
+  const { restaurants } = await api('/v1/restaurants');
+  state.venues = restaurants;
+  paintVenues();
+  if (state.venue) {
+    // Keep the open sheet's copy fresh; a kitchen can go dark while it is open.
+    const fresh = restaurants.find((r) => r.id === state.venue.id);
+    if (fresh) state.venue = { ...state.venue, ...fresh };
+  }
+
+  const open = restaurants.filter((r) => r.accepting_orders).length;
+  $('badge').querySelector('span').textContent =
+    open > 0
+      ? `${open}/${restaurants.length} ресторан захиалга авч байна`
+      : 'Нэг ч гал тогоо холбогдоогүй';
+
+  // A map of grey pins with no explanation is a dead end. A kitchen goes dark
+  // ninety seconds after its tablet stops checking in — the guard working, but
+  // the guest still deserves to be told what that means.
+  const existing = $('map').querySelector('.note');
+  if (open === 0 && !existing) {
+    $('map').append(
+      el(`<div class="note" style="position:absolute;top:62px;left:12px;right:12px;z-index:5;margin:0">
+            <b>Одоогоор нэг ч гал тогоо холбогдоогүй</b>
+            <span>Тогооч дэлгэцээ нээгээгүй бол захиалга хүлээж авах хүнгүй.
+            Демо үзэж байгаа бол <a href="/kds">гал тогооны дэлгэцийг</a> нээнэ үү.</span>
+          </div>`),
+    );
+  } else if (open > 0 && existing) {
+    existing.remove();
+  }
+}
+
+/* ── the sheet ──────────────────────────────────────────────────── */
+
+function closeSheet() {
+  $('sheet').removeAttribute('data-open');
+  $('scrim').removeAttribute('data-open');
+
+  if (state.orderId) {
+    // The order is still live: keep its route on the map and leave a bar to
+    // bring the detail back. Someone walking there wants to see both.
+    $('orderbar').dataset.open = '1';
+    return;
+  }
+  // No order — the route belonged to a venue nobody chose.
+  map.getSource(ROUTE)?.setData(emptyLine());
+  state.venue = null;
+  state.route = null;
+}
+$('sheet-close').addEventListener('click', closeSheet);
+$('scrim').addEventListener('click', closeSheet);
+$('orderbar').addEventListener('click', () => {
+  $('orderbar').removeAttribute('data-open');
+  void showStatus(true);
+});
+
+async function openVenue(venue) {
+  $('orderbar').removeAttribute('data-open');
+  state.venue = venue;
+  state.cart = new Map();
+  state.slot = null;
+
+  const walk = state.here
+    ? walkMinutes(metresBetween(state.here, { lat: venue.lat, lon: venue.lon }))
+    : venue.walk_minutes;
+
+  $('sheet-name').textContent = venue.name;
+  const sub = $('sheet-sub');
+  sub.replaceChildren(
+    document.createTextNode(
+      `${walk} мин алхаад · ${venue.accepting_orders ? 'захиалга авч байна' : 'хаалттай'} · `,
+    ),
+    ratingLine(venue.rating),
+  );
+  $('sheet-body').replaceChildren(el('<p class="empty">Цэс ачаалж байна…</p>'));
+  $('sheet-foot').replaceChildren();
+  $('sheet').dataset.open = '1';
+  $('scrim').dataset.open = '1';
+
+  document.getElementById('sheet-walk').textContent = '';
+  if (state.here) {
+    // The walk answers "is this worth it" before the menu does.
+    void drawWalk(venue);
+  } else {
+    // Lift the pin above the sheet rather than leaving it hidden behind it.
+    map.easeTo({ center: [venue.lon, venue.lat], zoom: 16.6, offset: [0, -120], duration: 500 });
+  }
+
+  if (!venue.accepting_orders) {
+    $('sheet-body').replaceChildren(
+      el(`<div class="note"><b>Одоогоор захиалга авахгүй байна</b>
+            <span>Гал тогооны дэлгэц холбогдоогүй тул хоол хийх хүн байхгүй.</span></div>`),
+    );
+    return;
+  }
+
+  const [{ items }, { slots }] = await Promise.all([
+    api(`/v1/restaurants/${venue.id}/menu`),
+    api(`/v1/restaurants/${venue.id}/slots`),
+  ]);
+  state.menu = items;
+  state.slots = slots;
+  renderSheet();
+}
+
+function renderSheet() {
+  const body = $('sheet-body');
+  body.replaceChildren();
+
+  for (const item of state.menu) {
+    const qty = state.cart.get(item.id) ?? 0;
+    const row = el(`
+      <div class="item"${item.sold_out ? ' data-sold' : ''}>
+        <img src="${item.image_url ?? '/dishes/unknown.svg'}" alt="" loading="lazy" width="56" height="56">
+        <div class="who">
+          <div class="name">${item.name}</div>
+          ${item.description ? `<div class="desc">${item.description}</div>` : ''}
+          <div class="meta">${item.station} · ${item.prep_minutes} мин${
+            item.rating?.count ? ` · ★ ${item.rating.stars.toFixed(1)}` : ''
+          }</div>
+        </div>
+        <div class="price">${mnt(item.price_mnt)}</div>
+      </div>`);
+
+    if (item.sold_out) {
+      row.append(el('<span class="chip">Дууссан</span>'));
+    } else {
+      const stepper = el(`
+        <div class="qty">
+          <button type="button" data-d="-1" aria-label="Хасах">−</button>
+          <span>${qty}</span>
+          <button type="button" data-d="1" aria-label="Нэмэх">+</button>
+        </div>`);
+      stepper.addEventListener('click', (event) => {
+        const button = event.target.closest('button');
+        if (!button) return;
+        const next = Math.max(0, (state.cart.get(item.id) ?? 0) + Number(button.dataset.d));
+        if (next === 0) state.cart.delete(item.id);
+        else state.cart.set(item.id, next);
+        renderSheet();
+      });
+      row.append(stepper);
+    }
+    body.append(row);
+  }
+
+  body.append(el('<div class="slothead">Хэдэн цагт ирэх вэ?</div>'));
+  const grid = el('<div class="slots"></div>');
+  for (const slot of state.slots) {
+    const button = el(
+      `<button class="slot" type="button" aria-pressed="${state.slot === slot.starts_at}"${
+        slot.available ? '' : ' disabled'
+      }>${slot.label}</button>`,
+    );
+    button.addEventListener('click', () => {
+      state.slot = slot.starts_at;
+      renderSheet();
+    });
+    grid.append(button);
+  }
+  body.append(grid);
+  renderFoot();
+  void appendComments(state.venue.id);
+}
+
+/**
+ * What people who ate here said.
+ *
+ * Loaded after the menu rather than with it: the menu is what somebody came
+ * for, and it should not wait on a second query to appear.
+ */
+async function appendComments(venueId) {
+  let data;
+  try {
+    data = await api(`/v1/restaurants/${venueId}/reviews`);
+  } catch {
+    return;
+  }
+  if (state.venue?.id !== venueId || !data.rating?.count) return;
+
+  const rating = data.rating;
+  const said = el(`
+    <div class="said">
+      <div class="lab">Хоолтой хүмүүс юу гэсэн бэ</div>
+      <div class="summary">
+        <span class="big"><i>★</i>${rating.stars.toFixed(1)}</span>
+        <span>${rating.count} үнэлгээ</span>
+        ${
+          rating.onTimeShare === null
+            ? ''
+            : `<span class="pct" data-good="${rating.onTimeShare >= 0.8}">${Math.round(
+                rating.onTimeShare * 100,
+              )}% цагтаа ирсэн</span>`
+        }
+      </div>
+    </div>`);
+  if (!data.comments.length) {
+    said.append(el('<div class="none">Одоогоор бичсэн сэтгэгдэл алга.</div>'));
+  }
+  for (const c of data.comments) {
+    said.append(
+      el(`<div class="one">
+            <div class="who">
+              <b>${c.by}</b>
+              <span class="rating"><i>${'★'.repeat(c.stars)}</i></span>
+              ${c.onTime === false ? '<span class="late">цагтаа ирээгүй</span>' : ''}
+            </div>
+            <div class="txt">${escapeHtml(c.comment)}</div>
+          </div>`),
+    );
+  }
+  $('sheet-body').append(said);
+}
+
+/** Guest text goes into the DOM as text, never as markup. */
+function escapeHtml(value) {
+  const node = document.createElement('span');
+  node.textContent = value;
+  return node.innerHTML;
+}
+
+function renderFoot() {
+  const total = [...state.cart].reduce((sum, [id, qty]) => {
+    const item = state.menu.find((m) => m.id === id);
+    return sum + (item ? item.price_mnt * qty : 0);
+  }, 0);
+  const foot = $('sheet-foot');
+  foot.replaceChildren();
+  if (total === 0) return;
+
+  const chosen = Boolean(state.slot);
+  foot.append(el('<p class="terms">Хоол <b>гал дээр гарахаас өмнө</b> үнэгүй цуцална.</p>'));
+  const button = el(
+    `<button class="btn" data-v="primary" data-size="lg" type="button"${chosen ? '' : ' disabled'}>
+       ${chosen ? `${mnt(total)} төлөх` : 'Цагаа сонгоно уу'}
+     </button>`,
+  );
+  button.addEventListener('click', placeOrder);
+  foot.append(button);
+}
+
+async function placeOrder() {
+  const button = $('sheet-foot').querySelector('button');
+  button.disabled = true;
+  button.textContent = 'Түр хүлээнэ үү…';
+  try {
+    const order = await guestApi('/v1/orders', {
+      method: 'POST',
+      // A phone on a patchy connection retries; the same key must not buy lunch twice.
+      idempotencyKey: `order-${state.venue.id}-${state.slot}-${[...state.cart].join(',')}`,
+      body: {
+        restaurant_id: state.venue.id,
+        slot_starts_at: state.slot,
+        party_size: 2,
+        items: [...state.cart].map(([menu_item_id, qty]) => ({ menu_item_id, qty })),
+      },
+    });
+    await guestApi(`/v1/orders/${order.id}/pay`, { method: 'POST' });
+    state.orderId = order.id;
+    state.sent = new Set();
+    rendered = null;
+    await showStatus(true);
+  } catch (error) {
+    toast(error.message, 'bad');
+    renderFoot();
+  }
+}
+
+/* ── status ─────────────────────────────────────────────────────── */
+
+const STEPS = [
+  ['placed', 'Захиалга баталгаажлаа'],
+  ['accepted', 'Ресторан хүлээн авлаа'],
+  ['fired', 'Гал дээр гарлаа'],
+  ['ready', 'Хоол бэлэн'],
+  ['served', 'Ширээн дээр'],
+];
+
+/**
+ * The states with a walk in front of them.
+ *
+ * From the moment the kitchen accepts until the food is on the table, the
+ * guest's job is to get there — so that is when the map carries a route.
+ */
+const WALKING = ['ACCEPTED', 'SCHEDULED', 'ARMED', 'HELD', 'FIRED', 'COOKING', 'READY'];
+
+/**
+ * What the last render was of, so a poll that found no news changes nothing.
+ *
+ * The status sheet refreshes every few seconds to catch the kitchen accepting
+ * or firing. Rebuilding it unconditionally destroyed whatever the guest was
+ * doing inside it — a comment being typed vanished a word or two in, which is
+ * the sort of thing that makes an app feel broken rather than busy.
+ */
+let rendered = null;
+
+async function showStatus(force) {
+  if (!state.orderId) return;
+  const order = await guestApi(`/v1/orders/${state.orderId}`);
+
+  // Everything the sheet draws. Same signature, same picture — so leave it.
+  const signature = [
+    order.state,
+    order.fire_at,
+    order.ready_at,
+    order.table,
+    order.review ? 'reviewed' : '',
+  ].join('|');
+  const open = $('sheet').hasAttribute('data-open');
+  if (!force && open && signature === rendered) return;
+  rendered = signature;
+
+  // The states that carry a time say it; the rest carry a word.
+  const [word, cap] = HEADLINE[order.state] ?? [null, ''];
+  const big = word ?? hhmm(order.fire_at);
+  const sub =
+    cap ||
+    (order.state === 'SCHEDULED'
+      ? 'Энэ цагт гал дээр гарна'
+      : order.state === 'ARMED'
+        ? 'Та замд гарсан уу?'
+        : order.state === 'COOKING'
+          ? `${hhmm(order.ready_at)}-д бэлэн болно`
+          : '');
+
+  // The collapsed bar carries the same answer in one line.
+  $('ob-code').textContent = `№${order.code}`;
+  $('ob-what').textContent = sub || String(word ?? '');
+  $('ob-when').textContent = HEADLINE[order.state]?.[0] ?? hhmm(order.fire_at);
+
+  $('orderbar').removeAttribute('data-open');
+  $('sheet').dataset.open = '1';
+  $('scrim').dataset.open = '1';
+  $('sheet-name').textContent = `№${order.code}`;
+  $('sheet-sub').textContent = [order.restaurant?.name ?? state.venue?.name, order.table && `Ширээ ${order.table}`]
+    .filter(Boolean)
+    .join(' · ');
+
+  const body = $('sheet-body');
+  body.replaceChildren();
+
+  const card = el(`
+    <div class="status" data-s="${order.state}">
+      <div class="lab">${order.state}</div>
+      <div class="big">${big}</div>
+      <div class="cap">${sub}</div>
+    </div>`);
+
+  const done = {
+    placed: true,
+    accepted: order.state !== 'PLACED',
+    fired: ['FIRED', 'COOKING', 'READY', 'SERVED', 'CLOSED'].includes(order.state),
+    ready: ['READY', 'SERVED', 'CLOSED'].includes(order.state),
+    served: ['SERVED', 'CLOSED'].includes(order.state),
+  };
+  const when = { placed: order.slot_starts_at, fired: order.fire_at, ready: order.ready_at };
+
+  const timeline = el('<ul class="timeline"></ul>');
+  for (const [key, wordFor] of STEPS) {
+    timeline.append(
+      el(`<li${done[key] ? ' data-done' : ''}>
+            <span class="t">${when[key] ? hhmm(when[key]) : '·'}</span>
+            <span class="w">${wordFor}</span>
+          </li>`),
+    );
+  }
+  card.append(timeline);
+  body.append(card);
+
+  // Once the kitchen has taken the order there is a walk to make, so the map
+  // shows it — and this is the moment to ask where the guest is, rather than
+  // on page load when the answer is not yet useful for anything.
+  if (WALKING.includes(order.state)) {
+    if (state.here && state.venue?.lat) void drawWalk(state.venue);
+    else askWhereYouAre();
+  }
+
+  const foot = $('sheet-foot');
+  foot.replaceChildren();
+
+  if (order.can_cancel) {
+    const cancel = el(
+      `<button class="btn" data-v="danger" data-size="lg" type="button">
+         Үнэгүй цуцлах${order.free_cancel_until ? ` — ${hhmm(order.free_cancel_until)} хүртэл` : ''}
+       </button>`,
+    );
+    cancel.addEventListener('click', async () => {
+      try {
+        await guestApi(`/v1/orders/${state.orderId}/cancel`, { method: 'POST' });
+        toast('Цуцлагдлаа. Мөнгө буцаагдана.');
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+      void showStatus(true);
+    });
+    foot.append(cancel);
+  }
+
+  if (order.state === 'ARMED' || order.state === 'SCHEDULED') {
+    const otw = el(
+      '<button class="btn" data-size="lg" type="button" style="margin-top:8px">Хөдөллөө</button>',
+    );
+    otw.addEventListener('click', async () => {
+      await guestApi(`/v1/orders/${state.orderId}/signal`, {
+        method: 'POST',
+        body: { type: 'on_my_way' },
+      });
+      toast('Мэдэгдлээ. Гал тавих цаг шинэчлэгдэнэ.');
+      await api('/dev/tick', { method: 'POST' }).catch(() => {});
+      void showStatus(true);
+    });
+    foot.append(otw);
+  }
+
+  if (order.receipt) {
+    body.append(
+      el(`<div class="note"><b>Е-баримт</b><span>Сугалаа ${order.receipt.lottery}</span></div>`),
+    );
+  }
+
+  if (order.can_review) appendReview(body, order);
+
+  // Once there is nothing left to watch, let go of the order and the route.
+  if (['SERVED', 'CLOSED', 'REFUNDED', 'CANCELLED', 'NO_SHOW', 'REJECTED'].includes(order.state)) {
+    const again = el('<button class="btn" data-size="lg" type="button" style="margin-top:8px">Шинэ захиалга</button>');
+    again.addEventListener('click', () => {
+      state.orderId = null;
+      state.route = null;
+      map.getSource(ROUTE)?.setData(emptyLine());
+      closeSheet();
+      void loadVenues();
+    });
+    foot.append(again);
+  }
+}
+
+/**
+ * The review, once the food has been handed over.
+ *
+ * Two questions, deliberately not merged. Stars are for the next guest — was
+ * it good. `on_time` is for us: a four-star lunch that arrived ten minutes
+ * late is a success by one measure and a failure by the other, and one score
+ * would hide exactly the thing this product is judged on.
+ *
+ * Nothing is required. A guest who taps three stars and closes the sheet has
+ * told us something useful, and demanding a comment first would lose it.
+ */
+function appendReview(body, order) {
+  const existing = order.review;
+  const draft = {
+    stars: existing?.stars ?? 0,
+    onTime: existing?.onTime ?? null,
+    comment: existing?.comment ?? '',
+    dishes: new Map((existing?.dishes ?? []).map((d) => [d.menuItemId, d.stars])),
+  };
+
+  const box = el(`
+    <div class="review">
+      <h3>${existing ? 'Таны үнэлгээ' : 'Хоол ямар байв?'}</h3>
+      <p class="lead">${
+        existing ? 'Өөрчилж болно.' : 'Дараагийн хүнд тусална. Заавал биш.'
+      }</p>
+    </div>`);
+
+  const send = el(
+    `<button class="btn" data-v="primary" data-size="lg" type="button" style="margin-top:12px"${
+      draft.stars ? '' : ' disabled'
+    }>${existing ? 'Шинэчлэх' : 'Илгээх'}</button>`,
+  );
+
+  box.append(
+    starPicker(draft.stars, (n) => {
+      draft.stars = n;
+      send.disabled = false;
+    }),
+  );
+
+  for (const line of order.lines ?? []) {
+    const row = el(`
+      <div class="row">
+        ${line.image_url ? `<img src="${line.image_url}" alt="">` : ''}
+        <div class="n">${line.name}${line.qty > 1 ? ` ×${line.qty}` : ''}</div>
+      </div>`);
+    row.append(
+      starPicker(
+        draft.dishes.get(line.menu_item_id) ?? 0,
+        (n) => draft.dishes.set(line.menu_item_id, n),
+        'sm',
+      ),
+    );
+    box.append(row);
+  }
+
+  const timing = el(`
+    <div class="ontime">
+      <span>Хоол цагтаа ирсэн үү?</span>
+      <button type="button" data-a="yes">Тийм</button>
+      <button type="button" data-a="no">Үгүй</button>
+    </div>`);
+  const paintTiming = () => {
+    for (const button of timing.querySelectorAll('button')) {
+      const chosen =
+        (button.dataset.a === 'yes' && draft.onTime === true) ||
+        (button.dataset.a === 'no' && draft.onTime === false);
+      if (chosen) button.dataset.on = button.dataset.a;
+      else delete button.dataset.on;
+    }
+  };
+  timing.addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    draft.onTime = button.dataset.a === 'yes';
+    paintTiming();
+  });
+  paintTiming();
+  box.append(timing);
+
+  const note = el(
+    `<textarea maxlength="500" placeholder="Сэтгэгдэл (заавал биш)">${draft.comment}</textarea>`,
+  );
+  note.addEventListener('input', () => (draft.comment = note.value));
+  box.append(note);
+
+  send.addEventListener('click', async () => {
+    send.disabled = true;
+    send.textContent = 'Илгээж байна…';
+    try {
+      await guestApi(`/v1/orders/${state.orderId}/review`, {
+        method: 'POST',
+        body: {
+          stars: draft.stars,
+          on_time: draft.onTime ?? undefined,
+          comment: draft.comment,
+          dishes: [...draft.dishes].map(([menu_item_id, stars]) => ({ menu_item_id, stars })),
+        },
+      });
+      toast('Баярлалаа. Үнэлгээ хадгалагдлаа.');
+      void showStatus(true);
+    } catch (error) {
+      toast(error.message, 'bad');
+      void showStatus(true);
+    }
+  });
+  box.append(send);
+  body.append(box);
+}
+
+/* ── boot ───────────────────────────────────────────────────────── */
+
+/**
+ * Pick up an order that already exists.
+ *
+ * Two ways in: the Basu home screen deep-links one (`/dine?order=…`), or the
+ * page was reloaded mid-lunch and the guest expects their status back rather
+ * than an empty map. Which order that is comes from the server — an id kept
+ * on the phone would go on pointing at a lunch that finished yesterday.
+ *
+ * Nobody is signed in on the way through: a visitor who has never ordered
+ * gets the map, not an account.
+ */
+async function resumeOrder() {
+  if (!store.guestToken) return;
+  const wanted = new URLSearchParams(location.search).get('order');
+  let orders;
+  try {
+    ({ orders } = await guestApi('/v1/orders'));
+  } catch {
+    return;
+  }
+  // Live orders arrive in the order they will happen, so the first is the next.
+  const order = wanted ? orders.find((o) => o.id === wanted) : orders[0];
+  if (!order) return;
+
+  state.orderId = order.id;
+  // The venue object, not just its name: the route and the walk need its
+  // coordinates, and the sheet needs to know whether it is still accepting.
+  state.venue = state.venues.find((v) => v.id === order.restaurant.id) ?? state.venue;
+  state.sent = new Set();
+  await showStatus(true);
+}
+
+mountClock(() => {
+  void loadVenues();
+  if (state.orderId) void showStatus(true);
+});
+
+void loadVenues().then(resumeOrder);
+
+/**
+ * The status screen changes without the guest touching anything, so it polls.
+ *
+ * It stops when the page goes away. A browser tearing a page down makes this
+ * moot, but a page kept alive in the background — or embedded in a test — that
+ * keeps asking the server for orders it will never draw is doing work for
+ * nobody.
+ */
+const poll = setInterval(() => {
+  if (document.hidden) return;
+  if (state.orderId) void showStatus();
+  else void loadVenues();
+}, 4000);
+addEventListener('pagehide', () => clearInterval(poll));
+</script>
+</body>
+</html>

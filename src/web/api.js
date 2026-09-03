@@ -1,4 +1,4 @@
-/* Shared plumbing for the two demo pages: fetch with the right token, the
+/* Shared plumbing for the demo pages: fetch with the right token, the
    clock strip, and a toast. Kept dependency-free — a PWA that has to compile
    before it can be looked at is a PWA nobody looks at. */
 
@@ -122,6 +122,29 @@ export function mountClock(onChange) {
   refresh();
   return refresh;
 }
+
+/* ── how an order reads ────────────────────────────────────────────── */
+
+/**
+ * What each state is called, and the line under it.
+ *
+ * Shared rather than owned by the dine-in page: the home screen puts the same
+ * order in front of the same person, and two pages disagreeing about what
+ * ARMED means would read as two different products.
+ */
+export const HEADLINE = {
+  PLACED: ['Хүлээгдэж байна', 'Ресторан хараахан хараагүй'],
+  ACCEPTED: ['Баталгаажлаа', 'Гал тавих цаг тооцоологдож байна'],
+  HELD: ['Хүлээж байна', 'Гал тогоо ачаалалтай байна'],
+  FIRED: ['Гал дээр', 'Хоол хийгдэж эхэллээ'],
+  READY: ['Бэлэн', 'Ширээндээ хүрч ирлээ'],
+  SERVED: ['Сайхан хооллоорой', ''],
+  CLOSED: ['Дууслаа', 'Баярлалаа'],
+  CANCELLED: ['Цуцлагдлаа', 'Мөнгө буцаагдана'],
+  REFUNDED: ['Буцаагдлаа', 'Мөнгө таны данс руу очлоо'],
+  NO_SHOW: ['Ирээгүй', 'Хоол хадгалагдаагүй'],
+  REJECTED: ['Татгалзсан', 'Мөнгө бүтэн буцаагдана'],
+};
 
 export const mnt = (value) => `${Number(value).toLocaleString('mn-MN')}₮`;
 

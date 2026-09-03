@@ -14,9 +14,9 @@ export async function appendEvent(
   payload: Record<string, unknown> = {},
 ): Promise<void> {
   await db.query(
-    `INSERT INTO order_event (order_id, seq, type, payload, actor)
+    `INSERT INTO dine.order_event (order_id, seq, type, payload, actor)
      SELECT $1, COALESCE(MAX(seq), 0) + 1, $2, $3::jsonb, $4
-       FROM order_event WHERE order_id = $1`,
+       FROM dine.order_event WHERE order_id = $1`,
     [orderId, type, JSON.stringify(payload), actor],
   );
 }

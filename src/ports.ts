@@ -19,8 +19,14 @@ export interface PaymentIntent {
 
 export interface PaymentProvider {
   readonly name: 'qpay' | 'card';
-  /** Reserve the money. For QPay this is the invoice; for a card, the auth. */
-  authorize(input: { orderId: string; amountMnt: number }): Promise<PaymentIntent>;
+  /**
+   * Reserve the money. For QPay this is the invoice; for a card, the auth.
+   *
+   * `reference` is ours, not theirs — a top-up id today, an order id before
+   * there were wallets. The provider only echoes it back on the statement, and
+   * a provider that thinks in orders cannot be asked to top up a balance.
+   */
+  authorize(input: { reference: string; amountMnt: number }): Promise<PaymentIntent>;
   capture(providerRef: string): Promise<void>;
   refund(input: { providerRef: string; amountMnt: number }): Promise<void>;
 }
@@ -81,9 +87,9 @@ export class FakePaymentProvider implements PaymentProvider {
   failNext = false;
   #seq = 0;
 
-  async authorize(input: { orderId: string; amountMnt: number }): Promise<PaymentIntent> {
+  async authorize(input: { reference: string; amountMnt: number }): Promise<PaymentIntent> {
     this.#guard();
-    const providerRef = `qpay-${++this.#seq}-${input.orderId.slice(0, 8)}`;
+    const providerRef = `qpay-${++this.#seq}-${input.reference.slice(0, 8)}`;
     this.authorized.push(providerRef);
     return { providerRef, actionUrl: `qpay://invoice/${providerRef}` };
   }

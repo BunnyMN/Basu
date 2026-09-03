@@ -40,7 +40,7 @@ const PLANNABLE = ['SCHEDULED', 'ARMED', 'HELD'];
 
 async function loadKitchen(db: Db, restaurantId: string, platingBuffer: number): Promise<KitchenConfig> {
   const { rows } = await db.query<{ code: string; display_name: string; parallel_lanes: number }>(
-    'SELECT code, display_name, parallel_lanes FROM station WHERE restaurant_id = $1',
+    'SELECT code, display_name, parallel_lanes FROM dine.station WHERE restaurant_id = $1',
     [restaurantId],
   );
   const stations: KitchenConfig['stations'] = {};
@@ -64,7 +64,7 @@ async function loadLines(db: Db, orderId: string): Promise<OrderLine[]> {
     station_code: string;
   }>(
     `SELECT id, name, qty, prep_minutes, hold_tolerance_minutes, station_code
-       FROM order_line WHERE order_id = $1 AND cancelled_at IS NULL`,
+       FROM dine.order_line WHERE order_id = $1 AND cancelled_at IS NULL`,
     [orderId],
   );
   return rows.map((r) => ({
@@ -79,7 +79,7 @@ async function loadLines(db: Db, orderId: string): Promise<OrderLine[]> {
 
 async function loadSignals(db: Db, orderId: string): Promise<ArrivalSignal[]> {
   const { rows } = await db.query<{ type: SignalType; at: Date }>(
-    'SELECT type, at FROM arrival_signal WHERE order_id = $1 ORDER BY at',
+    'SELECT type, at FROM dine.arrival_signal WHERE order_id = $1 ORDER BY at',
     [orderId],
   );
   return rows.map((r) => ({ type: r.type, at: r.at }));
@@ -100,9 +100,9 @@ export async function planAndSchedule(ctx: Ctx, orderId: string): Promise<PlanOu
     const { rows } = await client.query<OrderRow>(
       `SELECT o.id, o.code, o.restaurant_id, o.state, o.slot_starts_at, o.fire_at,
               o.fire_not_before, r.plating_buffer_min, r.travel_minutes, t.tier
-         FROM dining_order o
-         JOIN restaurant r ON r.id = o.restaurant_id
-         LEFT JOIN trust_profile t ON t.guest_id = o.guest_id
+         FROM dine.dining_order o
+         JOIN dine.restaurant r ON r.id = o.restaurant_id
+         LEFT JOIN dine.trust_profile t ON t.guest_id = o.guest_id
         WHERE o.id = $1`,
       [orderId],
     );
@@ -149,7 +149,7 @@ export async function planAndSchedule(ctx: Ctx, orderId: string): Promise<PlanOu
     });
 
     await client.query(
-      `UPDATE dining_order
+      `UPDATE dine.dining_order
           SET eta_at = $2, eta_confidence = $3, eta_basis = $4, fire_mode = $5,
               version = version + 1, updated_at = $6
         WHERE id = $1`,
@@ -161,7 +161,7 @@ export async function planAndSchedule(ctx: Ctx, orderId: string): Promise<PlanOu
       await cancelFire(client, orderId);
       if (order.state !== 'HELD') {
         await client.query(
-          `UPDATE dining_order SET state = 'HELD', fire_at = NULL, updated_at = $2 WHERE id = $1`,
+          `UPDATE dine.dining_order SET state = 'HELD', fire_at = NULL, updated_at = $2 WHERE id = $1`,
           [orderId, now],
         );
         await appendEvent(client, orderId, 'HELD', 'system:planner', { reason: decision.reason });
@@ -183,7 +183,7 @@ export async function planAndSchedule(ctx: Ctx, orderId: string): Promise<PlanOu
     const readyAt = fromEpochMinute(decision.readyAt);
 
     await client.query(
-      `UPDATE dining_order
+      `UPDATE dine.dining_order
           SET fire_at = $2, ready_at = $3, order_prep_minutes = $4,
               version = version + 1, updated_at = $5
         WHERE id = $1`,
@@ -221,7 +221,7 @@ export async function planAndSchedule(ctx: Ctx, orderId: string): Promise<PlanOu
  */
 export async function findPlannable(db: Db, restaurantId?: string): Promise<string[]> {
   const { rows } = await db.query<{ id: string }>(
-    `SELECT id FROM dining_order
+    `SELECT id FROM dine.dining_order
       WHERE state IN ('ARMED','HELD')
          OR (state = 'SCHEDULED' AND fire_at IS NULL)
         ${restaurantId ? 'AND restaurant_id = $1' : ''}

@@ -2,8 +2,8 @@ import { getPool } from '../db/pool.js';
 import { addMinutes } from '../domain/time.js';
 import { ARM_LEAD_MINUTES, armOrder, findAbandoned, markNoShow } from '../services/orders.js';
 import { findPlannable, planAndSchedule } from '../services/planning.js';
-import { relayNotifications } from '../services/notifications.js';
-import { processReceipts } from '../services/ebarimt.js';
+import { relay as relayNotifications } from '../platform/notify/index.js';
+import { processReceipts } from '../platform/ledger/index.js';
 import { claimDueJobs, findOverdue, fireOne } from './fireJobs.js';
 import type { Ctx } from '../ports.js';
 
@@ -60,7 +60,7 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
 
   /* 1. Arm everything inside its last fifteen minutes. */
   const { rows: armable } = await db.query<{ id: string }>(
-    `SELECT id FROM dining_order
+    `SELECT id FROM dine.dining_order
       WHERE state = 'SCHEDULED'
         AND slot_starts_at <= $1::timestamptz + make_interval(mins => $2)`,
     [now, ARM_LEAD_MINUTES],
@@ -91,7 +91,7 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
 
   /* 4. Cooking finishes on its own clock. */
   await db.query(
-    `UPDATE dining_order SET state = 'COOKING', updated_at = $1
+    `UPDATE dine.dining_order SET state = 'COOKING', updated_at = $1
       WHERE state = 'FIRED'`,
     [now],
   );
@@ -130,11 +130,16 @@ export async function relayOutbox(ctx: Ctx, limit = 200): Promise<number> {
     switch (row.topic) {
       case 'guest.notify.cooking': {
         const orderId = String(row.payload['orderId']);
-        const { enqueueNotification } = await import('../services/notifications.js');
-        await enqueueNotification(ctx, {
-          orderId,
+        const guestId = row.payload['guestId'];
+        if (typeof guestId !== 'string') break;
+        const { enqueue } = await import('../platform/notify/index.js');
+        await enqueue(ctx, {
+          guestId,
+          subject: 'order',
+          subjectId: orderId,
           template: 'order.cooking',
           channel: 'push',
+          title: 'Гал дээр гарлаа',
           body: 'Таны хоол гал дээр гарлаа. Цуцлах боломжгүй боллоо.',
         });
         break;

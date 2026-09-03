@@ -1,17 +1,21 @@
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { getPool } from '../db/pool.js';
 import { hhmm } from '../domain/time.js';
-import { isFreeToCancel } from '../domain/states.js';
+import { isFreeToCancel, LIVE_STATES } from '../domain/states.js';
 import type { SignalType } from '../domain/eta.js';
+import {
+  displayNamesFor,
+  requestOtp,
+  resolveGuest,
+  verifyOtp,
+} from '../platform/identity/index.js';
+import { receiptsFor } from '../platform/ledger/index.js';
 import {
   createPairingCode,
   isRestaurantOnline,
   pairDevice,
-  requestOtp,
   resolveDevice,
-  resolveGuest,
-  verifyOtp,
-} from '../services/auth.js';
+} from '../services/devices.js';
 import {
   acceptOrder,
   cancelOrder,
@@ -26,7 +30,6 @@ import {
   recordSignal,
   rejectOrder,
 } from '../services/orders.js';
-import { enqueueNotification } from '../services/notifications.js';
 import {
   dishRatings,
   findReview,
@@ -38,6 +41,7 @@ import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import { registerMapRoutes } from './tiles.js';
 import { registerDishRoutes } from './dishes.js';
 import { registerRouteRoutes } from './route.js';
+import { registerPlatformRoutes } from './platform.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -107,10 +111,14 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     return undefined;
   };
 
+  // Who you are, what you have, what you were told. Mounted after the guard
+  // exists because every one of them needs it. See src/api/platform.ts.
+  await registerPlatformRoutes(app, ctx, requireGuest);
+
   /** A guest may only ever touch their own order. */
   const ownedByGuest = async (orderId: string, guestId: string): Promise<boolean> => {
     const { rows } = await db.query<{ n: number }>(
-      'SELECT count(*)::int AS n FROM dining_order WHERE id = $1 AND guest_id = $2',
+      'SELECT count(*)::int AS n FROM dine.dining_order WHERE id = $1 AND guest_id = $2',
       [orderId, guestId],
     );
     return (rows[0]?.n ?? 0) > 0;
@@ -119,7 +127,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
   /** …and a tablet only its own restaurant's tickets. */
   const ownedByRestaurant = async (orderId: string, restaurantId: string): Promise<boolean> => {
     const { rows } = await db.query<{ n: number }>(
-      'SELECT count(*)::int AS n FROM dining_order WHERE id = $1 AND restaurant_id = $2',
+      'SELECT count(*)::int AS n FROM dine.dining_order WHERE id = $1 AND restaurant_id = $2',
       [orderId, restaurantId],
     );
     return (rows[0]?.n ?? 0) > 0;
@@ -231,7 +239,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
 
   app.get('/v1/restaurants', async () => {
     const { rows } = await db.query(
-      `SELECT id, name, travel_minutes, lat, lon FROM restaurant WHERE active ORDER BY name`,
+      `SELECT id, name, travel_minutes, lat, lon FROM dine.restaurant WHERE active ORDER BY name`,
     );
     const ratings = await restaurantRatings(db);
     const out = [];
@@ -261,7 +269,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
       `SELECT m.id, m.name, m.price_mnt, m.prep_minutes, m.image_url, m.description,
               s.display_name AS station,
               (m.sold_out_until IS NOT NULL) AS sold_out
-         FROM menu_item m JOIN station s ON s.id = m.station_id
+         FROM dine.menu_item m JOIN dine.station s ON s.id = m.station_id
         WHERE m.restaurant_id = $1 AND m.active AND m.preorder_enabled
         ORDER BY m.price_mnt DESC, m.name`,
       [request.params.id],
@@ -289,7 +297,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     async (request) => {
       const { rows } = await db.query(
         `SELECT starts_at, max_orders, taken_orders, closed
-           FROM slot
+           FROM dine.slot
           WHERE restaurant_id = $1
             AND starts_at::date = COALESCE($2::date, $3::timestamptz::date)
           ORDER BY starts_at`,
@@ -413,19 +421,66 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     },
   );
 
+  /**
+   * Everything of this guest's that has not finished yet.
+   *
+   * Keyed on the guest, not on an id the phone had to keep: the Basu home
+   * screen has to say "lunch at 12:21" before it knows which order that is,
+   * and the dine-in app uses the same call to find its way back after a
+   * reload. One row per live order, in the order they will happen.
+   */
+  app.get('/v1/orders', { preHandler: requireGuest }, async (request, reply) => {
+    const { rows } = await db.query<{
+      id: string;
+      code: string;
+      state: string;
+      restaurant_id: string;
+      restaurant: string;
+      slot_starts_at: Date;
+      fire_at: Date | null;
+      ready_at: Date | null;
+      total_mnt: number;
+      table_code: string | null;
+    }>(
+      `SELECT o.id, o.code, o.state, o.restaurant_id, r.name AS restaurant,
+              o.slot_starts_at, o.fire_at, o.ready_at, o.total_mnt,
+              t.code AS table_code
+         FROM dine.dining_order o
+         JOIN dine.restaurant r ON r.id = o.restaurant_id
+         LEFT JOIN dine.table_hold h ON h.order_id = o.id AND h.released_at IS NULL
+         LEFT JOIN dine.dining_table t ON t.id = h.table_id
+        WHERE o.guest_id = $1 AND o.state = ANY($2)
+        ORDER BY o.slot_starts_at, o.created_at`,
+      [request.guestId, LIVE_STATES],
+    );
+
+    return reply.send({
+      orders: rows.map((o) => ({
+        id: o.id,
+        code: o.code,
+        state: o.state,
+        restaurant: { id: o.restaurant_id, name: o.restaurant },
+        table: o.table_code,
+        total_mnt: o.total_mnt,
+        slot_starts_at: o.slot_starts_at.toISOString(),
+        fire_at: o.fire_at?.toISOString() ?? null,
+        ready_at: o.ready_at?.toISOString() ?? null,
+      })),
+    });
+  });
+
   app.get<{ Params: { id: string } }>(
     '/v1/orders/:id',
     { preHandler: requireGuest },
     async (request, reply) => {
       const { rows } = await db.query(
         `SELECT o.id, o.code, o.state, o.slot_starts_at, o.fire_at, o.ready_at,
-                o.seated_at, o.total_mnt, t.code AS table_code,
-                e.qr_payload, e.lottery
-           FROM dining_order o
-           LEFT JOIN table_hold h ON h.order_id = o.id AND h.released_at IS NULL
-           LEFT JOIN dining_table t ON t.id = h.table_id
-           LEFT JOIN payment p ON p.order_id = o.id AND p.state = 'captured'
-           LEFT JOIN ebarimt_receipt e ON e.payment_id = p.id AND e.state = 'issued'
+                o.seated_at, o.total_mnt, o.restaurant_id, o.ledger_transfer_id,
+                r.name AS restaurant, t.code AS table_code
+           FROM dine.dining_order o
+           JOIN dine.restaurant r ON r.id = o.restaurant_id
+           LEFT JOIN dine.table_hold h ON h.order_id = o.id AND h.released_at IS NULL
+           LEFT JOIN dine.dining_table t ON t.id = h.table_id
           WHERE o.id = $1 AND o.guest_id = $2`,
         [request.params.id, request.guestId],
       );
@@ -439,18 +494,25 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
             ready_at: Date | null;
             seated_at: Date | null;
             total_mnt: number;
+            restaurant_id: string;
+            restaurant: string;
             table_code: string | null;
-            qr_payload: string | null;
-            lottery: string | null;
+            ledger_transfer_id: string | null;
           }
         | undefined;
       if (!order) return sendError(reply, new OrderError('NOT_FOUND', 'no such order'));
 
+      // The tax receipt belongs to the money, not to the meal: dine holds the
+      // movement's id and asks the ledger whether a receipt exists for it yet.
+      const receipt = order.ledger_transfer_id
+        ? (await receiptsFor([order.ledger_transfer_id])).get(order.ledger_transfer_id)
+        : undefined;
+
       // The lines are what a review is left against, so they travel with it.
       const { rows: lines } = await db.query(
         `SELECT l.menu_item_id, l.name, l.qty, m.image_url
-           FROM order_line l
-           LEFT JOIN menu_item m ON m.id = l.menu_item_id
+           FROM dine.order_line l
+           LEFT JOIN dine.menu_item m ON m.id = l.menu_item_id
           WHERE l.order_id = $1 AND l.cancelled_at IS NULL
           ORDER BY l.name`,
         [request.params.id],
@@ -464,6 +526,9 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
         id: order.id,
         code: order.code,
         state: order.state,
+        // Named here as well as in the list, because an order can be opened
+        // straight from the home screen without the venue having been picked.
+        restaurant: { id: order.restaurant_id, name: order.restaurant },
         table: order.table_code,
         total_mnt: order.total_mnt,
         slot_starts_at: order.slot_starts_at.toISOString(),
@@ -474,7 +539,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
           ? (order.fire_at?.toISOString() ?? null)
           : null,
         can_cancel: isFreeToCancel(order.state as never),
-        receipt: order.qr_payload ? { qr: order.qr_payload, lottery: order.lottery } : null,
+        receipt: receipt?.qrPayload ? { qr: receipt.qrPayload, lottery: receipt.lottery } : null,
       });
     },
   );
@@ -540,7 +605,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     // the right board — an unnamed empty board looks the same whether nothing
     // has been ordered or the tablet is watching somebody else's kitchen.
     const named = restaurantId
-      ? await db.query<{ name: string }>('SELECT name FROM restaurant WHERE id = $1', [
+      ? await db.query<{ name: string }>('SELECT name FROM dine.restaurant WHERE id = $1', [
           restaurantId,
         ])
       : null;
@@ -549,29 +614,33 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     const { rows } = await db.query(
       `SELECT o.id, o.code, o.state, o.party_size, o.slot_starts_at, o.fire_at,
               o.ready_at, o.eta_at, o.seated_at, o.order_prep_minutes,
-              g.name AS guest_name, t.code AS table_code, r.name AS restaurant,
+              o.guest_id, t.code AS table_code, r.name AS restaurant,
               COALESCE(
                 json_agg(json_build_object('name', l.name, 'qty', l.qty,
                                            'station', l.station_code, 'image', mi.image_url)
                          ORDER BY l.name) FILTER (WHERE l.id IS NOT NULL),
                 '[]'
               ) AS lines
-         FROM dining_order o
-         JOIN guest g ON g.id = o.guest_id
-         JOIN restaurant r ON r.id = o.restaurant_id
-         LEFT JOIN order_line l ON l.order_id = o.id AND l.cancelled_at IS NULL
-         LEFT JOIN menu_item mi ON mi.id = l.menu_item_id
-         LEFT JOIN table_hold h ON h.order_id = o.id AND h.released_at IS NULL
-         LEFT JOIN dining_table t ON t.id = h.table_id
+         FROM dine.dining_order o
+         JOIN dine.restaurant r ON r.id = o.restaurant_id
+         LEFT JOIN dine.order_line l ON l.order_id = o.id AND l.cancelled_at IS NULL
+         LEFT JOIN dine.menu_item mi ON mi.id = l.menu_item_id
+         LEFT JOIN dine.table_hold h ON h.order_id = o.id AND h.released_at IS NULL
+         LEFT JOIN dine.dining_table t ON t.id = h.table_id
         WHERE ($1::uuid IS NULL OR o.restaurant_id = $1::uuid)
           AND o.state IN ('PLACED','ACCEPTED','SCHEDULED','ARMED','HELD','FIRED','COOKING','READY')
-        GROUP BY o.id, g.name, t.code, r.name
+        GROUP BY o.id, t.code, r.name
         ORDER BY COALESCE(o.fire_at, o.slot_starts_at)`,
       [restaurantId],
     );
 
     const now = ctx.clock.now();
     const lanes = { incoming: [] as unknown[], cooking: [] as unknown[], ready: [] as unknown[] };
+    // One call for the whole board rather than a join: the same shape this
+    // will have when identity is answering over HTTP.
+    const names = await displayNamesFor(
+      (rows as Array<{ guest_id: string }>).map((r) => r.guest_id),
+    );
 
     for (const row of rows as Array<Record<string, never> & {
       id: string;
@@ -582,7 +651,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
       fire_at: Date | null;
       ready_at: Date | null;
       seated_at: Date | null;
-      guest_name: string | null;
+      guest_id: string;
       table_code: string | null;
       restaurant: string;
       lines: Array<{ name: string; qty: number }>;
@@ -592,7 +661,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
         code: row.code,
         state: row.state,
         party_size: row.party_size,
-        guest: row.guest_name,
+        guest: names.get(row.guest_id) ?? null,
         table: row.table_code,
         restaurant: row.restaurant,
         seated: row.seated_at !== null,
@@ -686,7 +755,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
         ? new Date(request.body.until)
         : new Date(ctx.clock.now().getTime() + 4 * 60 * 60_000);
       const { rowCount } = await db.query(
-        `UPDATE menu_item SET sold_out_until = $3
+        `UPDATE dine.menu_item SET sold_out_until = $3
           WHERE id = $1 AND restaurant_id = $2`,
         [request.params.itemId, request.device!.restaurantId, until],
       );
@@ -700,7 +769,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     { preHandler: requireDevice },
     async (request, reply) => {
       const { rows } = await db.query<{ id: string }>(
-        'SELECT id FROM dining_order WHERE code = $1 AND restaurant_id = $2',
+        'SELECT id FROM dine.dining_order WHERE code = $1 AND restaurant_id = $2',
         [request.params.code, request.device!.restaurantId],
       );
       const order = rows[0];
@@ -731,14 +800,14 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
       cooking: number;
     }>(
       `SELECT
-         (SELECT count(*)::int FROM dining_order WHERE state = 'HELD') AS held,
-         (SELECT count(*)::int FROM fire_job
+         (SELECT count(*)::int FROM dine.dining_order WHERE state = 'HELD') AS held,
+         (SELECT count(*)::int FROM dine.fire_job
            WHERE state = 'pending' AND run_at < $1::timestamptz - interval '2 minutes') AS late,
-         (SELECT count(*)::int FROM restaurant r WHERE r.active AND NOT EXISTS (
-            SELECT 1 FROM kds_device d
+         (SELECT count(*)::int FROM dine.restaurant r WHERE r.active AND NOT EXISTS (
+            SELECT 1 FROM dine.kds_device d
              WHERE d.restaurant_id = r.id AND d.revoked_at IS NULL
                AND d.last_seen_at > $1::timestamptz - interval '90 seconds')) AS offline,
-         (SELECT count(*)::int FROM dining_order WHERE state IN ('FIRED','COOKING')) AS cooking`,
+         (SELECT count(*)::int FROM dine.dining_order WHERE state IN ('FIRED','COOKING')) AS cooking`,
       [ctx.clock.now()],
     );
     return rows[0];
@@ -748,7 +817,6 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
 
   if (options.dev) await mountDevRoutes(app, ctx, board);
 
-  void enqueueNotification;
   return app;
 }
 
@@ -775,6 +843,8 @@ async function mountDevRoutes(
     prefix: '/',
   });
 
+  // `/` is the Basu home screen; the dine-in pre-order app is one icon on it.
+  app.get('/dine', (_request, reply) => reply.sendFile('dine.html'));
   app.get('/kds', (_request, reply) => reply.sendFile('kds.html'));
   app.get('/ops', (_request, reply) => reply.sendFile('ops.html'));
 
@@ -807,7 +877,7 @@ async function mountDevRoutes(
       // Straight to a session. Going through the OTP path would put a
       // walkthrough behind the three-codes-an-hour limit, which exists to stop
       // somebody running up an SMS bill and has nothing to say about a demo.
-      const { startSession } = await import('../services/auth.js');
+      const { startSession } = await import('../platform/identity/index.js');
       const session = await startSession(ctx, phone);
       return reply.send({ token: session.token, guest_id: session.guestId, phone });
     } catch (error) {
@@ -819,7 +889,7 @@ async function mountDevRoutes(
   app.get('/dev/pairing-codes', async () => {
     const { rows } = await getPool().query(
       `SELECT d.pairing_code AS code, r.name, r.id AS restaurant_id
-         FROM kds_device d JOIN restaurant r ON r.id = d.restaurant_id
+         FROM dine.kds_device d JOIN dine.restaurant r ON r.id = d.restaurant_id
         WHERE d.paired_at IS NULL AND d.pairing_code IS NOT NULL
         ORDER BY r.name`,
     );
@@ -880,10 +950,10 @@ async function mountDevRoutes(
   app.get('/dev/venues', async () => {
     const { rows } = await getPool().query(
       `SELECT r.id, r.name,
-              EXISTS (SELECT 1 FROM kds_device d
+              EXISTS (SELECT 1 FROM dine.kds_device d
                        WHERE d.restaurant_id = r.id AND d.revoked_at IS NULL
                          AND d.paired_at IS NOT NULL) AS watched
-         FROM restaurant r WHERE r.active ORDER BY r.name`,
+         FROM dine.restaurant r WHERE r.active ORDER BY r.name`,
     );
     return { venues: rows };
   });
@@ -899,7 +969,7 @@ async function mountDevRoutes(
   app.post<{ Body: { restaurant_id?: string } }>('/dev/kds-token', async (request, reply) => {
     const restaurantId = request.body?.restaurant_id;
     if (!restaurantId) return badRequest(reply, 'Ресторан заана уу.', 'restaurant_id required');
-    const { createPairingCode, pairDevice } = await import('../services/auth.js');
+    const { createPairingCode, pairDevice } = await import('../services/devices.js');
     const code = await createPairingCode(ctx, restaurantId, 'Демо таблет', 60);
     const session = await pairDevice(ctx, code);
     return reply.send({ token: session.token, restaurant_id: session.restaurantId });
@@ -917,7 +987,7 @@ async function mountDevRoutes(
       `SELECT o.code, o.state, r.name AS restaurant, o.slot_starts_at, o.fire_at,
               o.ready_at, o.seated_at, o.fired_by, o.fire_mode, o.eta_confidence,
               o.order_prep_minutes, o.total_mnt
-         FROM dining_order o JOIN restaurant r ON r.id = o.restaurant_id
+         FROM dine.dining_order o JOIN dine.restaurant r ON r.id = o.restaurant_id
         ORDER BY o.created_at DESC LIMIT 50`,
     );
     return { orders: rows };

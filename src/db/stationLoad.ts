@@ -33,7 +33,7 @@ export async function readLedger(
   const ledger = new InMemoryStationLoad();
   const { rows } = await db.query<{ order_id: string; station_code: string; minute: number }>(
     `SELECT order_id, station_code, minute
-       FROM station_reservation
+       FROM dine.station_reservation
       WHERE restaurant_id = $1 AND minute >= $2 AND minute < $3
         AND ($4::uuid IS NULL OR order_id <> $4::uuid)`,
     [restaurantId, from, to, excludeOrderId ?? null],
@@ -69,7 +69,7 @@ export async function persistReservation(
   }
 
   await db.query(
-    `INSERT INTO station_reservation (order_id, restaurant_id, station_code, minute)
+    `INSERT INTO dine.station_reservation (order_id, restaurant_id, station_code, minute)
      SELECT $1, $2, s, m FROM unnest($3::text[], $4::int[]) AS t(s, m)
      ON CONFLICT DO NOTHING`,
     [input.orderId, input.restaurantId, stations, minutes],
@@ -78,7 +78,7 @@ export async function persistReservation(
 
 /** Called on READY, on cancellation, and before every re-plan. */
 export async function releaseReservation(db: Db, orderId: string): Promise<void> {
-  await db.query('DELETE FROM station_reservation WHERE order_id = $1', [orderId]);
+  await db.query('DELETE FROM dine.station_reservation WHERE order_id = $1', [orderId]);
 }
 
 /** Ops view: how many lanes of a station are spoken for in a given minute. */
@@ -89,7 +89,7 @@ export async function occupancyAt(
   minute: EpochMinute,
 ): Promise<number> {
   const { rows } = await db.query<{ n: number }>(
-    `SELECT count(*)::int AS n FROM station_reservation
+    `SELECT count(*)::int AS n FROM dine.station_reservation
       WHERE restaurant_id = $1 AND station_code = $2 AND minute = $3`,
     [restaurantId, station, minute],
   );

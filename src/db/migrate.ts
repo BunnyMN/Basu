@@ -54,7 +54,11 @@ export async function reset(): Promise<void> {
   if (process.env['NODE_ENV'] === 'production') {
     throw new Error('refusing to reset the schema in production');
   }
-  await getPool().query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
+  await getPool().query(`
+    DROP SCHEMA IF EXISTS dine, notify, ledger, identity CASCADE;
+    DROP SCHEMA public CASCADE;
+    CREATE SCHEMA public;
+  `);
 }
 
 /** True when this file was run directly — same answer as .ts or compiled .js. */

@@ -22,7 +22,7 @@ async function anOrder(state: OrderState = 'SCHEDULED') {
 
 async function orderState(orderId: string): Promise<string> {
   const { rows } = await pool().query<{ state: string }>(
-    'SELECT state FROM dining_order WHERE id = $1',
+    'SELECT state FROM dine.dining_order WHERE id = $1',
     [orderId],
   );
   return rows[0]!.state;
@@ -71,7 +71,7 @@ describe('fire job queue', () => {
 
     const { rows } = await pool().query<{ count: number; run_at: Date }>(
       `SELECT count(*)::int AS count, min(run_at) AS run_at
-         FROM fire_job WHERE order_id = $1 AND state = 'pending'`,
+         FROM dine.fire_job WHERE order_id = $1 AND state = 'pending'`,
       [orderId],
     );
     expect(rows[0]!.count).toBe(1);
@@ -83,7 +83,7 @@ describe('fire job queue', () => {
     await scheduleFire(pool(), orderId, at('12:23'));
 
     await expect(
-      pool().query(`INSERT INTO fire_job (order_id, run_at) VALUES ($1, $2)`, [
+      pool().query(`INSERT INTO dine.fire_job (order_id, run_at) VALUES ($1, $2)`, [
         orderId,
         at('12:25'),
       ]),
@@ -102,7 +102,7 @@ describe('firing', () => {
     expect(await orderState(orderId)).toBe('FIRED');
 
     const events = await pool().query(
-      `SELECT type, actor FROM order_event WHERE order_id = $1`,
+      `SELECT type, actor FROM dine.order_event WHERE order_id = $1`,
       [orderId],
     );
     expect(events.rows).toEqual([{ type: 'FIRED', actor: 'system:scheduler' }]);
@@ -114,7 +114,7 @@ describe('firing', () => {
     ]);
 
     const job2 = await pool().query<{ state: string }>(
-      `SELECT state FROM fire_job WHERE id = $1`,
+      `SELECT state FROM dine.fire_job WHERE id = $1`,
       [job!.id],
     );
     expect(job2.rows[0]!.state).toBe('done');
@@ -133,7 +133,7 @@ describe('firing', () => {
     expect(second.result).toBe('superseded');
 
     const events = await pool().query(
-      `SELECT count(*)::int AS n FROM order_event WHERE order_id = $1 AND type = 'FIRED'`,
+      `SELECT count(*)::int AS n FROM dine.order_event WHERE order_id = $1 AND type = 'FIRED'`,
       [orderId],
     );
     expect(events.rows[0]!.n).toBe(1);
@@ -146,7 +146,7 @@ describe('firing', () => {
 
     // «Одоо тавь» on the tablet, two seconds before the timer would have run.
     await pool().query(
-      `UPDATE dining_order SET state = 'FIRED', fired_at = $2, fired_by = 'kds:tablet-1'
+      `UPDATE dine.dining_order SET state = 'FIRED', fired_at = $2, fired_by = 'kds:tablet-1'
         WHERE id = $1`,
       [orderId, at('12:22')],
     );
@@ -155,7 +155,7 @@ describe('firing', () => {
     expect(outcome.result).toBe('superseded');
 
     const { rows } = await pool().query<{ fired_by: string }>(
-      `SELECT fired_by FROM dining_order WHERE id = $1`,
+      `SELECT fired_by FROM dine.dining_order WHERE id = $1`,
       [orderId],
     );
     expect(rows[0]!.fired_by).toBe('kds:tablet-1'); // the chef's action survives
@@ -166,7 +166,7 @@ describe('firing', () => {
     await scheduleFire(pool(), orderId, at('12:23'));
     const [job] = await claimDueJobs(pool(), { workerId: 'w1', now: at('12:23') });
 
-    await pool().query(`UPDATE dining_order SET state = 'CANCELLED' WHERE id = $1`, [orderId]);
+    await pool().query(`UPDATE dine.dining_order SET state = 'CANCELLED' WHERE id = $1`, [orderId]);
     await cancelFire(pool(), orderId);
 
     const outcome = await fireOne(job!, { now: at('12:23') });
