@@ -10,6 +10,7 @@ export {
   LedgerError,
   balance,
   collect,
+  movement,
   reconcileLedger,
   refund,
   settleTopup,

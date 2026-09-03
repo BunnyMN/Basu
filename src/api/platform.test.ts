@@ -26,13 +26,16 @@ let venue: SeededRestaurant;
 const pool = () => getPool();
 const auth = (token: string) => ({ authorization: `Bearer ${token}` });
 
-async function signIn(phone = '+97699001122'): Promise<string> {
+async function signIn(phone = '+97699001122', device?: string): Promise<string> {
+  // A second sign-in needs a later second: `verifyOtp` takes the newest
+  // challenge by `created_at`, and a frozen clock stamps two of them alike.
+  clock.advanceSeconds(1);
   await app.inject({ method: 'POST', url: '/v1/auth/otp', payload: { phone } });
   const code = /(\d{6})/.exec(notifier.of('auth.otp').at(-1)?.body ?? '')?.[1];
   const verified = await app.inject({
     method: 'POST',
     url: '/v1/auth/verify',
-    payload: { phone, code },
+    payload: { phone, code, device },
   });
   return verified.json().token as string;
 }
@@ -244,6 +247,186 @@ describe('the wallet', () => {
     const wallet = await app.inject({ method: 'GET', url: '/v1/wallet', headers: auth(mine) });
     expect(wallet.json().balance_mnt).toBe(0);
     expect(wallet.json().lines).toEqual([]);
+  });
+});
+
+describe('where you are signed in', () => {
+  it('lists the sessions and says which one is asking', async () => {
+    const first = await signIn('+97699001122', 'iPhone 15')
+    const second = await signIn('+97699001122', 'iPad')
+
+    const seen = await app.inject({
+      method: 'GET',
+      url: '/v1/me/sessions',
+      headers: auth(second),
+    });
+    const sessions = seen.json().sessions as Array<{ label: string; current: boolean }>;
+
+    expect(sessions.map((s) => s.label).sort()).toEqual(['iPad', 'iPhone 15']);
+    // A list where you cannot tell which row is the phone in your hand is a
+    // list nobody dares use.
+    expect(sessions.filter((s) => s.current)).toHaveLength(1);
+    expect(sessions.find((s) => s.current)?.label).toBe('iPad');
+    void first;
+  });
+
+  it('signs the other phones out and leaves this one alone', async () => {
+    const lost = await signIn('+97699001122', 'iPhone 15');
+    const mine = await signIn('+97699001122', 'iPad');
+
+    const revoked = await app.inject({
+      method: 'POST',
+      url: '/v1/me/sessions/revoke',
+      headers: auth(mine),
+    });
+    expect(revoked.json()).toEqual({ revoked: 1 });
+
+    // The lost phone is out; the one that asked is still in. Reversing those
+    // two is the whole failure mode of this feature.
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: auth(lost) })).statusCode)
+      .toBe(401);
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: auth(mine) })).statusCode)
+      .toBe(200);
+  });
+});
+
+describe('leaving', () => {
+  it('closes the account and lets the number come back as somebody new', async () => {
+    const token = await signIn();
+    const before = await app.inject({ method: 'GET', url: '/v1/me', headers: auth(token) });
+    await app.inject({
+      method: 'PATCH',
+      url: '/v1/me',
+      headers: auth(token),
+      payload: { display_name: 'Батаа' },
+    });
+
+    const closed = await app.inject({ method: 'DELETE', url: '/v1/me', headers: auth(token) });
+    expect(closed.json()).toEqual({ closed: true });
+
+    // Every session goes with it, including the one that asked.
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: auth(token) })).statusCode)
+      .toBe(401);
+
+    // The same number opens a new account, and it is a stranger: a phone
+    // number that could never be reused would be a tombstone, not a closure.
+    const again = await signIn();
+    const now = await app.inject({ method: 'GET', url: '/v1/me', headers: auth(again) });
+    expect(now.json().id).not.toBe(before.json().id);
+    expect(now.json().display_name).toBeNull();
+  });
+
+  it('refuses while the wallet still holds money', async () => {
+    const token = await signIn();
+    await topUp(token, 20_000);
+
+    const refused = await app.inject({ method: 'DELETE', url: '/v1/me', headers: auth(token) });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json().error.code).toBe('HAS_BALANCE');
+    // Still signed in, still holding the money.
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: auth(token) })).statusCode)
+      .toBe(200);
+  });
+
+  it('refuses while something of theirs is still running', async () => {
+    const token = await signIn();
+    // No top-up: the whole bill is pulled from the card, so the wallet ends at
+    // zero and this reaches the check it is actually about.
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/orders',
+      headers: auth(token),
+      payload: {
+        restaurant_id: venue.restaurantId,
+        slot_starts_at: at('12:30').toISOString(),
+        party_size: 2,
+        items: [{ menu_item_id: venue.menuIds['tsuivan'], qty: 1 }],
+      },
+    });
+    await app.inject({
+      method: 'POST',
+      url: `/v1/orders/${created.json().id}/pay`,
+      headers: auth(token),
+    });
+
+    const refused = await app.inject({ method: 'DELETE', url: '/v1/me', headers: auth(token) });
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json().error.code).toBe('HAS_LIVE_WORK');
+  });
+});
+
+describe('one movement, in full', () => {
+  it('hands back the tax receipt once the authority has issued it', async () => {
+    const token = await signIn();
+    await topUp(token, 200_000);
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/orders',
+      headers: auth(token),
+      payload: {
+        restaurant_id: venue.restaurantId,
+        slot_starts_at: at('12:30').toISOString(),
+        party_size: 2,
+        items: [{ menu_item_id: venue.menuIds['tsuivan'], qty: 1 }],
+      },
+    });
+    const order = created.json();
+    await app.inject({
+      method: 'POST',
+      url: `/v1/orders/${order.id}/pay`,
+      headers: auth(token),
+    });
+
+    const statement = await app.inject({ method: 'GET', url: '/v1/wallet', headers: auth(token) });
+    const purchase = (statement.json().lines as Array<{ id: string; kind: string }>)
+      .find((l) => l.kind === 'purchase')!;
+
+    const before = await app.inject({
+      method: 'GET',
+      url: `/v1/wallet/${purchase.id}`,
+      headers: auth(token),
+    });
+    // Nothing has been issued yet, and saying so is better than an empty box.
+    expect(before.json().receipt).toBeNull();
+    expect(before.json().memo).toMatch(/Хоол/);
+
+    // Queue the receipt against the movement and drain it, which is what
+    // closing an order does. Walking the whole state machine to get here would
+    // be re-testing `lifecycle.test.ts`; what this test is about is the wallet
+    // handing the receipt back once one exists.
+    const { processReceipts, queueReceipt } = await import('../platform/ledger/index.js');
+    await queueReceipt({
+      transferId: purchase.id,
+      kind: 'SALE',
+      merchantTin: '1234567',
+      orderCode: order.code,
+      amountMnt: order.total_mnt,
+    });
+    await processReceipts(ctx);
+
+    const after = await app.inject({
+      method: 'GET',
+      url: `/v1/wallet/${purchase.id}`,
+      headers: auth(token),
+    });
+    expect(after.json().receipt.lottery).toMatch(/^AA/);
+    expect(after.json().receipt.qr).toMatch(/ebarimt/);
+  });
+
+  it('will not show one guest what another guest spent', async () => {
+    const mine = await signIn('+97699001122');
+    const theirs = await signIn('+97688112233');
+    await topUp(theirs, 30_000);
+
+    const statement = await app.inject({ method: 'GET', url: '/v1/wallet', headers: auth(theirs) });
+    const line = statement.json().lines[0];
+
+    const peek = await app.inject({
+      method: 'GET',
+      url: `/v1/wallet/${line.id}`,
+      headers: auth(mine),
+    });
+    expect(peek.statusCode).toBe(500);
   });
 });
 

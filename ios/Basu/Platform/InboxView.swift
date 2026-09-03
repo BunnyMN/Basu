@@ -12,6 +12,9 @@ import SwiftUI
  */
 struct InboxView: View {
   let back: () -> Void
+  /// Where a message points. A notification about an order that cannot be
+  /// opened is a notification that made somebody go and find it themselves.
+  let open: (Destination) -> Void
 
   @Environment(Platform.self) private var platform
 
@@ -30,6 +33,7 @@ struct InboxView: View {
           ForEach(platform.inbox.messages) { message in
             Button {
               Task { await platform.markRead(message) }
+              if let destination = message.destination { open(destination) }
             } label: {
               MessageRow(message: message)
             }
@@ -162,4 +166,11 @@ struct ChannelChip: View {
 extension InboxMessage {
   /// Which app the message is about, in the launcher's own vocabulary.
   var source: String { subject == "order" ? "ХООЛ" : "BASU" }
+
+  /// What tapping it opens, when it is about something that can be opened.
+  /// The platform's own messages — a welcome, a receipt — go nowhere.
+  var destination: Destination? {
+    guard subject == "order", let id = subjectId else { return nil }
+    return .dine(orderId: id)
+  }
 }

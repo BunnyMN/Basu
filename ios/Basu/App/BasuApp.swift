@@ -75,7 +75,10 @@ struct RootView: View {
             case .dine(let orderId):
               DineView(resuming: orderId)
             case .inbox:
-              InboxView(back: { if !path.isEmpty { path.removeLast() } })
+              InboxView(
+                back: { if !path.isEmpty { path.removeLast() } },
+                open: { path.append($0) },
+              )
             }
           }
       }

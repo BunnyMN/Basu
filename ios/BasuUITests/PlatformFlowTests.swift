@@ -104,7 +104,21 @@ final class PlatformFlowTests: XCTestCase {
       app.buttons["profile.signout"].exists,
       "signing out has to be reachable without hunting for it",
     )
+    // This phone has to be in the list, or nobody can revoke a lost one.
+    XCTAssertTrue(
+      app.staticTexts["Энэ утас"].waitForExistence(timeout: 10),
+      "the session list should mark the phone doing the asking",
+    )
     shot("5-profile")
+
+    // Closing an account is an App Store requirement, not a nice-to-have, and
+    // it has to be reachable without asking anybody.
+    app.swipeUp()
+    XCTAssertTrue(
+      app.buttons["profile.close"].waitForExistence(timeout: 5),
+      "closing the account must be reachable in the app itself",
+    )
+    shot("6-profile-foot")
   }
 
   // MARK: - the wire

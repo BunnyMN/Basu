@@ -15,6 +15,8 @@ struct ProfileView: View {
   @Environment(AppModel.self) private var model
 
   @State private var editing: Field?
+  @State private var closing = false
+  @State private var signingOutOthers = false
 
   enum Field: String, Identifiable {
     case name, locale
@@ -27,7 +29,10 @@ struct ProfileView: View {
         identity
         fields
         notifications
+        devices
+        help
         signOut
+        closeAccount
       }
       .padding(.horizontal, 20)
       .padding(.bottom, 88)
@@ -40,9 +45,34 @@ struct ProfileView: View {
     .sheet(item: $editing) { field in
       ProfileEditSheet(field: field)
     }
+    .confirmationDialog(
+      "Бусад төхөөрөмжөөс гарах уу?",
+      isPresented: $signingOutOthers,
+      titleVisibility: .visible,
+    ) {
+      Button("Гаргах", role: .destructive) {
+        Task { await platform.signOutOtherDevices() }
+      }
+      Button("Болих", role: .cancel) {}
+    } message: {
+      Text("Энэ утас нэвтэрсэн хэвээр үлдэнэ.")
+    }
+    .confirmationDialog(
+      "Бүртгэлээ бүрмөсөн хаах уу?",
+      isPresented: $closing,
+      titleVisibility: .visible,
+    ) {
+      Button("Хаах", role: .destructive) {
+        Task { if await platform.closeAccount() { back() } }
+      }
+      Button("Болих", role: .cancel) {}
+    } message: {
+      Text("Нэр, утас, мэдэгдэл устана. Хийсэн гүйлгээ, татварын баримт хуулийн дагуу үлдэнэ. Буцаах боломжгүй.")
+    }
     .task {
       await platform.refresh()
       await platform.loadPreferences()
+      await platform.loadSessions()
     }
   }
 
@@ -164,6 +194,106 @@ struct ProfileView: View {
     .accessibilityIdentifier("profile.pref.\(name)")
   }
 
+  // MARK: - where you are signed in
+
+  /**
+   Not a feature until a phone is lost, and then the only one that matters.
+
+   It is here so that day needs nobody's help: no email, no support queue, no
+   waiting sixty days for a token to expire on its own.
+   */
+  @ViewBuilder private var devices: some View {
+    if !platform.sessions.isEmpty {
+      VStack(alignment: .leading, spacing: 11) {
+        SectionLabel("Нэвтэрсэн төхөөрөмж")
+        VStack(spacing: 0) {
+          ForEach(Array(platform.sessions.enumerated()), id: \.element.id) { index, device in
+            if index > 0 { Hairline() }
+            deviceRow(device)
+          }
+        }
+        .glassCard()
+
+        if platform.sessions.count > 1 {
+          Button("Бусад бүхнээс гарах") { signingOutOthers = true }
+            .font(.system(size: 13, weight: .medium))
+            .foregroundStyle(Color.accentInk)
+            .accessibilityIdentifier("profile.revokeothers")
+        }
+      }
+    }
+  }
+
+  private func deviceRow(_ device: DeviceSession) -> some View {
+    HStack(spacing: 12) {
+      VStack(alignment: .leading, spacing: 3) {
+        Text(device.name)
+          .font(.system(size: 15, weight: device.current ? .semibold : .regular))
+          .foregroundStyle(Color.ink)
+          .fixedSize(horizontal: false, vertical: true)
+        Text(device.current
+          ? "Энэ утас"
+          : "Сүүлд \(Format.when(device.lastSeenAt ?? device.createdAt))")
+          .font(.mono(11))
+          .foregroundStyle(Color.ink3)
+      }
+      Spacer(minLength: 8)
+      if !device.current {
+        Button("Гаргах") { Task { await platform.signOutDevice(device) } }
+          .font(.system(size: 13, weight: .medium))
+          .foregroundStyle(Color.stop)
+      }
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 14)
+    .accessibilityIdentifier("profile.device")
+  }
+
+  // MARK: - the footer everything else lives in
+
+  private var help: some View {
+    VStack(alignment: .leading, spacing: 11) {
+      SectionLabel("Тусламж")
+      VStack(spacing: 0) {
+        link("Үйлчилгээний нөхцөл", "https://basu.mn/terms")
+        Hairline()
+        link("Нууцлалын бодлого", "https://basu.mn/privacy")
+        Hairline()
+        link("Холбоо барих", "mailto:tuslah@basu.mn")
+      }
+      .glassCard()
+
+      // The version, because the first thing anybody is asked when they report
+      // something is which build they are on, and nobody knows.
+      Text("Basu \(Self.version)")
+        .font(.mono(11))
+        .foregroundStyle(Color.ink3)
+        .textSelection(.enabled)
+    }
+  }
+
+  private static var version: String {
+    let info = Bundle.main.infoDictionary
+    let short = info?["CFBundleShortVersionString"] as? String ?? "?"
+    let build = info?["CFBundleVersion"] as? String ?? "?"
+    return "\(short) (\(build))"
+  }
+
+  private func link(_ title: String, _ url: String) -> some View {
+    Link(destination: URL(string: url)!) {
+      HStack(spacing: 12) {
+        Text(title)
+          .font(.system(size: 15))
+          .foregroundStyle(Color.ink)
+        Spacer(minLength: 8)
+        Chevron(size: 13).foregroundStyle(Color.ink3)
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 14)
+      .contentShape(Rectangle())
+    }
+  }
+
   private var signOut: some View {
     Button {
       session.signOut()
@@ -182,6 +312,27 @@ struct ProfileView: View {
     }
     .buttonStyle(.plain)
     .accessibilityIdentifier("profile.signout")
+  }
+
+  /**
+   Leaving, for good.
+
+   Required by App Store review guideline 5.1.1(v): an app that makes accounts
+   has to let somebody close theirs from inside it — not by email, not by
+   ringing anybody. Set apart from «Гарах» and worded so the two cannot be
+   confused, because one of them is reversible and the other is not.
+   */
+  private var closeAccount: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Button("Бүртгэл хаах") { closing = true }
+        .font(.system(size: 13))
+        .foregroundStyle(Color.ink3)
+        .accessibilityIdentifier("profile.close")
+      if let trouble = platform.trouble {
+        Banner(message: trouble)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .center)
   }
 }
 

@@ -117,9 +117,15 @@ struct API: Sendable {
     _ = try await send(.init(path: "/v1/auth/otp", method: "POST", body: ["phone": phone]), as: Blank.self)
   }
 
-  func verify(phone: String, code: String) async throws -> String {
+  func verify(phone: String, code: String, device: String) async throws -> String {
     let answer: Token = try await send(
-      .init(path: "/v1/auth/verify", method: "POST", body: ["phone": phone, "code": code]),
+      .init(
+        path: "/v1/auth/verify",
+        method: "POST",
+        // What this phone calls itself, so the session list on the profile
+        // screen is four different rows rather than four identical ones.
+        body: ["phone": phone, "code": code, "device": device],
+      ),
     )
     return answer.token
   }
@@ -219,8 +225,11 @@ struct API: Sendable {
 
   /// Straight to a session, the way the demo pages do it. Debug builds only:
   /// the real way in is an SMS.
-  func demoLogin(phone: String) async throws -> String {
-    try await send(.init(path: "/dev/login", method: "POST", body: ["phone": phone]), as: Token.self).token
+  func demoLogin(phone: String, device: String) async throws -> String {
+    try await send(
+      .init(path: "/dev/login", method: "POST", body: ["phone": phone, "device": device]),
+      as: Token.self,
+    ).token
   }
 
   // MARK: the wire
@@ -230,7 +239,7 @@ struct API: Sendable {
   struct Blank: Decodable {}
 
   /// A payload that is one named array — `{ "restaurants": [...] }`.
-  private struct Wrapped<T: Decodable>: Decodable {
+  struct Wrapped<T: Decodable>: Decodable {
     let value: T
 
     init(from decoder: Decoder) throws {

@@ -215,15 +215,17 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     }
   });
 
-  app.post<{ Body: { phone?: string; code?: string } }>(
+  app.post<{ Body: { phone?: string; code?: string; device?: string } }>(
     '/v1/auth/verify',
     async (request, reply) => {
-      const { phone, code } = request.body ?? {};
+      const { phone, code, device } = request.body ?? {};
       if (!phone || !code) {
         return badRequest(reply, 'Утас, кодоо оруулна уу.', 'phone and code are required');
       }
       try {
-        const session = await verifyOtp(ctx, phone, code);
+        // What the phone calls itself, so the session list on the profile
+        // screen is four different rows rather than four identical ones.
+        const session = await verifyOtp(ctx, phone, code, device);
         return reply.send({
           token: session.token,
           guest_id: session.guestId,
@@ -871,14 +873,14 @@ async function mountDevRoutes(
    * The real OTP path is what the tests exercise; this exists so a person
    * clicking through does not need a phone in their hand.
    */
-  app.post<{ Body: { phone?: string } }>('/dev/login', async (request, reply) => {
+  app.post<{ Body: { phone?: string; device?: string } }>('/dev/login', async (request, reply) => {
     const phone = request.body?.phone ?? '+97699001122';
     try {
       // Straight to a session. Going through the OTP path would put a
       // walkthrough behind the three-codes-an-hour limit, which exists to stop
       // somebody running up an SMS bill and has nothing to say about a demo.
       const { startSession } = await import('../platform/identity/index.js');
-      const session = await startSession(ctx, phone);
+      const session = await startSession(ctx, phone, request.body?.device);
       return reply.send({ token: session.token, guest_id: session.guestId, phone });
     } catch (error) {
       return sendError(reply, error);

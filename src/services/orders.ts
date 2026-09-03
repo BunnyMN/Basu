@@ -2,7 +2,7 @@ import { getPool, tx, type Db } from '../db/pool.js';
 import { appendEvent } from '../db/events.js';
 import { releaseReservation } from '../db/stationLoad.js';
 import { addMinutes } from '../domain/time.js';
-import { isFreeToCancel } from '../domain/states.js';
+import { isFreeToCancel, LIVE_STATES } from '../domain/states.js';
 import type { OrderState } from '../domain/types.js';
 import type { SignalType } from '../domain/eta.js';
 import { cancelFire } from '../scheduler/fireJobs.js';
@@ -664,6 +664,23 @@ async function billingFacts(orderId: string): Promise<
     merchantTin: row.tin ?? 'UNSET',
     transferId: row.ledger_transfer_id,
   };
+}
+
+/**
+ * How much of this guest's is still running.
+ *
+ * Dine answers this because identity cannot ask it — closing an account has to
+ * know whether somebody has lunch on the fire, and «what counts as running» is
+ * a question only the vertical can answer. The second vertical will add its own
+ * count beside this one.
+ */
+export async function liveOrderCount(guestId: string): Promise<number> {
+  const { rows } = await getPool().query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM dine.dining_order
+      WHERE guest_id = $1 AND state = ANY($2)`,
+    [guestId, LIVE_STATES],
+  );
+  return rows[0]?.n ?? 0;
 }
 
 /** Guests who never appeared and whose table has long since been let go. */
