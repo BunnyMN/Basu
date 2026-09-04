@@ -46,16 +46,13 @@ final class OrderFlowTests: XCTestCase {
     shot("1-home")
 
     // ── signing in, the demo way ─────────────────────────────────────
-    app.buttons["home.account"].firstMatch.tap()
-    let demo = app.buttons["signin.demo"]
-    if demo.waitForExistence(timeout: 5) {
-      demo.tap()
-    } else if app.buttons["Хаах"].firstMatch.waitForExistence(timeout: 2) {
-      // Already signed in from an earlier run; close the sheet and carry on.
-      app.buttons["Хаах"].firstMatch.tap()
+    // Signed out, the header offers the way in where the bell will be. Signed
+    // in from an earlier run, there is a bell instead and nothing to do.
+    if app.buttons["home.account"].waitForExistence(timeout: 2) {
+      app.buttons["home.account"].firstMatch.tap()
+      let demo = app.buttons["signin.demo"]
+      if demo.waitForExistence(timeout: 5) { demo.tap() }
     }
-    // Otherwise the guest was already signed in, the account button is inert,
-    // and no sheet opened — nothing to dismiss.
 
     // ── the map ──────────────────────────────────────────────────────
     XCTAssertTrue(dine.waitForExistence(timeout: 10))

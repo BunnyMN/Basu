@@ -1,11 +1,12 @@
+import BasuKit
 import SwiftUI
 
 /**
  The bowl, seen from the side.
 
- Kept for the dine screens, which had it first. The launcher's food icon is the
- same object read from above — see `GlyphKind.food` — because a three-quarter
- bowl at 34 points is a smudge, and the two views are not interchangeable.
+ Kept for the dine screens, which had it first. The launcher's food icon is
+ now the supplied render — see `AppTile` — and this stays where the food app
+ itself wants a mark.
  */
 struct BowlGlyph: Shape {
   func path(in rect: CGRect) -> Path {
@@ -43,10 +44,12 @@ struct BowlGlyph: Shape {
 }
 
 /**
- One tile on the launcher: the glyph, the name, and one word about it.
+ One tile on the launcher: the mark, the name, and one word about it.
 
- The tag under the tile carries the specificity so the glyph does not have to.
- If a mark needs a second element to say «pre-order», the tag was already doing
+ The Хоол tile is the supplied render, full-bleed at radius 18 with no inner
+ margin and no plate edge. The rest are drawn glyphs on glass, and the tag
+ under the tile carries the specificity so the glyph does not have to. If a
+ mark needs a second element to say «pre-order», the tag was already doing
  that job — which is rule six of the icon system.
  */
 struct AppTile: View {
@@ -56,31 +59,45 @@ struct AppTile: View {
   var body: some View {
     Button(action: action) {
       VStack(alignment: .leading, spacing: 6) {
-        Glyph(kind: app.glyph, size: 34)
-          .frame(width: 92, height: 92)
-          .glassCard(radius: 18)
+        tile
+          .frame(width: BasuMetric.tileMin, height: BasuMetric.tileMin)
           .shadow(color: .tileShadow, radius: 2, y: 1)
 
-        Text(app.name)
-          .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(Color.ink)
-          // Wraps rather than truncates: at larger Dynamic Type a clipped app
-          // name is an app somebody cannot find.
-          .fixedSize(horizontal: false, vertical: true)
-          .multilineTextAlignment(.leading)
-        Text(app.tag)
-          .font(.mono(9.5))
-          .foregroundStyle(Color.ink3)
-          .fixedSize(horizontal: false, vertical: true)
-          .multilineTextAlignment(.leading)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(app.name)
+            .font(.sans(13, .semibold))
+            .foregroundStyle(Color.ink)
+            // Wraps rather than truncates: at larger Dynamic Type a clipped
+            // app name is an app somebody cannot find.
+            .fixedSize(horizontal: false, vertical: true)
+            .multilineTextAlignment(.leading)
+          Text(app.tag)
+            .font(.mono(9.5))
+            .foregroundStyle(Color.ink3)
+            .fixedSize(horizontal: false, vertical: true)
+            .multilineTextAlignment(.leading)
+        }
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())
-      .opacity(app.isLive ? 1 : 0.55)
     }
     .buttonStyle(.plain)
-    .disabled(!app.isLive)
+    // Not `.disabled`: the plain style dims a disabled button, and the design
+    // draws every tile at full strength. A tile with nothing behind it simply
+    // does nothing when tapped, and says so.
     .accessibilityIdentifier("app.\(app.name)")
     .accessibilityLabel("\(app.name), \(app.tag)")
+    .accessibilityHint(app.isLive ? "" : "Удахгүй")
+  }
+
+  @ViewBuilder private var tile: some View {
+    switch app.icon {
+    case .raster:
+      FoodTile(size: BasuMetric.tileMin, radius: BasuMetric.iconTile)
+    case .glyph(let kind):
+      Glyph(kind: kind, size: BasuMetric.glyph)
+        .frame(width: BasuMetric.tileMin, height: BasuMetric.tileMin)
+        .glassCard(radius: BasuMetric.iconTile)
+    }
   }
 }

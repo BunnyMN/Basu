@@ -154,6 +154,7 @@ final class DineModel {
     do {
       let detail = try await api.order(orderId, token: token)
       order = detail
+      OrderActivity.shared.sync(detail)
       // The venue the order names, not the one that happens to be selected:
       // an order opened from the home screen never had a pin tapped.
       if venue?.id != detail.restaurant.id {

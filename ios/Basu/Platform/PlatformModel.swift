@@ -20,6 +20,9 @@ final class Platform {
   private(set) var sessions: [DeviceSession] = []
   /// Set while a page of the statement is on its way, so the button can say so.
   private(set) var loadingMore = false
+  /// Whether any call has actually told us the balance. Until one has, the
+  /// wallet shows nothing where the number goes — never a zero.
+  private(set) var walletLoaded = false
 
   /// Set while a top-up is in flight, so the button can say so.
   private(set) var toppingUp = false
@@ -34,6 +37,7 @@ final class Platform {
   }
 
   var balanceMnt: Int { me?.wallet.balanceMnt ?? wallet.balanceMnt }
+  var balanceKnown: Bool { me != nil || walletLoaded }
   var unread: Int { max(me?.unread ?? 0, inbox.unread) }
   var isSignedIn: Bool { session.isSignedIn }
 
@@ -43,6 +47,7 @@ final class Platform {
       me = nil
       wallet = .empty
       inbox = .empty
+      walletLoaded = false
       return
     }
     do {
@@ -63,6 +68,7 @@ final class Platform {
     guard let token = session.token else { return }
     do {
       wallet = try await api.wallet(token: token)
+      walletLoaded = true
       trouble = nil
     } catch {
       note(error)
@@ -207,11 +213,22 @@ final class Platform {
     }
   }
 
-  func markAllRead() async {
-    guard let token = session.token, unread > 0 else { return }
-    try? await api.markRead(nil, token: token)
-    await loadInbox()
-    await refresh()
+  /// The swipe. Gone from the list at once; the server is told after, and a
+  /// refusal puts it back rather than leaving a hole nobody explained.
+  func delete(_ message: InboxMessage) async {
+    guard let token = session.token else { return }
+    let kept = inbox
+    inbox = Inbox(
+      unread: message.read ? inbox.unread : max(0, inbox.unread - 1),
+      messages: inbox.messages.filter { $0.id != message.id },
+    )
+    do {
+      try await api.deleteMessage(message.id, token: token)
+      await refresh()
+    } catch {
+      inbox = kept
+      note(error)
+    }
   }
 
   func markRead(_ message: InboxMessage) async {
@@ -253,6 +270,12 @@ final class Platform {
   func registerPush(token pushToken: String) async {
     guard let session = session.token else { return }
     try? await api.registerPushToken(pushToken, label: UIDevice.current.name, token: session)
+  }
+
+  /// ActivityKit's token for one order's lock screen card.
+  func registerActivityToken(_ pushToken: String, order orderId: String) async {
+    guard let session = session.token else { return }
+    try? await api.registerActivityToken(pushToken, order: orderId, token: session)
   }
 
   private func note(_ error: Error) {

@@ -52,7 +52,7 @@ extension LiveOrder {
       id: id,
       source: "ХООЛ",
       title: restaurant.name,
-      meta: "№\(code) · \(state.word)",
+      meta: "№\(code) · \(state.headline?.word ?? state.stage.label)",
       time: moment.time,
       timeLabel: moment.label.uppercased(),
       status: state == .fired || state == .cooking ? .moving : .waiting,

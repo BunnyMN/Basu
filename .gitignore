@@ -9,3 +9,7 @@ dist/
 ios/*.xcodeproj/
 ios/DerivedData/
 ios/Basu/Info.plist
+ios/BasuWidgets/Info.plist
+ios/Basu/Basu.entitlements
+ios/BasuWidgets/BasuWidgets.entitlements
+ios/pass/

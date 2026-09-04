@@ -63,18 +63,18 @@ struct StatusSheet: View {
         .foregroundStyle(Color.ink3)
       // The states that carry a time say it; the rest carry a word.
       Text(order.state.headline?.word ?? Format.hhmm(order.fireAt))
-        .font(.system(size: 32, weight: .black))
+        .font(.sans(32, .black))
         .kerning(-1)
         .foregroundStyle(Color.ink)
         .multilineTextAlignment(.center)
       if let sub = order.state.subtitle, !sub.isEmpty {
         Text(order.state == .cooking ? "\(Format.hhmm(order.readyAt))-д бэлэн болно" : sub)
-          .font(.system(size: 14))
+          .font(.sans(14))
           .foregroundStyle(Color.ink2)
       }
       HStack(spacing: 8) {
         Text(order.restaurant.name)
-          .font(.system(size: 13, weight: .medium))
+          .font(.sans(13, .medium))
           .foregroundStyle(Color.ink2)
         if let table = order.table {
           Text("Ширээ \(table)")
@@ -113,12 +113,12 @@ struct StatusSheet: View {
             .foregroundStyle(Color.ink3)
             .frame(width: 44, alignment: .leading)
           Text(step.label)
-            .font(.system(size: 14, weight: done[step.key] == true ? .semibold : .regular))
+            .font(.sans(14, done[step.key] == true ? .semibold : .regular))
             .foregroundStyle(done[step.key] == true ? Color.ink : Color.ink3)
           Spacer()
           if done[step.key] == true {
             Image(systemName: "checkmark")
-              .font(.system(size: 11, weight: .bold))
+              .font(.sans(11, .bold))
               .foregroundStyle(Color.ready)
           }
         }
@@ -211,11 +211,11 @@ struct StatusSheet: View {
           .foregroundStyle(Color.accentInk)
         if let comment = review.comment, !comment.isEmpty {
           Text(comment)
-            .font(.system(size: 13))
+            .font(.sans(13))
             .foregroundStyle(Color.ink2)
         }
         Button("Өөрчлөх") { reviewing = true }
-          .font(.system(size: 13))
+          .font(.sans(13))
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(12)

@@ -46,7 +46,7 @@ struct ReviewSheet: View {
             ForEach(lines) { line in
               HStack {
                 Text("\(line.name) ×\(line.qty)")
-                  .font(.system(size: 14))
+                  .font(.sans(14))
                 Spacer()
                 StarPicker(
                   stars: Binding(

@@ -69,6 +69,7 @@ final class AppModel {
     do {
       live = try await api.liveOrders(token: token)
       noted(nil)
+      OrderActivity.shared.sync(live: live)
     } catch let error as APIError where error.isUnauthorised {
       // A token from a reseeded database is dead, not a reason to shout at
       // somebody who has only just opened the app.

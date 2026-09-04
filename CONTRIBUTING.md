@@ -30,6 +30,12 @@ npm run ios:test              # unit + бүтэн урсгал (сервер а�
 
 Xcode төсөл git-д байхгүй. `ios/project.yml` бол эх сурвалж, `xcodegen` төслийг
 үүсгэнэ — үүсгэсэн файл нь файл нэмэх бүрд өөрчлөгддөг, merge нь муу байдаг.
+Entitlements (App Group, push) ба Info.plist-үүд мөн тэндээс үүснэ.
+
+Shell-ийн дэлгэц хөндвөл `design/handoff/`-той тулга: `npm run ios:pass -- --xxl`
+нь дэлгэц бүрийг light/dark, default/XXL-ээр `ios/pass/`-д зургаар гаргана.
+Өнгө, радиус, фонтын хэмжээ бүр `ios/BasuKit/Sources/BasuKit/DesignTokens.swift`-д
+байх ёстой; тэнд байхгүй утга дизайнд байхгүй.
 
 ## Гурван дүрэм
 
@@ -75,7 +81,8 @@ Vertical нь QPay-тэй ярихгүй. `collect()` дуудна, ledger нь 
 | `npm run sim` | Оргилын ачаалал даана | Төлөвлөлт хөндвөл |
 | `npm run smoke` | HTTP-ээр, бодит сервер дээр | API хөндвөл |
 | `npm run verify` | Дээрх бүгд, зөв дарааллаар | **PR нээхийн өмнө** |
-| `npm run ios:test` | Swift unit + симулятор дээрх бүтэн урсгал | Swift хөндвөл |
+| `npm run ios:test` | Swift unit + симулятор дээрх бүтэн урсгал, island, widget | Swift хөндвөл |
+| `npm run ios:pass` | Дэлгэц бүрийн зураг — artboard-той нүдээр тулгана | Shell хөндвөл |
 
 CI нь `npm run verify`-г Postgres 16 дээр ажиллуулна. iOS-ийг ажиллуулахгүй —
 macOS runner үнэтэй, тэр багц зөвхөн Swift хөндөхөд эвддэг. Swift хөндсөн PR

@@ -18,9 +18,11 @@ import {
 } from '../platform/ledger/index.js';
 import { liveOrderCount } from '../services/orders.js';
 import {
+  dismiss,
   inbox,
   markRead,
   preferences,
+  registerActivityToken,
   registerDevice,
   revokeDevice,
   setPreferences,
@@ -50,6 +52,7 @@ const bearer = (request: FastifyRequest): string | null => {
   return header?.startsWith('Bearer ') ? header.slice(7) : null;
 };
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_TOPUP_MNT = 2_000_000;
 const MIN_TOPUP_MNT = 1_000;
 
@@ -302,6 +305,22 @@ export async function registerPlatformRoutes(
     return { unread: await unreadCount(request.guestId!) };
   });
 
+  /**
+   * The swipe. 204 whether or not the row was there: the guest wants it gone,
+   * and it is. A message that was never theirs is simply not found to remove.
+   */
+  app.delete<{ Params: { id: string } }>(
+    '/v1/notifications/:id',
+    guarded,
+    async (request, reply) => {
+      // A non-uuid would make Postgres throw rather than find nothing.
+      if (UUID.test(request.params.id)) {
+        await dismiss(request.guestId!, request.params.id, ctx.clock.now());
+      }
+      return reply.code(204).send();
+    },
+  );
+
   app.get('/v1/notifications/preferences', guarded, async (request) =>
     preferences(request.guestId!),
   );
@@ -340,6 +359,29 @@ export async function registerPlatformRoutes(
         at: ctx.clock.now(),
       });
       return { registered: true };
+    },
+  );
+
+  /**
+   * ActivityKit's push token for one order's Live Activity. Stored so the
+   * lock screen can be moved without the app; sending to it is the relay's job
+   * once APNs credentials exist, and until then the phone updates its own
+   * activity on every poll.
+   */
+  app.post<{ Params: { id: string }; Body: { push_token?: string } }>(
+    '/v1/activities/:id/token',
+    guarded,
+    async (request, reply) => {
+      const token = request.body?.push_token;
+      if (!token) return badRequest(reply, 'Токен заагаагүй байна.', 'push_token is required');
+      await registerActivityToken({
+        guestId: request.guestId!,
+        subject: 'order',
+        subjectId: request.params.id,
+        pushToken: token,
+        at: ctx.clock.now(),
+      });
+      return reply.code(204).send();
     },
   );
 

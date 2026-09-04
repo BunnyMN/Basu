@@ -59,7 +59,7 @@ struct BehaviourTests {
     func order(_ state: OrderState, fireAt: Date?, readyAt: Date?) -> LiveOrder {
       LiveOrder(
         id: "o", code: "0001", state: state,
-        restaurant: VenueRef(id: "r", name: "Ц"), table: nil, totalMnt: 1,
+        restaurant: VenueRef(id: "r", name: "Ц"), table: nil, totalMnt: 1, partySize: 2,
         slotStartsAt: slot, fireAt: fireAt, readyAt: readyAt,
       )
     }

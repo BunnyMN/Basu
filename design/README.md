@@ -35,7 +35,10 @@ springboard-ын зургийг ав — бусад иконы дунд яаж �
 
 ## Shell-ийн дизайн
 
-`handoff/` — 14 artboard (launcher 1/4/9 икон, түрийвч, мэдэгдэл, профайл,
-гэрэл ба харанхуй), токен, icon системийн дүрэм, аватарын алгоритм.
-`Basu Shell.dc.html`-ийг браузераар нээнэ. Хэрэгжүүлэлт нь `ios/Basu/Design/`,
-`Home/`, `Platform/` гурван хавтаст.
+`handoff/` — 22 artboard (splash, launcher 1/4/9 икон, түрийвч, мэдэгдэл,
+профайл, Live Activity, Dynamic Island, widget — гэрэл ба харанхуй), токен,
+icon системийн дүрэм, аватарын алгоритм, ба хэрэгжүүлэлтийн баримтууд:
+`ARCHITECTURE.md`, `DATA-MODEL.md`, `BUILD-PLAN.md`. `Basu Shell.dc.html`-ийг
+браузераар нээнэ (`support.js` хажууд нь байх ёстой). Токен нь кодоор
+`ios/BasuKit/Sources/BasuKit/DesignTokens.swift`; хэрэгжүүлэлт `ios/Basu/Design/`,
+`Home/`, `Platform/`, `ios/BasuWidgets/`.

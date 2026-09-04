@@ -463,6 +463,100 @@ describe('the inbox', () => {
     expect(read.json().unread).toBe(0);
   });
 
+  it('lets a guest swipe a row away, and only their own', async () => {
+    const token = await signIn();
+    const other = await signIn('+97699002233');
+    const { enqueue } = await import('../platform/notify/index.js');
+    const me = await app.inject({ method: 'GET', url: '/v1/me', headers: auth(token) });
+
+    await enqueue(ctx, {
+      guestId: me.json().id,
+      template: 'welcome',
+      title: 'Basu-д тавтай морил',
+      body: 'Түрийвчээ цэнэглээрэй.',
+      channel: 'push',
+    });
+    const listed = await app.inject({ method: 'GET', url: '/v1/notifications', headers: auth(token) });
+    const id = listed.json().messages[0].id as string;
+
+    // Somebody else swiping it changes nothing for the owner.
+    const theirs = await app.inject({
+      method: 'DELETE',
+      url: `/v1/notifications/${id}`,
+      headers: auth(other),
+    });
+    expect(theirs.statusCode).toBe(204);
+    const still = await app.inject({ method: 'GET', url: '/v1/notifications', headers: auth(token) });
+    expect(still.json().messages).toHaveLength(1);
+    expect(still.json().unread).toBe(1);
+
+    // The owner's swipe: gone from the list, gone from the count, and the
+    // launcher's badge agrees.
+    const mine = await app.inject({
+      method: 'DELETE',
+      url: `/v1/notifications/${id}`,
+      headers: auth(token),
+    });
+    expect(mine.statusCode).toBe(204);
+    const after = await app.inject({ method: 'GET', url: '/v1/notifications', headers: auth(token) });
+    expect(after.json().messages).toHaveLength(0);
+    expect(after.json().unread).toBe(0);
+    const home = await app.inject({ method: 'GET', url: '/v1/me', headers: auth(token) });
+    expect(home.json().unread).toBe(0);
+
+    // Swiping it again is not an error either: it is gone, which is what
+    // was asked for.
+    const again = await app.inject({
+      method: 'DELETE',
+      url: `/v1/notifications/${id}`,
+      headers: auth(token),
+    });
+    expect(again.statusCode).toBe(204);
+
+    // A garbage id is nothing to remove, not a server error.
+    const junk = await app.inject({
+      method: 'DELETE',
+      url: '/v1/notifications/not-a-uuid',
+      headers: auth(token),
+    });
+    expect(junk.statusCode).toBe(204);
+  });
+
+  it('keeps the lock screen\'s own push token, per order', async () => {
+    const token = await signIn();
+    const orderId = '11111111-2222-4333-8444-555555555555';
+    const first = await app.inject({
+      method: 'POST',
+      url: `/v1/activities/${orderId}/token`,
+      headers: auth(token),
+      payload: { push_token: 'abc123' },
+    });
+    expect(first.statusCode).toBe(204);
+    // The same token again is the same row; a second phone is a second row.
+    await app.inject({
+      method: 'POST',
+      url: `/v1/activities/${orderId}/token`,
+      headers: auth(token),
+      payload: { push_token: 'abc123' },
+    });
+    await app.inject({
+      method: 'POST',
+      url: `/v1/activities/${orderId}/token`,
+      headers: auth(token),
+      payload: { push_token: 'def456' },
+    });
+    const { activityTokensFor } = await import('../platform/notify/index.js');
+    expect((await activityTokensFor('order', orderId)).sort()).toEqual(['abc123', 'def456']);
+
+    const empty = await app.inject({
+      method: 'POST',
+      url: `/v1/activities/${orderId}/token`,
+      headers: auth(token),
+      payload: {},
+    });
+    expect(empty.statusCode).toBe(400);
+  });
+
   it('remembers a phone to push to, and what the guest agreed to', async () => {
     const token = await signIn();
     const registered = await app.inject({

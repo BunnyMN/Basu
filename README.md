@@ -62,8 +62,10 @@ Docker хэрэггүй — локал Postgres 16 хангалттай. Тес�
 | iOS нэгжийн | Payload задлалт, цаг/мөнгө, geofence зурвас | `npm run ios:test` |
 | iOS бүтэн урсгал | Нэвтрэх → пин → цэс → төлбөр → төлөв, симулятор дээр | `npm run ios:test` |
 | iOS платформ | Түрийвч цэнэглэх → inbox цэвэрлэх → профайл | `npm run ios:test` |
-| Shell-ийн дүрэм | Аватарын үүсгэлт, launcher-ийн 1/4/9 байдал | `npm run ios:test` |
+| Shell-ийн дүрэм | Аватарын үүсгэлт, launcher-ийн 1/4/9 байдал, badge, шат | `npm run ios:test` |
 | iOS доройтол | Сервергүй үед апп хоосон биш, шалтгаанаа хэлдэг | `npm run ios:test` |
+| Гадна талд | Dynamic Island, lock screen карт, deep link, widget хоёр хэмжээ | `npm run ios:test` |
+| Дизайны pass | Дэлгэц бүр light/dark, default/XXL — artboard-той нүдээр тулгана | `npm run ios:pass` |
 
 ## Бүтэц
 
@@ -87,10 +89,13 @@ src/ports.ts    Гадаад системүүдийн интерфейс + те�
 src/sim/        Өдрийн симуляц
 migrations/     Дугаарлагдсан .sql, зөвхөн урагш
 ios/            Shell: launcher, native түрийвч/профайл/мэдэгдэл + хоолны дэлгэц
-  Basu/Design/  Токен, glass гадаргуу, icon систем, seed аватар
-  Basu/Home/    Launcher: аппын каталог, идэвхтэй мөр, grid
-  Basu/Platform/ Shell-ийн гурав — түрийвч, мэдэгдэл, профайл
-design/handoff/ Дизайны эх сурвалж: 14 artboard, токен, icon-ын дүрэм
+  BasuKit/      Апп ба widget-ийн хамтын багц: токен, activity, snapshot, food tile
+  BasuWidgets/  Live Activity (lock screen, Dynamic Island) + нүүрний widget
+  Basu/Design/  Токеныг аппын нэрээр, glass гадаргуу, icon систем, seed аватар
+  Basu/Home/    Launcher: аппын каталог, идэвхтэй карт, grid
+  Basu/Platform/ Shell-ийн гурав — түрийвч, мэдэгдэл, профайл; захиалгын activity
+  Fonts/        Golos Text, JetBrains Mono — 400/500/600, OFL
+design/handoff/ Дизайны эх сурвалж: 22 artboard, токен, icon-ын дүрэм, build plan
 ```
 
 Launcher-ыг нэг иконоор биш, **өсөлтөөр нь** шалгана. Дизайн 1 / 4 / 9 иконтой
@@ -395,7 +400,8 @@ inline SVG: launcher өөрийгөө зурахын тулд сүлжээ хү�
 brew install xcodegen        # нэг удаа
 npm run dev                  # API :3000 дээр байх ёстой
 npm run ios                  # төсөл үүсгэх → build → симулятор дээр ажиллуулах
-npm run ios:test             # нэгжийн + бүтэн урсгалын тест
+npm run ios:test             # нэгжийн + бүтэн урсгалын + island/widget тест
+npm run ios:pass -- --xxl    # дэлгэц бүрийг light/dark, default/XXL-ээр зургаар авна
 ```
 
 Сервер унтраалттай үед апп хоосон харагдахаа больж, **«Серверт холбогдож
@@ -408,13 +414,54 @@ npm run ios:test             # нэгжийн + бүтэн урсгалын те
 generated файлыг хадгалах шалтгаан алга.
 
 ```
-ios/Basu/
-  App/          Оролт, навигаци, демо цагийн зурвас
-  Core/         API клиент, моделууд, сесс (Keychain), байршил, формат
-  Design/       app.css-ийн өнгө, chip, товч — хоёр газарт нэг бүтээгдэхүүн
-  Home/         Basu нүүр: иконы сүлжээ + идэвхтэй захиалга
-  Dine/         Газрын зураг, цэс, төлөв, үнэлгээ, хоолны зураг
+ios/
+  BasuKit/      Swift package. DesignTokens.swift (handoff-ынх, фонтын нэрийг
+                static face-ээр засаж), BasuActivityAttributes, OrderSnapshot
+                (App Group), StageBar, food-tile. Аппаас юу ч импортлохгүй.
+  BasuWidgets/  Widget extension: OrderLiveActivity, OrderWidget (small, medium)
+  Basu/
+    App/        Оролт, splash, 66pt икон-л таб бар, deep link, демо цагийн зурвас
+    Core/       API клиент, моделууд, сесс (Keychain), байршил, формат
+    Design/     Токеныг аппын нэрээр, glass, glyph-ууд, seed аватар
+    Home/       Basu нүүр: иконы сүлжээ + идэвхтэй карт
+    Platform/   Түрийвч, мэдэгдэл, профайл; OrderActivity (lock screen, widget)
+    Dine/       Газрын зураг, цэс, төлөв, үнэлгээ, хоолны зураг
 ```
+
+### Shell дизайны дагуу
+
+`design/handoff/` бол гэрээ: 22 artboard, `README.md` (спек), `BUILD-PLAN.md`
+(11 алхам), `DesignTokens.swift`. Аппын shell дэлгэц бүр — splash, launcher
+1/4/9, түрийвч, мэдэгдэл (жагсаалт, хоосон), профайл, lock screen карт,
+Dynamic Island, widget — тэдгээртэй 402×874 дээр, light/dark, default/XXL
+Dynamic Type-аар тулгагдсан. `npm run ios:pass` нь яг тэр зургуудыг
+`ios/pass/` дотор гаргана; artboard-уудыг `design/handoff/Basu Shell.dc.html`
+браузерт нээгээд хажууд нь тавина.
+
+Дизайнд байхгүй, гэхдээ App Store ба амьдралд хэрэгтэй зүйлс профайлын
+доод хэсэгт хэвээр: нэвтэрсэн төхөөрөмж, нөхцөл/нууцлал/хувилбар, бүртгэл
+хаах. «Гарах» тэдгээрийн дараа, дизайны картаараа. Нэвтрээгүй үед launcher-ийн
+хонхны оронд «Нэвтрэх» гарна — дизайн зөвхөн нэвтэрсэн төлвийг зурсан.
+
+Түрийвчийн «Өөр дүн» гурван товчны доор холбоос байхаа больсон: дизайнд гурван
+товч л бий. Аль ч дүнг **удаан дарахад** дурын дүнгийн цонх нээгдэнэ; VoiceOver
+дээр тус бүр «Өөр дүн» үйлдэлтэй.
+
+### Захиалга аппаас гадна
+
+Захиалга баталгаажмагц **Live Activity** эхэлж, суух эсвэл цуцлахад дуусна.
+Lock screen карт, Dynamic Island (compact, expanded, minimal) ба нүүрний widget
+(small, medium) бүгд нэг гурван шатыг харуулна — Хүлээгдэж байна / Гал дээр /
+Ширээ бэлэн. Хувь хэзээ ч тооцоологдохгүй: гурван хэсэгт бар, гурван төлөв.
+
+Апп өөрөө activity-гаа poll бүр дээр шинэчилнэ. ActivityKit-ийн push токен
+`POST /v1/activities/:id/token`-д бүртгэгдэнэ (`notify.activity_token`), гэхдээ
+серверээс APNs руу илгээх relay хараахан байхгүй — APNs итгэмжлэл орж ирэхэд
+тэр нэг газарт нэмэгдэнэ. Widget App Group (`group.mn.basu.shared`) дахь
+snapshot-оос уншина; апп захиалга өөрчлөгдөх бүрд бичнэ.
+
+Утасны цаг демо цагтай зөрөх үед lock screen нь утасныхаа цагийг дагана:
+бодит цагаар 15 минутаас өмнө өнгөрсөн суулт activity ч биш, widget ч биш.
 
 Гурван шийдвэр тайлбартай:
 
@@ -435,8 +482,10 @@ ios/Basu/
 800/300 метрийн хоёр зурвас нь бүтээгдэхүүний өөрийн хэмжүүр — арын байршил
 асуух нь апп-д хэрэгтэйгээс хамаагүй том амлалт болно.
 
-Үсэг: Golos Text/IBM Plex Mono вэб фонтуудыг апп дотор суулгаагүй, системийн
-SF Pro / SF Mono-г ашиглана. Өнгө, зай, бүтэц нь адил.
+Үсэг: Golos Text ба JetBrains Mono (OFL) аппын дотор суулгасан — дизайн яг
+эдгээрийг зааж өгсөн, кирилл бүрэн, дэлгэцэнд зориулж зурагдсан. Тоо бүр mono,
+₮ тэмдэг sans-аар (mono-д тэр тэмдэг байхгүй). Хэмжээ бүр Dynamic Type-тай
+хамт томордог.
 
 ## Интерфейс
 

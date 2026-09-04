@@ -7,6 +7,7 @@
  */
 export {
   ack,
+  dismiss,
   enqueue,
   inbox,
   markRead,
@@ -20,7 +21,9 @@ export {
 } from './messages.js';
 
 export {
+  activityTokensFor,
   devicesOf,
+  registerActivityToken,
   registerDevice,
   revokeDevice,
   type Device,

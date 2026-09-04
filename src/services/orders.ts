@@ -591,6 +591,11 @@ export async function markNoShow(ctx: Ctx, orderId: string): Promise<void> {
  * the same two accounts the purchase used, so the pair nets to zero and reads
  * as one line of story rather than two unrelated events.
  */
+const REFUND_MEMO: Record<string, string> = {
+  'cancelled before firing': 'цуцалсан',
+  'restaurant rejected': 'ресторан татгалзсан',
+};
+
 async function refund(ctx: Ctx, orderId: string, reason: string): Promise<void> {
   const billed = await billingFacts(orderId);
   if (!billed?.transferId) return; // never paid — nothing to give back
@@ -600,7 +605,9 @@ async function refund(ctx: Ctx, orderId: string, reason: string): Promise<void> 
     amountMnt: billed.amountMnt,
     subject: 'order',
     subjectId: orderId,
-    memo: `Хоол · ${reason}`,
+    // The memo is what the statement prints under «Буцаалт». The reason is
+    // the event log's, in English; the guest reads Mongolian.
+    memo: `Хоол · ${REFUND_MEMO[reason] ?? 'буцаалт'}`,
     idempotencyKey: `order:${orderId}:refund`,
   });
 

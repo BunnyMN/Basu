@@ -2,7 +2,7 @@
 
 ## Overview
 
-Basu is a Mongolian-language super-app shell for iOS. It launches other services (food pre-order first, more later), holds a shared wallet balance, and collects notifications from every service into one list. This handoff covers the shell only: the launcher at three stages of growth (1, 4 and 9 app icons), the wallet, notifications (populated and empty) and profile, plus the icon system, avatar marks and the bell badge.
+Basu is a Mongolian-language super-app shell for iOS. It launches other services (food pre-order first, more later), holds a shared wallet balance, and collects notifications from every service into one list. This handoff covers the shell only: the splash, the launcher at three stages of growth (1, 4 and 9 app icons), the wallet, notifications (populated and empty) and profile, the Live Activity and Dynamic Island, the Home Screen widgets, plus the icon system, avatar marks and the bell badge.
 
 Everything is specified in both light and dark theme, at 402 × 874 pt (iPhone 16 logical size).
 
@@ -12,7 +12,7 @@ Everything is specified in both light and dark theme, at 402 × 874 pt (iPhone 1
 
 `support.js` is the runtime the prototype needs to open in a browser. It is not part of the design; ignore it when implementing.
 
-Open the HTML file directly in a browser to see all fourteen artboards on one pannable canvas. Each artboard has a caption above it and, on the light/dark sections, an annotation below it explaining why the screen is built that way.
+Open the HTML file directly in a browser to see all twenty-two artboards on one pannable canvas. Each artboard has a caption above it and, on the light/dark sections, an annotation below it explaining why the screen is built that way.
 
 ## Fidelity
 
@@ -20,10 +20,10 @@ Open the HTML file directly in a browser to see all fourteen artboards on one pa
 
 | Design intends | Prototype uses | On implementation |
 | --- | --- | --- |
-| SF Pro Text / Display | IBM Plex Sans | Use SF Pro (system font) |
-| SF Mono | IBM Plex Mono | Use SF Mono |
+| SF Pro Text / Display | Golos Text | Golos Text is the intended face — it carries Cyrillic and is drawn for screen. Ship it. |
+| SF Mono | JetBrains Mono | Intended for all numerals and labels. Ship it. |
 
-The prototype's icons are hand-drawn SVG at SF Symbols' metrics. Where an SF Symbol exists for the same object, prefer the symbol.
+The Хоол tile is a supplied raster render (`food-tile.png`), full-bleed at radius 18 with no inner margin. The remaining tiles are hand-drawn SVG at SF Symbols' metrics. Where an SF Symbol exists for the same object, prefer the symbol.
 
 All copy is Mongolian Cyrillic and is final — do not translate or rewrite it.
 
@@ -88,7 +88,7 @@ Body copy uses `text-wrap: pretty`. App names wrap rather than truncate at large
 
 ### Geometry
 
-- Radius: **4** on cards and rows, **18** on app icon tiles, **28%** on avatar plates, **8** on the badge pill, **16** on the switch track, **2** on the channel chip.
+- Radius: **12** on cards and rows, **18** on app icon tiles, **28%** on avatar plates, **8** on the badge pill, **16** on the switch track, **2** on the channel chip.
 - Screen padding: **20** horizontal.
 - Status bar: **54** tall, clock at 30 from the left edge.
 - Tab bar: **78** tall, `1px` top hairline, content padded **10** from its top.
@@ -100,16 +100,18 @@ Body copy uses `text-wrap: pretty`. App names wrap rather than truncate at large
 
 ## Screens
 
+### 0. Splash
+
+Shown for the length of launch, then the launcher fades in behind it. Contents, centred on the ground gradient: the wordmark `Basu` at 44/600 tracked −0.03em in `ink`; a 34 × 2 accent rule below it, radius 1, gap 14; and `УЛААНБААТАР` in mono 10.5 tracked 0.16em `ink3` pinned 44 from the bottom. The 54pt status bar is present, as on every other screen. No logo file, no spinner, no progress text.
+
 ### 1. Launcher (Нүүр)
 
 The default screen. Three artboards show it at 1, 4 and 9 icons — same structure, different content, to prove it holds up as the product grows.
 
 **Layout**, top to bottom inside 20pt side padding, gap 9:
 
-1. **Header block**, gap 10.
-   - Row: left column holds `УЛААНБААТАР` (section label) over `Basu` (27/600); right side holds the bell and avatar, gap 14, offset 4 from the top.
-   - Below: greeting `Сайн байна уу, Батаа` at 17/400 in `ink2`.
-2. **ИДЭВХТЭЙ (live) section**, label + rows, gap 7 / 6.
+1. **Header block**: `Basu` at 27/600 on the left, the bell alone on the right. No city label, no greeting, no avatar — all three were cut.
+2. **ИДЭВХТЭЙ (live) section**: one card containing everything. The `ИДЭВХТЭЙ` label sits inside it at padding 11 × 14 (10 at the bottom); rows follow, each separated by a 1pt `line` top border, padding 11 × 14. Rows are not individual cards.
 3. **App grid section**, gap 9.
 
 **Bell.** 26 × 26, stroke 1.6 in `ink`. Badge is a **15pt-tall pill** (not a circle), min-width 15, horizontal padding 4, radius 8, `accent` fill, `onAccent` mono 9.5 tabular. Positioned `top: −3, right: −5` so it grows rightward from its own left edge and the bell never shifts. Three digits become `99+`.
@@ -131,14 +133,14 @@ Rows are ordered by the moment that matters, not by which app produced them.
 **Band rules that must be preserved:**
 - Bands are **editorial, fixed by the product** — `АППУУД` when few; `ӨДӨР ТУТАМ` / `БУСАД` from nine on.
 - **No folders and no most-recently-used reordering.** A grid that rearranges itself cannot be learned by thumb. Recency belongs to the LIVE section, which sits above the grid already.
-- A **search field appears at seven or more icons**, inline on the first band's label row: `surface2` + blur, 1pt `line`, radius 4, padding 5 × 9, 13pt magnifier + `Хайх` in mono 12 `ink3`.
+- A **search field appears at seven or more icons**, inline on the first band's label row: `surface2` + blur, 1pt `line`, radius 12, padding 5 × 9, 13pt magnifier + `Хайх` in mono 12 `ink3`.
 - With one icon only, the coming-soon line is **a hairline and one line of type** (`Такси, хүргэлт, тасалбар — 2026 оны төгсгөлд`, mono 11.5 `ink3`), never an empty placeholder card.
 
 ### 2. Wallet (Түрийвч)
 
-Reached from the tab bar. Back affordance at the top left: 20pt chevron + `Basu` in `accent`.
+Reached from the tab bar. Nav title `Түрийвч` at 28/600, padding 2 × 20 × 16.
 
-- **Balance block**, gap 12: `ТҮРИЙВЧ` label; `70,000₮` at 48/600 mono tabular; then one explanatory sentence at 13.5/400 `ink2`, max 30ch — `Хоолны төлбөр эндээс хасагдана. Дутвал зөрүүг нь л асууна.`
+- **Balance block**, gap 12: `70,000₮` at 48/600 mono tabular; then one explanatory sentence at 13.5/400 `ink2`, max 30ch — `Хоолны төлбөр эндээс хасагдана. Дутвал зөрүүг нь л асууна.`
 - **ЦЭНЭГЛЭХ**: three equal top-up amounts in a `repeat(3, 1fr)` grid, gap 10. Each is a card, padding 15 × 6, centred mono 14/600.
 - **ГҮЙЛГЭЭ**: rows separated by top hairlines, padding 14 vertical. Left column is kind (15/500) over source (mono 11.5 `ink3`) — the source names the app the transaction came from, e.g. `Хоол · Модерн Номадс №0971`. Right column is amount (mono 15/600, `ready` for credits, `ink` for debits, real minus sign `−`) over time (mono 11 `ink3`).
 
@@ -146,16 +148,17 @@ Reached from the tab bar. Back affordance at the top left: 20pt chevron + `Basu`
 
 Two artboards: populated and empty.
 
-- Top bar: back link left, `Бүгдийг уншсан` in `accent` right.
-- Title `Мэдэгдэл`, 28/600, 18pt bottom padding.
-- Rows: top hairline, padding 16 vertical, gap 12. A leading 6pt `accent` dot marks unread (offset 8 from the top); read rows keep a 6pt-wide empty spacer so text stays aligned.
+- Nav bar: a three-column grid — 20pt back chevron in `accent` on the left, `Мэдэгдэл` centred at 17/600, right cell empty. Padding 4 × 20 × 18. There is no mark-all-read action.
+- Rows: top hairline, padding 16 × 12, gap 12, inside a wrapper with `margin: 0 -12px`, radius 12 and `overflow: hidden`.
+- **Unread** is a muted blue wash across the row — `unread` = `#E4EDF5` light / `#16232E` dark — plus the heavier title. No dot, and the accent is reserved for the bell badge.
+- **Swipe left** on a row reveals `Устгах`: an 88pt-wide `stop`-filled button pinned to the row's right edge, label 14/500 in `onStop` (`#FFFFFF` light / `#2A0B0C` dark). The row's own right padding goes to 100 while open so text truncates rather than sliding out of the clip box. Shown open on the third row of the populated artboard.
 - Row content, gap 7: header line with source label + channel chip on the left and time on the right; title (600 when unread, 400 `ink2` when read); body at 13/400 `ink2`.
 - **Channel chip** is a separate fact from the source: `SMS` or `АПП`, mono 9/500 tracked 0.12em, 1pt `line2` border, radius 2, padding 3 × 5. Source says where it came from; channel says where to look for it.
-- Unread is expressed by the dot and the heavier title only — never a tinted row background.
 - **Empty state** is a paragraph on the ground colour under the same hairline, max 32ch, 14/400 `ink2`. No illustration, no card, no button.
 
 ### 4. Profile (Профайл)
 
+- Nav title `Профайл` at 28/600, padding 2 × 20 × 16.
 - Identity row, gap 16: 54pt avatar; name 24/600; phone in mono 14 `ink2`; a line of provenance at 11.5/400 `ink3` — `Basu-д 2026 оны 8-р сараас хойш · 3f8c1a92`.
 - Fields card: two rows (`Нэр`, `Хэл`), padding 14 × 16, hairline between. Label left in `ink2`, value right in `ink` 500 followed by a 13pt chevron in `ink3`.
 - **МЭДЭГДЭЛ** card: three switch rows — `Аппаар` (on), `Мессежээр` (on), `Урамшуулал` (off). Track 51 × 31, radius 16, `accent` when on and `line2` when off, 2pt inset, knob 27 white with `0 1px 2px rgba(0,0,0,.2)`.
@@ -164,7 +167,7 @@ Two artboards: populated and empty.
 
 ### 5. Tab bar (all screens)
 
-Three items — `Нүүр`, `Түрийвч`, `Профайл` — pinned to the bottom, `surface` + blur, 1pt top hairline, 78 tall. Each item is a 23pt stroked glyph over a 10pt label, gap 5, in `accent` when active and `ink3` when not. Items are equal-width thirds; the tap target is the full third × 44 minimum.
+Three items — home, wallet, profile — pinned to the bottom, `surface` + blur, 1pt top hairline, **66 tall**, content padded 14 from its top. Each item is a **25pt stroked glyph, icon only** — the labels were removed — in `accent` when active and `ink3` when not. Items are equal-width thirds; the tap target is the full third × 44 minimum.
 
 The bar carries the shell only. Apps are never tabs — they stay in the grid.
 
@@ -173,6 +176,8 @@ The bar carries the shell only. Apps are never tabs — they stay in the grid.
 ---
 
 ## Icon system
+
+The **Хоол** tile is a supplied raster render, `food-tile.png` — full-bleed inside the 92pt tile at radius 18, no inner margin, no plate border. It sets the direction for the rest; the drawn glyphs below are the current stand-ins and the rules still govern them.
 
 Six glyphs shipped, three more drawn to prove the rule (see the icon sheet at the bottom of the prototype).
 
@@ -213,6 +218,36 @@ Symmetry keeps it from reading as noise at 54pt; the empty cells are what make t
 
 ---
 
+### 6. Live Activity (ActivityKit)
+
+One activity per order, started when the order is confirmed and ended when the party is seated or the order is cancelled. It is not a notification.
+
+**Lock screen card.** Full-width less 14pt side margin, `lockCard` (white at 12%) over an 18pt blur, 1pt `lockLine` border, radius 22, padding 16 × 18, gap 14.
+
+- Header row: 30pt app icon at radius 8; venue at 15/600; `№0971 · 2 хүн` in mono 11.5 `onLock2`. Right side is the seating time at 26/600 mono over `СУУХ` in mono 9 tracked 0.14em.
+- Below, gap 7: a **three-segment bar** — three equal 3pt bars, gap 4, radius 2, filled in `accent` up to the current stage and `lockTrack` beyond it. The three segments are the order's only states (Хүлээгдэж байна / Гал дээр / Ширээ бэлэн), so no percentage is ever computed or shown.
+- Under the bar: the stage label at 12.5/500 on the left, the fire time at 12.5/600 mono `accent` on the right.
+
+The seating time is the largest element on the card because it is the only number the user acts on.
+
+**Dynamic Island.**
+
+- *Compact*: 37pt pill, radius 19, black. 22pt icon at radius 6 leading, seating time at 15/600 mono trailing.
+- *Expanded*: radius 40, black, padding 18 × 20 × 20, gap 15. Same facts as the lock screen card — 34pt icon, venue at 15/600, stage label in mono 11.5 `#8E9AA0`, seating time at 28/600 mono over `СУУХ`, then the three-segment bar with `#2B3236` as the empty track. It shows nothing the card doesn't.
+- *Two activities*: the food activity keeps the wide compact slot and the other collapses to a 37pt circular glyph. Whichever is nearer in time takes the wide slot.
+
+`staleDate` is seating time + 30 minutes. Updates arrive by push; see `DATA-MODEL.md` for the payload.
+
+### 7. Home Screen widgets (WidgetKit)
+
+Same timeline as the activity. Both sizes are `surface` + blur, 1pt `line`, radius 24, padding 16.
+
+- **Medium (2 × 4)**, height 158: header row identical in structure to the activity card (28pt icon, venue 14.5/600, `№0971 · 2 хүн` mono 11) with the seating time at 30/600 mono over `СУУХ` on the right; the three-segment bar and the stage / fire-time line at the bottom. Empty track is `line2`.
+- **Small (2 × 2)**, 158 × 158: 28pt icon at the top, then the seating time at 34/600 mono tracked −0.02em over `СУУХ · №0971` in mono 9. Nothing else.
+- **Empty state** (no live order): the icon and one sentence — `Захиалга алга. Товшиж хоол сонгоно.` at 12.5/400 `ink2`. Never a zeroed layout.
+
+Timeline entries at now, fire time, seating time, and seating + 15 minutes. Tap opens `basu://order/{id}`.
+
 ## Interactions & behaviour
 
 Navigation is a flat three-tab shell. Tapping an app icon pushes that service; tapping a LIVE row opens the order it refers to; `Дэлгэрэнгүй`-style inline actions push the detail view. Back is a chevron + `Basu`, not a bare arrow.
@@ -239,5 +274,14 @@ None to import. All icons are vector drawings specified above and should become 
 
 ## Files
 
-- `Basu Shell.dc.html` — all fourteen artboards, both themes, plus the icon sheet, avatar marks and badge states. Open in a browser.
+- `Basu Shell.dc.html` — all twenty-two artboards, both themes, plus the icon sheet, avatar marks and badge states. Open in a browser.
+- `food-tile.png` — the Хоол app icon, 512 × 512, pre-rounded at radius 18/92.
 - `support.js` — prototype runtime only; not part of the design.
+
+## Implementation docs in this folder
+
+- `CLAUDE.md` — read-me-first brief and the rules for this codebase.
+- `ARCHITECTURE.md` — targets, module layout, stores, ActivityKit / WidgetKit setup, navigation, accessibility.
+- `DATA-MODEL.md` — Swift models, endpoints, push payloads, formatting rules.
+- `BUILD-PLAN.md` — eleven ordered steps, each with acceptance criteria.
+- `DesignTokens.swift` — every colour, font role and metric as code. Drop it into `BasuKit`.

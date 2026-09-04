@@ -208,6 +208,7 @@ struct LiveOrder: Decodable, Sendable, Identifiable, Hashable {
   let restaurant: VenueRef
   let table: String?
   let totalMnt: Int
+  let partySize: Int?
   let slotStartsAt: Date
   let fireAt: Date?
   let readyAt: Date?
@@ -215,6 +216,7 @@ struct LiveOrder: Decodable, Sendable, Identifiable, Hashable {
   enum CodingKeys: String, CodingKey {
     case id, code, state, restaurant, table
     case totalMnt = "total_mnt"
+    case partySize = "party_size"
     case slotStartsAt = "slot_starts_at"
     case fireAt = "fire_at"
     case readyAt = "ready_at"
@@ -268,6 +270,7 @@ struct OrderDetail: Decodable, Sendable, Hashable {
   let restaurant: VenueRef
   let table: String?
   let totalMnt: Int
+  let partySize: Int?
   let slotStartsAt: Date
   let fireAt: Date?
   let readyAt: Date?
@@ -281,6 +284,7 @@ struct OrderDetail: Decodable, Sendable, Hashable {
   enum CodingKeys: String, CodingKey {
     case id, code, state, restaurant, table, lines, review, receipt
     case totalMnt = "total_mnt"
+    case partySize = "party_size"
     case slotStartsAt = "slot_starts_at"
     case fireAt = "fire_at"
     case readyAt = "ready_at"

@@ -23,7 +23,8 @@
     "ios": "node scripts/ios.mjs",
     "ios:test": "node scripts/ios.mjs test",
     "inspect": "node scripts/inspect.mjs",
-    "probe:route": "node scripts/probe-route.mjs"
+    "probe:route": "node scripts/probe-route.mjs",
+    "ios:pass": "node scripts/ios-pass.mjs"
   },
   "type": "module",
   "private": true,

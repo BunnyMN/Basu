@@ -106,10 +106,10 @@ struct VenueSheet: View {
       }
 
       Text("Хоол ")
-        .font(.system(size: 12.5))
+        .font(.sans(12.5))
         .foregroundStyle(Color.ink2)
-        + Text("гал дээр гарахаас өмнө").font(.system(size: 12.5, weight: .semibold)).foregroundStyle(Color.accentInk)
-        + Text(" үнэгүй цуцална.").font(.system(size: 12.5)).foregroundStyle(Color.ink2)
+        + Text("гал дээр гарахаас өмнө").font(.sans(12.5, .semibold)).foregroundStyle(Color.accentInk)
+        + Text(" үнэгүй цуцална.").font(.sans(12.5)).foregroundStyle(Color.ink2)
 
       if !session.isSignedIn {
         WideButton(title: "Нэвтэрч захиалах", enabled: !model.cart.isEmpty) {
@@ -151,12 +151,12 @@ struct MenuRow: View {
 
       VStack(alignment: .leading, spacing: 2) {
         Text(item.name)
-          .font(.system(size: 15, weight: .medium))
+          .font(.sans(15, .medium))
           .foregroundStyle(item.soldOut ? Color.ink3 : Color.ink)
           .strikethrough(item.soldOut)
         if let description = item.description, !description.isEmpty {
           Text(description)
-            .font(.system(size: 12.5))
+            .font(.sans(12.5))
             .foregroundStyle(Color.ink2)
             .lineLimit(2)
         }
@@ -217,7 +217,7 @@ struct Stepper: View {
   private func button(_ symbol: String, _ action: @escaping () -> Void) -> some View {
     Button(action: action) {
       Image(systemName: symbol)
-        .font(.system(size: 11, weight: .semibold))
+        .font(.sans(11, .semibold))
         .frame(width: 30, height: 30)
         .foregroundStyle(Color.ink2)
         .contentShape(Rectangle())
@@ -261,7 +261,7 @@ struct CommentRow: View {
     VStack(alignment: .leading, spacing: 4) {
       HStack(spacing: 6) {
         Text(String(repeating: "★", count: comment.stars))
-          .font(.system(size: 11))
+          .font(.sans(11))
           .foregroundStyle(Color.accentInk)
         Text(comment.by)
           .font(.mono(10))
@@ -273,7 +273,7 @@ struct CommentRow: View {
         }
       }
       Text(comment.comment)
-        .font(.system(size: 13))
+        .font(.sans(13))
         .foregroundStyle(Color.ink2)
     }
     .frame(maxWidth: .infinity, alignment: .leading)

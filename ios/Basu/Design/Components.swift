@@ -42,7 +42,7 @@ struct WideButton: View {
   var body: some View {
     Button(action: action) {
       Text(title)
-        .font(.system(size: 15, weight: kind == .primary ? .semibold : .regular))
+        .font(.sans(15, kind == .primary ? .semibold : .regular))
         .frame(maxWidth: .infinity)
         .padding(.vertical, 15)
         .foregroundStyle(foreground)
@@ -83,7 +83,7 @@ struct StarPicker: View {
           stars = n
         } label: {
           Image(systemName: n <= stars ? "star.fill" : "star")
-            .font(.system(size: size))
+            .font(.sans(size))
             .foregroundStyle(n <= stars ? Color.accentInk : Color.line2)
         }
         .buttonStyle(.plain)
@@ -108,14 +108,14 @@ struct OfflineBanner: View {
   var body: some View {
     HStack(alignment: .top, spacing: 10) {
       Image(systemName: "wifi.slash")
-        .font(.system(size: 15))
+        .font(.sans(15))
         .foregroundStyle(Color.hold)
       VStack(alignment: .leading, spacing: 2) {
         Text("Серверт холбогдож чадсангүй")
-          .font(.system(size: 13.5, weight: .semibold))
+          .font(.sans(13.5, .semibold))
           .foregroundStyle(Color.ink)
         Text(hint)
-          .font(.system(size: 12))
+          .font(.sans(12))
           .foregroundStyle(Color.ink2)
           .fixedSize(horizontal: false, vertical: true)
       }
@@ -162,7 +162,7 @@ struct Banner: View {
 
   var body: some View {
     Text(message)
-      .font(.system(size: 13))
+      .font(.sans(13))
       .foregroundStyle(Color.stop)
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(12)

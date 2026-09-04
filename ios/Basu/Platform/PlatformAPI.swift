@@ -290,6 +290,27 @@ extension API {
     )
   }
 
+  /// The swipe. The row is gone from this guest's inbox; the message itself
+  /// stays a record of what was sent.
+  func deleteMessage(_ id: String, token: String) async throws {
+    _ = try await send(
+      .init(path: "/v1/notifications/\(id)", method: "DELETE", token: token),
+      as: API.Blank.self,
+    )
+  }
+
+  /// ActivityKit's push token for one order, so the server can move the lock
+  /// screen without the app being open.
+  func registerActivityToken(_ pushToken: String, order orderId: String, token: String) async throws {
+    _ = try await send(
+      .init(
+        path: "/v1/activities/\(orderId)/token", method: "POST",
+        body: ["push_token": pushToken], token: token,
+      ),
+      as: API.Blank.self,
+    )
+  }
+
   func notifyPreferences(token: String) async throws -> NotifyPreferences {
     try await send(.init(path: "/v1/notifications/preferences", token: token))
   }

@@ -1,3 +1,4 @@
+import BasuKit
 import SwiftUI
 import Testing
 
@@ -126,9 +127,12 @@ struct ShellTests {
     #expect(AppCatalogue.bands(count: 9).map(\.label) == bands.map(\.label))
   }
 
-  @Test func everyAppHasItsOwnGlyphAndAOneWordTag() {
+  @Test func everyAppHasItsOwnMarkAndAOneWordTag() {
     let apps = AppCatalogue.bands(count: 9).flatMap(\.apps)
-    #expect(Set(apps.map(\.glyph)).count == apps.count)
+    #expect(Set(apps.map(\.icon)).count == apps.count)
+    // The food tile is the supplied render; every other mark is drawn.
+    #expect(apps[0].icon == .raster("food-tile"))
+    #expect(apps.dropFirst().allSatisfy { $0.glyph != nil })
     for app in apps {
       #expect(!app.name.isEmpty)
       #expect(!app.tag.isEmpty)
@@ -142,6 +146,33 @@ struct ShellTests {
     #expect(AppCatalogue.searchThreshold == 7)
     #expect(AppCatalogue.bands(count: 4).flatMap(\.apps).count < AppCatalogue.searchThreshold)
     #expect(AppCatalogue.bands(count: 9).flatMap(\.apps).count >= AppCatalogue.searchThreshold)
+  }
+
+  // MARK: - the shell's furniture
+
+  @Test func theBarCarriesTheShellAndNothingElse() {
+    // Home, wallet, profile. Apps are never tabs — they stay in the grid.
+    #expect(ShellTab.allCases.map(\.rawValue) == ["home", "wallet", "profile"])
+    // Icon-only, so the label is all VoiceOver has; every one has one.
+    #expect(ShellTab.allCases.allSatisfy { !$0.title.isEmpty })
+  }
+
+  @Test func theBadgeStopsAtNinetyNine() {
+    #expect(BasuFormat.badge(9) == "9")
+    #expect(BasuFormat.badge(99) == "99")
+    #expect(BasuFormat.badge(100) == "99+")
+  }
+
+  @Test func theStageIsTheBarsSegmentAndTheEndIsTheEnd() {
+    #expect(OrderState.placed.stage == .waiting)
+    #expect(OrderState.scheduled.stage == .waiting)
+    #expect(OrderState.fired.stage == .cooking)
+    #expect(OrderState.cooking.stage == .cooking)
+    #expect(OrderState.ready.stage == .ready)
+    // Nothing more will happen to these: the activity ends, the widget empties.
+    #expect(OrderState.served.isOver)
+    #expect(OrderState.cancelled.isOver)
+    #expect(!OrderState.armed.isOver)
   }
 
   // MARK: - money, as it is set

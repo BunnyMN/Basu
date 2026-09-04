@@ -19,18 +19,55 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     GENERATE_INFOPLIST_FILE: NO
 
+# Shared by the app and the widget extension: tokens, the activity attributes,
+# the order snapshot both read. It imports nothing from the app.
+packages:
+  BasuKit:
+    path: BasuKit
+
+# Golos Text and JetBrains Mono, static 400 / 500 / 600. Every target that
+# draws text bundles them and lists them under UIAppFonts.
+fonts: &fonts
+  - GolosText-Regular.ttf
+  - GolosText-Medium.ttf
+  - GolosText-SemiBold.ttf
+  - JetBrainsMono-Regular.ttf
+  - JetBrainsMono-Medium.ttf
+  - JetBrainsMono-SemiBold.ttf
+
 targets:
   Basu:
     type: application
     platform: iOS
     sources:
       - path: Basu
+      - path: Fonts
+        buildPhase: resources
+        excludes: ["*.txt"]
+    dependencies:
+      - package: BasuKit
+      - target: BasuWidgets
+        embed: true
+    entitlements:
+      path: Basu/Basu.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.mn.basu.shared
+        # Push, for the device and for each Live Activity's own token.
+        aps-environment: development
     info:
       path: Basu/Info.plist
       properties:
         CFBundleDisplayName: Basu
         CFBundleShortVersionString: "0.1.0"
         CFBundleVersion: "1"
+        UIAppFonts: *fonts
+        # The order's progress on the lock screen and in the Dynamic Island.
+        NSSupportsLiveActivities: true
+        # basu://order/{id}, basu://wallet, basu://notifications
+        CFBundleURLTypes:
+          - CFBundleURLName: mn.basu.app
+            CFBundleURLSchemes: [basu]
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations:
@@ -57,6 +94,37 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
 
+  # WidgetKit + ActivityKit UI. Renders whatever the timeline or the activity
+  # hands it; never touches the network.
+  BasuWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: BasuWidgets
+      - path: Fonts
+        buildPhase: resources
+        excludes: ["*.txt"]
+    dependencies:
+      - package: BasuKit
+    entitlements:
+      path: BasuWidgets/BasuWidgets.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.mn.basu.shared
+    info:
+      path: BasuWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Basu
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        UIAppFonts: *fonts
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: mn.basu.app.widgets
+        TARGETED_DEVICE_FAMILY: "1"
+
   BasuUITests:
     type: bundle.ui-testing
     platform: iOS
@@ -80,3 +148,18 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: mn.basu.app.tests
         GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Basu:
+    build:
+      targets:
+        Basu: all
+        BasuWidgets: [run, test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - BasuTests
+        - package: BasuKit/BasuKitTests
+        - BasuUITests

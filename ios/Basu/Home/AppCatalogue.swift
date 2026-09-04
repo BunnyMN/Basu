@@ -16,10 +16,23 @@ struct LauncherApp: Identifiable, Hashable, Sendable {
   let name: String
   /// One lower-case word. It carries the specificity the glyph must not.
   let tag: String
-  let glyph: GlyphKind
+  let icon: ServiceIcon
   let destination: Destination?
 
+  /// The glyph, for the tiles that are drawn. The food tile is a render and
+  /// has none.
+  var glyph: GlyphKind? {
+    if case .glyph(let kind) = icon { return kind }
+    return nil
+  }
+
   var isLive: Bool { destination != nil }
+}
+
+/// A supplied render, or a mark drawn to the icon system's rules.
+enum ServiceIcon: Hashable, Sendable {
+  case raster(String)
+  case glyph(GlyphKind)
 }
 
 struct AppBand: Identifiable, Hashable, Sendable {
@@ -30,20 +43,20 @@ struct AppBand: Identifiable, Hashable, Sendable {
 
 enum AppCatalogue {
   static let food = LauncherApp(
-    id: "food", name: "Хоол", tag: "урьдчилсан", glyph: .food, destination: .dine(orderId: nil),
+    id: "food", name: "Хоол", tag: "урьдчилсан", icon: .raster("food-tile"), destination: .dine(orderId: nil),
   )
 
   /// Drawn, named, and not built. They exist here so the grid can be seen at
   /// the sizes it will really be — see `bands(count:)`.
   static let planned: [LauncherApp] = [
-    .init(id: "taxi", name: "Такси", tag: "дуудлага", glyph: .taxi, destination: nil),
-    .init(id: "delivery", name: "Хүргэлт", tag: "30 минут", glyph: .delivery, destination: nil),
-    .init(id: "ticket", name: "Тасалбар", tag: "театр, кино", glyph: .ticket, destination: nil),
-    .init(id: "bill", name: "Төлбөр", tag: "нэхэмжлэх", glyph: .bill, destination: nil),
-    .init(id: "shop", name: "Дэлгүүр", tag: "ойрхон", glyph: .shop, destination: nil),
-    .init(id: "net", name: "Интернэт", tag: "дата", glyph: .net, destination: nil),
-    .init(id: "pharmacy", name: "Эмийн сан", tag: "24 цаг", glyph: .pharmacy, destination: nil),
-    .init(id: "cafe", name: "Кофе", tag: "авч явах", glyph: .cafe, destination: nil),
+    .init(id: "taxi", name: "Такси", tag: "дуудлага", icon: .glyph(.taxi), destination: nil),
+    .init(id: "delivery", name: "Хүргэлт", tag: "30 минут", icon: .glyph(.delivery), destination: nil),
+    .init(id: "ticket", name: "Тасалбар", tag: "театр, кино", icon: .glyph(.ticket), destination: nil),
+    .init(id: "bill", name: "Төлбөр", tag: "нэхэмжлэх", icon: .glyph(.bill), destination: nil),
+    .init(id: "shop", name: "Дэлгүүр", tag: "ойрхон", icon: .glyph(.shop), destination: nil),
+    .init(id: "net", name: "Интернэт", tag: "дата", icon: .glyph(.net), destination: nil),
+    .init(id: "pharmacy", name: "Эмийн сан", tag: "24 цаг", icon: .glyph(.pharmacy), destination: nil),
+    .init(id: "cafe", name: "Кофе", tag: "авч явах", icon: .glyph(.cafe), destination: nil),
   ]
 
   /// The line under the grid while there is one icon. A hairline and a

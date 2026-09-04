@@ -52,7 +52,7 @@ enum Format {
   /// The same, for an already-signed string such as `+50,000` or `−18,500`.
   static func signedText(_ digits: String, size: CGFloat, weight: Font.Weight = .semibold) -> Text {
     Text(digits).font(.mono(size, weight)).monospacedDigit()
-      + Text("\u{200A}\u{200A}₮").font(.system(size: size, weight: weight))
+      + Text("\u{200A}\u{200A}₮").font(.sans(size, weight))
   }
 
   /// Signed money as a plain string: `+50 000₮` / `−18 500₮`.

@@ -109,7 +109,7 @@ struct DineView: View {
         Button { dismiss() } label: {
           HStack(spacing: 2) {
             Image(systemName: "chevron.left")
-            Text("Basu").font(.system(size: 15, weight: .semibold))
+            Text("Basu").font(.sans(15, .semibold))
           }
         }
         .accessibilityIdentifier("dine.home")
@@ -155,7 +155,7 @@ struct DineView: View {
   private func badge(_ model: DineModel) -> some View {
     VStack(alignment: .leading, spacing: 3) {
       Text("Үдийн хоол")
-        .font(.system(size: 14.5, weight: .bold))
+        .font(.sans(14.5, .bold))
         .foregroundStyle(Color.ink)
       Text(model.venues.isEmpty
         // With nothing on the map, silence would read as "nowhere is open".
@@ -228,7 +228,7 @@ struct OrderBar: View {
             .font(.mono(11))
             .foregroundStyle(Color.ink3)
           Text(order.state.subtitle ?? order.state.word)
-            .font(.system(size: 14, weight: .medium))
+            .font(.sans(14, .medium))
             .foregroundStyle(Color.ink)
         }
         Spacer()
@@ -253,7 +253,7 @@ struct Toast: View {
   var body: some View {
     if let text {
       Text(text)
-        .font(.system(size: 13))
+        .font(.sans(13))
         .foregroundStyle(Color.bg)
         .padding(.horizontal, 18)
         .padding(.vertical, 11)

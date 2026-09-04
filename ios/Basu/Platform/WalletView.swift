@@ -1,3 +1,4 @@
+import BasuKit
 import SwiftUI
 
 /**
@@ -8,8 +9,6 @@ import SwiftUI
  see a trend, they open it to find out whether the next thing will work.
  */
 struct WalletView: View {
-  let back: () -> Void
-
   @Environment(Platform.self) private var platform
   @State private var confirming: Int?
   @State private var customAmount = false
@@ -25,13 +24,13 @@ struct WalletView: View {
         topUp
         statement
       }
-      .padding(.horizontal, 20)
-      .padding(.bottom, 88)
+      .padding(.horizontal, BasuMetric.screenPadding)
+      .padding(.bottom, 78)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .scrollIndicators(.hidden)
     .background(LinearGradient.ground)
-    .safeAreaInset(edge: .top) { ShellHeader(back: back) }
+    .safeAreaInset(edge: .top, spacing: 0) { ShellTitle("Түрийвч") }
     .toolbarVisibility(.hidden, for: .navigationBar)
     .confirmationDialog(
       confirming.map { "\(Format.mnt($0)) цэнэглэх үү?" } ?? "",
@@ -59,19 +58,34 @@ struct WalletView: View {
     .task { await platform.loadWallet() }
   }
 
+  /// One number, then only what explains it. A failed fetch omits the number
+  /// rather than showing a zero — a wallet that says 0₮ when it means «I do not
+  /// know» is the one thing here that could make somebody top up twice.
   private var balance: some View {
     VStack(alignment: .leading, spacing: 12) {
-      SectionLabel("Түрийвч")
-      Format.mntText(platform.wallet.balanceMnt, size: 48)
-        .kerning(-0.96)
-        .foregroundStyle(Color.ink)
-        .contentTransition(.numericText())
-        .accessibilityIdentifier("wallet.balance")
+      if platform.balanceKnown {
+        Format.mntText(platform.wallet.balanceMnt, size: 48)
+          .kerning(-0.02 * 48)
+          .foregroundStyle(Color.ink)
+          .contentTransition(.numericText())
+          .accessibilityIdentifier("wallet.balance")
+      } else {
+        Button {
+          Task { await platform.loadWallet() }
+        } label: {
+          Text("Үлдэгдэл уншигдсангүй — дахин")
+            .font(.sans(15, .medium))
+            .foregroundStyle(Color.accent)
+            .frame(minHeight: 48)
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("wallet.retry")
+      }
       Text("Хоолны төлбөр эндээс хасагдана. Дутвал зөрүүг нь л асууна.")
-        .font(.system(size: 13.5))
-        .lineSpacing(3)
+        .font(.sans(13.5))
+        .lineSpacing(13.5 * 0.5 - 3)
         .foregroundStyle(Color.ink2)
-        .frame(maxWidth: 280, alignment: .leading)
+        .frame(maxWidth: 262, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
     }
   }
@@ -92,18 +106,14 @@ struct WalletView: View {
               .glassCard(stroke: .line2)
           }
           .buttonStyle(.plain)
+          // Three amounts cover most of it. Holding one is the fourth way,
+          // for the person who needs 37 000₮ and would otherwise top up twice.
+          .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in customAmount = true })
           .disabled(platform.toppingUp)
           .accessibilityIdentifier("wallet.topup.\(amount)")
+          .accessibilityAction(named: "Өөр дүн") { customAmount = true }
         }
       }
-
-      // Three amounts cover most of it; the fourth way out is for the person
-      // who needs 37 000 ₮ and would otherwise top up twice.
-      Button("Өөр дүн") { customAmount = true }
-        .font(.system(size: 13, weight: .medium))
-        .foregroundStyle(Color.accentInk)
-        .disabled(platform.toppingUp)
-        .accessibilityIdentifier("wallet.topup.other")
       if let trouble = platform.trouble {
         Banner(message: trouble)
       }
@@ -118,8 +128,8 @@ struct WalletView: View {
       if platform.wallet.lines.isEmpty {
         Hairline()
         Text("Гүйлгээ алга. Цэнэглэвэл энд харагдана.")
-          .font(.system(size: 14))
-          .lineSpacing(4)
+          .font(.sans(14))
+          .lineSpacing(14 * 0.6 - 4)
           .foregroundStyle(Color.ink2)
           .padding(.top, 26)
           .frame(maxWidth: 300, alignment: .leading)
@@ -136,8 +146,8 @@ struct WalletView: View {
             Task { await platform.loadMoreWallet() }
           } label: {
             Text(platform.loadingMore ? "Уншиж байна…" : "Цааш үзэх")
-              .font(.system(size: 14, weight: .medium))
-              .foregroundStyle(Color.accentInk)
+              .font(.sans(13, .medium))
+              .foregroundStyle(Color.accent)
               .frame(maxWidth: .infinity)
               .padding(.vertical, 16)
               .contentShape(Rectangle())
@@ -257,7 +267,7 @@ struct MovementSheet: View {
           if let lottery = receipt.lottery {
             HStack {
               Text("Сугалааны дугаар")
-                .font(.system(size: 14))
+                .font(.sans(14))
                 .foregroundStyle(Color.ink2)
               Spacer(minLength: 8)
               Text(lottery)
@@ -284,7 +294,7 @@ struct MovementSheet: View {
           : line.kind == "topup"
             ? "Цэнэглэлтэд баримт гардаггүй — баримт хоол зарсан ресторанаас гарна."
             : "Баримт хараахан гараагүй байна. Захиалга хаагдмагц энд гарч ирнэ.")
-          .font(.system(size: 13))
+          .font(.sans(13))
           .lineSpacing(3.5)
           .foregroundStyle(Color.ink2)
           .fixedSize(horizontal: false, vertical: true)
@@ -295,11 +305,11 @@ struct MovementSheet: View {
   private func detail(_ label: String, _ value: String, mono: Bool = false) -> some View {
     HStack(spacing: 12) {
       Text(label)
-        .font(.system(size: 15))
+        .font(.sans(15))
         .foregroundStyle(Color.ink2)
       Spacer(minLength: 8)
       Text(value)
-        .font(mono ? .mono(14) : .system(size: 15, weight: .medium))
+        .font(mono ? .mono(14) : .sans(15, .medium))
         .foregroundStyle(Color.ink)
     }
     .padding(.horizontal, 16)
@@ -321,7 +331,7 @@ struct StatementRow: View {
       HStack(alignment: .top, spacing: 16) {
         VStack(alignment: .leading, spacing: 5) {
           Text(line.title)
-            .font(.system(size: 15, weight: .medium))
+            .font(.sans(15, .medium))
             .foregroundStyle(Color.ink)
             .fixedSize(horizontal: false, vertical: true)
           // The source names the app, because with several apps a bare
@@ -357,38 +367,63 @@ struct StatementRow: View {
 }
 
 /**
- The way back to the launcher: a chevron and the word `Basu`.
+ The title a tab root carries: 28/600, tracked −0.02em, padding 2 × 20 × 16.
 
- Not a bare arrow. The shell has a name, and a person two screens deep should
- be told what they are going back to rather than left to remember.
+ Wallet and Profile are roots, not pushed screens — there is nothing to go back
+ to, so there is no back link. The glass under it is the same the tab bar has,
+ so content scrolling up runs under a surface rather than a gap.
  */
-struct ShellHeader: View {
-  let back: () -> Void
-  var title: String?
-  var trailing: AnyView?
+struct ShellTitle: View {
+  let text: String
+  init(_ text: String) { self.text = text }
 
   var body: some View {
-    HStack(spacing: 6) {
-      Button(action: back) {
-        HStack(spacing: 6) {
-          Chevron(direction: .back, size: 20)
-          Text("Basu").font(.system(size: 15, weight: .medium))
-        }
-        .foregroundStyle(Color.accent)
-        .frame(minHeight: 44)
-        .contentShape(Rectangle())
-      }
-      .buttonStyle(.plain)
-      .accessibilityIdentifier("shell.back")
+    Text(text)
+      .font(.sans(28, .semibold))
+      .tracking(-0.02 * 28)
+      .foregroundStyle(Color.ink)
+      .frame(maxWidth: .infinity, alignment: .leading)
+      .padding(.top, 2)
+      .padding(.horizontal, BasuMetric.screenPadding)
+      .padding(.bottom, 16)
+      .background(Color.groundTop.ignoresSafeArea(edges: .top))
+      .accessibilityAddTraits(.isHeader)
+  }
+}
 
-      Spacer(minLength: 8)
-      if let trailing { trailing }
+/**
+ The nav bar of a pushed shell screen: a chevron on the left in `accent`, the
+ title centred at 17/600, and an empty right cell. Three columns, so the title
+ is centred on the screen and not on what is left of it.
+ */
+struct ShellNav: View {
+  let title: String
+  let back: () -> Void
+
+  var body: some View {
+    ZStack {
+      Text(title)
+        .font(.sans(17, .semibold))
+        .tracking(-0.01 * 17)
+        .foregroundStyle(Color.ink)
+        .accessibilityAddTraits(.isHeader)
+      HStack {
+        Button(action: back) {
+          Chevron(direction: .back, size: 20)
+            .foregroundStyle(Color.accent)
+            .frame(width: BasuMetric.minTarget, height: BasuMetric.minTarget, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("shell.back")
+        .accessibilityLabel("Буцах")
+        Spacer()
+      }
     }
-    .padding(.horizontal, 20)
-    .padding(.bottom, 6)
-    // The same glass the tab bar uses. Without it the content scrolls under a
-    // transparent row and the two read on top of each other — the header has
-    // to be a surface, not a gap with a link in it.
-    .background(.ultraThinMaterial)
+    .frame(height: 44)
+    .padding(.top, 4 - (44 - 20) / 2)
+    .padding(.horizontal, BasuMetric.screenPadding)
+    .padding(.bottom, 18 - (44 - 20) / 2)
+    .background(Color.groundTop.ignoresSafeArea(edges: .top))
   }
 }
