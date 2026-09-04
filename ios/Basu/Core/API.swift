@@ -19,6 +19,13 @@ enum Endpoint {
       return url
     }
     #if DEBUG
+      // A debug build on a real phone: the address is baked in at build time
+      // (`BASU_API=` on the xcodebuild line), because a phone has no
+      // environment and `localhost` there is the phone itself.
+      if let raw = Bundle.main.object(forInfoDictionaryKey: "BasuAPI") as? String,
+         !raw.isEmpty, let url = URL(string: raw) {
+        return url
+      }
       return URL(string: "http://localhost:3000")!
     #else
       return URL(string: "https://basu.burzai.cloud")!
