@@ -13,23 +13,6 @@ struct SectionLabel: View {
   }
 }
 
-/// The state chip: `PLACED`, `FIRED`, `READY` — each with the colour the
-/// kitchen display and the web app already give it.
-struct StateChip: View {
-  let state: OrderState
-  let label: String
-
-  var body: some View {
-    Text(label)
-      .font(.mono(11, .medium))
-      .foregroundStyle(state.tint)
-      .padding(.horizontal, 8)
-      .padding(.vertical, 3)
-      .background(state.soft, in: RoundedRectangle(cornerRadius: 3))
-      .overlay(RoundedRectangle(cornerRadius: 3).stroke(state.line, lineWidth: 1))
-  }
-}
-
 /// The big button at the bottom of a sheet — pay, cancel, send.
 struct WideButton: View {
   enum Kind { case primary, quiet, danger }
@@ -66,29 +49,6 @@ struct WideButton: View {
     case .primary: .accent
     case .quiet: .line2
     case .danger: .stopLine
-    }
-  }
-}
-
-/// Five tappable stars. Keeps its own value so the form around it can rebuild
-/// without taking the caret out of whatever somebody is typing.
-struct StarPicker: View {
-  @Binding var stars: Int
-  var size: CGFloat = 30
-
-  var body: some View {
-    HStack(spacing: 4) {
-      ForEach(1...5, id: \.self) { n in
-        Button {
-          stars = n
-        } label: {
-          Image(systemName: n <= stars ? "star.fill" : "star")
-            .font(.sans(size))
-            .foregroundStyle(n <= stars ? Color.accentInk : Color.line2)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(n) од")
-      }
     }
   }
 }

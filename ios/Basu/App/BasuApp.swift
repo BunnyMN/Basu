@@ -7,9 +7,13 @@ import WidgetKit
 
  The home screen owns no domain logic: it is a list of icons, whatever of the
  guest's is running, and a way into the three things every app shares. Today
- there is one icon. The second is one entry in `AppCatalogue` and one
- `Destination` case, and nothing else on this screen changes — which is the
- whole of what "shell" means here.
+ there is one icon. The second is one entry in `AppCatalogue`, and nothing
+ else on this screen changes — which is the whole of what "shell" means here.
+
+ The shell is native and the apps are not. Every icon opens a web page from
+ the shell's own server inside `ServiceView`, signed in as the shell's guest;
+ the shell keeps the launcher, the wallet, the inbox, the profile and the
+ lock screen, which are the parts a person sees before choosing anything.
 
  Wallet, notifications and profile are not apps. They are the shell's, they are
  in `Platform/`, and a second vertical gets all three without writing any of it.
@@ -75,8 +79,8 @@ struct RootView: View {
         surface
           .navigationDestination(for: Destination.self) { destination in
             switch destination {
-            case .dine(let orderId):
-              DineView(resuming: orderId)
+            case .app(let id, let page):
+              ServiceView(app: id, path: page, back: { if !path.isEmpty { path.removeLast() } })
             case .inbox:
               InboxView(
                 back: { if !path.isEmpty { path.removeLast() } },
@@ -132,7 +136,7 @@ struct RootView: View {
   /// True while a vertical owns the screen. The shell's own pushes do not
   /// count — the inbox keeps the bar, and keeps Нүүр lit under it.
   private var inApp: Bool {
-    path.contains { if case .dine = $0 { true } else { false } }
+    path.contains { if case .app = $0 { true } else { false } }
   }
 
   @ViewBuilder private var surface: some View {
@@ -152,12 +156,16 @@ struct RootView: View {
     guard url.scheme == "basu" else { return }
     switch url.host {
     case "order":
-      let id = url.pathComponents.dropFirst().first
       tab = .home
-      path = [.dine(orderId: id)]
+      if let id = url.pathComponents.dropFirst().first,
+         let destination = AppCatalogue.food.destination(order: id) {
+        path = [destination]
+      } else if let destination = AppCatalogue.food.destination {
+        path = [destination]
+      }
     case "dine":
       tab = .home
-      path = [.dine(orderId: nil)]
+      if let destination = AppCatalogue.food.destination { path = [destination] }
     case "wallet":
       path = []
       tab = .wallet
@@ -171,14 +179,15 @@ struct RootView: View {
 
   // MARK: - the design pass
 
-  /// `BASU_SCREEN=wallet|profile|inbox|splash` lands the app on a screen so the
-  /// pass can photograph it. Debug only; production has no such door.
+  /// `BASU_SCREEN=wallet|profile|inbox|splash|food` lands the app on a screen
+  /// so the pass can photograph it. Debug only; production has no such door.
   private static func jumpForDebug(tab: inout ShellTab, path: inout [Destination]) {
     #if DEBUG
       switch ProcessInfo.processInfo.environment["BASU_SCREEN"] {
       case "wallet": tab = .wallet
       case "profile": tab = .profile
       case "inbox": path = [.inbox]
+      case "food": path = [AppCatalogue.food.destination].compactMap { $0 }
       default: break
       }
     #endif
@@ -279,9 +288,10 @@ struct TabBar: View {
 }
 
 enum Destination: Hashable {
-  /// `orderId` is the deep link: the launcher sends somebody straight to the
-  /// order they already have, rather than to a map they have to search.
-  case dine(orderId: String?)
+  /// An app: its id from `AppCatalogue`, and the page to open — `/dine`, or
+  /// `/dine?order=…` when the launcher sends somebody straight to the order
+  /// they already have rather than to a map they have to search.
+  case app(id: String, path: String)
 
   /// Reached from the bell, and pushed over the launcher rather than given a
   /// tab — an inbox is somewhere you go back from, not somewhere you live.

@@ -27,7 +27,14 @@ struct DemoAPI {
   }
 
   /// An order of the demo guest's that is running, made if there is none.
-  func runningOrder() async throws -> Running {
+  ///
+  /// `onTheWall` asks for a sitting still ahead on the *phone's* clock, not
+  /// only the demo one: the island and the widget run on real time, and a
+  /// seating the wall has passed is an order that is over out there. After
+  /// the last sitting of the day there is no such order to be had, and the
+  /// tests that need one skip rather than fail — the app is not wrong at
+  /// two in the afternoon, the demo day is.
+  func runningOrder(onTheWall: Bool = false) async throws -> Running {
     guard let token = try await post("/dev/login", ["phone": "+97699001122"])["token"] as? String else {
       throw XCTSkip("The demo server did not sign the demo guest in.")
     }
@@ -58,6 +65,9 @@ struct DemoAPI {
       guard slot["available"] as? Bool == true, let raw = slot["starts_at"] as? String,
             let at = ISO8601DateFormatter.lenient.date(from: raw) else { return false }
       return at > soonest
+    }
+    if onTheWall, ahead == nil {
+      throw XCTSkip("No sitting is still ahead on the wall clock; the lock screen would have nothing to show.")
     }
     guard let slot = (ahead ?? slots.first { $0["available"] as? Bool == true })?["starts_at"] as? String else {
       throw XCTSkip("No free sitting left today.")

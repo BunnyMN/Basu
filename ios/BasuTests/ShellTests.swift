@@ -141,6 +141,22 @@ struct ShellTests {
     }
   }
 
+  @Test func anAppIsAPageAndOnlyTheBuiltOnesOpen() {
+    // The shell is native; what an icon opens is a web page from the shell's
+    // own server, signed in as the shell's guest. Nothing native per app.
+    #expect(AppCatalogue.food.destination == .app(id: "food", path: "/dine"))
+    // The launcher's ИДЭВХТЭЙ row, the inbox and the lock screen all land on
+    // the order itself, the way the web launcher's `?order=` does.
+    #expect(AppCatalogue.food.destination(order: "o1") == .app(id: "food", path: "/dine?order=o1"))
+    // An icon that is drawn but not built promises nothing — it has no page,
+    // so a tap does nothing rather than opening a blank one.
+    for app in AppCatalogue.planned {
+      #expect(app.destination == nil)
+      #expect(app.destination(order: "o1") == nil)
+      #expect(!app.isLive)
+    }
+  }
+
   @Test func theFilterOnlyEarnsItsPlaceAtSeven() {
     // Under seven, a filter is slower than looking.
     #expect(AppCatalogue.searchThreshold == 7)

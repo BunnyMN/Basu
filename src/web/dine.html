@@ -265,7 +265,7 @@ body{display:flex;flex-direction:column}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
 <script type="module">
-import { api, store, toast, mountClock, mnt, hhmm, HEADLINE } from '/api.js';
+import { api, store, shell, toast, mountClock, mnt, hhmm, HEADLINE } from '/api.js';
 import { mapStyle, pinImage, ULAANBAATAR, isCovered, metresBetween, walkMinutes } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -335,6 +335,8 @@ const state = {
 /* ── signing in ──────────────────────────────────────────────────── */
 
 async function signIn() {
+  // Inside the phone app the sheet is the shell's, and so is the token.
+  if (shell.present) return shell.signIn();
   const { token } = await api('/dev/login', { method: 'POST', body: {} });
   store.guestToken = token;
   return token;
@@ -900,6 +902,7 @@ async function placeOrder() {
     state.orderId = order.id;
     state.sent = new Set();
     rendered = null;
+    shell.ordersChanged();
     await showStatus(true);
   } catch (error) {
     toast(error.message, 'bad');
@@ -947,8 +950,11 @@ async function showStatus(force) {
     order.table,
     order.review ? 'reviewed' : '',
   ].join('|');
-  const open = $('sheet').hasAttribute('data-open');
-  if (!force && open && signature === rendered) return;
+  // A poll that found no news changes nothing — including a sheet the guest
+  // has just closed, which used to come back four seconds later. News
+  // reopens it: the kitchen accepting or firing is worth interrupting for.
+  if (!force && signature === rendered) return;
+  if (rendered !== null && signature !== rendered) shell.ordersChanged();
   rendered = signature;
 
   // The states that carry a time say it; the rest carry a word.

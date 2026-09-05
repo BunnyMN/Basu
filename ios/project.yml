@@ -73,8 +73,10 @@ targets:
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         # The whole product is "the kitchen starts cooking as you approach", so
-        # the app has to be able to tell how close the guest is. Foreground
-        # only for now: the bands are reported while the status screen is up.
+        # the food app has to be able to tell how close the guest is. That app
+        # is a web page inside the shell, and its `navigator.geolocation` asks
+        # through this string. Foreground only: the bands are reported while
+        # the page is up.
         NSLocationWhenInUseUsageDescription: >-
           Хэр ойрхон байгааг тань мэдвэл гал тогоо хоолыг чинь яг таарах цагт
           нь тавина. Байршлыг зөвхөн захиалга явж байх үед асууна.
@@ -86,8 +88,10 @@ targets:
         # Empty by default, and ignored by release builds.
         BasuAPI: $(BASU_API)
         NSAppTransportSecurity:
-          # The demo API runs on the developer's own machine over http. The
-          # exception is localhost and nothing else.
+          # The demo API runs on the developer's own machine over http, and
+          # the apps inside the shell are pages from it. The exception is
+          # localhost (and, for a phone, the Mac's LAN address) and nothing
+          # else; the pilot is https.
           NSAllowsLocalNetworking: true
           NSExceptionDomains:
             localhost:

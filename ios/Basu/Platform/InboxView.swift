@@ -217,6 +217,6 @@ extension InboxMessage {
   /// The platform's own messages — a welcome, a receipt — go nowhere.
   var destination: Destination? {
     guard subject == "order", let id = subjectId else { return nil }
-    return .dine(orderId: id)
+    return AppCatalogue.food.destination(order: id)
   }
 }

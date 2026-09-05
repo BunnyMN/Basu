@@ -2,48 +2,6 @@ import BasuKit
 import SwiftUI
 
 /**
- The bowl, seen from the side.
-
- Kept for the dine screens, which had it first. The launcher's food icon is
- now the supplied render — see `AppTile` — and this stays where the food app
- itself wants a mark.
- */
-struct BowlGlyph: Shape {
-  func path(in rect: CGRect) -> Path {
-    // The glyph is described in a 24×24 box, then scaled into whatever it is
-    // given — the same viewBox the SVG uses.
-    let s = min(rect.width, rect.height) / 24
-    func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-      CGPoint(x: rect.minX + x * s, y: rect.minY + y * s)
-    }
-
-    var path = Path()
-
-    // The bowl: a rim, and the round of it underneath.
-    path.move(to: p(3.5, 11))
-    path.addLine(to: p(20.5, 11))
-    path.addCurve(to: p(12, 18.5), control1: p(20.5, 15.4), control2: p(16.7, 18.5))
-    path.addCurve(to: p(3.5, 11), control1: p(7.3, 18.5), control2: p(3.5, 15.4))
-    path.closeSubpath()
-
-    // The line of the rim, wider than the bowl, the way a bowl looks.
-    path.move(to: p(2.5, 11))
-    path.addLine(to: p(21.5, 11))
-
-    // Two curls of steam. Without them a bowl from above is a circle.
-    path.move(to: p(9, 7.5))
-    path.addCurve(to: p(10, 5.1), control1: p(9, 6.5), control2: p(10, 6.1))
-    path.addCurve(to: p(9, 3.5), control1: p(10, 4.1), control2: p(9, 3.5))
-
-    path.move(to: p(13.5, 8))
-    path.addCurve(to: p(14.7, 5.1), control1: p(13.5, 6.8), control2: p(14.7, 6.3))
-    path.addCurve(to: p(13.5, 3.5), control1: p(14.7, 3.9), control2: p(13.5, 3.5))
-
-    return path
-  }
-}
-
-/**
  One tile on the launcher: the mark, the name, and one word about it.
 
  The Хоол tile is the supplied render, full-bleed at radius 18 with no inner

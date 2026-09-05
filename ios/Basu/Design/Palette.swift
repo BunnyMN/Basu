@@ -5,9 +5,9 @@ import SwiftUI
  The design's tokens, in the names the app has always used.
 
  Every value here comes from `BasuKit/DesignTokens.swift` — nothing is picked by
- eye and nothing is invented. The shell only uses what is there. The dine
- screens keep a few soft/line pairs of their own for state chips and banners;
- those are the vertical's, are marked as such, and are not in the shell.
+ eye and nothing is invented. The shell only uses what is there. The apps
+ inside it are web pages and bring their own CSS; none of their colours are
+ here.
  */
 extension Color {
   static let bg = BasuColor.ground
@@ -39,14 +39,9 @@ extension Color {
   static let stop = BasuColor.stop
   static let onStop = BasuColor.onStop
 
-  // ── dine's own ─────────────────────────────────────────────────────
-  // State chips and banners inside the food app. Not shell tokens.
-  static let accentSoft = dynamic(light: 0xFAE7DA, dark: 0x33200F)
-  static let accentLine = dynamic(light: 0xE9B893, dark: 0x5E3A1B)
-  static let routeSoft = dynamic(light: 0xDFEAF3, dark: 0x16242F)
-  static let routeLine = dynamic(light: 0xA8C6DE, dark: 0x2E4A61)
-  static let readySoft = dynamic(light: 0xDCEDE6, dark: 0x0F2620)
-  static let readyLine = dynamic(light: 0x9CCBB7, dark: 0x1F4A3A)
+  // ── washes ─────────────────────────────────────────────────────────
+  // Behind a banner or a destructive button. The food app's own state
+  // colours are not here: that app is a web page and carries its own CSS.
   static let holdSoft = dynamic(light: 0xF1E9D2, dark: 0x2A2312)
   static let holdLine = dynamic(light: 0xD9C48A, dark: 0x4E4222)
   static let stopSoft = dynamic(light: 0xF7DEDE, dark: 0x2E1416)

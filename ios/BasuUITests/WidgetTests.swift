@@ -23,7 +23,7 @@ final class WidgetTests: XCTestCase {
   func testTheWidgetShowsTheOrderInBothSizes() async throws {
     let server = DemoAPI(base: base)
     try await server.requireServer()
-    let order = try await server.runningOrder()
+    let order = try await server.runningOrder(onTheWall: true)
     defer { Task { await server.cancel(order) } }
 
     // The app first, so the snapshot in the App Group is fresh.

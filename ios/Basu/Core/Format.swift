@@ -91,11 +91,4 @@ enum Format {
     calendar.timeZone = TimeZone(identifier: "Asia/Ulaanbaatar") ?? .current
     return calendar.isDateInToday(date) ? hhmm(date) : day.string(from: date)
   }
-
-  /// "1.2 км" / "480 м" — the walk, at the precision it is worth quoting.
-  static func metres(_ value: Double) -> String {
-    value >= 1000
-      ? String(format: "%.1f км", value / 1000)
-      : "\(Int(value.rounded())) м"
-  }
 }

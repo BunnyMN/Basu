@@ -25,7 +25,7 @@ final class PresenceTests: XCTestCase {
   func testTheOrderReachesTheIslandAndTheLockScreen() async throws {
     let server = DemoAPI(base: base)
     try await server.requireServer()
-    let order = try await server.runningOrder()
+    let order = try await server.runningOrder(onTheWall: true)
     defer { Task { await server.cancel(order) } }
 
     let app = XCUIApplication()
@@ -65,7 +65,12 @@ final class PresenceTests: XCTestCase {
     // Tapping the compact island is the deep link, and lands on the order.
     springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.42, dy: 0.04)).tap()
     XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10), "the island should open the app")
-    XCTAssertTrue(app.buttons["status.close"].waitForExistence(timeout: 10), "…on the order it refers to")
+    XCTAssertTrue(app.webViews.firstMatch.waitForExistence(timeout: 15), "…inside the food app's page")
+    XCTAssertTrue(
+      app.webViews.staticTexts.matching(NSPredicate(format: "label BEGINSWITH '№'")).firstMatch
+        .waitForExistence(timeout: 30),
+      "…on the order it refers to",
+    )
     shot("3b-deep-link")
     XCUIDevice.shared.press(.home)
     try await Task.sleep(for: .seconds(1))

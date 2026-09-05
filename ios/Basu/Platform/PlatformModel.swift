@@ -4,10 +4,10 @@ import UIKit
 /**
  The shell's own state: profile, wallet, inbox.
 
- Separate from `AppModel` on purpose. `AppModel` knows about dishes and live
- orders — those are dine's. This knows about a person and their money, which is
- every app inside Basu's business and none of them in particular. When there is
- a second app on the launcher, it reads this one and does not learn a thing
+ Separate from `AppModel` on purpose. `AppModel` knows what of the guest's is
+ running — that is the apps'. This knows about a person and their money, which
+ is every app inside Basu's business and none of them in particular. When there
+ is a second app on the launcher, it reads this one and does not learn a thing
  about lunch.
  */
 @MainActor

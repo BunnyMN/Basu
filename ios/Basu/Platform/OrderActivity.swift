@@ -21,19 +21,6 @@ final class OrderActivity {
 
   private var watching: Set<String> = []
 
-  /// Bring the lock screen and the widgets in line with what the server said.
-  func sync(_ order: OrderDetail) {
-    let snapshot = order.snapshot
-    if order.state.isOver {
-      end(order.id)
-      if OrderSnapshotStore.read()?.orderID == order.id { OrderSnapshotStore.write(nil) }
-    } else {
-      OrderSnapshotStore.write(snapshot)
-      show(snapshot)
-    }
-    WidgetCenter.shared.reloadTimelines(ofKind: OrderSnapshotStore.widgetKind)
-  }
-
   /// The launcher's list, for the widget: the first thing that will happen.
   /// Nothing live clears the snapshot; a failed fetch leaves it alone, which
   /// is `AppModel`'s job to distinguish.
@@ -123,16 +110,6 @@ extension OrderState {
   /// Nothing more will happen to it. The activity ends and the widget empties.
   var isOver: Bool {
     [.served, .closed, .cancelled, .refunded, .noShow, .rejected].contains(self)
-  }
-}
-
-extension OrderDetail {
-  var snapshot: OrderSnapshot {
-    OrderSnapshot(
-      orderID: id, venueName: restaurant.name, orderNumber: "№\(code)", partySize: partySize ?? 1,
-      stage: state.stage, stageLabel: state.stage.label,
-      seatingTime: slotStartsAt, fireTime: fireAt, takenAt: .now,
-    )
   }
 }
 
