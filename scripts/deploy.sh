@@ -21,7 +21,9 @@ PORT=3210
 KEEP_BACKUPS=10
 
 cd "$APP"
-sha=$(git rev-parse --short HEAD)
+# git is run as the checkout's owner throughout; root in another user's repo is
+# "dubious ownership" and a refusal.
+sha=$(sudo -u "$RUN_AS" git rev-parse --short HEAD)
 echo "── deploy $sha ─────────────────────────────────────────"
 
 echo "→ dependencies"
