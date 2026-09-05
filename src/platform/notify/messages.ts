@@ -178,7 +178,7 @@ export async function inbox(guestId: string, limit = 50): Promise<InboxItem[]> {
   }>(
     `SELECT id, title, body, template, subject, subject_id, channel, state, created_at, read_at
        FROM notify.message
-      WHERE guest_id = $1 AND state <> 'failed'
+      WHERE guest_id = $1 AND state <> 'failed' AND dismissed_at IS NULL
       ORDER BY created_at DESC
       LIMIT $2`,
     [guestId, limit],
@@ -200,7 +200,7 @@ export async function inbox(guestId: string, limit = 50): Promise<InboxItem[]> {
 export async function unreadCount(guestId: string): Promise<number> {
   const { rows } = await getPool().query<{ n: number }>(
     `SELECT count(*)::int AS n FROM notify.message
-      WHERE guest_id = $1 AND read_at IS NULL AND state <> 'failed'`,
+      WHERE guest_id = $1 AND read_at IS NULL AND state <> 'failed' AND dismissed_at IS NULL`,
     [guestId],
   );
   return rows[0]?.n ?? 0;
@@ -213,6 +213,20 @@ export async function markRead(guestId: string, messageId: string | null, at: Da
       WHERE guest_id = $1 AND read_at IS NULL AND ($2::uuid IS NULL OR id = $2::uuid)`,
     [guestId, messageId, at],
   );
+}
+
+/**
+ * The swipe. The row leaves the inbox and stops counting as unread; the
+ * message itself stays, because "we told you" has to remain true afterwards.
+ * Returns whether there was anything of this guest's to dismiss.
+ */
+export async function dismiss(guestId: string, messageId: string, at: Date): Promise<boolean> {
+  const { rowCount } = await getPool().query(
+    `UPDATE notify.message SET dismissed_at = $3
+      WHERE guest_id = $1 AND id = $2::uuid AND dismissed_at IS NULL`,
+    [guestId, messageId, at],
+  );
+  return (rowCount ?? 0) > 0;
 }
 
 /* ── preferences ───────────────────────────────────────────────────── */

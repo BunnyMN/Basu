@@ -211,7 +211,7 @@ input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
 <script type="module">
-import { api, store, toast, mountClock, mnt, IDESH_HEADLINE, KIND, dayLabel, dayShort } from '/api.js';
+import { api, store, shell, toast, mountClock, mnt, IDESH_HEADLINE, KIND, dayLabel, dayShort } from '/api.js';
 import { mapStyle, ULAANBAATAR } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -268,9 +268,19 @@ const state = {
   map: null,
 };
 
+/**
+ * The page is on its way out. A request already in flight still lands after
+ * `pagehide`, and drawing its answer into a document that is being torn down
+ * is an error in a test and wasted work in a browser — so every path that
+ * awaits the server and then touches the page checks this first.
+ */
+let gone = false;
+
 /* ── signing in ──────────────────────────────────────────────────── */
 
 async function signIn() {
+  // Inside the phone app the sheet is the shell's, and so is the token.
+  if (shell.present) return shell.signIn();
   const { token } = await api('/dev/login', { method: 'POST', body: {} });
   store.guestToken = token;
   return token;
@@ -292,6 +302,7 @@ async function guestApi(path, options = {}) {
 
 async function loadListings() {
   const { today, listings } = await api('/v1/idesh/listings');
+  if (gone) return;
   state.today = today;
   state.listings = listings;
   paintKinds();
@@ -616,6 +627,9 @@ async function placeOrder() {
       },
     });
     await guestApi(`/v1/idesh/${order.id}/pay`, { method: 'POST' });
+    if (gone) return;
+    // The card outside the page, on a phone, should say so now.
+    shell.ordersChanged();
     state.listing = null;
     state.form = null;
     if (state.map) {
@@ -649,10 +663,13 @@ let rendered = null;
 async function showStatus(force) {
   if (!state.orderId) return;
   const order = await guestApi(`/v1/idesh/${state.orderId}`);
+  if (gone) return;
 
   const signature = [order.state, order.receipt ? 'receipt' : ''].join('|');
-  const open = $('sheet').hasAttribute('data-open');
-  if (!force && open && signature === rendered) return;
+  // A poll that found no news changes nothing — including a sheet the guest
+  // has just closed. News reopens it: the supplier starting is worth it.
+  if (!force && signature === rendered) return;
+  if (rendered !== null && signature !== rendered) shell.ordersChanged();
   rendered = signature;
 
   const [word, cap] = IDESH_HEADLINE[order.state] ?? [order.state, ''];
@@ -728,9 +745,11 @@ async function showStatus(force) {
       try {
         await guestApi(`/v1/idesh/${state.orderId}/cancel`, { method: 'POST' });
         toast('Цуцлагдлаа. Мөнгө түрийвчинд буцна.');
+        shell.ordersChanged();
       } catch (error) {
         toast(error.message, 'bad');
       }
+      if (gone) return;
       await Promise.all([showStatus(true), loadMine(), loadListings()]);
     });
     foot.append(cancel);
@@ -748,9 +767,10 @@ async function loadMine() {
   if (!store.guestToken) return paintMine([]);
   try {
     const { orders } = await guestApi('/v1/idesh');
+    if (gone) return;
     paintMine(orders);
   } catch {
-    paintMine([]);
+    if (!gone) paintMine([]);
   }
 }
 
@@ -812,7 +832,10 @@ const poll = setInterval(() => {
   if (state.orderId) void showStatus();
   else void loadMine();
 }, 4000);
-addEventListener('pagehide', () => clearInterval(poll));
+addEventListener('pagehide', () => {
+  clearInterval(poll);
+  gone = true;
+});
 </script>
 </body>
 </html>

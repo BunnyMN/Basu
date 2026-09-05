@@ -219,15 +219,17 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     }
   });
 
-  app.post<{ Body: { phone?: string; code?: string } }>(
+  app.post<{ Body: { phone?: string; code?: string; device?: string } }>(
     '/v1/auth/verify',
     async (request, reply) => {
-      const { phone, code } = request.body ?? {};
+      const { phone, code, device } = request.body ?? {};
       if (!phone || !code) {
         return badRequest(reply, 'Утас, кодоо оруулна уу.', 'phone and code are required');
       }
       try {
-        const session = await verifyOtp(ctx, phone, code);
+        // What the phone calls itself, so the session list on the profile
+        // screen is four different rows rather than four identical ones.
+        const session = await verifyOtp(ctx, phone, code, device);
         return reply.send({
           token: session.token,
           guest_id: session.guestId,
@@ -444,10 +446,11 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
       fire_at: Date | null;
       ready_at: Date | null;
       total_mnt: number;
+      party_size: number;
       table_code: string | null;
     }>(
       `SELECT o.id, o.code, o.state, o.restaurant_id, r.name AS restaurant,
-              o.slot_starts_at, o.fire_at, o.ready_at, o.total_mnt,
+              o.slot_starts_at, o.fire_at, o.ready_at, o.total_mnt, o.party_size,
               t.code AS table_code
          FROM dine.dining_order o
          JOIN dine.restaurant r ON r.id = o.restaurant_id
@@ -466,6 +469,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
         restaurant: { id: o.restaurant_id, name: o.restaurant },
         table: o.table_code,
         total_mnt: o.total_mnt,
+        party_size: o.party_size,
         slot_starts_at: o.slot_starts_at.toISOString(),
         fire_at: o.fire_at?.toISOString() ?? null,
         ready_at: o.ready_at?.toISOString() ?? null,
@@ -479,7 +483,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     async (request, reply) => {
       const { rows } = await db.query(
         `SELECT o.id, o.code, o.state, o.slot_starts_at, o.fire_at, o.ready_at,
-                o.seated_at, o.total_mnt, o.restaurant_id, o.ledger_transfer_id,
+                o.seated_at, o.total_mnt, o.party_size, o.restaurant_id, o.ledger_transfer_id,
                 r.name AS restaurant, t.code AS table_code
            FROM dine.dining_order o
            JOIN dine.restaurant r ON r.id = o.restaurant_id
@@ -498,6 +502,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
             ready_at: Date | null;
             seated_at: Date | null;
             total_mnt: number;
+            party_size: number;
             restaurant_id: string;
             restaurant: string;
             table_code: string | null;
@@ -535,6 +540,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
         restaurant: { id: order.restaurant_id, name: order.restaurant },
         table: order.table_code,
         total_mnt: order.total_mnt,
+        party_size: order.party_size,
         slot_starts_at: order.slot_starts_at.toISOString(),
         fire_at: order.fire_at?.toISOString() ?? null,
         ready_at: order.ready_at?.toISOString() ?? null,
@@ -878,14 +884,14 @@ async function mountDevRoutes(
    * The real OTP path is what the tests exercise; this exists so a person
    * clicking through does not need a phone in their hand.
    */
-  app.post<{ Body: { phone?: string } }>('/dev/login', async (request, reply) => {
+  app.post<{ Body: { phone?: string; device?: string } }>('/dev/login', async (request, reply) => {
     const phone = request.body?.phone ?? '+97699001122';
     try {
       // Straight to a session. Going through the OTP path would put a
       // walkthrough behind the three-codes-an-hour limit, which exists to stop
       // somebody running up an SMS bill and has nothing to say about a demo.
       const { startSession } = await import('../platform/identity/index.js');
-      const session = await startSession(ctx, phone);
+      const session = await startSession(ctx, phone, request.body?.device);
       return reply.send({ token: session.token, guest_id: session.guestId, phone });
     } catch (error) {
       return sendError(reply, error);

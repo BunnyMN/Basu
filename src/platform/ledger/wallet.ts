@@ -1,4 +1,5 @@
 import { getPool, tx } from '../../db/pool.js';
+import { receiptsFor, type IssuedReceipt } from './ebarimt.js';
 import type { Ctx } from '../../ports.js';
 import type { Db } from '../../db/pool.js';
 
@@ -377,9 +378,74 @@ export interface Wallet {
   balanceMnt: number;
   currency: 'MNT';
   lines: StatementLine[];
+  /** Pass back as `before` for the next page. Absent when the list is done. */
+  nextCursor?: string;
 }
 
-export async function wallet(guestId: string, limit = 25): Promise<Wallet> {
+/**
+ * The statement, a page at a time.
+ *
+ * Keyed on the entry id rather than an offset: entries are append-only and
+ * strictly increasing, so a page never shifts under somebody who is scrolling
+ * while a refund lands. An offset would show them the same line twice.
+ */
+export async function wallet(
+  guestId: string,
+  limit = 25,
+  before?: string,
+): Promise<Wallet> {
+  const { rows } = await getPool().query<{
+    id: string;
+    transfer_id: string;
+    kind: string;
+    amount_mnt: number;
+    subject: string | null;
+    subject_id: string | null;
+    memo: string | null;
+    created_at: Date;
+  }>(
+    `SELECT e.id, e.transfer_id, t.kind, e.amount_mnt, t.subject, t.subject_id,
+            t.memo, e.created_at
+       FROM ledger.entry e
+       JOIN ledger.account  a ON a.id = e.account_id
+       JOIN ledger.transfer t ON t.id = e.transfer_id
+      WHERE a.kind = 'guest' AND a.owner_id = $1
+        AND ($3::bigint IS NULL OR e.id < $3::bigint)
+      ORDER BY e.id DESC
+      LIMIT $2`,
+    [guestId, limit, before ?? null],
+  );
+
+  const lines = rows.map((r) => ({
+    transferId: r.transfer_id,
+    kind: r.kind,
+    amountMnt: r.amount_mnt,
+    subject: r.subject,
+    subjectId: r.subject_id,
+    memo: r.memo,
+    at: r.created_at,
+  }));
+
+  return {
+    balanceMnt: await balance(guestId),
+    currency: 'MNT',
+    lines,
+    ...(rows.length === limit ? { nextCursor: String(rows[rows.length - 1]!.id) } : {}),
+  };
+}
+
+/**
+ * One movement, in full, with the tax receipt if the authority has issued it.
+ *
+ * The receipt is the reason this exists. In Mongolia it is not a nicety —
+ * somebody who wants to claim lunch back needs the ДДТД and the lottery number,
+ * and asking them to find the order it came from to get at it is asking them to
+ * know how the software is built.
+ */
+export async function movement(
+  guestId: string,
+  transferId: string,
+): Promise<(StatementLine & { receipt: IssuedReceipt | null }) | null> {
   const { rows } = await getPool().query<{
     transfer_id: string;
     kind: string;
@@ -389,28 +455,26 @@ export async function wallet(guestId: string, limit = 25): Promise<Wallet> {
     memo: string | null;
     created_at: Date;
   }>(
-    `SELECT e.transfer_id, t.kind, e.amount_mnt, t.subject, t.subject_id, t.memo, e.created_at
+    `SELECT e.transfer_id, t.kind, e.amount_mnt, t.subject, t.subject_id,
+            t.memo, e.created_at
        FROM ledger.entry e
        JOIN ledger.account  a ON a.id = e.account_id
        JOIN ledger.transfer t ON t.id = e.transfer_id
-      WHERE a.kind = 'guest' AND a.owner_id = $1
-      ORDER BY e.id DESC
-      LIMIT $2`,
-    [guestId, limit],
+      WHERE a.kind = 'guest' AND a.owner_id = $1 AND e.transfer_id = $2`,
+    [guestId, transferId],
   );
+  const row = rows[0];
+  if (!row) return null;
 
   return {
-    balanceMnt: await balance(guestId),
-    currency: 'MNT',
-    lines: rows.map((r) => ({
-      transferId: r.transfer_id,
-      kind: r.kind,
-      amountMnt: r.amount_mnt,
-      subject: r.subject,
-      subjectId: r.subject_id,
-      memo: r.memo,
-      at: r.created_at,
-    })),
+    transferId: row.transfer_id,
+    kind: row.kind,
+    amountMnt: row.amount_mnt,
+    subject: row.subject,
+    subjectId: row.subject_id,
+    memo: row.memo,
+    at: row.created_at,
+    receipt: (await receiptsFor([transferId])).get(transferId) ?? null,
   };
 }
 

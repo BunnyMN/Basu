@@ -1,3 +1,4 @@
+import BasuKit
 import SwiftUI
 
 /**
@@ -49,9 +50,9 @@ struct HomeView: View {
         if !live.isEmpty { liveSection }
         grid
       }
-      .padding(.horizontal, 20)
+      .padding(.horizontal, BasuMetric.screenPadding)
       .padding(.top, 6)
-      .padding(.bottom, 82)
+      .padding(.bottom, BasuMetric.tabBarInset)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .scrollIndicators(.hidden)
@@ -70,93 +71,86 @@ struct HomeView: View {
 
   // MARK: - header
 
+  /// `Basu` on the left, the bell alone on the right. No city label, no
+  /// greeting, no avatar — all three were cut. Signed out there is no bell to
+  /// ring, so the way in stands where it would be.
   private var header: some View {
-    VStack(alignment: .leading, spacing: 10) {
-      HStack(alignment: .top, spacing: 16) {
-        VStack(alignment: .leading, spacing: 5) {
-          SectionLabel("Улаанбаатар")
-          Text("Basu")
-            .font(.system(size: 27, weight: .semibold))
-            .kerning(-0.675)
-            .foregroundStyle(Color.ink)
-        }
-        Spacer(minLength: 8)
-        HStack(spacing: 14) {
-          if session.isSignedIn { bell }
-          account
-        }
-        .padding(.top, 4)
+    HStack(alignment: .top, spacing: 16) {
+      Text("Basu")
+        .font(.sans(27, .semibold))
+        .tracking(-0.025 * 27)
+        .foregroundStyle(Color.ink)
+        .padding(.top, 8)
+      Spacer(minLength: 8)
+      if session.isSignedIn {
+        bell
+      } else {
+        signIn
       }
-
-      Text(greeting)
-        .font(.system(size: 17))
-        .foregroundStyle(Color.ink2)
     }
-  }
-
-  private var greeting: String {
-    guard session.isSignedIn else { return "Сайн байна уу. Өнөөдөр юу хийх вэ?" }
-    return platform.me?.greeting ?? "Өнөөдөр юу хийх вэ?"
   }
 
   private var bell: some View {
     Button {
       open(.inbox)
     } label: {
-      ShellGlyph(mark: .bell, size: 26)
+      ShellGlyph(mark: .bell, size: BasuMetric.bell)
         .foregroundStyle(Color.ink)
         .overlay(alignment: .topTrailing) {
           if platform.unread > 0 {
             UnreadBadge(count: platform.unread).offset(x: 5, y: -3)
           }
         }
-        .frame(width: 44, height: 44, alignment: .center)
+        .frame(width: BasuMetric.minTarget, height: BasuMetric.minTarget, alignment: .center)
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+    // The glyph is 26 in a 44 target; the design puts its top 4 below the
+    // wordmark's, and the target's own slack accounts for the rest.
+    .padding(.top, -5)
     .accessibilityIdentifier("home.inbox")
     .accessibilityLabel("Мэдэгдэл")
     .accessibilityValue(platform.unread > 0 ? "\(platform.unread) уншаагүй" : "уншаагүй алга")
   }
 
-  private var account: some View {
+  private var signIn: some View {
     Button {
-      if !session.isSignedIn { signingIn = true }
+      signingIn = true
     } label: {
-      Group {
-        if session.isSignedIn {
-          SeedAvatar(seed: platform.me?.avatarSeed ?? "00000000", size: 30)
-        } else {
-          ShellGlyph(mark: .profile, size: 26).foregroundStyle(Color.ink3)
-        }
-      }
-      .frame(width: 44, height: 44)
-      .contentShape(Rectangle())
+      Text("Нэвтрэх")
+        .font(.sans(15, .medium))
+        .foregroundStyle(Color.accent)
+        .frame(minHeight: BasuMetric.minTarget)
+        .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    // Signed in, the avatar is decoration — the profile is a tab. Signed out,
-    // it is the way in, and the only control on the screen that does anything.
-    .disabled(session.isSignedIn)
+    .padding(.top, -5)
     .accessibilityIdentifier("home.account")
-    .accessibilityLabel(session.isSignedIn ? "Бүртгэл" : "Нэвтрэх")
+    .accessibilityLabel("Нэвтрэх")
   }
 
   // MARK: - what is running
 
+  /// One card. The label sits inside it; rows follow, each with a hairline on
+  /// top. Rows are not individual cards.
   private var liveSection: some View {
-    VStack(alignment: .leading, spacing: 7) {
+    VStack(alignment: .leading, spacing: 0) {
       SectionLabel("Идэвхтэй")
-      VStack(spacing: 6) {
-        ForEach(live) { item in
-          Button {
-            if let destination = item.destination { open(destination) }
-          } label: {
-            LiveRow(item: item)
-          }
-          .buttonStyle(.plain)
+        .padding(.top, 11)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 10)
+      ForEach(live) { item in
+        Button {
+          if let destination = item.destination { open(destination) }
+        } label: {
+          LiveRow(item: item)
         }
+        .buttonStyle(.plain)
       }
     }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .glassCard()
+    .accessibilityIdentifier("live.card")
   }
 
   // MARK: - the grid
@@ -176,9 +170,9 @@ struct HomeView: View {
           .frame(minHeight: 22)
 
           LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 92), spacing: 14, alignment: .topLeading)],
+            columns: [GridItem(.adaptive(minimum: BasuMetric.tileMin), spacing: BasuMetric.gridGapX, alignment: .topLeading)],
             alignment: .leading,
-            spacing: 10,
+            spacing: BasuMetric.gridGapY,
           ) {
             ForEach(matching(band.apps)) { app in
               AppTile(app: app) {
@@ -198,6 +192,7 @@ struct HomeView: View {
             .font(.mono(11.5))
             .foregroundStyle(Color.ink3)
             .padding(.top, 12)
+            .fixedSize(horizontal: false, vertical: true)
         }
       }
     }
@@ -222,45 +217,53 @@ struct SearchField: View {
         .font(.mono(12))
         .foregroundStyle(Color.ink)
         .textFieldStyle(.plain)
-        .frame(width: 74)
+        .frame(width: 56, height: 12)
     }
     .padding(.horizontal, 9)
     .padding(.vertical, 5)
     .glassWell()
     .accessibilityIdentifier("home.search")
+    .accessibilityLabel("Хайх")
   }
 }
 
 /**
- One live thing, as one row.
+ One live thing, as one row inside the card.
 
- The header run wraps: dot, source, title and meta sit on one line when they fit
- and fall onto the next when they do not, which is why «Чингисийн өргөн чөлөө»
- and «Алтан Тавган» both read without either being truncated.
+ Three lines on the left — the dot and the source, the title, the meta — and
+ the moment on the right. A second line, separated by a hairline, only when
+ the row is alone on the screen.
  */
 struct LiveRow: View {
   let item: LiveItem
 
   var body: some View {
     VStack(alignment: .leading, spacing: 9) {
-      HStack(alignment: .center, spacing: 14) {
-        FlowLayout(spacing: CGSize(width: 8, height: 4)) {
-          Circle()
-            .fill(item.status.tint)
-            .frame(width: 6, height: 6)
-          SourceLabel(text: item.source)
+      HStack(alignment: .top, spacing: 14) {
+        VStack(alignment: .leading, spacing: 5) {
+          HStack(spacing: 7) {
+            Circle()
+              .fill(item.status.tint)
+              .frame(width: 6, height: 6)
+            SourceLabel(text: item.source)
+          }
           Text(item.title)
-            .font(.system(size: 15.5, weight: .semibold))
+            .font(.sans(15.5, .semibold))
             .foregroundStyle(Color.ink)
+            .fixedSize(horizontal: false, vertical: true)
+            .multilineTextAlignment(.leading)
           Text(item.meta)
             .font(.mono(11.5))
+            .monospacedDigit()
             .foregroundStyle(Color.ink3)
+            .fixedSize(horizontal: false, vertical: true)
+            .multilineTextAlignment(.leading)
         }
         Spacer(minLength: 0)
         HStack(alignment: .firstTextBaseline, spacing: 6) {
           Text(item.timeLabel)
             .font(.mono(9, .medium))
-            .tracking(1.26)
+            .tracking(9 * 0.14)
             .foregroundStyle(Color.ink3)
           Text(item.when)
             .font(.mono(23, .semibold))
@@ -275,7 +278,7 @@ struct LiveRow: View {
           Hairline()
           HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text(extra.label)
-              .font(.system(size: 12.5))
+              .font(.sans(12.5))
               .foregroundStyle(Color.ink2)
             Spacer(minLength: 0)
             Text(Format.hhmm(extra.time))
@@ -288,9 +291,10 @@ struct LiveRow: View {
       }
     }
     .padding(.horizontal, 14)
-    .padding(.vertical, 9)
+    .padding(.vertical, 11)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .glassCard()
+    .overlay(alignment: .top) { Hairline() }
+    .contentShape(Rectangle())
     .accessibilityElement(children: .combine)
     .accessibilityIdentifier("live.\(item.id)")
   }

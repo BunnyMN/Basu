@@ -279,21 +279,6 @@ function drink(d: Dish): string {
 const SLUG = /^[a-z0-9_]{1,40}$/;
 
 export async function registerDishRoutes(app: FastifyInstance): Promise<void> {
-  /**
-   * The same drawings, as the numbers they are drawn from.
-   *
-   * The iOS app cannot read an SVG, and shipping a second copy of this table
-   * inside it would mean a dish whose colour changes here quietly keeps the
-   * old one there. So the table is served and each client draws the nine
-   * forms in its own language — one source for what a dish looks like, two
-   * renderers, which is the least duplication the platforms allow.
-   */
-  app.get('/v1/dishes', async (_request, reply) =>
-    reply
-      .header('cache-control', 'public, max-age=604800, immutable')
-      .send({ fallback: FALLBACK, dishes: DISHES }),
-  );
-
   app.get<{ Params: { slug: string } }>('/dishes/:slug', async (request, reply) => {
     const slug = request.params.slug.replace(/\.svg$/, '');
     if (!SLUG.test(slug)) return reply.status(400).send();
@@ -304,6 +289,3 @@ export async function registerDishRoutes(app: FastifyInstance): Promise<void> {
       .send(dishSvg(slug));
   });
 }
-
-/** Every slug that has a drawing of its own. The seed checks against this. */
-export const DRAWN_DISHES = Object.keys(DISHES);

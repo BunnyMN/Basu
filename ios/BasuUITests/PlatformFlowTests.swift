@@ -35,16 +35,16 @@ final class PlatformFlowTests: XCTestCase {
 
     // ── in ────────────────────────────────────────────────────────────
     XCTAssertTrue(
-      app.buttons["home.account"].waitForExistence(timeout: 10),
+      app.buttons["app.Хоол"].waitForExistence(timeout: 10),
       "the launcher should be up",
     )
-    app.buttons["home.account"].firstMatch.tap()
-    let demo = app.buttons["signin.demo"]
-    if demo.waitForExistence(timeout: 5) {
-      demo.tap()
+    // Signed out, the header offers the way in where the bell will be. Signed
+    // in from an earlier run, there is a bell instead and nothing to do.
+    if app.buttons["home.account"].waitForExistence(timeout: 2) {
+      app.buttons["home.account"].firstMatch.tap()
+      let demo = app.buttons["signin.demo"]
+      if demo.waitForExistence(timeout: 5) { demo.tap() }
     }
-    // Already signed in, the account button is inert and no sheet opens — the
-    // profile is a tab now, so there is nothing to back out of.
 
     // ── the launcher, signed in ───────────────────────────────────────
     XCTAssertTrue(
@@ -74,23 +74,35 @@ final class PlatformFlowTests: XCTestCase {
     shot("3-wallet-topped-up")
 
     // ── the inbox, from the bell ──────────────────────────────────────
-    app.buttons["shell.back"].tap()
+    // The wallet is a tab root: there is no back link, the launcher is a tab.
+    XCTAssertFalse(app.buttons["shell.back"].exists, "a tab root has nothing to go back to")
+    app.buttons["tab.home"].tap()
     XCTAssertTrue(app.buttons["home.inbox"].waitForExistence(timeout: 10))
     app.buttons["home.inbox"].tap()
 
-    let welcome = app.buttons["inbox.welcome"]
-    XCTAssertTrue(
-      welcome.waitForExistence(timeout: 10),
-      "the seeded welcome message should be in the inbox",
-    )
+    // The seeded welcome is there on the first run; a swipe below removes it,
+    // so a later run finds the empty state instead. Both are the design.
+    let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'inbox.'"))
+    let empty = app.staticTexts["inbox.empty"]
+    let landed = NSPredicate { _, _ in rows.count > 0 || empty.exists }
+    await fulfillment(of: [expectation(for: landed, evaluatedWith: nil)], timeout: 10)
+    XCTAssertFalse(app.buttons["inbox.readall"].exists, "there is no mark-all-read")
     shot("4-inbox")
 
-    if app.buttons["inbox.readall"].exists {
-      app.buttons["inbox.readall"].tap()
-      XCTAssertFalse(
-        app.buttons["inbox.readall"].waitForExistence(timeout: 5),
-        "with nothing unread the read-all button should go away",
-      )
+    if rows.count > 0 {
+      // Swiping a row left reveals Устгах; the row goes and the server agrees.
+      let first = rows.firstMatch
+      let rowsBefore = rows.count
+      first.swipeLeft()
+      let delete = app.buttons["inbox.delete"]
+      XCTAssertTrue(delete.waitForExistence(timeout: 5), "swiping left should reveal Устгах")
+      shot("4b-inbox-swiped")
+      delete.tap()
+      let fewer = NSPredicate { _, _ in rows.count == rowsBefore - 1 }
+      await fulfillment(of: [expectation(for: fewer, evaluatedWith: nil)], timeout: 10)
+      XCTAssertEqual(rows.count, rowsBefore - 1, "one row fewer, and nothing else moved")
+    } else {
+      XCTAssertTrue(empty.exists, "an empty inbox is a sentence, not a blank")
     }
 
     // ── the profile, from the tab bar ─────────────────────────────────
@@ -104,7 +116,21 @@ final class PlatformFlowTests: XCTestCase {
       app.buttons["profile.signout"].exists,
       "signing out has to be reachable without hunting for it",
     )
+    // This phone has to be in the list, or nobody can revoke a lost one.
+    XCTAssertTrue(
+      app.staticTexts["Энэ утас"].waitForExistence(timeout: 10),
+      "the session list should mark the phone doing the asking",
+    )
     shot("5-profile")
+
+    // Closing an account is an App Store requirement, not a nice-to-have, and
+    // it has to be reachable without asking anybody.
+    app.swipeUp()
+    XCTAssertTrue(
+      app.buttons["profile.close"].waitForExistence(timeout: 5),
+      "closing the account must be reachable in the app itself",
+    )
+    shot("6-profile-foot")
   }
 
   // MARK: - the wire

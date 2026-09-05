@@ -51,13 +51,68 @@ struct WalletStatement: Decodable, Sendable, Equatable {
   let balanceMnt: Int
   let currency: String
   let lines: [WalletLine]
+  /// Pass back as `before` for the next page. `nil` when the list is done.
+  let next: String?
 
   enum CodingKeys: String, CodingKey {
-    case currency, lines
+    case currency, lines, next
     case balanceMnt = "balance_mnt"
   }
 
-  static let empty = WalletStatement(balanceMnt: 0, currency: "MNT", lines: [])
+  static let empty = WalletStatement(balanceMnt: 0, currency: "MNT", lines: [], next: nil)
+}
+
+/// One movement in full, with the tax receipt once the authority issues one.
+struct Movement: Decodable, Sendable, Equatable {
+  let id: String
+  let kind: String
+  let amountMnt: Int
+  let subject: String?
+  let subjectId: String?
+  let memo: String?
+  let at: Date
+  let receipt: Receipt?
+
+  struct Receipt: Decodable, Sendable, Equatable {
+    /// The URL the tax authority's QR encodes.
+    let qr: String
+    /// The lottery number, which is the part people actually check.
+    let lottery: String?
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case id, kind, subject, memo, at, receipt
+    case amountMnt = "amount_mnt"
+    case subjectId = "subject_id"
+  }
+
+  var title: String {
+    switch kind {
+    case "topup": "Цэнэглэлт"
+    case "purchase": "Захиалга"
+    case "refund": "Буцаалт"
+    case "promotion": "Урамшуулал"
+    default: "Гүйлгээ"
+    }
+  }
+}
+
+/// Where somebody is signed in. One row per phone that still holds a token.
+struct DeviceSession: Decodable, Sendable, Identifiable, Equatable {
+  let id: String
+  let label: String?
+  /// The phone asking. A list where you cannot tell is a list nobody uses.
+  let current: Bool
+  let createdAt: Date
+  let lastSeenAt: Date?
+
+  enum CodingKeys: String, CodingKey {
+    case id, label, current
+    case createdAt = "created_at"
+    case lastSeenAt = "last_seen_at"
+  }
+
+  var name: String { label?.isEmpty == false ? label! : "Тодорхойгүй төхөөрөмж" }
 }
 
 struct WalletLine: Decodable, Sendable, Identifiable, Equatable {
@@ -144,6 +199,8 @@ struct NotifyPreferences: Decodable, Sendable, Equatable {
   static let `default` = NotifyPreferences(push: true, sms: true, marketing: false)
 }
 
+private struct Revoked: Decodable { let revoked: Int }
+
 // MARK: - the calls
 
 extension API {
@@ -159,8 +216,43 @@ extension API {
     return try await send(.init(path: "/v1/me", method: "PATCH", body: body, token: token))
   }
 
-  func wallet(token: String) async throws -> WalletStatement {
-    try await send(.init(path: "/v1/wallet", token: token))
+  func wallet(token: String, before: String? = nil) async throws -> WalletStatement {
+    var query: [URLQueryItem] = []
+    if let before { query.append(.init(name: "before", value: before)) }
+    return try await send(.init(path: "/v1/wallet", query: query, token: token))
+  }
+
+  func movement(_ id: String, token: String) async throws -> Movement {
+    try await send(.init(path: "/v1/wallet/\(id)", token: token))
+  }
+
+  // MARK: where you are signed in
+
+  func sessions(token: String) async throws -> [DeviceSession] {
+    try await send(.init(path: "/v1/me/sessions", token: token), as: Wrapped<[DeviceSession]>.self, key: "sessions").value
+  }
+
+  /// Everywhere *else*. Signing somebody out of the phone in their hand
+  /// mid-panic is the wrong end of the tool.
+  @discardableResult
+  func revokeOtherSessions(token: String) async throws -> Int {
+    let answer: Revoked = try await send(
+      .init(path: "/v1/me/sessions/revoke", method: "POST", token: token),
+    )
+    return answer.revoked
+  }
+
+  func revokeSession(_ id: String, token: String) async throws {
+    _ = try await send(
+      .init(path: "/v1/me/sessions/\(id)", method: "DELETE", token: token),
+      as: API.Blank.self,
+    )
+  }
+
+  /// Closing the account. Refused while the wallet holds money or something of
+  /// theirs is running — the server says which, in Mongolian.
+  func closeAccount(token: String) async throws {
+    _ = try await send(.init(path: "/v1/me", method: "DELETE", token: token), as: API.Blank.self)
   }
 
   /// Asking for money. Nothing is credited until `settleTopup`.
@@ -194,6 +286,27 @@ extension API {
     if let id { body["id"] = id }
     _ = try await send(
       .init(path: "/v1/notifications/read", method: "POST", body: body, token: token),
+      as: API.Blank.self,
+    )
+  }
+
+  /// The swipe. The row is gone from this guest's inbox; the message itself
+  /// stays a record of what was sent.
+  func deleteMessage(_ id: String, token: String) async throws {
+    _ = try await send(
+      .init(path: "/v1/notifications/\(id)", method: "DELETE", token: token),
+      as: API.Blank.self,
+    )
+  }
+
+  /// ActivityKit's push token for one order, so the server can move the lock
+  /// screen without the app being open.
+  func registerActivityToken(_ pushToken: String, order orderId: String, token: String) async throws {
+    _ = try await send(
+      .init(
+        path: "/v1/activities/\(orderId)/token", method: "POST",
+        body: ["push_token": pushToken], token: token,
+      ),
       as: API.Blank.self,
     )
   }

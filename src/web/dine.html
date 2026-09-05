@@ -265,7 +265,7 @@ body{display:flex;flex-direction:column}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
 <script type="module">
-import { api, store, toast, mountClock, mnt, hhmm, HEADLINE } from '/api.js';
+import { api, store, shell, toast, mountClock, mnt, hhmm, HEADLINE } from '/api.js';
 import { mapStyle, pinImage, ULAANBAATAR, isCovered, metresBetween, walkMinutes } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -332,9 +332,19 @@ const state = {
   sent: new Set(),
 };
 
+/**
+ * The page is on its way out. A request already in flight still lands after
+ * `pagehide`, and drawing its answer into a document that is being torn down
+ * is an error in a test and wasted work in a browser — so every path that
+ * awaits the server and then touches the page checks this first.
+ */
+let gone = false;
+
 /* ── signing in ──────────────────────────────────────────────────── */
 
 async function signIn() {
+  // Inside the phone app the sheet is the shell's, and so is the token.
+  if (shell.present) return shell.signIn();
   const { token } = await api('/dev/login', { method: 'POST', body: {} });
   store.guestToken = token;
   return token;
@@ -640,6 +650,7 @@ function paintVenues() {
 
 async function loadVenues() {
   const { restaurants } = await api('/v1/restaurants');
+  if (gone) return;
   state.venues = restaurants;
   paintVenues();
   if (state.venue) {
@@ -900,6 +911,7 @@ async function placeOrder() {
     state.orderId = order.id;
     state.sent = new Set();
     rendered = null;
+    shell.ordersChanged();
     await showStatus(true);
   } catch (error) {
     toast(error.message, 'bad');
@@ -938,6 +950,7 @@ let rendered = null;
 async function showStatus(force) {
   if (!state.orderId) return;
   const order = await guestApi(`/v1/orders/${state.orderId}`);
+  if (gone) return;
 
   // Everything the sheet draws. Same signature, same picture — so leave it.
   const signature = [
@@ -947,8 +960,11 @@ async function showStatus(force) {
     order.table,
     order.review ? 'reviewed' : '',
   ].join('|');
-  const open = $('sheet').hasAttribute('data-open');
-  if (!force && open && signature === rendered) return;
+  // A poll that found no news changes nothing — including a sheet the guest
+  // has just closed, which used to come back four seconds later. News
+  // reopens it: the kitchen accepting or firing is worth interrupting for.
+  if (!force && signature === rendered) return;
+  if (rendered !== null && signature !== rendered) shell.ordersChanged();
   rendered = signature;
 
   // The states that carry a time say it; the rest carry a word.
@@ -1208,6 +1224,7 @@ async function resumeOrder() {
   } catch {
     return;
   }
+  if (gone) return;
   // Live orders arrive in the order they will happen, so the first is the next.
   const order = wanted ? orders.find((o) => o.id === wanted) : orders[0];
   if (!order) return;
@@ -1240,7 +1257,10 @@ const poll = setInterval(() => {
   if (state.orderId) void showStatus();
   else void loadVenues();
 }, 4000);
-addEventListener('pagehide', () => clearInterval(poll));
+addEventListener('pagehide', () => {
+  clearInterval(poll);
+  gone = true;
+});
 </script>
 </body>
 </html>

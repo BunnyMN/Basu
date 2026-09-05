@@ -9,12 +9,18 @@
 # which is minutes of billed time on every push for a suite that only breaks
 # when somebody touches Swift. Run `npm run ios:test` before opening a PR that
 # does; CONTRIBUTING.md says so too.
+#
+# When verify passes on main, the same run deploys that commit to the pilot
+# server (basu.burzai.cloud): one SSH login with a key that can do nothing
+# but run scripts/deploy-entry.sh there. A PR never deploys; a push to main
+# that fails verify never deploys. `workflow_dispatch` is the redeploy button.
 name: verify
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   verify:
@@ -58,3 +64,27 @@ jobs:
       - run: npm ci
 
       - run: npm run verify
+
+  deploy:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    # Two pushes in quick succession deploy one after the other, never over
+    # each other.
+    concurrency:
+      group: deploy-pilot
+      cancel-in-progress: false
+
+    steps:
+      - name: Deploy ${{ github.sha }} to the pilot
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          # The command is the commit; the server's forced command reads it
+          # and refuses anything that is not on main.
+          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes "root@$DEPLOY_HOST" "${{ github.sha }}"

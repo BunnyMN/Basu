@@ -1,6 +1,7 @@
 import type { FastifyReply } from 'fastify';
 import { AuthError } from '../platform/identity/index.js';
 import { LedgerError } from '../platform/ledger/index.js';
+import { ClosureError } from '../platform/identity/index.js';
 import { IdeshError, type IdeshErrorCode } from '../idesh/index.js';
 import { OrderError, type OrderErrorCode } from '../services/orders.js';
 
@@ -105,7 +106,24 @@ const LEDGER_ERRORS: Record<LedgerError['code'], Spec> = {
   NOT_FOUND: { status: 404, mn: 'Ийм гүйлгээ олдсонгүй.' },
 };
 
+const CLOSURE_ERRORS: Record<ClosureError['code'], Spec> = {
+  HAS_BALANCE: {
+    status: 409,
+    // Says what to do about it. Somebody leaving is not somebody who wants to
+    // leave their money behind.
+    mn: 'Түрийвчинд мөнгө байна. Зарцуулах эсвэл буцаан авсны дараа хаах боломжтой.',
+  },
+  HAS_LIVE_WORK: {
+    status: 409,
+    mn: 'Явж байгаа захиалга байна. Дуусахыг хүлээгээд дахин оролдоно уу.',
+  },
+};
+
 export function sendError(reply: FastifyReply, error: unknown): FastifyReply {
+  if (error instanceof ClosureError) {
+    const spec = CLOSURE_ERRORS[error.code];
+    return reply.status(spec.status).send(envelope(error.code, spec.mn, error.message));
+  }
   if (error instanceof LedgerError) {
     const spec = LEDGER_ERRORS[error.code];
     return reply.status(spec.status).send(envelope(error.code, spec.mn, error.message));

@@ -50,6 +50,56 @@ export async function api(path, { method = 'GET', body, token, idempotencyKey } 
   return parsed;
 }
 
+/* ── the Basu shell ────────────────────────────────────────────────── */
+
+/**
+ * The native app, when this page is inside it.
+ *
+ * On a phone the launcher, the wallet and the lock screen are Swift, and this
+ * page is one icon inside them — loaded in a web view, signed in as the
+ * shell's guest. The shell puts its token in `localStorage['basu.guest']`
+ * before the page runs, so nothing here changes. Two things do need the
+ * shell: signing in, which is the shell's sheet and not this page's, and
+ * telling it that an order moved so the card outside the page catches up now
+ * rather than on its next poll.
+ *
+ * In a browser `present` is false and every call here is a no-op — the page
+ * signs itself in the demo way, as it always did.
+ */
+export const shell = {
+  get present() {
+    return Boolean(globalThis.webkit?.messageHandlers?.basu);
+  },
+
+  post(message) {
+    if (shell.present) globalThis.webkit.messageHandlers.basu.postMessage(message);
+  },
+
+  /**
+   * Ask the shell for a guest. Resolves with the token once the person has
+   * signed in on the shell's own sheet; rejects if they closed it instead.
+   */
+  signIn() {
+    return new Promise((resolve, reject) => {
+      globalThis.__basuSignedIn = (token) => {
+        delete globalThis.__basuSignedIn;
+        if (token) {
+          store.guestToken = token;
+          resolve(token);
+        } else {
+          reject(new ApiError(401, { error: { code: 'SIGN_IN', message_mn: 'Нэвтрээгүй байна.' } }));
+        }
+      };
+      shell.post({ type: 'signIn' });
+    });
+  },
+
+  /** An order of the guest's changed — the shell's card should say so too. */
+  ordersChanged() {
+    shell.post({ type: 'orders' });
+  },
+};
+
 /* ── toast ─────────────────────────────────────────────────────────── */
 
 let toastTimer;

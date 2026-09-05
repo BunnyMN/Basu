@@ -85,7 +85,7 @@ struct SignInSheet: View {
                   }
                 }
               }
-              .font(.system(size: 14))
+              .font(.sans(14))
               .accessibilityIdentifier("signin.demo")
             } footer: {
               Text("Зөвхөн хөгжүүлэлтийн build дээр. Демо серверийн SMS хаашаа ч очдоггүй.")

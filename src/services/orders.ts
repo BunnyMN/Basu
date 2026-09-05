@@ -2,7 +2,7 @@ import { getPool, tx, type Db } from '../db/pool.js';
 import { appendEvent } from '../db/events.js';
 import { releaseReservation } from '../db/stationLoad.js';
 import { addMinutes } from '../domain/time.js';
-import { isFreeToCancel } from '../domain/states.js';
+import { isFreeToCancel, LIVE_STATES } from '../domain/states.js';
 import type { OrderState } from '../domain/types.js';
 import type { SignalType } from '../domain/eta.js';
 import { cancelFire } from '../scheduler/fireJobs.js';
@@ -591,6 +591,11 @@ export async function markNoShow(ctx: Ctx, orderId: string): Promise<void> {
  * the same two accounts the purchase used, so the pair nets to zero and reads
  * as one line of story rather than two unrelated events.
  */
+const REFUND_MEMO: Record<string, string> = {
+  'cancelled before firing': 'цуцалсан',
+  'restaurant rejected': 'ресторан татгалзсан',
+};
+
 async function refund(ctx: Ctx, orderId: string, reason: string): Promise<void> {
   const billed = await billingFacts(orderId);
   if (!billed?.transferId) return; // never paid — nothing to give back
@@ -600,7 +605,9 @@ async function refund(ctx: Ctx, orderId: string, reason: string): Promise<void> 
     amountMnt: billed.amountMnt,
     subject: 'order',
     subjectId: orderId,
-    memo: `Хоол · ${reason}`,
+    // The memo is what the statement prints under «Буцаалт». The reason is
+    // the event log's, in English; the guest reads Mongolian.
+    memo: `Хоол · ${REFUND_MEMO[reason] ?? 'буцаалт'}`,
     idempotencyKey: `order:${orderId}:refund`,
   });
 
@@ -664,6 +671,23 @@ async function billingFacts(orderId: string): Promise<
     merchantTin: row.tin ?? 'UNSET',
     transferId: row.ledger_transfer_id,
   };
+}
+
+/**
+ * How much of this guest's is still running.
+ *
+ * Dine answers this because identity cannot ask it — closing an account has to
+ * know whether somebody has lunch on the fire, and «what counts as running» is
+ * a question only the vertical can answer. The second vertical will add its own
+ * count beside this one.
+ */
+export async function liveOrderCount(guestId: string): Promise<number> {
+  const { rows } = await getPool().query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM dine.dining_order
+      WHERE guest_id = $1 AND state = ANY($2)`,
+    [guestId, LIVE_STATES],
+  );
+  return rows[0]?.n ?? 0;
 }
 
 /** Guests who never appeared and whose table has long since been let go. */

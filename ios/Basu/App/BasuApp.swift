@@ -1,13 +1,19 @@
+import BasuKit
 import SwiftUI
+import WidgetKit
 
 /**
  Basu — a launcher, and the things that arrive inside it.
 
  The home screen owns no domain logic: it is a list of icons, whatever of the
  guest's is running, and a way into the three things every app shares. Today
- there is one icon. The second is one entry in `AppCatalogue` and one
- `Destination` case, and nothing else on this screen changes — which is the
- whole of what "shell" means here.
+ there is one icon. The second is one entry in `AppCatalogue`, and nothing
+ else on this screen changes — which is the whole of what "shell" means here.
+
+ The shell is native and the apps are not. Every icon opens a web page from
+ the shell's own server inside `ServiceView`, signed in as the shell's guest;
+ the shell keeps the launcher, the wallet, the inbox, the profile and the
+ lock screen, which are the parts a person sees before choosing anything.
 
  Wallet, notifications and profile are not apps. They are the shell's, they are
  in `Platform/`, and a second vertical gets all three without writing any of it.
@@ -63,6 +69,7 @@ struct RootView: View {
 
   @State private var tab: ShellTab = .home
   @State private var path: [Destination] = []
+  @State private var splash = true
 
   var body: some View {
     ZStack(alignment: .bottom) {
@@ -72,12 +79,13 @@ struct RootView: View {
         surface
           .navigationDestination(for: Destination.self) { destination in
             switch destination {
-            case .dine(let orderId):
-              DineView(resuming: orderId)
-            case .idesh(let orderId):
-              IdeshView(resuming: orderId)
+            case .app(let id, let page):
+              ServiceView(app: id, path: page, back: { if !path.isEmpty { path.removeLast() } })
             case .inbox:
-              InboxView(back: { if !path.isEmpty { path.removeLast() } })
+              InboxView(
+                back: { if !path.isEmpty { path.removeLast() } },
+                open: { path.append($0) },
+              )
             }
           }
       }
@@ -91,27 +99,44 @@ struct RootView: View {
       if !inApp {
         TabBar(tab: $tab)
       }
+
+      if splash {
+        SplashView()
+          .transition(.opacity)
+          .zIndex(1)
+      }
     }
+    // The bar is 66 from the screen's bottom edge, home indicator included —
+    // not 66 above the safe area. Content pads itself past it.
+    .ignoresSafeArea(edges: .bottom)
+    .onOpenURL { url in open(url) }
     .task {
       // APNs answers whenever it answers — before a sign-in or long after it —
       // so the token is handed over on arrival rather than asked for at a moment.
       PushRegistrar.shared.onToken = { token in
         Task { await platform.registerPush(token: token) }
       }
-      await model.bootstrap()
-      await platform.refresh()
+      OrderActivity.shared.register = { orderId, token in
+        await platform.registerActivityToken(token, order: orderId)
+      }
+      Self.jumpForDebug(tab: &tab, path: &path)
+      await Self.signInForDebug(model)
+      async let boot: Void = model.bootstrap()
+      async let me: Void = platform.refresh()
+      // The splash lasts as long as the launch does and not a moment longer;
+      // the floor is so a fast launch does not flash.
+      async let floor: Void = { try? await Task.sleep(for: .milliseconds(650)) }()
+      _ = await (boot, me, floor)
+      if !Self.debugHoldsSplash {
+        withAnimation(.easeOut(duration: 0.35)) { splash = false }
+      }
     }
   }
 
   /// True while a vertical owns the screen. The shell's own pushes do not
   /// count — the inbox keeps the bar, and keeps Нүүр lit under it.
   private var inApp: Bool {
-    path.contains {
-      switch $0 {
-      case .dine, .idesh: true
-      case .inbox: false
-      }
-    }
+    path.contains { if case .app = $0 { true } else { false } }
   }
 
   @ViewBuilder private var surface: some View {
@@ -119,20 +144,119 @@ struct RootView: View {
     case .home:
       HomeView(open: { path.append($0) })
     case .wallet:
-      WalletView(back: { tab = .home })
+      WalletView()
     case .profile:
-      ProfileView(back: { tab = .home })
+      ProfileView(home: { tab = .home })
     }
+  }
+
+  /// `basu://order/{id}`, `basu://wallet`, `basu://notifications`, `basu://dine`.
+  /// The Live Activity and both widgets link to the first.
+  private func open(_ url: URL) {
+    guard url.scheme == "basu" else { return }
+    switch url.host {
+    case "order":
+      tab = .home
+      if let id = url.pathComponents.dropFirst().first,
+         let destination = AppCatalogue.food.destination(order: id) {
+        path = [destination]
+      } else if let destination = AppCatalogue.food.destination {
+        path = [destination]
+      }
+    case "dine":
+      tab = .home
+      if let destination = AppCatalogue.food.destination { path = [destination] }
+    case "wallet":
+      path = []
+      tab = .wallet
+    case "notifications":
+      tab = .home
+      path = [.inbox]
+    default:
+      break
+    }
+  }
+
+  // MARK: - the design pass
+
+  /// `BASU_SCREEN=wallet|profile|inbox|splash|food` lands the app on a screen
+  /// so the pass can photograph it. Debug only; production has no such door.
+  private static func jumpForDebug(tab: inout ShellTab, path: inout [Destination]) {
+    #if DEBUG
+      switch ProcessInfo.processInfo.environment["BASU_SCREEN"] {
+      case "wallet": tab = .wallet
+      case "profile": tab = .profile
+      case "inbox": path = [.inbox]
+      case "food": path = [AppCatalogue.food.destination].compactMap { $0 }
+      default: break
+      }
+    #endif
+  }
+
+  /// `BASU_DEMO_SIGNIN=1` signs the demo guest in before the first draw, so
+  /// the pass photographs a launcher with a bell rather than a way in.
+  private static func signInForDebug(_ model: AppModel) async {
+    #if DEBUG
+      guard ProcessInfo.processInfo.environment["BASU_DEMO_SIGNIN"] == "1",
+            !model.session.isSignedIn else { return }
+      try? await model.session.demoSignIn()
+    #endif
+  }
+
+  private static var debugHoldsSplash: Bool {
+    #if DEBUG
+      ProcessInfo.processInfo.environment["BASU_SCREEN"] == "splash"
+    #else
+      false
+    #endif
   }
 }
 
 /**
- The bar. Glass, a hairline on top, 78 points tall.
+ The splash. The wordmark, a rule, and the city — no logo file, no spinner,
+ no progress text. It sits over the launcher and fades to reveal it, so there
+ is no jump between the two.
+ */
+struct SplashView: View {
+  var body: some View {
+    ZStack {
+      LinearGradient.ground.ignoresSafeArea()
+      VStack(spacing: 14) {
+        Text("Basu")
+          .font(.sans(44, .semibold))
+          .tracking(-0.03 * 44)
+          .foregroundStyle(Color.ink)
+        RoundedRectangle(cornerRadius: 1, style: .continuous)
+          .fill(Color.accent)
+          .frame(width: 34, height: 2)
+      }
+      VStack {
+        Spacer()
+        Text("УЛААНБААТАР")
+          .font(.mono(10.5))
+          .tracking(0.16 * 10.5)
+          .foregroundStyle(Color.ink3)
+          .padding(.bottom, 44)
+      }
+    }
+    // Centred on the whole screen, status bar included, the way it is drawn.
+    .ignoresSafeArea()
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("Basu")
+    .accessibilityIdentifier("splash")
+  }
+}
+
+/**
+ The bar. Glass, a hairline on top, 66 points tall, icon only.
 
  It carries the shell and nothing else. The launcher used to hold a wallet strip
  as well; at nine icons there was no room for both, and the strip and this tab
  were the same tap twice — so the balance is one tap away rather than visible on
  arrival. That is a real trade against the brief, made once, on purpose.
+
+ The labels came off with the same revision. The bar is icon-only, so the
+ accessibility labels below are the only thing VoiceOver has.
  */
 struct TabBar: View {
   @Binding var tab: ShellTab
@@ -144,14 +268,10 @@ struct TabBar: View {
         Button {
           tab = item
         } label: {
-          VStack(spacing: 5) {
-            ShellGlyph(mark: item.mark, size: 23)
-            Text(item.title)
-              .font(.system(size: 10, weight: active ? .semibold : .medium))
-          }
-          .foregroundStyle(active ? Color.accent : Color.ink3)
-          .frame(maxWidth: .infinity, minHeight: 44)
-          .contentShape(Rectangle())
+          ShellGlyph(mark: item.mark, size: BasuMetric.tabGlyph)
+            .foregroundStyle(active ? Color.accent : Color.ink3)
+            .frame(maxWidth: .infinity, minHeight: BasuMetric.minTarget)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("tab.\(item.rawValue)")
@@ -160,22 +280,18 @@ struct TabBar: View {
       }
     }
     .padding(.horizontal, 8)
-    .padding(.top, 10)
-    .frame(height: 78, alignment: .top)
+    .padding(.top, 14 - (BasuMetric.minTarget - BasuMetric.tabGlyph) / 2)
+    .frame(height: BasuMetric.tabBar, alignment: .top)
     .background(.ultraThinMaterial)
     .overlay(alignment: .top) { Hairline() }
-    .ignoresSafeArea(edges: .bottom)
   }
 }
 
 enum Destination: Hashable {
-  /// `orderId` is the deep link: the launcher sends somebody straight to the
-  /// order they already have, rather than to a map they have to search.
-  case dine(orderId: String?)
-
-  /// The second app. Same deep link shape: the launcher sends somebody to
-  /// the order they already have.
-  case idesh(orderId: String?)
+  /// An app: its id from `AppCatalogue`, and the page to open — `/dine`, or
+  /// `/dine?order=…` when the launcher sends somebody straight to the order
+  /// they already have rather than to a map they have to search.
+  case app(id: String, path: String)
 
   /// Reached from the bell, and pushed over the launcher rather than given a
   /// tab — an inbox is somewhere you go back from, not somewhere you live.

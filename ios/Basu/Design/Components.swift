@@ -13,23 +13,6 @@ struct SectionLabel: View {
   }
 }
 
-/// The state chip: `PLACED`, `FIRED`, `READY` — each with the colour the
-/// kitchen display and the web app already give it.
-struct StateChip: View {
-  let state: OrderState
-  let label: String
-
-  var body: some View {
-    Text(label)
-      .font(.mono(11, .medium))
-      .foregroundStyle(state.tint)
-      .padding(.horizontal, 8)
-      .padding(.vertical, 3)
-      .background(state.soft, in: RoundedRectangle(cornerRadius: 3))
-      .overlay(RoundedRectangle(cornerRadius: 3).stroke(state.line, lineWidth: 1))
-  }
-}
-
 /// The big button at the bottom of a sheet — pay, cancel, send.
 struct WideButton: View {
   enum Kind { case primary, quiet, danger }
@@ -42,7 +25,7 @@ struct WideButton: View {
   var body: some View {
     Button(action: action) {
       Text(title)
-        .font(.system(size: 15, weight: kind == .primary ? .semibold : .regular))
+        .font(.sans(15, kind == .primary ? .semibold : .regular))
         .frame(maxWidth: .infinity)
         .padding(.vertical, 15)
         .foregroundStyle(foreground)
@@ -70,29 +53,6 @@ struct WideButton: View {
   }
 }
 
-/// Five tappable stars. Keeps its own value so the form around it can rebuild
-/// without taking the caret out of whatever somebody is typing.
-struct StarPicker: View {
-  @Binding var stars: Int
-  var size: CGFloat = 30
-
-  var body: some View {
-    HStack(spacing: 4) {
-      ForEach(1...5, id: \.self) { n in
-        Button {
-          stars = n
-        } label: {
-          Image(systemName: n <= stars ? "star.fill" : "star")
-            .font(.system(size: size))
-            .foregroundStyle(n <= stars ? Color.accentInk : Color.line2)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(n) од")
-      }
-    }
-  }
-}
-
 /**
  The server is not answering.
 
@@ -108,14 +68,14 @@ struct OfflineBanner: View {
   var body: some View {
     HStack(alignment: .top, spacing: 10) {
       Image(systemName: "wifi.slash")
-        .font(.system(size: 15))
+        .font(.sans(15))
         .foregroundStyle(Color.hold)
       VStack(alignment: .leading, spacing: 2) {
         Text("Серверт холбогдож чадсангүй")
-          .font(.system(size: 13.5, weight: .semibold))
+          .font(.sans(13.5, .semibold))
           .foregroundStyle(Color.ink)
         Text(hint)
-          .font(.system(size: 12))
+          .font(.sans(12))
           .foregroundStyle(Color.ink2)
           .fixedSize(horizontal: false, vertical: true)
       }
@@ -162,7 +122,7 @@ struct Banner: View {
 
   var body: some View {
     Text(message)
-      .font(.system(size: 13))
+      .font(.sans(13))
       .foregroundStyle(Color.stop)
       .frame(maxWidth: .infinity, alignment: .leading)
       .padding(12)

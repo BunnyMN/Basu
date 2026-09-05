@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import UIKit
 
 /**
  Who is signed in, and the token that proves it.
@@ -31,16 +32,20 @@ final class Session {
   }
 
   func verify(phone: String, code: String) async throws {
-    let token = try await api.verify(phone: phone, code: code)
+    let token = try await api.verify(phone: phone, code: code, device: Self.deviceName)
     keep(token: token, phone: phone)
   }
+
+  /// What this phone calls itself — «Батаагийн iPhone». It goes to identity so
+  /// somebody looking at their sessions can tell which row to revoke.
+  @MainActor static var deviceName: String { UIDevice.current.name }
 
   #if DEBUG
     /// The demo way in: the walkthrough cannot read an SMS that went to a fake
     /// gateway, and putting the code in the response would be a hole that
     /// shipped. Debug builds only — the button does not exist in a release.
     func demoSignIn(phone: String = "+97699001122") async throws {
-      let token = try await api.demoLogin(phone: phone)
+      let token = try await api.demoLogin(phone: phone, device: Self.deviceName)
       keep(token: token, phone: phone)
     }
   #endif
