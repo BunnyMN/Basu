@@ -54,32 +54,66 @@
 .kinds button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
 
 /* ── the stalls ──────────────────────────────────────────────────── */
-.listings{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+/* A stall is chosen with the eyes and bought on trust, so the card leads
+   with the cut and says who stands behind it before it says the price. Sans
+   for everything a person reads; mono only for the numbers. */
+.tally{font-size:.8rem;color:var(--ink-3);margin:-6px 0 12px}
+.trust{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:0 0 16px;
+}
+.trust div{
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 10px 9px;
+  display:flex;flex-direction:column;gap:5px;
+}
+.trust svg{width:18px;height:18px;fill:none;stroke:var(--ready);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.trust b{font-size:.76rem;font-weight:700;letter-spacing:-.01em;line-height:1.25}
+.trust span{font-size:.68rem;color:var(--ink-3);line-height:1.35}
+@media(max-width:380px){.trust{grid-template-columns:1fr 1fr}.trust div:last-child{grid-column:1 / -1}}
+
+.listings{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
 .listing{
-  display:flex;align-items:center;gap:12px;width:100%;text-align:left;color:inherit;
-  background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:11px 12px;
-  box-shadow:var(--shadow);
+  display:flex;align-items:stretch;gap:14px;width:100%;text-align:left;color:inherit;
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;
+  box-shadow:var(--shadow);transition:border-color .15s,transform .15s;
 }
 .listing:hover{border-color:var(--accent-line)}
+.listing:active{transform:scale(.995)}
 .listing[data-gone]{opacity:.55}
 .listing .art{
-  width:52px;height:52px;flex:none;border-radius:4px;border:1px solid var(--line);
+  width:88px;height:88px;flex:none;border-radius:8px;border:1px solid var(--line);
   background:var(--accent-soft);display:grid;place-items:center;color:var(--accent-ink);
-  overflow:hidden;
+  overflow:hidden;align-self:center;
 }
 .listing .art img{width:100%;height:100%;object-fit:cover;display:block}
 .listing .art svg{width:32px;height:32px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.listing .who{min-width:0;flex:1}
-.listing .name{font-weight:700;font-size:.94rem;letter-spacing:-.01em;overflow-wrap:anywhere}
-.listing .from{font-size:.78rem;color:var(--ink-2);margin-top:1px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.listing .meta{font-family:"IBM Plex Mono",monospace;font-size:.64rem;color:var(--ink-3);margin-top:4px;overflow-wrap:anywhere}
-.listing .price{font-family:"IBM Plex Mono",monospace;font-size:.86rem;font-weight:600;font-variant-numeric:tabular-nums;flex:none;text-align:right}
-.listing .price small{display:block;font-size:.58rem;font-weight:400;color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
-.verified{
-  font-family:"IBM Plex Mono",monospace;font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--ready);border:1px solid var(--ready-line);border-radius:2px;padding:1px 5px;font-style:normal;
+.listing .who{min-width:0;flex:1;display:flex;flex-direction:column;gap:5px}
+.listing .name{font-weight:800;font-size:1.02rem;letter-spacing:-.02em;line-height:1.2;overflow-wrap:anywhere}
+.listing .from{font-size:.8rem;color:var(--ink-2);line-height:1.35;overflow-wrap:anywhere}
+.listing .from .verified{margin-right:6px}
+.listing .bits{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.76rem;color:var(--ink-2);line-height:1.4}
+.listing .bits span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.listing .bits svg{width:13px;height:13px;flex:none;fill:none;stroke:var(--ink-3);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.listing .row{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin-top:auto;padding-top:2px}
+.listing .left{font-size:.74rem;color:var(--ink-3)}
+.listing .left[data-low]{color:var(--hold);font-weight:600}
+.listing .left[data-gone]{color:var(--stop);font-weight:600}
+.listing .price{text-align:right;flex:none}
+.listing .price b{
+  display:block;font-family:"IBM Plex Mono",monospace;font-size:1.02rem;font-weight:600;
+  font-variant-numeric:tabular-nums;letter-spacing:-.01em;color:var(--ink);
 }
+.listing .price small{display:block;font-size:.68rem;color:var(--ink-3);margin-top:1px}
+.verified{
+  display:inline-flex;align-items:center;gap:4px;font-style:normal;font-size:.72rem;font-weight:600;
+  color:var(--ready);background:var(--ready-soft);border:1px solid var(--ready-line);
+  border-radius:99px;padding:2px 8px 2px 6px;vertical-align:middle;
+}
+.verified svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 .empty{padding:26px 18px;text-align:center;color:var(--ink-3);font-size:.86rem;line-height:1.5}
+
+/* the picture at the top of the sheet */
+.hero{height:170px;background:var(--accent-soft);overflow:hidden}
+.hero img{width:100%;height:100%;object-fit:cover;display:block}
 
 /* ── the sheet ───────────────────────────────────────────────────── */
 .scrim{position:fixed;inset:0;z-index:20;background:rgba(10,14,16,.45);opacity:0;pointer-events:none;transition:opacity .2s}
@@ -185,6 +219,28 @@ input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
       <p class="sub">Гэрээт малчин, махны газраас. Үнэ нь зар дээр бичсэнээрээ эцсийнх.</p>
     </div>
     <a class="home" href="/" id="home" aria-label="Basu нүүр">‹ Basu</a>
+  </div>
+
+  <p class="tally" id="tally"></p>
+
+  <!-- The three things a buyer is trusting. All three are true by
+       construction: contract, fixed price, refund before PREPARING. -->
+  <div class="trust" aria-label="Баталгаа">
+    <div>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+      <b>Гэрээт нийлүүлэгч</b>
+      <span>Basu шалгаж, гэрээ байгуулсан</span>
+    </div>
+    <div>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12l-8 8-8-8V4h8l8 8z"/><circle cx="8.5" cy="8.5" r="1.3"/></svg>
+      <b>Үнэ эцсийнх</b>
+      <span>Зар дээр бичсэнээс өөрчлөгдөхгүй</span>
+    </div>
+    <div>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v5h5"/></svg>
+      <b>Үнэгүй цуцлалт</b>
+      <span>Нийлүүлэгч бэлтгэж эхлэх хүртэл</span>
+    </div>
   </div>
 
   <section class="mine" id="mine">
@@ -332,17 +388,32 @@ function paintKinds() {
   }
 }
 
-/** «460,000₮ / бүтэн, ~38 кг» or «13,500₮ / кг, доод тал нь 20 кг». */
-function unitLine(l) {
-  return l.unit === 'whole'
-    ? `бүтэн · ~${l.approx_kg} кг`
-    : `кг · доод тал нь ${l.min_qty} кг`;
+/** The little marks on a row. Same stroke as the launcher's, one colour. */
+const MARK = {
+  check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg>',
+  day: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/></svg>',
+  truck: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/></svg>',
+  scale: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M5 20h14M4 8h16"/><path d="M7 8l-3 6h6l-3-6zM17 8l-3 6h6l-3-6z"/></svg>',
+};
+
+const unitWord = (l) => (l.unit === 'whole' ? 'толгой' : 'кг');
+
+/** «бүтэн · ~38 кг» / «1 кг · доод тал нь 20 кг» — what the price is for. */
+function priceFor(l) {
+  return l.unit === 'whole' ? `бүтэн · ~${l.approx_kg} кг` : `1 кг · доод тал нь ${l.min_qty} кг`;
 }
 
 function paintListings() {
   const list = $('listings');
   list.replaceChildren();
   const shown = state.listings.filter((l) => state.kind === 'all' || l.kind === state.kind);
+
+  const suppliers = new Set(state.listings.map((l) => l.supplier.id)).size;
+  $('tally').textContent = state.listings.length
+    ? `${state.listings.length} зар · ${suppliers} гэрээт нийлүүлэгч`
+    : '';
+
   if (!shown.length) {
     list.append(
       el(`<li class="empty">Одоогоор зар алга.<br>Өвлийн идэшний зар 10–11-р сард гарна.</li>`),
@@ -350,22 +421,30 @@ function paintListings() {
     return;
   }
   for (const l of shown) {
+    const gone = l.remaining === 0;
+    // Three left of twenty is worth saying louder than seventeen of twenty.
+    const low = !gone && l.remaining <= Math.max(2, Math.ceil(l.quantity * 0.15));
     const item = el(`
       <li>
-        <button class="listing" type="button" data-kind="${l.kind}" data-id="${l.id}"${
-          l.remaining === 0 ? ' data-gone' : ''
-        }>
-          <span class="art"><img src="${PHOTO(l.kind)}" alt="" loading="lazy" width="52" height="52"></span>
+        <button class="listing" type="button" data-kind="${l.kind}" data-id="${l.id}"${gone ? ' data-gone' : ''}>
+          <span class="art"><img src="${PHOTO(l.kind)}" alt="" loading="lazy" width="88" height="88"></span>
           <span class="who">
             <span class="name">${escapeHtml(l.title)}</span>
-            <span class="from">${escapeHtml(l.supplier.name)}${
-              l.supplier.contracted ? '<i class="verified">гэрээт</i>' : ''
-            }</span>
-            <span class="meta">${escapeHtml(l.origin)} · ${dayLabel(l.ready_from)}-нөөс · ${
-              l.remaining === 0 ? 'дууссан' : `${l.remaining} ${l.unit === 'whole' ? 'толгой' : 'кг'} үлдсэн`
-            }${l.delivers ? ' · хүргэнэ' : ''}</span>
+            <span class="from">${
+              l.supplier.contracted ? `<i class="verified">${MARK.check}Гэрээт</i>` : ''
+            }${escapeHtml(l.supplier.name)}</span>
+            <span class="bits">
+              <span>${MARK.pin}${escapeHtml(l.origin)}</span>
+              <span>${MARK.day}${dayLabel(l.ready_from)}-нөөс</span>
+              ${l.delivers ? `<span>${MARK.truck}Хүргэлттэй</span>` : ''}
+            </span>
+            <span class="row">
+              <span class="left"${gone ? ' data-gone' : low ? ' data-low' : ''}>${
+                gone ? 'Дууссан' : `${l.remaining} ${unitWord(l)} үлдсэн`
+              }</span>
+              <span class="price"><b>${mnt(l.price_mnt)}</b><small>${priceFor(l)}</small></span>
+            </span>
           </span>
-          <span class="price">${mnt(l.price_mnt)}<small>${l.unit === 'whole' ? 'бүтэн' : '1 кг'}</small></span>
         </button>
       </li>`);
     item.querySelector('button').addEventListener('click', () => openListing(l));
@@ -427,6 +506,13 @@ function openListing(l) {
   renderForm();
 }
 
+/** The same picture, larger, at the top of the sheet. */
+function hero(kind) {
+  const box = el(`<div class="hero"><img src="${PHOTO(kind)}" alt="" width="520" height="170"></div>`);
+  box.querySelector('img').addEventListener('error', () => box.remove());
+  return box;
+}
+
 function total() {
   const l = state.listing;
   const f = state.form;
@@ -439,6 +525,7 @@ function renderForm() {
   const body = $('sheet-body');
   body.replaceChildren();
 
+  body.append(hero(l.kind));
   if (l.note) body.append(el(`<div class="about">${escapeHtml(l.note)}</div>`));
 
   body.append(

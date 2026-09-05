@@ -746,10 +746,17 @@ describe('өвлийн идэш', () => {
 
     for (const row of dom.window.document.querySelectorAll('.listing')) {
       expect(row.querySelector('.art img')?.getAttribute('src')).toMatch(/^\/idesh\/(sheep|goat|beef|horse)\.jpg$/);
-      expect(row.querySelector('.verified')?.textContent).toBe('гэрээт');
-      expect(row.querySelector('.price')?.textContent).toMatch(/₮/);
-      expect(row.querySelector('.meta')?.textContent).toMatch(/-р сарын \d+-нөөс/);
+      // The contract is the trust mark, on every row, before the name.
+      expect(row.querySelector('.from .verified')?.textContent).toContain('Гэрээт');
+      expect(row.querySelector('.price b')?.textContent).toMatch(/₮$/);
+      // What the price is for sits under it: the weight, or the minimum.
+      expect(row.querySelector('.price small')?.textContent).toMatch(/кг/);
+      expect(row.querySelector('.bits')?.textContent).toMatch(/-р сарын \d+-нөөс/);
+      expect(row.querySelector('.left')?.textContent).toMatch(/үлдсэн|Дууссан/);
     }
+    // The page says how much there is to choose from, and who stands behind it.
+    expect(dom.window.document.querySelector('#tally')?.textContent).toMatch(/^\d+ зар · \d+ гэрээт нийлүүлэгч$/);
+    expect(dom.window.document.querySelectorAll('.trust div')).toHaveLength(3);
     // The filter narrows by animal, never rearranges.
     clickText(dom, '#kinds button', 'Үхэр');
     await until(dom, 'only beef', (d) =>
@@ -796,7 +803,7 @@ describe('өвлийн идэш', () => {
     const dom = await openPage('idesh.html');
     await until(dom, 'the stalls', (d) => d.querySelectorAll('.listing').length >= seeded.listings);
     const delivered = [...dom.window.document.querySelectorAll('.listing')].find(
-      (l) => l.textContent?.includes('хүргэнэ') && !l.hasAttribute('data-gone'),
+      (l) => l.textContent?.includes('Хүргэлттэй') && !l.hasAttribute('data-gone'),
     ) as HTMLElement;
     delivered.click();
     await until(dom, 'the sheet', (d) => Boolean(d.querySelector('#pay')));
