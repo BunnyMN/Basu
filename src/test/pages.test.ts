@@ -745,7 +745,7 @@ describe('өвлийн идэш', () => {
     await until(dom, 'the stalls', (d) => d.querySelectorAll('.listing').length >= seeded.listings);
 
     for (const row of dom.window.document.querySelectorAll('.listing')) {
-      expect(row.querySelector('.art svg')).toBeTruthy();
+      expect(row.querySelector('.art img')?.getAttribute('src')).toMatch(/^\/idesh\/(sheep|goat|beef|horse)\.jpg$/);
       expect(row.querySelector('.verified')?.textContent).toBe('гэрээт');
       expect(row.querySelector('.price')?.textContent).toMatch(/₮/);
       expect(row.querySelector('.meta')?.textContent).toMatch(/-р сарын \d+-нөөс/);

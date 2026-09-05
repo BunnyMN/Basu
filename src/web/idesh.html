@@ -65,7 +65,9 @@
 .listing .art{
   width:52px;height:52px;flex:none;border-radius:4px;border:1px solid var(--line);
   background:var(--accent-soft);display:grid;place-items:center;color:var(--accent-ink);
+  overflow:hidden;
 }
+.listing .art img{width:100%;height:100%;object-fit:cover;display:block}
 .listing .art svg{width:32px;height:32px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .listing .who{min-width:0;flex:1}
 .listing .name{font-weight:700;font-size:.94rem;letter-spacing:-.01em;overflow-wrap:anywhere}
@@ -229,11 +231,14 @@ function escapeHtml(value) {
 }
 
 /**
- * One drawing per kind of animal, in the launcher's stroke: the object, two
- * to four elements, one colour. No photographs this autumn — a supplier's
- * own picture is a real thing to show, but storage and moderation are a
- * second release, and a menu with holes in it sells nothing.
+ * A photograph of the cut, per kind of animal — Basu's own four, served from
+ * /idesh/<kind>.jpg. Not a supplier's picture: uploads, storage and
+ * moderation are a second release. Below it, one drawing per kind in the
+ * launcher's stroke, which is what shows if a picture fails to arrive — a
+ * list with holes in it sells nothing.
  */
+const PHOTO = (kind) => `/idesh/${kind}.jpg`;
+
 const ART = {
   sheep: `<svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6.5 9.5a3 3 0 0 1 3-3.8 3.2 3.2 0 0 1 5.6 0 3 3 0 0 1 3.4 3.4 3 3 0 0 1-.4 5.6H7.3a3 3 0 0 1-.8-5.2Z"/>
@@ -350,7 +355,7 @@ function paintListings() {
         <button class="listing" type="button" data-kind="${l.kind}" data-id="${l.id}"${
           l.remaining === 0 ? ' data-gone' : ''
         }>
-          <span class="art">${ART[l.kind] ?? ''}</span>
+          <span class="art"><img src="${PHOTO(l.kind)}" alt="" loading="lazy" width="52" height="52"></span>
           <span class="who">
             <span class="name">${escapeHtml(l.title)}</span>
             <span class="from">${escapeHtml(l.supplier.name)}${
@@ -364,6 +369,11 @@ function paintListings() {
         </button>
       </li>`);
     item.querySelector('button').addEventListener('click', () => openListing(l));
+    // The picture did not come: the drawn mark stands in, and the row stays whole.
+    const picture = item.querySelector('.art img');
+    picture.addEventListener('error', () => {
+      picture.parentElement.innerHTML = ART[l.kind] ?? '';
+    });
     list.append(item);
   }
 }
