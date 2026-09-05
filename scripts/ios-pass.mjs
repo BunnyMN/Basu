@@ -12,13 +12,30 @@
  * debug builds only. Compare the output against `design/handoff/` by eye.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const args = process.argv.slice(2);
 const out = args.includes('--out') ? args[args.indexOf('--out') + 1] : join('ios', 'pass');
 const sizes = args.includes('--xxl') ? ['medium', 'extra-extra-extra-large'] : ['medium'];
-const BUNDLE = 'mn.basu.app';
+/**
+ * The bundle id, with the developer's own suffix if Developer.xcconfig sets
+ * one (see ios/Developer.example.xcconfig): a personal team builds as
+ * mn.basu.app.yourname, and that is what the simulator has to be asked to launch.
+ */
+const BUNDLE = `mn.basu.app${idSuffix()}`;
+function idSuffix() {
+  if (process.env.BASU_ID_SUFFIX) return process.env.BASU_ID_SUFFIX;
+  try {
+    const text = readFileSync(join(root, 'ios', 'Developer.xcconfig'), 'utf8');
+    return /^\s*BASU_ID_SUFFIX\s*=\s*(\S+)/m.exec(text)?.[1] ?? '';
+  } catch {
+    return '';
+  }
+}
 const simctl = (...a) => execFileSync('xcrun', ['simctl', ...a], { stdio: ['ignore', 'pipe', 'inherit'] }).toString();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

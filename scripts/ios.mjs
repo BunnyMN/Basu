@@ -10,14 +10,28 @@
  * file added and merges badly, and this one is regenerated in a second.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const ios = join(root, 'ios');
 const DEVICE = process.env.BASU_SIM ?? 'iPhone 17';
-const BUNDLE = 'mn.basu.app';
+/**
+ * The bundle id, with the developer's own suffix if Developer.xcconfig sets
+ * one (see ios/Developer.example.xcconfig): a personal team builds as
+ * mn.basu.app.yourname, and that is what the simulator has to be asked to launch.
+ */
+const BUNDLE = `mn.basu.app${idSuffix()}`;
+function idSuffix() {
+  if (process.env.BASU_ID_SUFFIX) return process.env.BASU_ID_SUFFIX;
+  try {
+    const text = readFileSync(join(root, 'ios', 'Developer.xcconfig'), 'utf8');
+    return /^\s*BASU_ID_SUFFIX\s*=\s*(\S+)/m.exec(text)?.[1] ?? '';
+  } catch {
+    return '';
+  }
+}
 const derived = join(ios, 'DerivedData');
 
 const step = (text) => console.log(`\n\x1b[1m${text}\x1b[0m`);

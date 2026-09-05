@@ -537,12 +537,21 @@ Release build энэ хоёрыг хоёуланг нь үл тоодог.
 секундэд үүсгэдэг — файл нэмэх бүрд өөрчлөгддөг, merge-д муу байдаг
 generated файлыг хадгалах шалтгаан алга.
 
-**Өөрийн утсан дээр, хувийн (үнэгүй) Apple ID-ийн багаар** build хийж болно:
-Debug нь `ios/Basu/Basu.debug.entitlements`-ээр гарын үсэг зурдаг бөгөөд тэнд
-Push Notifications байхгүй — хувийн баг push-ийг дэмждэггүй, debug build-д
-push токен хэзээ ч ирдэггүй тул алдах зүйл алга. Release нь `project.yml`-ийн
-бүрэн entitlements-тэй (App Group + push) хэвээр; түүнийг зурахад Apple
-Developer Program-ын баг хэрэгтэй.
+**Өөрийн утсан дээр, хувийн (үнэгүй) Apple ID-ийн багаар** build хийж болно.
+Хоёр зүйл:
+
+1. Identifier-ууд Apple-ийн бүх багийн дунд давхцахгүй: `mn.basu.app` ба
+   `group.mn.basu.shared` аль хэдийн нэг багийнх тул өөр баг тэдгээрээр гарын
+   үсэг зурж чадахгүй. `ios/Developer.xcconfig`-д (git-д ордоггүй, эхний
+   `xcodegen generate` жишээнээс нь үүсгэнэ) өөрийн дагавраа бичнэ:
+   `BASU_ID_SUFFIX = .yourname` — тэгвэл апп `mn.basu.app.yourname`, widget
+   `…widgets`, App Group `group.mn.basu.shared.yourname` болно, код нь ч
+   Info.plist-ээс тэр group-ийг уншина. `BASU_API`-г ч тэнд тавина.
+2. Debug нь `ios/Basu/Basu.debug.entitlements`-ээр зурагддаг, тэнд Push
+   Notifications байхгүй — хувийн баг push-ийг дэмждэггүй, debug build-д push
+   токен хэзээ ч ирдэггүй тул алдах зүйл алга. Release нь `Basu.entitlements`
+   (App Group + push) хэвээр; түүнийг зурахад Apple Developer Program-ын баг
+   хэрэгтэй.
 
 ```
 ios/

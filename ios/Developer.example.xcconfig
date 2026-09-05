@@ -1,0 +1,18 @@
+// Your own copy of this file is Developer.xcconfig, next to it, and git
+// never sees it. `xcodegen generate` (and npm run ios) creates it from this
+// one when it is missing. Both settings are empty by default; a personal
+// (free) Apple ID team needs the first to build for its own phone.
+//
+// Identifiers are unique across every Apple developer team. mn.basu.app and
+// group.mn.basu.shared already belong to one, so another team cannot sign
+// for them. A suffix of your own makes them yours:
+//   mn.basu.app.yourname, mn.basu.app.yourname.widgets,
+//   group.mn.basu.shared.yourname.
+//
+// BASU_ID_SUFFIX = .yourname
+//
+// Where a debug build on a real phone finds the API. `localhost` on a phone
+// is the phone; use the Mac's address on the same Wi-Fi. In an xcconfig
+// `//` starts a comment, so the URL is written with $() in the middle:
+//
+// BASU_API = http:/$()/192.168.1.20:3000

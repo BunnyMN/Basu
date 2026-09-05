@@ -13,3 +13,5 @@ ios/Basu/Info.plist
 ios/BasuWidgets/Info.plist
 ios/BasuWidgets/BasuWidgets.entitlements
 ios/pass/
+# Per-developer identifiers and API address; see ios/Developer.example.xcconfig
+ios/Developer.xcconfig

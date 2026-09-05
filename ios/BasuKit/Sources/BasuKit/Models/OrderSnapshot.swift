@@ -40,7 +40,13 @@ public struct OrderSnapshot: Codable, Hashable, Sendable {
 }
 
 public enum OrderSnapshotStore {
-  public static let appGroup = "group.mn.basu.shared"
+  /// The App Group the app and the widget share. Read from the running
+  /// bundle's Info.plist rather than written here, because a developer on a
+  /// personal team builds with a suffix on every identifier (see
+  /// Developer.example.xcconfig) and the group has to follow it.
+  public static var appGroup: String {
+    (Bundle.main.object(forInfoDictionaryKey: "BasuAppGroup") as? String) ?? "group.mn.basu.shared"
+  }
   static let key = "order.snapshot"
   /// The widget's timeline needs a kick when the snapshot changes.
   public static let widgetKind = "mn.basu.order"
