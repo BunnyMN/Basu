@@ -14,7 +14,6 @@ export {
   BOARD_STATES,
   canTransition,
   nextStates,
-  isFreeToCancel,
   isCommitted,
   isLive,
   type IdeshState,

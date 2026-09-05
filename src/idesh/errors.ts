@@ -7,7 +7,6 @@ export type IdeshErrorCode =
   | 'NO_DELIVERY'
   | 'NO_ADDRESS'
   | 'BAD_DATE'
-  | 'TOO_LATE_TO_CANCEL'
   | 'PAYMENT_FAILED'
   | 'ALREADY_APPLIED'
   | 'NOT_PENDING'

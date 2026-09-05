@@ -11,7 +11,7 @@ import type { Ctx } from '../ports.js';
 import { IdeshError } from './errors.js';
 import type { Kind } from './listings.js';
 import { dayOf, quote, type Receive, type Unit } from './pricing.js';
-import { BOARD_STATES, LIVE_STATES, isFreeToCancel, type IdeshState } from './states.js';
+import { BOARD_STATES, LIVE_STATES, type IdeshState } from './states.js';
 
 /**
  * The life of an идэш, one function per thing a person can do.
@@ -279,18 +279,24 @@ export async function payIdesh(ctx: Ctx, orderId: string): Promise<void> {
   });
 }
 
+/**
+ * Who may cancel: the supplier, or the house sweeping up an unpaid draft.
+ * Never the guest. Money that has moved does not come back at the press of a
+ * button; a guest who chose wrongly rings the supplier, they talk, and the
+ * supplier cancels from their screen.
+ */
 export interface CancelledBy {
   actor: string;
-  role: 'guest' | 'supplier' | 'system';
+  role: 'supplier' | 'system';
 }
 
 /**
  * Cancel, and give back whatever there is to give back.
  *
- * A guest may only cancel before the supplier has started — PREPARING is the
- * boundary, and it is the same line dine draws at FIRED. A supplier may cancel
- * at any point short of the handover (an animal that failed the vet is theirs
- * to answer for), and the guest is refunded in full whichever side cancelled.
+ * A supplier may cancel at any point short of the handover — an order the
+ * guest asked them to undo, or an animal that failed the vet — and the guest
+ * is refunded in full either way. Past PREPARING the animal has been
+ * slaughtered and does not go back on offer.
  */
 export async function cancelIdesh(
   ctx: Ctx,
@@ -302,11 +308,7 @@ export async function cancelIdesh(
   const facts = await billingFacts(orderId);
   if (!facts) throw new IdeshError('NOT_FOUND', 'no such order');
 
-  if (by.role === 'guest' && !isFreeToCancel(facts.state)) {
-    throw new IdeshError('TOO_LATE_TO_CANCEL', 'the supplier has already started on this order');
-  }
-  const from: readonly IdeshState[] =
-    by.role === 'guest' ? ['DRAFT', 'PAID'] : ['DRAFT', 'PAID', 'PREPARING', 'READY', 'DISPATCHED'];
+  const from: readonly IdeshState[] = ['DRAFT', 'PAID', 'PREPARING', 'READY', 'DISPATCHED'];
 
   const cancelled = await tx(async (client) => {
     const ok = await transition(client, orderId, from, 'CANCELLED', {
@@ -326,12 +328,7 @@ export async function cancelIdesh(
     return true;
   });
 
-  if (!cancelled) {
-    if (by.role === 'guest') {
-      throw new IdeshError('TOO_LATE_TO_CANCEL', 'the supplier got there first');
-    }
-    throw new IdeshError('WRONG_STATE', `cannot cancel in ${facts.state}`);
-  }
+  if (!cancelled) throw new IdeshError('WRONG_STATE', `cannot cancel in ${facts.state}`);
 
   if (!facts.transferId) {
     // Never paid: nothing to give back, and nothing left to watch.
@@ -366,7 +363,7 @@ export async function startPreparing(ctx: Ctx, orderId: string, actor: string): 
     channel: 'push',
     title: 'Мал бэлтгэгдэж байна',
     // The guest is told what changed, the way dine says it at the fire.
-    body: `${facts.title} №${facts.code} бэлтгэгдэж эхэллээ. Цуцлах боломжгүй боллоо.`,
+    body: `${facts.title} №${facts.code} бэлтгэгдэж эхэллээ.`,
   });
 }
 
@@ -634,7 +631,6 @@ export interface IdeshDetail extends IdeshSummary {
   readyAt: Date | null;
   dispatchedAt: Date | null;
   handedAt: Date | null;
-  canCancel: boolean;
   receipt: { qr: string; lottery: string | null } | null;
 }
 
@@ -746,7 +742,6 @@ export async function detailFor(
     readyAt: r.ready_at,
     dispatchedAt: r.dispatched_at,
     handedAt: r.handed_at,
-    canCancel: isFreeToCancel(r.state),
     receipt: receipt?.qrPayload ? { qr: receipt.qrPayload, lottery: receipt.lottery } : null,
   };
 }

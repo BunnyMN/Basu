@@ -158,7 +158,6 @@ describe('ordering', () => {
       total_mnt: 460_000,
       supplier_phone: '+97688010001',
       pickup_address: 'Нарантуул, хойд хаалга',
-      can_cancel: true,
     });
 
     const wallet = await app.inject({ method: 'GET', url: '/v1/wallet', headers: auth(token) });
@@ -219,19 +218,26 @@ describe('ordering', () => {
     const theirs = await signIn('+97699002233');
     const peek = await app.inject({ method: 'GET', url: `/v1/idesh/${id}`, headers: auth(theirs) });
     expect(peek.statusCode).toBe(404);
-    const meddle = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/cancel`, headers: auth(theirs) });
+    const meddle = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/pay`, headers: auth(theirs) });
     expect(meddle.statusCode).toBe(403);
 
     const noToken = await app.inject({ method: 'GET', url: `/v1/idesh/${id}` });
     expect(noToken.statusCode).toBe(401);
   });
 
-  it('lets the guest cancel for a full refund until the supplier starts', async () => {
+  it('refunds the guest in full when the supplier cancels — the guest has no cancel of their own', async () => {
     const token = await signIn();
     await topUp(token, 500_000);
     const { id } = await placeAndPay(token);
 
-    const cancelled = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/cancel`, headers: auth(token) });
+    // The guest rang, they talked: the supplier cancels from their screen.
+    const screen = await pairScreen(supplierId);
+    const cancelled = await app.inject({
+      method: 'POST',
+      url: `/v1/supplier/orders/${id}/cancel`,
+      headers: auth(screen),
+      payload: { reason: 'зочин утсаар хүссэн' },
+    });
     expect(cancelled.json()).toEqual({ state: 'REFUNDED', refunded: true });
     const wallet = await app.inject({ method: 'GET', url: '/v1/wallet', headers: auth(token) });
     expect(wallet.json().balance_mnt).toBe(500_000);
@@ -276,7 +282,7 @@ describe('the supplier’s screen', () => {
     expect(meddle.statusCode).toBe(403);
   });
 
-  it('walks the order through, and the guest can no longer cancel', async () => {
+  it('walks the order through, and gives the guest nothing to cancel with', async () => {
     const token = await signIn();
     await topUp(token, 500_000);
     const { id } = await placeAndPay(token);
@@ -286,9 +292,10 @@ describe('the supplier’s screen', () => {
       app.inject({ method: 'POST', url: `/v1/supplier/orders/${id}/${action}`, headers: auth(screen), payload: {} });
 
     expect((await act('prepare')).json()).toEqual({ state: 'PREPARING' });
-    const tooLate = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/cancel`, headers: auth(token) });
-    expect(tooLate.statusCode).toBe(409);
-    expect(tooLate.json().error.code).toBe('TOO_LATE_TO_CANCEL');
+    // No guest-side cancel exists — not a refusal, not a route. The guest
+    // rings the supplier, whose number the detail carries.
+    const noSuchThing = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/cancel`, headers: auth(token) });
+    expect(noSuchThing.statusCode).toBe(404);
 
     expect((await act('ready')).json()).toEqual({ state: 'READY' });
     // A pickup is handed over, not dispatched.
@@ -296,7 +303,7 @@ describe('the supplier’s screen', () => {
     expect((await act('hand')).json()).toEqual({ state: 'HANDED' });
 
     const detail = await app.inject({ method: 'GET', url: `/v1/idesh/${id}`, headers: auth(token) });
-    expect(detail.json()).toMatchObject({ state: 'HANDED', can_cancel: false });
+    expect(detail.json()).toMatchObject({ state: 'HANDED' });
     expect(detail.json().handed_at).toBeTruthy();
   });
 

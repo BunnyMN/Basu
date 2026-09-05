@@ -233,12 +233,19 @@ describe('paying for an идэш', () => {
   });
 });
 
+/**
+ * Cancelling is the supplier's act. A guest has no cancel of their own — money
+ * that has moved does not come back at the press of a button — so a guest who
+ * chose wrongly rings the supplier, and the supplier undoes it from their
+ * screen. The guest is refunded in full whenever that happens.
+ */
 describe('cancelling', () => {
   it('refunds in full and gives the animal back while the supplier has not started', async () => {
     const { orderId, code } = await book();
     await payIdesh(ctx, orderId);
 
-    const { refunded } = await cancelIdesh(ctx, orderId, { actor: `guest:${guestId}`, role: 'guest' });
+    // The guest rang, they talked, the supplier cancels.
+    const { refunded } = await cancelIdesh(ctx, orderId, { actor: 'supplier:d1', role: 'supplier' });
     expect(refunded).toBe(true);
     expect(await stateOf(orderId)).toBe('REFUNDED');
     expect(await balance(guestId)).toBe(1_000_000);
@@ -251,16 +258,11 @@ describe('cancelling', () => {
     expect(await told(guestId)).toContain('idesh.refunded');
   });
 
-  it('is too late once the supplier has started — and the supplier can still cancel', async () => {
+  it('still refunds in full once the supplier has started, but the animal stays sold', async () => {
     const { orderId } = await book();
     await payIdesh(ctx, orderId);
     await startPreparing(ctx, orderId, 'supplier:d1');
     expect(await told(guestId)).toContain('idesh.preparing');
-
-    await expect(
-      cancelIdesh(ctx, orderId, { actor: `guest:${guestId}`, role: 'guest' }),
-    ).rejects.toMatchObject({ code: 'TOO_LATE_TO_CANCEL' });
-    expect(await stateOf(orderId)).toBe('PREPARING');
 
     // A carcass that failed the vet: the supplier cancels, the guest is made
     // whole, and the sheep is not put back on offer.
@@ -278,7 +280,7 @@ describe('cancelling', () => {
 
   it('closes an unpaid draft without any money moving', async () => {
     const { orderId } = await book();
-    const { refunded } = await cancelIdesh(ctx, orderId, { actor: `guest:${guestId}`, role: 'guest' });
+    const { refunded } = await cancelIdesh(ctx, orderId, { actor: 'scheduler', role: 'system' });
     expect(refunded).toBe(false);
     expect(await stateOf(orderId)).toBe('CLOSED');
     expect(await balance(guestId)).toBe(1_000_000);
@@ -364,7 +366,6 @@ describe('what the guest sees', () => {
     const before = await detailFor(guestId, orderId);
     expect(before?.supplierPhone).toBeNull();
     expect(before?.pickupAddress).toBe('Нарантуул, хойд хаалга');
-    expect(before?.canCancel).toBe(true);
 
     await payIdesh(ctx, orderId);
     const after = await detailFor(guestId, orderId);

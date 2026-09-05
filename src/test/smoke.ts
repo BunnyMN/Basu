@@ -380,7 +380,7 @@ async function idesh(guest: string): Promise<void> {
   check(`бүтэн үнэ ${created.body.total_mnt.toLocaleString('mn-MN')}₮ нэг удаа төлөгдлөө`,
     paid.body.state === 'PAID', paid.body);
 
-  const detail = await call<{ state: string; supplier_phone: string | null; can_cancel: boolean }>(
+  const detail = await call<{ state: string; supplier_phone: string | null }>(
     `/v1/idesh/${id}`, { token: guest });
   check('төлсний дараа нийлүүлэгчийн утас харагдана', Boolean(detail.body.supplier_phone), detail.body);
 
@@ -400,9 +400,8 @@ async function idesh(guest: string): Promise<void> {
   const prepared = await call(`/v1/supplier/orders/${id}/prepare`, { method: 'POST', token: supplier, body: {} });
   check('нийлүүлэгч бэлтгэж эхэллээ', prepared.status === 200, prepared.body);
 
-  const tooLate = await call(`/v1/idesh/${id}/cancel`, { method: 'POST', token: guest });
-  check('бэлтгэж эхэлсний дараа цуцлах боломжгүй',
-    tooLate.status === 409 && tooLate.body.error?.code === 'TOO_LATE_TO_CANCEL', tooLate.body);
+  const noSuchThing = await call(`/v1/idesh/${id}/cancel`, { method: 'POST', token: guest });
+  check('зочинд цуцлах зам байхгүй — нийлүүлэгч л цуцална', noSuchThing.status === 404, noSuchThing.body);
 
   const ready = await call(`/v1/supplier/orders/${id}/ready`, { method: 'POST', token: supplier, body: {} });
   check('мах бэлэн', ready.status === 200, ready.body);

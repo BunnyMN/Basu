@@ -123,7 +123,6 @@ const shapeDetail = (o: IdeshDetail) => ({
   ready_at: o.readyAt?.toISOString() ?? null,
   dispatched_at: o.dispatchedAt?.toISOString() ?? null,
   handed_at: o.handedAt?.toISOString() ?? null,
-  can_cancel: o.canCancel,
   receipt: o.receipt,
 });
 
@@ -265,20 +264,9 @@ export async function registerIdeshRoutes(
     }
   });
 
-  app.post<{ Params: { id: string } }>('/v1/idesh/:id/cancel', guarded, async (request, reply) => {
-    if (!(await ownedByGuest(request.params.id, request.guestId!))) {
-      return forbidden(reply, 'not your order');
-    }
-    try {
-      const { refunded } = await cancelIdesh(ctx, request.params.id, {
-        actor: `guest:${request.guestId}`,
-        role: 'guest',
-      });
-      return reply.send({ state: refunded ? 'REFUNDED' : 'CANCELLED', refunded });
-    } catch (error) {
-      return sendError(reply, error);
-    }
-  });
+  // There is no `/v1/idesh/:id/cancel` for a guest, on purpose. Money that
+  // has moved does not come back at the press of a button; the guest rings
+  // the supplier, and the supplier cancels from their own screen.
 
   /* ── becoming a supplier ───────────────────────────────────────── */
 

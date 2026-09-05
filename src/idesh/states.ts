@@ -3,9 +3,12 @@
  *
  * Fewer states than a lunch, because nothing here is timed to the minute:
  * the guest pays, the supplier slaughters, the meat is ready, it travels or
- * it does not, it is handed over. The one line that matters is the same as
- * dine's — PREPARING is the refund boundary, the way FIRED is — and every
- * cancel button, countdown and line of copy reads from that one predicate.
+ * it does not, it is handed over. Unlike dine there is no guest-side cancel
+ * at all: money that has moved does not come back at the press of a button.
+ * A guest who chose wrongly rings the supplier, and it is the supplier who
+ * cancels — from their screen, any time short of the handover — whereupon the
+ * guest is refunded in full. The one line that remains is PREPARING: past it
+ * an animal has been slaughtered, and a cancel no longer puts it back on offer.
  */
 export const IDESH_STATES = [
   'DRAFT',
@@ -24,9 +27,9 @@ export type IdeshState = (typeof IDESH_STATES)[number];
 const ALLOWED: Record<IdeshState, readonly IdeshState[]> = {
   DRAFT: ['PAID', 'CANCELLED'],
   PAID: ['PREPARING', 'CANCELLED'],
-  // Past this line the animal has been slaughtered and the guest's money stops
-  // moving back. The supplier can still cancel — a carcass that failed the vet
-  // is theirs to answer for, and the guest is refunded in full.
+  // Past this line the animal has been slaughtered. The supplier can still
+  // cancel — a carcass that failed the vet is theirs to answer for, and the
+  // guest is refunded in full — but the animal is not put back on offer.
   PREPARING: ['READY', 'CANCELLED'],
   READY: ['DISPATCHED', 'HANDED', 'CANCELLED'],
   DISPATCHED: ['HANDED', 'CANCELLED'],
@@ -54,11 +57,6 @@ export function canTransition(from: IdeshState, to: IdeshState): boolean {
 
 export function nextStates(from: IdeshState): readonly IdeshState[] {
   return ALLOWED[from];
-}
-
-/** Before the supplier has started, cancelling costs the guest nothing. */
-export function isFreeToCancel(state: IdeshState): boolean {
-  return state === 'DRAFT' || state === 'PAID';
 }
 
 /** Has the supplier committed an animal to this order? */

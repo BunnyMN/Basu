@@ -233,6 +233,14 @@ extension ServicePage: WKNavigationDelegate {
       return .cancel
     }
 
+    // A phone number, an SMS — anything that is not a page — is the
+    // system's. A web view given `tel:` to load fails it quietly, and the
+    // supplier's number on an order is the one link a guest most needs.
+    if let scheme = url.scheme, !["http", "https", "about", "blob", "data", "file"].contains(scheme) {
+      await UIApplication.shared.open(url)
+      return .cancel
+    }
+
     // A link out of the page — the tile attribution, a restaurant's site —
     // is Safari's, not this screen's. So is anything asking for a new window.
     let external = ["http", "https"].contains(url.scheme ?? "") && !isOurs(url)

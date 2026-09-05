@@ -132,7 +132,7 @@ button{touch-action:manipulation}
 }
 .bar{
   flex:none;position:relative;display:flex;align-items:center;justify-content:center;
-  min-height:52px;padding:env(safe-area-inset-top) 56px 0;
+  min-height:52px;padding:env(safe-area-inset-top) 96px 0;
   background:color-mix(in srgb,var(--surface) 82%,transparent);
   -webkit-backdrop-filter:blur(14px) saturate(1.1);backdrop-filter:blur(14px) saturate(1.1);
   border-bottom:1px solid var(--line);
@@ -260,26 +260,56 @@ input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 .promise b{color:var(--ink)}
 
 /* ── the status ──────────────────────────────────────────────────── */
-.status{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:22px 18px;text-align:center;margin:14px 16px 0}
-.status .big{font-size:1.9rem;font-weight:900;letter-spacing:-.04em;line-height:1.05}
-.status .cap{font-size:.86rem;color:var(--ink-2);margin-top:8px;line-height:1.45}
-.status[data-s="PREPARING"] .big{color:var(--accent-ink)}
-.status[data-s="READY"] .big,.status[data-s="HANDED"] .big{color:var(--ready)}
-.status[data-s="DISPATCHED"] .big{color:var(--route)}
-.timeline{list-style:none;margin:16px 0 0;padding:0;text-align:left}
-.timeline li{display:grid;grid-template-columns:1.2rem 1fr;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:.92rem}
-.timeline .d{width:12px;height:12px;border-radius:99px;border:2px solid var(--line-2);margin-top:4px}
+/* ── the order, after paying: one calm page that says what happens next ── */
+.status{margin:14px 16px 0;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:26px 18px 20px;text-align:center}
+.status .mark{width:64px;height:64px;border-radius:99px;margin:0 auto 14px;display:grid;place-items:center;background:var(--ready-soft);color:var(--ready)}
+.status .mark svg{width:32px;height:32px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.status[data-s="PREPARING"] .mark{background:var(--accent-soft);color:var(--accent-ink)}
+.status[data-s="DISPATCHED"] .mark{background:var(--route-soft);color:var(--route)}
+.status[data-s="CLOSED"] .mark{background:var(--surface-2);color:var(--ink-3)}
+.status[data-s="CANCELLED"] .mark,.status[data-s="REFUNDED"] .mark{background:var(--stop-soft);color:var(--stop)}
+.status .big{font-size:1.5rem;font-weight:800;letter-spacing:-.03em;line-height:1.15}
+.status .cap{font-size:.92rem;color:var(--ink-2);margin:8px auto 0;line-height:1.5;max-width:32ch}
+.status .cap b{color:var(--ink);font-weight:600}
+.timeline{list-style:none;margin:22px 0 0;padding:0 2px;text-align:left}
+.timeline li{position:relative;display:grid;grid-template-columns:26px 1fr;gap:12px;padding-bottom:18px}
+.timeline li:last-child{padding-bottom:0}
+.timeline li::before{content:"";position:absolute;left:12px;top:26px;bottom:-2px;width:2px;background:var(--line)}
+.timeline li:last-child::before{display:none}
+.timeline li[data-done]::before{background:var(--ready)}
+.timeline .d{width:26px;height:26px;border-radius:99px;border:2px solid var(--line-2);background:var(--surface);display:grid;place-items:center;position:relative;z-index:1}
+.timeline .d svg{width:14px;height:14px;fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;opacity:0}
+.timeline .d i{width:10px;height:10px;border-radius:99px;background:var(--accent);opacity:0}
 .timeline li[data-done] .d{background:var(--ready);border-color:var(--ready)}
-.timeline li[data-done] .w{color:var(--ink)}
-.timeline li:not([data-done]) .w{color:var(--ink-3)}
-.handcode{margin:14px 16px 0;padding:16px;border:1.5px dashed var(--line-2);border-radius:12px;text-align:center;background:var(--surface)}
-.handcode .lab{display:block;margin-bottom:4px}
-.handcode b{font-family:"IBM Plex Mono",monospace;font-size:2.4rem;font-weight:600;letter-spacing:.1em;font-variant-numeric:tabular-nums}
-.where{margin:14px 16px 0;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px 14px;font-size:.92rem;line-height:1.5}
-.where > div{padding:10px 0;border-top:1px solid var(--line)}
-.where > div:first-child{border-top:none}
-.where .lab{display:block;margin-bottom:3px}
-.where a{color:var(--accent-ink);font-family:"IBM Plex Mono",monospace;font-weight:600}
+.timeline li[data-done] .d svg{opacity:1}
+.timeline li[data-next] .d{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.timeline li[data-next] .d i{opacity:1}
+.timeline .w{font-size:.95rem;font-weight:600;color:var(--ink-3);line-height:26px}
+.timeline li[data-done] .w,.timeline li[data-next] .w{color:var(--ink)}
+.timeline .s{display:block;font-size:.8rem;font-weight:400;color:var(--ink-3);line-height:1.4;margin-top:-1px}
+.handcode{margin:12px 16px 0;padding:18px 16px;border:1.5px dashed var(--ready-line);border-radius:14px;text-align:center;background:var(--surface)}
+.handcode .lab{display:block;margin-bottom:6px;color:var(--ready)}
+.handcode b{display:block;font-family:"IBM Plex Mono",monospace;font-size:2.6rem;font-weight:600;letter-spacing:.14em;font-variant-numeric:tabular-nums;line-height:1.1}
+.handcode small{display:block;margin-top:8px;font-size:.8rem;color:var(--ink-3);line-height:1.45}
+.panel{margin:12px 16px 0;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.panel .line{display:grid;grid-template-columns:22px 1fr;gap:12px;padding:14px;border-top:1px solid var(--line);align-items:start}
+.panel .line:first-child{border-top:none}
+.panel .line>svg{width:22px;height:22px;fill:none;stroke:var(--ink-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;margin-top:1px}
+.panel .lab{display:block;margin-bottom:3px}
+.panel .v{font-size:.95rem;line-height:1.45;font-weight:600;overflow-wrap:anywhere}
+.panel .v small{display:block;font-weight:400;color:var(--ink-2);font-size:.84rem;margin-top:3px;line-height:1.45}
+.panel .v .mono{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+.panel .v a{color:var(--accent-ink);font-family:"IBM Plex Mono",monospace;font-weight:600;text-decoration:none}
+.badge{display:inline-flex;align-items:center;gap:4px;margin-left:6px;padding:2px 7px;border-radius:99px;background:var(--ready-soft);color:var(--ready);font-size:.66rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;vertical-align:middle}
+.badge svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.assure{margin:12px 16px 0;padding:14px 16px;border-radius:14px;background:var(--ready-soft);border:1px solid var(--ready-line)}
+.assure .t{font-size:.7rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ready);margin-bottom:6px}
+.assure div:not(.t){display:flex;gap:10px;align-items:flex-start;font-size:.86rem;color:var(--ink-2);line-height:1.45;padding:5px 0}
+.assure svg{width:18px;height:18px;flex:none;fill:none;stroke:var(--ready);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;margin-top:1px}
+.assure b{color:var(--ink)}
+.why[data-calm]{color:var(--ink-3)}
+.screen .btn[data-size="lg"] svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.screen a.btn{text-decoration:none}
 </style>
 </head>
 <body>
@@ -296,7 +326,7 @@ input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
   <p class="tally" id="tally"></p>
 
   <!-- The three things a buyer is trusting. All three are true by
-       construction: contract, fixed price, refund before PREPARING. -->
+       construction: contract, fixed price, a supplier they can ring. -->
   <div class="trust" aria-label="Баталгаа">
     <div>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
@@ -309,9 +339,9 @@ input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
       <span>Зар дээр бичсэнээс өөрчлөгдөхгүй</span>
     </div>
     <div>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v5h5"/></svg>
-      <b>Үнэгүй цуцлалт</b>
-      <span>Нийлүүлэгч бэлтгэж эхлэх хүртэл</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 12l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/></svg>
+      <b>Утсаар холбоотой</b>
+      <span>Төлсний дараа нийлүүлэгчийн утас гарна</span>
     </div>
   </div>
 
@@ -396,6 +426,12 @@ const MARK = {
   undo: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v5h5"/></svg>',
   phone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 12l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/></svg>',
   warn: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>',
+  work: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg>',
+  box: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l9-4 9 4v9l-9 4-9-4z"/><path d="M3 8l9 4 9-4M12 12v9"/></svg>',
+  hand: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6.5a1.5 1.5 0 0 1 3 0V13M17 13v-2.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.6a6 6 0 0 1-5-2.7L4.4 14a1.5 1.5 0 0 1 2.4-1.8L8 13.5"/></svg>',
+  cross: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg>',
+  wallet: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M15.5 14.5h2"/></svg>',
+  receipt: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>',
 };
 
 const state = {
@@ -885,8 +921,8 @@ function renderReview({ replace = false } = {}) {
   body.append(
     el(`<div class="promise">
           <div>${MARK.tag}<span><b>Үнэ эцсийнх.</b> Бодит жин зөрсөн ч нэмж төлөхгүй.</span></div>
-          <div>${MARK.undo}<span><b>Үнэгүй цуцална</b> — нийлүүлэгч бэлтгэж эхлэх хүртэл. Мөнгө түрийвчинд буцна.</span></div>
           <div>${MARK.phone}<span><b>Төлсний дараа</b> нийлүүлэгчийн утас гарна; та ч, тэр ч залгаж чадна.</span></div>
+          <div>${MARK.undo}<span><b>Санал зөрвөл</b> нийлүүлэгчтэй ярина; тэр цуцалбал мөнгө түрийвчинд бүтнээр буцна.</span></div>
         </div>`),
   );
 
@@ -948,15 +984,92 @@ async function placeOrder() {
 
 /* ── the status ──────────────────────────────────────────────────── */
 
+/**
+ * The steps, as a person expects them: what has happened, what comes next.
+ * Each has a line for when it is done and a line for while it is still to
+ * come, because «Бэлэн» on its own does not say where or when.
+ */
 const STEPS = [
-  ['paid', 'Төлсөн'],
-  ['preparing', 'Бэлтгэж байна'],
-  ['ready', 'Бэлэн'],
-  ['dispatched', 'Замд'],
-  ['handed', 'Хүлээлгэн өгсөн'],
+  {
+    key: 'paid',
+    word: 'Төлсөн',
+    done: (o, at) => `Төлбөр хүлээн авсан · ${at}`,
+    next: () => 'Төлбөр хүлээгдэж байна',
+  },
+  {
+    key: 'preparing',
+    word: 'Бэлтгэж байна',
+    done: (o, at) => `Нийлүүлэгч ${at}-д эхэлсэн`,
+    next: () => 'Нийлүүлэгч мал нядалж, махыг бэлтгэнэ',
+  },
+  {
+    key: 'ready',
+    word: 'Бэлэн',
+    done: (o, at) => `${at}-д бэлэн болсон`,
+    next: (o) =>
+      o.receive === 'delivery'
+        ? `${dayLabel(o.receive_on)}-нд хүргэлтэнд бэлэн болно`
+        : `${dayLabel(o.receive_on)}-нд авах цэг дээр бэлэн болно`,
+  },
+  {
+    key: 'dispatched',
+    word: 'Замд',
+    done: (o, at) => `${at}-д замд гарсан`,
+    next: () => 'Хүргэгч ирэхийн өмнө танд залгана',
+  },
+  {
+    key: 'handed',
+    word: 'Хүлээлгэн өгсөн',
+    done: (o, at) => `${at}-д гарт орсон`,
+    next: (o) => (o.receive === 'delivery' ? 'Кодоо хэлээд махаа хүлээн авна' : 'Кодоо хэлээд махаа авна'),
+  },
 ];
 
 const DONE = ['HANDED', 'CLOSED', 'CANCELLED', 'REFUNDED'];
+
+/**
+ * The headline and the one sentence under it, per state. Written for a
+ * person seeing a screen like this for the first time: what just happened,
+ * and what happens next — not the name of a state.
+ */
+const FACE = {
+  PAID: {
+    mark: 'check',
+    word: 'Захиалга баталгаажлаа',
+    cap: (o) =>
+      o.receive === 'delivery'
+        ? `Төлбөр хүлээн авлаа. Нийлүүлэгч <b>${dayLabel(o.receive_on)}</b>-нд хаягаар тань хүргэнэ.`
+        : `Төлбөр хүлээн авлаа. Нийлүүлэгч <b>${dayLabel(o.receive_on)}</b>-нд махыг авах цэг дээр бэлэн байлгана.`,
+  },
+  PREPARING: {
+    mark: 'work',
+    word: 'Мах бэлтгэгдэж байна',
+    cap: () => 'Нийлүүлэгч малыг нядалж, махыг бэлтгэж байна. Бэлэн болмогц мэдэгдэнэ.',
+  },
+  READY: {
+    mark: 'box',
+    word: 'Мах бэлэн боллоо',
+    cap: (o) =>
+      o.receive === 'delivery'
+        ? 'Удахгүй замд гарна. Хүргэгч ирэхийн өмнө танд залгана.'
+        : `Авах цэг дээр очоод <b>${o.code}</b> кодоо хэлээд авна уу.`,
+  },
+  DISPATCHED: {
+    mark: 'truck',
+    word: 'Мах замд гарлаа',
+    cap: (o) => `Хүргэгч хаягаар тань очиж, ирэхдээ залгана. <b>${o.code}</b> кодоо хэлээд хүлээн авна уу.`,
+  },
+  HANDED: { mark: 'hand', word: 'Хүлээлгэн өгсөн', cap: () => 'Мах гарт орлоо. Амтархан хэрэглээрэй.' },
+  CLOSED: { mark: 'check', word: 'Захиалга дууссан', cap: () => 'Энэ захиалга хаагдсан.' },
+  CANCELLED: { mark: 'cross', word: 'Цуцлагдсан', cap: () => 'Нийлүүлэгч захиалгыг цуцалсан. Мөнгө түрийвчинд буцна.' },
+  REFUNDED: { mark: 'undo', word: 'Мөнгө буцаасан', cap: () => 'Захиалга цуцлагдаж, төлбөр түрийвчинд бүтнээр буцлаа.' },
+};
+
+/** «14:05», the local clock, for a step that is done. */
+function clockOf(iso) {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
 
 /** What the last render was of, so a poll that found no news changes nothing. */
 let rendered = null;
@@ -973,7 +1086,9 @@ async function showStatus(force, { replace = false } = {}) {
   if (rendered !== null && signature !== rendered) shell.ordersChanged();
   rendered = signature;
 
-  const [word, cap] = IDESH_HEADLINE[order.state] ?? [order.state, ''];
+  const face = FACE[order.state] ?? { mark: 'check', word: order.state, cap: () => '' };
+  const live = !DONE.includes(order.state);
+  const delivery = order.receive === 'delivery';
   showScreen('status', `№${order.code}`, `${order.supplier.name} · ${order.title} ×${order.qty}`, {
     replace: replace || state.screen === 'status',
   });
@@ -981,83 +1096,132 @@ async function showStatus(force, { replace = false } = {}) {
   const body = $('screen-body');
   const card = el(`
     <div class="status" data-s="${order.state}">
-      <div class="lab">${order.state}</div>
-      <div class="big">${word}</div>
-      <div class="cap">${cap}</div>
+      <div class="mark">${MARK[face.mark]}</div>
+      <div class="big">${face.word}</div>
+      <div class="cap">${face.cap(order)}</div>
     </div>`);
 
-  const done = {
-    paid: Boolean(order.paid_at),
-    preparing: Boolean(order.preparing_at),
-    ready: Boolean(order.ready_at),
-    dispatched: Boolean(order.dispatched_at),
-    handed: Boolean(order.handed_at),
-  };
-  const timeline = el('<ul class="timeline"></ul>');
-  for (const [key, label] of STEPS) {
-    // A pickup never goes on the road, so that step is not shown as missing.
-    if (key === 'dispatched' && order.receive !== 'delivery') continue;
-    timeline.append(el(`<li${done[key] ? ' data-done' : ''}><i class="d"></i><span class="w">${label}</span></li>`));
+  // The steps: done ones ticked with the time, the next one ringed with what
+  // it will take. A cancelled order has no road ahead to draw.
+  if (order.state !== 'CANCELLED' && order.state !== 'REFUNDED') {
+    const at = {
+      paid: order.paid_at,
+      preparing: order.preparing_at,
+      ready: order.ready_at,
+      dispatched: order.dispatched_at,
+      handed: order.handed_at,
+    };
+    const timeline = el('<ul class="timeline"></ul>');
+    let nextFound = false;
+    for (const step of STEPS) {
+      // A pickup never goes on the road, so that step is not shown as missing.
+      if (step.key === 'dispatched' && !delivery) continue;
+      const when = at[step.key];
+      const isNext = !when && !nextFound && order.state !== 'CLOSED';
+      if (isNext) nextFound = true;
+      timeline.append(
+        el(`<li${when ? ' data-done' : ''}${isNext ? ' data-next' : ''}>
+              <span class="d">${MARK.check}<i></i></span>
+              <span class="w">${step.word}<span class="s">${when ? step.done(order, clockOf(when)) : step.next(order)}</span></span>
+            </li>`),
+      );
+    }
+    card.append(timeline);
   }
-  card.append(timeline);
   body.append(card);
 
   // The code is what the guest shows at the handover: big, because it will be
   // read across a counter or a courtyard.
-  if (['PAID', 'PREPARING', 'READY', 'DISPATCHED'].includes(order.state)) {
+  if (live) {
     body.append(
-      el(`<div class="handcode"><span class="lab">Авахдаа энэ кодыг хэлнэ</span><b>${order.code}</b></div>`),
+      el(`<div class="handcode">
+            <span class="lab">${delivery ? 'Хүргэгчид энэ кодыг хэлнэ' : 'Мах авахдаа энэ кодыг хэлнэ'}</span>
+            <b>${order.code}</b>
+            <small>Кодоо сонссон нийлүүлэгч махыг өгнө. Өөр хүн очих бол кодыг хэлээд явуулж болно.</small>
+          </div>`),
     );
   }
 
-  const where = el(`<div class="where"></div>`);
-  if (order.receive === 'delivery') {
-    where.append(
-      el(`<div><span class="lab">Хүргэлт · ${dayLabel(order.receive_on)}</span>${escapeHtml(order.address)}<br>
-          <span style="color:var(--ink-3)">Залгах: ${escapeHtml(order.address_phone)}</span></div>`),
-    );
-  } else {
-    where.append(
-      el(`<div><span class="lab">Очиж авах · ${dayLabel(order.receive_on)}</span>${escapeHtml(order.pickup_address)}</div>`),
-    );
-  }
-  if (order.supplier_phone) {
-    where.append(
-      el(`<div><span class="lab">Нийлүүлэгч</span>${escapeHtml(order.supplier.name)}<br>
-          <a href="tel:${order.supplier_phone}">${order.supplier_phone}</a></div>`),
-    );
-  }
-  where.append(
-    el(`<div><span class="lab">Төлбөр</span>${mnt(order.total_mnt)}${
-      order.delivery_fee_mnt ? ` <span style="color:var(--ink-3)">(хүргэлт ${mnt(order.delivery_fee_mnt)} орсон)</span>` : ''
-    }</div>`),
+  /* where and when */
+  const plan = el('<div class="panel"></div>');
+  plan.append(
+    el(`<div class="line">${MARK.day}<div>
+          <span class="lab">${delivery ? 'Хүргэх өдөр' : 'Очиж авах өдөр'}</span>
+          <div class="v">${dayLabel(order.receive_on)}<small>${
+            delivery ? 'Хүргэгч ирэхийн өмнө утсаар залгана.' : 'Нийлүүлэгч тэр өдөр утсаар цагаа тохирно.'
+          }</small></div>
+        </div></div>`),
   );
-  body.append(where);
+  plan.append(
+    el(`<div class="line">${MARK.pin}<div>
+          <span class="lab">${delivery ? 'Хүргэх хаяг' : 'Авах цэг'}</span>
+          <div class="v">${escapeHtml(delivery ? order.address : order.pickup_address)}${
+            delivery ? `<small>Залгах утас: <span class="mono">${escapeHtml(order.address_phone)}</span></small>` : ''
+          }</div>
+        </div></div>`),
+  );
+  body.append(plan);
 
+  /* the supplier: who they are, and that they can be rung */
+  const who = el('<div class="panel"></div>');
+  who.append(
+    el(`<div class="line">${MARK.shield}<div>
+          <span class="lab">Нийлүүлэгч</span>
+          <div class="v">${escapeHtml(order.supplier.name)}<span class="badge">${MARK.check}Гэрээт</span>
+            <small>Basu шалгаж, гэрээ байгуулсан.${
+              order.supplier_phone
+                ? ` Асуух зүйл байвал шууд залгаарай: <a href="tel:${order.supplier_phone}">${order.supplier_phone}</a>`
+                : ''
+            }</small>
+          </div>
+        </div></div>`),
+  );
+  body.append(who);
+
+  /* the money */
+  const pay = el('<div class="panel"></div>');
+  pay.append(
+    el(`<div class="line">${MARK.wallet}<div>
+          <span class="lab">Төлсөн дүн</span>
+          <div class="v"><span class="mono">${mnt(order.total_mnt)}</span><small>Түрийвчнээс · ${
+            order.delivery_fee_mnt ? `хүргэлт ${mnt(order.delivery_fee_mnt)} орсон` : 'нэмэлт төлбөр гарахгүй'
+          }</small></div>
+        </div></div>`),
+  );
   if (order.receipt) {
-    body.append(el(`<div class="note"><b>Е-баримт</b><span>Сугалаа ${order.receipt.lottery}</span></div>`));
+    pay.append(
+      el(`<div class="line">${MARK.receipt}<div>
+            <span class="lab">Е-баримт</span>
+            <div class="v">Сугалаа <span class="mono">${escapeHtml(order.receipt.lottery ?? '')}</span><small>Татварын баримт бүртгэгдсэн.</small></div>
+          </div></div>`),
+    );
+  }
+  body.append(pay);
+
+  /* what the guest is holding on to */
+  if (live) {
+    body.append(
+      el(`<div class="assure">
+            <div class="t">Таны баталгаа</div>
+            <div>${MARK.check}<span><b>Үнэ эцсийнх.</b> Бодит жин зөрсөн ч нэмж төлөхгүй.</span></div>
+            <div>${MARK.check}<span><b>Гэрээт нийлүүлэгч.</b> Basu шалгаж, гэрээ байгуулсан.</span></div>
+            <div>${MARK.check}<span><b>Санал зөрвөл</b> нийлүүлэгчтэй ярина; тэр цуцалбал мөнгө түрийвчинд бүтнээр буцна.</span></div>
+          </div>`),
+    );
   }
 
+  // No cancel button, on purpose: money that has moved does not come back at
+  // a press. The one thing a guest can do about an order is talk to the
+  // person who has it, so that is the button.
   const foot = $('screen-foot');
   foot.replaceChildren();
-  if (order.can_cancel) {
-    const cancel = el(
-      `<button class="btn" data-v="danger" data-size="lg" type="button">Үнэгүй цуцлах — бэлтгэж эхлэх хүртэл</button>`,
+  if (live && order.supplier_phone) {
+    foot.append(
+      el(`<p class="why" data-calm>${MARK.warn}Өөрчлөх, цуцлах бол нийлүүлэгчтэй ярина уу — цуцлахыг тэр хийнэ.</p>`),
+      el(`<a class="btn" data-size="lg" href="tel:${order.supplier_phone}">${MARK.phone}Нийлүүлэгч рүү залгах</a>`),
     );
-    cancel.addEventListener('click', async () => {
-      try {
-        await guestApi(`/v1/idesh/${state.orderId}/cancel`, { method: 'POST' });
-        toast('Цуцлагдлаа. Мөнгө түрийвчинд буцна.');
-        shell.ordersChanged();
-      } catch (error) {
-        toast(error.message, 'bad');
-      }
-      if (gone) return;
-      await Promise.all([showStatus(true), loadMine(), loadListings()]);
-    });
-    foot.append(cancel);
   }
-  if (DONE.includes(order.state)) {
+  if (!live) {
     const again = el('<button class="btn" data-size="lg" type="button">Зар үзэх</button>');
     again.addEventListener('click', () => history.back());
     foot.append(again);

@@ -775,14 +775,14 @@ describe('өвлийн идэш', () => {
     const dom = await openPage('idesh.html');
     const title = await buyOne(dom);
 
-    // Paid, the code is shown large for the handover, the cancel button says
-    // until when, and the supplier is now somebody you can call.
-    expect(dom.window.document.querySelector('.status .big')?.textContent).toBe('Төлсөн');
+    // Paid, the code is shown large for the handover, and the supplier is now
+    // somebody you can call — which is the one button. There is no cancel:
+    // money that has moved does not come back at a press.
+    expect(dom.window.document.querySelector('.status .big')?.textContent).toBe('Захиалга баталгаажлаа');
     expect(dom.window.document.querySelector('.handcode b')?.textContent).toMatch(/^\d{4}$/);
-    expect(dom.window.document.querySelector('#screen-foot [data-v="danger"]')?.textContent).toContain(
-      'Үнэгүй цуцлах',
-    );
-    expect(dom.window.document.querySelector('.where a[href^="tel:"]')).toBeTruthy();
+    expect(dom.window.document.querySelector('#screen-foot a[href^="tel:"]')?.textContent).toContain('залгах');
+    expect(dom.window.document.querySelector('#screen-foot [data-v="danger"]')).toBeNull();
+    expect(dom.window.document.querySelector('.panel a[href^="tel:"]')).toBeTruthy();
     // A pickup has no «Замд» step to leave undone.
     expect(dom.window.document.querySelectorAll('.timeline li')).toHaveLength(4);
     expect(dom.window.document.querySelector('#screen-sub')?.textContent).toContain(title);
@@ -868,13 +868,12 @@ describe('өвлийн идэш', () => {
     start.click();
     await until(screen, 'the ticket to move', () => ticket()?.getAttribute('data-lane') === 'preparing');
 
-    // The guest's page catches up on its own and the cancel button is gone.
+    // The guest's page catches up on its own: the headline moves on, the
+    // step is ticked, and the supplier is still the one to ring.
     await until(guest, 'the guest to be told', (d) => d.querySelector('.status')?.getAttribute('data-s') === 'PREPARING');
-    // `body.textContent` carries the page's own script, so a phrase that
-    // appears in the code cannot be asserted absent from the text. Ask the
-    // footer instead.
-    expect(guest.window.document.querySelector('#screen-foot [data-v="danger"]')).toBeNull();
-    expect(guest.window.document.querySelector('.status .big')?.textContent).toBe('Бэлтгэж байна');
+    expect(guest.window.document.querySelector('.status .big')?.textContent).toBe('Мах бэлтгэгдэж байна');
+    expect(guest.window.document.querySelectorAll('.timeline li[data-done]')).toHaveLength(2);
+    expect(guest.window.document.querySelector('#screen-foot a[href^="tel:"]')).toBeTruthy();
   });
 
   it('lets a supplier run their own stall from their screen', async () => {

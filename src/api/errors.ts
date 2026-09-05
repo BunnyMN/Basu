@@ -71,11 +71,6 @@ const IDESH_ERRORS: Record<IdeshErrorCode, Spec> = {
   NO_DELIVERY: { status: 400, mn: 'Энэ нийлүүлэгч хүргэлт хийдэггүй. Өөрөө очиж авна уу.' },
   NO_ADDRESS: { status: 400, mn: 'Хүргүүлэх хаяг, залгах утсаа оруулна уу.' },
   BAD_DATE: { status: 400, mn: 'Энэ өдөр мах бэлэн болоогүй байна. Өөр өдөр сонгоно уу.' },
-  TOO_LATE_TO_CANCEL: {
-    status: 409,
-    // Say what changed, the way dine does at the fire.
-    mn: 'Нийлүүлэгч малыг аль хэдийн бэлтгэж эхэлсэн тул цуцлах боломжгүй.',
-  },
   PAYMENT_FAILED: { status: 402, mn: 'Төлбөр амжилтгүй боллоо. Дахин оролдоно уу.' },
   ALREADY_APPLIED: {
     status: 409,

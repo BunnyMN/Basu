@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { IdeshError } from './errors.js';
 import { dayOf, quote, type Offer } from './pricing.js';
-import { canTransition, isCommitted, isFreeToCancel, isLive, nextStates } from './states.js';
+import { canTransition, isCommitted, isLive, nextStates } from './states.js';
 import { dayLabel } from './orders.js';
 
 /**
@@ -104,13 +104,13 @@ describe('what an идэш costs', () => {
 });
 
 describe('the life of an идэш', () => {
-  it('lets the guest cancel only until the supplier has started', () => {
-    expect(isFreeToCancel('DRAFT')).toBe(true);
-    expect(isFreeToCancel('PAID')).toBe(true);
-    // The animal is slaughtered — the same line dine draws at FIRED.
-    expect(isFreeToCancel('PREPARING')).toBe(false);
-    expect(isFreeToCancel('READY')).toBe(false);
-    expect(isFreeToCancel('DISPATCHED')).toBe(false);
+  it('counts the animal as committed from the moment the supplier starts', () => {
+    expect(isCommitted('DRAFT')).toBe(false);
+    expect(isCommitted('PAID')).toBe(false);
+    // The animal is slaughtered — a cancel from here on does not put it back.
+    expect(isCommitted('PREPARING')).toBe(true);
+    expect(isCommitted('READY')).toBe(true);
+    expect(isCommitted('DISPATCHED')).toBe(true);
   });
 
   it('lets the supplier cancel right up to the handover', () => {
