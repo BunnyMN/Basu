@@ -1,5 +1,6 @@
 import type { Db } from '../db/pool.js';
 import {
+  applySupplier,
   createListing,
   createSupplierCode,
   pairSupplier,
@@ -7,6 +8,7 @@ import {
   type Kind,
   type Unit,
 } from '../idesh/index.js';
+import { startSession } from '../platform/identity/index.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -106,6 +108,9 @@ export const LISTINGS: SeedListing[] = [
 /** The demo clock jumps hours; pairing codes have to outlive that. */
 const PAIRING_TTL_MINUTES = 8 * 60;
 
+/** The would-be supplier in the seed. Sign in as them to see the application. */
+export const APPLICANT_PHONE = '+97688010009';
+
 function plusDays(day: string, n: number): string {
   const d = new Date(`${day}T12:00:00+08:00`);
   d.setUTCDate(d.getUTCDate() + n);
@@ -170,6 +175,17 @@ export async function seedIdesh(
   // One supplier's screen is on from the start, like the first kitchen's.
   const first = codes[0]!;
   await pairSupplier(ctx, first.code);
+
+  // And one person asking to become one, so the ops page has a decision to
+  // make rather than an empty list to show the shape of.
+  const applicant = await startSession(ctx, APPLICANT_PHONE, 'Нийлүүлэгчийн дэлгэц');
+  await applySupplier(ctx, {
+    guestId: applicant.guestId,
+    name: 'Завхан · Бат-Эрдэнийн хот айл',
+    merchantTin: '6505678901',
+    pickupAddress: 'Баянгол дүүрэг, Хархорин захын урд хаалга',
+    about: 'Завханы хонь, ямаа. 10-р сарын дундаас 30 толгой. Хүргэлт хийнэ.',
+  });
 
   return { codes: codes.slice(1), paired: first.name, listings: LISTINGS.length };
 }

@@ -77,6 +77,15 @@ const IDESH_ERRORS: Record<IdeshErrorCode, Spec> = {
     mn: 'Нийлүүлэгч малыг аль хэдийн бэлтгэж эхэлсэн тул цуцлах боломжгүй.',
   },
   PAYMENT_FAILED: { status: 402, mn: 'Төлбөр амжилтгүй боллоо. Дахин оролдоно уу.' },
+  ALREADY_APPLIED: {
+    status: 409,
+    mn: 'Та аль хэдийн хүсэлт гаргасан эсвэл нийлүүлэгч байна.',
+  },
+  NOT_PENDING: { status: 409, mn: 'Энэ хүсэлт хүлээгдэж байгаа төлөвт биш байна.' },
+  OPS_CLOSED: {
+    status: 503,
+    mn: 'Ops хаалттай байна: сервер дээр OPS_TOKEN тохируулаагүй.',
+  },
 };
 
 const AUTH_ERRORS: Record<AuthError['code'], Spec> = {

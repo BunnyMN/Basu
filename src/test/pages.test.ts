@@ -901,6 +901,83 @@ describe('өвлийн идэш', () => {
   });
 });
 
+describe('нийлүүлэгч болох', () => {
+  it('takes an application on the supplier page, approves it on the ops page, and pairs', async () => {
+    // A person of this test's own, signed in the demo way with their number.
+    await ownGuest('+97688010011');
+    storage.removeItem('basu.supplier');
+    const page = await openPage('supplier.html');
+    await until(page, 'the pairing form', (d) => Boolean(d.querySelector('#become')));
+    (page.window.document.querySelector('#become') as HTMLElement).click();
+
+    await until(page, 'the application form', (d) => Boolean(d.querySelector('#apply')));
+    const set = (name: string, value: string) => {
+      const input = page.window.document.querySelector(`#apply [name="${name}"]`) as HTMLInputElement;
+      input.value = value;
+    };
+    set('name', 'Хөвсгөл · Түмэн-Өлзий');
+    set('tin', '6509876543');
+    set('address', 'Сонгинохайрхан, Эмээлтийн зах');
+    set('about', 'Хөвсгөлийн үхэр, 11-р сараас');
+    (page.window.document.querySelector('#submit') as HTMLElement).click();
+
+    await until(page, 'the waiting card', (d) => d.querySelector('#application .status')?.getAttribute('data-s') === 'applied');
+    expect(page.window.document.querySelector('#application .big')?.textContent).toBe('Хүлээгдэж байна');
+
+    // Nothing of theirs is on the guests' page yet.
+    const guests = await openPage('idesh.html');
+    await until(guests, 'the stalls', (d) => d.querySelectorAll('.listing').length >= seeded.listings);
+    expect(
+      [...guests.window.document.querySelectorAll('.listing .from')].some((f) =>
+        f.textContent?.includes('Түмэн-Өлзий'),
+      ),
+    ).toBe(false);
+
+    /* the desk */
+    storage.removeItem('basu.ops');
+    const desk = await openPage('ops.html');
+    await until(desk, 'the secret prefilled', (d) =>
+      Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
+    );
+    clickText(desk, '.pair button', 'Нэвтрэх');
+    await until(desk, 'the applications', (d) =>
+      [...d.querySelectorAll('#applied .row')].some((r) => r.textContent?.includes('Түмэн-Өлзий')),
+    );
+    const row = [...desk.window.document.querySelectorAll('#applied .row')].find((r) =>
+      r.textContent?.includes('Түмэн-Өлзий'),
+    )!;
+    // The proved phone travels with the application, so ops can ring.
+    expect(row.textContent).toContain('+97688010011');
+    (row.querySelector('[data-a="approve"]') as HTMLElement).click();
+    await until(desk, 'the row to move', (d) =>
+      [...d.querySelectorAll('#all .row[data-state="contracted"]')].some((r) =>
+        r.textContent?.includes('Түмэн-Өлзий'),
+      ),
+    );
+
+    /* back on the applicant's page, the yes has arrived with a code */
+    const again = await openPage('supplier.html');
+    await until(again, 'the pairing form', (d) => Boolean(d.querySelector('#become')));
+    (again.window.document.querySelector('#become') as HTMLElement).click();
+    await until(again, 'the approval', (d) => d.querySelector('#application .status')?.getAttribute('data-s') === 'contracted');
+    expect(again.window.document.querySelector('.code b')?.textContent).toMatch(/^\d{8}$/);
+    (again.window.document.querySelector('#pair-now') as HTMLElement).click();
+    await until(again, 'the board', (d) => d.querySelectorAll('.lane').length === 4);
+    expect(again.window.document.querySelector('#supplier')?.textContent).toBe('Хөвсгөл · Түмэн-Өлзий');
+  });
+
+  it('shows the seeded application waiting on the ops page', async () => {
+    storage.removeItem('basu.ops');
+    const desk = await openPage('ops.html');
+    await until(desk, 'the secret prefilled', (d) =>
+      Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
+    );
+    clickText(desk, '.pair button', 'Нэвтрэх');
+    await until(desk, 'the applications', (d) => d.querySelectorAll('#applied .row').length > 0);
+    expect(desk.window.document.querySelector('#applied .row')?.textContent).toContain('Завхан');
+  });
+});
+
 /**
  * Sign in as somebody nobody else is using.
  *

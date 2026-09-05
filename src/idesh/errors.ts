@@ -8,7 +8,10 @@ export type IdeshErrorCode =
   | 'NO_ADDRESS'
   | 'BAD_DATE'
   | 'TOO_LATE_TO_CANCEL'
-  | 'PAYMENT_FAILED';
+  | 'PAYMENT_FAILED'
+  | 'ALREADY_APPLIED'
+  | 'NOT_PENDING'
+  | 'OPS_CLOSED';
 
 export class IdeshError extends Error {
   constructor(

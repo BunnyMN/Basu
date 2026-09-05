@@ -426,6 +426,41 @@ async function idesh(guest: string): Promise<void> {
   }
   const noToken = await call(`/v1/idesh/${id}`);
   check('токенгүй бол 401', noToken.status === 401);
+
+  /* ── becoming a supplier ───────────────────────────────────────── */
+  console.log('\nНийлүүлэгч болох');
+  const applicant = await call<{ token: string }>('/dev/login', {
+    method: 'POST',
+    body: { phone: `+9768801${String(Date.now() % 10000).padStart(4, '0')}` },
+  });
+  const asked = await call<{ id: string }>('/v1/supplier/apply', {
+    method: 'POST',
+    token: applicant.body.token,
+    body: { name: 'Smoke · хот айл', tin: '6500000001', address: 'Smoke зах', about: 'smoke' },
+  });
+  check('хүсэлт бүртгэгдлээ', asked.status === 201, asked.body);
+
+  const ops = await call<{ token: string }>('/dev/ops-token');
+  check('ops нууц үг демо горимд байна', ops.status === 200 && Boolean(ops.body.token), ops.body);
+  const locked = await call('/v1/ops/suppliers');
+  check('нууц үггүй ops хаалттай', locked.status === 401);
+
+  const approved = await call<{ pairing_code: string }>(`/v1/ops/suppliers/${asked.body.id}/approve`, {
+    method: 'POST', token: ops.body.token, body: {},
+  });
+  check('ops батлав, код гарлаа', approved.status === 200 && /^\d{8}$/.test(approved.body.pairing_code ?? ''), approved.body);
+
+  const mine = await call<{ application: { state: string; pairing_code: string | null } }>(
+    '/v1/supplier/application', { token: applicant.body.token },
+  );
+  check('хүсэлт гаргагч батлагдсанаа кодтойгоо харна',
+    mine.body.application?.state === 'contracted' && mine.body.application?.pairing_code === approved.body.pairing_code,
+    mine.body);
+
+  const screenPaired = await call<{ token: string }>('/v1/supplier/pair', {
+    method: 'POST', body: { pairing_code: approved.body.pairing_code },
+  });
+  check('тэр кодоор дэлгэц холбогдлоо', screenPaired.status === 200, screenPaired.body);
 }
 
 function hhmm(iso: string | null): string {

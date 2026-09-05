@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ops — Basu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+<style>
+/* Ops is two or three people in one room signing contracts. A table and a
+   form, no more chrome than a spreadsheet. */
+body{background:var(--sunk)}
+.top{display:flex;align-items:baseline;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--bg);flex-wrap:wrap}
+.top h1{font-size:1rem;font-weight:700}
+.top .lab{margin-left:auto}
+.top .swap{
+  font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink-3);background:none;border:1px solid var(--line-2);border-radius:2px;padding:3px 8px;
+}
+.wrap{padding:14px;display:flex;flex-direction:column;gap:18px;max-width:960px}
+section > h2{
+  font-family:"IBM Plex Mono",monospace;font-size:.68rem;text-transform:uppercase;letter-spacing:.14em;
+  color:var(--ink-3);font-weight:500;margin-bottom:10px;display:flex;justify-content:space-between;
+}
+.rows{display:flex;flex-direction:column;gap:8px}
+.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:11px 13px}
+.row[data-state="applied"]{border-left:3px solid var(--hold)}
+.row[data-state="contracted"]{border-left:3px solid var(--ready)}
+.row[data-state="declined"]{border-left:3px solid var(--line-2);opacity:.6}
+.row .name{font-weight:700;font-size:.94rem;flex:1;min-width:200px}
+.row .name small{display:block;font-family:"IBM Plex Mono",monospace;font-size:.66rem;color:var(--ink-3);font-weight:400;margin-top:3px;line-height:1.5;overflow-wrap:anywhere}
+.row .about{flex-basis:100%;font-size:.82rem;color:var(--ink-2);line-height:1.45;padding:6px 0 0;border-top:1px dashed var(--line)}
+.row .btns{display:flex;gap:6px;flex-wrap:wrap}
+.row .code{
+  flex-basis:100%;font-family:"IBM Plex Mono",monospace;font-size:.86rem;padding:8px 10px;
+  background:var(--ready-soft);border:1px solid var(--ready-line);border-radius:3px;color:var(--ready);
+}
+.row .code b{font-size:1.2rem;letter-spacing:.14em}
+.none{color:var(--ink-3);font-size:.84rem;padding:10px 0}
+.new{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:14px}
+.new .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
+.new label{display:flex;flex-direction:column;gap:4px;font-family:"IBM Plex Mono",monospace;font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3)}
+.new label.wide{grid-column:1 / -1}
+.new input{width:100%;padding:8px 9px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);color:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:.86rem;letter-spacing:0;text-transform:none}
+.new .foot{display:flex;justify-content:flex-end;margin-top:10px;gap:10px;align-items:center}
+.pair{max-width:420px;margin:60px auto;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:26px 24px;text-align:center}
+.pair h2{font-size:1.1rem;margin-bottom:6px}
+.pair p{color:var(--ink-2);font-size:.86rem;margin:0 0 18px;line-height:1.5}
+.pair input{width:100%;font-family:"IBM Plex Mono",monospace;font-size:.95rem;padding:11px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);color:var(--ink);margin-bottom:12px}
+.pair .hint{font-size:.74rem;color:var(--ink-3);margin-top:14px;line-height:1.5}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="module">
+import { api, store, toast, mountClock, dayLabel } from '/api.js';
+
+const root = document.getElementById('root');
+const el = (html) => {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+};
+const esc = (value) => {
+  const node = document.createElement('span');
+  node.textContent = value ?? '';
+  return node.innerHTML;
+};
+const when = (iso) => (iso ? dayLabel(iso.slice(0, 10)) : '—');
+
+const STATE = { applied: 'хүлээгдэж байна', contracted: 'гэрээт', declined: 'татгалзсан' };
+
+/* ── the secret ──────────────────────────────────────────────────── */
+
+async function showToken() {
+  root.replaceChildren();
+  // The demo hands its secret out; production types it once.
+  const demo = await api('/dev/ops-token').catch(() => null);
+  const card = el(`
+    <div class="pair">
+      <h2>Ops</h2>
+      <p>Сервер дээрх <code>OPS_TOKEN</code>-ыг оруулна уу. Нийлүүлэгчийн хүсэлтийг батлах, шинэ нийлүүлэгч бүртгэх нь эндээс.</p>
+      <input type="password" placeholder="OPS_TOKEN" aria-label="Ops нууц" autocomplete="off">
+      <button class="btn" data-v="primary" data-size="lg" type="button">Нэвтрэх</button>
+    </div>`);
+  const input = card.querySelector('input');
+  if (demo?.token) {
+    input.value = demo.token;
+    card.append(el('<div class="hint">Демо горим: нууц үг автоматаар орлоо.</div>'));
+  }
+  const submit = async () => {
+    store.opsToken = input.value.trim();
+    try {
+      await api('/v1/ops/suppliers', { token: store.opsToken });
+      boot();
+    } catch (error) {
+      store.opsToken = null;
+      toast(error.message, 'bad');
+      input.select();
+    }
+  };
+  card.querySelector('button').addEventListener('click', submit);
+  input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+  root.append(card);
+  input.focus();
+}
+
+/* ── the desk ────────────────────────────────────────────────────── */
+
+const ops = (path, options = {}) => api(path, { ...options, token: store.opsToken });
+
+async function refresh() {
+  let suppliers;
+  try {
+    ({ suppliers } = await ops('/v1/ops/suppliers'));
+  } catch (error) {
+    if (error.status === 401 || error.status === 503) {
+      store.opsToken = null;
+      toast(error.message, 'bad');
+      showToken();
+      return;
+    }
+    toast(error.message, 'bad');
+    return;
+  }
+  render(suppliers);
+}
+
+function render(suppliers) {
+  const scroll = window.scrollY;
+  const applied = suppliers.filter((s) => s.state === 'applied');
+  const rest = suppliers.filter((s) => s.state !== 'applied');
+
+  const frame = el(`
+    <div>
+      <div class="top">
+        <h1>Ops · нийлүүлэгч</h1>
+        <span class="lab">${applied.length} хүсэлт · ${rest.filter((s) => s.state === 'contracted').length} гэрээт</span>
+        <button class="swap" type="button" id="out">Гарах</button>
+      </div>
+      <div class="wrap">
+        <section id="applied"><h2><span>Хүсэлт</span></h2><div class="rows"></div></section>
+        <section id="all"><h2><span>Нийлүүлэгчид</span></h2><div class="rows"></div></section>
+        <section id="new"><h2><span>Шинэ нийлүүлэгч, гэрээтэй</span></h2></section>
+      </div>
+    </div>`);
+  frame.querySelector('#out').addEventListener('click', () => {
+    store.opsToken = null;
+    showToken();
+  });
+
+  const pending = frame.querySelector('#applied .rows');
+  if (!applied.length) pending.append(el('<div class="none">Хүлээгдэж буй хүсэлт алга.</div>'));
+  for (const s of applied) pending.append(renderRow(s));
+
+  const list = frame.querySelector('#all .rows');
+  if (!rest.length) list.append(el('<div class="none">Нийлүүлэгч алга.</div>'));
+  for (const s of rest) list.append(renderRow(s));
+
+  frame.querySelector('#new').append(newForm());
+  root.replaceChildren(frame);
+  window.scrollTo(0, scroll);
+}
+
+function renderRow(s) {
+  const row = el(`
+    <div class="row" data-state="${s.state}" data-supplier="${s.id}">
+      <div class="name">${esc(s.name)}<small>${esc(s.phone)}${s.merchant_tin ? ` · ТТД ${esc(s.merchant_tin)}` : ' · ТТД алга'} · ${esc(s.pickup_address)}<br>${
+        s.state === 'applied'
+          ? `хүсэлт ${when(s.applied_at)}`
+          : s.state === 'contracted'
+            ? `гэрээ ${when(s.contracted_at)} · ${s.listings} зар · ${s.watched ? 'дэлгэц холбогдсон' : 'дэлгэц холбогдоогүй'}`
+            : `татгалзсан ${when(s.decided_at)}: ${esc(s.decline_reason)}`
+      }</small></div>
+      <span class="chip" data-s="${s.state === 'contracted' ? 'READY' : s.state === 'applied' ? 'PAID' : 'CANCELLED'}">${STATE[s.state]}</span>
+      <div class="btns"></div>
+      ${s.about ? `<div class="about">${esc(s.about)}</div>` : ''}
+    </div>`);
+  const buttons = row.querySelector('.btns');
+  const act = async (path, body, done) => {
+    try {
+      const answer = await ops(path, { method: 'POST', body: body ?? {} });
+      done?.(answer);
+      await refresh();
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  };
+  const showCode = (answer) => {
+    // The code is on its way by SMS; it is also here, in case the SMS is not.
+    const code = answer?.pairing_code;
+    if (code) {
+      toast(`Батлагдлаа. Код ${code} — SMS-ээр илгээгдэнэ.`);
+      sessionStorage.setItem(`ops.code.${s.id}`, code);
+    }
+  };
+
+  if (s.state === 'applied') {
+    const ok = el('<button class="btn" data-v="primary" type="button" data-a="approve">Батлах</button>');
+    ok.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/approve`, null, showCode));
+    const no = el('<button class="btn" data-v="danger" type="button" data-a="decline">Татгалзах</button>');
+    no.addEventListener('click', () => {
+      const reason = prompt('Шалтгаан (нийлүүлэгчид SMS-ээр очно):', '');
+      if (reason === null) return;
+      act(`/v1/ops/suppliers/${s.id}/decline`, { reason });
+    });
+    buttons.append(ok, no);
+  } else if (s.state === 'contracted') {
+    const code = el('<button class="btn" type="button" data-a="code">Шинэ код</button>');
+    code.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/code`, null, showCode));
+    buttons.append(code);
+  }
+
+  const remembered = sessionStorage.getItem(`ops.code.${s.id}`);
+  if (remembered && s.state === 'contracted' && !s.watched) {
+    row.append(el(`<div class="code">Дэлгэц холбох код <b>${remembered}</b> · 24 цаг</div>`));
+  }
+  return row;
+}
+
+function newForm() {
+  const form = el(`
+    <div class="new">
+      <div class="grid">
+        <label class="wide">Нэр<input name="name" placeholder="Хэнтий · «Хэрлэн» хоршоо"></label>
+        <label>Утас<input name="phone" placeholder="+976…"></label>
+        <label>ТТД<input name="tin" placeholder="7–10 орон"></label>
+        <label class="wide">Авах цэг<input name="address" placeholder="Дүүрэг, зах, хаалга"></label>
+        <label>Өргөрөг<input name="lat" placeholder="47.9…"></label>
+        <label>Уртраг<input name="lon" placeholder="106.9…"></label>
+      </div>
+      <div class="foot"><button class="btn" data-v="primary" type="button" id="add">Бүртгээд код авах</button></div>
+    </div>`);
+  form.querySelector('#add').addEventListener('click', async () => {
+    const v = (name) => form.querySelector(`[name="${name}"]`).value.trim();
+    const body = { name: v('name'), phone: v('phone'), tin: v('tin'), address: v('address') };
+    if (v('lat')) body.lat = Number(v('lat'));
+    if (v('lon')) body.lon = Number(v('lon'));
+    try {
+      const { id, pairing_code } = await ops('/v1/ops/suppliers', { method: 'POST', body });
+      sessionStorage.setItem(`ops.code.${id}`, pairing_code);
+      toast(`Бүртгэгдлээ. Код ${pairing_code}`);
+      await refresh();
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  return form;
+}
+
+/* ── boot ────────────────────────────────────────────────────────── */
+
+function boot() {
+  root.replaceChildren();
+  if (!store.opsToken) {
+    showToken();
+    return;
+  }
+  refresh();
+}
+
+mountClock(() => {
+  if (store.opsToken) refresh();
+});
+boot();
+</script>
+</body>
+</html>

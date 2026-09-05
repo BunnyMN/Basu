@@ -21,6 +21,12 @@ export const store = {
   set supplierToken(v) {
     v ? localStorage.setItem('basu.supplier', v) : localStorage.removeItem('basu.supplier');
   },
+  get opsToken() {
+    return localStorage.getItem('basu.ops');
+  },
+  set opsToken(v) {
+    v ? localStorage.setItem('basu.ops', v) : localStorage.removeItem('basu.ops');
+  },
 };
 
 export class ApiError extends Error {

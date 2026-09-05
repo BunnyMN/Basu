@@ -132,7 +132,7 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
       delivery_fee_mnt: number;
       ready_from: string;
     }>(
-      `SELECT l.id, l.supplier_id, s.active AS supplier_active, l.active, l.kind, l.unit,
+      `SELECT l.id, l.supplier_id, (s.active AND s.state = 'contracted') AS supplier_active, l.active, l.kind, l.unit,
               l.title, l.origin, l.price_mnt, l.min_qty, l.quantity, l.sold, l.delivers,
               l.delivery_fee_mnt, to_char(l.ready_from, 'YYYY-MM-DD') AS ready_from
          FROM idesh.listing l JOIN idesh.supplier s ON s.id = l.supplier_id

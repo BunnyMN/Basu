@@ -60,7 +60,7 @@ interface ListingRow {
 }
 
 const SELECT = `
-  SELECT l.id, l.supplier_id, s.name AS supplier, s.contracted_at IS NOT NULL AS contracted,
+  SELECT l.id, l.supplier_id, s.name AS supplier, s.state = 'contracted' AS contracted,
          s.pickup_address, l.kind, l.unit, l.title, l.note, l.price_mnt, l.approx_kg,
          l.min_qty, l.quantity, l.sold, l.origin, to_char(l.ready_from, 'YYYY-MM-DD') AS ready_from,
          l.delivers, l.delivery_fee_mnt, l.active
@@ -102,7 +102,7 @@ function shape(r: ListingRow): Listing {
 export async function openListings(db: Db = getPool()): Promise<Listing[]> {
   const { rows } = await db.query<ListingRow>(
     `${SELECT}
-      WHERE l.active AND s.active
+      WHERE l.active AND s.active AND s.state = 'contracted'
       ORDER BY l.ready_from, l.kind, l.price_mnt`,
   );
   return rows.map(shape);

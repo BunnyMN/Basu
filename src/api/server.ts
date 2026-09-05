@@ -43,6 +43,7 @@ import { registerDishRoutes } from './dishes.js';
 import { registerRouteRoutes } from './route.js';
 import { registerPlatformRoutes } from './platform.js';
 import { registerIdeshRoutes } from './idesh.js';
+import { registerOpsRoutes } from './ops.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -118,6 +119,8 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
   // The second vertical. Its own file for the same reason platform is: when
   // идэш moves out of this process, this is the mount that goes with it.
   await registerIdeshRoutes(app, ctx, { requireGuest, dev: options.dev ?? false });
+  // The people who sign contracts, behind one secret. See src/api/ops.ts.
+  await registerOpsRoutes(app, ctx, { dev: options.dev ?? false });
 
   /** A guest may only ever touch their own order. */
   const ownedByGuest = async (orderId: string, guestId: string): Promise<boolean> => {

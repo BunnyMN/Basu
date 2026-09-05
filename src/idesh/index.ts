@@ -38,6 +38,10 @@ export {
 
 export {
   registerSupplier,
+  applySupplier,
+  applicationOf,
+  approveSupplier,
+  declineSupplier,
   listSuppliers,
   createSupplierCode,
   pairSupplier,
@@ -45,6 +49,9 @@ export {
   revokeSupplierDevice,
   unpairedCodes,
   type SupplierInput,
+  type ApplicationInput,
+  type Application,
+  type SupplierState,
   type SupplierRow,
   type SupplierSession,
   type SupplierDevice,

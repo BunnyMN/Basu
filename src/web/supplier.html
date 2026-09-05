@@ -116,6 +116,30 @@ body{background:var(--sunk)}
 .venues button:hover{border-color:var(--accent-line);background:var(--accent-soft)}
 .venues .tag{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
 .venues button[data-watched] .tag{color:var(--ready)}
+
+/* ── becoming a supplier ────────────────────────────────────────── */
+.apply{max-width:420px;margin:40px auto;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:24px}
+.apply h2{font-size:1.1rem;margin-bottom:6px}
+.apply p{color:var(--ink-2);font-size:.86rem;margin:0 0 16px;line-height:1.5}
+.apply label{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;font-family:"IBM Plex Mono",monospace;font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3)}
+.apply input,.apply textarea{width:100%;padding:9px 10px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);color:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:.88rem;letter-spacing:0;text-transform:none}
+.apply textarea{font-family:inherit;min-height:60px}
+.apply .foot{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
+.apply .foot .btn{flex:1}
+.apply .back{background:none;border:none;color:var(--ink-3);font-family:"IBM Plex Mono",monospace;font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;padding:14px 0 0;width:100%;text-align:center}
+.status{text-align:center;padding:10px 0 4px}
+.status .big{font-size:1.4rem;font-weight:900;letter-spacing:-.03em}
+.status .cap{font-size:.84rem;color:var(--ink-2);margin-top:6px;line-height:1.5}
+.status[data-s="applied"] .big{color:var(--hold)}
+.status[data-s="contracted"] .big{color:var(--ready)}
+.status[data-s="declined"] .big{color:var(--stop)}
+.code{margin:14px 0;padding:14px;border:1px dashed var(--line-2);border-radius:4px;text-align:center}
+.code b{display:block;font-family:"IBM Plex Mono",monospace;font-size:1.9rem;font-weight:600;letter-spacing:.14em;margin-top:4px}
+.otp{display:flex;gap:8px}
+.otp[hidden]{display:none}
+.otp input{flex:1}
+.pair .become{margin-top:18px;font-size:.82rem;color:var(--ink-2)}
+.pair .become a{color:var(--accent-ink);font-weight:600;cursor:pointer}
 </style>
 </head>
 <body>
@@ -227,8 +251,178 @@ async function showPairing() {
     card.append(el('<div class="hint">Нийлүүлэгч алга. <code>npm run seed</code> ажиллуулна уу.</div>'));
   }
 
+  // Not a supplier yet: this is where one starts.
+  const become = el('<div class="become">Код байхгүй юу? <a id="become">Нийлүүлэгч болох →</a></div>');
+  become.querySelector('#become').addEventListener('click', () => showApply());
+  card.append(become);
+
   root.append(card);
   input.focus();
+}
+
+/* ── becoming a supplier ─────────────────────────────────────────── */
+
+/**
+ * The form a would-be supplier fills in, behind a phone they have proved.
+ *
+ * The phone is not a field: it is the number they sign in with, by OTP, and
+ * that is the only proof anybody has that it is theirs. What they type is who
+ * they are and where a guest collects. Ops answers from the ops page and the
+ * answer arrives here — and by SMS, with the code, when it is yes.
+ */
+async function showApply() {
+  root.replaceChildren();
+  if (!store.guestToken) {
+    root.append(signInCard());
+    return;
+  }
+  let application;
+  try {
+    ({ application } = await api('/v1/supplier/application', { token: store.guestToken }));
+  } catch (error) {
+    if (error.status === 401) {
+      store.guestToken = null;
+      root.append(signInCard());
+      return;
+    }
+    toast(error.message, 'bad');
+    return;
+  }
+  root.append(application ? statusCard(application) : applyForm());
+}
+
+/** Phone and a one-time code, the way the app signs in. No password. */
+function signInCard() {
+  const card = el(`
+    <div class="apply" id="signin">
+      <h2>Нийлүүлэгч болох</h2>
+      <p>Эхлээд утсаа баталгаажуулна. Энэ дугаар руу зочид залгана.</p>
+      <label>Утас<input name="phone" inputmode="tel" placeholder="+976XXXXXXXX"></label>
+      <div class="otp" hidden><input name="code" inputmode="numeric" maxlength="6" placeholder="6 оронтой код"></div>
+      <div class="foot">
+        <button class="btn" data-v="primary" type="button" id="send">Код авах</button>
+      </div>
+      <button class="back" type="button" id="back">‹ Дэлгэц холбох</button>
+    </div>`);
+  const phone = card.querySelector('[name="phone"]');
+  const code = card.querySelector('[name="code"]');
+  const send = card.querySelector('#send');
+  let asked = false;
+  send.addEventListener('click', async () => {
+    try {
+      if (!asked) {
+        await api('/v1/auth/otp', { method: 'POST', body: { phone: phone.value.trim() } });
+        asked = true;
+        card.querySelector('.otp').hidden = false;
+        send.textContent = 'Нэвтрэх';
+        code.focus();
+        toast('Код илгээгдлээ.');
+        return;
+      }
+      const { token } = await api('/v1/auth/verify', {
+        method: 'POST',
+        body: { phone: phone.value.trim(), code: code.value.trim(), device: 'Нийлүүлэгчийн дэлгэц' },
+      });
+      store.guestToken = token;
+      showApply();
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  // The demo has no SMS to read a code from; a walkthrough skips straight in.
+  api('/dev/clock')
+    .then(() => {
+      const demo = el('<button class="btn" type="button" id="demo">Демо: кодгүй нэвтрэх</button>');
+      demo.addEventListener('click', async () => {
+        // A number typed is the person who typed it; none typed is somebody
+        // new, so a walkthrough reaches the form rather than the seed's own
+        // waiting application.
+        const fresh = `+97688${String(Date.now() % 1_000_000).padStart(6, '0')}`;
+        const { token } = await api('/dev/login', {
+          method: 'POST',
+          body: { phone: phone.value.trim() || fresh, device: 'Нийлүүлэгчийн дэлгэц' },
+        });
+        store.guestToken = token;
+        showApply();
+      });
+      card.querySelector('.foot').append(demo);
+    })
+    .catch(() => {});
+  card.querySelector('#back').addEventListener('click', showPairing);
+  return card;
+}
+
+function applyForm() {
+  const card = el(`
+    <div class="apply" id="apply">
+      <h2>Нийлүүлэгч болох</h2>
+      <p>Basu хүсэлтийг тань үзээд гэрээ байгуулна. Батлагдвал дэлгэц холбох код SMS-ээр ирнэ.</p>
+      <label>Нэр (малчин, хоршоо, махны газар)<input name="name" placeholder="Архангай · Доржийн хот айл"></label>
+      <label>ТТД (е-баримтад, байвал)<input name="tin" inputmode="numeric" placeholder="7–10 орон"></label>
+      <label>Хотод мах авах цэг<input name="address" placeholder="Дүүрэг, зах, хаалга"></label>
+      <label>Юу зарах вэ, хаанаас<textarea name="about" placeholder="Архангайн хонь, 10-р сараас, 20 толгой…"></textarea></label>
+      <div class="foot"><button class="btn" data-v="primary" data-size="lg" type="button" id="submit">Хүсэлт илгээх</button></div>
+      <button class="back" type="button" id="back">‹ Дэлгэц холбох</button>
+    </div>`);
+  card.querySelector('#submit').addEventListener('click', async () => {
+    const v = (name) => card.querySelector(`[name="${name}"]`).value.trim();
+    try {
+      await api('/v1/supplier/apply', {
+        method: 'POST',
+        token: store.guestToken,
+        body: { name: v('name'), tin: v('tin'), address: v('address'), about: v('about') },
+      });
+      toast('Хүсэлт илгээгдлээ.');
+      showApply();
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  card.querySelector('#back').addEventListener('click', showPairing);
+  return card;
+}
+
+const APPLICATION = {
+  applied: ['Хүлээгдэж байна', 'Basu хүсэлтийг тань үзэж байна. Батлагдвал энд болон SMS-ээр код ирнэ.'],
+  contracted: ['Батлагдлаа', 'Та гэрээт нийлүүлэгч боллоо.'],
+  declined: ['Татгалзсан', ''],
+};
+
+function statusCard(a) {
+  const [word, cap] = APPLICATION[a.state] ?? [a.state, ''];
+  const card = el(`
+    <div class="apply" id="application">
+      <h2>${esc(a.name)}</h2>
+      <div class="status" data-s="${a.state}">
+        <div class="big">${word}</div>
+        <div class="cap">${a.state === 'declined' ? `Шалтгаан: ${esc(a.decline_reason)}` : cap}</div>
+      </div>
+    </div>`);
+  if (a.state === 'contracted' && a.pairing_code) {
+    card.append(el(`<div class="code">Дэлгэц холбох код<b>${a.pairing_code}</b></div>`));
+    const pair = el('<button class="btn" data-v="primary" data-size="lg" type="button" id="pair-now">Энэ кодоор холбох</button>');
+    pair.addEventListener('click', async () => {
+      try {
+        const { token } = await api('/v1/supplier/pair', { method: 'POST', body: { pairing_code: a.pairing_code } });
+        store.supplierToken = token;
+        boot();
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+    });
+    card.append(pair);
+  } else if (a.state === 'contracted' && a.paired) {
+    card.append(el('<p>Дэлгэц аль хэдийн холбогдсон. Код шинээр хэрэгтэй бол Basu-д хэлнэ үү.</p>'));
+  } else if (a.state === 'declined') {
+    const again = el('<button class="btn" data-size="lg" type="button" id="again">Дахин хүсэлт гаргах</button>');
+    again.addEventListener('click', () => {
+      root.replaceChildren(applyForm());
+    });
+    card.append(again);
+  }
+  card.append(el('<button class="back" type="button" id="back">‹ Дэлгэц холбох</button>'));
+  card.querySelector('#back').addEventListener('click', showPairing);
+  return card;
 }
 
 /* ── the board ───────────────────────────────────────────────────── */

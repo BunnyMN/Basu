@@ -1,5 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
+  applicationOf,
+  applySupplier,
   boardFor,
   cancelIdesh,
   createIdesh,
@@ -278,6 +280,55 @@ export async function registerIdeshRoutes(
     }
   });
 
+  /* ── becoming a supplier ───────────────────────────────────────── */
+
+  /**
+   * Ask. The guest is signed in — the phone on the application is the one
+   * they proved by OTP, never one typed into a box — and ops answers from
+   * their own page.
+   */
+  app.post<{
+    Body: { name?: string; tin?: string; address?: string; about?: string; lat?: number; lon?: number };
+  }>('/v1/supplier/apply', guarded, async (request, reply) => {
+    const body = request.body ?? {};
+    if (!body.name?.trim() || !body.address?.trim()) {
+      return badRequest(reply, 'Нэр, авах цэгээ оруулна уу.', 'name and address are required');
+    }
+    try {
+      const id = await applySupplier(ctx, {
+        guestId: request.guestId!,
+        name: body.name,
+        merchantTin: body.tin?.trim() || null,
+        pickupAddress: body.address,
+        about: body.about ?? null,
+        lat: typeof body.lat === 'number' ? body.lat : null,
+        lon: typeof body.lon === 'number' ? body.lon : null,
+      });
+      return reply.status(201).send({ id, state: 'applied' });
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
+
+  /** Where the guest's application stands — and the code, once there is one. */
+  app.get('/v1/supplier/application', guarded, async (request) => {
+    const application = await applicationOf(ctx, request.guestId!);
+    return {
+      application: application
+        ? {
+            id: application.id,
+            name: application.name,
+            state: application.state,
+            applied_at: application.appliedAt?.toISOString() ?? null,
+            decided_at: application.decidedAt?.toISOString() ?? null,
+            decline_reason: application.declineReason,
+            pairing_code: application.pairingCode,
+            paired: application.paired,
+          }
+        : null,
+    };
+  });
+
   /* ── the supplier ──────────────────────────────────────────────── */
 
   app.post<{ Body: { pairing_code?: string } }>('/v1/supplier/pair', async (request, reply) => {
@@ -443,12 +494,12 @@ export async function registerIdeshRoutes(
     })),
   }));
 
+  /** The screens a walkthrough may open: contracted suppliers only. An
+      applicant has no screen yet — that is what the ops page decides. */
   app.get('/dev/suppliers', async () => ({
-    suppliers: (await listSuppliers()).map((s) => ({
-      id: s.id,
-      name: s.name,
-      watched: s.watched,
-    })),
+    suppliers: (await listSuppliers())
+      .filter((s) => s.state === 'contracted')
+      .map((s) => ({ id: s.id, name: s.name, watched: s.watched })),
   }));
 
   /** Hand this browser a screen for a supplier, no code typing. */
