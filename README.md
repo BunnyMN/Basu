@@ -537,6 +537,13 @@ Release build энэ хоёрыг хоёуланг нь үл тоодог.
 секундэд үүсгэдэг — файл нэмэх бүрд өөрчлөгддөг, merge-д муу байдаг
 generated файлыг хадгалах шалтгаан алга.
 
+**Өөрийн утсан дээр, хувийн (үнэгүй) Apple ID-ийн багаар** build хийж болно:
+Debug нь `ios/Basu/Basu.debug.entitlements`-ээр гарын үсэг зурдаг бөгөөд тэнд
+Push Notifications байхгүй — хувийн баг push-ийг дэмждэггүй, debug build-д
+push токен хэзээ ч ирдэггүй тул алдах зүйл алга. Release нь `project.yml`-ийн
+бүрэн entitlements-тэй (App Group + push) хэвээр; түүнийг зурахад Apple
+Developer Program-ын баг хэрэгтэй.
+
 ```
 ios/
   BasuKit/      Swift package. DesignTokens.swift (handoff-ынх, фонтын нэрийг

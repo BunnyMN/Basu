@@ -48,13 +48,12 @@ targets:
       - package: BasuKit
       - target: BasuWidgets
         embed: true
-    entitlements:
-      path: Basu/Basu.entitlements
-      properties:
-        com.apple.security.application-groups:
-          - group.mn.basu.shared
-        # Push, for the device and for each Live Activity's own token.
-        aps-environment: development
+    # Entitlements are two committed files rather than one generated here,
+    # because a personal (free) development team cannot sign for Push
+    # Notifications and a debug build gets no push token anywhere it runs:
+    #   Basu/Basu.entitlements        App Group + push   — Release
+    #   Basu/Basu.debug.entitlements  App Group only     — Debug
+    # `entitlements:` would write one path into every configuration.
     info:
       path: Basu/Info.plist
       properties:
@@ -105,6 +104,11 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+      configs:
+        Debug:
+          CODE_SIGN_ENTITLEMENTS: Basu/Basu.debug.entitlements
+        Release:
+          CODE_SIGN_ENTITLEMENTS: Basu/Basu.entitlements
 
   # WidgetKit + ActivityKit UI. Renders whatever the timeline or the activity
   # hands it; never touches the network.

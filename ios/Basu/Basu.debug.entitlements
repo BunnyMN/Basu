@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The debug build's entitlements: the App Group and nothing else.
+
+  Basu.entitlements, the release one, carries the push entitlement as well,
+  and a personal development team — the free kind, one Apple ID and no programme —
+  cannot sign anything that asks for Push Notifications. Xcode refuses to
+  make the provisioning profile at all, so nobody with a personal team could
+  put a debug build on their phone. Push tokens never arrive on the simulator
+  or on a personal-team device anyway; the app already treats a refused
+  registration as nothing to do. Release keeps the full set.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.mn.basu.shared</string>
+	</array>
+</dict>
+</plist>
