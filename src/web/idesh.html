@@ -716,19 +716,12 @@ function renderDetail({ replace = false } = {}) {
         </button>
       </div>
     </div>`);
-  pick.addEventListener('click', (event) => {
-    const button = event.target.closest('button');
-    if (!button || button.disabled) return;
-    f.receive = button.dataset.r;
-    renderDetail({ replace: true });
-    $('screen-body').scrollTop = pick.offsetTop - 60;
-  });
   body.append(pick);
 
   /* 3 · when */
   const when = el(`
     <div class="step" id="step-when">
-      <div class="q"><span class="n">3</span><b>${f.receive === 'delivery' ? 'Хэзээ хүргүүлэх вэ?' : 'Хэзээ очиж авах вэ?'}</b></div>
+      <div class="q"><span class="n">3</span><b></b></div>
       <input type="date" id="when" min="${earliest(l)}" value="${f.receiveOn}" aria-label="Өдөр">
       <div class="help">Хамгийн эрт <b>${dayLabel(earliest(l))}</b> — мах тэр өдрөөс бэлэн. Дараа нь нийлүүлэгч утсаар цагийг тохирно.</div>
     </div>`);
@@ -738,37 +731,65 @@ function renderDetail({ replace = false } = {}) {
   });
   body.append(when);
 
-  /* 4 · where, for a delivery */
-  if (f.receive === 'delivery') {
-    const where = el(`
-      <div class="step" id="step-where">
-        <div class="q"><span class="n">4</span><b>Хаана хүргэх вэ?</b></div>
-        <div class="field">
-          <label for="address">Хаяг</label>
-          <textarea id="address" placeholder="Дүүрэг, хороолол, байр, орц, тоот">${escapeHtml(f.address)}</textarea>
-        </div>
-        <div class="field">
-          <label for="phone">Хүргэгчийн залгах утас</label>
-          <input type="tel" id="phone" inputmode="tel" placeholder="+976 XXXX XXXX" value="${escapeHtml(f.phone)}">
-        </div>
-        <div class="field">
-          <label>Газрын зураг дээр цэг <span style="font-weight:400;color:var(--ink-3)">— заавал биш, хүргэгчид тусална</span></label>
-          <div class="mapbox" id="mapbox"><span class="tip" id="maptip">Байшингаа дарж цэг тавина уу</span></div>
-        </div>
-      </div>`);
-    where.querySelector('#address').addEventListener('input', (e) => {
-      f.address = e.target.value;
-      renderFoot();
-    });
-    where.querySelector('#phone').addEventListener('input', (e) => {
-      f.phone = e.target.value;
-      renderFoot();
-    });
-    body.append(where);
-    mountMap(where.querySelector('#mapbox'));
-  }
+  /**
+   * Changing how the meat arrives changes the page in place — the check,
+   * the third question's wording, the fourth question coming or going —
+   * and nothing else moves. Redrawing the screen here threw the person back
+   * to the top with the choice they had just made out of sight; scrolling
+   * to the new question instead was a jump the other way. Nothing scrolls.
+   */
+  const settle = () => {
+    for (const choice of pick.querySelectorAll('.choice')) {
+      choice.setAttribute('aria-checked', String(choice.dataset.r === f.receive));
+    }
+    when.querySelector('.q b').textContent = f.receive === 'delivery' ? 'Хэзээ хүргүүлэх вэ?' : 'Хэзээ очиж авах вэ?';
+    let where = body.querySelector('#step-where');
+    if (f.receive === 'delivery' && !where) {
+      where = whereStep(f);
+      when.insertAdjacentElement('afterend', where);
+      mountMap(where.querySelector('#mapbox'));
+    } else if (f.receive !== 'delivery' && where) {
+      dropMap();
+      where.remove();
+    }
+    renderFoot();
+  };
+  pick.addEventListener('click', (event) => {
+    const button = event.target.closest('button');
+    if (!button || button.disabled || button.dataset.r === f.receive) return;
+    f.receive = button.dataset.r;
+    settle();
+  });
+  settle();
+}
 
-  renderFoot();
+/** 4 · where, for a delivery. Built only when asked for, dropped when not. */
+function whereStep(f) {
+  const where = el(`
+    <div class="step" id="step-where">
+      <div class="q"><span class="n">4</span><b>Хаана хүргэх вэ?</b></div>
+      <div class="field">
+        <label for="address">Хаяг</label>
+        <textarea id="address" placeholder="Дүүрэг, хороолол, байр, орц, тоот">${escapeHtml(f.address)}</textarea>
+      </div>
+      <div class="field">
+        <label for="phone">Хүргэгчийн залгах утас</label>
+        <input type="tel" id="phone" inputmode="tel" placeholder="+976 XXXX XXXX" value="${escapeHtml(f.phone)}">
+      </div>
+      <div class="field">
+        <label>Газрын зураг дээр цэг <span style="font-weight:400;color:var(--ink-3)">— заавал биш, хүргэгчид тусална</span></label>
+        <div class="mapbox" id="mapbox"><span class="tip" id="maptip">Байшингаа дарж цэг тавина уу</span></div>
+      </div>
+    </div>`);
+  where.querySelector('#address').addEventListener('input', (e) => {
+    f.address = e.target.value;
+    renderFoot();
+  });
+  where.querySelector('#phone').addEventListener('input', (e) => {
+    f.phone = e.target.value;
+    renderFoot();
+  });
+  return where;
 }
 
 /**
