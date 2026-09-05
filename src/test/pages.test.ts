@@ -727,15 +727,20 @@ describe('өвлийн идэш', () => {
       (l) => !l.hasAttribute('data-gone') && l.textContent?.includes('бүтэн'),
     ) as HTMLElement;
     whole.click();
-    await until(dom, 'the sheet', (d) => Boolean(d.querySelector('#pay')));
-    const title = dom.window.document.querySelector('#sheet-name')?.textContent ?? '';
+    await until(dom, 'the stall screen', (d) => Boolean(d.querySelector('#next')));
+    const title = dom.window.document.querySelector('#screen-title')?.textContent ?? '';
     // Collected, on the day it is ready — the form's own defaults.
-    expect(dom.window.document.querySelector('.pick [data-r="pickup"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(dom.window.document.querySelector('.choice[data-r="pickup"]')?.getAttribute('aria-checked')).toBe('true');
     expect((dom.window.document.querySelector('#when') as HTMLInputElement).value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    const pay = dom.window.document.querySelector('#pay') as HTMLButtonElement;
-    expect(pay.disabled).toBe(false);
-    expect(pay.textContent).toMatch(/₮ төлөх/);
-    pay.click();
+    // The four questions are numbered, and a pickup has three of them.
+    expect(dom.window.document.querySelectorAll('.step').length).toBe(3);
+    const next = dom.window.document.querySelector('#next') as HTMLButtonElement;
+    expect(next.disabled).toBe(false);
+    next.click();
+    // Nothing is charged before the person has seen the whole order once.
+    await until(dom, 'the review', (d) => Boolean(d.querySelector('#pay')));
+    expect(dom.window.document.querySelector('.review .total b')?.textContent).toMatch(/₮$/);
+    (dom.window.document.querySelector('#pay') as HTMLElement).click();
     await until(dom, 'the status', (d) => Boolean(d.querySelector('.status')));
     return title;
   }
@@ -774,13 +779,13 @@ describe('өвлийн идэш', () => {
     // until when, and the supplier is now somebody you can call.
     expect(dom.window.document.querySelector('.status .big')?.textContent).toBe('Төлсөн');
     expect(dom.window.document.querySelector('.handcode b')?.textContent).toMatch(/^\d{4}$/);
-    expect(dom.window.document.querySelector('#sheet-foot [data-v="danger"]')?.textContent).toContain(
+    expect(dom.window.document.querySelector('#screen-foot [data-v="danger"]')?.textContent).toContain(
       'Үнэгүй цуцлах',
     );
     expect(dom.window.document.querySelector('.where a[href^="tel:"]')).toBeTruthy();
     // A pickup has no «Замд» step to leave undone.
     expect(dom.window.document.querySelectorAll('.timeline li')).toHaveLength(4);
-    expect(dom.window.document.querySelector('#sheet-sub')?.textContent).toContain(title);
+    expect(dom.window.document.querySelector('#screen-sub')?.textContent).toContain(title);
 
     // …and it sits on the home screen beside whatever lunch there is.
     const home = await openPage('index.html');
@@ -795,7 +800,7 @@ describe('өвлийн идэш', () => {
     // Following it lands on the order, not on the stalls.
     const back = await openPage('idesh.html', card.getAttribute('href')!.slice('/idesh'.length));
     await until(back, 'the status', (d) => Boolean(d.querySelector('.status')));
-    expect(back.window.document.querySelector('#sheet-name')?.textContent).toMatch(/^№\d{4}$/);
+    expect(back.window.document.querySelector('#screen-title')?.textContent).toMatch(/^№\d{4}$/);
   });
 
   it('asks for an address only when the meat is to be delivered', async () => {
@@ -806,15 +811,16 @@ describe('өвлийн идэш', () => {
       (l) => l.textContent?.includes('Хүргэлттэй') && !l.hasAttribute('data-gone'),
     ) as HTMLElement;
     delivered.click();
-    await until(dom, 'the sheet', (d) => Boolean(d.querySelector('#pay')));
+    await until(dom, 'the stall screen', (d) => Boolean(d.querySelector('#next')));
     expect(dom.window.document.querySelector('#address')).toBeNull();
 
-    clickText(dom, '.pick button', 'Хүргүүлэх');
-    await until(dom, 'the address field', (d) => Boolean(d.querySelector('#address')));
-    // Nothing to pay for until the courier knows where to go.
-    const pay = () => dom.window.document.querySelector('#pay') as HTMLButtonElement;
+    (dom.window.document.querySelector('.choice[data-r="delivery"]') as HTMLElement).click();
+    await until(dom, 'the address question', (d) => Boolean(d.querySelector('#step-where #address')));
+    expect(dom.window.document.querySelectorAll('.step').length).toBe(4);
+    // No way on until the courier knows where to go — and the bar says why.
+    const pay = () => dom.window.document.querySelector('#next') as HTMLButtonElement;
     expect(pay().disabled).toBe(true);
-    expect(pay().textContent).toContain('Хаяг');
+    expect(dom.window.document.querySelector('#screen-foot .why')?.textContent).toContain('Хаяг');
 
     const address = dom.window.document.querySelector('#address') as HTMLTextAreaElement;
     address.value = 'Баянзүрх, 13-р хороолол, 45-12';
@@ -822,9 +828,10 @@ describe('өвлийн идэш', () => {
     const phone = dom.window.document.querySelector('#phone') as HTMLInputElement;
     phone.value = '+97699112233';
     phone.dispatchEvent(new dom.window.Event('input'));
-    await until(dom, 'a price', () => !pay().disabled);
+    await until(dom, 'the way on', () => !pay().disabled);
     // The fee is in the number, not a surprise after.
-    expect(pay().textContent).toMatch(/₮ төлөх/);
+    expect(dom.window.document.querySelector('#screen-foot .sum span')?.textContent).toContain('хүргэлт');
+    expect(dom.window.document.querySelector('#screen-foot .sum b')?.textContent).toMatch(/₮$/);
   });
 
   it('shows the paid order to its supplier, who walks it to the handover', async () => {
@@ -866,7 +873,7 @@ describe('өвлийн идэш', () => {
     // `body.textContent` carries the page's own script, so a phrase that
     // appears in the code cannot be asserted absent from the text. Ask the
     // footer instead.
-    expect(guest.window.document.querySelector('#sheet-foot [data-v="danger"]')).toBeNull();
+    expect(guest.window.document.querySelector('#screen-foot [data-v="danger"]')).toBeNull();
     expect(guest.window.document.querySelector('.status .big')?.textContent).toBe('Бэлтгэж байна');
   });
 
