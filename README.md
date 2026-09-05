@@ -232,6 +232,39 @@ basu.burzai.cloud → nginx → 127.0.0.1:3210 → basu-api.service
 холбох. Хаалттай байх шаардлагатай бол `BASU_MODE=production` болгож,
 `basu-scheduler`-ыг асаана.
 
+### Байршуулалт нь main руу push
+
+Сервер дээр `/opt/basu/app` бол энэ репогийн `main`-ийн git checkout. `main`
+руу орсон commit бүр `.github/workflows/verify.yml`-ийн бүх шатыг өнгөрвөл
+**өөрөө байршина**; PR хэзээ ч байршихгүй, verify унасан push байршихгүй.
+Дахин байршуулах товч нь Actions дахь «Run workflow» (`workflow_dispatch`).
+
+```
+push main → verify (typecheck, test, sim, smoke) → ssh root@server <sha>
+                                                     └ /opt/basu/deploy-entry.sh
+                                                         fetch, reset --hard <sha>
+                                                         exec scripts/deploy.sh
+                                                             npm ci → build → pg_dump → migrate → restart → /health
+```
+
+Actions-ийн SSH түлхүүр (`DEPLOY_SSH_KEY` secret) сервер дээр **forced
+command**-той: `deploy-entry.sh`-ээс өөр юу ч ажиллуулж чадахгүй, shell
+нээхгүй, порт дамжуулахгүй. Илгээсэн команд нь commit-ийн SHA гэж л уншигдана,
+`main` дээр байхгүй SHA татгалзагдана. `deploy-entry.sh` репод байгаа нь
+баримт; сервер дээрх хуулбар нь `/opt/basu/deploy-entry.sh`, гараар суулгасан.
+
+Байршуулалт бүрийн өмнө `/root/basu-predeploy-*.sql.gz` (v16 `pg_dump`,
+сүүлийн 10) үлддэг. Буцаах: хуучин SHA-г гараар өгнө —
+
+```bash
+ssh root@176.97.64.22 <хуучин sha>   # deploy түлхүүрээр; өөрийн түлхүүрээр бол
+ssh root@176.97.64.22 /opt/basu/deploy-entry.sh   # SSH_ORIGINAL_COMMAND-гүй = main-ийн орой
+```
+
+`.env` (`DATABASE_URL`, `PORT=3210`) git-д байхгүй, сервер дээр л байдаг.
+Node 22, PostgreSQL 16 (`postgresql@16-basu`, :5433), nginx + certbot
+(`basu.burzai.cloud`), ufw 22/80/443 — сервер дээр өөр юу ч ажилладаггүй.
+
 ## Демо өгөгдөл
 
 `npm run seed` — Шангри-Ла орчмын **10 ресторан, 60 хоол**. Тодорхойлолт нь
