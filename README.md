@@ -513,6 +513,13 @@ npm run ios:test             # нэгжийн + бүтэн урсгалын + is
 npm run ios:pass -- --xxl    # дэлгэц бүрийг light/dark, default/XXL-ээр зургаар авна
 ```
 
+**Апп анхдагчаар pilot (`https://basu.burzai.cloud`) руу ярина** — debug ч,
+release ч, утсан дээр ч. Хөгжүүлэгч л өөрийн серверээ заана: `npm run ios`
+ба `npm run ios:pass` симуляторт `BASU_API=http://localhost:3000` өгдөг
+(өөр хаяг бол `BASU_API=… npm run ios`); утсан дээр debug build-д
+`xcodebuild … BASU_API=http://<mac-lan-ip>:3000` гэж build хийхэд суудаг.
+Release build энэ хоёрыг хоёуланг нь үл тоодог.
+
 Сервер унтраалттай үед апп хоосон харагдахаа больж, **«Серверт холбогдож
 чадсангүй»** гэж хэлээд «Дахин» товч гаргана — debug build дээр ямар хаяг руу
 ярьж байгаагаа хамт бичнэ. Хоосон газрын зураг ба холбогдоогүй сервер хоёр

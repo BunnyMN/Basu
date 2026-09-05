@@ -39,7 +39,8 @@ for (const size of sizes) {
     simctl('ui', 'booted', 'appearance', appearance);
     for (const screen of screens) {
       try { simctl('terminate', 'booted', BUNDLE); } catch {}
-      const env = { BASU_DEMO_SIGNIN: '1', ...screen.env };
+      // The pass photographs the developer's own server's data, like `npm run ios`.
+      const env = { BASU_API: process.env.BASU_API ?? 'http://localhost:3000', BASU_DEMO_SIGNIN: '1', ...screen.env };
       const prefixed = Object.fromEntries(Object.entries(env).map(([k, v]) => [`SIMCTL_CHILD_${k}`, v]));
       execFileSync('xcrun', ['simctl', 'launch', 'booted', BUNDLE], { env: { ...process.env, ...prefixed }, stdio: 'ignore' });
       await sleep(screen.name === 'splash' ? 1200 : 4500);

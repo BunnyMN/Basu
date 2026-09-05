@@ -11,26 +11,30 @@ import Foundation
  hands it.
  */
 
-/// Where the API is. A debug build talks to the machine it was built on; a
-/// release build talks to the pilot. `BASU_API` overrides both, which is how
-/// the UI test points the app at a server it started itself.
+/// Where the API is: the pilot, unless a developer says otherwise.
+///
+/// Every build — debug or release, simulator or phone — talks to the pilot
+/// by default, so a build handed to somebody works without a laptop beside
+/// it. A developer running `npm run dev` points a debug build at their own
+/// machine instead, with `BASU_API`: as an environment variable (the
+/// simulator, and how the UI tests point the app at the server they check),
+/// or baked into Info.plist at build time (`BASU_API=… xcodebuild …`) for a
+/// phone, which has no environment to read and for which `localhost` is the
+/// phone itself. Release builds ignore both.
 enum Endpoint {
+  static let pilot = URL(string: "https://basu.burzai.cloud")!
+
   static let base: URL = {
-    if let raw = ProcessInfo.processInfo.environment["BASU_API"], let url = URL(string: raw) {
-      return url
-    }
     #if DEBUG
-      // A debug build on a real phone: the address is baked in at build time
-      // (`BASU_API=` on the xcodebuild line), because a phone has no
-      // environment and `localhost` there is the phone itself.
+      if let raw = ProcessInfo.processInfo.environment["BASU_API"], let url = URL(string: raw) {
+        return url
+      }
       if let raw = Bundle.main.object(forInfoDictionaryKey: "BasuAPI") as? String,
          !raw.isEmpty, let url = URL(string: raw) {
         return url
       }
-      return URL(string: "http://localhost:3000")!
-    #else
-      return URL(string: "https://basu.burzai.cloud")!
     #endif
+    return pilot
   }()
 }
 

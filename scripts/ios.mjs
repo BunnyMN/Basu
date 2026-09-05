@@ -74,12 +74,16 @@ function launch() {
   spawnSync('xcrun', ['simctl', 'boot', DEVICE], { stdio: 'ignore' });
   spawnSync('open', ['-a', 'Simulator'], { stdio: 'ignore' });
   run('xcrun', ['simctl', 'install', DEVICE, app]);
-  run('xcrun', ['simctl', 'launch', DEVICE, BUNDLE]);
+  // The app talks to the pilot unless told otherwise. `npm run ios` is the
+  // developer's way in, so it points the simulator at the developer's own
+  // server — the one `npm run dev` starts — unless BASU_API says where else.
+  const api = process.env.BASU_API ?? 'http://localhost:3000';
+  run('xcrun', ['simctl', 'launch', DEVICE, BUNDLE], { env: { ...process.env, SIMCTL_CHILD_BASU_API: api } });
 
   console.log(`
 \x1b[32m✓ Basu симулятор дээр ажиллаж байна\x1b[0m
 
-  API:  http://localhost:3000  (\x1b[1mnpm run dev\x1b[0m ажиллаж байх ёстой)
+  API:  ${api}  (\x1b[1mnpm run dev\x1b[0m ажиллаж байх ёстой; BASU_API=… гэж өөрчилнө)
   Нэвтрэх: баруун дээд булан → «Демо: кодгүй нэвтрэх»
 `);
 }

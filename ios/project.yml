@@ -81,11 +81,12 @@ targets:
           Хэр ойрхон байгааг тань мэдвэл гал тогоо хоолыг чинь яг таарах цагт
           нь тавина. Байршлыг зөвхөн захиалга явж байх үед асууна.
         ITSAppUsesNonExemptEncryption: false
-        # Where a debug build on a real phone finds the API. `localhost` is
-        # the simulator's word for this Mac; a phone needs the LAN address, and
-        # a phone launched from its own Home Screen has no environment to read
-        # it from. Set at build time: `xcodebuild … BASU_API=http://192.168.x.x:3000`.
-        # Empty by default, and ignored by release builds.
+        # A developer's override for a debug build on a real phone: the app
+        # talks to the pilot unless this says otherwise, and a phone launched
+        # from its own Home Screen has no environment to read it from, so it
+        # is baked in at build time: `xcodebuild … BASU_API=http://192.168.x.x:3000`
+        # (the Mac's LAN address; `localhost` on a phone is the phone). Empty
+        # by default, and ignored by release builds.
         BasuAPI: $(BASU_API)
         NSAppTransportSecurity:
           # The demo API runs on the developer's own machine over http, and
