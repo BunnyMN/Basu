@@ -146,7 +146,7 @@ body{background:var(--sunk)}
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mountClock, mnt, KIND, dayLabel } from '/api.js';
+import { api, store, toast, mnt, KIND, dayLabel } from '/api.js';
 
 const root = document.getElementById('root');
 const el = (html) => {
@@ -725,10 +725,6 @@ function boot() {
   }
   refreshBoard();
 }
-
-mountClock(() => {
-  if (store.supplierToken) refreshBoard();
-});
 
 boot();
 

@@ -211,7 +211,7 @@ input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
 <script type="module">
-import { api, store, shell, toast, mountClock, mnt, IDESH_HEADLINE, KIND, dayLabel, dayShort } from '/api.js';
+import { api, store, shell, toast, mnt, IDESH_HEADLINE, KIND, dayLabel, dayShort } from '/api.js';
 import { mapStyle, ULAANBAATAR } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -819,12 +819,9 @@ async function resume() {
   await showStatus(true);
 }
 
-mountClock(() => {
-  void loadListings();
-  void loadMine();
-  if (state.orderId) void showStatus(true);
-});
-
+// No demo clock strip here. Its buttons are the lunch service's — arm at
+// 12:14, fire at 12:21 — and an идэш is measured in days, not minutes. The
+// strip stays on the food pages, where it is the whole demo.
 void Promise.all([loadListings(), loadMine()]).then(resume);
 
 const poll = setInterval(() => {

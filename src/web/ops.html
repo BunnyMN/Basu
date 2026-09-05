@@ -56,7 +56,7 @@ section > h2{
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mountClock, dayLabel } from '/api.js';
+import { api, store, toast, dayLabel } from '/api.js';
 
 const root = document.getElementById('root');
 const el = (html) => {
@@ -262,9 +262,6 @@ function boot() {
   refresh();
 }
 
-mountClock(() => {
-  if (store.opsToken) refresh();
-});
 boot();
 </script>
 </body>
