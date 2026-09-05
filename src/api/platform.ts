@@ -1,10 +1,28 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { profileOf, updateProfile, type Profile } from '../platform/identity/index.js';
-import { balance, settleTopup, startTopup, wallet } from '../platform/ledger/index.js';
 import {
+  ClosureError,
+  closeAccount,
+  profileOf,
+  revokeOtherSessions,
+  revokeSession,
+  sessionsOf,
+  updateProfile,
+  type Profile,
+} from '../platform/identity/index.js';
+import {
+  balance,
+  movement,
+  settleTopup,
+  startTopup,
+  wallet,
+} from '../platform/ledger/index.js';
+import { liveOrderCount } from '../services/orders.js';
+import {
+  dismiss,
   inbox,
   markRead,
   preferences,
+  registerActivityToken,
   registerDevice,
   revokeDevice,
   setPreferences,
@@ -28,6 +46,13 @@ import type { Ctx } from '../ports.js';
 
 type Guard = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
 
+/** The token on the request, for the routes that need to know which one it is. */
+const bearer = (request: FastifyRequest): string | null => {
+  const header = request.headers.authorization;
+  return header?.startsWith('Bearer ') ? header.slice(7) : null;
+};
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_TOPUP_MNT = 2_000_000;
 const MIN_TOPUP_MNT = 1_000;
 
@@ -83,13 +108,80 @@ export async function registerPlatformRoutes(
     },
   );
 
+  /* ── where you are signed in ──────────────────────────────────────── */
+
+  /**
+   * Not a feature until a phone is lost, and then the only one that matters.
+   * It exists so that day needs nobody's help — no email, no support queue,
+   * no waiting sixty days for a token to expire on its own.
+   */
+  app.get('/v1/me/sessions', guarded, async (request) => {
+    const sessions = await sessionsOf(request.guestId!, bearer(request) ?? '');
+    return {
+      sessions: sessions.map((s) => ({
+        id: s.id,
+        label: s.label,
+        current: s.current,
+        created_at: s.createdAt.toISOString(),
+        last_seen_at: s.lastSeenAt?.toISOString() ?? null,
+      })),
+    };
+  });
+
+  /** Everywhere *else*: signing somebody out of the phone in their hand
+      mid-panic is the wrong end of the tool. */
+  app.post('/v1/me/sessions/revoke', guarded, async (request) => {
+    const revoked = await revokeOtherSessions(
+      request.guestId!,
+      bearer(request) ?? '',
+      ctx.clock.now(),
+    );
+    return { revoked };
+  });
+
+  app.delete<{ Params: { id: string } }>(
+    '/v1/me/sessions/:id',
+    guarded,
+    async (request, reply) => {
+      const gone = await revokeSession(request.guestId!, request.params.id, ctx.clock.now());
+      if (!gone) return sendError(reply, new Error('no such session'));
+      return { revoked: 1 };
+    },
+  );
+
+  /**
+   * Leaving.
+   *
+   * Required by App Store review guideline 5.1.1(v): an app that makes
+   * accounts has to let somebody close theirs from inside it. Refused while
+   * the wallet holds money or something of theirs is still running — those are
+   * not obstacles, they are the two things somebody would be furious to
+   * discover they had thrown away.
+   */
+  app.delete('/v1/me', guarded, async (request, reply) => {
+    const guestId = request.guestId!;
+    try {
+      await closeAccount({
+        guestId,
+        at: ctx.clock.now(),
+        balanceMnt: await balance(guestId),
+        // Identity cannot ask dine what a live order is, so dine answers.
+        liveWork: await liveOrderCount(guestId),
+      });
+      return { closed: true };
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
+
   /* ── wallet ───────────────────────────────────────────────────────── */
 
-  app.get('/v1/wallet', guarded, async (request) => {
-    const statement = await wallet(request.guestId!);
+  app.get<{ Querystring: { before?: string } }>('/v1/wallet', guarded, async (request) => {
+    const statement = await wallet(request.guestId!, 25, request.query.before);
     return {
       balance_mnt: statement.balanceMnt,
       currency: statement.currency,
+      next: statement.nextCursor ?? null,
       lines: statement.lines.map((line) => ({
         id: line.transferId,
         kind: line.kind,
@@ -102,6 +194,34 @@ export async function registerPlatformRoutes(
       })),
     };
   });
+
+  /**
+   * One movement, in full, with the tax receipt when there is one.
+   *
+   * The receipt is why this route exists. Somebody claiming lunch back needs
+   * the ДДТД and the lottery number, and making them find the order it came
+   * from to get at it is making them know how the software is built.
+   */
+  app.get<{ Params: { id: string } }>(
+    '/v1/wallet/:id',
+    guarded,
+    async (request, reply) => {
+      const line = await movement(request.guestId!, request.params.id);
+      if (!line) return sendError(reply, new Error('no such movement'));
+      return {
+        id: line.transferId,
+        kind: line.kind,
+        amount_mnt: line.amountMnt,
+        subject: line.subject,
+        subject_id: line.subjectId,
+        memo: line.memo,
+        at: line.at.toISOString(),
+        receipt: line.receipt?.qrPayload
+          ? { qr: line.receipt.qrPayload, lottery: line.receipt.lottery }
+          : null,
+      };
+    },
+  );
 
   /**
    * Ask for money. Nothing is credited until `settle`.
@@ -185,6 +305,22 @@ export async function registerPlatformRoutes(
     return { unread: await unreadCount(request.guestId!) };
   });
 
+  /**
+   * The swipe. 204 whether or not the row was there: the guest wants it gone,
+   * and it is. A message that was never theirs is simply not found to remove.
+   */
+  app.delete<{ Params: { id: string } }>(
+    '/v1/notifications/:id',
+    guarded,
+    async (request, reply) => {
+      // A non-uuid would make Postgres throw rather than find nothing.
+      if (UUID.test(request.params.id)) {
+        await dismiss(request.guestId!, request.params.id, ctx.clock.now());
+      }
+      return reply.code(204).send();
+    },
+  );
+
   app.get('/v1/notifications/preferences', guarded, async (request) =>
     preferences(request.guestId!),
   );
@@ -223,6 +359,29 @@ export async function registerPlatformRoutes(
         at: ctx.clock.now(),
       });
       return { registered: true };
+    },
+  );
+
+  /**
+   * ActivityKit's push token for one order's Live Activity. Stored so the
+   * lock screen can be moved without the app; sending to it is the relay's job
+   * once APNs credentials exist, and until then the phone updates its own
+   * activity on every poll.
+   */
+  app.post<{ Params: { id: string }; Body: { push_token?: string } }>(
+    '/v1/activities/:id/token',
+    guarded,
+    async (request, reply) => {
+      const token = request.body?.push_token;
+      if (!token) return badRequest(reply, 'Токен заагаагүй байна.', 'push_token is required');
+      await registerActivityToken({
+        guestId: request.guestId!,
+        subject: 'order',
+        subjectId: request.params.id,
+        pushToken: token,
+        at: ctx.clock.now(),
+      });
+      return reply.code(204).send();
     },
   );
 

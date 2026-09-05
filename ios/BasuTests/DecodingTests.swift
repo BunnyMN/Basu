@@ -11,6 +11,9 @@ import Testing
  that has no other alarm: a field the API renames, a date format that loses its
  milliseconds, a state the phone has never heard of. All three show up as a
  blank screen rather than as an error.
+
+ Only the shell's payloads are here. The food service decodes its own JSON in
+ its own page, and `src/test/pages.test.ts` is where that is checked.
  */
 struct DecodingTests {
   private func decode<T: Decodable>(_ type: T.Type, _ json: String) throws -> T {
@@ -58,61 +61,6 @@ struct DecodingTests {
       }
       """)
     #expect(order.state == .placed)
-  }
-
-  @Test func orderDetailKeepsTheCancelWindowAndTheLines() throws {
-    let detail = try decode(OrderDetail.self, """
-      {
-        "lines": [{ "menu_item_id": "m1", "name": "Хуушуур", "qty": 2, "image_url": "/dishes/khuushuur.svg" }],
-        "review": null,
-        "can_review": false,
-        "id": "o1",
-        "code": "0971",
-        "state": "SCHEDULED",
-        "restaurant": { "id": "r1", "name": "Модерн Номадс" },
-        "table": "T4",
-        "total_mnt": 24000,
-        "slot_starts_at": "2026-09-01T04:45:00.000Z",
-        "fire_at": "2026-09-01T04:21:00.000Z",
-        "ready_at": null,
-        "free_cancel_until": "2026-09-01T04:21:00.000Z",
-        "can_cancel": true,
-        "receipt": null
-      }
-      """)
-
-    #expect(detail.canCancel)
-    #expect(detail.freeCancelUntil == detail.fireAt)
-    #expect(detail.lines.first?.qty == 2)
-    #expect(detail.state.subtitle == "Энэ цагт гал дээр гарна")
-  }
-
-  @Test func reviewsAreCamelCaseWhileOrdersAreNot() throws {
-    // The API is snake_case except for the review payloads, which are not. A
-    // blanket key strategy would silently empty one of them.
-    let review = try decode(Review.self, """
-      { "stars": 4, "onTime": true, "comment": "Сайхан", "dishes": [{ "menuItemId": "m1", "stars": 5 }] }
-      """)
-    #expect(review.onTime == true)
-    #expect(review.dishes.first?.menuItemId == "m1")
-  }
-
-  @Test func slotsAndDishesDecode() throws {
-    let slot = try decode(Slot.self, """
-      { "starts_at": "2026-09-01T04:45:00.000Z", "label": "12:45", "available": true, "remaining": 2 }
-      """)
-    #expect(slot.label == "12:45")
-
-    let table = try decode(DishTable.self, """
-      {
-        "fallback": { "form": "soup", "fill": "#B98A52", "detail": "#EFE3CC", "ground": "#EBE5D9" },
-        "dishes": { "khuushuur": { "form": "fried", "fill": "#D9A03F", "detail": "#B87A28", "ground": "#EDE3D2" } }
-      }
-      """)
-    #expect(table["khuushuur"].form == .fried)
-    // A dish nobody drew still has something to show.
-    #expect(table["a_dish_from_the_future"].form == .soup)
-    #expect(table[nil].form == .soup)
   }
 
   @Test func timestampsSurviveWithAndWithoutMilliseconds() {

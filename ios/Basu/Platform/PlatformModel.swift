@@ -4,10 +4,10 @@ import UIKit
 /**
  The shell's own state: profile, wallet, inbox.
 
- Separate from `AppModel` on purpose. `AppModel` knows about dishes and live
- orders — those are dine's. This knows about a person and their money, which is
- every app inside Basu's business and none of them in particular. When there is
- a second app on the launcher, it reads this one and does not learn a thing
+ Separate from `AppModel` on purpose. `AppModel` knows what of the guest's is
+ running — that is the apps'. This knows about a person and their money, which
+ is every app inside Basu's business and none of them in particular. When there
+ is a second app on the launcher, it reads this one and does not learn a thing
  about lunch.
  */
 @MainActor
@@ -17,6 +17,12 @@ final class Platform {
   private(set) var wallet: WalletStatement = .empty
   private(set) var inbox: Inbox = .empty
   private(set) var preferences: NotifyPreferences = .default
+  private(set) var sessions: [DeviceSession] = []
+  /// Set while a page of the statement is on its way, so the button can say so.
+  private(set) var loadingMore = false
+  /// Whether any call has actually told us the balance. Until one has, the
+  /// wallet shows nothing where the number goes — never a zero.
+  private(set) var walletLoaded = false
 
   /// Set while a top-up is in flight, so the button can say so.
   private(set) var toppingUp = false
@@ -31,6 +37,7 @@ final class Platform {
   }
 
   var balanceMnt: Int { me?.wallet.balanceMnt ?? wallet.balanceMnt }
+  var balanceKnown: Bool { me != nil || walletLoaded }
   var unread: Int { max(me?.unread ?? 0, inbox.unread) }
   var isSignedIn: Bool { session.isSignedIn }
 
@@ -40,6 +47,7 @@ final class Platform {
       me = nil
       wallet = .empty
       inbox = .empty
+      walletLoaded = false
       return
     }
     do {
@@ -60,9 +68,102 @@ final class Platform {
     guard let token = session.token else { return }
     do {
       wallet = try await api.wallet(token: token)
+      walletLoaded = true
       trouble = nil
     } catch {
       note(error)
+    }
+  }
+
+  /**
+   The next page of the statement.
+
+   Keyed on the last line rather than an offset: entries are append-only, so a
+   page cannot shift under somebody who is scrolling while a refund lands.
+   */
+  func loadMoreWallet() async {
+    guard let token = session.token, let cursor = wallet.next, !loadingMore else { return }
+    loadingMore = true
+    defer { loadingMore = false }
+    do {
+      let page = try await api.wallet(token: token, before: cursor)
+      wallet = WalletStatement(
+        balanceMnt: page.balanceMnt,
+        currency: page.currency,
+        lines: wallet.lines + page.lines,
+        next: page.next,
+      )
+    } catch {
+      note(error)
+    }
+  }
+
+  func movement(_ id: String) async -> Movement? {
+    guard let token = session.token else { return nil }
+    do {
+      return try await api.movement(id, token: token)
+    } catch {
+      note(error)
+      return nil
+    }
+  }
+
+  /* ── where you are signed in ─────────────────────────────────────── */
+
+  func loadSessions() async {
+    guard let token = session.token else { return }
+    do {
+      sessions = try await api.sessions(token: token)
+      trouble = nil
+    } catch {
+      note(error)
+    }
+  }
+
+  @discardableResult
+  func signOutOtherDevices() async -> Int {
+    guard let token = session.token else { return 0 }
+    do {
+      let revoked = try await api.revokeOtherSessions(token: token)
+      await loadSessions()
+      return revoked
+    } catch {
+      note(error)
+      return 0
+    }
+  }
+
+  func signOutDevice(_ device: DeviceSession) async {
+    guard let token = session.token, !device.current else { return }
+    do {
+      try await api.revokeSession(device.id, token: token)
+      await loadSessions()
+    } catch {
+      note(error)
+    }
+  }
+
+  /**
+   Close the account.
+
+   The server refuses while the wallet holds money or something is still
+   running, and says which in Mongolian — so the refusal is shown rather than
+   guessed at here. Returns whether it went through.
+   */
+  func closeAccount() async -> Bool {
+    guard let token = session.token else { return false }
+    do {
+      try await api.closeAccount(token: token)
+      session.signOut()
+      me = nil
+      wallet = .empty
+      inbox = .empty
+      sessions = []
+      trouble = nil
+      return true
+    } catch {
+      note(error)
+      return false
     }
   }
 
@@ -112,11 +213,22 @@ final class Platform {
     }
   }
 
-  func markAllRead() async {
-    guard let token = session.token, unread > 0 else { return }
-    try? await api.markRead(nil, token: token)
-    await loadInbox()
-    await refresh()
+  /// The swipe. Gone from the list at once; the server is told after, and a
+  /// refusal puts it back rather than leaving a hole nobody explained.
+  func delete(_ message: InboxMessage) async {
+    guard let token = session.token else { return }
+    let kept = inbox
+    inbox = Inbox(
+      unread: message.read ? inbox.unread : max(0, inbox.unread - 1),
+      messages: inbox.messages.filter { $0.id != message.id },
+    )
+    do {
+      try await api.deleteMessage(message.id, token: token)
+      await refresh()
+    } catch {
+      inbox = kept
+      note(error)
+    }
   }
 
   func markRead(_ message: InboxMessage) async {
@@ -158,6 +270,12 @@ final class Platform {
   func registerPush(token pushToken: String) async {
     guard let session = session.token else { return }
     try? await api.registerPushToken(pushToken, label: UIDevice.current.name, token: session)
+  }
+
+  /// ActivityKit's token for one order's lock screen card.
+  func registerActivityToken(_ pushToken: String, order orderId: String) async {
+    guard let session = session.token else { return }
+    try? await api.registerActivityToken(pushToken, order: orderId, token: session)
   }
 
   private func note(_ error: Error) {

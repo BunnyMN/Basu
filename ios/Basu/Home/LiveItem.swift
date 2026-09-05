@@ -5,9 +5,9 @@ import SwiftUI
 
  The launcher's ИДЭВХТЭЙ section is deliberately not "your orders": rows are
  ordered by the moment that matters, not by which app produced them, so a taxi
- four minutes away sits above a lunch that fires at half past. Dine maps into
- this; the second vertical will map into it too, and the section will not know
- the difference.
+ four minutes away sits above a lunch that fires at half past. The food app
+ maps into this; the second app will map into it too, and the section will
+ not know the difference.
  */
 struct LiveItem: Identifiable, Hashable {
   enum Status: Hashable {
@@ -45,18 +45,18 @@ struct LiveItem: Identifiable, Hashable {
 }
 
 extension LiveOrder {
-  /// The dine-in order, as the launcher sees it.
+  /// The food app's order, as the launcher sees it.
   func asLiveItem(expanded: Bool) -> LiveItem {
     let moment = moment
     return LiveItem(
       id: id,
       source: "ХООЛ",
       title: restaurant.name,
-      meta: "№\(code) · \(state.word)",
+      meta: "№\(code) · \(state.headline?.word ?? state.stage.label)",
       time: moment.time,
       timeLabel: moment.label.uppercased(),
       status: state == .fired || state == .cooking ? .moving : .waiting,
-      destination: .dine(orderId: id),
+      destination: AppCatalogue.food.destination(order: id),
       // The fire time is the product. When this is the only thing running it
       // belongs on the launcher, not one tap inside the app.
       extra: expanded && fireAt != nil && state != .fired && state != .cooking

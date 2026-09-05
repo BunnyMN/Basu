@@ -25,3 +25,12 @@ export {
   type Profile,
   type ProfileEdit,
 } from './profile.js';
+
+export {
+  ClosureError,
+  closeAccount,
+  revokeOtherSessions,
+  revokeSession,
+  sessionsOf,
+  type DeviceSession,
+} from './sessions.js';

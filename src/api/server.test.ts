@@ -2,7 +2,6 @@ import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { closePool, getPool } from '../db/pool.js';
 import { at, PILOT_MENU } from '../domain/fixtures.js';
-import { DRAWN_DISHES } from './dishes.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
 import { createPairingCode } from '../services/devices.js';
@@ -702,28 +701,6 @@ describe('the map', () => {
       const response = await app.inject({ method: 'GET', url });
       expect(response.statusCode, url).toBeGreaterThanOrEqual(400);
     }
-  });
-
-  it('hands a client the numbers a dish is drawn from', async () => {
-    const response = await app.inject({ method: 'GET', url: '/v1/dishes' });
-    expect(response.statusCode).toBe(200);
-    const { dishes, fallback } = response.json() as {
-      dishes: Record<string, { form: string; fill: string; detail: string; ground: string }>;
-      fallback: { form: string };
-    };
-
-    // Every dish the seed can draw is in the table, with a form and colours a
-    // renderer that has never seen an SVG can use.
-    for (const slug of DRAWN_DISHES) {
-      const dish = dishes[slug];
-      expect(dish, slug).toBeTruthy();
-      expect(dish!.form).toMatch(/^(soup|dumpling|fried|noodle|grill|salad|drink|rice|skewer)$/);
-      for (const colour of [dish!.fill, dish!.detail, dish!.ground]) {
-        expect(colour, `${slug} ${colour}`).toMatch(/^#[0-9A-Fa-f]{6}$/);
-      }
-    }
-    // …and a dish nobody drew still has something to show.
-    expect(fallback.form).toBe('soup');
   });
 
   it('gives every restaurant a coordinate the map can place', async () => {

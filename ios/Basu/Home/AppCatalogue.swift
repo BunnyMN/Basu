@@ -8,18 +8,47 @@ import Foundation
  rearranges itself under the thumb cannot be learned, and recency already has a
  home one section higher, in ИДЭВХТЭЙ.
 
- Adding the second app is one entry here and a `Destination` case. Nothing in
- the launcher, the wallet, the inbox or the profile changes.
+ An app is a web page. The shell is native — launcher, wallet, inbox, profile,
+ the lock screen — and every icon opens a page from the same server the shell
+ talks to, inside `ServiceView`, signed in as the shell's guest. Adding the
+ second app is one entry here with its path. Nothing in the launcher, the
+ wallet, the inbox or the profile changes, and nothing native is written.
  */
 struct LauncherApp: Identifiable, Hashable, Sendable {
   let id: String
   let name: String
   /// One lower-case word. It carries the specificity the glyph must not.
   let tag: String
-  let glyph: GlyphKind
-  let destination: Destination?
+  let icon: ServiceIcon
+  /// Where the page lives on the server — `/dine`. `nil` is an icon that is
+  /// drawn but not built, so the grid can be seen at the size it will be.
+  let path: String?
+
+  /// The page, as the shell opens it.
+  var destination: Destination? {
+    path.map { .app(id: id, path: $0) }
+  }
+
+  /// The page, opened on one thing the guest already has — `/dine?order=…`.
+  /// The launcher's ИДЭВХТЭЙ row, the inbox and the lock screen all land here.
+  func destination(order id: String) -> Destination? {
+    path.map { .app(id: self.id, path: "\($0)?order=\(id)") }
+  }
+
+  /// The glyph, for the tiles that are drawn. The food tile is a render and
+  /// has none.
+  var glyph: GlyphKind? {
+    if case .glyph(let kind) = icon { return kind }
+    return nil
+  }
 
   var isLive: Bool { destination != nil }
+}
+
+/// A supplied render, or a mark drawn to the icon system's rules.
+enum ServiceIcon: Hashable, Sendable {
+  case raster(String)
+  case glyph(GlyphKind)
 }
 
 struct AppBand: Identifiable, Hashable, Sendable {
@@ -30,20 +59,20 @@ struct AppBand: Identifiable, Hashable, Sendable {
 
 enum AppCatalogue {
   static let food = LauncherApp(
-    id: "food", name: "Хоол", tag: "урьдчилсан", glyph: .food, destination: .dine(orderId: nil),
+    id: "food", name: "Хоол", tag: "урьдчилсан", icon: .raster("food-tile"), path: "/dine",
   )
 
   /// Drawn, named, and not built. They exist here so the grid can be seen at
   /// the sizes it will really be — see `bands(count:)`.
   static let planned: [LauncherApp] = [
-    .init(id: "taxi", name: "Такси", tag: "дуудлага", glyph: .taxi, destination: nil),
-    .init(id: "delivery", name: "Хүргэлт", tag: "30 минут", glyph: .delivery, destination: nil),
-    .init(id: "ticket", name: "Тасалбар", tag: "театр, кино", glyph: .ticket, destination: nil),
-    .init(id: "bill", name: "Төлбөр", tag: "нэхэмжлэх", glyph: .bill, destination: nil),
-    .init(id: "shop", name: "Дэлгүүр", tag: "ойрхон", glyph: .shop, destination: nil),
-    .init(id: "net", name: "Интернэт", tag: "дата", glyph: .net, destination: nil),
-    .init(id: "pharmacy", name: "Эмийн сан", tag: "24 цаг", glyph: .pharmacy, destination: nil),
-    .init(id: "cafe", name: "Кофе", tag: "авч явах", glyph: .cafe, destination: nil),
+    .init(id: "taxi", name: "Такси", tag: "дуудлага", icon: .glyph(.taxi), path: nil),
+    .init(id: "delivery", name: "Хүргэлт", tag: "30 минут", icon: .glyph(.delivery), path: nil),
+    .init(id: "ticket", name: "Тасалбар", tag: "театр, кино", icon: .glyph(.ticket), path: nil),
+    .init(id: "bill", name: "Төлбөр", tag: "нэхэмжлэх", icon: .glyph(.bill), path: nil),
+    .init(id: "shop", name: "Дэлгүүр", tag: "ойрхон", icon: .glyph(.shop), path: nil),
+    .init(id: "net", name: "Интернэт", tag: "дата", icon: .glyph(.net), path: nil),
+    .init(id: "pharmacy", name: "Эмийн сан", tag: "24 цаг", icon: .glyph(.pharmacy), path: nil),
+    .init(id: "cafe", name: "Кофе", tag: "авч явах", icon: .glyph(.cafe), path: nil),
   ]
 
   /// The line under the grid while there is one icon. A hairline and a

@@ -1,4 +1,3 @@
-import CoreLocation
 import Foundation
 import Testing
 
@@ -19,38 +18,6 @@ struct BehaviourTests {
     #expect(Format.mnt(32000).contains("32"))
   }
 
-  @Test func theWalkIsQuotedAtThePrecisionItIsWorth() {
-    #expect(Format.metres(480) == "480 м")
-    #expect(Format.metres(1240) == "1.2 км")
-  }
-
-  @Test func geofenceBandsAreTheTwoTheServerKnows() {
-    #expect(Geofence.band(metres: 120) == "geofence_300")
-    #expect(Geofence.band(metres: 300) == "geofence_300")
-    #expect(Geofence.band(metres: 301) == "geofence_800")
-    #expect(Geofence.band(metres: 800) == "geofence_800")
-    // Further out than that is not news: it is where everybody starts.
-    #expect(Geofence.band(metres: 1200) == nil)
-  }
-
-  @Test func aDrawnDishIsRecognisedByItsUrlAndAPhotographIsNot() {
-    let drawn = MenuItem(
-      id: "1", name: "Хуушуур", priceMnt: 8000, prepMinutes: 9,
-      imageUrl: "/dishes/khuushuur.svg", description: nil, station: "Хайруулга",
-      soldOut: false, rating: nil,
-    )
-    #expect(drawn.drawingSlug == "khuushuur")
-    #expect(drawn.photoURL == nil)
-
-    let photographed = MenuItem(
-      id: "2", name: "Цуйван", priceMnt: 12000, prepMinutes: 12,
-      imageUrl: "https://example.mn/tsuivan.jpg", description: nil, station: "Вок",
-      soldOut: false, rating: nil,
-    )
-    #expect(photographed.drawingSlug == nil)
-    #expect(photographed.photoURL != nil)
-  }
-
   @Test func theMomentOnACardIsTheOneThatMattersNext() {
     let slot = ISODate.parse("2026-09-01T04:45:00.000Z")!
     let fire = ISODate.parse("2026-09-01T04:21:00.000Z")!
@@ -59,7 +26,7 @@ struct BehaviourTests {
     func order(_ state: OrderState, fireAt: Date?, readyAt: Date?) -> LiveOrder {
       LiveOrder(
         id: "o", code: "0001", state: state,
-        restaurant: VenueRef(id: "r", name: "Ц"), table: nil, totalMnt: 1,
+        restaurant: VenueRef(id: "r", name: "Ц"), table: nil, totalMnt: 1, partySize: 2,
         slotStartsAt: slot, fireAt: fireAt, readyAt: readyAt,
       )
     }
@@ -70,12 +37,5 @@ struct BehaviourTests {
     #expect(order(.scheduled, fireAt: fire, readyAt: nil).moment.time == fire)
     // And once it is cooking, what matters is when it lands on the table.
     #expect(order(.cooking, fireAt: fire, readyAt: ready).moment.time == ready)
-  }
-
-  @Test func onlyTheStatesWithAWalkInFrontOfThemCarryARoute() {
-    #expect(OrderState.armed.isWalking)
-    #expect(OrderState.cooking.isWalking)
-    #expect(!OrderState.served.isWalking)
-    #expect(!OrderState.cancelled.isWalking)
   }
 }

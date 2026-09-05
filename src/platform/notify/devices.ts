@@ -87,3 +87,32 @@ export async function pushTokensFor(guestIds: readonly string[]): Promise<Map<st
   );
   return new Map(rows.map((r) => [r.guest_id, r.push_token]));
 }
+
+/**
+ * ActivityKit's token for one live activity on one phone. Separate from the
+ * device token: it moves a lock screen card, not the notification tray, and a
+ * new one arrives every time the activity is started.
+ */
+export async function registerActivityToken(input: {
+  guestId: string;
+  subject: string;
+  subjectId: string;
+  pushToken: string;
+  at: Date;
+}): Promise<void> {
+  await getPool().query(
+    `INSERT INTO notify.activity_token (guest_id, subject, subject_id, push_token, updated_at)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (subject, subject_id, push_token) DO UPDATE
+        SET guest_id = EXCLUDED.guest_id, updated_at = EXCLUDED.updated_at`,
+    [input.guestId, input.subject, input.subjectId, input.pushToken, input.at],
+  );
+}
+
+export async function activityTokensFor(subject: string, subjectId: string): Promise<string[]> {
+  const { rows } = await getPool().query<{ push_token: string }>(
+    `SELECT push_token FROM notify.activity_token WHERE subject = $1 AND subject_id = $2`,
+    [subject, subjectId],
+  );
+  return rows.map((r) => r.push_token);
+}

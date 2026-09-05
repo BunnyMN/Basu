@@ -86,7 +86,12 @@ export interface GuestSession {
  * there is no separate sign-up step, because asking someone to register before
  * they have seen a menu is the single biggest drop-off in the funnel.
  */
-export async function verifyOtp(ctx: Ctx, phone: string, code: string): Promise<GuestSession> {
+export async function verifyOtp(
+  ctx: Ctx,
+  phone: string,
+  code: string,
+  label?: string | null,
+): Promise<GuestSession> {
   const now = ctx.clock.now();
 
   /**
@@ -141,7 +146,7 @@ export async function verifyOtp(ctx: Ctx, phone: string, code: string): Promise<
     throw new AuthError('INVALID_CODE', 'that code is not right');
   }
 
-  return startSession(ctx, phone);
+  return startSession(ctx, phone, label);
 }
 
 /**
@@ -156,7 +161,12 @@ export async function verifyOtp(ctx: Ctx, phone: string, code: string): Promise<
  * stop somebody running up an SMS bill — has no business blocking a
  * walkthrough.
  */
-export async function startSession(ctx: Ctx, phone: string): Promise<GuestSession> {
+export async function startSession(
+  ctx: Ctx,
+  phone: string,
+  /** What the phone calls itself, for the session list. */
+  label?: string | null,
+): Promise<GuestSession> {
   const now = ctx.clock.now();
 
   return tx(async (client) => {
@@ -175,19 +185,29 @@ export async function startSession(ctx: Ctx, phone: string): Promise<GuestSessio
     const token = randomBytes(32).toString('base64url');
     const expiresAt = addMinutes(now, SESSION_DAYS * 24 * 60);
     await client.query(
-      `INSERT INTO identity.guest_session (guest_id, token_hash, expires_at, created_at)
-       VALUES ($1, $2, $3, $4)`,
-      [guestId, sha256(token), expiresAt, now],
+      `INSERT INTO identity.guest_session
+         (guest_id, token_hash, expires_at, created_at, last_seen_at, label)
+       VALUES ($1, $2, $3, $4, $4, $5)`,
+      [guestId, sha256(token), expiresAt, now, label?.slice(0, 60) || null],
     );
 
     return { token, guestId, expiresAt };
   });
 }
 
+/**
+ * Who is asking, and a note that they were here.
+ *
+ * Resolving a token also records the heartbeat — the same trick the kitchen
+ * tablets use. Any authenticated call is proof the session is alive, so
+ * liveness needs no separate ping and cannot drift out of step with real use.
+ * It is what makes the session list on the profile screen worth reading.
+ */
 export async function resolveGuest(ctx: Ctx, token: string): Promise<string | null> {
   const { rows } = await getPool().query<{ guest_id: string }>(
-    `SELECT guest_id FROM identity.guest_session
-      WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > $2`,
+    `UPDATE identity.guest_session SET last_seen_at = $2
+      WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > $2
+      RETURNING guest_id`,
     [sha256(token), ctx.clock.now()],
   );
   return rows[0]?.guest_id ?? null;
