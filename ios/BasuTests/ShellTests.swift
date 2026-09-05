@@ -143,9 +143,10 @@ struct ShellTests {
   @Test func everyAppHasItsOwnMarkAndAOneWordTag() {
     let apps = AppCatalogue.bands(count: 9).flatMap(\.apps)
     #expect(Set(apps.map(\.icon)).count == apps.count)
-    // The food tile is the supplied render; every other mark is drawn.
+    // The two shipped tiles are supplied renders; every planned mark is drawn.
     #expect(apps[0].icon == .raster("food-tile"))
-    #expect(apps.dropFirst().allSatisfy { $0.glyph != nil })
+    #expect(apps[1].icon == .raster("idesh-tile"))
+    #expect(apps.dropFirst(2).allSatisfy { $0.glyph != nil })
     for app in apps {
       #expect(!app.name.isEmpty)
       #expect(!app.tag.isEmpty)

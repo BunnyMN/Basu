@@ -50,8 +50,8 @@ struct AppTile: View {
 
   @ViewBuilder private var tile: some View {
     switch app.icon {
-    case .raster:
-      FoodTile(size: BasuMetric.tileMin, radius: BasuMetric.iconTile)
+    case .raster(let name):
+      RasterTile(name: name, size: BasuMetric.tileMin, radius: BasuMetric.iconTile)
     case .glyph(let kind):
       Glyph(kind: kind, size: BasuMetric.glyph)
         .frame(width: BasuMetric.tileMin, height: BasuMetric.tileMin)

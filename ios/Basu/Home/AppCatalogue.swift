@@ -63,9 +63,11 @@ enum AppCatalogue {
   )
 
   /// The second app: the page at `/idesh`, opened like the first. One entry
-  /// here, no Swift — which is what «an app is a web page» was for.
+  /// here, no Swift — which is what «an app is a web page» was for. Its tile
+  /// is a supplied render, like the food one; the drawn rib mark stays in the
+  /// icon system for the sheet.
   static let idesh = LauncherApp(
-    id: "idesh", name: "Идэш", tag: "өвлийн", icon: .glyph(.idesh), path: "/idesh",
+    id: "idesh", name: "Идэш", tag: "өвлийн", icon: .raster("idesh-tile"), path: "/idesh",
   )
 
   /// What is actually built. Everything in `planned` is drawn and named only.

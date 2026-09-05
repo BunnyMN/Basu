@@ -40,7 +40,28 @@ public struct FoodTile: View {
   }
 
   public var body: some View {
-    Image("food-tile", bundle: .module)
+    RasterTile(name: "food-tile", size: size, radius: radius)
+  }
+}
+
+/**
+ A supplied render as an app tile, full-bleed at the tile's radius with no
+ inner margin. The food tile was the first; the идэш tile is the second, and
+ any app whose mark is a render rather than a drawn glyph is one of these.
+ */
+public struct RasterTile: View {
+  public let name: String
+  public let size: CGFloat
+  public var radius: CGFloat
+
+  public init(name: String, size: CGFloat, radius: CGFloat? = nil) {
+    self.name = name
+    self.size = size
+    self.radius = radius ?? size * 18 / 92
+  }
+
+  public var body: some View {
+    Image(name, bundle: .module)
       .resizable()
       .interpolation(.high)
       .aspectRatio(contentMode: .fill)

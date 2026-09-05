@@ -23,7 +23,7 @@ Open the HTML file directly in a browser to see all twenty-two artboards on one 
 | SF Pro Text / Display | Golos Text | Golos Text is the intended face — it carries Cyrillic and is drawn for screen. Ship it. |
 | SF Mono | JetBrains Mono | Intended for all numerals and labels. Ship it. |
 
-The Хоол tile is a supplied raster render (`food-tile.png`), full-bleed at radius 18 with no inner margin. The remaining tiles are hand-drawn SVG at SF Symbols' metrics. Where an SF Symbol exists for the same object, prefer the symbol.
+The Хоол tile is a supplied raster render (`food-tile.png`), full-bleed at radius 18 with no inner margin; so is the Идэш tile (`idesh-tile.png`), composed onto the same off-white ground. The remaining tiles are hand-drawn SVG at SF Symbols' metrics. Where an SF Symbol exists for the same object, prefer the symbol.
 
 All copy is Mongolian Cyrillic and is final — do not translate or rewrite it.
 
