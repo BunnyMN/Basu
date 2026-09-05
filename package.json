@@ -13,6 +13,7 @@
     "api": "tsx watch src/entry/api.ts",
     "scheduler": "tsx watch src/entry/scheduler.ts",
     "seed": "tsx src/seed/demo.ts",
+    "supplier:add": "tsx src/idesh/register.ts",
     "dev": "npm run db:migrate && npm run seed && npm run api",
     "smoke": "tsx src/test/smoke.ts",
     "verify": "node scripts/verify.mjs",

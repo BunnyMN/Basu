@@ -33,6 +33,16 @@ enum AppCatalogue {
     id: "food", name: "Хоол", tag: "урьдчилсан", glyph: .food, destination: .dine(orderId: nil),
   )
 
+  /// The second app. Web-first, shown in a WKWebView — see `IdeshView` and
+  /// ADR 0001. One entry here, one `Destination` case, and the launcher did
+  /// not have to learn anything.
+  static let idesh = LauncherApp(
+    id: "idesh", name: "Идэш", tag: "өвлийн", glyph: .idesh, destination: .idesh(orderId: nil),
+  )
+
+  /// What is actually built. Everything in `planned` is drawn and named only.
+  static let shipped: [LauncherApp] = [food, idesh]
+
   /// Drawn, named, and not built. They exist here so the grid can be seen at
   /// the sizes it will really be — see `bands(count:)`.
   static let planned: [LauncherApp] = [
@@ -46,7 +56,7 @@ enum AppCatalogue {
     .init(id: "cafe", name: "Кофе", tag: "авч явах", glyph: .cafe, destination: nil),
   ]
 
-  /// The line under the grid while there is one icon. A hairline and a
+  /// The line under the grid while there are few icons. A hairline and a
   /// sentence — never an empty placeholder tile, which promises a tap that
   /// does nothing.
   static let comingSoon = "Такси, хүргэлт, тасалбар — 2026 оны төгсгөлд"
@@ -63,7 +73,7 @@ enum AppCatalogue {
    launch argument below — shipping today is one icon.
    */
   static func bands(count: Int) -> [AppBand] {
-    let all = [food] + planned
+    let all = shipped + planned
     let apps = Array(all.prefix(max(1, count)))
 
     if apps.count < 9 {
@@ -78,10 +88,10 @@ enum AppCatalogue {
   /**
    How many icons to draw.
 
-   One in anything shipped. A debug build reads `BASU_APPS` so the four- and
-   nine-icon states the design specifies can be looked at on a real device
-   rather than only in the artboards — a grid that was never seen full is a
-   grid nobody has checked.
+   The shipped ones, in anything shipped. A debug build reads `BASU_APPS` so
+   the four- and nine-icon states the design specifies can be looked at on a
+   real device rather than only in the artboards — a grid that was never seen
+   full is a grid nobody has checked.
    */
   static var installedCount: Int {
     #if DEBUG
@@ -89,6 +99,6 @@ enum AppCatalogue {
         return min(max(n, 1), 9)
       }
     #endif
-    return 1
+    return shipped.count
   }
 }

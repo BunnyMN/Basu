@@ -30,7 +30,10 @@ struct LiveItem: Identifiable, Hashable {
   let title: String
   let meta: String
   let time: Date
-  /// What the time *is* — `СУУХ`, `ИРЭХ`, `ГАЛ`.
+  /// The time as the corner shows it: `12:21` for a lunch, `11/03` for a
+  /// sheep. A day is not an instant, and printing one as 00:00 would be a lie.
+  let when: String
+  /// What the time *is* — `СУУХ`, `ИРЭХ`, `ГАЛ`, `АВАХ`.
   let timeLabel: String
   let status: Status
   let destination: Destination?
@@ -54,6 +57,7 @@ extension LiveOrder {
       title: restaurant.name,
       meta: "№\(code) · \(state.word)",
       time: moment.time,
+      when: Format.hhmm(moment.time),
       timeLabel: moment.label.uppercased(),
       status: state == .fired || state == .cooking ? .moving : .waiting,
       destination: .dine(orderId: id),
@@ -62,6 +66,25 @@ extension LiveOrder {
       extra: expanded && fireAt != nil && state != .fired && state != .cooking
         ? ("Гал тавих цаг", fireAt!)
         : nil,
+    )
+  }
+}
+
+extension LiveIdesh {
+  /// The winter-meat order, as the launcher sees it. The second vertical
+  /// mapping into the same row — which is what the row was drawn for.
+  func asLiveItem() -> LiveItem {
+    LiveItem(
+      id: id,
+      source: "ИДЭШ",
+      title: supplier.name,
+      meta: "№\(code) · \(title) ×\(qty) · \(state.word)",
+      time: receiveOn,
+      when: Format.day(receiveOn),
+      timeLabel: receive == "delivery" ? "ИРЭХ" : "АВАХ",
+      status: state == .dispatched ? .moving : .waiting,
+      destination: .idesh(orderId: id),
+      extra: nil,
     )
   }
 }

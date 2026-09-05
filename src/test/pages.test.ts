@@ -533,6 +533,13 @@ describe('the Basu home screen', () => {
     // show its icons is a launcher that looks broken on a slow morning.
     expect(dine.querySelector('.tile svg')).toBeTruthy();
     expect(home.window.document.querySelectorAll('.card')).toHaveLength(0);
+
+    // The second app: one entry in the list, and nothing else moved.
+    const idesh = home.window.document.querySelector('.app[data-app="idesh"]') as HTMLAnchorElement;
+    expect(idesh.getAttribute('href')).toBe('/idesh');
+    expect(idesh.textContent).toContain('Идэш');
+    expect(idesh.querySelector('.tile svg')).toBeTruthy();
+    expect(home.window.document.querySelectorAll('.app')).toHaveLength(2);
   });
 
   it('carries a live order home, and opens it again from there', async () => {
@@ -709,6 +716,188 @@ describe('the kitchen display', () => {
 
     await until(kds, 'the pairing screen', (d) => Boolean(d.querySelector('.pair')), 12_000);
     expect(text(kds)).toContain('Таблетаа холбоно уу');
+  });
+});
+
+describe('өвлийн идэш', () => {
+  /** Buy one whole animal, collected, on the first day it exists. */
+  async function buyOne(dom: JSDOM): Promise<string> {
+    await until(dom, 'the stalls', (d) => d.querySelectorAll('.listing').length >= seeded.listings);
+    const whole = [...dom.window.document.querySelectorAll('.listing')].find(
+      (l) => !l.hasAttribute('data-gone') && l.textContent?.includes('бүтэн'),
+    ) as HTMLElement;
+    whole.click();
+    await until(dom, 'the sheet', (d) => Boolean(d.querySelector('#pay')));
+    const title = dom.window.document.querySelector('#sheet-name')?.textContent ?? '';
+    // Collected, on the day it is ready — the form's own defaults.
+    expect(dom.window.document.querySelector('.pick [data-r="pickup"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect((dom.window.document.querySelector('#when') as HTMLInputElement).value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    const pay = dom.window.document.querySelector('#pay') as HTMLButtonElement;
+    expect(pay.disabled).toBe(false);
+    expect(pay.textContent).toMatch(/₮ төлөх/);
+    pay.click();
+    await until(dom, 'the status', (d) => Boolean(d.querySelector('.status')));
+    return title;
+  }
+
+  it('lists every stall, names the supplier, and says it is under contract', async () => {
+    const dom = await openPage('idesh.html');
+    await until(dom, 'the stalls', (d) => d.querySelectorAll('.listing').length >= seeded.listings);
+
+    for (const row of dom.window.document.querySelectorAll('.listing')) {
+      expect(row.querySelector('.art svg')).toBeTruthy();
+      expect(row.querySelector('.verified')?.textContent).toBe('гэрээт');
+      expect(row.querySelector('.price')?.textContent).toMatch(/₮/);
+      expect(row.querySelector('.meta')?.textContent).toMatch(/-р сарын \d+-нөөс/);
+    }
+    // The filter narrows by animal, never rearranges.
+    clickText(dom, '#kinds button', 'Үхэр');
+    await until(dom, 'only beef', (d) =>
+      [...d.querySelectorAll('.listing')].every((l) => l.getAttribute('data-kind') === 'beef'),
+    );
+    expect(dom.window.document.querySelectorAll('.listing').length).toBeGreaterThan(0);
+  });
+
+  it('walks a guest from a stall to a paid order, and the launcher knows', async () => {
+    await ownGuest('+97699004001');
+    const dom = await openPage('idesh.html');
+    const title = await buyOne(dom);
+
+    // Paid, the code is shown large for the handover, the cancel button says
+    // until when, and the supplier is now somebody you can call.
+    expect(dom.window.document.querySelector('.status .big')?.textContent).toBe('Төлсөн');
+    expect(dom.window.document.querySelector('.handcode b')?.textContent).toMatch(/^\d{4}$/);
+    expect(dom.window.document.querySelector('#sheet-foot [data-v="danger"]')?.textContent).toContain(
+      'Үнэгүй цуцлах',
+    );
+    expect(dom.window.document.querySelector('.where a[href^="tel:"]')).toBeTruthy();
+    // A pickup has no «Замд» step to leave undone.
+    expect(dom.window.document.querySelectorAll('.timeline li')).toHaveLength(4);
+    expect(dom.window.document.querySelector('#sheet-sub')?.textContent).toContain(title);
+
+    // …and it sits on the home screen beside whatever lunch there is.
+    const home = await openPage('index.html');
+    await until(home, 'the order on the home screen', (d) =>
+      d.querySelectorAll('.card[data-source="Идэш"]').length > 0,
+    );
+    const card = home.window.document.querySelector('.card[data-source="Идэш"]') as HTMLAnchorElement;
+    expect(card.getAttribute('href')).toMatch(/^\/idesh\?order=[0-9a-f-]{36}$/);
+    expect(card.querySelector('.chip')?.textContent).toBe('Төлсөн');
+    expect(card.querySelector('.when')?.textContent).toMatch(/^\d{1,2}\/\d{1,2}авах$/);
+
+    // Following it lands on the order, not on the stalls.
+    const back = await openPage('idesh.html', card.getAttribute('href')!.slice('/idesh'.length));
+    await until(back, 'the status', (d) => Boolean(d.querySelector('.status')));
+    expect(back.window.document.querySelector('#sheet-name')?.textContent).toMatch(/^№\d{4}$/);
+  });
+
+  it('asks for an address only when the meat is to be delivered', async () => {
+    await ownGuest('+97699004002');
+    const dom = await openPage('idesh.html');
+    await until(dom, 'the stalls', (d) => d.querySelectorAll('.listing').length >= seeded.listings);
+    const delivered = [...dom.window.document.querySelectorAll('.listing')].find(
+      (l) => l.textContent?.includes('хүргэнэ') && !l.hasAttribute('data-gone'),
+    ) as HTMLElement;
+    delivered.click();
+    await until(dom, 'the sheet', (d) => Boolean(d.querySelector('#pay')));
+    expect(dom.window.document.querySelector('#address')).toBeNull();
+
+    clickText(dom, '.pick button', 'Хүргүүлэх');
+    await until(dom, 'the address field', (d) => Boolean(d.querySelector('#address')));
+    // Nothing to pay for until the courier knows where to go.
+    const pay = () => dom.window.document.querySelector('#pay') as HTMLButtonElement;
+    expect(pay().disabled).toBe(true);
+    expect(pay().textContent).toContain('Хаяг');
+
+    const address = dom.window.document.querySelector('#address') as HTMLTextAreaElement;
+    address.value = 'Баянзүрх, 13-р хороолол, 45-12';
+    address.dispatchEvent(new dom.window.Event('input'));
+    const phone = dom.window.document.querySelector('#phone') as HTMLInputElement;
+    phone.value = '+97699112233';
+    phone.dispatchEvent(new dom.window.Event('input'));
+    await until(dom, 'a price', () => !pay().disabled);
+    // The fee is in the number, not a surprise after.
+    expect(pay().textContent).toMatch(/₮ төлөх/);
+  });
+
+  it('shows the paid order to its supplier, who walks it to the handover', async () => {
+    await ownGuest('+97699004003');
+    const guest = await openPage('idesh.html');
+    await buyOne(guest);
+    const code = guest.window.document.querySelector('.handcode b')?.textContent;
+
+    storage.removeItem('basu.supplier');
+    const screen = await openPage('supplier.html');
+    await until(screen, 'the pairing form', (d) => d.querySelectorAll('.venues button').length > 0);
+    expect(screen.window.document.querySelector('.pair h2')?.textContent).toBe('Дэлгэцээ холбоно уу');
+    // The demo codes are offered, so nobody copies one out of a terminal.
+    expect((screen.window.document.querySelector('.pair input') as HTMLInputElement).value).toMatch(/^\d{8}$/);
+
+    clickText(screen, '.venues button', 'Бүх нийлүүлэгч');
+    await until(screen, 'the board', (d) => d.querySelectorAll('.lane').length === 4);
+    await until(screen, 'our order', (d) =>
+      [...d.querySelectorAll('.ticket')].some((t) => t.textContent?.includes(`№${code}`)),
+    );
+    const ticket = () =>
+      [...screen.window.document.querySelectorAll('.ticket')].find((t) =>
+        t.textContent?.includes(`№${code}`),
+      )!;
+    expect(ticket().getAttribute('data-lane')).toBe('paid');
+    expect(ticket().textContent).toContain('Өөрөө ирж авна');
+
+    // Every supplier's board is on this screen, so the button has to be the
+    // one on *our* ticket — the first «Бэлтгэж эхлэх» on the page may belong
+    // to an order another test just paid for.
+    const start = [...ticket().querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('Бэлтгэж эхлэх'),
+    ) as HTMLElement;
+    start.click();
+    await until(screen, 'the ticket to move', () => ticket()?.getAttribute('data-lane') === 'preparing');
+
+    // The guest's page catches up on its own and the cancel button is gone.
+    await until(guest, 'the guest to be told', (d) => d.querySelector('.status')?.getAttribute('data-s') === 'PREPARING');
+    // `body.textContent` carries the page's own script, so a phrase that
+    // appears in the code cannot be asserted absent from the text. Ask the
+    // footer instead.
+    expect(guest.window.document.querySelector('#sheet-foot [data-v="danger"]')).toBeNull();
+    expect(guest.window.document.querySelector('.status .big')?.textContent).toBe('Бэлтгэж байна');
+  });
+
+  it('lets a supplier run their own stall from their screen', async () => {
+    storage.removeItem('basu.supplier');
+    const screen = await openPage('supplier.html');
+    await until(screen, 'the pairing form', (d) => d.querySelectorAll('.venues button').length > 0);
+    clickText(screen, '.venues button', seeded.supplierPaired);
+    await until(screen, 'the stall', (d) => d.querySelectorAll('.stall .row').length > 0);
+    const before = screen.window.document.querySelectorAll('.stall .row[data-listing]').length;
+    expect(before).toBeGreaterThan(0);
+    expect(screen.window.document.querySelector('.new h3')?.textContent).toBe('Шинэ зар');
+
+    const form = screen.window.document.querySelector('.new')!;
+    const set = (name: string, value: string) => {
+      const input = form.querySelector(`[name="${name}"]`) as HTMLInputElement;
+      input.value = value;
+    };
+    set('title', 'Хонь, шинэ зар');
+    set('price_mnt', '400000');
+    set('approx_kg', '35');
+    set('quantity', '5');
+    set('origin', 'Архангай');
+    (form.querySelector('#add') as HTMLElement).click();
+
+    await until(screen, 'the new row', (d) =>
+      d.querySelectorAll('.stall .row[data-listing]').length === before + 1,
+    );
+    expect(
+      [...screen.window.document.querySelectorAll('.stall .row .name')].some((n) =>
+        n.textContent?.includes('Хонь, шинэ зар'),
+      ),
+    ).toBe(true);
+    // …and the guests can see it at once.
+    const guest = await openPage('idesh.html');
+    await until(guest, 'the new stall', (d) =>
+      [...d.querySelectorAll('.listing .name')].some((n) => n.textContent === 'Хонь, шинэ зар'),
+    );
   });
 });
 

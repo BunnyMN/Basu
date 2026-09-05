@@ -84,6 +84,9 @@ enum Format {
   /// ending, because «9-р сар-аас» is not Mongolian.
   static func since(_ date: Date) -> String { month.string(from: date) }
 
+  /// `11/03` — a day, at the size a card corner allows.
+  static func day(_ date: Date) -> String { day.string(from: date) }
+
   /// The time if it happened today, the date if it did not. What a list of
   /// things that happened needs, and nothing more.
   static func when(_ date: Date) -> String {

@@ -130,6 +130,11 @@ struct API: Sendable {
     try await send(.init(path: "/v1/orders", token: token), as: Wrapped<[LiveOrder]>.self, key: "orders").value
   }
 
+  /// The other vertical's live list. Its page draws everything else.
+  func liveIdesh(token: String) async throws -> [LiveIdesh] {
+    try await send(.init(path: "/v1/idesh", token: token), as: Wrapped<[LiveIdesh]>.self, key: "orders").value
+  }
+
   func order(_ id: String, token: String) async throws -> OrderDetail {
     try await send(.init(path: "/v1/orders/\(id)", token: token))
   }

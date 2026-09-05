@@ -1,6 +1,7 @@
 import type { FastifyReply } from 'fastify';
 import { AuthError } from '../platform/identity/index.js';
 import { LedgerError } from '../platform/ledger/index.js';
+import { IdeshError, type IdeshErrorCode } from '../idesh/index.js';
 import { OrderError, type OrderErrorCode } from '../services/orders.js';
 
 /**
@@ -58,6 +59,25 @@ const ORDER_ERRORS: Record<OrderErrorCode, Spec> = {
   },
 };
 
+const IDESH_ERRORS: Record<IdeshErrorCode, Spec> = {
+  NOT_FOUND: { status: 404, mn: 'Ийм идэш олдсонгүй.' },
+  WRONG_STATE: {
+    status: 409,
+    mn: 'Идэшний төлөв өөрчлөгдсөн байна. Дэлгэцээ шинэчилнэ үү.',
+  },
+  SOLD_OUT: { status: 409, mn: 'Энэ зар дууссан байна. Өөр зар сонгоно уу.' },
+  TOO_FEW: { status: 400, mn: 'Захиалах тоо хамгийн бага хэмжээнээс бага байна.' },
+  NO_DELIVERY: { status: 400, mn: 'Энэ нийлүүлэгч хүргэлт хийдэггүй. Өөрөө очиж авна уу.' },
+  NO_ADDRESS: { status: 400, mn: 'Хүргүүлэх хаяг, залгах утсаа оруулна уу.' },
+  BAD_DATE: { status: 400, mn: 'Энэ өдөр мах бэлэн болоогүй байна. Өөр өдөр сонгоно уу.' },
+  TOO_LATE_TO_CANCEL: {
+    status: 409,
+    // Say what changed, the way dine does at the fire.
+    mn: 'Нийлүүлэгч малыг аль хэдийн бэлтгэж эхэлсэн тул цуцлах боломжгүй.',
+  },
+  PAYMENT_FAILED: { status: 402, mn: 'Төлбөр амжилтгүй боллоо. Дахин оролдоно уу.' },
+};
+
 const AUTH_ERRORS: Record<AuthError['code'], Spec> = {
   RATE_LIMITED: {
     status: 429,
@@ -92,6 +112,10 @@ export function sendError(reply: FastifyReply, error: unknown): FastifyReply {
   }
   if (error instanceof OrderError) {
     const spec = ORDER_ERRORS[error.code];
+    return reply.status(spec.status).send(envelope(error.code, spec.mn, error.message));
+  }
+  if (error instanceof IdeshError) {
+    const spec = IDESH_ERRORS[error.code];
     return reply.status(spec.status).send(envelope(error.code, spec.mn, error.message));
   }
   if (error instanceof AuthError) {

@@ -4,6 +4,7 @@ import { ARM_LEAD_MINUTES, armOrder, findAbandoned, markNoShow } from '../servic
 import { findPlannable, planAndSchedule } from '../services/planning.js';
 import { relay as relayNotifications } from '../platform/notify/index.js';
 import { processReceipts } from '../platform/ledger/index.js';
+import { housekeeping as ideshHousekeeping } from '../idesh/index.js';
 import { claimDueJobs, findOverdue, fireOne } from './fireJobs.js';
 import type { Ctx } from '../ports.js';
 
@@ -27,6 +28,9 @@ export interface TickReport {
   notified: number;
   receipts: number;
   abandoned: number;
+  /** Idesh drafts that gave their animal back, and handovers that closed. */
+  ideshExpired: number;
+  ideshClosed: number;
 }
 
 const EMPTY: TickReport = {
@@ -40,6 +44,8 @@ const EMPTY: TickReport = {
   notified: 0,
   receipts: 0,
   abandoned: 0,
+  ideshExpired: 0,
+  ideshClosed: 0,
 };
 
 /** Fire tickets are spaced so a 12:00 crush does not flood the tablet at once. */
@@ -102,7 +108,13 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
     report.abandoned++;
   }
 
-  /* 6. Anything the state changes promised the outside world. */
+  /* 6. The other vertical's housekeeping. Before the outbox, for the same
+   *    reason everything else is: a refund it posts wants relaying now. */
+  const idesh = await ideshHousekeeping(ctx);
+  report.ideshExpired = idesh.expired;
+  report.ideshClosed = idesh.closed;
+
+  /* 7. Anything the state changes promised the outside world. */
   report.relayed = await relayOutbox(ctx);
   report.notified = await relayNotifications(ctx);
   report.receipts = (await processReceipts(ctx)).issued;

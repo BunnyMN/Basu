@@ -8,6 +8,8 @@ import { enqueue } from '../platform/notify/index.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { DISHES, STATIONS, VENUES } from './catalogue.js';
 import { seedHistory } from './history.js';
+import { seedIdesh } from './idesh.js';
+import { dayOf } from '../idesh/index.js';
 
 /**
  * A pilot lunch service you can click through.
@@ -44,6 +46,10 @@ export async function seedDemo(): Promise<{
   dishes: number;
   reviews: number;
   walletMnt: number;
+  /** The second vertical: its suppliers' codes, and how many listings. */
+  supplierCodes: Array<{ name: string; code: string }>;
+  supplierPaired: string;
+  listings: number;
 }> {
   const db = getPool();
   // Same instant the API boots to, so the pairing codes below are still live
@@ -66,6 +72,8 @@ export async function seedDemo(): Promise<{
              dine.order_line, dine.station_reservation, dine.dish_review, dine.order_review,
              dine.dining_order, dine.slot, dine.dining_table, dine.menu_item, dine.station,
              dine.trust_profile, dine.kds_device, dine.restaurant,
+             idesh.order_event, idesh.idesh_order, idesh.listing, idesh.supplier_device,
+             idesh.supplier,
              identity.profile, identity.guest_session, identity.guest, identity.otp_challenge
     RESTART IDENTITY CASCADE
   `);
@@ -169,6 +177,9 @@ export async function seedDemo(): Promise<{
   // the behaviour.
   const wallet = await seedPlatform(ctx);
 
+  // The second app on the home screen: four suppliers and their stalls.
+  const idesh = await seedIdesh(ctx, db, dayOf(ctx.clock.now()));
+
   return {
     pairingCodes: pairingCodes.slice(1),
     paired: first.name,
@@ -176,6 +187,9 @@ export async function seedDemo(): Promise<{
     dishes,
     reviews: history.reviews,
     walletMnt: wallet,
+    supplierCodes: idesh.codes,
+    supplierPaired: idesh.paired,
+    listings: idesh.listings,
   };
 }
 
@@ -212,7 +226,8 @@ const isEntrypoint = (() => {
 
 if (isEntrypoint) {
   try {
-    const { pairingCodes, paired, venues, dishes, reviews, walletMnt } = await seedDemo();
+    const { pairingCodes, paired, venues, dishes, reviews, walletMnt, supplierCodes, supplierPaired, listings } =
+      await seedDemo();
     const base = process.env['BASU_URL'] ?? `http://localhost:${process.env['PORT'] ?? 3000}`;
 
     console.log(
@@ -225,8 +240,15 @@ if (isEntrypoint) {
     for (const { name, code } of pairingCodes) {
       console.log(`  ${name.padEnd(24)} ${code}`);
     }
-    console.log(`\n  Зочин:  ${base}/`);
-    console.log(`  Тогооч: ${base}/kds`);
+    console.log(`\nӨвлийн идэш — ${listings} зар. ${supplierPaired} — дэлгэц холбогдсон.`);
+    console.log('Бусад нийлүүлэгчийн дэлгэц холбох код:');
+    for (const { name, code } of supplierCodes) {
+      console.log(`  ${name.padEnd(32)} ${code}`);
+    }
+    console.log(`\n  Зочин:        ${base}/`);
+    console.log(`  Тогооч:       ${base}/kds`);
+    console.log(`  Идэш:         ${base}/idesh`);
+    console.log(`  Нийлүүлэгч:   ${base}/supplier`);
   } catch (error) {
     console.error((error as Error).message);
     process.exitCode = 1;

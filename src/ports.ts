@@ -113,7 +113,7 @@ export class FakePaymentProvider implements PaymentProvider {
 }
 
 export class FakeTaxProvider implements TaxProvider {
-  readonly issued: Array<{ orderCode: string; kind: string; amountMnt: number }> = [];
+  readonly issued: Array<{ orderCode: string; kind: string; amountMnt: number; merchantTin: string }> = [];
   /** The tax API being down must never block a ticket — this proves it. */
   down = false;
   #seq = 0;
@@ -126,7 +126,12 @@ export class FakeTaxProvider implements TaxProvider {
   }): Promise<Receipt> {
     if (this.down) throw new Error('ebarimt unavailable');
     const n = ++this.#seq;
-    this.issued.push({ orderCode: input.orderCode, kind: input.kind, amountMnt: input.amountMnt });
+    this.issued.push({
+      orderCode: input.orderCode,
+      kind: input.kind,
+      amountMnt: input.amountMnt,
+      merchantTin: input.merchantTin,
+    });
     return {
       billId: `BILL${String(n).padStart(8, '0')}`,
       lottery: `AA${String(n).padStart(8, '0')}`,

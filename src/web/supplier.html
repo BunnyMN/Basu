@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Нийлүүлэгч — Basu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/app.css">
+<style>
+/* The kitchen display's sibling: a tool for a person with a knife in one
+   hand and a phone in the other. Big type, state by colour and column. */
+body{background:var(--sunk)}
+.top{
+  display:flex;align-items:baseline;gap:14px;padding:12px 18px;
+  border-bottom:1px solid var(--line);background:var(--bg);flex-wrap:wrap;
+}
+.top h1{font-size:1rem;font-weight:700}
+.top .day{font-family:"IBM Plex Mono",monospace;font-size:.9rem;font-weight:600;margin-left:auto;font-variant-numeric:tabular-nums}
+.top .swap{
+  font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--ink-3);background:none;
+  border:1px solid var(--line-2);border-radius:2px;padding:3px 8px;
+}
+.top .swap:hover{color:var(--ink);border-color:var(--ink-3)}
+.top .conn{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ready)}
+.top .conn[data-stale]{color:var(--stop)}
+
+.board{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:12px;padding:14px;align-items:start}
+@media(max-width:1000px){.board{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.board{grid-template-columns:1fr}}
+
+.lane{background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:11px;min-height:120px}
+.lane > h2{
+  font-family:"IBM Plex Mono",monospace;font-size:.68rem;text-transform:uppercase;
+  letter-spacing:.14em;color:var(--ink-3);display:flex;justify-content:space-between;
+  font-weight:500;margin-bottom:10px;
+}
+.lane .stack{display:flex;flex-direction:column;gap:9px;min-width:0}
+.lane .none{color:var(--line-2);font-size:.8rem;text-align:center;padding:14px 0}
+
+.ticket{border:1px solid var(--line);border-left:3px solid var(--line-2);border-radius:3px;padding:11px 12px;background:var(--surface-2);min-width:0}
+.ticket .head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:3px}
+.ticket .id{font-family:"IBM Plex Mono",monospace;font-size:.86rem;font-weight:600}
+.ticket .day{font-family:"IBM Plex Mono",monospace;font-size:.82rem;font-weight:600;font-variant-numeric:tabular-nums}
+.ticket .what{font-size:.94rem;font-weight:700;margin-bottom:2px;overflow-wrap:anywhere}
+.ticket .meta{font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--ink-3);margin-bottom:7px;overflow-wrap:anywhere;line-height:1.5}
+.ticket .where{font-family:"Golos Text",sans-serif;font-size:.78rem;font-weight:700;color:var(--ink-2);margin-bottom:6px;overflow-wrap:anywhere}
+.ticket .btns{display:flex;gap:6px;flex-wrap:wrap}
+.ticket .btns .btn{flex:1;min-width:96px;padding:9px 8px}
+.ticket[data-lane="paid"]{border-left-color:var(--route)}
+.ticket[data-lane="paid"] .day{color:var(--route)}
+.ticket[data-lane="preparing"]{border-left-color:var(--accent);background:var(--accent-soft)}
+.ticket[data-lane="preparing"] .day{color:var(--accent-ink)}
+.ticket[data-lane="ready"]{border-left-color:var(--ready)}
+.ticket[data-lane="ready"] .day{color:var(--ready)}
+.ticket[data-lane="dispatched"]{border-left-color:var(--route)}
+/* A delivery that is due today has to be seen across the yard. */
+.ticket[data-due]{box-shadow:inset 0 0 0 1px var(--accent-line)}
+
+/* ── the stall ───────────────────────────────────────────────────── */
+.stall{padding:0 14px 24px}
+.stall > h2{
+  font-family:"IBM Plex Mono",monospace;font-size:.68rem;text-transform:uppercase;
+  letter-spacing:.14em;color:var(--ink-3);font-weight:500;margin:6px 0 10px;
+}
+.rows{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.row{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface);
+  border:1px solid var(--line);border-radius:4px;padding:10px 12px;
+}
+.row[data-off]{opacity:.55}
+.row .name{font-weight:700;font-size:.92rem;flex:1;min-width:160px}
+.row .name small{display:block;font-family:"IBM Plex Mono",monospace;font-size:.64rem;color:var(--ink-3);font-weight:400;margin-top:2px}
+.row .num{font-family:"IBM Plex Mono",monospace;font-size:.82rem;font-variant-numeric:tabular-nums;min-width:90px}
+.row .num small{display:block;font-size:.58rem;color:var(--ink-3);letter-spacing:.08em;text-transform:uppercase}
+.row .btns{display:flex;gap:6px}
+.row input{
+  width:110px;padding:6px 8px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);
+  color:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:.82rem;
+}
+.new{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:14px}
+.new h3{font-size:.95rem;font-weight:700;margin-bottom:10px}
+.new .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.new label{display:flex;flex-direction:column;gap:4px;font-family:"IBM Plex Mono",monospace;font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3)}
+.new label.wide{grid-column:1 / -1}
+.new input,.new select,.new textarea{
+  width:100%;padding:8px 9px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);
+  color:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:.86rem;letter-spacing:0;text-transform:none;
+}
+.new textarea{font-family:inherit;min-height:52px}
+.new .check{flex-direction:row;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-family:inherit;font-size:.86rem;color:var(--ink)}
+.new .check input{width:auto}
+.new .foot{display:flex;justify-content:flex-end;margin-top:10px}
+
+/* ── pairing ─────────────────────────────────────────────────────── */
+.pair{max-width:380px;margin:60px auto;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:26px 24px;text-align:center}
+.pair h2{font-size:1.1rem;margin-bottom:6px}
+.pair p{color:var(--ink-2);font-size:.86rem;margin:0 0 18px}
+.pair input{
+  width:100%;text-align:center;font-size:1.5rem;letter-spacing:.28em;padding:12px;
+  border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);
+  color:var(--ink);margin-bottom:12px;font-variant-numeric:tabular-nums;
+}
+.pair .hint{font-size:.74rem;color:var(--ink-3);margin-top:16px;line-height:1.5;text-align:left}
+.pair .hint code{background:var(--surface-2);padding:1px 5px;border-radius:2px;border:1px solid var(--line)}
+.pair .or{display:flex;align-items:center;gap:10px;margin:20px 0 14px;font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.pair .or::before,.pair .or::after{content:"";flex:1;height:1px;background:var(--line)}
+.venues{display:flex;flex-direction:column;gap:6px}
+.venues button{
+  width:100%;text-align:left;display:flex;align-items:center;gap:10px;
+  font-family:"Golos Text",sans-serif;font-size:.86rem;padding:11px 13px;border-radius:3px;
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink);
+}
+.venues button:hover{border-color:var(--accent-line);background:var(--accent-soft)}
+.venues .tag{margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3)}
+.venues button[data-watched] .tag{color:var(--ready)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="module">
+import { api, store, toast, mountClock, mnt, KIND, dayLabel } from '/api.js';
+
+const root = document.getElementById('root');
+const el = (html) => {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+};
+const esc = (value) => {
+  const node = document.createElement('span');
+  node.textContent = value ?? '';
+  return node.innerHTML;
+};
+
+/**
+ * Which stall this screen is showing.
+ *
+ * A real screen is paired to one supplier and sees that one — the token says
+ * so and the API enforces it. A walkthrough moves between four suppliers, so
+ * the demo can watch every one at once, read-only on the stall.
+ */
+const ALL = 'all-suppliers';
+const watchingAll = () => store.supplierToken === ALL;
+
+/* ── pairing ─────────────────────────────────────────────────────── */
+
+async function showPairing() {
+  const [{ devices }, { suppliers }] = await Promise.all([
+    api('/dev/supplier-codes').catch(() => ({ devices: [] })),
+    api('/dev/suppliers').catch(() => ({ suppliers: [] })),
+  ]);
+  root.replaceChildren();
+
+  const card = el(`
+    <div class="pair">
+      <h2>Дэлгэцээ холбоно уу</h2>
+      <p>Basu-гаас авсан 8 оронтой кодоо оруулна уу.</p>
+      <input inputmode="numeric" maxlength="8" placeholder="········" aria-label="Холбох код">
+      <button class="btn" data-v="primary" data-size="lg" type="button">Холбох</button>
+    </div>`);
+
+  const input = card.querySelector('input');
+  const submit = async () => {
+    try {
+      const { token } = await api('/v1/supplier/pair', {
+        method: 'POST',
+        body: { pairing_code: input.value.trim() },
+      });
+      store.supplierToken = token;
+      boot();
+    } catch (error) {
+      toast(error.message, 'bad');
+      input.select();
+    }
+  };
+  card.querySelector('button').addEventListener('click', submit);
+  input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+
+  if (devices.length) {
+    input.value = devices[0].code;
+    const hint = el('<div class="hint">Холбоогүй нийлүүлэгчийн кодууд:<br></div>');
+    for (const device of devices) hint.append(el(`<code>${device.code}</code> ${esc(device.name)}<br>`));
+    card.append(hint);
+  }
+
+  if (suppliers.length) {
+    card.append(el('<div class="or">эсвэл демо горимоор</div>'));
+    const list = el('<div class="venues"></div>');
+    const all = el(`
+      <button type="button" data-watched>
+        Бүх нийлүүлэгч
+        <span class="tag">${suppliers.length}</span>
+      </button>`);
+    all.addEventListener('click', () => {
+      store.supplierToken = ALL;
+      boot();
+    });
+    list.append(all);
+    for (const s of suppliers) {
+      const button = el(`
+        <button type="button"${s.watched ? ' data-watched' : ''}>
+          ${esc(s.name)}
+          <span class="tag">${s.watched ? 'холбогдсон' : 'холбогдоогүй'}</span>
+        </button>`);
+      button.addEventListener('click', async () => {
+        try {
+          const { token } = await api('/dev/supplier-token', {
+            method: 'POST',
+            body: { supplier_id: s.id },
+          });
+          store.supplierToken = token;
+          boot();
+        } catch (error) {
+          toast(error.message, 'bad');
+        }
+      });
+      list.append(button);
+    }
+    card.append(list);
+  }
+
+  if (!devices.length && !suppliers.length) {
+    card.append(el('<div class="hint">Нийлүүлэгч алга. <code>npm run seed</code> ажиллуулна уу.</div>'));
+  }
+
+  root.append(card);
+  input.focus();
+}
+
+/* ── the board ───────────────────────────────────────────────────── */
+
+const LANES = [
+  { key: 'paid', title: 'Төлсөн' },
+  { key: 'preparing', title: 'Бэлтгэж байна' },
+  { key: 'ready', title: 'Бэлэн' },
+  { key: 'dispatched', title: 'Замд' },
+];
+
+let today = null;
+
+function frameFor(data) {
+  const frame = el(`
+    <div>
+      <div class="top">
+        <h1 id="supplier">${watchingAll() ? 'Бүх нийлүүлэгч' : esc(data.supplier?.name ?? 'Нийлүүлэгч')}</h1>
+        <button class="swap" type="button" id="swap">Солих</button>
+        <span class="conn" id="conn">холбогдсон</span>
+        <span class="day mn" id="today">${dayLabel(data.today)}</span>
+      </div>
+      <div class="board" id="board"></div>
+      <div class="stall" id="stall"></div>
+    </div>`);
+  frame.querySelector('#swap').addEventListener('click', () => {
+    store.supplierToken = null;
+    showPairing();
+  });
+  return frame;
+}
+
+function renderBoard(data) {
+  today = data.today;
+  let board = document.getElementById('board');
+  if (!board) {
+    root.replaceChildren(frameFor(data));
+    board = document.getElementById('board');
+    if (!watchingAll()) renderStall(data.listings);
+  }
+  document.getElementById('supplier').textContent = watchingAll()
+    ? 'Бүх нийлүүлэгч'
+    : (data.supplier?.name ?? 'Нийлүүлэгч');
+  document.getElementById('today').textContent = dayLabel(data.today);
+  const conn = document.getElementById('conn');
+  conn.textContent = 'холбогдсон';
+  delete conn.dataset.stale;
+
+  const scroll = window.scrollY;
+  board.replaceChildren();
+  for (const lane of LANES) {
+    const tickets = data.lanes[lane.key] ?? [];
+    const column = el(`
+      <section class="lane">
+        <h2><span>${lane.title}</span><span>${tickets.length}</span></h2>
+        <div class="stack"></div>
+      </section>`);
+    const stack = column.querySelector('.stack');
+    if (!tickets.length) stack.append(el('<div class="none">—</div>'));
+    for (const ticket of tickets) stack.append(renderTicket(ticket, lane.key));
+    board.append(column);
+  }
+  window.scrollTo(0, scroll);
+}
+
+function renderTicket(ticket, lane) {
+  const delivery = ticket.receive === 'delivery';
+  const node = el(`
+    <article class="ticket" data-lane="${lane}"${ticket.receive_on <= today && lane !== 'paid' ? ' data-due' : ''}>
+      <div class="head">
+        <span class="id">№${ticket.code}</span>
+        <span class="day">${dayLabel(ticket.receive_on)}</span>
+      </div>
+      <div class="what">${esc(ticket.title)} ×${ticket.qty}${ticket.unit === 'kg' ? ' кг' : ''}</div>
+      ${watchingAll() ? `<div class="where">${esc(ticket.supplier.name)}</div>` : ''}
+      <div class="meta">${KIND[ticket.kind] ?? ticket.kind} · ${mnt(ticket.total_mnt)}${
+        ticket.guest ? ` · ${esc(ticket.guest)}` : ''
+      }<br>${
+        delivery
+          ? `Хүргэлт: ${esc(ticket.address)} · ${esc(ticket.address_phone)}`
+          : 'Өөрөө ирж авна'
+      }</div>
+      <div class="btns"></div>
+    </article>`);
+
+  const buttons = node.querySelector('.btns');
+  const add = (label, action, variant) => {
+    const button = el(
+      `<button class="btn" type="button"${variant ? ` data-v="${variant}"` : ''}>${label}</button>`,
+    );
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        await api(
+          watchingAll()
+            ? `/dev/supplier/orders/${ticket.id}/${action}`
+            : `/v1/supplier/orders/${ticket.id}/${action}`,
+          { method: 'POST', token: watchingAll() ? undefined : store.supplierToken, body: {} },
+        );
+        await refreshBoard();
+      } catch (error) {
+        if (error.status === 401 && !watchingAll()) {
+          store.supplierToken = null;
+          showPairing();
+          return;
+        }
+        toast(error.message, 'bad');
+        button.disabled = false;
+      }
+    });
+    buttons.append(button);
+  };
+
+  if (lane === 'paid') {
+    add('Бэлтгэж эхлэх', 'prepare', 'primary');
+    add('Цуцлах', 'cancel', 'danger');
+  } else if (lane === 'preparing') {
+    add('Бэлэн боллоо', 'ready', 'primary');
+    add('Цуцлах', 'cancel', 'danger');
+  } else if (lane === 'ready') {
+    if (delivery) add('Замд гаргах', 'dispatch', 'primary');
+    else add('Хүлээлгэн өгсөн', 'hand', 'primary');
+  } else {
+    add('Хүлээлгэн өгсөн', 'hand', 'primary');
+  }
+  return node;
+}
+
+async function refreshBoard() {
+  try {
+    const data = watchingAll()
+      ? await api('/dev/supplier/board')
+      : await api('/v1/supplier/board', { token: store.supplierToken });
+    renderBoard(data);
+  } catch (error) {
+    if (error.status === 401 && !watchingAll()) {
+      store.supplierToken = null;
+      showPairing();
+      return;
+    }
+    const conn = document.getElementById('conn');
+    if (conn) {
+      conn.textContent = 'холболт тасарсан';
+      conn.dataset.stale = '1';
+    }
+  }
+}
+
+/* ── the stall ───────────────────────────────────────────────────── */
+
+/**
+ * The supplier's own listings, edited here and nowhere else. Twenty sheep
+ * becoming fifteen sold is a fact only they know; ops does not edit numbers
+ * on a phone. Drawn separately from the board so a poll never wipes a form
+ * somebody is typing into.
+ */
+function renderStall(listings) {
+  const stall = document.getElementById('stall');
+  if (!stall) return;
+  stall.replaceChildren(el('<h2>Миний зар</h2>'));
+
+  const rows = el('<div class="rows"></div>');
+  if (!listings.length) rows.append(el('<div class="row">Зар алга. Доор нэмнэ үү.</div>'));
+  for (const l of listings) rows.append(renderRow(l));
+  stall.append(rows);
+  stall.append(newForm());
+}
+
+function renderRow(l) {
+  const row = el(`
+    <div class="row"${l.active ? '' : ' data-off'} data-listing="${l.id}">
+      <div class="name">${esc(l.title)}<small>${KIND[l.kind]} · ${l.unit === 'whole' ? `бүтэн, ~${l.approx_kg} кг` : `кг, доод ${l.min_qty}`} · ${esc(l.origin)} · ${dayLabel(l.ready_from)}-нөөс${l.delivers ? ` · хүргэлт ${mnt(l.delivery_fee_mnt)}` : ''}</small></div>
+      <div class="num"><small>үнэ</small>${mnt(l.price_mnt)}</div>
+      <div class="num"><small>зарагдсан</small>${l.sold} / ${l.quantity}</div>
+      <div class="btns">
+        <button class="btn" type="button" data-a="edit">Засах</button>
+        <button class="btn" type="button" data-a="toggle">${l.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>
+      </div>
+    </div>`);
+
+  const patch = async (body) => {
+    try {
+      const { listing } = await api(`/v1/supplier/listings/${l.id}`, {
+        method: 'PATCH',
+        token: store.supplierToken,
+        body,
+      });
+      row.replaceWith(renderRow(listing));
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  };
+
+  row.querySelector('[data-a="toggle"]').addEventListener('click', () => patch({ active: !l.active }));
+  row.querySelector('[data-a="edit"]').addEventListener('click', () => {
+    const form = el(`
+      <div class="row" data-editing>
+        <div class="name">${esc(l.title)}</div>
+        <label class="num"><small>үнэ ₮</small><input type="number" name="price" value="${l.price_mnt}" min="1"></label>
+        <label class="num"><small>нийт тоо</small><input type="number" name="quantity" value="${l.quantity}" min="${l.sold}"></label>
+        <label class="num"><small>бэлэн болох</small><input type="date" name="ready" value="${l.ready_from}"></label>
+        <div class="btns">
+          <button class="btn" data-v="primary" type="button" data-a="save">Хадгалах</button>
+          <button class="btn" type="button" data-a="back">Болих</button>
+        </div>
+      </div>`);
+    form.querySelector('[data-a="back"]').addEventListener('click', () => form.replaceWith(renderRow(l)));
+    form.querySelector('[data-a="save"]').addEventListener('click', async () => {
+      const body = {
+        price_mnt: Number(form.querySelector('[name="price"]').value),
+        quantity: Number(form.querySelector('[name="quantity"]').value),
+        ready_from: form.querySelector('[name="ready"]').value,
+      };
+      try {
+        const { listing } = await api(`/v1/supplier/listings/${l.id}`, {
+          method: 'PATCH',
+          token: store.supplierToken,
+          body,
+        });
+        form.replaceWith(renderRow(listing));
+        toast('Хадгалагдлаа');
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+    });
+    row.replaceWith(form);
+  });
+  return row;
+}
+
+function newForm() {
+  const plusWeek = (() => {
+    const d = new Date(`${today}T12:00:00+08:00`);
+    d.setUTCDate(d.getUTCDate() + 7);
+    return d.toISOString().slice(0, 10);
+  })();
+  const form = el(`
+    <div class="new">
+      <h3>Шинэ зар</h3>
+      <div class="grid">
+        <label>Мал<select name="kind">${Object.entries(KIND).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
+        <label>Нэгж<select name="unit"><option value="whole">Бүтэн мал</option><option value="kg">Кг-аар</option></select></label>
+        <label class="wide">Гарчиг<input name="title" placeholder="Хонь, залуу ирэг"></label>
+        <label>Үнэ ₮ (толгой / кг)<input name="price_mnt" type="number" min="1" placeholder="460000"></label>
+        <label data-for="whole">Ойролцоо жин, кг<input name="approx_kg" type="number" min="1" placeholder="38"></label>
+        <label data-for="kg" hidden>Доод захиалга, кг<input name="min_qty" type="number" min="1" placeholder="10"></label>
+        <label>Хэдэн толгой / кг<input name="quantity" type="number" min="0" placeholder="20"></label>
+        <label class="wide">Гарал<input name="origin" placeholder="Архангай, Их тамир"></label>
+        <label>Бэлэн болох өдөр<input name="ready_from" type="date" value="${plusWeek}"></label>
+        <label class="check"><input name="delivers" type="checkbox" checked>Хүргэлт хийнэ</label>
+        <label>Хүргэлтийн төлбөр ₮<input name="delivery_fee_mnt" type="number" min="0" value="0"></label>
+        <label class="wide">Тайлбар<textarea name="note" placeholder="Толгой, дотор мөнтэйгээ…"></textarea></label>
+      </div>
+      <div class="foot"><button class="btn" data-v="primary" type="button" id="add">Зар нэмэх</button></div>
+    </div>`);
+
+  const unit = form.querySelector('[name="unit"]');
+  const sync = () => {
+    form.querySelector('[data-for="whole"]').hidden = unit.value !== 'whole';
+    form.querySelector('[data-for="kg"]').hidden = unit.value !== 'kg';
+  };
+  unit.addEventListener('change', sync);
+  sync();
+
+  form.querySelector('#add').addEventListener('click', async () => {
+    const v = (name) => form.querySelector(`[name="${name}"]`).value;
+    const body = {
+      kind: v('kind'),
+      unit: v('unit'),
+      title: v('title'),
+      price_mnt: Number(v('price_mnt')),
+      quantity: Number(v('quantity')),
+      origin: v('origin'),
+      ready_from: v('ready_from'),
+      delivers: form.querySelector('[name="delivers"]').checked,
+      delivery_fee_mnt: Number(v('delivery_fee_mnt') || 0),
+      note: v('note'),
+    };
+    if (body.unit === 'whole') body.approx_kg = Number(v('approx_kg'));
+    else body.min_qty = Number(v('min_qty') || 1);
+    try {
+      await api('/v1/supplier/listings', { method: 'POST', token: store.supplierToken, body });
+      toast('Зар нэмэгдлээ');
+      const { listings } = await api('/v1/supplier/listings', { token: store.supplierToken });
+      renderStall(listings);
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  return form;
+}
+
+/* ── boot ────────────────────────────────────────────────────────── */
+
+function boot() {
+  root.replaceChildren();
+  if (!store.supplierToken) {
+    showPairing();
+    return;
+  }
+  refreshBoard();
+}
+
+mountClock(() => {
+  if (store.supplierToken) refreshBoard();
+});
+
+boot();
+
+const poll = setInterval(() => {
+  if (!document.hidden && store.supplierToken) void refreshBoard();
+}, 3000);
+addEventListener('pagehide', () => clearInterval(poll));
+</script>
+</body>
+</html>

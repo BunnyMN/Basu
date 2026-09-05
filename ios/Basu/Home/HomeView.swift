@@ -26,9 +26,14 @@ struct HomeView: View {
   private var bands: [AppBand] { AppCatalogue.bands(count: AppCatalogue.installedCount) }
   private var iconCount: Int { bands.reduce(0) { $0 + $1.apps.count } }
 
+  /// Both verticals, in one list, by the moment that matters. A sheep due
+  /// Tuesday sits under today's lunch; the section does not know which app
+  /// either came from.
   private var live: [LiveItem] {
-    let orders = model.live
-    return orders.map { $0.asLiveItem(expanded: orders.count == 1) }
+    let count = model.live.count + model.liveIdesh.count
+    let lunches = model.live.map { $0.asLiveItem(expanded: count == 1) }
+    let provisions = model.liveIdesh.map { $0.asLiveItem() }
+    return (lunches + provisions).sorted { $0.time < $1.time }
   }
 
   var body: some View {
@@ -184,7 +189,7 @@ struct HomeView: View {
         }
       }
 
-      if iconCount == 1 {
+      if iconCount <= AppCatalogue.shipped.count {
         // A hairline and a sentence. Never a placeholder tile — that promises
         // a tap which does nothing.
         VStack(alignment: .leading, spacing: 0) {
@@ -257,7 +262,7 @@ struct LiveRow: View {
             .font(.mono(9, .medium))
             .tracking(1.26)
             .foregroundStyle(Color.ink3)
-          Text(Format.hhmm(item.time))
+          Text(item.when)
             .font(.mono(23, .semibold))
             .monospacedDigit()
             .foregroundStyle(Color.ink)

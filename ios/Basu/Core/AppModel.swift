@@ -20,6 +20,7 @@ final class AppModel {
   private(set) var dishes = DishTable(fallback: .init(form: .soup, fill: "#B98A52", detail: "#EFE3CC", ground: "#EBE5D9"), dishes: [:])
 
   private(set) var live: [LiveOrder] = []
+  private(set) var liveIdesh: [LiveIdesh] = []
   private(set) var trouble: String?
 
   /// Whether the last call reached the server at all.
@@ -60,24 +61,33 @@ final class AppModel {
     if let api = error as? APIError, api.code == "OFFLINE" { offline = true }
   }
 
-  /// The guest's live orders, if there is a guest.
+  /// The guest's live orders, if there is a guest. Two calls, one per
+  /// vertical: the launcher is the one place that knows there are two.
   func refreshLive() async {
     guard let token = session.token else {
       live = []
+      liveIdesh = []
       return
     }
+    async let lunches = api.liveOrders(token: token)
+    async let provisions = api.liveIdesh(token: token)
     do {
-      live = try await api.liveOrders(token: token)
+      live = try await lunches
       noted(nil)
     } catch let error as APIError where error.isUnauthorised {
       // A token from a reseeded database is dead, not a reason to shout at
       // somebody who has only just opened the app.
       session.forget()
       live = []
+      liveIdesh = []
+      return
     } catch {
       noted(error)
       live = []
     }
+    // A server that predates the second vertical answers 404 here; that is
+    // an empty list, not an outage.
+    liveIdesh = (try? await provisions) ?? []
   }
 
   func readClock() async {

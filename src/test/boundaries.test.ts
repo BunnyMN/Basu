@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest';
  */
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
-const SCHEMAS = ['identity', 'ledger', 'notify', 'dine'] as const;
+const SCHEMAS = ['identity', 'ledger', 'notify', 'idesh', 'dine'] as const;
 
 /**
  * Fixtures and harnesses are exempt, and named one by one so that the
@@ -57,6 +57,9 @@ function owner(file: string): (typeof SCHEMAS)[number] | null {
   for (const schema of SCHEMAS) {
     if (file.startsWith(`platform/${schema}/`)) return schema;
   }
+  // The second vertical, beside dine rather than under platform: it owns
+  // tables the way dine does, and nothing about lunch.
+  if (file.startsWith('idesh/')) return 'idesh';
   return 'dine';
 }
 
@@ -76,7 +79,7 @@ describe('module boundaries', () => {
       // Only where SQL can name a table. `ledger.occupy(...)` in the station
       // load code is a local variable, and `guest.notify.cooking` is an outbox
       // topic — neither is a query, and neither is a trespass.
-      const sql = /\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\s+(identity|ledger|notify|dine)\.([a-z_]+)/g;
+      const sql = /\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\s+(identity|ledger|notify|idesh|dine)\.([a-z_]+)/g;
       for (const match of body.matchAll(sql)) {
         const [, schema, table] = match;
         if (schema !== mine) seen.add(`${schema}.${table}`);
@@ -106,6 +109,7 @@ describe('module boundaries', () => {
       const index = join(SRC, 'platform', schema, 'index.ts');
       expect(statSync(index).isFile(), `platform/${schema}/index.ts`).toBe(true);
     }
+    expect(statSync(join(SRC, 'idesh', 'index.ts')).isFile(), 'idesh/index.ts').toBe(true);
   });
 
   it('nothing imports past a platform module’s index', () => {
@@ -115,6 +119,20 @@ describe('module boundaries', () => {
       const body = readFileSync(path, 'utf8');
       for (const match of body.matchAll(/from '[^']*platform\/(\w+)\/([\w.]+)'/g)) {
         if (match[2] !== 'index.js') reachAround.push(`${rel} → platform/${match[1]}/${match[2]}`);
+      }
+    }
+    expect(reachAround).toEqual([]);
+  });
+
+  it('nothing outside idesh imports past its index either', () => {
+    // A vertical is held to the platform's rule. The day it is split out, the
+    // index is the wire and everything else is somebody else's process.
+    const reachAround: string[] = [];
+    for (const { path, rel } of files) {
+      if (rel.startsWith('idesh/')) continue;
+      const body = readFileSync(path, 'utf8');
+      for (const match of body.matchAll(/from '[^']*\/idesh\/([\w.]+)'/g)) {
+        if (match[1] !== 'index.js') reachAround.push(`${rel} → idesh/${match[1]}`);
       }
     }
     expect(reachAround).toEqual([]);

@@ -32,7 +32,7 @@ private struct Box {
 // MARK: - the app glyphs
 
 enum GlyphKind: String, CaseIterable, Sendable {
-  case food, taxi, delivery, ticket, bill, shop, net, pharmacy, cafe
+  case food, idesh, taxi, delivery, ticket, bill, shop, net, pharmacy, cafe
 }
 
 /// One app's mark. `food` is the only one with a moving part.
@@ -143,6 +143,16 @@ private struct GlyphBody: Shape {
       // a smudge. The steam is drawn separately so it can move.
       circle(12, 14.6, 6.4)
       circle(12, 14.6, 2.6)
+
+    case .idesh:
+      // A cut of ribs: the spine, and three bones hanging from it. The object,
+      // not the animal — a sheep at 34 points is a cloud, and a hook reads as
+      // a fishmonger. Four elements, which is the rule's ceiling.
+      path.move(to: b.p(5, 6))
+      path.addCurve(to: b.p(19, 6), control1: b.p(8.6, 7.4), control2: b.p(15.4, 7.4))
+      run([(8, 7.2), (8, 18.5)])
+      run([(12, 7.6), (12, 19.2)])
+      run([(16, 7.2), (16, 18.5)])
 
     case .taxi:
       rounded(3.2, 10.4, 17.6, 6.2, 1.6)

@@ -15,6 +15,12 @@ export const store = {
   set deviceToken(v) {
     v ? localStorage.setItem('basu.device', v) : localStorage.removeItem('basu.device');
   },
+  get supplierToken() {
+    return localStorage.getItem('basu.supplier');
+  },
+  set supplierToken(v) {
+    v ? localStorage.setItem('basu.supplier', v) : localStorage.removeItem('basu.supplier');
+  },
 };
 
 export class ApiError extends Error {
@@ -146,7 +152,45 @@ export const HEADLINE = {
   REJECTED: ['Татгалзсан', 'Мөнгө бүтэн буцаагдана'],
 };
 
+/**
+ * The same, for an идэш. Shared for the same reason: the launcher and the
+ * page put the same order in front of the same person.
+ */
+export const IDESH_HEADLINE = {
+  DRAFT: ['Төлөгдөөгүй', 'Төлбөр хүлээгдэж байна'],
+  PAID: ['Төлсөн', 'Нийлүүлэгч бэлтгэж эхлэхийг хүлээж байна'],
+  PREPARING: ['Бэлтгэж байна', 'Мал нядлагдаж байна. Цуцлах боломжгүй'],
+  READY: ['Бэлэн', 'Мах бэлэн боллоо'],
+  DISPATCHED: ['Замд', 'Хүргэлтэнд гарлаа'],
+  HANDED: ['Хүлээлгэн өгсөн', 'Сайхан өвөлжөөрэй'],
+  CLOSED: ['Дууслаа', 'Баярлалаа'],
+  CANCELLED: ['Цуцлагдлаа', 'Мөнгө буцаагдана'],
+  REFUNDED: ['Буцаагдлаа', 'Мөнгө таны түрийвчинд орлоо'],
+};
+
+/** What each kind of animal is called, and the word for one of it. */
+export const KIND = {
+  sheep: 'Хонь',
+  goat: 'Ямаа',
+  beef: 'Үхэр',
+  horse: 'Адуу',
+};
+
 export const mnt = (value) => `${Number(value).toLocaleString('mn-MN')}₮`;
+
+/** `2026-11-03` → `11-р сарын 3`. The day, said the way a message says it. */
+export function dayLabel(day) {
+  if (!day) return '—';
+  const [, month, date] = day.split('-');
+  return `${Number(month)}-р сарын ${Number(date)}`;
+}
+
+/** `2026-11-03` → `11/3`. The day, at the size a card corner allows. */
+export function dayShort(day) {
+  if (!day) return '—';
+  const [, month, date] = day.split('-');
+  return `${Number(month)}/${Number(date)}`;
+}
 
 export function hhmm(iso) {
   if (!iso) return '—';

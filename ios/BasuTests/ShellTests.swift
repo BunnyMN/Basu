@@ -99,12 +99,24 @@ struct ShellTests {
 
   // MARK: - the launcher, as it grows
 
-  @Test func oneIconIsOneBandAndTheOnlyLiveApp() {
-    let bands = AppCatalogue.bands(count: 1)
+  @Test func theShippedAppsAreTheLiveOnesAndSitInOneBand() {
+    let bands = AppCatalogue.bands(count: AppCatalogue.shipped.count)
     #expect(bands.count == 1)
     #expect(bands[0].label == "АППУУД")
+    #expect(bands[0].apps.map(\.name) == ["Хоол", "Идэш"])
+    let allLive = bands[0].apps.allSatisfy { $0.isLive }
+    #expect(allLive)
+    // The second app opens its own destination, not the first one's.
+    let opens: Destination? = .idesh(orderId: nil)
+    #expect(bands[0].apps[1].destination == opens)
+  }
+
+  @Test func oneIconStillWorks() {
+    // The state the design drew first. Nothing ships with it any more, but a
+    // grid that only holds up from two icons on is a grid with a hole in it.
+    let bands = AppCatalogue.bands(count: 1)
+    #expect(bands.count == 1)
     #expect(bands[0].apps.map(\.name) == ["Хоол"])
-    #expect(bands[0].apps[0].isLive)
   }
 
   @Test func fourIconsStayInOneBand() {
@@ -113,7 +125,7 @@ struct ShellTests {
     #expect(bands[0].apps.count == 4)
     // Drawn and named, but nothing behind them yet. A tile that opens nothing
     // has to look like it opens nothing.
-    #expect(bands[0].apps.filter(\.isLive).count == 1)
+    #expect(bands[0].apps.filter(\.isLive).count == AppCatalogue.shipped.count)
   }
 
   @Test func nineIconsSplitIntoTheTwoEditorialBands() {

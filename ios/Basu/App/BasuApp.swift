@@ -74,6 +74,8 @@ struct RootView: View {
             switch destination {
             case .dine(let orderId):
               DineView(resuming: orderId)
+            case .idesh(let orderId):
+              IdeshView(resuming: orderId)
             case .inbox:
               InboxView(back: { if !path.isEmpty { path.removeLast() } })
             }
@@ -104,7 +106,12 @@ struct RootView: View {
   /// True while a vertical owns the screen. The shell's own pushes do not
   /// count — the inbox keeps the bar, and keeps Нүүр lit under it.
   private var inApp: Bool {
-    path.contains { if case .dine = $0 { true } else { false } }
+    path.contains {
+      switch $0 {
+      case .dine, .idesh: true
+      case .inbox: false
+      }
+    }
   }
 
   @ViewBuilder private var surface: some View {
@@ -165,6 +172,10 @@ enum Destination: Hashable {
   /// `orderId` is the deep link: the launcher sends somebody straight to the
   /// order they already have, rather than to a map they have to search.
   case dine(orderId: String?)
+
+  /// The second app. Same deep link shape: the launcher sends somebody to
+  /// the order they already have.
+  case idesh(orderId: String?)
 
   /// Reached from the bell, and pushed over the launcher rather than given a
   /// tab — an inbox is somewhere you go back from, not somewhere you live.

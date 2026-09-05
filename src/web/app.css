@@ -92,6 +92,14 @@ button{font:inherit;cursor:pointer}
   border-color:var(--ready-line);color:var(--ready);background:var(--ready-soft)}
 .chip[data-s="CANCELLED"],.chip[data-s="REFUNDED"],.chip[data-s="NO_SHOW"],.chip[data-s="REJECTED"]{
   color:var(--ink-3)}
+/* The идэш states, in the same colours: waiting is blue, committed is the
+   accent, moving is blue again, done is green. */
+.chip[data-s="PAID"],.chip[data-s="DISPATCHED"]{
+  border-color:var(--route-line);color:var(--route);background:var(--route-soft)}
+.chip[data-s="PREPARING"]{
+  border-color:var(--accent);color:var(--accent-ink);background:var(--accent-soft);font-weight:600}
+.chip[data-s="HANDED"]{
+  border-color:var(--ready-line);color:var(--ready);background:var(--ready-soft)}
 
 /* ── toast ────────────────────────────────────────────────────────── */
 #toast{

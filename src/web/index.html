@@ -114,7 +114,7 @@ h2.sec{
 </main>
 
 <script type="module">
-import { api, store, hhmm, mountClock, HEADLINE } from '/api.js';
+import { api, store, hhmm, mountClock, HEADLINE, IDESH_HEADLINE, dayShort } from '/api.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (html) => {
@@ -142,6 +142,20 @@ const APPS = [
              <path d="M2.5 11h19"/>
              <path d="M9 7.5c0-1 1-1.4 1-2.4S9 3.5 9 3.5"/>
              <path d="M13.5 8c0-1.2 1.2-1.7 1.2-2.9s-1.2-1.6-1.2-1.6"/>
+           </svg>`,
+  },
+  {
+    id: 'idesh',
+    name: 'Идэш',
+    tag: 'өвлийн',
+    href: '/idesh',
+    // A cut of ribs: the spine and three bones. The object, not the animal —
+    // a sheep at 34 points is a cloud, and a hook is a fishmonger.
+    icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+             <path d="M5 6c3.6 1.4 10.4 1.4 14 0"/>
+             <path d="M8 7.2v11.3"/>
+             <path d="M12 7.6v11.6"/>
+             <path d="M16 7.2v11.3"/>
            </svg>`,
   },
 ];
@@ -181,46 +195,97 @@ const SUB = {
 };
 
 /**
+ * One row of ИДЭВХТЭЙ, whichever app it came from.
+ *
+ * The section is deliberately not "your lunches": rows are ordered by the
+ * moment that matters, so a sheep arriving Tuesday sits under today's lunch
+ * and above nothing else. Each vertical maps into this shape and the section
+ * does not know the difference.
+ */
+function dineRow(order) {
+  const [word, cap] = HEADLINE[order.state] ?? [order.state, ''];
+  const [time, label] = moment(order);
+  return {
+    at: new Date(order.ready_at ?? order.fire_at ?? order.slot_starts_at),
+    href: `/dine?order=${order.id}`,
+    source: 'Хоол',
+    title: order.restaurant.name,
+    what: SUB[order.state] ?? cap ?? '',
+    code: order.code,
+    state: order.state,
+    word,
+    time,
+    label,
+  };
+}
+
+function ideshRow(order) {
+  const [word, cap] = IDESH_HEADLINE[order.state] ?? [order.state, ''];
+  return {
+    // Noon on the day, in the restaurant's zone: a day, not an instant.
+    at: new Date(`${order.receive_on}T12:00:00+08:00`),
+    href: `/idesh?order=${order.id}`,
+    source: 'Идэш',
+    title: order.supplier.name,
+    what: `${order.title} ×${order.qty} · ${cap}`,
+    code: order.code,
+    state: order.state,
+    word,
+    time: dayShort(order.receive_on),
+    label: order.receive === 'delivery' ? 'ирэх' : 'авах',
+  };
+}
+
+/**
  * The guest's live orders, if there is a guest.
  *
  * No session is created here: signing in is the dine-in app's business, and a
  * launcher that quietly makes an account for anyone who opens it would be
  * lying about what a visit costs. No token simply means nothing to show.
+ *
+ * Two calls, one per vertical, merged here: the launcher is the one place
+ * that knows there are two, and each app's list stays its own.
  */
 async function loadLive() {
   const token = store.guestToken;
   if (!token) return paint([]);
-  try {
-    const { orders } = await api('/v1/orders', { token });
-    paint(orders);
-  } catch (error) {
-    // A token from a reseeded database is dead, not a reason to shout at
-    // somebody who has only just opened the app.
-    if (error.status === 401) store.guestToken = null;
-    paint([]);
-  }
+  const ask = (path, key) =>
+    api(path, { token }).then(
+      (body) => body[key],
+      (error) => {
+        // A token from a reseeded database is dead, not a reason to shout at
+        // somebody who has only just opened the app.
+        if (error.status === 401) store.guestToken = null;
+        return [];
+      },
+    );
+  const [lunches, provisions] = await Promise.all([
+    ask('/v1/orders', 'orders'),
+    ask('/v1/idesh', 'orders'),
+  ]);
+  const rows = [...lunches.map(dineRow), ...provisions.map(ideshRow)];
+  rows.sort((a, b) => a.at - b.at);
+  paint(rows);
 }
 
-function paint(orders) {
+function paint(rows) {
   const list = $('live-list');
   list.replaceChildren();
-  if (!orders.length) {
+  if (!rows.length) {
     $('live').removeAttribute('data-any');
     return;
   }
-  $('live').dataset.any = String(orders.length);
+  $('live').dataset.any = String(rows.length);
 
-  for (const order of orders) {
-    const [word, cap] = HEADLINE[order.state] ?? [order.state, ''];
-    const [time, label] = moment(order);
+  for (const row of rows) {
     const card = el(`
-      <a class="card" href="/dine?order=${order.id}">
+      <a class="card" href="${row.href}" data-source="${row.source}">
         <span class="who">
-          <span class="venue">${order.restaurant.name}</span>
-          <span class="what">${SUB[order.state] ?? cap ?? ''}</span>
-          <span class="code">№${order.code}<span class="chip" data-s="${order.state}">${word}</span></span>
+          <span class="venue">${row.title}</span>
+          <span class="what">${row.what}</span>
+          <span class="code">${row.source} · №${row.code}<span class="chip" data-s="${row.state}">${row.word}</span></span>
         </span>
-        <span class="when">${time}<small>${label}</small></span>
+        <span class="when">${row.time}<small>${row.label}</small></span>
       </a>`);
     list.append(card);
   }

@@ -27,6 +27,8 @@ export async function truncateAll(db: Db = getPool()): Promise<void> {
              dine.order_line, dine.station_reservation, dine.dish_review, dine.order_review,
              dine.dining_order, dine.slot, dine.dining_table, dine.menu_item, dine.station,
              dine.trust_profile, dine.kds_device, dine.restaurant,
+             idesh.order_event, idesh.idesh_order, idesh.listing, idesh.supplier_device,
+             idesh.supplier,
              identity.profile, identity.guest_session, identity.guest, identity.otp_challenge
     RESTART IDENTITY CASCADE
   `);

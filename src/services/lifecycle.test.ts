@@ -204,7 +204,7 @@ describe('the whole journey', () => {
     await tick(ctx, { spacingMs: 0 });
 
     expect((await readOrder(orderId)).state).toBe('CLOSED');
-    expect(tax.issued).toEqual([{ orderCode: code, kind: 'SALE', amountMnt: totalMnt }]);
+    expect(tax.issued).toMatchObject([{ orderCode: code, kind: 'SALE', amountMnt: totalMnt }]);
     expect((await reconcile()).gap).toBe(0);
 
     expect(await journey(orderId)).toEqual([

@@ -42,6 +42,7 @@ import { registerMapRoutes } from './tiles.js';
 import { registerDishRoutes } from './dishes.js';
 import { registerRouteRoutes } from './route.js';
 import { registerPlatformRoutes } from './platform.js';
+import { registerIdeshRoutes } from './idesh.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -114,6 +115,9 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
   // Who you are, what you have, what you were told. Mounted after the guard
   // exists because every one of them needs it. See src/api/platform.ts.
   await registerPlatformRoutes(app, ctx, requireGuest);
+  // The second vertical. Its own file for the same reason platform is: when
+  // идэш moves out of this process, this is the mount that goes with it.
+  await registerIdeshRoutes(app, ctx, { requireGuest, dev: options.dev ?? false });
 
   /** A guest may only ever touch their own order. */
   const ownedByGuest = async (orderId: string, guestId: string): Promise<boolean> => {
@@ -846,6 +850,9 @@ async function mountDevRoutes(
   // `/` is the Basu home screen; the dine-in pre-order app is one icon on it.
   app.get('/dine', (_request, reply) => reply.sendFile('dine.html'));
   app.get('/kds', (_request, reply) => reply.sendFile('kds.html'));
+  // The second app on the home screen, and the screen its suppliers hold.
+  app.get('/idesh', (_request, reply) => reply.sendFile('idesh.html'));
+  app.get('/supplier', (_request, reply) => reply.sendFile('supplier.html'));
   app.get('/ops', (_request, reply) => reply.sendFile('ops.html'));
 
   const clock = ctx.clock as { setTo?: (v: string) => void; advanceMinutes?: (m: number) => void };

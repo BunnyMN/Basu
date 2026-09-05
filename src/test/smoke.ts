@@ -330,10 +330,102 @@ async function main(): Promise<void> {
     `      HELD ${opsHealth.body.held} · хоцорсон ${opsHealth.body.late} · офлайн ${opsHealth.body.offline}`,
   );
 
+  /* ── the second vertical ───────────────────────────────────────── */
+  await idesh(guest);
+
   console.log(
     `\n${failures === 0 ? '✓' : '✗'} ${checks - failures}/${checks} шалгалт өнгөрлөө\n`,
   );
   if (failures > 0) process.exit(1);
+}
+
+/**
+ * Өвлийн идэш, over the same wire: a stall is listed, the guest pays for a
+ * sheep, the supplier walks it to the handover, and nobody else can touch it.
+ *
+ * The demo guest holds 50 000₮ and a sheep costs more, so this is also the
+ * «дутвал зөрүүг нь татна» path exercised for real.
+ */
+async function idesh(guest: string): Promise<void> {
+  console.log('\nӨвлийн идэш');
+
+  const listed = await call<{
+    today: string;
+    listings: Array<{
+      id: string;
+      title: string;
+      unit: string;
+      remaining: number;
+      ready_from: string;
+      price_mnt: number;
+      supplier: { id: string; name: string; contracted: boolean };
+    }>;
+  }>('/v1/idesh/listings');
+  check(`${listed.body.listings.length} зар, бүгд гэрээт нийлүүлэгчээс`,
+    listed.body.listings.length >= 10 && listed.body.listings.every((l) => l.supplier.contracted));
+  const stall = listed.body.listings.find((l) => l.unit === 'whole' && l.remaining > 0);
+  check('бүтэн малын зар байна', Boolean(stall), listed.body);
+  if (!stall) return;
+
+  const created = await call<{ id: string; code: string; total_mnt: number }>('/v1/idesh', {
+    method: 'POST',
+    token: guest,
+    key: `${RUN}-idesh`,
+    body: { listing_id: stall.id, qty: 1, receive: 'pickup', receive_on: stall.ready_from },
+  });
+  check(`№${created.body.code} үүслээ (${stall.title})`, created.status === 201, created.body);
+  const id = created.body.id;
+
+  const paid = await call<{ state: string }>(`/v1/idesh/${id}/pay`, { method: 'POST', token: guest });
+  check(`бүтэн үнэ ${created.body.total_mnt.toLocaleString('mn-MN')}₮ нэг удаа төлөгдлөө`,
+    paid.body.state === 'PAID', paid.body);
+
+  const detail = await call<{ state: string; supplier_phone: string | null; can_cancel: boolean }>(
+    `/v1/idesh/${id}`, { token: guest });
+  check('төлсний дараа нийлүүлэгчийн утас харагдана', Boolean(detail.body.supplier_phone), detail.body);
+
+  const live = await call<{ orders: Array<{ id: string }> }>('/v1/idesh', { token: guest });
+  check('нүүрний жагсаалтад орлоо', live.body.orders.some((o) => o.id === id));
+
+  /* the supplier */
+  const screen = await call<{ token: string }>('/dev/supplier-token', {
+    method: 'POST', body: { supplier_id: stall.supplier.id },
+  });
+  check('нийлүүлэгчийн дэлгэц холбогдлоо', screen.status === 200, screen.body);
+  const supplier = screen.body.token;
+
+  const board = await call<{ lanes: { paid: Array<{ id: string }> } }>('/v1/supplier/board', { token: supplier });
+  check('идэш нийлүүлэгчийн дэлгэц дээр гарлаа', board.body.lanes.paid.some((t) => t.id === id), board.body);
+
+  const prepared = await call(`/v1/supplier/orders/${id}/prepare`, { method: 'POST', token: supplier, body: {} });
+  check('нийлүүлэгч бэлтгэж эхэллээ', prepared.status === 200, prepared.body);
+
+  const tooLate = await call(`/v1/idesh/${id}/cancel`, { method: 'POST', token: guest });
+  check('бэлтгэж эхэлсний дараа цуцлах боломжгүй',
+    tooLate.status === 409 && tooLate.body.error?.code === 'TOO_LATE_TO_CANCEL', tooLate.body);
+
+  const ready = await call(`/v1/supplier/orders/${id}/ready`, { method: 'POST', token: supplier, body: {} });
+  check('мах бэлэн', ready.status === 200, ready.body);
+  const handed = await call(`/v1/supplier/orders/${id}/hand`, { method: 'POST', token: supplier, body: {} });
+  check('хүлээлгэн өгсөн', handed.status === 200, handed.body);
+
+  const final = await call<{ state: string }>(`/v1/idesh/${id}`, { token: guest });
+  check('төлөв HANDED', final.body.state === 'HANDED', final.body);
+
+  /* isolation */
+  const suppliers = await call<{ suppliers: Array<{ id: string }> }>('/dev/suppliers');
+  const rival = suppliers.body.suppliers.find((s) => s.id !== stall.supplier.id);
+  if (rival) {
+    const rivalScreen = await call<{ token: string }>('/dev/supplier-token', {
+      method: 'POST', body: { supplier_id: rival.id },
+    });
+    const meddle = await call(`/v1/supplier/orders/${id}/hand`, {
+      method: 'POST', token: rivalScreen.body.token, body: {},
+    });
+    check('өөр нийлүүлэгч энэ идэшинд хүрч чадахгүй', meddle.status === 403, meddle.body);
+  }
+  const noToken = await call(`/v1/idesh/${id}`);
+  check('токенгүй бол 401', noToken.status === 401);
 }
 
 function hhmm(iso: string | null): string {

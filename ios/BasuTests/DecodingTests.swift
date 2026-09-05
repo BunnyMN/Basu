@@ -47,6 +47,34 @@ struct DecodingTests {
     #expect(order.fireAt == nil)
   }
 
+  @Test func aLiveIdeshCarriesADayNotAnInstant() throws {
+    let order = try decode(LiveIdesh.self, """
+      {
+        "id": "8c1f2a2e-1d1e-4b4a-9f0e-2b1a3c4d5e6f",
+        "code": "7003",
+        "state": "PAID",
+        "supplier": { "id": "s1", "name": "Архангай · Дорж" },
+        "kind": "sheep",
+        "unit": "whole",
+        "title": "Хонь, залуу ирэг",
+        "qty": 1,
+        "total_mnt": 460000,
+        "receive": "pickup",
+        "receive_on": "2026-11-03",
+        "paid_at": "2026-10-01T04:12:00.000Z"
+      }
+      """)
+
+    #expect(order.code == "7003")
+    #expect(order.state == .paid)
+    #expect(order.supplier.name == "Архангай · Дорж")
+    #expect(order.receiveOnDay == "2026-11-03")
+    // The day is sorted as noon in Ulaanbaatar and printed as a day.
+    #expect(Format.day(order.receiveOn) == "11/3")
+    #expect(order.asLiveItem().timeLabel == "АВАХ")
+    #expect(order.asLiveItem().when == "11/3")
+  }
+
   @Test func anUnknownStateDoesNotBrickThePhone() throws {
     // A server that learns a new state should not take the app down with it.
     let order = try decode(LiveOrder.self, """
