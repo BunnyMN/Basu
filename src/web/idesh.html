@@ -101,9 +101,13 @@ button{touch-action:manipulation}
 .listing .left[data-low]{color:var(--hold);font-weight:600}
 .listing .left[data-gone]{color:var(--stop);font-weight:600}
 .listing .price{text-align:right;flex:none}
+/* Money is one colour on this page, and nothing else is that colour: a
+   glance finds every price, on the list, in the stall, at the foot. */
+:root{--price:var(--accent-ink)}
+.money,.listing .price b,.foot-row .sum b,.review .r.total b{color:var(--price)}
 .listing .price b{
-  display:block;font-family:"IBM Plex Mono",monospace;font-size:1.02rem;font-weight:600;
-  font-variant-numeric:tabular-nums;letter-spacing:-.01em;color:var(--ink);
+  display:block;font-family:"IBM Plex Mono",monospace;font-size:1.06rem;font-weight:700;
+  font-variant-numeric:tabular-nums;letter-spacing:-.01em;
 }
 .listing .price small{display:block;font-size:.68rem;color:var(--ink-3);margin-top:1px}
 .verified{
@@ -688,7 +692,7 @@ function renderDetail({ replace = false } = {}) {
   if (l.note) body.append(el(`<div class="about">${escapeHtml(l.note)}</div>`));
   body.append(
     el(`<div class="facts">
-          <div><span class="lab">Үнэ</span><b>${mnt(l.price_mnt)} / ${unitWord(l)}</b></div>
+          <div><span class="lab">Үнэ</span><b class="money">${mnt(l.price_mnt)} / ${unitWord(l)}</b></div>
           <div><span class="lab">${l.unit === 'whole' ? 'Ойролцоо жин' : 'Доод захиалга'}</span><b>${
             l.unit === 'whole' ? `~${l.approx_kg} кг` : `${l.min_qty} кг`
           }</b></div>
@@ -721,7 +725,8 @@ function renderDetail({ replace = false } = {}) {
     </div>`);
   const paintQty = () => {
     qty.querySelector('#qty').innerHTML = `${f.qty}<small>${unitWord(l)}</small>`;
-    qty.querySelector('#sumline').textContent = `${f.qty} ${unitWord(l)} × ${mnt(l.price_mnt)} = ${mnt(l.price_mnt * f.qty)}`;
+    qty.querySelector('#sumline').innerHTML =
+      `${f.qty} ${unitWord(l)} × ${mnt(l.price_mnt)} = <b class="money">${mnt(l.price_mnt * f.qty)}</b>`;
     qty.querySelector('[data-d="-1"]').disabled = f.qty <= l.min_qty;
     qty.querySelector('[data-d="1"]').disabled = f.qty >= l.remaining;
   };
@@ -748,7 +753,7 @@ function renderDetail({ replace = false } = {}) {
         <button class="choice" type="button" role="radio" data-r="delivery" aria-checked="${f.receive === 'delivery'}"${l.delivers ? '' : ' disabled'}>
           <span class="dot">${MARK.check}</span>
           <span class="txt"><b>Гэрт хүргүүлнэ</b><small>${l.delivers ? 'Нийлүүлэгч таны хаяг руу хүргэнэ' : 'Энэ нийлүүлэгч хүргэлт хийдэггүй'}</small></span>
-          <span class="tag">${l.delivers ? `+${mnt(l.delivery_fee_mnt)}` : ''}</span>
+          <span class="tag money">${l.delivers ? `+${mnt(l.delivery_fee_mnt)}` : ''}</span>
         </button>
       </div>
     </div>`);
@@ -1183,7 +1188,7 @@ async function showStatus(force, { replace = false } = {}) {
   pay.append(
     el(`<div class="line">${MARK.wallet}<div>
           <span class="lab">Төлсөн дүн</span>
-          <div class="v"><span class="mono">${mnt(order.total_mnt)}</span><small>Түрийвчнээс · ${
+          <div class="v"><span class="mono money">${mnt(order.total_mnt)}</span><small>Түрийвчнээс · ${
             order.delivery_fee_mnt ? `хүргэлт ${mnt(order.delivery_fee_mnt)} орсон` : 'нэмэлт төлбөр гарахгүй'
           }</small></div>
         </div></div>`),
