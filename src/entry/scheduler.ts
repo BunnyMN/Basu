@@ -1,8 +1,8 @@
 import '../env.js';
 import { closePool } from '../db/pool.js';
-import { buildClock, mode } from '../mode.js';
+import { mode } from '../mode.js';
 import { run } from '../scheduler/runner.js';
-import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
+import { buildProviders } from './providers.js';
 
 /**
  * The scheduler runs as its own process, separate from the API.
@@ -21,12 +21,7 @@ if (mode() === 'demo') {
   process.exit(0);
 }
 
-const ctx: Ctx = {
-  clock: buildClock(),
-  payments: new FakePaymentProvider(),
-  tax: new FakeTaxProvider(),
-  notifier: new FakeNotifier(),
-};
+const ctx = buildProviders((line) => console.log(line.replace('[providers]', '[scheduler]')));
 
 const intervalMs = Number(process.env['SCHEDULER_TICK_MS'] ?? 1000);
 const stop = await run(ctx, intervalMs);

@@ -21,10 +21,16 @@ export {
 } from './messages.js';
 
 export {
+  activityCards,
   activityTokensFor,
   devicesOf,
+  forgetActivityToken,
+  markActivityPushed,
   registerActivityToken,
   registerDevice,
   revokeDevice,
+  type ActivityCard,
   type Device,
 } from './devices.js';
+
+export { ApnsClient, ApnsNotifier, apnsConfigFromEnv, type ApnsConfig } from './apns.js';

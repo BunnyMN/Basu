@@ -599,11 +599,23 @@ Lock screen карт, Dynamic Island (compact, expanded, minimal) ба нүүр�
 (small, medium) бүгд нэг гурван шатыг харуулна — Хүлээгдэж байна / Гал дээр /
 Ширээ бэлэн. Хувь хэзээ ч тооцоологдохгүй: гурван хэсэгт бар, гурван төлөв.
 
-Апп өөрөө activity-гаа poll бүр дээр шинэчилнэ. ActivityKit-ийн push токен
-`POST /v1/activities/:id/token`-д бүртгэгдэнэ (`notify.activity_token`), гэхдээ
-серверээс APNs руу илгээх relay хараахан байхгүй — APNs итгэмжлэл орж ирэхэд
-тэр нэг газарт нэмэгдэнэ. Widget App Group (`group.mn.basu.shared`) дахь
-snapshot-оос уншина; апп захиалга өөрчлөгдөх бүрд бичнэ.
+Апп нээлттэй байхдаа activity-гаа poll бүр дээр өөрөө шинэчилнэ. Хаалттай
+байхад **сервер push-ээр хөдөлгөнө**: ActivityKit-ийн токен
+`POST /v1/activities/:id/token`-д бүртгэгдэж (`notify.activity_token`),
+scheduler tick бүрд карттай захиалга бүрийн байх ёстой төлвийг тооцоод
+(`src/services/activities.ts`), сүүлд илгээснээс ялгаатай бол л APNs руу
+явуулна — төлөв солигдсон ч, гал тавих цаг зөөгдсөн ч. Гал дээр гарах, хоол
+бэлэн болох хоёр нь lock screen-ийг сэрээх alert-тэй; суух/цуцлах нь `end`.
+Apple «токен үхсэн» гэвэл мартана, бусад алдаа дараагийн tick дахин оролдоно.
+Widget App Group (`group.mn.basu.shared`) дахь snapshot-оос уншина; апп
+захиалга өөрчлөгдөх бүрд бичнэ.
+
+APNs-ийг `src/platform/notify/apns.ts` шууд ярьдаг (HTTP/2, `.p8`-аар ES256
+JWT, сангүй). `.env`-д `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_KEY_FILE` гурав
+байвал бодит, байхгүй бол Fake — сервер boot дээр аль нь болохоо хэлнэ.
+`APNS_ENV=sandbox` нь Xcode-оос суулгасан build-д, `production` нь
+TestFlight/App Store-д. Утасны Debug build push entitlement-гүй тул
+серверийн push-ийг шалгахад **Release build** хэрэгтэй.
 
 Утасны цаг демо цагтай зөрөх үед lock screen нь утасныхаа цагийг дагана:
 бодит цагаар 15 минутаас өмнө өнгөрсөн суулт activity ч биш, widget ч биш.
@@ -655,5 +667,4 @@ smoke` ба `pages.test.ts` түүнийг батална, iOS-ийн тест �
 - [ ] Ops консол (гар удирдлага, буцаалт, төхөөрөмж цуцлах)
 - [ ] Ачааллын тест — үдийн оргилын p95
 - [ ] Service worker + Home Screen-д нэмэх урсгал (iOS push-ийн урьдчилсан нөхцөл)
-- [ ] APNs: төхөөрөмжийн токен бүртгэх endpoint + `ports.ts`-д адаптер
-      (одоо мэдэгдэл зөвхөн SMS-ээр)
+- [x] APNs: адаптер ба Live Activity relay (итгэмжлэл орж ирэхэд `.env`-д)

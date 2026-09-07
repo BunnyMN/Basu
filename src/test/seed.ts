@@ -21,7 +21,7 @@ export interface SeededRestaurant {
 export async function truncateAll(db: Db = getPool()): Promise<void> {
   await db.query(`
     TRUNCATE outbox, idempotency_key,
-             notify.message, notify.device, notify.preference,
+             notify.message, notify.device, notify.preference, notify.activity_token,
              ledger.ebarimt_receipt, ledger.payment, ledger.topup, ledger.entry, ledger.transfer,
              dine.order_event, dine.fire_job, dine.arrival_signal, dine.table_hold,
              dine.order_line, dine.station_reservation, dine.dish_review, dine.order_review,

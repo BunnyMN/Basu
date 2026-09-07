@@ -7,6 +7,7 @@ import { processReceipts } from '../platform/ledger/index.js';
 import { housekeeping as ideshHousekeeping } from '../idesh/index.js';
 import { claimDueJobs, findOverdue, fireOne } from './fireJobs.js';
 import type { Ctx } from '../ports.js';
+import { relayActivities } from '../services/activities.js';
 
 /**
  * One pass of the scheduler.
@@ -31,6 +32,9 @@ export interface TickReport {
   /** Idesh drafts that gave their animal back, and handovers that closed. */
   ideshExpired: number;
   ideshClosed: number;
+  /** Lock screen cards moved by push, and cards taken down. */
+  activitiesUpdated: number;
+  activitiesEnded: number;
 }
 
 const EMPTY: TickReport = {
@@ -46,6 +50,8 @@ const EMPTY: TickReport = {
   abandoned: 0,
   ideshExpired: 0,
   ideshClosed: 0,
+  activitiesUpdated: 0,
+  activitiesEnded: 0,
 };
 
 /** Fire tickets are spaced so a 12:00 crush does not flood the tablet at once. */
@@ -118,6 +124,12 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
   report.relayed = await relayOutbox(ctx);
   report.notified = await relayNotifications(ctx);
   report.receipts = (await processReceipts(ctx)).issued;
+
+  /* 8. The lock screens. After everything above, so one push carries the
+   *    tick's whole result rather than each step's. */
+  const activities = await relayActivities(ctx);
+  report.activitiesUpdated = activities.updated;
+  report.activitiesEnded = activities.ended;
 
   return report;
 }

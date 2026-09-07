@@ -29,4 +29,34 @@ struct BasuKitTests {
     #expect(back == snap)
     #expect(back.url.absoluteString == "basu://order/o1")
   }
+
+  @Test func theServersPushAndTheAppsOwnEncodingBothDecodeAsContentState() throws {
+    // What the relay sends (src/services/activities.ts): ISO 8601 text.
+    let pushed = try JSONDecoder().decode(
+      BasuActivityAttributes.ContentState.self,
+      from: Data("""
+        {"stage":"cooking","stageLabel":"Гал дээр гарлаа","seatingTime":"2026-09-05T04:30:00.000Z","fireTime":null}
+        """.utf8),
+    )
+    #expect(pushed.stage == .cooking)
+    #expect(pushed.stageLabel == "Гал дээр гарлаа")
+    #expect(pushed.seatingTime == Date(timeIntervalSince1970: 1_788_582_600))
+    #expect(pushed.fireTime == nil)
+
+    // What the app itself writes: Swift's default, seconds since 2001.
+    let own = BasuActivityAttributes.ContentState(
+      stage: .ready, seatingTime: Date(timeIntervalSince1970: 1_788_582_600),
+      fireTime: Date(timeIntervalSince1970: 1_788_580_000), stageLabel: "Ширээ бэлэн",
+    )
+    let back = try JSONDecoder().decode(BasuActivityAttributes.ContentState.self, from: JSONEncoder().encode(own))
+    #expect(back == own)
+
+    // A stage the phone has never heard of does not take the card down.
+    let future = try JSONDecoder().decode(
+      BasuActivityAttributes.ContentState.self,
+      from: Data(#"{"stage":"plated","stageLabel":"Тавагласан","seatingTime":"2026-09-05T04:30:00Z"}"#.utf8),
+    )
+    #expect(future.stage == .waiting)
+    #expect(future.fireTime == nil)
+  }
 }

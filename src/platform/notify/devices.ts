@@ -116,3 +116,48 @@ export async function activityTokensFor(subject: string, subjectId: string): Pro
   );
   return rows.map((r) => r.push_token);
 }
+
+/** One lock screen card that the server may need to move. */
+export interface ActivityCard {
+  guestId: string;
+  subjectId: string;
+  pushToken: string;
+  /** What this token was last told, or null if nothing has landed yet. */
+  pushedHash: string | null;
+}
+
+/** Every card out there for one subject kind — `order` — oldest first. */
+export async function activityCards(subject: string): Promise<ActivityCard[]> {
+  const { rows } = await getPool().query<{
+    guest_id: string;
+    subject_id: string;
+    push_token: string;
+    pushed_hash: string | null;
+  }>(
+    `SELECT guest_id, subject_id, push_token, pushed_hash
+       FROM notify.activity_token WHERE subject = $1 ORDER BY created_at`,
+    [subject],
+  );
+  return rows.map((r) => ({
+    guestId: r.guest_id,
+    subjectId: r.subject_id,
+    pushToken: r.push_token,
+    pushedHash: r.pushed_hash,
+  }));
+}
+
+export async function markActivityPushed(pushToken: string, subjectId: string, hash: string, at: Date): Promise<void> {
+  await getPool().query(
+    `UPDATE notify.activity_token SET pushed_hash = $3, pushed_at = $4
+      WHERE push_token = $1 AND subject_id = $2`,
+    [pushToken, subjectId, hash, at],
+  );
+}
+
+/** The activity ended, or Apple said the token is dead: nothing more to send. */
+export async function forgetActivityToken(pushToken: string, subjectId?: string): Promise<void> {
+  await getPool().query(
+    `DELETE FROM notify.activity_token WHERE push_token = $1 AND ($2::text IS NULL OR subject_id = $2)`,
+    [pushToken, subjectId ?? null],
+  );
+}

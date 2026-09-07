@@ -63,8 +63,38 @@ export interface OutgoingMessage {
   body: string;
 }
 
+/**
+ * A Live Activity on a lock screen, moved from the server.
+ *
+ * `contentState` is whatever the app's `ActivityAttributes.ContentState`
+ * decodes — the shape is the app's, notify carries it untouched. `end` takes
+ * the card off the lock screen; iOS keeps it visible until `dismissAt` and
+ * then removes it on its own.
+ */
+export interface ActivityPush {
+  token: string;
+  event: 'update' | 'end';
+  contentState: Record<string, unknown>;
+  alert?: { title: string; body: string };
+  /** After this the card is greyed as out of date. */
+  staleAt?: Date;
+  /** With `end`: when the finished card disappears. */
+  dismissAt?: Date;
+}
+
+export class PushTokenGone extends Error {
+  constructor(readonly token: string) {
+    super('the push token is no longer valid');
+  }
+}
+
 export interface Notifier {
   send(message: OutgoingMessage): Promise<{ providerRef: string }>;
+  /**
+   * Throws `PushTokenGone` when the provider says the token is dead, so the
+   * caller can forget it rather than retry it forever.
+   */
+  pushActivity(push: ActivityPush): Promise<{ providerRef: string }>;
 }
 
 /* ── the bundle services take ──────────────────────────────────────── */
@@ -143,8 +173,11 @@ export class FakeTaxProvider implements TaxProvider {
 
 export class FakeNotifier implements Notifier {
   readonly sent: OutgoingMessage[] = [];
+  readonly activities: ActivityPush[] = [];
   /** Simulates the push provider dying so traffic falls back to SMS. */
   failChannel: 'push' | 'sms' | null = null;
+  /** Tokens APNs would answer 410 for. */
+  readonly deadTokens = new Set<string>();
   #seq = 0;
 
   async send(message: OutgoingMessage): Promise<{ providerRef: string }> {
@@ -153,6 +186,13 @@ export class FakeNotifier implements Notifier {
     }
     this.sent.push(message);
     return { providerRef: `msg-${++this.#seq}` };
+  }
+
+  async pushActivity(push: ActivityPush): Promise<{ providerRef: string }> {
+    if (this.deadTokens.has(push.token)) throw new PushTokenGone(push.token);
+    if (this.failChannel === 'push') throw new Error('push provider unavailable');
+    this.activities.push(push);
+    return { providerRef: `act-${++this.#seq}` };
   }
 
   of(template: string): OutgoingMessage[] {

@@ -43,6 +43,45 @@ public struct BasuActivityAttributes: ActivityAttributes {
       self.fireTime = fireTime
       self.stageLabel = stageLabel
     }
+
+    /**
+     Two sources write this state and they write dates differently.
+
+     The app encodes it itself, and Swift's default for a `Date` is a number:
+     seconds since 2001. The server's push writes the ISO 8601 text every
+     other payload uses (`2026-09-05T04:30:00.000Z`), because a payload the
+     eye can check beats one it cannot, and the relay's tests compare the
+     text. So a date here is read by type: a string is ISO 8601, a number is
+     Swift's own. An unknown stage — a server that learned a new one — is
+     read as waiting rather than taking the card down.
+     */
+    public init(from decoder: Decoder) throws {
+      let c = try decoder.container(keyedBy: CodingKeys.self)
+      stage = (try? c.decode(OrderStage.self, forKey: .stage)) ?? .waiting
+      stageLabel = try c.decode(String.self, forKey: .stageLabel)
+      seatingTime = try Self.date(c, .seatingTime) ?? { throw DecodingError.keyNotFound(CodingKeys.seatingTime, .init(codingPath: c.codingPath, debugDescription: "seatingTime")) }()
+      fireTime = try Self.date(c, .fireTime)
+    }
+
+    private enum CodingKeys: String, CodingKey { case stage, seatingTime, fireTime, stageLabel }
+
+    private static func date(_ c: KeyedDecodingContainer<CodingKeys>, _ key: CodingKeys) throws -> Date? {
+      // Absent and null both mean "no such time" — the server writes null,
+      // a hand-written payload may leave the key out.
+      if !c.contains(key) { return nil }
+      if try c.decodeNil(forKey: key) { return nil }
+      if let text = try? c.decode(String.self, forKey: key) {
+        // Formatters are not Sendable, and a push is decoded once; two
+        // throwaway ones cost less than a lock.
+        let withFraction = ISO8601DateFormatter()
+        withFraction.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = withFraction.date(from: text) ?? ISO8601DateFormatter().date(from: text) else {
+          throw DecodingError.dataCorruptedError(forKey: key, in: c, debugDescription: "not an ISO 8601 date: \(text)")
+        }
+        return date
+      }
+      return try c.decode(Date.self, forKey: key)
+    }
   }
 
   public var orderID: String
