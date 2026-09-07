@@ -36,6 +36,10 @@ body{display:flex;flex-direction:column}
   letter-spacing:.02em;color:var(--accent-ink);
 }
 .home:hover{border-color:var(--accent-line)}
+/* Inside the phone app the way back is where iOS puts one — the leading
+   edge — and the badge steps aside to the right. */
+.in-shell .home{left:12px;right:auto}
+.in-shell .badge{left:auto;right:12px;max-width:calc(100% - 110px);text-align:right}
 .badge span{font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--ink-3)}
 
 /* The walk, when a venue is open and we know where the guest is. */

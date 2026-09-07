@@ -106,6 +106,13 @@ export const shell = {
   },
 };
 
+// Pages style the seam with one class: inside the shell the way back sits
+// where iOS puts a back control, on the leading edge, and nothing a
+// developer needs is drawn.
+if (shell.present && typeof document !== 'undefined') {
+  document.documentElement.classList.add('in-shell');
+}
+
 /* ── toast ─────────────────────────────────────────────────────────── */
 
 let toastTimer;
@@ -133,6 +140,13 @@ export function toast(message, kind) {
  * scheduler pass, because otherwise time moves and nothing acts on it.
  */
 export function mountClock(onChange) {
+  // The strip is the developer's: a phone inside the shell is not a
+  // developer's browser, and a production server has no /dev/clock to move.
+  // Neither gets the strip; the page's data loads on its own either way.
+  if (shell.present) {
+    onChange?.();
+    return async () => {};
+  }
   const bar = document.createElement('div');
   bar.className = 'clockbar';
   bar.innerHTML = `
@@ -181,7 +195,11 @@ export function mountClock(onChange) {
     }
   });
 
-  refresh();
+  refresh().catch(() => {
+    // No /dev/clock: production. The strip has nothing to control.
+    bar.remove();
+    onChange?.();
+  });
   return refresh;
 }
 
