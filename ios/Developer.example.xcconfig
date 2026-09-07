@@ -16,3 +16,10 @@
 // `//` starts a comment, so the URL is written with $() in the middle:
 //
 // BASU_API = http:/$()/192.168.1.20:3000
+//
+// Your team, if Xcode should not guess it. A team in the Developer Program
+// can also sign a debug build with push — set both to test the server's
+// push from a phone:
+//
+// DEVELOPMENT_TEAM = XXXXXXXXXX
+// BASU_DEBUG_ENTITLEMENTS = Basu/Basu.entitlements

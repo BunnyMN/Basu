@@ -33,6 +33,12 @@ settings:
     BASU_ID_SUFFIX: ""
     # BASU_API — where a debug build on a real phone finds the API.
     BASU_API: ""
+    # BASU_DEBUG_ENTITLEMENTS — which entitlements a debug build signs with.
+    # The default has no push, so a free personal team can build; a team in
+    # the Developer Program sets Basu/Basu.entitlements in Developer.xcconfig
+    # and gets push tokens on a debug build too, which is how the server's
+    # push is tested from a phone without a release build.
+    BASU_DEBUG_ENTITLEMENTS: Basu/Basu.debug.entitlements
 
 # Shared by the app and the widget extension: tokens, the activity attributes,
 # the order snapshot both read. It imports nothing from the app.
@@ -126,7 +132,7 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
       configs:
         Debug:
-          CODE_SIGN_ENTITLEMENTS: Basu/Basu.debug.entitlements
+          CODE_SIGN_ENTITLEMENTS: $(BASU_DEBUG_ENTITLEMENTS)
         Release:
           CODE_SIGN_ENTITLEMENTS: Basu/Basu.entitlements
 
