@@ -1120,7 +1120,7 @@ function refundPanel(order) {
     panel.append(
       el(`<div class="line">${MARK.wallet}<div>
             <span class="lab">Буцаалт авах данс</span>
-            <div class="v">${mnt(r.amount_mnt)}<small>Аль банкны ямар данс руу шилжүүлэхийг бичнэ үү. Basu шилжүүлмэгц SMS ирнэ.</small></div>
+            <div class="v"><span class="mono money">${mnt(r.amount_mnt)}</span><small>Аль банкны ямар данс руу шилжүүлэхийг бичнэ үү. Basu шилжүүлмэгц SMS ирнэ.</small></div>
             <div class="field"><label for="bank">Банк</label>
               <input id="bank" list="banks" placeholder="Хаан банк" autocomplete="off">
               <datalist id="banks">${BANKS.map((b) => `<option value="${b}">`).join('')}</datalist></div>
@@ -1171,7 +1171,7 @@ function refundPanel(order) {
   panel.append(
     el(`<div class="line">${r.state === 'paid' ? MARK.check : MARK.wallet}<div>
           <span class="lab">${r.state === 'paid' ? 'Буцаалт шилжүүлсэн' : 'Буцаалт'}</span>
-          <div class="v">${mnt(r.amount_mnt)}<small>${escapeHtml(r.bank_name ?? '')} · ${escapeHtml(r.bank_account ?? '')} · ${escapeHtml(r.bank_holder ?? '')}${
+          <div class="v"><span class="mono money">${mnt(r.amount_mnt)}</span><small>${escapeHtml(r.bank_name ?? '')} · ${escapeHtml(r.bank_account ?? '')} · ${escapeHtml(r.bank_holder ?? '')}${
             r.state === 'paid' ? `<br>Шилжүүлсэн ${r.paid_at ? `${dayShort(r.paid_at.slice(0, 10))} ${clockOf(r.paid_at)}` : ''}` : '<br>Basu ажлын өдөрт шилжүүлж, SMS илгээнэ.'
           }</small></div>
         </div></div>`),
@@ -1237,6 +1237,10 @@ async function showStatus(force, { replace = false } = {}) {
     card.append(timeline);
   }
   body.append(card);
+
+  // A cancelled order asks one thing of the guest — where the money goes —
+  // so that comes before anything they already know.
+  if (order.refund) body.append(refundPanel(order));
 
   // The code is what the guest shows at the handover: big, because it will be
   // read across a counter or a courtyard.
@@ -1305,9 +1309,6 @@ async function showStatus(force, { replace = false } = {}) {
     );
   }
   body.append(pay);
-
-  /* the refund: where it goes, and where it stands */
-  if (order.refund) body.append(refundPanel(order));
 
   /* what the guest is holding on to */
   if (live) {
