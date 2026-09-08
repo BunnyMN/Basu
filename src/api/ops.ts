@@ -5,8 +5,12 @@ import {
   createSupplierCode,
   declineSupplier,
   IdeshError,
+  listSettlements,
   listSuppliers,
+  markSettled,
   registerSupplier,
+  updateSupplier,
+  type Settlement,
   type SupplierRow,
 } from '../idesh/index.js';
 import { mode } from '../mode.js';
@@ -67,8 +71,31 @@ const shape = (s: SupplierRow) => ({
   applied_at: s.appliedAt?.toISOString() ?? null,
   contracted_at: s.contractedAt?.toISOString() ?? null,
   decline_reason: s.declineReason,
+  commission_pct: s.commissionPct,
+  bank_name: s.bankName,
+  bank_account: s.bankAccount,
+  bank_holder: s.bankHolder,
   watched: s.watched,
   listings: s.listings,
+});
+
+/** A settlement as the ops page and the supplier's screen read it. */
+export const shapeSettlement = (t: Settlement) => ({
+  id: t.id,
+  kind: t.kind,
+  state: t.state,
+  memo: t.memo,
+  order_id: t.orderId,
+  order_code: t.orderCode,
+  amount_mnt: t.amountMnt,
+  supplier: t.supplier,
+  guest: t.guest,
+  bank_name: t.bank?.bankName ?? null,
+  bank_account: t.bank?.bankAccount ?? null,
+  bank_holder: t.bank?.bankHolder ?? null,
+  reference: t.reference,
+  paid_at: t.paidAt?.toISOString() ?? null,
+  created_at: t.createdAt.toISOString(),
 });
 
 export async function registerOpsRoutes(
@@ -94,7 +121,17 @@ export async function registerOpsRoutes(
 
   /** Ops writes a contracted supplier straight in, as the script does. */
   app.post<{
-    Body: { name?: string; phone?: string; tin?: string; address?: string; lat?: number; lon?: number };
+    Body: {
+      name?: string;
+      phone?: string;
+      tin?: string;
+      address?: string;
+      lat?: number;
+      lon?: number;
+      bank_name?: string;
+      bank_account?: string;
+      bank_holder?: string;
+    };
   }>('/v1/ops/suppliers', asOps, async (request, reply) => {
     const body = request.body ?? {};
     if (!body.name?.trim() || !body.phone || !body.address?.trim()) {
@@ -111,6 +148,9 @@ export async function registerOpsRoutes(
         pickupAddress: body.address,
         lat: typeof body.lat === 'number' ? body.lat : null,
         lon: typeof body.lon === 'number' ? body.lon : null,
+        bankName: body.bank_name,
+        bankAccount: body.bank_account,
+        bankHolder: body.bank_holder,
       });
       const code = await createSupplierCode(ctx, id, 'Нийлүүлэгчийн дэлгэц', 24 * 60);
       return reply.status(201).send({ id, pairing_code: code, expires_in_minutes: 24 * 60 });
@@ -135,6 +175,51 @@ export async function registerOpsRoutes(
       try {
         await declineSupplier(ctx, request.params.id, request.body?.reason ?? '');
         return reply.send({ state: 'declined' });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  /** The contract's terms, written in by whoever signed it. */
+  app.patch<{
+    Params: { id: string };
+    Body: { commission_pct?: number; tin?: string; bank_name?: string; bank_account?: string; bank_holder?: string };
+  }>('/v1/ops/suppliers/:id', asOps, async (request, reply) => {
+    const body = request.body ?? {};
+    if (body.commission_pct !== undefined && typeof body.commission_pct !== 'number') {
+      return badRequest(reply, 'Шимтгэл тоо байх ёстой.', 'commission_pct must be a number');
+    }
+    try {
+      await updateSupplier(request.params.id, {
+        commissionPct: body.commission_pct,
+        merchantTin: body.tin,
+        bankName: body.bank_name,
+        bankAccount: body.bank_account,
+        bankHolder: body.bank_holder,
+      });
+      const row = (await listSuppliers()).find((s) => s.id === request.params.id);
+      return reply.send(row ? shape(row) : { id: request.params.id });
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
+
+  /* ── the list to pay ── */
+
+  /** Everything owed outside, unpaid first. */
+  app.get('/v1/ops/settlements', asOps, async () => ({
+    settlements: (await listSettlements()).map(shapeSettlement),
+  }));
+
+  /** «Шилжүүлсэн»: the bank transfer was made by hand; the ledger and the person owed hear of it. */
+  app.post<{ Params: { id: string }; Body: { reference?: string } }>(
+    '/v1/ops/settlements/:id/paid',
+    asOps,
+    async (request, reply) => {
+      try {
+        const paid = await markSettled(ctx, request.params.id, 'ops', request.body?.reference ?? '');
+        return reply.send(shapeSettlement(paid));
       } catch (error) {
         return sendError(reply, error);
       }

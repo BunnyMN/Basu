@@ -225,22 +225,48 @@ describe('ordering', () => {
     expect(noToken.statusCode).toBe(401);
   });
 
-  it('refunds the guest in full when the supplier cancels — the guest has no cancel of their own', async () => {
+  it('refunds the guest in full when the supplier cancels — to a bank account the guest names', async () => {
     const token = await signIn();
     await topUp(token, 500_000);
     const { id } = await placeAndPay(token);
 
-    // The guest rang, they talked: the supplier cancels from their screen.
+    // The guest rang, they talked: the supplier cancels from their screen —
+    // and must say why, because the reason decides the money.
     const screen = await pairScreen(supplierId);
+    const unsaid = await app.inject({
+      method: 'POST',
+      url: `/v1/supplier/orders/${id}/cancel`,
+      headers: auth(screen),
+      payload: {},
+    });
+    expect(unsaid.statusCode).toBe(409);
+    expect(unsaid.json().error.code).toBe('BAD_REASON');
+
     const cancelled = await app.inject({
       method: 'POST',
       url: `/v1/supplier/orders/${id}/cancel`,
       headers: auth(screen),
-      payload: { reason: 'зочин утсаар хүссэн' },
+      payload: { reason: 'guest_asked' },
     });
-    expect(cancelled.json()).toEqual({ state: 'REFUNDED', refunded: true });
+    expect(cancelled.json()).toEqual({ state: 'CANCELLED', refund_mnt: 460_000, forfeit_mnt: 0 });
+
+    // Not back in the wallet: owed to the guest's bank, once they say which.
     const wallet = await app.inject({ method: 'GET', url: '/v1/wallet', headers: auth(token) });
-    expect(wallet.json().balance_mnt).toBe(500_000);
+    expect(wallet.json().balance_mnt).toBe(40_000);
+    const before = await app.inject({ method: 'GET', url: `/v1/idesh/${id}`, headers: auth(token) });
+    expect(before.json()).toMatchObject({ state: 'CANCELLED', cancel_reason: 'guest_asked', refund: { state: 'needs_account' } });
+    // …and still on the list, because there is something left to do.
+    const live = await app.inject({ method: 'GET', url: '/v1/idesh', headers: auth(token) });
+    expect(live.json().orders.map((o: { id: string }) => o.id)).toEqual([id]);
+
+    const named = await app.inject({
+      method: 'POST',
+      url: `/v1/idesh/${id}/refund-account`,
+      headers: auth(token),
+      payload: { bank_name: 'Хаан банк', bank_account: '5012 3456 78', bank_holder: 'Бат' },
+    });
+    expect(named.statusCode, named.body).toBe(200);
+    expect(named.json().refund).toMatchObject({ state: 'due', bank_account: '5012345678', amount_mnt: 460_000 });
   });
 });
 

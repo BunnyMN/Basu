@@ -8,9 +8,12 @@
  */
 export {
   LedgerError,
+  accrue,
   balance,
   collect,
   movement,
+  owed,
+  payOut,
   reconcileLedger,
   refund,
   settleTopup,
@@ -18,6 +21,7 @@ export {
   wallet,
   type Collected,
   type CollectInput,
+  type OweInput,
   type StatementLine,
   type TopupStarted,
   type Wallet,

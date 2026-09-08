@@ -834,6 +834,75 @@ describe('өвлийн идэш', () => {
     expect(dom.window.document.querySelector('#screen-foot .sum b')?.textContent).toMatch(/₮$/);
   });
 
+  it('cancels for a reason on the supplier’s screen, and the guest names the account the refund goes to', async () => {
+    await ownGuest('+97699004007');
+    const guest = await openPage('idesh.html');
+    await buyOne(guest);
+    const code = guest.window.document.querySelector('.handcode b')?.textContent;
+    const total = guest.window.document.querySelector('.panel .mono')?.textContent;
+
+    /* the supplier: why, then how much, then confirm */
+    storage.removeItem('basu.supplier');
+    const screen = await openPage('supplier.html');
+    await until(screen, 'the pairing form', (d) => d.querySelectorAll('.venues button').length > 0);
+    clickText(screen, '.venues button', 'Бүх нийлүүлэгч');
+    const ticket = () =>
+      [...screen.window.document.querySelectorAll('.ticket')].find((t) => t.textContent?.includes(`№${code}`));
+    await until(screen, 'our order', () => Boolean(ticket()));
+    expect(ticket()!.textContent).toContain('Танд очих');
+    (ticket()!.querySelector('[data-a="cancel"]') as HTMLElement).click();
+    const reasons = ticket()!.querySelector('.reasons')!;
+    expect(reasons.querySelector('[data-a="confirm"]')).toHaveProperty('disabled', true);
+    const pick = reasons.querySelector('input[value="guest_asked"]') as HTMLInputElement;
+    pick.checked = true;
+    pick.dispatchEvent(new screen.window.Event('change', { bubbles: true }));
+    // Before slaughter: everything back, and the screen says so before the press.
+    expect(reasons.querySelector('.money')?.textContent).toContain('бүтнээр');
+    (reasons.querySelector('[data-a="confirm"]') as HTMLElement).click();
+    await until(screen, 'the ticket to go', () => !ticket());
+
+    /* the guest: told, and asked where the money goes */
+    await until(guest, 'the cancel to show', (d) => d.querySelector('.status')?.getAttribute('data-s') === 'CANCELLED');
+    expect(guest.window.document.querySelector('.status .cap')?.textContent).toContain('банкны данс');
+    const form = guest.window.document.querySelector('#refund')!;
+    const send = form.querySelector('#send-account') as HTMLButtonElement;
+    expect(send.disabled).toBe(true);
+    const type = (id: string, value: string) => {
+      const input = form.querySelector(`#${id}`) as HTMLInputElement;
+      input.value = value;
+      input.dispatchEvent(new guest.window.Event('input'));
+    };
+    type('bank', 'Хаан банк');
+    type('account', '5012 3456 78');
+    expect(send.disabled).toBe(true);
+    type('holder', 'Бат Дорж');
+    expect(send.disabled).toBe(false);
+    send.click();
+    await until(guest, 'the account to be kept', (d) => d.querySelector('#refund')?.textContent?.includes('5012345678') ?? false);
+    expect(guest.window.document.querySelector('#refund')?.textContent).toContain('Basu ажлын өдөрт');
+
+    /* the desk: one line to pay, then paid */
+    storage.removeItem('basu.ops');
+    const desk = await openPage('ops.html');
+    await until(desk, 'the secret prefilled', (d) =>
+      Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
+    );
+    clickText(desk, '.pair button', 'Нэвтрэх');
+    const line = () =>
+      [...desk.window.document.querySelectorAll('#pay .row')].find((r) => r.textContent?.includes(`№${code}`));
+    await until(desk, 'the refund to pay', () => Boolean(line()));
+    expect(line()!.textContent).toContain('Буцаалт');
+    expect(line()!.textContent).toContain('5012345678');
+    expect(line()!.querySelector('.amount')?.textContent).toBe(total);
+    desk.window.prompt = () => 'KB-2026-001';
+    (line()!.querySelector('[data-a="paid"]') as HTMLElement).click();
+    await until(desk, 'the line to be paid', () => line()?.hasAttribute('data-paid') ?? false);
+    expect(line()!.textContent).toContain('KB-2026-001');
+
+    await until(guest, 'the guest to see it', (d) => d.querySelector('.status')?.getAttribute('data-s') === 'REFUNDED');
+    expect(guest.window.document.querySelector('.status .big')?.textContent).toBe('Мөнгө буцаасан');
+  });
+
   it('shows the paid order to its supplier, who walks it to the handover', async () => {
     await ownGuest('+97699004003');
     const guest = await openPage('idesh.html');

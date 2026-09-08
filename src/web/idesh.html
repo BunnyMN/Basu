@@ -262,6 +262,13 @@ input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
 .promise div{display:flex;gap:10px;align-items:flex-start;font-size:.86rem;color:var(--ink-2);line-height:1.45}
 .promise svg{width:18px;height:18px;flex:none;fill:none;stroke:var(--ready);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;margin-top:1px}
 .promise b{color:var(--ink)}
+.terms{margin:12px 16px 0;font-size:.8rem;color:var(--ink-3);text-align:center}
+.terms a{color:var(--accent-ink);font-weight:600}
+#refund .field{margin-top:10px}
+#refund .field label{display:block;font-size:.8rem;color:var(--ink-2);margin-bottom:6px;font-weight:600}
+#refund input{width:100%;box-sizing:border-box;padding:12px;border:1.5px solid var(--line-2);border-radius:10px;font:inherit;font-size:1rem;background:var(--surface);color:var(--ink)}
+#refund .why{margin:10px 0 8px}
+#refund .btn{margin-top:4px}
 
 /* ── the status ──────────────────────────────────────────────────── */
 /* ── the order, after paying: one calm page that says what happens next ── */
@@ -927,8 +934,9 @@ function renderReview({ replace = false } = {}) {
     el(`<div class="promise">
           <div>${MARK.tag}<span><b>Үнэ эцсийнх.</b> Бодит жин зөрсөн ч нэмж төлөхгүй.</span></div>
           <div>${MARK.phone}<span><b>Төлсний дараа</b> нийлүүлэгчийн утас гарна; та ч, тэр ч залгаж чадна.</span></div>
-          <div>${MARK.undo}<span><b>Санал зөрвөл</b> нийлүүлэгчтэй ярина; тэр цуцалбал мөнгө түрийвчинд бүтнээр буцна.</span></div>
+          <div>${MARK.undo}<span><b>Санал зөрвөл</b> нийлүүлэгчтэй ярина; тэр цуцалбал мөнгө банкны данс руу тань буцна — мал нядалсны дараа таны буруугаас бол ${FORFEIT_PCT}% суутгана.</span></div>
         </div>`),
+    el(`<p class="terms">Төлснөөр <a href="/terms" id="terms">үйлчилгээний нөхцөл</a>-ийг зөвшөөрнө.</p>`),
   );
 
   const foot = $('screen-foot');
@@ -1066,14 +1074,109 @@ const FACE = {
   },
   HANDED: { mark: 'hand', word: 'Хүлээлгэн өгсөн', cap: () => 'Мах гарт орлоо. Амтархан хэрэглээрэй.' },
   CLOSED: { mark: 'check', word: 'Захиалга дууссан', cap: () => 'Энэ захиалга хаагдсан.' },
-  CANCELLED: { mark: 'cross', word: 'Цуцлагдсан', cap: () => 'Нийлүүлэгч захиалгыг цуцалсан. Мөнгө түрийвчинд буцна.' },
-  REFUNDED: { mark: 'undo', word: 'Мөнгө буцаасан', cap: () => 'Захиалга цуцлагдаж, төлбөр түрийвчинд бүтнээр буцлаа.' },
+  CANCELLED: {
+    mark: 'cross',
+    word: 'Цуцлагдсан',
+    cap: (o) => {
+      const why = REASON_WORDS[o.cancel_reason] ?? 'нийлүүлэгч цуцалсан';
+      if (!o.refund_mnt) return `Захиалга цуцлагдлаа (${why}).`;
+      const cut = o.forfeit_mnt ? ` Мал нядалсны дараа тул <b>${mnt(o.forfeit_mnt)}</b> (${FORFEIT_PCT}%) суутгав.` : '';
+      return `Захиалга цуцлагдлаа (${why}).${cut} <b>${mnt(o.refund_mnt)}</b> таны банкны данс руу буцна.`;
+    },
+  },
+  REFUNDED: {
+    mark: 'undo',
+    word: 'Мөнгө буцаасан',
+    cap: (o) => `<b>${mnt(o.refund?.amount_mnt ?? o.refund_mnt ?? 0)}</b> ${o.refund?.bank_name ? `${escapeHtml(o.refund.bank_name)} дахь ` : ''}данс руу тань шилжүүлсэн.`,
+  },
 };
+
+const REASON_WORDS = {
+  guest_asked: 'таны хүсэлтээр',
+  vet: 'мал эмнэлгийн шалгалт',
+  cannot_fulfil: 'нийлүүлэгч биелүүлж чадаагүй',
+  no_show: 'та ирээгүй',
+  unreachable: 'хаяг дээр холбогдоогүй',
+  draft_expired: 'төлөгдөөгүй',
+};
+const FORFEIT_PCT = 10;
+const BANKS = ['Хаан банк', 'Голомт банк', 'Худалдаа хөгжлийн банк', 'Хас банк', 'Төрийн банк', 'Капитрон банк', 'Ариг банк', 'Богд банк', 'М банк'];
 
 /** «14:05», the local clock, for a step that is done. */
 function clockOf(iso) {
   const d = new Date(iso);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/**
+ * A refund does not go to a wallet: the guest names their own bank account
+ * here, once, and ops sends the money there. Until then the order waits on
+ * this one form; after, the panel says what was sent and when.
+ */
+function refundPanel(order) {
+  const r = order.refund;
+  const panel = el('<div class="panel" id="refund"></div>');
+  if (r.state === 'needs_account') {
+    panel.append(
+      el(`<div class="line">${MARK.wallet}<div>
+            <span class="lab">Буцаалт авах данс</span>
+            <div class="v">${mnt(r.amount_mnt)}<small>Аль банкны ямар данс руу шилжүүлэхийг бичнэ үү. Basu шилжүүлмэгц SMS ирнэ.</small></div>
+            <div class="field"><label for="bank">Банк</label>
+              <input id="bank" list="banks" placeholder="Хаан банк" autocomplete="off">
+              <datalist id="banks">${BANKS.map((b) => `<option value="${b}">`).join('')}</datalist></div>
+            <div class="field"><label for="account">Дансны дугаар</label>
+              <input id="account" inputmode="numeric" placeholder="5012345678"></div>
+            <div class="field"><label for="holder">Данс эзэмшигчийн нэр</label>
+              <input id="holder" placeholder="Банкинд бүртгэлтэй нэр"></div>
+            <p class="why" data-calm id="refund-why">${MARK.warn}Гурвууланг нь бичнэ үү.</p>
+            <button class="btn" data-v="primary" data-size="lg" type="button" id="send-account" disabled>Данс илгээх</button>
+          </div></div>`),
+    );
+    const bank = panel.querySelector('#bank');
+    const account = panel.querySelector('#account');
+    const holder = panel.querySelector('#holder');
+    const send = panel.querySelector('#send-account');
+    const why = panel.querySelector('#refund-why');
+    const check = () => {
+      const digits = account.value.replace(/\s+/g, '');
+      const problem = !bank.value.trim()
+        ? 'Банкаа сонгоно уу.'
+        : !/^\d{6,20}$/.test(digits)
+          ? 'Дансны дугаар 6–20 оронтой тоо.'
+          : holder.value.trim().length < 2
+            ? 'Данс эзэмшигчийн нэрээ бичнэ үү.'
+            : null;
+      why.hidden = !problem;
+      if (problem) why.innerHTML = `${MARK.warn}${problem}`;
+      send.disabled = Boolean(problem);
+    };
+    for (const input of [bank, account, holder]) input.addEventListener('input', check);
+    send.addEventListener('click', async () => {
+      send.disabled = true;
+      try {
+        await guestApi(`/v1/idesh/${state.orderId}/refund-account`, {
+          method: 'POST',
+          body: { bank_name: bank.value, bank_account: account.value, bank_holder: holder.value },
+        });
+        toast('Данс бүртгэгдлээ. Шилжүүлмэгц SMS ирнэ.');
+        shell.ordersChanged();
+        if (!gone) await Promise.all([showStatus(true), loadMine()]);
+      } catch (error) {
+        toast(error.message, 'bad');
+        send.disabled = false;
+      }
+    });
+    return panel;
+  }
+  panel.append(
+    el(`<div class="line">${r.state === 'paid' ? MARK.check : MARK.wallet}<div>
+          <span class="lab">${r.state === 'paid' ? 'Буцаалт шилжүүлсэн' : 'Буцаалт'}</span>
+          <div class="v">${mnt(r.amount_mnt)}<small>${escapeHtml(r.bank_name ?? '')} · ${escapeHtml(r.bank_account ?? '')} · ${escapeHtml(r.bank_holder ?? '')}${
+            r.state === 'paid' ? `<br>Шилжүүлсэн ${r.paid_at ? `${dayShort(r.paid_at.slice(0, 10))} ${clockOf(r.paid_at)}` : ''}` : '<br>Basu ажлын өдөрт шилжүүлж, SMS илгээнэ.'
+          }</small></div>
+        </div></div>`),
+  );
+  return panel;
 }
 
 /** What the last render was of, so a poll that found no news changes nothing. */
@@ -1084,7 +1187,7 @@ async function showStatus(force, { replace = false } = {}) {
   const order = await guestApi(`/v1/idesh/${state.orderId}`);
   if (gone || !state.orderId) return;
 
-  const signature = [order.state, order.receipt ? 'receipt' : ''].join('|');
+  const signature = [order.state, order.receipt ? 'receipt' : '', order.refund?.state ?? ''].join('|');
   // A poll that found no news changes nothing. News redraws: the supplier
   // starting is worth it.
   if (!force && signature === rendered) return;
@@ -1202,6 +1305,9 @@ async function showStatus(force, { replace = false } = {}) {
     );
   }
   body.append(pay);
+
+  /* the refund: where it goes, and where it stands */
+  if (order.refund) body.append(refundPanel(order));
 
   /* what the guest is holding on to */
   if (live) {

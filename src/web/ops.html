@@ -33,6 +33,14 @@ section > h2{
 .row .name small{display:block;font-family:"IBM Plex Mono",monospace;font-size:.66rem;color:var(--ink-3);font-weight:400;margin-top:3px;line-height:1.5;overflow-wrap:anywhere}
 .row .about{flex-basis:100%;font-size:.82rem;color:var(--ink-2);line-height:1.45;padding:6px 0 0;border-top:1px dashed var(--line)}
 .row .btns{display:flex;gap:6px;flex-wrap:wrap}
+.row .amount{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:.95rem;font-variant-numeric:tabular-nums;color:var(--accent-ink)}
+.row[data-kind="refund"]{border-left:3px solid var(--stop)}
+.row[data-kind="payout"]{border-left:3px solid var(--ready)}
+.row[data-paid]{opacity:.6}
+.row .terms{flex-basis:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;padding-top:8px;border-top:1px dashed var(--line)}
+.row .terms label{font-size:.72rem;color:var(--ink-3);display:flex;flex-direction:column;gap:3px}
+.row .terms input{font:inherit;font-size:.84rem;padding:7px 8px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface);color:var(--ink)}
+.row .terms .foot{grid-column:1 / -1;display:flex;gap:6px}
 .row .code{
   flex-basis:100%;font-family:"IBM Plex Mono",monospace;font-size:.86rem;padding:8px 10px;
   background:var(--ready-soft);border:1px solid var(--ready-line);border-radius:3px;color:var(--ready);
@@ -56,7 +64,7 @@ section > h2{
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, dayLabel } from '/api.js';
+import { api, store, toast, mnt, dayLabel } from '/api.js';
 
 const root = document.getElementById('root');
 const el = (html) => {
@@ -114,8 +122,10 @@ const ops = (path, options = {}) => api(path, { ...options, token: store.opsToke
 
 async function refresh() {
   let suppliers;
+  let settlements = [];
   try {
     ({ suppliers } = await ops('/v1/ops/suppliers'));
+    ({ settlements } = await ops('/v1/ops/settlements'));
   } catch (error) {
     if (error.status === 401 || error.status === 503) {
       store.opsToken = null;
@@ -126,22 +136,24 @@ async function refresh() {
     toast(error.message, 'bad');
     return;
   }
-  render(suppliers);
+  render(suppliers, settlements);
 }
 
-function render(suppliers) {
+function render(suppliers, settlements) {
   const scroll = window.scrollY;
   const applied = suppliers.filter((s) => s.state === 'applied');
   const rest = suppliers.filter((s) => s.state !== 'applied');
+  const toPay = settlements.filter((t) => t.state !== 'paid');
 
   const frame = el(`
     <div>
       <div class="top">
         <h1>Ops · нийлүүлэгч</h1>
-        <span class="lab">${applied.length} хүсэлт · ${rest.filter((s) => s.state === 'contracted').length} гэрээт</span>
+        <span class="lab">${applied.length} хүсэлт · ${rest.filter((s) => s.state === 'contracted').length} гэрээт · ${toPay.length} шилжүүлэх</span>
         <button class="swap" type="button" id="out">Гарах</button>
       </div>
       <div class="wrap">
+        <section id="pay"><h2><span>Олголт, буцаалт</span><span>${mnt(toPay.reduce((sum, t) => sum + t.amount_mnt, 0))}</span></h2><div class="rows"></div></section>
         <section id="applied"><h2><span>Хүсэлт</span></h2><div class="rows"></div></section>
         <section id="all"><h2><span>Нийлүүлэгчид</span></h2><div class="rows"></div></section>
         <section id="new"><h2><span>Шинэ нийлүүлэгч, гэрээтэй</span></h2></section>
@@ -151,6 +163,10 @@ function render(suppliers) {
     store.opsToken = null;
     showToken();
   });
+
+  const pay = frame.querySelector('#pay .rows');
+  if (!settlements.length) pay.append(el('<div class="none">Шилжүүлэх зүйл алга.</div>'));
+  for (const t of settlements) pay.append(renderSettlement(t));
 
   const pending = frame.querySelector('#applied .rows');
   if (!applied.length) pending.append(el('<div class="none">Хүлээгдэж буй хүсэлт алга.</div>'));
@@ -163,6 +179,46 @@ function render(suppliers) {
   frame.querySelector('#new').append(newForm());
   root.replaceChildren(frame);
   window.scrollTo(0, scroll);
+}
+
+/**
+ * One thing to pay: who, how much, to which account, and the button that
+ * says it was done. A refund without an account yet is shown but cannot be
+ * paid — the guest has not said where.
+ */
+function renderSettlement(t) {
+  const who = t.kind === 'payout' ? esc(t.supplier?.name ?? '') : `${esc(t.guest?.name ?? 'Зочин')} (зочин)`;
+  const bank = t.bank_account ? `${esc(t.bank_name)} · ${esc(t.bank_account)} · ${esc(t.bank_holder)}` : 'данс алга';
+  const row = el(`
+    <div class="row" data-kind="${t.kind}" data-settlement="${t.id}"${t.state === 'paid' ? ' data-paid' : ''}>
+      <div class="name">${esc(t.memo)} · ${who}<small>№${esc(t.order_code)} · ${bank}<br>${
+        t.state === 'paid'
+          ? `шилжүүлсэн ${when(t.paid_at)}${t.reference ? ` · ${esc(t.reference)}` : ''}`
+          : t.state === 'needs_account'
+            ? 'зочин дансаа оруулаагүй байна'
+            : `үүссэн ${when(t.created_at)}`
+      }</small></div>
+      <span class="amount">${mnt(t.amount_mnt)}</span>
+      <div class="btns"></div>
+    </div>`);
+  if (t.state === 'due') {
+    const paid = el('<button class="btn" data-v="primary" type="button" data-a="paid">Шилжүүлсэн</button>');
+    paid.addEventListener('click', async () => {
+      const reference = prompt(`${mnt(t.amount_mnt)} → ${bank}\nБанкны гүйлгээний дугаар (заавал биш):`, '');
+      if (reference === null) return;
+      paid.disabled = true;
+      try {
+        await ops(`/v1/ops/settlements/${t.id}/paid`, { method: 'POST', body: { reference } });
+        toast('Тэмдэглэгдлээ, мэдэгдэл явлаа.');
+        await refresh();
+      } catch (error) {
+        toast(error.message, 'bad');
+        paid.disabled = false;
+      }
+    });
+    row.querySelector('.btns').append(paid);
+  }
+  return row;
 }
 
 function renderRow(s) {
@@ -178,6 +234,13 @@ function renderRow(s) {
       <span class="chip" data-s="${s.state === 'contracted' ? 'READY' : s.state === 'applied' ? 'PAID' : 'CANCELLED'}">${STATE[s.state]}</span>
       <div class="btns"></div>
       ${s.about ? `<div class="about">${esc(s.about)}</div>` : ''}
+      ${
+        s.state !== 'declined'
+          ? `<div class="about">Шимтгэл <b>${s.commission_pct}%</b> · Данс: ${
+              s.bank_account ? `${esc(s.bank_name)} ${esc(s.bank_account)} · ${esc(s.bank_holder)}` : '<b>алга</b>'
+            }</div>`
+          : ''
+      }
     </div>`);
   const buttons = row.querySelector('.btns');
   const act = async (path, body, done) => {
@@ -213,6 +276,40 @@ function renderRow(s) {
     code.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/code`, null, showCode));
     buttons.append(code);
   }
+  if (s.state !== 'declined') {
+    // The contract's terms: written in once it is signed, corrected here.
+    const terms = el('<button class="btn" type="button" data-a="terms">Нөхцөл</button>');
+    terms.addEventListener('click', () => {
+      if (row.querySelector('.terms')) return;
+      const form = el(`
+        <div class="terms">
+          <label>Шимтгэл, %<input name="commission_pct" inputmode="decimal" value="${s.commission_pct}"></label>
+          <label>ТТД<input name="tin" value="${esc(s.merchant_tin ?? '')}" placeholder="7–14 орон"></label>
+          <label>Банк<input name="bank_name" value="${esc(s.bank_name ?? '')}"></label>
+          <label>Данс<input name="bank_account" value="${esc(s.bank_account ?? '')}"></label>
+          <label>Эзэмшигч<input name="bank_holder" value="${esc(s.bank_holder ?? '')}"></label>
+          <div class="foot">
+            <button class="btn" data-v="primary" type="button" data-a="save">Хадгалах</button>
+            <button class="btn" type="button" data-a="close">Болих</button>
+          </div>
+        </div>`);
+      form.querySelector('[data-a="close"]').addEventListener('click', () => form.remove());
+      form.querySelector('[data-a="save"]').addEventListener('click', async () => {
+        const v = (name) => form.querySelector(`[name="${name}"]`).value.trim();
+        const body = { tin: v('tin'), bank_name: v('bank_name'), bank_account: v('bank_account'), bank_holder: v('bank_holder') };
+        if (v('commission_pct') !== '') body.commission_pct = Number(v('commission_pct'));
+        try {
+          await ops(`/v1/ops/suppliers/${s.id}`, { method: 'PATCH', body });
+          toast('Хадгалагдлаа.');
+          await refresh();
+        } catch (error) {
+          toast(error.message, 'bad');
+        }
+      });
+      row.append(form);
+    });
+    buttons.append(terms);
+  }
 
   const remembered = sessionStorage.getItem(`ops.code.${s.id}`);
   if (remembered && s.state === 'contracted' && !s.watched) {
@@ -231,12 +328,23 @@ function newForm() {
         <label class="wide">Авах цэг<input name="address" placeholder="Дүүрэг, зах, хаалга"></label>
         <label>Өргөрөг<input name="lat" placeholder="47.9…"></label>
         <label>Уртраг<input name="lon" placeholder="106.9…"></label>
+        <label>Банк<input name="bank_name" placeholder="Хаан банк"></label>
+        <label>Данс<input name="bank_account" inputmode="numeric" placeholder="5012345678"></label>
+        <label>Эзэмшигч<input name="bank_holder" placeholder="Гэрээний нэр"></label>
       </div>
       <div class="foot"><button class="btn" data-v="primary" type="button" id="add">Бүртгээд код авах</button></div>
     </div>`);
   form.querySelector('#add').addEventListener('click', async () => {
     const v = (name) => form.querySelector(`[name="${name}"]`).value.trim();
-    const body = { name: v('name'), phone: v('phone'), tin: v('tin'), address: v('address') };
+    const body = {
+      name: v('name'),
+      phone: v('phone'),
+      tin: v('tin'),
+      address: v('address'),
+      bank_name: v('bank_name'),
+      bank_account: v('bank_account'),
+      bank_holder: v('bank_holder'),
+    };
     if (v('lat')) body.lat = Number(v('lat'));
     if (v('lon')) body.lon = Number(v('lon'));
     try {

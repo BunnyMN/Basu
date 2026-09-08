@@ -1,16 +1,22 @@
 import { getPool, tx, type Db } from '../db/pool.js';
 import { displayNamesFor } from '../platform/identity/index.js';
-import {
-  collect,
-  queueReceipt,
-  receiptsFor,
-  refund as refundToWallet,
-} from '../platform/ledger/index.js';
+import { collect, queueReceipt, receiptsFor } from '../platform/ledger/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
 import { IdeshError } from './errors.js';
 import type { Kind } from './listings.js';
+import {
+  REASON_LABEL,
+  FORFEIT_PCT,
+  commissionOf,
+  noShowFrom,
+  reasonProblem,
+  splitRefund,
+  type CancelReason,
+  type Split,
+} from './money.js';
 import { dayOf, quote, type Receive, type Unit } from './pricing.js';
+import { openSettlement, refundOf, type Settlement } from './settlements.js';
 import { BOARD_STATES, LIVE_STATES, type IdeshState } from './states.js';
 
 /**
@@ -291,22 +297,43 @@ export interface CancelledBy {
 }
 
 /**
- * Cancel, and give back whatever there is to give back.
+ * Cancel, for a reason, and let the rule decide the money.
  *
- * A supplier may cancel at any point short of the handover — an order the
- * guest asked them to undo, or an animal that failed the vet — and the guest
- * is refunded in full either way. Past PREPARING the animal has been
- * slaughtered and does not go back on offer.
+ * A supplier may cancel at any point short of the handover, and must say
+ * why — the reason is what sets the refund, not their choice of number
+ * (see `splitRefund`). Some reasons are only true at some times: «зочин
+ * ирээгүй» needs a ready order and three days' grace. Past PREPARING the
+ * animal has been slaughtered and does not go back on offer.
  */
 export async function cancelIdesh(
   ctx: Ctx,
   orderId: string,
   by: CancelledBy,
-  reason = 'cancelled',
-): Promise<{ refunded: boolean }> {
+  reason: CancelReason,
+): Promise<Split> {
   const now = ctx.clock.now();
   const facts = await billingFacts(orderId);
   if (!facts) throw new IdeshError('NOT_FOUND', 'no such order');
+
+  if (by.role === 'system' && reason !== 'draft_expired') {
+    throw new IdeshError('BAD_REASON', 'the scheduler only sweeps unpaid drafts');
+  }
+  if (by.role === 'supplier') {
+    const problem = reasonProblem({
+      state: facts.state,
+      reason,
+      receive: facts.receive,
+      readyAt: facts.readyAt,
+      receiveOn: facts.receiveOn,
+      now,
+    });
+    if (problem) throw new IdeshError('BAD_REASON', problem);
+  }
+
+  const meatMnt = facts.unitPriceMnt * facts.qty;
+  const split: Split = facts.transferId
+    ? splitRefund({ state: facts.state, reason, meatMnt, deliveryFeeMnt: facts.deliveryFeeMnt })
+    : { refundMnt: 0, forfeitMnt: 0 };
 
   const from: readonly IdeshState[] = ['DRAFT', 'PAID', 'PREPARING', 'READY', 'DISPATCHED'];
 
@@ -314,6 +341,9 @@ export async function cancelIdesh(
     const ok = await transition(client, orderId, from, 'CANCELLED', {
       cancelled_at: now,
       cancelled_by: by.actor,
+      cancel_reason: reason,
+      refund_mnt: split.refundMnt,
+      forfeit_mnt: split.forfeitMnt,
     });
     if (!ok) return false;
     // The animal goes back on offer only if it was never committed. A carcass
@@ -324,7 +354,7 @@ export async function cancelIdesh(
         [facts.listingId, facts.qty, now],
       );
     }
-    await appendEvent(client, orderId, 'CANCELLED', by.actor, { reason, from: facts.state });
+    await appendEvent(client, orderId, 'CANCELLED', by.actor, { reason, from: facts.state, ...split });
     return true;
   });
 
@@ -335,11 +365,11 @@ export async function cancelIdesh(
     await tx(async (client) => {
       await transition(client, orderId, ['CANCELLED'], 'CLOSED', { closed_at: now });
     });
-    return { refunded: false };
+    return split;
   }
 
-  await refund(ctx, orderId, reason);
-  return { refunded: true };
+  await arrangeRefund(ctx, orderId, facts, split, reason);
+  return split;
 }
 
 /* ── the supplier ──────────────────────────────────────────────────── */
@@ -420,16 +450,24 @@ export async function markDispatched(ctx: Ctx, orderId: string, actor: string): 
 /** «Хүлээлгэн өгсөн» — read against the code the guest shows. */
 export async function markHanded(ctx: Ctx, orderId: string, actor: string): Promise<void> {
   const now = ctx.clock.now();
+  const facts = await billingFacts(orderId);
+  if (!facts) throw new IdeshError('NOT_FOUND', 'no such order');
+
+  // The supplier's share is fixed here, at the rate in force today: a
+  // contract renegotiated next week does not reach back into this order.
+  const commissionMnt = commissionOf(facts.unitPriceMnt * facts.qty, facts.commissionPct);
+  const payoutMnt = facts.totalMnt - commissionMnt;
+
   await tx(async (client) => {
     const ok = await transition(client, orderId, ['READY', 'DISPATCHED'], 'HANDED', {
       handed_at: now,
+      commission_mnt: commissionMnt,
+      payout_mnt: payoutMnt,
     });
     if (!ok) throw new IdeshError('WRONG_STATE', 'this order is not ready to hand over');
-    await appendEvent(client, orderId, 'HANDED', actor);
+    await appendEvent(client, orderId, 'HANDED', actor, { commissionMnt, payoutMnt });
   });
 
-  const facts = await billingFacts(orderId);
-  if (!facts) return;
   await enqueue(ctx, {
     guestId: facts.guestId,
     subject: 'idesh',
@@ -459,26 +497,51 @@ export async function housekeeping(ctx: Ctx): Promise<{ expired: number; closed:
   let expired = 0;
   for (const row of stale) {
     try {
-      await cancelIdesh(ctx, row.id, { actor: 'system:scheduler', role: 'system' }, 'draft expired');
+      await cancelIdesh(ctx, row.id, { actor: 'system:scheduler', role: 'system' }, 'draft_expired');
       expired++;
     } catch {
       // Paid in the meantime, or already cancelled: not ours any more.
     }
   }
 
-  const { rows: done } = await db.query<{ id: string }>(
-    `SELECT id FROM idesh.idesh_order
-      WHERE state = 'HANDED' AND handed_at < $1::timestamptz - make_interval(hours => $2)`,
+  const { rows: done } = await db.query<{
+    id: string;
+    code: string;
+    supplier_id: string;
+    payout_mnt: number | null;
+    total_mnt: number;
+    unit_price_mnt: number;
+    qty: number;
+    commission_pct: string;
+  }>(
+    `SELECT o.id, o.code, o.supplier_id, o.payout_mnt, o.total_mnt, o.unit_price_mnt, o.qty,
+            s.commission_pct
+       FROM idesh.idesh_order o JOIN idesh.supplier s ON s.id = o.supplier_id
+      WHERE o.state = 'HANDED' AND o.handed_at < $1::timestamptz - make_interval(hours => $2)`,
     [now, HANDED_TTL_HOURS],
   );
   let closed = 0;
   for (const row of done) {
-    await tx(async (client) => {
+    const moved = await tx(async (client) => {
       const ok = await transition(client, row.id, ['HANDED'], 'CLOSED', { closed_at: now });
-      if (ok) {
-        await appendEvent(client, row.id, 'CLOSED', 'system:scheduler');
-        closed++;
-      }
+      if (ok) await appendEvent(client, row.id, 'CLOSED', 'system:scheduler');
+      return ok;
+    });
+    if (!moved) continue;
+    closed++;
+    // A day after the handover the supplier's share is theirs: the ledger
+    // sets it aside and ops gets a line to pay.
+    const payoutMnt =
+      row.payout_mnt ??
+      Number(row.total_mnt) -
+        commissionOf(Number(row.unit_price_mnt) * row.qty, Number(row.commission_pct));
+    await openSettlement({
+      kind: 'payout',
+      orderId: row.id,
+      orderCode: row.code,
+      supplierId: row.supplier_id,
+      amountMnt: payoutMnt,
+      memo: 'Олголт',
     });
   }
 
@@ -488,45 +551,65 @@ export async function housekeeping(ctx: Ctx): Promise<{ expired: number; closed:
 /* ── money back ────────────────────────────────────────────────────── */
 
 /**
- * Into the wallet, on the same two accounts the purchase used, so the pair
- * nets to zero and reads as one story in the statement.
+ * Not into the wallet: the guest's refund goes to a bank account they name,
+ * and the supplier's forfeit, if any, to theirs. Both are set aside in the
+ * ledger now and paid by a person later (see settlements.ts). The order stays
+ * CANCELLED until the refund has actually been sent, which is when it turns
+ * REFUNDED. The guest is told by SMS — this is the message they will act on.
  */
-async function refund(ctx: Ctx, orderId: string, reason: string): Promise<void> {
-  const facts = await billingFacts(orderId);
-  if (!facts?.transferId) return;
-
-  const transferId = await refundToWallet({
-    guestId: facts.guestId,
-    amountMnt: facts.totalMnt,
-    subject: 'idesh',
-    subjectId: orderId,
-    memo: `Идэш · буцаалт №${facts.code}`,
-    idempotencyKey: `idesh:${orderId}:refund`,
-  });
+async function arrangeRefund(
+  ctx: Ctx,
+  orderId: string,
+  facts: NonNullable<Awaited<ReturnType<typeof billingFacts>>>,
+  split: Split,
+  reason: CancelReason,
+): Promise<void> {
+  if (split.refundMnt > 0) {
+    const opened = await openSettlement({
+      kind: 'refund',
+      orderId,
+      orderCode: facts.code,
+      guestId: facts.guestId,
+      amountMnt: split.refundMnt,
+      memo: 'Буцаалт',
+    });
+    if (opened) {
+      await queueReceipt({
+        transferId: opened.accrualId,
+        kind: 'RETURN',
+        merchantTin: facts.merchantTin,
+        orderCode: facts.code,
+        amountMnt: split.refundMnt,
+      });
+    }
+  }
+  if (split.forfeitMnt > 0) {
+    await openSettlement({
+      kind: 'payout',
+      orderId,
+      orderCode: facts.code,
+      supplierId: facts.supplierId,
+      amountMnt: split.forfeitMnt,
+      memo: 'Суутгал',
+    });
+  }
 
   await tx(async (client) => {
-    await transition(client, orderId, ['CANCELLED'], 'REFUNDED');
-    await appendEvent(client, orderId, 'REFUNDED', 'system:payments', {
-      amountMnt: facts.totalMnt,
-      reason,
-    });
-  });
-  await queueReceipt({
-    transferId,
-    kind: 'RETURN',
-    merchantTin: facts.merchantTin,
-    orderCode: facts.code,
-    amountMnt: facts.totalMnt,
+    await appendEvent(client, orderId, 'REFUND_DUE', 'system:payments', { ...split, reason });
   });
 
+  const amount = `${split.refundMnt.toLocaleString('mn-MN')}₮`;
   await enqueue(ctx, {
     guestId: facts.guestId,
     subject: 'idesh',
     subjectId: orderId,
-    template: 'idesh.refunded',
-    channel: 'push',
+    template: 'idesh.cancelled',
+    channel: 'sms',
     title: 'Идэш цуцлагдлаа',
-    body: `№${facts.code}: ${facts.totalMnt.toLocaleString('mn-MN')}₮ түрийвчинд чинь буцаж орлоо.`,
+    body:
+      `Идэш №${facts.code} цуцлагдлаа (${REASON_LABEL[reason].toLowerCase()}). ` +
+      (split.forfeitMnt > 0 ? `Мал нядалсны дараа тул ${FORFEIT_PCT}% суутгав. ` : '') +
+      `Буцаалт ${amount} — Basu аппаар дансаа оруулна уу.`,
   });
 }
 
@@ -538,39 +621,50 @@ async function refund(ctx: Ctx, orderId: string, reason: string): Promise<void> 
 async function billingFacts(orderId: string): Promise<{
   guestId: string;
   listingId: string;
+  supplierId: string;
   code: string;
   state: IdeshState;
   title: string;
   qty: number;
+  unitPriceMnt: number;
+  deliveryFeeMnt: number;
   totalMnt: number;
   receive: Receive;
   receiveOn: string;
+  readyAt: Date | null;
   addressPhone: string | null;
   supplier: string;
   pickupAddress: string;
   merchantTin: string;
+  commissionPct: number;
   transferId: string | null;
 } | null> {
   const { rows } = await getPool().query<{
     guest_id: string;
     listing_id: string;
+    supplier_id: string;
     code: string;
     state: IdeshState;
     title: string;
     qty: number;
+    unit_price_mnt: number;
+    delivery_fee_mnt: number;
     total_mnt: number;
     receive: Receive;
     receive_on: string;
+    ready_at: Date | null;
     address_phone: string | null;
     supplier: string;
     pickup_address: string;
     tin: string | null;
+    commission_pct: string;
     ledger_transfer_id: string | null;
   }>(
-    `SELECT o.guest_id, o.listing_id, o.code, o.state, o.title, o.qty, o.total_mnt, o.receive,
-            to_char(o.receive_on, 'YYYY-MM-DD') AS receive_on, o.address_phone,
+    `SELECT o.guest_id, o.listing_id, o.supplier_id, o.code, o.state, o.title, o.qty,
+            o.unit_price_mnt, o.delivery_fee_mnt, o.total_mnt, o.receive,
+            to_char(o.receive_on, 'YYYY-MM-DD') AS receive_on, o.ready_at, o.address_phone,
             o.ledger_transfer_id, s.name AS supplier, s.pickup_address,
-            s.ebarimt_merchant_tin AS tin
+            s.ebarimt_merchant_tin AS tin, s.commission_pct
        FROM idesh.idesh_order o
        JOIN idesh.supplier s ON s.id = o.supplier_id
       WHERE o.id = $1`,
@@ -581,17 +675,22 @@ async function billingFacts(orderId: string): Promise<{
   return {
     guestId: row.guest_id,
     listingId: row.listing_id,
+    supplierId: row.supplier_id,
     code: row.code,
     state: row.state,
     title: row.title,
     qty: row.qty,
-    totalMnt: row.total_mnt,
+    unitPriceMnt: Number(row.unit_price_mnt),
+    deliveryFeeMnt: Number(row.delivery_fee_mnt),
+    totalMnt: Number(row.total_mnt),
     receive: row.receive,
     receiveOn: row.receive_on,
+    readyAt: row.ready_at,
     addressPhone: row.address_phone,
     supplier: row.supplier,
     pickupAddress: row.pickup_address,
     merchantTin: row.tin ?? 'UNSET',
+    commissionPct: Number(row.commission_pct),
     transferId: row.ledger_transfer_id,
   };
 }
@@ -631,6 +730,11 @@ export interface IdeshDetail extends IdeshSummary {
   readyAt: Date | null;
   dispatchedAt: Date | null;
   handedAt: Date | null;
+  cancelReason: CancelReason | null;
+  refundMnt: number | null;
+  forfeitMnt: number | null;
+  /** The refund on its way, once cancelled and paid for: where it stands. */
+  refund: Pick<Settlement, 'state' | 'bank' | 'paidAt' | 'amountMnt'> | null;
   receipt: { qr: string; lottery: string | null } | null;
 }
 
@@ -665,6 +769,10 @@ interface OrderRow {
   ready_at: Date | null;
   dispatched_at: Date | null;
   handed_at: Date | null;
+  cancel_reason: CancelReason | null;
+  refund_mnt: number | null;
+  forfeit_mnt: number | null;
+  commission_pct: string;
 }
 
 const ORDER_SELECT = `
@@ -673,7 +781,8 @@ const ORDER_SELECT = `
          o.kind, o.unit, o.title, o.origin, o.qty, o.unit_price_mnt, o.delivery_fee_mnt,
          o.total_mnt, o.receive, to_char(o.receive_on, 'YYYY-MM-DD') AS receive_on,
          o.address, o.address_phone, o.address_lat, o.address_lon, o.ledger_transfer_id,
-         o.paid_at, o.preparing_at, o.ready_at, o.dispatched_at, o.handed_at
+         o.paid_at, o.preparing_at, o.ready_at, o.dispatched_at, o.handed_at,
+         o.cancel_reason, o.refund_mnt, o.forfeit_mnt, s.commission_pct
     FROM idesh.idesh_order o
     JOIN idesh.supplier s ON s.id = o.supplier_id`;
 
@@ -699,9 +808,15 @@ function summary(r: OrderRow): IdeshSummary {
  * puts beside the lunch, and what the page uses to find its way back.
  */
 export async function liveFor(guestId: string, db: Db = getPool()): Promise<IdeshSummary[]> {
+  // A cancelled order stays in view while its refund is still on its way —
+  // the guest has an account to type in, then a transfer to expect.
   const { rows } = await db.query<OrderRow>(
     `${ORDER_SELECT}
-      WHERE o.guest_id = $1 AND o.state = ANY($2::text[])
+      WHERE o.guest_id = $1
+        AND (o.state = ANY($2::text[])
+             OR (o.state = 'CANCELLED' AND EXISTS (
+                   SELECT 1 FROM idesh.settlement t
+                    WHERE t.order_id = o.id AND t.kind = 'refund' AND t.state <> 'paid')))
       ORDER BY o.receive_on, o.created_at`,
     [guestId, LIVE_STATES],
   );
@@ -724,6 +839,7 @@ export async function detailFor(
     ? (await receiptsFor([r.ledger_transfer_id])).get(r.ledger_transfer_id)
     : undefined;
   const paid = r.paid_at !== null;
+  const refund = r.cancel_reason ? await refundOf(r.id, db) : null;
 
   return {
     ...summary(r),
@@ -742,6 +858,12 @@ export async function detailFor(
     readyAt: r.ready_at,
     dispatchedAt: r.dispatched_at,
     handedAt: r.handed_at,
+    cancelReason: r.cancel_reason,
+    refundMnt: r.refund_mnt === null ? null : Number(r.refund_mnt),
+    forfeitMnt: r.forfeit_mnt === null ? null : Number(r.forfeit_mnt),
+    refund: refund
+      ? { state: refund.state, bank: refund.bank, paidAt: refund.paidAt, amountMnt: refund.amountMnt }
+      : null,
     receipt: receipt?.qrPayload ? { qr: receipt.qrPayload, lottery: receipt.lottery } : null,
   };
 }
@@ -773,6 +895,12 @@ export interface BoardTicket extends IdeshSummary {
   addressPhone: string | null;
   addressLat: number | null;
   addressLon: number | null;
+  deliveryFeeMnt: number;
+  readyAt: Date | null;
+  /** From when «зочин ирээгүй» may be said of a ready pickup; null otherwise. */
+  noShowFrom: Date | null;
+  /** What the supplier will be paid for this order at their rate. */
+  payoutMnt: number;
 }
 
 export interface Board {
@@ -817,6 +945,14 @@ export async function boardFor(supplierId: string | null, db: Db = getPool()): P
       guest: names.get(r.guest_id) ?? null,
       address: r.address,
       addressPhone: r.address_phone,
+      deliveryFeeMnt: Number(r.delivery_fee_mnt),
+      readyAt: r.ready_at,
+      noShowFrom:
+        r.state === 'READY' && r.receive === 'pickup' && r.ready_at
+          ? noShowFrom(r.ready_at, r.receive_on)
+          : null,
+      payoutMnt:
+        Number(r.total_mnt) - commissionOf(Number(r.unit_price_mnt) * r.qty, Number(r.commission_pct)),
       addressLat: r.address_lat === null ? null : Number(r.address_lat),
       addressLon: r.address_lon === null ? null : Number(r.address_lon),
     };

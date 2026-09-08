@@ -183,3 +183,73 @@ describe('the ops desk', () => {
     expect(bare.statusCode).toBe(400);
   });
 });
+
+describe('the contract’s terms and the list to pay', () => {
+  it('lets ops write the rate and the account in, and shows them on the row', async () => {
+    const made = await app.inject({
+      method: 'POST',
+      url: '/v1/ops/suppliers',
+      headers: auth(opsToken()!),
+      payload: { name: 'УБ махны төв', phone: '+97688010004', address: 'Бага тойруу 24', bank_name: 'Голомт', bank_account: '1105 0123 45', bank_holder: 'Махны төв ХХК' },
+    });
+    expect(made.statusCode, made.body).toBe(201);
+    const id = made.json().id as string;
+
+    const rows = (await app.inject({ method: 'GET', url: '/v1/ops/suppliers', headers: auth(opsToken()!) })).json().suppliers;
+    expect(rows.find((s: { id: string }) => s.id === id)).toMatchObject({
+      commission_pct: 2,
+      bank_name: 'Голомт',
+      bank_account: '1105012345',
+      bank_holder: 'Махны төв ХХК',
+    });
+
+    const changed = await app.inject({
+      method: 'PATCH',
+      url: `/v1/ops/suppliers/${id}`,
+      headers: auth(opsToken()!),
+      payload: { commission_pct: 3.5, tin: '6505678901' },
+    });
+    expect(changed.statusCode, changed.body).toBe(200);
+    expect(changed.json()).toMatchObject({ commission_pct: 3.5, merchant_tin: '6505678901', bank_name: 'Голомт' });
+
+    const silly = await app.inject({
+      method: 'PATCH',
+      url: `/v1/ops/suppliers/${id}`,
+      headers: auth(opsToken()!),
+      payload: { commission_pct: 140 },
+    });
+    expect(silly.statusCode).toBe(409);
+  });
+
+  it('keeps the bank details an applicant typed, for ops to check against the contract', async () => {
+    const token = await signIn();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/v1/supplier/apply',
+      headers: auth(token),
+      payload: {
+        name: 'Завхан · Бат-Эрдэнэ',
+        tin: '6505678901',
+        address: 'Хархорин зах',
+        bank_name: 'Хаан банк',
+        bank_account: '5012345678',
+        bank_holder: 'Бат-Эрдэнэ',
+      },
+    });
+    expect(response.statusCode, response.body).toBe(201);
+    const rows = (await app.inject({ method: 'GET', url: '/v1/ops/suppliers', headers: auth(opsToken()!) })).json().suppliers;
+    expect(rows[0]).toMatchObject({ state: 'applied', bank_name: 'Хаан банк', bank_account: '5012345678' });
+  });
+
+  it('starts with nothing to pay, and refuses to pay what is not there', async () => {
+    const empty = await app.inject({ method: 'GET', url: '/v1/ops/settlements', headers: auth(opsToken()!) });
+    expect(empty.json()).toEqual({ settlements: [] });
+    const nothing = await app.inject({
+      method: 'POST',
+      url: '/v1/ops/settlements/00000000-0000-0000-0000-000000000000/paid',
+      headers: auth(opsToken()!),
+      payload: { reference: 'x' },
+    });
+    expect(nothing.statusCode).toBe(404);
+  });
+});

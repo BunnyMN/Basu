@@ -47,6 +47,14 @@ body{background:var(--sunk)}
 .ticket .what{font-size:.94rem;font-weight:700;margin-bottom:2px;overflow-wrap:anywhere}
 .ticket .meta{font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--ink-3);margin-bottom:7px;overflow-wrap:anywhere;line-height:1.5}
 .ticket .where{font-family:"Golos Text",sans-serif;font-size:.78rem;font-weight:700;color:var(--ink-2);margin-bottom:6px;overflow-wrap:anywhere}
+.ticket .pay{font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--ready);font-weight:600;margin:-4px 0 7px}
+.ticket .grace{font-size:.72rem;color:var(--hold);margin:-4px 0 7px;line-height:1.4}
+.ticket .reasons{border-top:1px dashed var(--line);padding-top:8px;margin-top:2px}
+.ticket .reasons .q{font-size:.78rem;font-weight:700;margin-bottom:6px}
+.ticket .reasons label{display:flex;gap:8px;align-items:flex-start;font-size:.8rem;padding:5px 0;cursor:pointer;line-height:1.35}
+.ticket .reasons label input{margin-top:2px;accent-color:var(--accent)}
+.ticket .reasons .money{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--ink-2);margin:6px 0 8px;line-height:1.5;min-height:1.5em}
+.ticket .reasons .money b{color:var(--stop)}
 .ticket .btns{display:flex;gap:6px;flex-wrap:wrap}
 .ticket .btns .btn{flex:1;min-width:96px;padding:9px 8px}
 .ticket[data-lane="paid"]{border-left-color:var(--route)}
@@ -361,6 +369,11 @@ function applyForm() {
       <label>ТТД (е-баримтад, байвал)<input name="tin" inputmode="numeric" placeholder="7–10 орон"></label>
       <label>Хотод мах авах цэг<input name="address" placeholder="Дүүрэг, зах, хаалга"></label>
       <label>Юу зарах вэ, хаанаас<textarea name="about" placeholder="Архангайн хонь, 10-р сараас, 20 толгой…"></textarea></label>
+      <p>Олголт очих данс — гэрээнд бичигдэнэ, Basu тулгаж шалгана.</p>
+      <label>Банк<input name="bank_name" list="banks" placeholder="Хаан банк"></label>
+      <datalist id="banks">${BANKS.map((b) => `<option value="${b}">`).join('')}</datalist>
+      <label>Дансны дугаар<input name="bank_account" inputmode="numeric" placeholder="5012345678"></label>
+      <label>Данс эзэмшигчийн нэр<input name="bank_holder" placeholder="Гэрээнд гарын үсэг зурах нэр"></label>
       <div class="foot"><button class="btn" data-v="primary" data-size="lg" type="button" id="submit">Хүсэлт илгээх</button></div>
       <button class="back" type="button" id="back">‹ Дэлгэц холбох</button>
     </div>`);
@@ -370,7 +383,15 @@ function applyForm() {
       await api('/v1/supplier/apply', {
         method: 'POST',
         token: store.guestToken,
-        body: { name: v('name'), tin: v('tin'), address: v('address'), about: v('about') },
+        body: {
+          name: v('name'),
+          tin: v('tin'),
+          address: v('address'),
+          about: v('about'),
+          bank_name: v('bank_name'),
+          bank_account: v('bank_account'),
+          bank_holder: v('bank_holder'),
+        },
       });
       toast('Хүсэлт илгээгдлээ.');
       showApply();
@@ -381,6 +402,9 @@ function applyForm() {
   card.querySelector('#back').addEventListener('click', showPairing);
   return card;
 }
+
+/** The banks a person in Ulaanbaatar has an account at, most common first. */
+const BANKS = ['Хаан банк', 'Голомт банк', 'Худалдаа хөгжлийн банк', 'Хас банк', 'Төрийн банк', 'Капитрон банк', 'Ариг банк', 'Богд банк', 'М банк'];
 
 const APPLICATION = {
   applied: ['Хүлээгдэж байна', 'Basu хүсэлтийг тань үзэж байна. Батлагдвал энд болон SMS-ээр код ирнэ.'],
@@ -505,51 +529,125 @@ function renderTicket(ticket, lane) {
           ? `Хүргэлт: ${esc(ticket.address)} · ${esc(ticket.address_phone)}`
           : 'Өөрөө ирж авна'
       }</div>
+      ${typeof ticket.payout_mnt === 'number' ? `<div class="pay">Танд очих ${mnt(ticket.payout_mnt)}</div>` : ''}
+      ${
+        lane === 'ready' && !delivery && ticket.no_show_from
+          ? `<div class="grace">${
+              new Date(ticket.no_show_from) <= new Date()
+                ? 'Зочин ирсэнгүй бол «зочин ирээгүй» гэж цуцалж болно.'
+                : `Ирэхгүй бол ${dayLabel(ticket.no_show_from.slice(0, 10))}-нөөс «зочин ирээгүй» гэж цуцалж болно.`
+            }</div>`
+          : ''
+      }
       <div class="btns"></div>
     </article>`);
 
   const buttons = node.querySelector('.btns');
+  const send = async (action, body, button) => {
+    if (button) button.disabled = true;
+    try {
+      await api(
+        watchingAll()
+          ? `/dev/supplier/orders/${ticket.id}/${action}`
+          : `/v1/supplier/orders/${ticket.id}/${action}`,
+        { method: 'POST', token: watchingAll() ? undefined : store.supplierToken, body },
+      );
+      await refreshBoard();
+    } catch (error) {
+      if (error.status === 401 && !watchingAll()) {
+        store.supplierToken = null;
+        showPairing();
+        return;
+      }
+      toast(error.message, 'bad');
+      if (button) button.disabled = false;
+    }
+  };
   const add = (label, action, variant) => {
     const button = el(
       `<button class="btn" type="button"${variant ? ` data-v="${variant}"` : ''}>${label}</button>`,
     );
-    button.addEventListener('click', async () => {
-      button.disabled = true;
-      try {
-        await api(
-          watchingAll()
-            ? `/dev/supplier/orders/${ticket.id}/${action}`
-            : `/v1/supplier/orders/${ticket.id}/${action}`,
-          { method: 'POST', token: watchingAll() ? undefined : store.supplierToken, body: {} },
-        );
-        await refreshBoard();
-      } catch (error) {
-        if (error.status === 401 && !watchingAll()) {
-          store.supplierToken = null;
-          showPairing();
-          return;
-        }
-        toast(error.message, 'bad');
-        button.disabled = false;
-      }
+    button.addEventListener('click', () => send(action, {}, button));
+    buttons.append(button);
+  };
+
+  /**
+   * Cancelling asks why, because the reason decides the money — the
+   * supplier picks from what can be true of this order, sees what the guest
+   * gets back and what stays, and only then confirms.
+   */
+  const cancelWith = (reasons) => {
+    const button = el('<button class="btn" type="button" data-v="danger" data-a="cancel">Цуцлах</button>');
+    button.addEventListener('click', () => {
+      const slaughtered = lane !== 'paid';
+      const meat = ticket.total_mnt - (delivery ? ticket.delivery_fee_mnt ?? 0 : 0);
+      const box = el(`
+        <div class="reasons">
+          <div class="q">Яагаад цуцлах вэ?</div>
+          ${reasons
+            .map(
+              (r) =>
+                `<label><input type="radio" name="reason-${ticket.id}" value="${r}"><span>${REASON[r]}</span></label>`,
+            )
+            .join('')}
+          <div class="money"></div>
+          <div class="btns">
+            <button class="btn" type="button" data-v="danger" data-a="confirm" disabled>Цуцлах</button>
+            <button class="btn" type="button" data-a="keep">Болих</button>
+          </div>
+        </div>`);
+      const money = box.querySelector('.money');
+      const confirm = box.querySelector('[data-a="confirm"]');
+      box.addEventListener('change', () => {
+        const reason = box.querySelector('input:checked')?.value;
+        if (!reason) return;
+        const forfeit = slaughtered && !SUPPLIER_FAULT.includes(reason) ? Math.round((meat * FORFEIT_PCT) / 100) : 0;
+        money.innerHTML = forfeit
+          ? `Зочинд ${mnt(ticket.total_mnt - forfeit)} буцна, <b>${mnt(forfeit)}</b> (${FORFEIT_PCT}%) танд үлдэнэ.`
+          : `Зочинд ${mnt(ticket.total_mnt)} бүтнээр буцна.`;
+        confirm.disabled = false;
+      });
+      confirm.addEventListener('click', () => {
+        const reason = box.querySelector('input:checked')?.value;
+        if (reason) send('cancel', { reason }, confirm);
+      });
+      box.querySelector('[data-a="keep"]').addEventListener('click', () => {
+        box.remove();
+        buttons.hidden = false;
+      });
+      buttons.hidden = true;
+      node.append(box);
     });
     buttons.append(button);
   };
 
   if (lane === 'paid') {
     add('Бэлтгэж эхлэх', 'prepare', 'primary');
-    add('Цуцлах', 'cancel', 'danger');
+    cancelWith(['guest_asked', 'cannot_fulfil', 'vet']);
   } else if (lane === 'preparing') {
     add('Бэлэн боллоо', 'ready', 'primary');
-    add('Цуцлах', 'cancel', 'danger');
+    cancelWith(['guest_asked', 'vet', 'cannot_fulfil']);
   } else if (lane === 'ready') {
     if (delivery) add('Замд гаргах', 'dispatch', 'primary');
     else add('Хүлээлгэн өгсөн', 'hand', 'primary');
+    cancelWith(delivery ? ['guest_asked', 'unreachable', 'vet', 'cannot_fulfil'] : ['guest_asked', 'no_show', 'vet', 'cannot_fulfil']);
   } else {
     add('Хүлээлгэн өгсөн', 'hand', 'primary');
+    cancelWith(['unreachable', 'guest_asked', 'cannot_fulfil']);
   }
   return node;
 }
+
+/** The words for a reason, and which reasons are the supplier's own fault. */
+const REASON = {
+  guest_asked: 'Зочин хүссэн — утсаар ярьж тохирсон',
+  vet: 'Мал эмнэлгийн шалгалт унасан',
+  cannot_fulfil: 'Биелүүлж чадахгүй боллоо',
+  no_show: 'Зочин ирээгүй — өдрөөс 3 хоног өнгөрсөн',
+  unreachable: 'Хаяг дээр холбогдож чадсангүй',
+};
+const SUPPLIER_FAULT = ['vet', 'cannot_fulfil'];
+const FORFEIT_PCT = 10;
 
 async function refreshBoard() {
   try {
@@ -589,6 +687,56 @@ function renderStall(listings) {
   for (const l of listings) rows.append(renderRow(l));
   stall.append(rows);
   stall.append(newForm());
+  stall.append(el('<h2>Миний мөнгө</h2>'), el('<div class="rows" id="money"><div class="row">…</div></div>'));
+  void renderMoney();
+}
+
+/**
+ * What the supplier is owed and what has been sent: one line per order,
+ * with the rate and the account the contract names. The list is ops's to
+ * act on; here it is the supplier's to check.
+ */
+async function renderMoney() {
+  const box = document.getElementById('money');
+  if (!box) return;
+  let data;
+  try {
+    data = await api('/v1/supplier/money', { token: store.supplierToken });
+  } catch {
+    box.replaceChildren(el('<div class="row">Тооцоо ачаалж чадсангүй.</div>'));
+    return;
+  }
+  const due = data.settlements.filter((t) => t.state !== 'paid');
+  const owed = due.reduce((sum, t) => sum + t.amount_mnt, 0);
+  box.replaceChildren(
+    el(`<div class="row" id="terms">
+          <div class="name">Гэрээний нөхцөл<small>Шимтгэл ${data.commission_pct ?? '—'}% (махны үнээс; хүргэлтийн төлбөрөөс авахгүй) · Олголт хүлээлгэн өгснөөс хойш нэг хоногт<br>Данс: ${
+            data.bank_account ? `${esc(data.bank_name)} ${esc(data.bank_account)} · ${esc(data.bank_holder)}` : 'бүртгэгдээгүй — Basu-д хэлнэ үү'
+          }</small></div>
+          <span class="chip" data-s="${owed ? 'PAID' : 'READY'}">${owed ? `Хүлээгдэж буй ${mnt(owed)}` : 'Өр алга'}</span>
+        </div>`),
+  );
+  if (!data.settlements.length) {
+    box.append(el('<div class="row">Хүлээлгэн өгсөн захиалга бүр энд гарна.</div>'));
+    return;
+  }
+  for (const t of data.settlements) {
+    box.append(
+      el(`<div class="row" data-settlement="${t.id}">
+            <div class="name">№${esc(t.order_code)} · ${esc(t.memo)}<small>${
+              t.state === 'paid' ? `Шилжүүлсэн ${when(t.paid_at)}${t.reference ? ` · ${esc(t.reference)}` : ''}` : `Үүссэн ${when(t.created_at)} · Basu шилжүүлнэ`
+            }</small></div>
+            <span class="chip" data-s="${t.state === 'paid' ? 'READY' : 'PAID'}">${mnt(t.amount_mnt)}</span>
+          </div>`),
+    );
+  }
+}
+
+/** «9/8 14:05» for a timestamp the supplier reads across a list. */
+function when(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 function renderRow(l) {

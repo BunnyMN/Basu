@@ -863,6 +863,7 @@ async function mountDevRoutes(
   app.get('/idesh', (_request, reply) => reply.sendFile('idesh.html'));
   app.get('/supplier', (_request, reply) => reply.sendFile('supplier.html'));
   app.get('/ops', (_request, reply) => reply.sendFile('ops.html'));
+  app.get('/terms', (_request, reply) => reply.sendFile('terms.html'));
 
   const clock = ctx.clock as { setTo?: (v: string) => void; advanceMinutes?: (m: number) => void };
 

@@ -72,6 +72,8 @@ const IDESH_ERRORS: Record<IdeshErrorCode, Spec> = {
   NO_ADDRESS: { status: 400, mn: 'Хүргүүлэх хаяг, залгах утсаа оруулна уу.' },
   BAD_DATE: { status: 400, mn: 'Энэ өдөр мах бэлэн болоогүй байна. Өөр өдөр сонгоно уу.' },
   PAYMENT_FAILED: { status: 402, mn: 'Төлбөр амжилтгүй боллоо. Дахин оролдоно уу.' },
+  BAD_REASON: { status: 409, mn: 'Энэ шалтгаанаар одоо цуцлах боломжгүй.' },
+  NEEDS_ACCOUNT: { status: 409, mn: 'Шилжүүлэх данс оруулаагүй байна.' },
   ALREADY_APPLIED: {
     status: 409,
     mn: 'Та аль хэдийн хүсэлт гаргасан эсвэл нийлүүлэгч байна.',
@@ -138,7 +140,9 @@ export function sendError(reply: FastifyReply, error: unknown): FastifyReply {
   }
   if (error instanceof IdeshError) {
     const spec = IDESH_ERRORS[error.code];
-    return reply.status(spec.status).send(envelope(error.code, spec.mn, error.message));
+    // A refused cancel reason says why in Mongolian — the supplier is reading.
+    const mn = error.code === 'BAD_REASON' ? `${spec.mn.replace(/\.$/, '')}: ${error.message}.` : spec.mn;
+    return reply.status(spec.status).send(envelope(error.code, mn, error.message));
   }
   if (error instanceof AuthError) {
     const spec = AUTH_ERRORS[error.code];

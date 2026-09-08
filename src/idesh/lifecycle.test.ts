@@ -4,6 +4,7 @@ import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import {
   balance,
+  owed,
   processReceipts,
   reconcileLedger,
   settleTopup,
@@ -15,18 +16,24 @@ import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '..
 import { seedGuest, truncateAll } from '../test/seed.js';
 import { tick } from '../scheduler/runner.js';
 import {
+  FORFEIT_PCT,
   cancelIdesh,
   createIdesh,
   createListing,
   detailFor,
   housekeeping,
+  listSettlements,
   listingById,
   liveFor,
   markDispatched,
   markHanded,
   markReady,
+  markSettled,
   payIdesh,
+  refundOf,
   registerSupplier,
+  setRefundAccount,
+  settlementsOf,
   startPreparing,
   type Listing,
 } from './index.js';
@@ -234,57 +241,176 @@ describe('paying for an идэш', () => {
 });
 
 /**
- * Cancelling is the supplier's act. A guest has no cancel of their own — money
- * that has moved does not come back at the press of a button — so a guest who
- * chose wrongly rings the supplier, and the supplier undoes it from their
- * screen. The guest is refunded in full whenever that happens.
+ * Cancelling is the supplier's act, for a reason, and the reason decides the
+ * money. A guest has no cancel of their own — money that has moved does not
+ * come back at the press of a button — so a guest who chose wrongly rings
+ * the supplier, and the supplier undoes it from their screen. The refund
+ * then goes to a bank account the guest names, by a transfer ops makes; it
+ * never lands in the wallet.
  */
 describe('cancelling', () => {
-  it('refunds in full and gives the animal back while the supplier has not started', async () => {
-    const { orderId, code } = await book();
+  const by = { actor: 'supplier:d1', role: 'supplier' as const };
+  const BANK = { bankName: 'Хаан банк', bankAccount: '5012345678', bankHolder: 'Бат Дорж' };
+
+  it('before the supplier starts: everything back, the animal on offer again, the guest asked for an account', async () => {
+    const { orderId, code, totalMnt } = await book();
     await payIdesh(ctx, orderId);
 
     // The guest rang, they talked, the supplier cancels.
-    const { refunded } = await cancelIdesh(ctx, orderId, { actor: 'supplier:d1', role: 'supplier' });
-    expect(refunded).toBe(true);
-    expect(await stateOf(orderId)).toBe('REFUNDED');
-    expect(await balance(guestId)).toBe(1_000_000);
+    const split = await cancelIdesh(ctx, orderId, by, 'guest_asked');
+    expect(split).toEqual({ refundMnt: totalMnt, forfeitMnt: 0 });
+    expect(await stateOf(orderId)).toBe('CANCELLED');
     expect((await listingById(sheep.id))!.sold).toBe(0);
+
+    // Not in the wallet: set aside, owed to the guest's bank.
+    expect(await balance(guestId)).toBe(1_000_000 - totalMnt);
+    expect(await owed(`guest:${guestId}`)).toBe(totalMnt);
     expect((await reconcileLedger()).drift).toBe(0);
+    expect(await told(guestId)).toContain('idesh.cancelled');
 
     await processReceipts(ctx);
     expect(tax.issued.map((r) => r.kind)).toEqual(['SALE', 'RETURN']);
-    expect(tax.issued[1]).toMatchObject({ orderCode: code, merchantTin: TIN });
+    expect(tax.issued[1]).toMatchObject({ orderCode: code, merchantTin: TIN, amountMnt: totalMnt });
+
+    // Still the guest's to act on: the order stays in view until the money has gone.
+    expect((await liveFor(guestId)).map((o) => o.id)).toEqual([orderId]);
+    expect((await refundOf(orderId))?.state).toBe('needs_account');
+    expect((await detailFor(guestId, orderId))?.refund?.state).toBe('needs_account');
+
+    await setRefundAccount(orderId, guestId, BANK);
+    const due = await refundOf(orderId);
+    expect(due).toMatchObject({ state: 'due', amountMnt: totalMnt, bank: BANK });
+
+    // Ops pays it by bank and says so: the books close, the order is REFUNDED.
+    const paid = await markSettled(ctx, due!.id, 'ops:test', 'KB-2026-0912-001');
+    expect(paid.state).toBe('paid');
+    expect(await stateOf(orderId)).toBe('REFUNDED');
+    expect(await owed(`guest:${guestId}`)).toBe(0);
+    expect((await reconcileLedger()).drift).toBe(0);
     expect(await told(guestId)).toContain('idesh.refunded');
+    expect(await liveFor(guestId)).toEqual([]);
+    await expect(markSettled(ctx, due!.id, 'ops:test', 'again')).rejects.toMatchObject({ code: 'WRONG_STATE' });
   });
 
-  it('still refunds in full once the supplier has started, but the animal stays sold', async () => {
-    const { orderId } = await book();
+  it('after slaughter on the guest’s own word: a tenth of the meat stays with the supplier', async () => {
+    const { orderId, totalMnt } = await book();
     await payIdesh(ctx, orderId);
     await startPreparing(ctx, orderId, 'supplier:d1');
-    expect(await told(guestId)).toContain('idesh.preparing');
 
-    // A carcass that failed the vet: the supplier cancels, the guest is made
-    // whole, and the sheep is not put back on offer.
-    const { refunded } = await cancelIdesh(
-      ctx,
-      orderId,
-      { actor: 'supplier:d1', role: 'supplier' },
-      'мал эмнэлгийн шалгалт',
-    );
-    expect(refunded).toBe(true);
-    expect(await stateOf(orderId)).toBe('REFUNDED');
-    expect(await balance(guestId)).toBe(1_000_000);
+    const forfeit = Math.round((sheep.priceMnt * FORFEIT_PCT) / 100);
+    const split = await cancelIdesh(ctx, orderId, by, 'guest_asked');
+    expect(split).toEqual({ refundMnt: totalMnt - forfeit, forfeitMnt: forfeit });
+    // The sheep is not put back on offer: it is a carcass now.
     expect((await listingById(sheep.id))!.sold).toBe(1);
+
+    expect(await owed(`guest:${guestId}`)).toBe(totalMnt - forfeit);
+    expect(await owed(`supplier:${supplierId}`)).toBe(forfeit);
+    expect((await reconcileLedger()).drift).toBe(0);
+
+    // Two lines for ops: the guest's refund (waiting on an account) and the
+    // supplier's forfeit (due on the contract account).
+    const open = await listSettlements();
+    expect(open.map((t) => [t.kind, t.state, t.memo, t.amountMnt])).toEqual([
+      ['refund', 'needs_account', 'Буцаалт', totalMnt - forfeit],
+      ['payout', 'due', 'Суутгал', forfeit],
+    ]);
+    // The supplier has no account on file yet, so even a due line cannot be paid.
+    await expect(markSettled(ctx, open[1]!.id, 'ops:test', 'x')).rejects.toMatchObject({ code: 'NEEDS_ACCOUNT' });
+  });
+
+  it('the vet: everything back even after slaughter, and the animal stays sold', async () => {
+    const { orderId, totalMnt } = await book();
+    await payIdesh(ctx, orderId);
+    await startPreparing(ctx, orderId, 'supplier:d1');
+
+    const split = await cancelIdesh(ctx, orderId, by, 'vet');
+    expect(split).toEqual({ refundMnt: totalMnt, forfeitMnt: 0 });
+    expect((await listingById(sheep.id))!.sold).toBe(1);
+    expect(await owed(`supplier:${supplierId}`)).toBe(0);
+  });
+
+  it('«зочин ирээгүй» needs a ready pickup and three days past the guest’s day', async () => {
+    const { orderId, totalMnt } = await book({ receiveOn: '2026-09-12' });
+    await payIdesh(ctx, orderId);
+    await expect(cancelIdesh(ctx, orderId, by, 'no_show')).rejects.toMatchObject({ code: 'BAD_REASON' });
+
+    await startPreparing(ctx, orderId, 'supplier:d1');
+    await markReady(ctx, orderId, 'supplier:d1');
+    // Ready on the 2nd, the guest's day is the 12th: not absent until the 15th.
+    clock.advanceMinutes(12 * 24 * 60);
+    await expect(cancelIdesh(ctx, orderId, by, 'no_show')).rejects.toMatchObject({ code: 'BAD_REASON' });
+    clock.advanceMinutes(24 * 60);
+    const split = await cancelIdesh(ctx, orderId, by, 'no_show');
+    expect(split.forfeitMnt).toBe(Math.round((sheep.priceMnt * FORFEIT_PCT) / 100));
+    expect(split.refundMnt).toBe(totalMnt - split.forfeitMnt);
+  });
+
+  it('refuses a reason that does not fit, and any reason from the scheduler but its own', async () => {
+    const { orderId } = await book();
+    await payIdesh(ctx, orderId);
+    await expect(cancelIdesh(ctx, orderId, by, 'unreachable')).rejects.toMatchObject({ code: 'BAD_REASON' });
+    await expect(cancelIdesh(ctx, orderId, by, 'draft_expired')).rejects.toMatchObject({ code: 'BAD_REASON' });
+    await expect(
+      cancelIdesh(ctx, orderId, { actor: 'system:scheduler', role: 'system' }, 'guest_asked'),
+    ).rejects.toMatchObject({ code: 'BAD_REASON' });
+    expect(await stateOf(orderId)).toBe('PAID');
   });
 
   it('closes an unpaid draft without any money moving', async () => {
     const { orderId } = await book();
-    const { refunded } = await cancelIdesh(ctx, orderId, { actor: 'scheduler', role: 'system' });
-    expect(refunded).toBe(false);
+    const split = await cancelIdesh(ctx, orderId, { actor: 'scheduler', role: 'system' }, 'draft_expired');
+    expect(split).toEqual({ refundMnt: 0, forfeitMnt: 0 });
     expect(await stateOf(orderId)).toBe('CLOSED');
     expect(await balance(guestId)).toBe(1_000_000);
     expect((await listingById(sheep.id))!.sold).toBe(0);
+    expect(await listSettlements()).toEqual([]);
+  });
+});
+
+/**
+ * The supplier's share: fixed at the handover at their rate, set aside a day
+ * later when the order closes, paid by ops against the account on the
+ * contract. The delivery fee is theirs in full; Basu's cut is of the meat.
+ */
+describe('the supplier’s share', () => {
+  it('is set aside when the order closes and paid out against the contract account', async () => {
+    const { orderId, totalMnt } = await book({
+      receive: 'delivery',
+      address: 'Баянзүрх, 13-р хороолол',
+      addressPhone: '+97699112233',
+    });
+    await payIdesh(ctx, orderId);
+    await startPreparing(ctx, orderId, 'supplier:d1');
+    await markReady(ctx, orderId, 'supplier:d1');
+    await markDispatched(ctx, orderId, 'supplier:d1');
+    await markHanded(ctx, orderId, 'supplier:d1');
+
+    // 2% of 460 000 is 9 200; the 25 000 delivery fee passes through whole.
+    const commission = Math.round(sheep.priceMnt * 0.02);
+    expect(totalMnt).toBe(sheep.priceMnt + 25_000);
+    expect(await settlementsOf(supplierId)).toEqual([]);
+    expect(await owed(`supplier:${supplierId}`)).toBe(0);
+
+    clock.advanceMinutes(25 * 60);
+    expect((await housekeeping(ctx)).closed).toBe(1);
+    const [payout] = await settlementsOf(supplierId);
+    expect(payout).toMatchObject({ kind: 'payout', state: 'due', memo: 'Олголт', amountMnt: totalMnt - commission });
+    expect(await owed(`supplier:${supplierId}`)).toBe(totalMnt - commission);
+    // Closing twice opens nothing twice.
+    expect((await housekeeping(ctx)).closed).toBe(0);
+    expect(await settlementsOf(supplierId)).toHaveLength(1);
+
+    // No account on the contract yet: ops writes it in, then pays.
+    await expect(markSettled(ctx, payout!.id, 'ops:test', 'GB-1')).rejects.toMatchObject({ code: 'NEEDS_ACCOUNT' });
+    await getPool().query(
+      `UPDATE idesh.supplier SET bank_name = 'Голомт', bank_account = '1105012345', bank_holder = 'Дорж' WHERE id = $1`,
+      [supplierId],
+    );
+    const paid = await markSettled(ctx, payout!.id, 'ops:test', 'GB-1');
+    expect(paid.state).toBe('paid');
+    expect(paid.bank?.bankName).toBe('Голомт');
+    expect(await owed(`supplier:${supplierId}`)).toBe(0);
+    expect((await reconcileLedger()).drift).toBe(0);
   });
 });
 

@@ -8,6 +8,8 @@ export type IdeshErrorCode =
   | 'NO_ADDRESS'
   | 'BAD_DATE'
   | 'PAYMENT_FAILED'
+  | 'BAD_REASON'
+  | 'NEEDS_ACCOUNT'
   | 'ALREADY_APPLIED'
   | 'NOT_PENDING'
   | 'OPS_CLOSED';

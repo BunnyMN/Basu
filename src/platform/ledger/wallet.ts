@@ -20,6 +20,8 @@ import type { Db } from '../../db/pool.js';
 
 const CLEARING = 'qpay:clearing';
 const REVENUE = 'house:revenue';
+/** The far side of money that has physically left, by a bank transfer. */
+const OUT = 'bank:out';
 
 export class LedgerError extends Error {
   constructor(
@@ -69,7 +71,7 @@ export async function balance(guestId: string): Promise<number> {
 /* ── posting ───────────────────────────────────────────────────────── */
 
 interface PostInput {
-  kind: 'topup' | 'purchase' | 'refund' | 'promotion' | 'adjustment';
+  kind: 'topup' | 'purchase' | 'refund' | 'promotion' | 'adjustment' | 'accrual' | 'payout';
   amountMnt: number;
   from: string;
   to: string;
@@ -359,6 +361,102 @@ export async function refund(input: {
     });
     return transfer.id;
   });
+}
+
+/* ── money owed outside ────────────────────────────────────────────── */
+
+/**
+ * A payable: what the house holds that belongs to somebody outside it — a
+ * supplier's share of a sale, a refund on its way to a guest's bank. Made on
+ * first sight, one per payee, named so the books read as a list of debts.
+ */
+async function payableAccount(db: Db, payee: string): Promise<string> {
+  const { rows } = await db.query<{ id: string }>(
+    `INSERT INTO ledger.account (kind, label) VALUES ('payable', $1)
+     ON CONFLICT (label) DO UPDATE SET label = EXCLUDED.label
+     RETURNING id`,
+    [`payable:${payee}`],
+  );
+  return rows[0]!.id;
+}
+
+export interface OweInput {
+  /** `supplier:<id>` or `guest:<id>` — whoever the money belongs to. */
+  payee: string;
+  amountMnt: number;
+  subject: string;
+  subjectId: string;
+  memo?: string | undefined;
+  idempotencyKey: string;
+}
+
+/**
+ * Revenue that is not the house's to keep: set it aside for its owner. The
+ * money does not move yet — it is owed, and `owed()` says how much — but the
+ * house's own figure drops the moment the debt exists.
+ */
+export async function accrue(input: OweInput): Promise<string> {
+  return tx(async (client) => {
+    const revenue = await namedAccount(client, REVENUE);
+    const payable = await payableAccount(client, input.payee);
+    const transfer = await post(client, {
+      kind: 'accrual',
+      amountMnt: input.amountMnt,
+      from: revenue,
+      to: payable,
+      subject: input.subject,
+      subjectId: input.subjectId,
+      memo: input.memo,
+      idempotencyKey: input.idempotencyKey,
+    });
+    return transfer.id;
+  });
+}
+
+/**
+ * The debt is paid — a person made the bank transfer and said so. Refuses to
+ * pay out more than is owed, which is the one way a typo at ops could put
+ * the books wrong.
+ */
+export async function payOut(input: OweInput): Promise<string> {
+  return tx(async (client) => {
+    const payable = await payableAccount(client, input.payee);
+    const out = await namedAccount(client, OUT);
+    const { rows } = await client.query<{ balance: number }>(
+      'SELECT COALESCE(SUM(amount_mnt), 0)::bigint AS balance FROM ledger.entry WHERE account_id = $1',
+      [payable],
+    );
+    const held = Number(rows[0]?.balance ?? 0);
+    const already = await client.query<{ id: string }>(
+      'SELECT id FROM ledger.transfer WHERE idempotency_key = $1',
+      [input.idempotencyKey],
+    );
+    if (!already.rows[0] && held < input.amountMnt) {
+      throw new LedgerError('INSUFFICIENT_FUNDS', `only ${held} is owed to ${input.payee}`);
+    }
+    const transfer = await post(client, {
+      kind: 'payout',
+      amountMnt: input.amountMnt,
+      from: payable,
+      to: out,
+      subject: input.subject,
+      subjectId: input.subjectId,
+      memo: input.memo,
+      idempotencyKey: input.idempotencyKey,
+    });
+    return transfer.id;
+  });
+}
+
+/** What the house currently owes this payee and has not yet paid out. */
+export async function owed(payee: string): Promise<number> {
+  const { rows } = await getPool().query<{ balance: number }>(
+    `SELECT COALESCE(SUM(e.amount_mnt), 0)::bigint AS balance
+       FROM ledger.entry e JOIN ledger.account a ON a.id = e.account_id
+      WHERE a.label = $1`,
+    [`payable:${payee}`],
+  );
+  return Number(rows[0]?.balance ?? 0);
 }
 
 /* ── what the guest sees ───────────────────────────────────────────── */

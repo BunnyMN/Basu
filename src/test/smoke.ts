@@ -411,6 +411,9 @@ async function idesh(guest: string): Promise<void> {
   const final = await call<{ state: string }>(`/v1/idesh/${id}`, { token: guest });
   check('төлөв HANDED', final.body.state === 'HANDED', final.body);
 
+  const money = await call<{ commission_pct: number; settlements: unknown[] }>('/v1/supplier/money', { token: supplier });
+  check('нийлүүлэгч өөрийн тооцоог харна', money.status === 200 && typeof money.body.commission_pct === 'number', money.body);
+
   /* isolation */
   const suppliers = await call<{ suppliers: Array<{ id: string }> }>('/dev/suppliers');
   const rival = suppliers.body.suppliers.find((s) => s.id !== stall.supplier.id);

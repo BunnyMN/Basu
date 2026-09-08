@@ -28,7 +28,13 @@ const sha256 = (value: string): string => createHash('sha256').update(value).dig
 
 export type SupplierState = 'applied' | 'contracted' | 'declined';
 
-export interface SupplierInput {
+export interface BankDetails {
+  bankName?: string | null | undefined;
+  bankAccount?: string | null | undefined;
+  bankHolder?: string | null | undefined;
+}
+
+export interface SupplierInput extends BankDetails {
   name: string;
   phone: string;
   merchantTin?: string | null;
@@ -41,8 +47,9 @@ export interface SupplierInput {
 export async function registerSupplier(input: SupplierInput, db: Db = getPool()): Promise<string> {
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO idesh.supplier
-       (name, phone, ebarimt_merchant_tin, pickup_address, lat, lon, state, contracted_at)
-     VALUES ($1, $2, $3, $4, $5, $6, 'contracted', now()) RETURNING id`,
+       (name, phone, ebarimt_merchant_tin, pickup_address, lat, lon, state, contracted_at,
+        bank_name, bank_account, bank_holder)
+     VALUES ($1, $2, $3, $4, $5, $6, 'contracted', now(), $7, $8, $9) RETURNING id`,
     [
       input.name.trim(),
       input.phone,
@@ -50,6 +57,9 @@ export async function registerSupplier(input: SupplierInput, db: Db = getPool())
       input.pickupAddress.trim(),
       input.lat ?? null,
       input.lon ?? null,
+      input.bankName?.trim() || null,
+      input.bankAccount?.replace(/\s+/g, '') || null,
+      input.bankHolder?.trim() || null,
     ],
   );
   return rows[0]!.id;
@@ -57,7 +67,7 @@ export async function registerSupplier(input: SupplierInput, db: Db = getPool())
 
 /* ── applying ──────────────────────────────────────────────────────── */
 
-export interface ApplicationInput {
+export interface ApplicationInput extends BankDetails {
   guestId: string;
   name: string;
   merchantTin?: string | null;
@@ -91,8 +101,8 @@ export async function applySupplier(ctx: Ctx, input: ApplicationInput): Promise<
     const { rows } = await getPool().query<{ id: string }>(
       `INSERT INTO idesh.supplier
          (name, phone, ebarimt_merchant_tin, pickup_address, lat, lon, about,
-          state, applicant_guest_id, applied_at, active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'applied', $8, $9, true) RETURNING id`,
+          state, applicant_guest_id, applied_at, active, bank_name, bank_account, bank_holder)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'applied', $8, $9, true, $10, $11, $12) RETURNING id`,
       [
         name,
         contact.phone,
@@ -103,6 +113,9 @@ export async function applySupplier(ctx: Ctx, input: ApplicationInput): Promise<
         input.about?.trim() || null,
         input.guestId,
         ctx.clock.now(),
+        input.bankName?.trim() || null,
+        input.bankAccount?.replace(/\s+/g, '') || null,
+        input.bankHolder?.trim() || null,
       ],
     );
     return rows[0]!.id;
@@ -255,6 +268,11 @@ export interface SupplierRow {
   appliedAt: Date | null;
   contractedAt: Date | null;
   declineReason: string | null;
+  /** Basu's share of the meat price, per contract. */
+  commissionPct: number;
+  bankName: string | null;
+  bankAccount: string | null;
+  bankHolder: string | null;
   /** Whether a screen is currently paired — «холбогдсон» on the demo list. */
   watched: boolean;
   listings: number;
@@ -276,11 +294,16 @@ export async function listSuppliers(db: Db = getPool()): Promise<SupplierRow[]> 
     applied_at: Date | null;
     contracted_at: Date | null;
     decline_reason: string | null;
+    commission_pct: string;
+    bank_name: string | null;
+    bank_account: string | null;
+    bank_holder: string | null;
     watched: boolean;
     listings: number;
   }>(
     `SELECT s.id, s.name, s.phone, s.ebarimt_merchant_tin, s.pickup_address, s.about,
             s.lat, s.lon, s.state, s.active, s.applied_at, s.contracted_at, s.decline_reason,
+            s.commission_pct, s.bank_name, s.bank_account, s.bank_holder,
             EXISTS (SELECT 1 FROM idesh.supplier_device d
                      WHERE d.supplier_id = s.id AND d.revoked_at IS NULL
                        AND d.paired_at IS NOT NULL) AS watched,
@@ -302,9 +325,46 @@ export async function listSuppliers(db: Db = getPool()): Promise<SupplierRow[]> 
     appliedAt: r.applied_at,
     contractedAt: r.contracted_at,
     declineReason: r.decline_reason,
+    commissionPct: Number(r.commission_pct),
+    bankName: r.bank_name,
+    bankAccount: r.bank_account,
+    bankHolder: r.bank_holder,
     watched: r.watched,
     listings: r.listings,
   }));
+}
+
+export interface SupplierPatch extends BankDetails {
+  commissionPct?: number | undefined;
+  merchantTin?: string | null | undefined;
+}
+
+/** Ops writes the contract's terms in: the rate, the account, the TIN. */
+export async function updateSupplier(supplierId: string, patch: SupplierPatch, db: Db = getPool()): Promise<void> {
+  if (patch.commissionPct !== undefined && !(patch.commissionPct >= 0 && patch.commissionPct <= 100)) {
+    throw new IdeshError('WRONG_STATE', 'a commission is 0 to 100 percent');
+  }
+  if (patch.merchantTin && !/^\d{7,14}$/.test(patch.merchantTin)) {
+    throw new IdeshError('WRONG_STATE', 'a TIN is seven to fourteen digits');
+  }
+  const { rowCount } = await db.query(
+    `UPDATE idesh.supplier
+        SET commission_pct       = COALESCE($2, commission_pct),
+            bank_name            = COALESCE($3, bank_name),
+            bank_account         = COALESCE($4, bank_account),
+            bank_holder          = COALESCE($5, bank_holder),
+            ebarimt_merchant_tin = COALESCE($6, ebarimt_merchant_tin)
+      WHERE id = $1`,
+    [
+      supplierId,
+      patch.commissionPct ?? null,
+      patch.bankName?.trim() || null,
+      patch.bankAccount?.replace(/\s+/g, '') || null,
+      patch.bankHolder?.trim() || null,
+      patch.merchantTin?.trim() || null,
+    ],
+  );
+  if (!rowCount) throw new IdeshError('NOT_FOUND', 'no such supplier');
 }
 
 /* ── the supplier's screen ─────────────────────────────────────────── */

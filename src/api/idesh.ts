@@ -36,9 +36,14 @@ import {
   type ListingPatch,
   type Receive,
   type Unit,
+  CANCEL_REASONS,
+  setRefundAccount,
+  settlementsOf,
+  type CancelReason,
 } from '../idesh/index.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import type { Ctx } from '../ports.js';
+import { shapeSettlement } from './ops.js';
 
 /**
  * Өвлийн идэш over HTTP: the guest's side under /v1/idesh, the supplier's
@@ -123,6 +128,19 @@ const shapeDetail = (o: IdeshDetail) => ({
   ready_at: o.readyAt?.toISOString() ?? null,
   dispatched_at: o.dispatchedAt?.toISOString() ?? null,
   handed_at: o.handedAt?.toISOString() ?? null,
+  cancel_reason: o.cancelReason,
+  refund_mnt: o.refundMnt,
+  forfeit_mnt: o.forfeitMnt,
+  refund: o.refund
+    ? {
+        state: o.refund.state,
+        amount_mnt: o.refund.amountMnt,
+        bank_name: o.refund.bank?.bankName ?? null,
+        bank_account: o.refund.bank?.bankAccount ?? null,
+        bank_holder: o.refund.bank?.bankHolder ?? null,
+        paid_at: o.refund.paidAt?.toISOString() ?? null,
+      }
+    : null,
   receipt: o.receipt,
 });
 
@@ -268,6 +286,32 @@ export async function registerIdeshRoutes(
   // has moved does not come back at the press of a button; the guest rings
   // the supplier, and the supplier cancels from their own screen.
 
+  /** Where the refund goes: the guest's own bank account, in their words. */
+  app.post<{ Params: { id: string }; Body: { bank_name?: string; bank_account?: string; bank_holder?: string } }>(
+    '/v1/idesh/:id/refund-account',
+    guarded,
+    async (request, reply) => {
+      if (!(await ownedByGuest(request.params.id, request.guestId!))) {
+        return forbidden(reply, 'not your order');
+      }
+      const body = request.body ?? {};
+      if (!body.bank_name?.trim() || !body.bank_account?.trim() || !body.bank_holder?.trim()) {
+        return badRequest(reply, 'Банк, дансны дугаар, эзэмшигчийн нэрээ оруулна уу.', 'bank, account and holder are required');
+      }
+      try {
+        await setRefundAccount(request.params.id, request.guestId!, {
+          bankName: body.bank_name,
+          bankAccount: body.bank_account,
+          bankHolder: body.bank_holder,
+        });
+        const detail = await detailFor(request.guestId!, request.params.id);
+        return reply.send(detail ? shapeDetail(detail) : { ok: true });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
   /* ── becoming a supplier ───────────────────────────────────────── */
 
   /**
@@ -276,7 +320,17 @@ export async function registerIdeshRoutes(
    * their own page.
    */
   app.post<{
-    Body: { name?: string; tin?: string; address?: string; about?: string; lat?: number; lon?: number };
+    Body: {
+      name?: string;
+      tin?: string;
+      address?: string;
+      about?: string;
+      lat?: number;
+      lon?: number;
+      bank_name?: string;
+      bank_account?: string;
+      bank_holder?: string;
+    };
   }>('/v1/supplier/apply', guarded, async (request, reply) => {
     const body = request.body ?? {};
     if (!body.name?.trim() || !body.address?.trim()) {
@@ -291,6 +345,9 @@ export async function registerIdeshRoutes(
         about: body.about ?? null,
         lat: typeof body.lat === 'number' ? body.lat : null,
         lon: typeof body.lon === 'number' ? body.lon : null,
+        bankName: body.bank_name,
+        bankAccount: body.bank_account,
+        bankHolder: body.bank_holder,
       });
       return reply.status(201).send({ id, state: 'applied' });
     } catch (error) {
@@ -349,6 +406,10 @@ export async function registerIdeshRoutes(
         address_phone: t.addressPhone,
         address_lat: t.addressLat,
         address_lon: t.addressLon,
+        delivery_fee_mnt: t.deliveryFeeMnt,
+        ready_at: t.readyAt?.toISOString() ?? null,
+        no_show_from: t.noShowFrom?.toISOString() ?? null,
+        payout_mnt: t.payoutMnt,
       }));
     return {
       today: dayOf(ctx.clock.now()),
@@ -366,6 +427,19 @@ export async function registerIdeshRoutes(
   app.get('/v1/supplier/board', asSupplier, async (request) =>
     screen(request.supplierDevice!.supplierId),
   );
+
+  /** The supplier's money: their rate, what they are owed, what was sent. */
+  app.get('/v1/supplier/money', asSupplier, async (request) => {
+    const supplierId = request.supplierDevice!.supplierId;
+    const me = (await listSuppliers()).find((s) => s.id === supplierId);
+    return {
+      commission_pct: me?.commissionPct ?? null,
+      bank_name: me?.bankName ?? null,
+      bank_account: me?.bankAccount ?? null,
+      bank_holder: me?.bankHolder ?? null,
+      settlements: (await settlementsOf(supplierId)).map(shapeSettlement),
+    };
+  });
 
   /**
    * Every supplier action shares the same steps: check the order is theirs,
@@ -392,13 +466,13 @@ export async function registerIdeshRoutes(
         await markHanded(ctx, orderId, actor);
         return { state: 'HANDED' };
       case 'cancel': {
-        const { refunded } = await cancelIdesh(
-          ctx,
-          orderId,
-          { actor, role: 'supplier' },
-          body?.reason ?? 'supplier cancelled',
-        );
-        return { state: refunded ? 'REFUNDED' : 'CANCELLED', refunded };
+        // The reason is not a note; it decides the money. No reason, no cancel.
+        const reason = body?.reason;
+        if (!reason || !(CANCEL_REASONS as readonly string[]).includes(reason)) {
+          throw new IdeshError('BAD_REASON', 'шалтгаанаа сонгоно уу');
+        }
+        const split = await cancelIdesh(ctx, orderId, { actor, role: 'supplier' }, reason as CancelReason);
+        return { state: 'CANCELLED', refund_mnt: split.refundMnt, forfeit_mnt: split.forfeitMnt };
       }
       default:
         return null;
