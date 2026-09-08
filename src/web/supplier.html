@@ -613,9 +613,11 @@ function renderTicket(ticket, lane) {
       });
       box.querySelector('[data-a="keep"]').addEventListener('click', () => {
         box.remove();
-        buttons.hidden = false;
+        buttons.style.display = '';
       });
-      buttons.hidden = true;
+      // The row's own buttons step aside while the question is open — by
+      // style, because the class sets display and would outrank `hidden`.
+      buttons.style.display = 'none';
       node.append(box);
     });
     buttons.append(button);

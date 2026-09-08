@@ -49,7 +49,18 @@ ALTER TABLE idesh.idesh_order
   ADD COLUMN forfeit_mnt    bigint CHECK (forfeit_mnt IS NULL OR forfeit_mnt >= 0),
   -- Fixed at the handover from the supplier's rate that day.
   ADD COLUMN commission_mnt bigint CHECK (commission_mnt IS NULL OR commission_mnt >= 0),
-  ADD COLUMN payout_mnt     bigint CHECK (payout_mnt     IS NULL OR payout_mnt     >= 0),
+  ADD COLUMN payout_mnt     bigint CHECK (payout_mnt     IS NULL OR payout_mnt     >= 0);
+
+-- Orders cancelled before there were reasons: unpaid drafts the scheduler
+-- swept, and paid orders whose refund went to the wallet in full under the
+-- old rule. Named as such, so the rule below can be a constraint.
+UPDATE idesh.idesh_order
+   SET cancel_reason = CASE WHEN paid_at IS NULL THEN 'draft_expired' ELSE 'guest_asked' END,
+       refund_mnt    = CASE WHEN paid_at IS NULL THEN 0 ELSE total_mnt END,
+       forfeit_mnt   = 0
+ WHERE cancelled_at IS NOT NULL AND cancel_reason IS NULL;
+
+ALTER TABLE idesh.idesh_order
   ADD CONSTRAINT idesh_order_cancel_reasoned
     CHECK (cancelled_at IS NULL OR cancel_reason IS NOT NULL);
 
