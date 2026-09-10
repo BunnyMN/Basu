@@ -9,6 +9,7 @@ export {
   AuthError,
   OTP_PER_PHONE_PER_HOUR,
   requestOtp,
+  DEMO_OTP,
   verifyOtp,
   startSession,
   resolveGuest,

@@ -44,6 +44,9 @@ export class AuthError extends Error {
 
 /* ── guests ────────────────────────────────────────────────────────── */
 
+/** The one-time code every demo sign-in gets. Never used in production. */
+export const DEMO_OTP = '123456';
+
 export interface OtpIssued {
   challengeId: string;
   /**
@@ -65,7 +68,10 @@ export async function requestOtp(ctx: Ctx, phone: string): Promise<OtpIssued> {
     throw new AuthError('RATE_LIMITED', 'too many codes requested for this number');
   }
 
-  const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+  // The demo has no SMS: its code is the same every time, so a phone with a
+  // store build, a reviewer at Apple and a tester on TestFlight can all get
+  // in against the demo server. Production draws a real one.
+  const code = mode() === 'demo' ? DEMO_OTP : String(randomInt(0, 1_000_000)).padStart(6, '0');
   const inserted = await getPool().query<{ id: string }>(
     `INSERT INTO identity.otp_challenge (phone_e164, code_hash, expires_at, created_at)
      VALUES ($1, $2, $3, $4) RETURNING id`,
