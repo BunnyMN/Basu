@@ -11,6 +11,16 @@
 //
 // BASU_ID_SUFFIX = .yourname
 //
+// The team that signs. A member of the App Store team (the one that owns
+// mn.basu.app) sets it and needs no suffix; a personal team needs the
+// suffix above instead. Xcode shows the ten characters under Accounts.
+//
+// DEVELOPMENT_TEAM = T65Z28HF29
+//
+// A team in the Developer Program may sign debug builds with push too:
+//
+// BASU_DEBUG_ENTITLEMENTS = Basu/Basu.entitlements
+//
 // Where a debug build on a real phone finds the API. `localhost` on a phone
 // is the phone; use the Mac's address on the same Wi-Fi. In an xcconfig
 // `//` starts a comment, so the URL is written with $() in the middle:
