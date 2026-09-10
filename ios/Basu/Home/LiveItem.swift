@@ -80,8 +80,9 @@ extension LiveIdesh {
       title: supplier.name,
       meta: "№\(code) · \(title) ×\(qty) · \(state.word)",
       time: receiveOn,
-      when: Format.day(receiveOn),
-      timeLabel: receive == "delivery" ? "ИРЭХ" : "АВАХ",
+      // A cancelled order is still here for its refund, not for a day.
+      when: state == .cancelled ? "—" : Format.day(receiveOn),
+      timeLabel: state == .cancelled ? "БУЦААЛТ" : receive == "delivery" ? "ИРЭХ" : "АВАХ",
       status: state == .dispatched ? .moving : .waiting,
       destination: AppCatalogue.idesh.destination(order: id),
       extra: nil,

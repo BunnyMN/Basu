@@ -231,8 +231,9 @@ function ideshRow(order) {
     code: order.code,
     state: order.state,
     word,
-    time: dayShort(order.receive_on),
-    label: order.receive === 'delivery' ? 'ирэх' : 'авах',
+    // A cancelled order is still here for its refund, not for a day.
+    time: order.state === 'CANCELLED' ? '—' : dayShort(order.receive_on),
+    label: order.state === 'CANCELLED' ? 'буцаалт' : order.receive === 'delivery' ? 'ирэх' : 'авах',
   };
 }
 
