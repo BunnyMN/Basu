@@ -200,9 +200,12 @@ async function loadSupplierTile() {
   } catch {
     return;
   }
+  // Asked again after the wait: two refreshes in flight at once must not
+  // both find the tile missing and both draw it.
+  const drawn = $('apps').querySelector('[data-app="supplier"]');
   const isOne = mine?.state === 'contracted';
-  if (isOne && !shown) $('apps').append(tileOf(SUPPLIER_APP));
-  if (!isOne && shown) shown.closest('li').remove();
+  if (isOne && !drawn) $('apps').append(tileOf(SUPPLIER_APP));
+  if (!isOne && drawn) drawn.closest('li').remove();
 }
 
 /* ── what is already running ──────────────────────────────────────── */
