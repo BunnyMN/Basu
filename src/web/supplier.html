@@ -524,7 +524,7 @@ function renderTicket(ticket, lane) {
       ${watchingAll() ? `<div class="where">${esc(ticket.supplier.name)}</div>` : ''}
       <div class="meta">${KIND[ticket.kind] ?? ticket.kind} · ${mnt(ticket.total_mnt)}${
         ticket.guest ? ` · ${esc(ticket.guest)}` : ''
-      }<br>${
+      }${ticket.guest_phone ? ` · <a href="tel:${esc(ticket.guest_phone)}">${esc(ticket.guest_phone)}</a>` : ''}<br>${
         delivery
           ? `Хүргэлт: ${esc(ticket.address)} · ${esc(ticket.address_phone)}`
           : 'Өөрөө ирж авна'

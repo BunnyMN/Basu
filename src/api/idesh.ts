@@ -402,6 +402,7 @@ export async function registerIdeshRoutes(
       tickets.map((t) => ({
         ...shapeSummary(t),
         guest: t.guest,
+        guest_phone: t.guestPhone,
         address: t.address,
         address_phone: t.addressPhone,
         address_lat: t.addressLat,

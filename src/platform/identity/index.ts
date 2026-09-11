@@ -12,6 +12,7 @@ export {
   DEMO_OTP,
   verifyOtp,
   startSession,
+  guestForPhone,
   resolveGuest,
   type GuestSession,
   type OtpIssued,

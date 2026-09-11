@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { getPool, tx, type Db } from '../db/pool.js';
 import { addMinutes } from '../domain/time.js';
-import { AuthError, contactsFor } from '../platform/identity/index.js';
+import { AuthError, contactsFor, guestForPhone } from '../platform/identity/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
 import { IdeshError } from './errors.js';
@@ -48,8 +48,8 @@ export async function registerSupplier(input: SupplierInput, db: Db = getPool())
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO idesh.supplier
        (name, phone, ebarimt_merchant_tin, pickup_address, lat, lon, state, contracted_at,
-        bank_name, bank_account, bank_holder)
-     VALUES ($1, $2, $3, $4, $5, $6, 'contracted', now(), $7, $8, $9) RETURNING id`,
+        bank_name, bank_account, bank_holder, owner_guest_id)
+     VALUES ($1, $2, $3, $4, $5, $6, 'contracted', now(), $7, $8, $9, $10) RETURNING id`,
     [
       input.name.trim(),
       input.phone,
@@ -60,9 +60,45 @@ export async function registerSupplier(input: SupplierInput, db: Db = getPool())
       input.bankName?.trim() || null,
       input.bankAccount?.replace(/\s+/g, '') || null,
       input.bankHolder?.trim() || null,
+      await guestForPhone(input.phone),
     ],
   );
   return rows[0]!.id;
+}
+
+/**
+ * The person a supplier answers to — the guest whose phone it is. Made on
+ * first need for suppliers written in before there were owners.
+ */
+export async function ownerOf(supplierId: string, db: Db = getPool()): Promise<string | null> {
+  const { rows } = await db.query<{ owner_guest_id: string | null; phone: string }>(
+    'SELECT owner_guest_id, phone FROM idesh.supplier WHERE id = $1',
+    [supplierId],
+  );
+  const row = rows[0];
+  if (!row) return null;
+  if (row.owner_guest_id) return row.owner_guest_id;
+  const guestId = await guestForPhone(row.phone);
+  await db.query('UPDATE idesh.supplier SET owner_guest_id = $2 WHERE id = $1 AND owner_guest_id IS NULL', [
+    supplierId,
+    guestId,
+  ]);
+  return guestId;
+}
+
+/** The supplier this guest owns, if they own one that is not declined. */
+export async function supplierOf(
+  guestId: string,
+  db: Db = getPool(),
+): Promise<{ id: string; name: string; state: SupplierState } | null> {
+  const { rows } = await db.query<{ id: string; name: string; state: SupplierState }>(
+    `SELECT id, name, state FROM idesh.supplier
+      WHERE owner_guest_id = $1 AND state <> 'declined' AND active
+      ORDER BY (state = 'contracted') DESC, contracted_at DESC NULLS LAST
+      LIMIT 1`,
+    [guestId],
+  );
+  return rows[0] ?? null;
 }
 
 /* ── applying ──────────────────────────────────────────────────────── */
@@ -101,7 +137,7 @@ export async function applySupplier(ctx: Ctx, input: ApplicationInput): Promise<
     const { rows } = await getPool().query<{ id: string }>(
       `INSERT INTO idesh.supplier
          (name, phone, ebarimt_merchant_tin, pickup_address, lat, lon, about,
-          state, applicant_guest_id, applied_at, active, bank_name, bank_account, bank_holder)
+          state, owner_guest_id, applied_at, active, bank_name, bank_account, bank_holder)
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'applied', $8, $9, true, $10, $11, $12) RETURNING id`,
       [
         name,
@@ -162,7 +198,7 @@ export async function applicationOf(ctx: Ctx, guestId: string): Promise<Applicat
                      WHERE d.supplier_id = s.id AND d.paired_at IS NOT NULL
                        AND d.revoked_at IS NULL) AS paired
        FROM idesh.supplier s
-      WHERE s.applicant_guest_id = $1
+      WHERE s.owner_guest_id = $1
       -- The one that still matters: an open or contracted row over a declined
       -- one, then the newest. Two rows can share an instant on the demo clock.
       ORDER BY (s.state = 'declined') ASC, s.applied_at DESC NULLS LAST
@@ -193,11 +229,11 @@ export async function applicationOf(ctx: Ctx, guestId: string): Promise<Applicat
 export async function approveSupplier(ctx: Ctx, supplierId: string): Promise<{ pairingCode: string }> {
   const now = ctx.clock.now();
   const approved = await tx(async (client) => {
-    const { rows } = await client.query<{ applicant_guest_id: string | null; name: string }>(
+    const { rows } = await client.query<{ owner_guest_id: string | null; name: string }>(
       `UPDATE idesh.supplier
           SET state = 'contracted', contracted_at = $2, decided_at = $2, decline_reason = NULL
         WHERE id = $1 AND state = 'applied'
-        RETURNING applicant_guest_id, name`,
+        RETURNING owner_guest_id, name`,
       [supplierId, now],
     );
     return rows[0] ?? null;
@@ -211,9 +247,9 @@ export async function approveSupplier(ctx: Ctx, supplierId: string): Promise<{ p
     APPROVAL_CODE_TTL_MINUTES,
   );
 
-  if (approved.applicant_guest_id) {
+  if (approved.owner_guest_id) {
     await enqueue(ctx, {
-      guestId: approved.applicant_guest_id,
+      guestId: approved.owner_guest_id,
       subject: 'supplier',
       subjectId: supplierId,
       template: 'supplier.approved',
@@ -230,19 +266,19 @@ export async function approveSupplier(ctx: Ctx, supplierId: string): Promise<{ p
 export async function declineSupplier(ctx: Ctx, supplierId: string, reason: string): Promise<void> {
   const now = ctx.clock.now();
   const why = reason.trim() || 'шалтгаан заагаагүй';
-  const { rows } = await getPool().query<{ applicant_guest_id: string | null; name: string }>(
+  const { rows } = await getPool().query<{ owner_guest_id: string | null; name: string }>(
     `UPDATE idesh.supplier
         SET state = 'declined', decided_at = $2, decline_reason = $3, active = false
       WHERE id = $1 AND state = 'applied'
-      RETURNING applicant_guest_id, name`,
+      RETURNING owner_guest_id, name`,
     [supplierId, now, why],
   );
   const declined = rows[0];
   if (!declined) throw new IdeshError('NOT_PENDING', 'no application is waiting under that id');
 
-  if (declined.applicant_guest_id) {
+  if (declined.owner_guest_id) {
     await enqueue(ctx, {
-      guestId: declined.applicant_guest_id,
+      guestId: declined.owner_guest_id,
       subject: 'supplier',
       subjectId: supplierId,
       template: 'supplier.declined',

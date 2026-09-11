@@ -11,6 +11,7 @@ import {
   startTopup,
   wallet,
 } from '../platform/ledger/index.js';
+import { guestForPhone } from '../platform/identity/index.js';
 import { inbox, relay } from '../platform/notify/index.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { seedGuest, truncateAll } from '../test/seed.js';
@@ -138,6 +139,17 @@ afterAll(async () => {
 });
 
 describe('paying for an идэш', () => {
+  it('tells the supplier both ways the moment the money is down', async () => {
+    const { orderId, code } = await book();
+    await payIdesh(ctx, orderId);
+    // The supplier was written in by ops with a phone; that phone is who hears.
+    const owner = await guestForPhone('+97688010001');
+    const heard = (await inbox(owner)).filter((m) => m.template === 'supplier.order');
+    expect(heard.map((m) => m.channel).sort()).toEqual(['push', 'sms']);
+    expect(heard[0]?.body).toContain(`№${code}`);
+    expect(heard[0]?.body).toContain('өөрөө авна');
+  });
+
   it('takes the whole price once, out of the wallet, and the ledger still balances', async () => {
     const { orderId, code, totalMnt } = await book();
     expect(totalMnt).toBe(460_000);

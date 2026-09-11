@@ -259,11 +259,11 @@ export async function markSettled(
       body: `Идэш №${row.order_code}: ${amount} ${row.bank_name} дахь данс руу тань шилжүүллээ.`,
     });
   } else if (row.kind === 'payout' && row.supplier_id) {
-    const { rows: who } = await getPool().query<{ applicant_guest_id: string | null }>(
-      'SELECT applicant_guest_id FROM idesh.supplier WHERE id = $1',
+    const { rows: who } = await getPool().query<{ owner_guest_id: string | null }>(
+      'SELECT owner_guest_id FROM idesh.supplier WHERE id = $1',
       [row.supplier_id],
     );
-    const guestId = who[0]?.applicant_guest_id;
+    const guestId = who[0]?.owner_guest_id;
     if (guestId) {
       await enqueue(ctx, {
         guestId,

@@ -71,6 +71,8 @@ export {
   declineSupplier,
   listSuppliers,
   updateSupplier,
+  ownerOf,
+  supplierOf,
   createSupplierCode,
   pairSupplier,
   resolveSupplierDevice,

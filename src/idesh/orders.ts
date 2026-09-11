@@ -1,5 +1,5 @@
 import { getPool, tx, type Db } from '../db/pool.js';
-import { displayNamesFor } from '../platform/identity/index.js';
+import { contactsFor, displayNamesFor } from '../platform/identity/index.js';
 import { collect, queueReceipt, receiptsFor } from '../platform/ledger/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
@@ -17,6 +17,7 @@ import {
 } from './money.js';
 import { dayOf, quote, type Receive, type Unit } from './pricing.js';
 import { openSettlement, refundOf, type Settlement } from './settlements.js';
+import { ownerOf } from './suppliers.js';
 import { BOARD_STATES, LIVE_STATES, type IdeshState } from './states.js';
 
 /**
@@ -283,6 +284,29 @@ export async function payIdesh(ctx: Ctx, orderId: string): Promise<void> {
       `${facts.title} · №${facts.code}. ${facts.supplier} ${dayLabel(facts.receiveOn)}-нд ` +
       (facts.receive === 'delivery' ? 'хүргэнэ.' : 'бэлэн байлгана.'),
   });
+
+  // The supplier is told too, both ways: a screen nobody is looking at is
+  // not a notification, and an order they never heard of is the one that
+  // goes unprepared.
+  const owner = await ownerOf(facts.supplierId);
+  if (owner) {
+    const line =
+      `Шинэ захиалга №${facts.code}: ${facts.title} ×${facts.qty}, ${dayLabel(facts.receiveOn)}-нд ` +
+      (facts.receive === 'delivery' ? 'хүргүүлнэ' : 'өөрөө авна') +
+      `. ${facts.totalMnt.toLocaleString('mn-MN')}₮ төлөгдсөн.`;
+    for (const channel of ['push', 'sms'] as const) {
+      await enqueue(ctx, {
+        guestId: owner,
+        subject: 'idesh',
+        subjectId: orderId,
+        template: 'supplier.order',
+        channel,
+        dedupeKey: `supplier:${orderId}:paid:${channel}`,
+        title: 'Шинэ захиалга',
+        body: channel === 'sms' ? `Basu: ${line}` : line,
+      });
+    }
+  }
 }
 
 /**
@@ -891,6 +915,8 @@ export async function ownedBySupplier(
 
 export interface BoardTicket extends IdeshSummary {
   guest: string | null;
+  /** Paid for, so the supplier may ring: the review promised both ways. */
+  guestPhone: string | null;
   address: string | null;
   addressPhone: string | null;
   addressLat: number | null;
@@ -937,12 +963,14 @@ export async function boardFor(supplierId: string | null, db: Db = getPool()): P
 
   // One call for the whole board rather than a join: identity is a module.
   const names = await displayNamesFor(rows.map((r) => r.guest_id));
+  const contacts = await contactsFor(rows.map((r) => r.guest_id));
 
   const lanes: Board['lanes'] = { paid: [], preparing: [], ready: [], dispatched: [] };
   for (const r of rows) {
     const ticket: BoardTicket = {
       ...summary(r),
       guest: names.get(r.guest_id) ?? null,
+      guestPhone: contacts.get(r.guest_id)?.phone ?? null,
       address: r.address,
       addressPhone: r.address_phone,
       deliveryFeeMnt: Number(r.delivery_fee_mnt),
