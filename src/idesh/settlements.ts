@@ -190,6 +190,12 @@ export async function settlementsOf(supplierId: string, db: Db = getPool()): Pro
   return shape(rows);
 }
 
+/** Everything owed on one order: the guest's refund, the supplier's payout or forfeit. */
+export async function settlementsOfOrder(orderId: string, db: Db = getPool()): Promise<Settlement[]> {
+  const { rows } = await db.query<Row>(`${SELECT} WHERE t.order_id = $1 ORDER BY t.created_at`, [orderId]);
+  return shape(rows);
+}
+
 /** The refund a guest is waiting for on this order, if any. */
 export async function refundOf(orderId: string, db: Db = getPool()): Promise<Settlement | null> {
   const { rows } = await db.query<Row>(`${SELECT} WHERE t.order_id = $1 AND t.kind = 'refund'`, [orderId]);

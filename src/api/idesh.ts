@@ -52,7 +52,7 @@ import {
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import { resolveGuest } from '../platform/identity/index.js';
 import type { Ctx } from '../ports.js';
-import { shapeSettlement } from './ops.js';
+import { shapeOrder, shapeSettlement, shapeSummary } from './shapes.js';
 
 /**
  * Өвлийн идэш over HTTP: the guest's side under /v1/idesh, the supplier's
@@ -105,20 +105,6 @@ const shapeListing = (l: Listing) => ({
   active: l.active,
 });
 
-const shapeSummary = (o: IdeshSummary) => ({
-  id: o.id,
-  code: o.code,
-  state: o.state,
-  supplier: o.supplier,
-  kind: o.kind,
-  unit: o.unit,
-  title: o.title,
-  qty: o.qty,
-  total_mnt: o.totalMnt,
-  receive: o.receive,
-  receive_on: o.receiveOn,
-  paid_at: o.paidAt?.toISOString() ?? null,
-});
 
 const shapeDetail = (o: IdeshDetail) => ({
   ...shapeSummary(o),
@@ -459,25 +445,6 @@ export async function registerIdeshRoutes(
     return { supplier: mine ? { id: mine.id, name: mine.name, state: mine.state } : null };
   });
 
-  const shapeOrder = (o: SupplierOrder) => ({
-    ...shapeSummary(o),
-    guest: o.guest,
-    guest_phone: o.guestPhone,
-    address: o.address,
-    address_phone: o.addressPhone,
-    address_lat: o.addressLat,
-    address_lon: o.addressLon,
-    delivery_fee_mnt: o.deliveryFeeMnt,
-    ready_at: o.readyAt?.toISOString() ?? null,
-    handed_at: o.handedAt?.toISOString() ?? null,
-    cancelled_at: o.cancelledAt?.toISOString() ?? null,
-    cancel_reason: o.cancelReason,
-    refund_mnt: o.refundMnt,
-    forfeit_mnt: o.forfeitMnt,
-    no_show_from: o.noShowFrom?.toISOString() ?? null,
-    payout_mnt: o.payoutMnt,
-    created_at: o.createdAt.toISOString(),
-  });
 
   /** The numbers the supplier opens the app to. */
   app.get('/v1/supplier/home', asSupplier, async (request) => {

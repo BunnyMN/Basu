@@ -16,7 +16,7 @@ import {
   type Split,
 } from './money.js';
 import { dayOf, quote, type Receive, type Unit } from './pricing.js';
-import { openSettlement, refundOf, type Settlement } from './settlements.js';
+import { openSettlement, refundOf, settlementsOfOrder, type Settlement } from './settlements.js';
 import { ownerOf } from './suppliers.js';
 import { BOARD_STATES, LIVE_STATES, type IdeshState } from './states.js';
 
@@ -317,7 +317,7 @@ export async function payIdesh(ctx: Ctx, orderId: string): Promise<void> {
  */
 export interface CancelledBy {
   actor: string;
-  role: 'supplier' | 'system';
+  role: 'supplier' | 'system' | 'ops';
 }
 
 /**
@@ -342,7 +342,7 @@ export async function cancelIdesh(
   if (by.role === 'system' && reason !== 'draft_expired') {
     throw new IdeshError('BAD_REASON', 'the scheduler only sweeps unpaid drafts');
   }
-  if (by.role === 'supplier') {
+  if (by.role === 'supplier' || by.role === 'ops') {
     const problem = reasonProblem({
       state: facts.state,
       reason,
@@ -1106,13 +1106,36 @@ export async function ordersOf(
   opts: { scope?: OrderScope; q?: string; limit?: number } = {},
   db: Db = getPool(),
 ): Promise<SupplierOrder[]> {
+  return listOrders({ ...opts, supplierId }, db);
+}
+
+export interface OrderFilter {
+  scope?: OrderScope | undefined;
+  /** One state, when the scope is too wide. */
+  state?: IdeshState | undefined;
+  supplierId?: string | undefined;
+  /** `YYYY-MM-DD` — orders to be received that day. */
+  day?: string | undefined;
+  q?: string | undefined;
+  limit?: number | undefined;
+}
+
+/** Ops sees every supplier's orders through one window. */
+export async function allOrders(opts: OrderFilter = {}, db: Db = getPool()): Promise<SupplierOrder[]> {
+  return listOrders(opts, db);
+}
+
+async function listOrders(opts: OrderFilter, db: Db): Promise<SupplierOrder[]> {
   const scope = opts.scope ?? 'all';
+  const states = opts.state ? [opts.state] : SCOPE_STATES[scope];
   const { rows } = await db.query<OrderRow & { handed_at: Date | null; cancelled_at: Date | null; created_at: Date }>(
     `${ORDER_SELECT.replace('o.cancel_reason,', 'o.cancel_reason, o.cancelled_at, o.created_at,')}
-      WHERE o.supplier_id = $1 AND o.state = ANY($2::text[])
+      WHERE o.state = ANY($1::text[])
+        AND ($2::uuid IS NULL OR o.supplier_id = $2::uuid)
+        AND ($3::date IS NULL OR o.receive_on = $3::date)
       ORDER BY o.created_at DESC
       LIMIT 500`,
-    [supplierId, SCOPE_STATES[scope]],
+    [states, opts.supplierId ?? null, opts.day ?? null],
   );
   const names = await displayNamesFor(rows.map((r) => r.guest_id));
   const contacts = await contactsFor(rows.map((r) => r.guest_id));
@@ -1132,6 +1155,7 @@ export async function ordersOf(
         (o) =>
           o.code.includes(q) ||
           o.title.toLowerCase().replace(/\s+/g, '').includes(q) ||
+          o.supplier.name.toLowerCase().replace(/\s+/g, '').includes(q) ||
           (o.guest ?? '').toLowerCase().replace(/\s+/g, '').includes(q) ||
           (digits.length >= 4 &&
             ((o.guestPhone ?? '').replace(/\D/g, '').includes(digits) ||
@@ -1166,5 +1190,186 @@ export async function orderForSupplier(
   return {
     order,
     events: rows.map((e) => ({ seq: e.seq, type: e.type, actor: e.actor, payload: e.payload, at: e.created_at })),
+  };
+}
+
+/** One order as ops sees it: the order, its story, and every settlement on it. */
+export async function orderForOps(
+  orderId: string,
+  db: Db = getPool(),
+): Promise<{ order: SupplierOrder; events: OrderEvent[]; settlements: Settlement[] } | null> {
+  const [order] = (await listOrders({ limit: 1000 }, db)).filter((o) => o.id === orderId);
+  if (!order) return null;
+  const { rows } = await db.query<{ seq: number; type: string; actor: string; payload: Record<string, unknown>; created_at: Date }>(
+    'SELECT seq, type, actor, payload, created_at FROM idesh.order_event WHERE order_id = $1 ORDER BY seq',
+    [orderId],
+  );
+  return {
+    order,
+    events: rows.map((e) => ({ seq: e.seq, type: e.type, actor: e.actor, payload: e.payload, at: e.created_at })),
+    settlements: await settlementsOfOrder(orderId, db),
+  };
+}
+
+/**
+ * Say it again. The guest's message for the state the order is in, sent
+ * afresh — a phone that was off, an SMS that never came. Ops presses this,
+ * and the order remembers that they did.
+ */
+export async function resendForOps(ctx: Ctx, orderId: string, who: string): Promise<string> {
+  const facts = await billingFacts(orderId);
+  if (!facts) throw new IdeshError('NOT_FOUND', 'no such order');
+  const again = `resend:${Date.now()}`;
+  const say = (template: string, channel: 'push' | 'sms', title: string, body: string) =>
+    enqueue(ctx, { guestId: facts.guestId, subject: 'idesh', subjectId: orderId, template, channel, dedupeKey: `${orderId}:${template}:${again}`, title, body });
+  switch (facts.state) {
+    case 'PAID':
+    case 'PREPARING':
+      await say('idesh.paid', 'sms', 'Идэш баталгаажлаа',
+        `Basu: ${facts.title} №${facts.code} баталгаажсан. ${facts.supplier} ${dayLabel(facts.receiveOn)}-нд ${facts.receive === 'delivery' ? 'хүргэнэ' : 'бэлэн байлгана'}.`);
+      break;
+    case 'READY':
+      await say('idesh.ready', 'sms', 'Идэш бэлэн боллоо',
+        facts.receive === 'pickup'
+          ? `Таны идэш бэлэн боллоо. ${facts.pickupAddress} хаягаас авна уу. Код №${facts.code}.`
+          : `Таны идэш бэлэн боллоо. ${dayLabel(facts.receiveOn)}-нд хүргэнэ.`);
+      break;
+    case 'DISPATCHED':
+      await say('idesh.dispatched', 'sms', 'Идэш замд гарлаа', `Таны идэш №${facts.code} замд гарлаа. Хүргэгч залгана.`);
+      break;
+    case 'CANCELLED':
+      await say('idesh.cancelled', 'sms', 'Идэш цуцлагдлаа',
+        `Идэш №${facts.code} цуцлагдсан. Буцаалтаа авахын тулд Basu аппаар дансаа оруулна уу.`);
+      break;
+    default:
+      throw new IdeshError('WRONG_STATE', `nothing to say in ${facts.state}`);
+  }
+  await tx(async (client) => {
+    await appendEvent(client, orderId, 'RESENT', who, { state: facts.state });
+  });
+  return facts.state;
+}
+
+/* ── the numbers ops reads ────────────────────────────────────────── */
+
+export interface Tally {
+  /** Orders paid for in the period, and what they came to. */
+  paid: number;
+  salesMnt: number;
+  /** Orders handed over in the period, and Basu's share of them. */
+  handed: number;
+  commissionMnt: number;
+  /** Cancelled in the period: how many, whose fault, and the money that moved back or stayed. */
+  cancelled: number;
+  supplierFault: number;
+  guestFault: number;
+  refundMnt: number;
+  forfeitMnt: number;
+}
+
+export interface SupplierTally {
+  id: string;
+  name: string;
+  active: boolean;
+  paid: number;
+  handed: number;
+  cancelled: number;
+  supplierFault: number;
+  noShows: number;
+  salesMnt: number;
+  commissionMnt: number;
+  /** Paid to ready, averaged, in hours. Null until something was ready. */
+  readyHours: number | null;
+}
+
+export interface OpsStats {
+  today: Tally;
+  week: Tally;
+  season: Tally;
+  suppliers: SupplierTally[];
+  byKind: Array<{ kind: Kind; unit: Unit; qty: number; orders: number; salesMnt: number }>;
+}
+
+const SUPPLIER_FAULT_SQL = `cancel_reason IN ('vet','cannot_fulfil')`;
+
+async function tally(db: Db, from: Date | null, to: Date): Promise<Tally> {
+  const { rows } = await db.query<Record<string, string | number>>(
+    `SELECT count(*) FILTER (WHERE paid_at IS NOT NULL AND paid_at >= COALESCE($1, '-infinity'::timestamptz) AND paid_at < $2)::int AS paid,
+            COALESCE(sum(total_mnt) FILTER (WHERE paid_at IS NOT NULL AND paid_at >= COALESCE($1, '-infinity'::timestamptz) AND paid_at < $2), 0) AS sales,
+            count(*) FILTER (WHERE handed_at IS NOT NULL AND handed_at >= COALESCE($1, '-infinity'::timestamptz) AND handed_at < $2)::int AS handed,
+            COALESCE(sum(commission_mnt) FILTER (WHERE handed_at IS NOT NULL AND handed_at >= COALESCE($1, '-infinity'::timestamptz) AND handed_at < $2), 0) AS commission,
+            count(*) FILTER (WHERE cancelled_at IS NOT NULL AND paid_at IS NOT NULL AND cancelled_at >= COALESCE($1, '-infinity'::timestamptz) AND cancelled_at < $2)::int AS cancelled,
+            count(*) FILTER (WHERE cancelled_at IS NOT NULL AND paid_at IS NOT NULL AND ${SUPPLIER_FAULT_SQL} AND cancelled_at >= COALESCE($1, '-infinity'::timestamptz) AND cancelled_at < $2)::int AS supplier_fault,
+            COALESCE(sum(refund_mnt) FILTER (WHERE cancelled_at IS NOT NULL AND cancelled_at >= COALESCE($1, '-infinity'::timestamptz) AND cancelled_at < $2), 0) AS refund,
+            COALESCE(sum(forfeit_mnt) FILTER (WHERE cancelled_at IS NOT NULL AND cancelled_at >= COALESCE($1, '-infinity'::timestamptz) AND cancelled_at < $2), 0) AS forfeit
+       FROM idesh.idesh_order`,
+    [from, to],
+  );
+  const r = rows[0]!;
+  const cancelled = Number(r['cancelled']);
+  const supplierFault = Number(r['supplier_fault']);
+  return {
+    paid: Number(r['paid']),
+    salesMnt: Number(r['sales']),
+    handed: Number(r['handed']),
+    commissionMnt: Number(r['commission']),
+    cancelled,
+    supplierFault,
+    guestFault: cancelled - supplierFault,
+    refundMnt: Number(r['refund']),
+    forfeitMnt: Number(r['forfeit']),
+  };
+}
+
+/** Today, the last seven days, and the whole season, plus every supplier and every kind of meat. */
+export async function statsFor(now: Date, db: Db = getPool()): Promise<OpsStats> {
+  const startOfToday = new Date(`${dayOf(now)}T00:00:00+08:00`);
+  const weekAgo = new Date(startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000);
+  const end = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
+  const [today, week, season] = await Promise.all([
+    tally(db, startOfToday, end),
+    tally(db, weekAgo, end),
+    tally(db, null, end),
+  ]);
+
+  const { rows: suppliers } = await db.query<Record<string, string | number | boolean | null>>(
+    `SELECT s.id, s.name, s.active,
+            count(o.id) FILTER (WHERE o.paid_at IS NOT NULL)::int AS paid,
+            count(o.id) FILTER (WHERE o.handed_at IS NOT NULL)::int AS handed,
+            count(o.id) FILTER (WHERE o.cancelled_at IS NOT NULL AND o.paid_at IS NOT NULL)::int AS cancelled,
+            count(o.id) FILTER (WHERE o.cancelled_at IS NOT NULL AND o.${SUPPLIER_FAULT_SQL})::int AS supplier_fault,
+            count(o.id) FILTER (WHERE o.cancel_reason = 'no_show')::int AS no_shows,
+            COALESCE(sum(o.total_mnt) FILTER (WHERE o.handed_at IS NOT NULL), 0) AS sales,
+            COALESCE(sum(o.commission_mnt) FILTER (WHERE o.handed_at IS NOT NULL), 0) AS commission,
+            avg(EXTRACT(EPOCH FROM (o.ready_at - o.paid_at)) / 3600) FILTER (WHERE o.ready_at IS NOT NULL) AS ready_hours
+       FROM idesh.supplier s
+       LEFT JOIN idesh.idesh_order o ON o.supplier_id = s.id
+      WHERE s.state = 'contracted'
+      GROUP BY s.id, s.name, s.active
+      ORDER BY sales DESC, s.name`,
+  );
+  const { rows: kinds } = await db.query<{ kind: Kind; unit: Unit; qty: string; orders: number; sales: string }>(
+    `SELECT kind, unit, sum(qty) AS qty, count(*)::int AS orders, sum(total_mnt) AS sales
+       FROM idesh.idesh_order WHERE handed_at IS NOT NULL
+      GROUP BY kind, unit ORDER BY sum(total_mnt) DESC`,
+  );
+  return {
+    today,
+    week,
+    season,
+    suppliers: suppliers.map((r) => ({
+      id: String(r['id']),
+      name: String(r['name']),
+      active: Boolean(r['active']),
+      paid: Number(r['paid']),
+      handed: Number(r['handed']),
+      cancelled: Number(r['cancelled']),
+      supplierFault: Number(r['supplier_fault']),
+      noShows: Number(r['no_shows']),
+      salesMnt: Number(r['sales']),
+      commissionMnt: Number(r['commission']),
+      readyHours: r['ready_hours'] === null ? null : Math.round(Number(r['ready_hours']) * 10) / 10,
+    })),
+    byKind: kinds.map((k) => ({ kind: k.kind, unit: k.unit, qty: Number(k.qty), orders: k.orders, salesMnt: Number(k.sales) })),
   };
 }

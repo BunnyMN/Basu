@@ -7,6 +7,7 @@ import { buildServer } from './server.js';
 import { opsToken } from './ops.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
+import { createListing, markReady, registerSupplier, startPreparing } from '../idesh/index.js';
 
 /**
  * Becoming a supplier, over HTTP: the guest's side, the ops desk, and the
@@ -251,5 +252,127 @@ describe('the contract’s terms and the list to pay', () => {
       payload: { reference: 'x' },
     });
     expect(nothing.statusCode).toBe(404);
+  });
+});
+
+/* ── the desk's window onto orders, the numbers, and the record ── */
+
+async function topUp(token: string, amountMnt: number): Promise<void> {
+  const started = await app.inject({ method: 'POST', url: '/v1/wallet/topup', headers: auth(token), payload: { amount_mnt: amountMnt } });
+  expect(started.statusCode, started.body).toBe(200);
+  const settled = await app.inject({ method: 'POST', url: `/v1/wallet/topup/${started.json().topup_id}/settle`, headers: auth(token) });
+  expect(settled.statusCode, settled.body).toBe(200);
+}
+
+/** A contracted supplier with one sheep on offer, and a guest who has paid for it. */
+async function aPaidOrder() {
+  const supplierId = await registerSupplier({ name: 'Архангай · Дорж', phone: '+97688010001', merchantTin: '6501234567', pickupAddress: 'Нарантуул' });
+  const sheep = await createListing(
+    supplierId,
+    { kind: 'sheep', unit: 'whole', title: 'Хонь', priceMnt: 460_000, approxKg: 38, quantity: 3, origin: 'Архангай', readyFrom: '2026-09-10' },
+    clock.now(),
+  );
+  const guest = await signIn('+97699004009');
+  await topUp(guest, 500_000);
+  const created = await app.inject({
+    method: 'POST',
+    url: '/v1/idesh',
+    headers: auth(guest),
+    payload: { listing_id: sheep.id, qty: 1, receive: 'pickup', receive_on: '2026-09-12' },
+  });
+  expect(created.statusCode, created.body).toBe(201);
+  const { id, code } = created.json();
+  const paid = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/pay`, headers: auth(guest) });
+  expect(paid.statusCode, paid.body).toBe(200);
+  return { supplierId, listingId: sheep.id as string, guest, id: id as string, code: code as string };
+}
+
+const desk = (name?: string) => ({ ...auth(opsToken()!), ...(name ? { 'x-ops-name': name } : {}) });
+
+describe('the desk’s window onto orders', () => {
+  it('sees every order, finds one by anything, and reads its story', async () => {
+    const { id, code } = await aPaidOrder();
+    const all = await app.inject({ method: 'GET', url: '/v1/ops/orders', headers: desk() });
+    expect(all.json().orders.map((o: { id: string }) => o.id)).toEqual([id]);
+    expect(all.json().orders[0]).toMatchObject({ code, guest_phone: '+97699004009', supplier: { name: 'Архангай · Дорж' } });
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/orders?scope=done', headers: desk() })).json().orders).toEqual([]);
+    expect((await app.inject({ method: 'GET', url: `/v1/ops/orders?q=${code}`, headers: desk() })).json().orders).toHaveLength(1);
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/orders?q=Дорж', headers: desk() })).json().orders).toHaveLength(1);
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/orders?day=2026-09-13', headers: desk() })).json().orders).toEqual([]);
+
+    const one = await app.inject({ method: 'GET', url: `/v1/ops/orders/${id}`, headers: desk() });
+    expect(one.json().events.map((e: { type: string }) => e.type)).toEqual(['CREATED', 'PAID']);
+    expect(one.json().settlements).toEqual([]);
+  });
+
+  it('cancels on a guest’s behalf, for a reason, and the record says who and why', async () => {
+    const { id } = await aPaidOrder();
+    const unsaid = await app.inject({ method: 'POST', url: `/v1/ops/orders/${id}/cancel`, headers: desk('Bayaraa'), payload: {} });
+    expect(unsaid.statusCode).toBe(409);
+
+    const cancelled = await app.inject({
+      method: 'POST',
+      url: `/v1/ops/orders/${id}/cancel`,
+      headers: desk('Bayaraa'),
+      payload: { reason: 'guest_asked', note: 'зочин утсаар хүссэн, нийлүүлэгч холбогдохгүй' },
+    });
+    expect(cancelled.json()).toEqual({ state: 'CANCELLED', refund_mnt: 460_000, forfeit_mnt: 0 });
+
+    const one = await app.inject({ method: 'GET', url: `/v1/ops/orders/${id}`, headers: desk() });
+    expect(one.json().events.at(-2)).toMatchObject({ type: 'CANCELLED', actor: 'ops:Bayaraa' });
+    expect(one.json().settlements).toEqual([expect.objectContaining({ kind: 'refund', state: 'needs_account', amount_mnt: 460_000 })]);
+
+    const audit = await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() });
+    expect(audit.json().audit[0]).toMatchObject({ who: 'ops:Bayaraa', action: 'order.cancel', target_id: id, note: 'зочин утсаар хүссэн, нийлүүлэгч холбогдохгүй' });
+  });
+
+  it('says a message again, and hands over on the supplier’s behalf', async () => {
+    const { id } = await aPaidOrder();
+    const again = await app.inject({ method: 'POST', url: `/v1/ops/orders/${id}/resend`, headers: desk(), payload: {} });
+    expect(again.json()).toEqual({ state: 'PAID' });
+    await startPreparing(ctx, id, 'supplier:d1');
+    await markReady(ctx, id, 'supplier:d1');
+    const handed = await app.inject({ method: 'POST', url: `/v1/ops/orders/${id}/hand`, headers: desk(), payload: { note: 'нийлүүлэгч утсаар хэлсэн' } });
+    expect(handed.json()).toEqual({ state: 'HANDED' });
+    const one = await app.inject({ method: 'GET', url: `/v1/ops/orders/${id}`, headers: desk() });
+    expect(one.json().events.map((e: { type: string }) => e.type)).toEqual(['CREATED', 'PAID', 'RESENT', 'PREPARING', 'READY', 'HANDED']);
+    expect(one.json().order).toMatchObject({ state: 'HANDED', payout_mnt: 450_800 });
+  });
+
+  it('reads the numbers: today, the week, the season, each supplier, each kind of meat', async () => {
+    const { id, supplierId } = await aPaidOrder();
+    await startPreparing(ctx, id, 'supplier:d1');
+    clock.advanceMinutes(90);
+    await markReady(ctx, id, 'supplier:d1');
+    await app.inject({ method: 'POST', url: `/v1/ops/orders/${id}/hand`, headers: desk(), payload: {} });
+
+    const stats = (await app.inject({ method: 'GET', url: '/v1/ops/stats', headers: desk() })).json();
+    expect(stats.today).toMatchObject({ paid: 1, sales_mnt: 460_000, handed: 1, commission_mnt: 9_200, cancelled: 0 });
+    expect(stats.season).toMatchObject({ paid: 1, handed: 1 });
+    expect(stats.suppliers).toEqual([
+      expect.objectContaining({ id: supplierId, paid: 1, handed: 1, cancelled: 0, no_shows: 0, sales_mnt: 460_000, commission_mnt: 9_200, ready_hours: 1.5 }),
+    ]);
+    expect(stats.by_kind).toEqual([{ kind: 'sheep', unit: 'whole', qty: 1, orders: 1, sales_mnt: 460_000 }]);
+  });
+
+  it('takes a supplier off the market, and a listing out of sight, with the reason kept', async () => {
+    const { supplierId, listingId } = await aPaidOrder();
+    expect((await app.inject({ method: 'GET', url: '/v1/idesh/listings' })).json().listings).toHaveLength(1);
+
+    const hidden = await app.inject({ method: 'POST', url: `/v1/ops/listings/${listingId}/hide`, headers: desk(), payload: { note: 'зураг буруу' } });
+    expect(hidden.json()).toEqual({ id: listingId, active: false });
+    expect((await app.inject({ method: 'GET', url: '/v1/idesh/listings' })).json().listings).toEqual([]);
+
+    const off = await app.inject({ method: 'POST', url: `/v1/ops/suppliers/${supplierId}/active`, headers: desk('Bayaraa'), payload: { active: false, note: 'гэрээ зөрчсөн' } });
+    expect(off.json()).toMatchObject({ id: supplierId, active: false });
+    // Suspended, the owner's phone no longer opens the supplier's side.
+    const owner = await signIn('+97688010001');
+    expect((await app.inject({ method: 'GET', url: '/v1/supplier/me', headers: auth(owner) })).json()).toEqual({ supplier: null });
+    const back = await app.inject({ method: 'POST', url: `/v1/ops/suppliers/${supplierId}/active`, headers: desk(), payload: { active: true } });
+    expect(back.json()).toMatchObject({ active: true });
+
+    const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() })).json().audit;
+    expect(audit.map((a: { action: string }) => a.action)).toEqual(['supplier.activate', 'supplier.suspend', 'listing.hide']);
+    expect(audit[1]).toMatchObject({ who: 'ops:Bayaraa', note: 'гэрээ зөрчсөн' });
   });
 });

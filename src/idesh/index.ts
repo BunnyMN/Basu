@@ -8,6 +8,8 @@
  */
 export { IdeshError, type IdeshErrorCode } from './errors.js';
 
+export { recordAudit, listAudit, type AuditEntry, type AuditTarget } from './audit.js';
+
 export {
   IDESH_STATES,
   LIVE_STATES,
@@ -40,6 +42,7 @@ export {
 export {
   setRefundAccount,
   listSettlements,
+  settlementsOfOrder,
   settlementsOf,
   refundOf,
   markSettled,
@@ -57,6 +60,7 @@ export {
   listingsOf,
   createListing,
   updateListing,
+  hideListing,
   type Kind,
   type Listing,
   type ListingInput,
@@ -75,6 +79,7 @@ export {
   supplierOf,
   supplierById,
   updateSupplierProfile,
+  setSupplierActive,
   createSupplierCode,
   pairSupplier,
   resolveSupplierDevice,
@@ -106,7 +111,11 @@ export {
   boardFor,
   homeOf,
   ordersOf,
+  allOrders,
   orderForSupplier,
+  orderForOps,
+  resendForOps,
+  statsFor,
   ownedByGuest,
   ownedBySupplier,
   dayLabel,
@@ -118,6 +127,10 @@ export {
   type Board,
   type BoardTicket,
   type SupplierHome,
+  type OrderFilter,
+  type OpsStats,
+  type Tally,
+  type SupplierTally,
   type SupplierOrder,
   type OrderScope,
   type OrderEvent,

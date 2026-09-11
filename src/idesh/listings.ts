@@ -205,6 +205,15 @@ export interface ListingPatch {
  * The supplier changes their mind. Quantity can only go down as far as what is
  * already sold — the CHECK enforces it and this reads the outcome.
  */
+/** Ops hides a listing from every guest, whoever's it is. The supplier sees it as switched off. */
+export async function hideListing(listingId: string, at: Date, db: Db = getPool()): Promise<void> {
+  const { rowCount } = await db.query('UPDATE idesh.listing SET active = false, updated_at = $2 WHERE id = $1', [
+    listingId,
+    at,
+  ]);
+  if (!rowCount) throw new IdeshError('NOT_FOUND', 'no such listing');
+}
+
 export async function updateListing(
   supplierId: string,
   listingId: string,

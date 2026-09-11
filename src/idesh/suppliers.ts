@@ -437,6 +437,12 @@ export async function updateSupplierProfile(supplierId: string, edit: ProfileEdi
   if (!rowCount) throw new IdeshError('NOT_FOUND', 'no such supplier');
 }
 
+/** Ops takes a supplier off the market, or puts them back. Their orders in flight are untouched. */
+export async function setSupplierActive(supplierId: string, active: boolean, db: Db = getPool()): Promise<void> {
+  const { rowCount } = await db.query('UPDATE idesh.supplier SET active = $2 WHERE id = $1', [supplierId, active]);
+  if (!rowCount) throw new IdeshError('NOT_FOUND', 'no such supplier');
+}
+
 export interface SupplierPatch extends BankDetails {
   commissionPct?: number | undefined;
   merchantTin?: string | null | undefined;

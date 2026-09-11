@@ -1,18 +1,33 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
+  CANCEL_REASONS,
+  allOrders,
   approveSupplier,
+  cancelIdesh,
   createSupplierCode,
   declineSupplier,
+  hideListing,
   IdeshError,
+  listAudit,
   listSettlements,
   listSuppliers,
+  markHanded,
   markSettled,
+  orderForOps,
+  recordAudit,
   registerSupplier,
+  resendForOps,
+  setSupplierActive,
+  statsFor,
   updateSupplier,
-  type Settlement,
+  type CancelReason,
+  type IdeshState,
+  type OrderScope,
   type SupplierRow,
+  type Tally,
 } from '../idesh/index.js';
+import { shapeOrder, shapeSettlement } from './shapes.js';
 import { mode } from '../mode.js';
 import { badRequest, sendError, unauthorized } from './errors.js';
 import type { Ctx } from '../ports.js';
@@ -79,24 +94,6 @@ const shape = (s: SupplierRow) => ({
   listings: s.listings,
 });
 
-/** A settlement as the ops page and the supplier's screen read it. */
-export const shapeSettlement = (t: Settlement) => ({
-  id: t.id,
-  kind: t.kind,
-  state: t.state,
-  memo: t.memo,
-  order_id: t.orderId,
-  order_code: t.orderCode,
-  amount_mnt: t.amountMnt,
-  supplier: t.supplier,
-  guest: t.guest,
-  bank_name: t.bank?.bankName ?? null,
-  bank_account: t.bank?.bankAccount ?? null,
-  bank_holder: t.bank?.bankHolder ?? null,
-  reference: t.reference,
-  paid_at: t.paidAt?.toISOString() ?? null,
-  created_at: t.createdAt.toISOString(),
-});
 
 export async function registerOpsRoutes(
   app: FastifyInstance,
@@ -113,6 +110,12 @@ export async function registerOpsRoutes(
     return undefined;
   };
   const asOps = { preHandler: requireOps };
+
+  /** Who at ops: the token is one secret, so a name may ride on a header. */
+  const who = (request: FastifyRequest) => {
+    const name = String(request.headers['x-ops-name'] ?? '').trim();
+    return name ? `ops:${name.slice(0, 40)}` : 'ops';
+  };
 
   /** Everybody who is, or asked to be, a supplier. Applications first. */
   app.get('/v1/ops/suppliers', asOps, async () => ({
@@ -198,12 +201,163 @@ export async function registerOpsRoutes(
         bankAccount: body.bank_account,
         bankHolder: body.bank_holder,
       });
+      await recordAudit({ who: who(request), action: 'supplier.terms', targetKind: 'supplier', targetId: request.params.id, note: body.commission_pct !== undefined ? `шимтгэл ${body.commission_pct}%` : null });
       const row = (await listSuppliers()).find((s) => s.id === request.params.id);
       return reply.send(row ? shape(row) : { id: request.params.id });
     } catch (error) {
       return sendError(reply, error);
     }
   });
+
+  /* ── every order, through one window ── */
+
+  app.get<{ Querystring: { scope?: string; state?: string; supplier?: string; day?: string; q?: string } }>(
+    '/v1/ops/orders',
+    asOps,
+    async (request) => {
+      const raw = request.query.scope;
+      const scope: OrderScope = raw === 'live' || raw === 'done' ? raw : 'all';
+      const orders = await allOrders({
+        scope,
+        state: request.query.state ? (request.query.state as IdeshState) : undefined,
+        supplierId: request.query.supplier || undefined,
+        day: /^\d{4}-\d{2}-\d{2}$/.test(request.query.day ?? '') ? request.query.day : undefined,
+        q: request.query.q ?? '',
+        limit: 200,
+      });
+      return { orders: orders.map(shapeOrder) };
+    },
+  );
+
+  app.get<{ Params: { id: string } }>('/v1/ops/orders/:id', asOps, async (request, reply) => {
+    const found = await orderForOps(request.params.id);
+    if (!found) return sendError(reply, new IdeshError('NOT_FOUND', 'no such order'));
+    return reply.send({
+      order: shapeOrder(found.order),
+      events: found.events.map((e) => ({ seq: e.seq, type: e.type, actor: e.actor, payload: e.payload, at: e.at.toISOString() })),
+      settlements: found.settlements.map(shapeSettlement),
+    });
+  });
+
+  /**
+   * On somebody's behalf: cancel for a reason, mark handed over, say a
+   * message again. Each is the supplier's own action done by ops, recorded
+   * in the order's story as ops and in the audit with the note they typed.
+   */
+  app.post<{ Params: { id: string; action: string }; Body: { reason?: string; note?: string } }>(
+    '/v1/ops/orders/:id/:action',
+    asOps,
+    async (request, reply) => {
+      const { id, action } = request.params;
+      const body = request.body ?? {};
+      const actor = who(request);
+      try {
+        let result: Record<string, unknown>;
+        switch (action) {
+          case 'cancel': {
+            const reason = body.reason;
+            if (!reason || !(CANCEL_REASONS as readonly string[]).includes(reason)) {
+              throw new IdeshError('BAD_REASON', 'шалтгаанаа сонгоно уу');
+            }
+            const split = await cancelIdesh(ctx, id, { actor, role: 'ops' }, reason as CancelReason);
+            result = { state: 'CANCELLED', refund_mnt: split.refundMnt, forfeit_mnt: split.forfeitMnt };
+            break;
+          }
+          case 'hand':
+            await markHanded(ctx, id, actor);
+            result = { state: 'HANDED' };
+            break;
+          case 'resend':
+            result = { state: await resendForOps(ctx, id, actor) };
+            break;
+          default:
+            return badRequest(reply, 'Ийм үйлдэл алга.', `no such action: ${action}`);
+        }
+        await recordAudit({ who: actor, action: `order.${action}`, targetKind: 'order', targetId: id, note: body.note ?? body.reason ?? null });
+        return reply.send(result);
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  /* ── the numbers ── */
+
+  const shapeTally = (t: Tally) => ({
+    paid: t.paid,
+    sales_mnt: t.salesMnt,
+    handed: t.handed,
+    commission_mnt: t.commissionMnt,
+    cancelled: t.cancelled,
+    supplier_fault: t.supplierFault,
+    guest_fault: t.guestFault,
+    refund_mnt: t.refundMnt,
+    forfeit_mnt: t.forfeitMnt,
+  });
+
+  app.get('/v1/ops/stats', asOps, async () => {
+    const stats = await statsFor(ctx.clock.now());
+    return {
+      today: shapeTally(stats.today),
+      week: shapeTally(stats.week),
+      season: shapeTally(stats.season),
+      suppliers: stats.suppliers.map((s) => ({
+        id: s.id,
+        name: s.name,
+        active: s.active,
+        paid: s.paid,
+        handed: s.handed,
+        cancelled: s.cancelled,
+        supplier_fault: s.supplierFault,
+        no_shows: s.noShows,
+        sales_mnt: s.salesMnt,
+        commission_mnt: s.commissionMnt,
+        ready_hours: s.readyHours,
+      })),
+      by_kind: stats.byKind.map((k) => ({ kind: k.kind, unit: k.unit, qty: k.qty, orders: k.orders, sales_mnt: k.salesMnt })),
+    };
+  });
+
+  /* ── taking things off the market, and the record of it ── */
+
+  app.post<{ Params: { id: string }; Body: { active?: boolean; note?: string } }>(
+    '/v1/ops/suppliers/:id/active',
+    asOps,
+    async (request, reply) => {
+      const active = request.body?.active;
+      if (typeof active !== 'boolean') return badRequest(reply, 'active: true эсвэл false.', 'active must be a boolean');
+      try {
+        await setSupplierActive(request.params.id, active);
+        await recordAudit({ who: who(request), action: active ? 'supplier.activate' : 'supplier.suspend', targetKind: 'supplier', targetId: request.params.id, note: request.body?.note ?? null });
+        const row = (await listSuppliers()).find((s) => s.id === request.params.id);
+        return reply.send(row ? shape(row) : { id: request.params.id, active });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/listings/:id/hide', asOps, async (request, reply) => {
+    try {
+      await hideListing(request.params.id, ctx.clock.now());
+      await recordAudit({ who: who(request), action: 'listing.hide', targetKind: 'listing', targetId: request.params.id, note: request.body?.note ?? null });
+      return reply.send({ id: request.params.id, active: false });
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
+
+  app.get<{ Querystring: { limit?: string } }>('/v1/ops/audit', asOps, async (request) => ({
+    audit: (await listAudit({ limit: Math.min(Number(request.query.limit) || 100, 500) })).map((a) => ({
+      id: a.id,
+      who: a.who,
+      action: a.action,
+      target_kind: a.targetKind,
+      target_id: a.targetId,
+      note: a.note,
+      at: a.at.toISOString(),
+    })),
+  }));
 
   /* ── the list to pay ── */
 
