@@ -28,6 +28,7 @@ body{background:var(--sunk)}
 .top .conn[data-stale]{color:var(--stop)}
 
 .board{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:12px;padding:14px;align-items:start}
+.board:empty{display:none}
 @media(max-width:1000px){.board{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.board{grid-template-columns:1fr}}
 
@@ -67,6 +68,69 @@ body{background:var(--sunk)}
 /* A delivery that is due today has to be seen across the yard. */
 .ticket[data-due]{box-shadow:inset 0 0 0 1px var(--accent-line)}
 
+/* ── the module's frame: tabs under the top on a phone, beside it on a computer ── */
+.shell{min-height:100vh;display:flex;flex-direction:column}
+.tabs{display:flex;gap:4px;padding:8px 14px 0;border-bottom:1px solid var(--line);background:var(--bg);overflow-x:auto}
+.tabs button{
+  flex:1;font-family:"Golos Text",sans-serif;font-size:.82rem;font-weight:600;padding:9px 6px;border:none;background:none;
+  color:var(--ink-3);border-bottom:2px solid transparent;white-space:nowrap;
+}
+.tabs button[data-on]{color:var(--accent-ink);border-bottom-color:var(--accent)}
+.view{flex:1;min-width:0}
+@media(min-width:900px){
+  .shell{display:grid;grid-template-columns:200px 1fr;grid-template-rows:auto 1fr}
+  .shell .top{grid-column:1 / -1}
+  .tabs{flex-direction:column;border-bottom:none;border-right:1px solid var(--line);padding:14px 10px;gap:2px;overflow:visible}
+  .tabs button{text-align:left;border-bottom:none;border-left:2px solid transparent;padding:10px 12px;border-radius:0 3px 3px 0}
+  .tabs button[data-on]{border-left-color:var(--accent);background:var(--accent-soft)}
+}
+/* ── today's numbers ── */
+.home{padding:14px 14px 0}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.cards .card{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--line-2);border-radius:5px;padding:12px 14px}
+.cards .card[data-tone="accent"]{border-left-color:var(--accent)}
+.cards .card[data-tone="ready"]{border-left-color:var(--ready)}
+.cards .card[data-tone="stop"]{border-left-color:var(--stop)}
+.cards .card .lab{display:block;margin-bottom:4px}
+.cards .card b{font-family:"IBM Plex Mono",monospace;font-size:1.6rem;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.cards .card small{margin-left:6px;font-size:.74rem;color:var(--ink-3)}
+.cards .card p{font-size:.8rem;color:var(--ink-2);margin:6px 0 0;line-height:1.5}
+.cards .card p b{font-family:inherit;font-size:inherit;font-weight:700;color:var(--ink)}
+.cards .card p b.warn{color:var(--stop)}
+/* ── the orders list ── */
+.orders{padding:14px}
+.orders .tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.orders .tools input{flex:1;min-width:200px;padding:9px 11px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface);color:var(--ink);font:inherit;font-size:.9rem}
+.chips{display:flex;gap:6px}
+.chips button{font-family:"IBM Plex Mono",monospace;font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;padding:6px 10px;border:1px solid var(--line-2);border-radius:99px;background:var(--surface);color:var(--ink-3)}
+.chips button[data-on]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.row.order{width:100%;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.row.order:hover{border-color:var(--ink-3)}
+.row .chip{font-family:"IBM Plex Mono",monospace;font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:2px;border:1px solid var(--line-2);color:var(--ink-2)}
+.row .chip[data-s="PAID"]{color:var(--route);border-color:var(--route-line)}
+.row .chip[data-s="PREPARING"]{color:var(--accent-ink);border-color:var(--accent-line)}
+.row .chip[data-s="READY"],.row .chip[data-s="HANDED"]{color:var(--ready);border-color:var(--ready-line)}
+.row .chip[data-s="CANCELLED"],.row .chip[data-s="REFUNDED"]{color:var(--stop);border-color:var(--stop-line)}
+.none{color:var(--ink-3);font-size:.84rem;padding:14px;text-align:center}
+/* ── one order ── */
+.order-page{padding:14px;max-width:720px}
+.order-page .back{background:none;border:none;color:var(--accent-ink);font-family:"Golos Text",sans-serif;font-weight:600;font-size:.9rem;padding:0 0 10px}
+.order-head h2{font-size:1.2rem;font-weight:800;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.order-head .what{font-size:.92rem;color:var(--ink-2);margin:4px 0 12px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-bottom:12px}
+.facts div{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:10px 12px;font-size:.84rem;color:var(--ink-2);line-height:1.5}
+.facts .lab{display:block;margin-bottom:2px}
+.facts b{display:block;color:var(--ink);font-size:.95rem}
+.facts a{color:var(--accent-ink);font-family:"IBM Plex Mono",monospace;font-weight:600;text-decoration:none}
+.order-page h3{font-family:"IBM Plex Mono",monospace;font-size:.68rem;text-transform:uppercase;letter-spacing:.14em;color:var(--ink-3);font-weight:500;margin:16px 0 8px}
+.order-page #act .ticket{margin-bottom:4px}
+.story{list-style:none;padding:0;margin:0;border-left:2px solid var(--line);margin-left:6px}
+.story li{position:relative;padding:4px 0 10px 16px;font-size:.88rem}
+.story li::before{content:"";position:absolute;left:-6px;top:10px;width:10px;height:10px;border-radius:99px;background:var(--ready)}
+.story .t{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--ink-3);margin-right:8px}
+.story small{display:block;font-size:.76rem;color:var(--ink-3)}
+.profile{margin:14px}
+.profile .hint{font-size:.82rem;color:var(--ink-2);margin:-4px 0 12px;line-height:1.5}
 /* ── the stall ───────────────────────────────────────────────────── */
 .stall{padding:0 14px 24px}
 .stall > h2{
@@ -177,6 +241,16 @@ const esc = (value) => {
  */
 const ALL = 'all-suppliers';
 const watchingAll = () => store.supplierToken === ALL;
+/** A paired screen's token, or the owner's own sign-in: the API takes either. */
+const token = () => store.supplierToken || store.guestToken;
+/** Which way we came in: a screen paired by code, or a person by phone. */
+const mode = () => (store.supplierToken ? 'device' : 'owner');
+
+function signOut() {
+  store.supplierToken = null;
+  if (mode() === 'owner') store.guestToken = null;
+  boot();
+}
 
 /* ── pairing ─────────────────────────────────────────────────────── */
 
@@ -259,9 +333,9 @@ async function showPairing() {
     card.append(el('<div class="hint">Нийлүүлэгч алга. <code>npm run seed</code> ажиллуулна уу.</div>'));
   }
 
-  // Not a supplier yet: this is where one starts.
-  const become = el('<div class="become">Код байхгүй юу? <a id="become">Нийлүүлэгч болох →</a></div>');
-  become.querySelector('#become').addEventListener('click', () => showApply());
+  // A person, not a screen: the way in is a phone.
+  const become = el('<div class="become"><a id="become">‹ Утсаараа нэвтрэх</a></div>');
+  become.querySelector('#become').addEventListener('click', () => showLanding());
   card.append(become);
 
   root.append(card);
@@ -303,14 +377,14 @@ async function showApply() {
 function signInCard() {
   const card = el(`
     <div class="apply" id="signin">
-      <h2>Нийлүүлэгч болох</h2>
-      <p>Эхлээд утсаа баталгаажуулна. Энэ дугаар руу зочид залгана.</p>
+      <h2>Нийлүүлэгчийн хэсэг</h2>
+      <p>Гэрээт нийлүүлэгч гэрээний утсаараа нэвтэрнэ. Шинээр нийлүүлэгч болох бол мөн эндээс — эхлээд утсаа баталгаажуулна.</p>
       <label>Утас<input name="phone" inputmode="tel" placeholder="+976XXXXXXXX"></label>
       <div class="otp" hidden><input name="code" inputmode="numeric" maxlength="6" placeholder="6 оронтой код"></div>
       <div class="foot">
         <button class="btn" data-v="primary" type="button" id="send">Код авах</button>
       </div>
-      <button class="back" type="button" id="back">‹ Дэлгэц холбох</button>
+      <button class="back" type="button" id="back">Дэлгэц холбох кодоор ›</button>
     </div>`);
   const phone = card.querySelector('[name="phone"]');
   const code = card.querySelector('[name="code"]');
@@ -332,7 +406,7 @@ function signInCard() {
         body: { phone: phone.value.trim(), code: code.value.trim(), device: 'Нийлүүлэгчийн дэлгэц' },
       });
       store.guestToken = token;
-      showApply();
+      boot();
     } catch (error) {
       toast(error.message, 'bad');
     }
@@ -351,13 +425,18 @@ function signInCard() {
           body: { phone: phone.value.trim() || fresh, device: 'Нийлүүлэгчийн дэлгэц' },
         });
         store.guestToken = token;
-        showApply();
+        boot();
       });
       card.querySelector('.foot').append(demo);
     })
     .catch(() => {});
   card.querySelector('#back').addEventListener('click', showPairing);
   return card;
+}
+
+/** The front door: a phone first, a pairing code for a tablet behind it. */
+function showLanding() {
+  root.replaceChildren(signInCard());
 }
 
 function applyForm() {
@@ -451,6 +530,9 @@ function statusCard(a) {
 
 /* ── the board ───────────────────────────────────────────────────── */
 
+/** Set by whichever view holds tickets besides the board, to redraw after an action. */
+let onActed = null;
+
 const LANES = [
   { key: 'paid', title: 'Төлсөн' },
   { key: 'preparing', title: 'Бэлтгэж байна' },
@@ -460,40 +542,19 @@ const LANES = [
 
 let today = null;
 
-function frameFor(data) {
-  const frame = el(`
-    <div>
-      <div class="top">
-        <h1 id="supplier">${watchingAll() ? 'Бүх нийлүүлэгч' : esc(data.supplier?.name ?? 'Нийлүүлэгч')}</h1>
-        <button class="swap" type="button" id="swap">Солих</button>
-        <span class="conn" id="conn">холбогдсон</span>
-        <span class="day mn" id="today">${dayLabel(data.today)}</span>
-      </div>
-      <div class="board" id="board"></div>
-      <div class="stall" id="stall"></div>
-    </div>`);
-  frame.querySelector('#swap').addEventListener('click', () => {
-    store.supplierToken = null;
-    showPairing();
-  });
-  return frame;
-}
-
 function renderBoard(data) {
   today = data.today;
-  let board = document.getElementById('board');
-  if (!board) {
-    root.replaceChildren(frameFor(data));
-    board = document.getElementById('board');
-    if (!watchingAll()) renderStall(data.listings);
-  }
-  document.getElementById('supplier').textContent = watchingAll()
-    ? 'Бүх нийлүүлэгч'
-    : (data.supplier?.name ?? 'Нийлүүлэгч');
-  document.getElementById('today').textContent = dayLabel(data.today);
+  const board = document.getElementById('board');
+  if (!board) return;
+  const name = document.getElementById('supplier');
+  if (name) name.textContent = watchingAll() ? 'Бүх нийлүүлэгч' : (data.supplier?.name ?? 'Нийлүүлэгч');
+  const day = document.getElementById('today');
+  if (day) day.textContent = dayLabel(data.today);
   const conn = document.getElementById('conn');
-  conn.textContent = 'холбогдсон';
-  delete conn.dataset.stale;
+  if (conn) {
+    conn.textContent = 'холбогдсон';
+    delete conn.dataset.stale;
+  }
 
   const scroll = window.scrollY;
   board.replaceChildren();
@@ -550,13 +611,13 @@ function renderTicket(ticket, lane) {
         watchingAll()
           ? `/dev/supplier/orders/${ticket.id}/${action}`
           : `/v1/supplier/orders/${ticket.id}/${action}`,
-        { method: 'POST', token: watchingAll() ? undefined : store.supplierToken, body },
+        { method: 'POST', token: watchingAll() ? undefined : token(), body },
       );
       await refreshBoard();
+      await onActed?.();
     } catch (error) {
       if (error.status === 401 && !watchingAll()) {
-        store.supplierToken = null;
-        showPairing();
+        signOut();
         return;
       }
       toast(error.message, 'bad');
@@ -655,12 +716,11 @@ async function refreshBoard() {
   try {
     const data = watchingAll()
       ? await api('/dev/supplier/board')
-      : await api('/v1/supplier/board', { token: store.supplierToken });
+      : await api('/v1/supplier/board', { token: token() });
     renderBoard(data);
   } catch (error) {
     if (error.status === 401 && !watchingAll()) {
-      store.supplierToken = null;
-      showPairing();
+      signOut();
       return;
     }
     const conn = document.getElementById('conn');
@@ -689,8 +749,6 @@ function renderStall(listings) {
   for (const l of listings) rows.append(renderRow(l));
   stall.append(rows);
   stall.append(newForm());
-  stall.append(el('<h2>Миний мөнгө</h2>'), el('<div class="rows" id="money"><div class="row">…</div></div>'));
-  void renderMoney();
 }
 
 /**
@@ -703,7 +761,7 @@ async function renderMoney() {
   if (!box) return;
   let data;
   try {
-    data = await api('/v1/supplier/money', { token: store.supplierToken });
+    data = await api('/v1/supplier/money', { token: token() });
   } catch {
     box.replaceChildren(el('<div class="row">Тооцоо ачаалж чадсангүй.</div>'));
     return;
@@ -757,7 +815,7 @@ function renderRow(l) {
     try {
       const { listing } = await api(`/v1/supplier/listings/${l.id}`, {
         method: 'PATCH',
-        token: store.supplierToken,
+        token: token(),
         body,
       });
       row.replaceWith(renderRow(listing));
@@ -789,7 +847,7 @@ function renderRow(l) {
       try {
         const { listing } = await api(`/v1/supplier/listings/${l.id}`, {
           method: 'PATCH',
-          token: store.supplierToken,
+          token: token(),
           body,
         });
         form.replaceWith(renderRow(listing));
@@ -854,9 +912,9 @@ function newForm() {
     if (body.unit === 'whole') body.approx_kg = Number(v('approx_kg'));
     else body.min_qty = Number(v('min_qty') || 1);
     try {
-      await api('/v1/supplier/listings', { method: 'POST', token: store.supplierToken, body });
+      await api('/v1/supplier/listings', { method: 'POST', token: token(), body });
       toast('Зар нэмэгдлээ');
-      const { listings } = await api('/v1/supplier/listings', { token: store.supplierToken });
+      const { listings } = await api('/v1/supplier/listings', { token: token() });
       renderStall(listings);
     } catch (error) {
       toast(error.message, 'bad');
@@ -865,21 +923,318 @@ function newForm() {
   return form;
 }
 
-/* ── boot ────────────────────────────────────────────────────────── */
+/* ── the module ──────────────────────────────────────────────────── */
 
-function boot() {
-  root.replaceChildren();
-  if (!store.supplierToken) {
-    showPairing();
+const TABS = [
+  { key: 'today', label: 'Өнөөдөр' },
+  { key: 'orders', label: 'Захиалга' },
+  { key: 'stall', label: 'Зар' },
+  { key: 'money', label: 'Мөнгө' },
+  { key: 'profile', label: 'Профайл' },
+];
+let tab = 'today';
+
+/**
+ * The supplier's own app: five tabs on a phone, a sidebar on a computer,
+ * the same page in both. A demo watching every supplier at once gets only
+ * the board — the rest is one supplier's own.
+ */
+function openModule() {
+  const all = watchingAll();
+  const frame = el(`
+    <div class="shell">
+      <div class="top">
+        <h1 id="supplier">${all ? 'Бүх нийлүүлэгч' : '…'}</h1>
+        <span class="conn" id="conn">холбогдсон</span>
+        <span class="day mn" id="today"></span>
+        <button class="swap" type="button" id="out">${all ? 'Солих' : 'Гарах'}</button>
+      </div>
+      <nav class="tabs" aria-label="Хэсгүүд">
+        ${(all ? TABS.slice(0, 1) : TABS).map((t) => `<button type="button" data-tab="${t.key}">${t.label}</button>`).join('')}
+      </nav>
+      <main class="view" id="view"></main>
+    </div>`);
+  frame.querySelector('#out').addEventListener('click', () => (all ? (store.supplierToken = null, boot()) : signOut()));
+  frame.querySelector('.tabs').addEventListener('click', (e) => {
+    const button = e.target.closest('button[data-tab]');
+    if (button) show(button.dataset.tab);
+  });
+  root.replaceChildren(frame);
+  show(all ? 'today' : tab);
+}
+
+function show(key) {
+  tab = key;
+  onActed = null;
+  for (const b of document.querySelectorAll('.tabs button')) b.toggleAttribute('data-on', b.dataset.tab === key);
+  const view = document.getElementById('view');
+  view.replaceChildren();
+  ({ today: renderToday, orders: renderOrders, stall: renderStallTab, money: renderMoneyTab, profile: renderProfile })[key]?.(view);
+}
+
+/* ── today: the numbers, then the work ── */
+
+async function renderToday(view) {
+  view.append(el('<div class="home" id="home"></div>'), el('<div class="board" id="board"></div>'));
+  if (!watchingAll()) void renderHome();
+  void refreshBoard();
+}
+
+async function renderHome() {
+  const box = document.getElementById('home');
+  if (!box) return;
+  let h;
+  try {
+    h = await api('/v1/supplier/home', { token: token() });
+  } catch {
     return;
   }
-  refreshBoard();
+  if (!document.getElementById('home')) return;
+  const todo = h.lanes.paid + h.lanes.preparing + h.lanes.ready + h.lanes.dispatched;
+  const k = (n, unit) => `${n} ${unit === 'kg' ? 'кг' : 'толгой'}`;
+  box.replaceChildren(
+    el(`<section class="cards">
+          <div class="card" data-tone="${h.overdue ? 'stop' : todo ? 'accent' : 'ready'}">
+            <span class="lab">Өнөөдөр</span>
+            <b>${todo}</b><small>ажилтай захиалга</small>
+            <p>${[
+              h.lanes.paid ? `${h.lanes.paid} бэлтгэж эхлэх` : '',
+              h.lanes.preparing ? `${h.lanes.preparing} бэлэн болгох` : '',
+              h.lanes.ready ? `${h.lanes.ready} өгөх` : '',
+              h.lanes.dispatched ? `${h.lanes.dispatched} замд` : '',
+              h.due_today ? `<b>${h.due_today} өнөөдөр ирнэ</b>` : '',
+              h.overdue ? `<b class="warn">${h.overdue} зочин ирээгүй</b>` : '',
+            ].filter(Boolean).join(' · ') || 'Хийх ажил алга'}</p>
+          </div>
+          <div class="card">
+            <span class="lab">Энэ улирал</span>
+            <b>${h.season.handed}</b><small>хүлээлгэн өгсөн</small>
+            <p>${h.season.by_kind.map((b) => `${KIND[b.kind] ?? b.kind} ${k(b.qty, b.unit)}`).join(' · ') || 'одоогоор алга'}</p>
+          </div>
+          <div class="card">
+            <span class="lab">Орлого</span>
+            <b>${mnt(h.season.payout_mnt)}</b><small>танд очих (борлуулалт ${mnt(h.season.revenue_mnt)})</small>
+            <p>${h.season.cancelled ? `${h.season.cancelled} цуцлагдсан${h.season.forfeit_mnt ? `, суутгал ${mnt(h.season.forfeit_mnt)}` : ''}` : 'цуцлалт алга'}</p>
+          </div>
+        </section>`),
+  );
+}
+
+/* ── orders: the list, searched; one order, with its story ── */
+
+let orderQuery = { scope: 'live', q: '' };
+
+function renderOrders(view) {
+  view.append(el(`
+    <section class="orders">
+      <div class="tools">
+        <input type="search" id="q" placeholder="Код, утас, нэр, мах…" value="${esc(orderQuery.q)}" autocomplete="off">
+        <div class="chips">
+          ${[['live', 'Идэвхтэй'], ['done', 'Дууссан'], ['all', 'Бүгд']]
+            .map(([k, l]) => `<button type="button" data-scope="${k}"${orderQuery.scope === k ? ' data-on' : ''}>${l}</button>`)
+            .join('')}
+        </div>
+      </div>
+      <div class="rows" id="orders"><div class="none">…</div></div>
+    </section>`));
+  let timer;
+  view.querySelector('#q').addEventListener('input', (e) => {
+    orderQuery.q = e.target.value;
+    clearTimeout(timer);
+    timer = setTimeout(loadOrders, 250);
+  });
+  view.querySelector('.chips').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-scope]');
+    if (!b) return;
+    orderQuery.scope = b.dataset.scope;
+    for (const c of view.querySelectorAll('.chips button')) c.toggleAttribute('data-on', c === b);
+    void loadOrders();
+  });
+  void loadOrders();
+}
+
+async function loadOrders() {
+  const box = document.getElementById('orders');
+  if (!box) return;
+  let data;
+  try {
+    data = await api(`/v1/supplier/orders?scope=${orderQuery.scope}&q=${encodeURIComponent(orderQuery.q)}`, { token: token() });
+  } catch (error) {
+    if (error.status === 401) return signOut();
+    box.replaceChildren(el('<div class="none">Ачаалж чадсангүй.</div>'));
+    return;
+  }
+  if (!document.getElementById('orders')) return;
+  box.replaceChildren();
+  if (!data.orders.length) box.append(el('<div class="none">Захиалга алга.</div>'));
+  for (const o of data.orders) {
+    const row = el(`
+      <button class="row order" type="button" data-order="${o.id}">
+        <div class="name">№${o.code} · ${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}<small>${
+          [o.guest, o.guest_phone, o.receive === 'delivery' ? 'хүргэлт' : 'өөрөө авна', dayLabel(o.receive_on)].filter(Boolean).map(esc).join(' · ')
+        }</small></div>
+        <span class="chip" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span>
+        <span class="num">${mnt(o.state === 'CANCELLED' || o.state === 'REFUNDED' ? o.forfeit_mnt ?? 0 : o.payout_mnt)}<small>танд</small></span>
+      </button>`);
+    row.addEventListener('click', () => openOrder(o.id));
+    box.append(row);
+  }
+}
+
+const STATE_WORD = {
+  PAID: 'Төлсөн', PREPARING: 'Бэлтгэж байна', READY: 'Бэлэн', DISPATCHED: 'Замд',
+  HANDED: 'Өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан', REFUNDED: 'Буцаасан',
+};
+const EVENT_WORD = {
+  CREATED: 'Захиалга үүссэн', PAID: 'Төлсөн', PREPARING: 'Бэлтгэж эхэлсэн', READY: 'Бэлэн болсон',
+  DISPATCHED: 'Замд гарсан', HANDED: 'Хүлээлгэн өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан',
+  REFUND_DUE: 'Буцаалт үүссэн', REFUNDED: 'Буцаалт шилжүүлсэн',
+};
+const ACTOR_WORD = (a) =>
+  a.startsWith('guest:') ? 'зочин' : a.startsWith('supplier:owner:') ? 'та (утас)' : a.startsWith('supplier:') ? 'дэлгэц' : a.startsWith('ops') ? 'Basu' : 'систем';
+
+async function openOrder(id) {
+  const view = document.getElementById('view');
+  let data;
+  try {
+    data = await api(`/v1/supplier/orders/${id}`, { token: token() });
+  } catch (error) {
+    toast(error.message, 'bad');
+    return;
+  }
+  const o = data.order;
+  const lane = { PAID: 'paid', PREPARING: 'preparing', READY: 'ready', DISPATCHED: 'dispatched' }[o.state];
+  today = today ?? o.receive_on;
+  view.replaceChildren(
+    el(`<section class="order-page">
+          <button class="back" type="button" id="back">‹ Захиалгууд</button>
+          <div class="order-head">
+            <h2>№${o.code} <span class="chip" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span></h2>
+            <div class="what">${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''} · ${mnt(o.total_mnt)}</div>
+          </div>
+          <div class="facts">
+            <div><span class="lab">Зочин</span><b>${esc(o.guest ?? '—')}</b>${o.guest_phone ? `<a href="tel:${esc(o.guest_phone)}">${esc(o.guest_phone)}</a>` : ''}</div>
+            <div><span class="lab">${o.receive === 'delivery' ? 'Хүргэх' : 'Авах'}</span><b>${dayLabel(o.receive_on)}</b>${o.receive === 'delivery' ? `${esc(o.address)}<br>${esc(o.address_phone)}` : 'Өөрөө ирж авна'}</div>
+            <div><span class="lab">Танд очих</span><b>${mnt(o.payout_mnt)}</b>${o.delivery_fee_mnt ? `хүргэлт ${mnt(o.delivery_fee_mnt)} орсон` : 'шимтгэл хассан'}</div>
+            ${o.cancel_reason ? `<div><span class="lab">Цуцлалт</span><b>${REASON_SHORT[o.cancel_reason] ?? o.cancel_reason}</b>зочинд ${mnt(o.refund_mnt ?? 0)} буцна${o.forfeit_mnt ? `, танд ${mnt(o.forfeit_mnt)}` : ''}</div>` : ''}
+          </div>
+          <div id="act"></div>
+          <h3>Явц</h3>
+          <ol class="story">
+            ${data.events.map((e) => `<li><span class="t">${when(e.at)}</span><b>${EVENT_WORD[e.type] ?? e.type}</b><small>${ACTOR_WORD(e.actor)}${e.payload?.reason ? ` · ${REASON_SHORT[e.payload.reason] ?? e.payload.reason}` : ''}</small></li>`).join('')}
+          </ol>
+        </section>`),
+  );
+  view.querySelector('#back').addEventListener('click', () => show('orders'));
+  if (lane) {
+    view.querySelector('#act').append(renderTicket(o, lane));
+    onActed = () => openOrder(id);
+  }
+}
+
+const REASON_SHORT = {
+  guest_asked: 'зочин хүссэн', vet: 'мал эмнэлэг', cannot_fulfil: 'биелүүлж чадаагүй',
+  no_show: 'зочин ирээгүй', unreachable: 'хаяг дээр холбогдоогүй', draft_expired: 'төлөгдөөгүй',
+};
+
+/* ── the stall and the money, each on its own tab ── */
+
+async function renderStallTab(view) {
+  view.append(el('<div class="stall" id="stall"><h2>Миний зар</h2><div class="rows"><div class="row">…</div></div></div>'));
+  try {
+    const { listings } = await api('/v1/supplier/listings', { token: token() });
+    if (document.getElementById('stall')) renderStall(listings);
+  } catch (error) {
+    if (error.status === 401) signOut();
+  }
+}
+
+function renderMoneyTab(view) {
+  view.append(el('<div class="stall"><h2>Миний мөнгө</h2><div class="rows" id="money"><div class="row">…</div></div></div>'));
+  void renderMoney();
+}
+
+/* ── the profile: how they are found, where the money goes ── */
+
+async function renderProfile(view) {
+  let p;
+  try {
+    p = await api('/v1/supplier/profile', { token: token() });
+  } catch (error) {
+    if (error.status === 401) return signOut();
+    view.append(el('<div class="none">Ачаалж чадсангүй.</div>'));
+    return;
+  }
+  const form = el(`
+    <section class="new profile">
+      <h3>${esc(p.name)}</h3>
+      <p class="hint">Утас <b>${esc(p.phone)}</b> · ${p.merchant_tin ? `ТТД ${esc(p.merchant_tin)}` : 'ТТД алга'} · шимтгэл ${p.commission_pct}% — гэрээний нөхцөл, Basu өөрчилнө.</p>
+      <div class="grid">
+        <label class="wide">Нэр<input name="name" value="${esc(p.name)}"></label>
+        <label class="wide">Хотод мах авах цэг<input name="address" value="${esc(p.pickup_address)}"></label>
+        <label class="wide">Юу зарах вэ, хаанаас<textarea name="about">${esc(p.about ?? '')}</textarea></label>
+        <label>Банк<input name="bank_name" list="banks" value="${esc(p.bank_name ?? '')}"></label>
+        <datalist id="banks">${BANKS.map((b) => `<option value="${b}">`).join('')}</datalist>
+        <label>Данс<input name="bank_account" inputmode="numeric" value="${esc(p.bank_account ?? '')}"></label>
+        <label>Данс эзэмшигч<input name="bank_holder" value="${esc(p.bank_holder ?? '')}"></label>
+      </div>
+      <div class="foot"><button class="btn" data-v="primary" type="button" id="save">Хадгалах</button></div>
+    </section>`);
+  form.querySelector('#save').addEventListener('click', async () => {
+    const v = (name) => form.querySelector(`[name="${name}"]`).value.trim();
+    try {
+      await api('/v1/supplier/profile', {
+        method: 'PATCH',
+        token: token(),
+        body: { name: v('name'), address: v('address'), about: v('about'), bank_name: v('bank_name'), bank_account: v('bank_account'), bank_holder: v('bank_holder') },
+      });
+      toast('Хадгалагдлаа.');
+      const name = document.getElementById('supplier');
+      if (name) name.textContent = v('name');
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  view.append(form);
+}
+
+/* ── boot ────────────────────────────────────────────────────────── */
+
+/**
+ * Three ways this page is opened: by a screen paired with a code, by a
+ * person signed in with their phone — from the app's tile, or a browser on
+ * a computer — and by somebody who is neither yet.
+ */
+async function boot() {
+  root.replaceChildren();
+  if (store.supplierToken) {
+    openModule();
+    return;
+  }
+  if (store.guestToken) {
+    try {
+      const { supplier } = await api('/v1/supplier/me', { token: store.guestToken });
+      if (supplier?.state === 'contracted') {
+        openModule();
+        return;
+      }
+      showApply();
+      return;
+    } catch (error) {
+      if (error.status === 401) store.guestToken = null;
+      else {
+        toast(error.message, 'bad');
+        return;
+      }
+    }
+  }
+  showLanding();
 }
 
 boot();
 
 const poll = setInterval(() => {
-  if (!document.hidden && store.supplierToken) void refreshBoard();
+  if (!document.hidden && document.getElementById('board')) void refreshBoard();
 }, 3000);
 addEventListener('pagehide', () => clearInterval(poll));
 </script>

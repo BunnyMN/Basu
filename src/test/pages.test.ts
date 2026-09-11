@@ -844,7 +844,7 @@ describe('өвлийн идэш', () => {
     /* the supplier: why, then how much, then confirm */
     storage.removeItem('basu.supplier');
     const screen = await openPage('supplier.html');
-    await until(screen, 'the pairing form', (d) => d.querySelectorAll('.venues button').length > 0);
+    await pairingCard(screen);
     clickText(screen, '.venues button', 'Бүх нийлүүлэгч');
     const ticket = () =>
       [...screen.window.document.querySelectorAll('.ticket')].find((t) => t.textContent?.includes(`№${code}`));
@@ -911,7 +911,7 @@ describe('өвлийн идэш', () => {
 
     storage.removeItem('basu.supplier');
     const screen = await openPage('supplier.html');
-    await until(screen, 'the pairing form', (d) => d.querySelectorAll('.venues button').length > 0);
+    await pairingCard(screen);
     expect(screen.window.document.querySelector('.pair h2')?.textContent).toBe('Дэлгэцээ холбоно уу');
     // The demo codes are offered, so nobody copies one out of a terminal.
     expect((screen.window.document.querySelector('.pair input') as HTMLInputElement).value).toMatch(/^\d{8}$/);
@@ -948,9 +948,12 @@ describe('өвлийн идэш', () => {
   it('lets a supplier run their own stall from their screen', async () => {
     storage.removeItem('basu.supplier');
     const screen = await openPage('supplier.html');
-    await until(screen, 'the pairing form', (d) => d.querySelectorAll('.venues button').length > 0);
+    await pairingCard(screen);
     clickText(screen, '.venues button', seeded.supplierPaired);
-    await until(screen, 'the stall', (d) => d.querySelectorAll('.stall .row').length > 0);
+    // The stall has its own tab now, beside today's work.
+    await until(screen, 'the module', (d) => Boolean(d.querySelector('.tabs button[data-tab="stall"]')));
+    (screen.window.document.querySelector('.tabs button[data-tab="stall"]') as HTMLElement).click();
+    await until(screen, 'the stall', (d) => d.querySelectorAll('.stall .row[data-listing]').length > 0);
     const before = screen.window.document.querySelectorAll('.stall .row[data-listing]').length;
     expect(before).toBeGreaterThan(0);
     expect(screen.window.document.querySelector('.new h3')?.textContent).toBe('Шинэ зар');
@@ -989,9 +992,7 @@ describe('нийлүүлэгч болох', () => {
     await ownGuest('+97688010011');
     storage.removeItem('basu.supplier');
     const page = await openPage('supplier.html');
-    await until(page, 'the pairing form', (d) => Boolean(d.querySelector('#become')));
-    (page.window.document.querySelector('#become') as HTMLElement).click();
-
+    // Signed in already, the door opens straight onto the application form.
     await until(page, 'the application form', (d) => Boolean(d.querySelector('#apply')));
     const set = (name: string, value: string) => {
       const input = page.window.document.querySelector(`#apply [name="${name}"]`) as HTMLInputElement;
@@ -1039,13 +1040,11 @@ describe('нийлүүлэгч болох', () => {
 
     /* back on the applicant's page, the yes has arrived with a code */
     const again = await openPage('supplier.html');
-    await until(again, 'the pairing form', (d) => Boolean(d.querySelector('#become')));
-    (again.window.document.querySelector('#become') as HTMLElement).click();
-    await until(again, 'the approval', (d) => d.querySelector('#application .status')?.getAttribute('data-s') === 'contracted');
-    expect(again.window.document.querySelector('.code b')?.textContent).toMatch(/^\d{8}$/);
-    (again.window.document.querySelector('#pair-now') as HTMLElement).click();
-    await until(again, 'the board', (d) => d.querySelectorAll('.lane').length === 4);
-    expect(again.window.document.querySelector('#supplier')?.textContent).toBe('Хөвсгөл · Түмэн-Өлзий');
+    // Approved, the same phone now opens the supplier's own module — no
+    // code to type: the phone is the proof.
+    await until(again, 'the module', (d) => d.querySelectorAll('.lane').length === 4);
+    await until(again, 'the name', (d) => d.querySelector('#supplier')?.textContent === 'Хөвсгөл · Түмэн-Өлзий');
+    expect(again.window.document.querySelectorAll('.tabs button')).toHaveLength(5);
   });
 
   it('shows the seeded application waiting on the ops page', async () => {
@@ -1067,6 +1066,18 @@ describe('нийлүүлэгч болох', () => {
  * walkthrough and wrong for a test about "my orders": one guest's list would
  * carry every other test's lunch.
  */
+/**
+ * The supplier page opens on the phone sign-in — a person's door. A tablet
+ * goes one step further, to the pairing card with its code.
+ */
+async function pairingCard(dom: JSDOM): Promise<void> {
+  // Whichever card the door showed — sign-in, the application form, or the
+  // application's status — carries the way through to the pairing code.
+  await until(dom, 'the front door', (d) => Boolean(d.querySelector('.apply #back')));
+  (dom.window.document.querySelector('.apply #back') as HTMLElement).click();
+  await until(dom, 'the pairing form', (d) => d.querySelectorAll('.venues button').length > 0);
+}
+
 async function ownGuest(phone: string): Promise<void> {
   const response = await fetch(`${base}/dev/login`, {
     method: 'POST',

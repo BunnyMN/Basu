@@ -86,19 +86,36 @@ export async function ownerOf(supplierId: string, db: Db = getPool()): Promise<s
   return guestId;
 }
 
-/** The supplier this guest owns, if they own one that is not declined. */
+/**
+ * The supplier this guest owns, if they own one that is not declined. A
+ * supplier written in before there were owners is claimed here, by the
+ * phone on its row matching the phone the guest signed in with.
+ */
 export async function supplierOf(
   guestId: string,
   db: Db = getPool(),
 ): Promise<{ id: string; name: string; state: SupplierState } | null> {
-  const { rows } = await db.query<{ id: string; name: string; state: SupplierState }>(
+  const owned = await db.query<{ id: string; name: string; state: SupplierState }>(
     `SELECT id, name, state FROM idesh.supplier
       WHERE owner_guest_id = $1 AND state <> 'declined' AND active
       ORDER BY (state = 'contracted') DESC, contracted_at DESC NULLS LAST
       LIMIT 1`,
     [guestId],
   );
-  return rows[0] ?? null;
+  if (owned.rows[0]) return owned.rows[0];
+
+  const phone = (await contactsFor([guestId])).get(guestId)?.phone;
+  if (!phone) return null;
+  const claimed = await db.query<{ id: string; name: string; state: SupplierState }>(
+    `UPDATE idesh.supplier SET owner_guest_id = $1
+      WHERE id = (SELECT id FROM idesh.supplier
+                   WHERE phone = $2 AND owner_guest_id IS NULL AND state <> 'declined' AND active
+                   ORDER BY (state = 'contracted') DESC, contracted_at DESC NULLS LAST
+                   LIMIT 1)
+      RETURNING id, name, state`,
+    [guestId, phone],
+  );
+  return claimed.rows[0] ?? null;
 }
 
 /* ── applying ──────────────────────────────────────────────────────── */
