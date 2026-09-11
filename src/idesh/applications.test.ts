@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { closePool } from '../db/pool.js';
+import { closePool, getPool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { startSession } from '../platform/identity/index.js';
@@ -16,7 +16,9 @@ import {
   openListings,
   pairSupplier,
   registerSupplier,
+  supplierOf,
 } from './index.js';
+import { guestForPhone } from '../platform/identity/index.js';
 
 /**
  * Becoming a supplier, against a real database.
@@ -163,5 +165,20 @@ describe('ops decides', () => {
     const contracted = await registerSupplier({ name: 'X', phone: '+97688010001', pickupAddress: 'x' });
     await expect(approveSupplier(ctx, contracted)).rejects.toMatchObject({ code: 'NOT_PENDING' });
     await expect(declineSupplier(ctx, contracted, 'y')).rejects.toMatchObject({ code: 'NOT_PENDING' });
+  });
+});
+
+describe('who a supplier answers to', () => {
+  it('is the phone on the row — claimed at sign-in when the row predates owners', async () => {
+    const id = await registerSupplier({ name: 'Хэрлэн хоршоо', phone: '+97688010002', pickupAddress: 'x' });
+    const owner = await guestForPhone('+97688010002');
+    expect((await supplierOf(owner))?.id).toBe(id);
+
+    // Written in before there were owners: the column is empty, the phone is not.
+    await getPool().query('UPDATE idesh.supplier SET owner_guest_id = NULL WHERE id = $1', [id]);
+    expect((await supplierOf(owner))?.id).toBe(id);
+    expect((await supplierOf(owner))?.id).toBe(id);
+    // Somebody else's phone claims nothing.
+    expect(await supplierOf(await guestForPhone('+97699000099'))).toBeNull();
   });
 });

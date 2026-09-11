@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { closePool, getPool } from '../db/pool.js';
+import { closePool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
@@ -454,12 +454,6 @@ describe('the supplier’s own module', () => {
     const owner = await signIn('+97688010001');
     const me = await app.inject({ method: 'GET', url: '/v1/supplier/me', headers: auth(owner) });
     expect(me.json().supplier).toMatchObject({ id: supplierId, state: 'contracted' });
-
-    // A supplier written in before there were owners is claimed by its phone.
-    await getPool().query('UPDATE idesh.supplier SET owner_guest_id = NULL WHERE id = $1', [rivalId]);
-    const rivalOwner = await signIn('+97688010002');
-    const claimed = await app.inject({ method: 'GET', url: '/v1/supplier/me', headers: auth(rivalOwner) });
-    expect(claimed.json().supplier).toMatchObject({ id: rivalId, state: 'contracted' });
 
     const nobody = await signIn('+97699007777');
     expect((await app.inject({ method: 'GET', url: '/v1/supplier/me', headers: auth(nobody) })).json()).toEqual({ supplier: null });
