@@ -16,6 +16,8 @@ final class AppModel {
 
   private(set) var live: [LiveOrder] = []
   private(set) var liveIdesh: [LiveIdesh] = []
+  /// The supplier this guest is, when they are one: the launcher's extra tile.
+  private(set) var supplier: SupplierMine?
   private(set) var trouble: String?
 
   /// Whether the last call reached the server at all.
@@ -60,13 +62,16 @@ final class AppModel {
     guard let token = session.token else {
       live = []
       liveIdesh = []
+      supplier = nil
       return
     }
     // Two calls, one per service: the launcher is the one place that knows
     // there are two. The lock screen follows the lunch only — a sheep due
-    // next week is not a thing to watch from the island.
+    // next week is not a thing to watch from the island. A third asks
+    // whether this guest is a supplier, which draws or hides one tile.
     async let lunches = api.liveOrders(token: token)
     async let provisions = api.liveIdesh(token: token)
+    async let mine = api.supplierMine(token: token)
     do {
       live = try await lunches
       noted(nil)
@@ -77,14 +82,17 @@ final class AppModel {
       session.forget()
       live = []
       liveIdesh = []
+      supplier = nil
       return
     } catch {
       noted(error)
       live = []
     }
     // A server that predates the second service answers 404 here; that is an
-    // empty list, not an outage.
+    // empty list, not an outage. Likewise a server without the supplier's
+    // side: no tile, not an error.
     liveIdesh = (try? await provisions) ?? []
+    supplier = (try? await mine) ?? nil
   }
 
   func say(_ trouble: String?) { self.trouble = trouble }

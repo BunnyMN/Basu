@@ -114,6 +114,12 @@ struct API: Sendable {
 
   // MARK: what is running
 
+  /// Whether this guest is a supplier — the launcher's one question before
+  /// it draws the tile. `null` from the server is a plain no.
+  func supplierMine(token: String) async throws -> SupplierMine? {
+    try await send(.init(path: "/v1/supplier/me", token: token), as: Wrapped<SupplierMine?>.self, key: "supplier").value
+  }
+
   /// The other service's live list. Its page draws everything else.
   func liveIdesh(token: String) async throws -> [LiveIdesh] {
     try await send(.init(path: "/v1/idesh", token: token), as: Wrapped<[LiveIdesh]>.self, key: "orders").value

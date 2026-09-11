@@ -70,6 +70,13 @@ enum AppCatalogue {
     id: "idesh", name: "Идэш", tag: "өвлийн", icon: .raster("idesh-tile"), path: "/idesh",
   )
 
+  /// The supplier's own side of the second app, for the few guests who are
+  /// one: the same page a paired tablet shows, opened with the phone's own
+  /// sign-in. Not in `shipped` — it is on the launcher only for them.
+  static let supplier = LauncherApp(
+    id: "supplier", name: "Нийлүүлэгч", tag: "миний зар", icon: .glyph(.supplier), path: "/supplier",
+  )
+
   /// What is actually built. Everything in `planned` is drawn and named only.
   static let shipped: [LauncherApp] = [food, idesh]
 
@@ -102,8 +109,9 @@ enum AppCatalogue {
    editorial bands the design fixes. The counts other than one exist for the
    launch argument below — shipping today is one icon.
    */
-  static func bands(count: Int) -> [AppBand] {
-    let all = shipped + planned
+  static func bands(count: Int, extra: [LauncherApp] = []) -> [AppBand] {
+    // What this guest has that others do not sits after what everybody has.
+    let all = shipped + extra + planned
     let apps = Array(all.prefix(max(1, count)))
 
     if apps.count < 9 {

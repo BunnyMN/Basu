@@ -24,7 +24,11 @@ struct HomeView: View {
   @State private var signingIn = false
   @State private var query = ""
 
-  private var bands: [AppBand] { AppCatalogue.bands(count: AppCatalogue.installedCount) }
+  /// A guest who is also a supplier gets one more tile, after the two everybody has.
+  private var bands: [AppBand] {
+    let extra = model.supplier != nil ? [AppCatalogue.supplier] : []
+    return AppCatalogue.bands(count: AppCatalogue.installedCount + extra.count, extra: extra)
+  }
   private var iconCount: Int { bands.reduce(0) { $0 + $1.apps.count } }
 
   /// Both verticals, in one list, by the moment that matters. A sheep due
@@ -183,7 +187,7 @@ struct HomeView: View {
         }
       }
 
-      if iconCount <= AppCatalogue.shipped.count {
+      if iconCount <= AppCatalogue.shipped.count + 1 {
         // A hairline and a sentence. Never a placeholder tile — that promises
         // a tap which does nothing.
         VStack(alignment: .leading, spacing: 0) {

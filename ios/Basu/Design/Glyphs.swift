@@ -32,7 +32,7 @@ private struct Box {
 // MARK: - the app glyphs
 
 enum GlyphKind: String, CaseIterable, Sendable {
-  case food, idesh, taxi, delivery, ticket, bill, shop, net, pharmacy, cafe
+  case food, idesh, supplier, taxi, delivery, ticket, bill, shop, net, pharmacy, cafe
 }
 
 /// One app's mark. `food` is the only one with a moving part.
@@ -153,6 +153,14 @@ private struct GlyphBody: Shape {
       run([(8, 7.2), (8, 18.5)])
       run([(12, 7.6), (12, 19.2)])
       run([(16, 7.2), (16, 18.5)])
+
+    case .supplier:
+      // A clipboard: the board, its clip, and two lines of what is listed.
+      // The supplier's side is paperwork and a tally, not another animal.
+      rounded(5.5, 4.6, 13, 16, 1.8)
+      rounded(9.2, 3, 5.6, 3.2, 1)
+      run([(8.6, 11), (15.4, 11)])
+      run([(8.6, 15), (13.2, 15)])
 
     case .taxi:
       rounded(3.2, 10.4, 17.6, 6.2, 1.6)

@@ -160,8 +160,22 @@ const APPS = [
   },
 ];
 
-for (const app of APPS) {
-  const item = el(`
+/** The supplier's own side of the second app — on the launcher only for the few who are one. */
+const SUPPLIER_APP = {
+  id: 'supplier',
+  name: 'Нийлүүлэгч',
+  tag: 'миний зар',
+  href: '/supplier',
+  // A clipboard: the board, its clip, two lines of what is listed.
+  icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
+           <rect x="5.5" y="4.6" width="13" height="16" rx="1.8"/>
+           <rect x="9.2" y="3" width="5.6" height="3.2" rx="1"/>
+           <path d="M8.6 11h6.8M8.6 15h4.6"/>
+         </svg>`,
+};
+
+function tileOf(app) {
+  return el(`
     <li>
       <a class="app" href="${app.href}" data-app="${app.id}">
         <span class="tile">${app.icon}</span>
@@ -169,7 +183,26 @@ for (const app of APPS) {
         <span class="tag">${app.tag}</span>
       </a>
     </li>`);
-  $('apps').append(item);
+}
+for (const app of APPS) $('apps').append(tileOf(app));
+
+/** Draw the supplier's tile when this guest is one; take it away when they are not. */
+async function loadSupplierTile() {
+  const token = store.guestToken;
+  const shown = $('apps').querySelector('[data-app="supplier"]');
+  if (!token) {
+    shown?.closest('li').remove();
+    return;
+  }
+  let mine = null;
+  try {
+    ({ supplier: mine } = await api('/v1/supplier/me', { token }));
+  } catch {
+    return;
+  }
+  const isOne = mine?.state === 'contracted';
+  if (isOne && !shown) $('apps').append(tileOf(SUPPLIER_APP));
+  if (!isOne && shown) shown.closest('li').remove();
 }
 
 /* ── what is already running ──────────────────────────────────────── */
@@ -263,6 +296,7 @@ async function loadLive() {
   const [lunches, provisions] = await Promise.all([
     ask('/v1/orders', 'orders'),
     ask('/v1/idesh', 'orders'),
+    loadSupplierTile(),
   ]);
   const rows = [...lunches.map(dineRow), ...provisions.map(ideshRow)];
   rows.sort((a, b) => a.at - b.at);

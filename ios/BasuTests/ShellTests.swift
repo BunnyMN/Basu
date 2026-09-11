@@ -113,6 +113,20 @@ struct ShellTests {
     #expect(AppCatalogue.idesh.destination(order: "o2") == .app(id: "idesh", path: "/idesh?order=o2"))
   }
 
+  @Test func aSupplierGetsOneMoreTileAfterTheTwoEverybodyHas() {
+    let extra = [AppCatalogue.supplier]
+    let bands = AppCatalogue.bands(count: AppCatalogue.shipped.count + 1, extra: extra)
+    #expect(bands.count == 1)
+    #expect(bands[0].apps.map(\.name) == ["Хоол", "Идэш", "Нийлүүлэгч"])
+    let allLive = bands[0].apps.allSatisfy { $0.isLive }
+    #expect(allLive)
+    // The same page the paired tablet shows, opened by the phone's own sign-in.
+    let opens: Destination? = .app(id: "supplier", path: "/supplier")
+    #expect(bands[0].apps[2].destination == opens)
+    // For everybody else the grid is exactly what it was.
+    #expect(AppCatalogue.bands(count: AppCatalogue.shipped.count).flatMap(\.apps).map(\.id) == ["food", "idesh"])
+  }
+
   @Test func oneIconStillWorks() {
     // The state the design drew first. Nothing ships with it any more, but a
     // grid that only holds up from two icons on is a grid with a hole in it.

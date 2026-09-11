@@ -133,6 +133,13 @@ enum IdeshState: String, Decodable, Sendable, Hashable {
 /// One row of `GET /v1/idesh` — the second thing the home screen puts in
 /// front of you. Dates come as `YYYY-MM-DD` days, not instants: the meat is
 /// ready on a day, and the row says so.
+/// The supplier a signed-in guest owns, if they own one. Null for almost everybody.
+struct SupplierMine: Decodable, Sendable, Hashable {
+  let id: String
+  let name: String
+  let state: String
+}
+
 struct LiveIdesh: Decodable, Sendable, Identifiable, Hashable {
   let id: String
   let code: String
