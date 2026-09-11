@@ -39,8 +39,8 @@ export class ApiError extends Error {
   }
 }
 
-export async function api(path, { method = 'GET', body, token, idempotencyKey } = {}) {
-  const headers = {};
+export async function api(path, { method = 'GET', body, token, idempotencyKey, headers: extra = {} } = {}) {
+  const headers = { ...extra };
   if (body) headers['content-type'] = 'application/json';
   if (token) headers.authorization = `Bearer ${token}`;
   if (idempotencyKey) headers['idempotency-key'] = idempotencyKey;

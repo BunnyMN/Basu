@@ -53,6 +53,46 @@ section > h2{
 .new label.wide{grid-column:1 / -1}
 .new input{width:100%;padding:8px 9px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);color:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:.86rem;letter-spacing:0;text-transform:none}
 .new .foot{display:flex;justify-content:flex-end;margin-top:10px;gap:10px;align-items:center}
+/* ── the desk's sections, one at a time ── */
+.tabs{display:flex;gap:4px;padding:8px 14px 0;border-bottom:1px solid var(--line);background:var(--bg);overflow-x:auto}
+.tabs button{font-family:"Golos Text",sans-serif;font-size:.86rem;font-weight:600;padding:9px 12px;border:none;background:none;color:var(--ink-3);border-bottom:2px solid transparent;white-space:nowrap}
+.tabs button[data-on]{color:var(--accent-ink);border-bottom-color:var(--accent)}
+.tabs .name{margin-left:auto;font:inherit;font-size:.8rem;padding:6px 8px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface);color:var(--ink);width:150px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:12px 14px}
+.card h3{font-family:"IBM Plex Mono",monospace;font-size:.66rem;text-transform:uppercase;letter-spacing:.14em;color:var(--ink-3);font-weight:500;margin:0 0 8px}
+.card dl{display:grid;grid-template-columns:1fr auto;gap:4px 12px;margin:0;font-size:.86rem}
+.card dt{color:var(--ink-2)}
+.card dd{margin:0;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;text-align:right}
+.card dd.money{color:var(--accent-ink);font-weight:600}
+table.grid{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:4px;font-size:.84rem}
+table.grid th{font-family:"IBM Plex Mono",monospace;font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3);font-weight:500;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+table.grid td{padding:8px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+table.grid td.n{font-family:"IBM Plex Mono",monospace;text-align:right}
+table.grid tr[data-off] td{opacity:.55}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.filters input,.filters select{font:inherit;font-size:.86rem;padding:8px 10px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface);color:var(--ink)}
+.filters input[type="search"]{flex:1;min-width:200px}
+.chips{display:flex;gap:6px}
+.chips button{font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;padding:6px 10px;border:1px solid var(--line-2);border-radius:99px;background:var(--surface);color:var(--ink-3)}
+.chips button[data-on]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.row.order{cursor:pointer}
+.row.order:hover{border-color:var(--ink-3)}
+.chip[data-s="PAID"]{color:var(--route);border-color:var(--route-line)}
+.chip[data-s="PREPARING"]{color:var(--accent-ink);border-color:var(--accent-line)}
+.chip[data-s="READY"],.chip[data-s="HANDED"],.chip[data-s="CLOSED"]{color:var(--ready);border-color:var(--ready-line)}
+.chip[data-s="CANCELLED"],.chip[data-s="REFUNDED"]{color:var(--stop);border-color:var(--stop-line)}
+.detail{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,360px);gap:14px;align-items:start}
+@media(max-width:800px){.detail{grid-template-columns:1fr}}
+.detail .back{background:none;border:none;color:var(--accent-ink);font-family:"Golos Text",sans-serif;font-weight:600;font-size:.9rem;padding:0 0 8px;cursor:pointer}
+.story{list-style:none;padding:0;margin:0 0 0 6px;border-left:2px solid var(--line)}
+.story li{position:relative;padding:3px 0 9px 14px;font-size:.86rem}
+.story li::before{content:"";position:absolute;left:-6px;top:9px;width:10px;height:10px;border-radius:99px;background:var(--ready)}
+.story .t{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--ink-3);margin-right:8px}
+.story small{display:block;font-size:.74rem;color:var(--ink-3)}
+.acts{display:flex;flex-direction:column;gap:8px}
+.acts select,.acts input{font:inherit;font-size:.86rem;padding:8px 10px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface);color:var(--ink);width:100%}
+.audit .row small{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--ink-3)}
 .pair{max-width:420px;margin:60px auto;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:26px 24px;text-align:center}
 .pair h2{font-size:1.1rem;margin-bottom:6px}
 .pair p{color:var(--ink-2);font-size:.86rem;margin:0 0 18px;line-height:1.5}
@@ -64,7 +104,7 @@ section > h2{
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mnt, dayLabel } from '/api.js';
+import { api, store, toast, mnt, KIND, dayLabel } from '/api.js';
 
 const root = document.getElementById('root');
 const el = (html) => {
@@ -118,14 +158,25 @@ async function showToken() {
 
 /* ── the desk ────────────────────────────────────────────────────── */
 
-const ops = (path, options = {}) => api(path, { ...options, token: store.opsToken });
+const opsName = () => localStorage.getItem('basu.ops.name') ?? '';
+/** Every call from the desk carries the desk's secret and, when given, the person's name. */
+const ops = (path, options = {}) =>
+  api(path, { ...options, token: store.opsToken, headers: opsName() ? { 'x-ops-name': opsName() } : {} });
+
+const TABS = [
+  { key: 'stats', label: 'Тоон үзүүлэлт' },
+  { key: 'orders', label: 'Захиалгууд' },
+  { key: 'suppliers', label: 'Нийлүүлэгчид' },
+  { key: 'pay', label: 'Олголт, буцаалт' },
+  { key: 'audit', label: 'Бүртгэл' },
+];
+let tab = localStorage.getItem('basu.ops.tab') ?? 'stats';
+let cache = { suppliers: [], settlements: [] };
 
 async function refresh() {
-  let suppliers;
-  let settlements = [];
   try {
-    ({ suppliers } = await ops('/v1/ops/suppliers'));
-    ({ settlements } = await ops('/v1/ops/settlements'));
+    const [{ suppliers }, { settlements }] = await Promise.all([ops('/v1/ops/suppliers'), ops('/v1/ops/settlements')]);
+    cache = { suppliers, settlements };
   } catch (error) {
     if (error.status === 401 || error.status === 503) {
       store.opsToken = null;
@@ -136,49 +187,293 @@ async function refresh() {
     toast(error.message, 'bad');
     return;
   }
-  render(suppliers, settlements);
+  if (!document.querySelector('.tabs')) frame();
+  show(tab);
 }
 
-function render(suppliers, settlements) {
-  const scroll = window.scrollY;
-  const applied = suppliers.filter((s) => s.state === 'applied');
-  const rest = suppliers.filter((s) => s.state !== 'applied');
-  const toPay = settlements.filter((t) => t.state !== 'paid');
-
-  const frame = el(`
+function frame() {
+  const f = el(`
     <div>
       <div class="top">
-        <h1>Ops · нийлүүлэгч</h1>
-        <span class="lab">${applied.length} хүсэлт · ${rest.filter((s) => s.state === 'contracted').length} гэрээт · ${toPay.length} шилжүүлэх</span>
+        <h1>Ops · идэш</h1>
+        <span class="lab" id="tally"></span>
         <button class="swap" type="button" id="out">Гарах</button>
       </div>
-      <div class="wrap">
-        <section id="pay"><h2><span>Олголт, буцаалт</span><span>${mnt(toPay.reduce((sum, t) => sum + t.amount_mnt, 0))}</span></h2><div class="rows"></div></section>
-        <section id="applied"><h2><span>Хүсэлт</span></h2><div class="rows"></div></section>
-        <section id="all"><h2><span>Нийлүүлэгчид</span></h2><div class="rows"></div></section>
-        <section id="new"><h2><span>Шинэ нийлүүлэгч, гэрээтэй</span></h2></section>
-      </div>
+      <nav class="tabs" aria-label="Хэсгүүд">
+        ${TABS.map((t) => `<button type="button" data-tab="${t.key}">${t.label}</button>`).join('')}
+        <input class="name" id="who" placeholder="Таны нэр (бүртгэлд)" value="${esc(opsName())}">
+      </nav>
+      <div class="wrap" id="view"></div>
     </div>`);
-  frame.querySelector('#out').addEventListener('click', () => {
+  f.querySelector('#out').addEventListener('click', () => {
     store.opsToken = null;
     showToken();
   });
+  f.querySelector('.tabs').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-tab]');
+    if (b) show(b.dataset.tab);
+  });
+  f.querySelector('#who').addEventListener('change', (e) => localStorage.setItem('basu.ops.name', e.target.value.trim()));
+  root.replaceChildren(f);
+}
 
-  const pay = frame.querySelector('#pay .rows');
-  if (!settlements.length) pay.append(el('<div class="none">Шилжүүлэх зүйл алга.</div>'));
-  for (const t of settlements) pay.append(renderSettlement(t));
+function show(key) {
+  tab = key;
+  localStorage.setItem('basu.ops.tab', key);
+  for (const b of document.querySelectorAll('.tabs button')) b.toggleAttribute('data-on', b.dataset.tab === key);
+  const applied = cache.suppliers.filter((s) => s.state === 'applied').length;
+  const toPay = cache.settlements.filter((t) => t.state !== 'paid').length;
+  const tally = document.getElementById('tally');
+  if (tally) tally.textContent = `${applied} хүсэлт · ${cache.suppliers.filter((s) => s.state === 'contracted').length} гэрээт · ${toPay} шилжүүлэх`;
+  const view = document.getElementById('view');
+  const scroll = window.scrollY;
+  view.replaceChildren();
+  ({ stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit })[key]?.(view);
+  window.scrollTo(0, scroll);
+}
 
-  const pending = frame.querySelector('#applied .rows');
+/* ── the numbers ── */
+
+async function renderStats(view) {
+  view.append(el('<div class="none">…</div>'));
+  let st;
+  try {
+    st = await ops('/v1/ops/stats');
+  } catch (error) {
+    view.replaceChildren(el(`<div class="none">${esc(error.message)}</div>`));
+    return;
+  }
+  if (tab !== 'stats') return;
+  const tally = (title, t) => `
+    <div class="card"><h3>${title}</h3><dl>
+      <dt>Төлсөн захиалга</dt><dd>${t.paid}</dd>
+      <dt>Борлуулалт</dt><dd class="money">${mnt(t.sales_mnt)}</dd>
+      <dt>Хүлээлгэн өгсөн</dt><dd>${t.handed}</dd>
+      <dt>Шимтгэл (Basu)</dt><dd class="money">${mnt(t.commission_mnt)}</dd>
+      <dt>Цуцлагдсан</dt><dd>${t.cancelled}${t.cancelled ? ` <small>(нийлүүлэгч ${t.supplier_fault} · зочин ${t.guest_fault})</small>` : ''}</dd>
+      <dt>Буцаалт</dt><dd>${mnt(t.refund_mnt)}</dd>
+      <dt>Суутгал</dt><dd>${mnt(t.forfeit_mnt)}</dd>
+    </dl></div>`;
+  view.replaceChildren(
+    el(`<section class="cards">${tally('Өнөөдөр', st.today)}${tally('Сүүлийн 7 хоног', st.week)}${tally('Улирал', st.season)}</section>`),
+    el(`<section><h2><span>Нийлүүлэгч бүрээр</span></h2>
+          <table class="grid"><thead><tr><th>Нийлүүлэгч</th><th>Төлсөн</th><th>Өгсөн</th><th>Цуцалсан</th><th>Өөрийн буруу</th><th>Ирээгүй зочин</th><th>Бэлэн болтол, цаг</th><th>Борлуулалт</th><th>Шимтгэл</th></tr></thead>
+          <tbody>${st.suppliers
+            .map(
+              (r) => `<tr${r.active ? '' : ' data-off'}><td>${esc(r.name)}${r.active ? '' : ' · <b>түр зогссон</b>'}</td><td class="n">${r.paid}</td><td class="n">${r.handed}</td><td class="n">${r.cancelled}</td><td class="n">${r.supplier_fault}</td><td class="n">${r.no_shows}</td><td class="n">${r.ready_hours ?? '—'}</td><td class="n">${mnt(r.sales_mnt)}</td><td class="n">${mnt(r.commission_mnt)}</td></tr>`,
+            )
+            .join('') || '<tr><td colspan="9" class="none">Гэрээт нийлүүлэгч алга.</td></tr>'}</tbody></table>
+        </section>`),
+    el(`<section><h2><span>Махны төрлөөр (хүлээлгэн өгсөн)</span></h2>
+          <table class="grid"><thead><tr><th>Төрөл</th><th>Хэмжээ</th><th>Захиалга</th><th>Борлуулалт</th></tr></thead>
+          <tbody>${st.by_kind
+            .map((k) => `<tr><td>${KIND[k.kind] ?? k.kind}</td><td class="n">${k.qty} ${k.unit === 'kg' ? 'кг' : 'толгой'}</td><td class="n">${k.orders}</td><td class="n">${mnt(k.sales_mnt)}</td></tr>`)
+            .join('') || '<tr><td colspan="4" class="none">Одоогоор алга.</td></tr>'}</tbody></table>
+        </section>`),
+  );
+}
+
+/* ── every order ── */
+
+let orderFilter = { scope: 'live', supplier: '', day: '', q: '' };
+const STATE_WORD = {
+  PAID: 'Төлсөн', PREPARING: 'Бэлтгэж байна', READY: 'Бэлэн', DISPATCHED: 'Замд',
+  HANDED: 'Өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан', REFUNDED: 'Буцаасан',
+};
+const EVENT_WORD = {
+  CREATED: 'Үүссэн', PAID: 'Төлсөн', PREPARING: 'Бэлтгэж эхэлсэн', READY: 'Бэлэн болсон', DISPATCHED: 'Замд гарсан',
+  HANDED: 'Хүлээлгэн өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан', REFUND_DUE: 'Буцаалт үүссэн', REFUNDED: 'Буцаалт шилжүүлсэн', RESENT: 'Мэдэгдэл дахин илгээсэн',
+};
+const REASON = {
+  guest_asked: 'Зочин хүссэн', vet: 'Мал эмнэлгийн шалгалт', cannot_fulfil: 'Нийлүүлэгч биелүүлж чадахгүй',
+  no_show: 'Зочин ирээгүй', unreachable: 'Хаяг дээр холбогдоогүй', draft_expired: 'Төлөгдөөгүй',
+};
+const actorWord = (a) =>
+  a.startsWith('guest:') ? 'зочин' : a.startsWith('supplier:owner:') ? 'нийлүүлэгч (утас)' : a.startsWith('supplier:') ? 'нийлүүлэгчийн дэлгэц' : a.startsWith('ops') ? a.replace('ops:', 'ops · ') : 'систем';
+
+function renderOrders(view) {
+  const suppliers = cache.suppliers.filter((s) => s.state === 'contracted');
+  view.append(el(`
+    <section>
+      <div class="filters">
+        <input type="search" id="q" placeholder="Код, утас, зочин, нийлүүлэгч, мах…" value="${esc(orderFilter.q)}" autocomplete="off">
+        <select id="supplier"><option value="">Бүх нийлүүлэгч</option>${suppliers.map((s) => `<option value="${s.id}"${orderFilter.supplier === s.id ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
+        <input type="date" id="day" value="${esc(orderFilter.day)}" title="Авах/хүргэх өдөр">
+        <div class="chips">${[['live', 'Идэвхтэй'], ['done', 'Дууссан'], ['all', 'Бүгд']].map(([k, l]) => `<button type="button" data-scope="${k}"${orderFilter.scope === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>
+      </div>
+      <div class="rows" id="orders"><div class="none">…</div></div>
+    </section>`));
+  let timer;
+  view.querySelector('#q').addEventListener('input', (e) => {
+    orderFilter.q = e.target.value;
+    clearTimeout(timer);
+    timer = setTimeout(loadOrders, 250);
+  });
+  view.querySelector('#supplier').addEventListener('change', (e) => ((orderFilter.supplier = e.target.value), loadOrders()));
+  view.querySelector('#day').addEventListener('change', (e) => ((orderFilter.day = e.target.value), loadOrders()));
+  view.querySelector('.chips').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-scope]');
+    if (!b) return;
+    orderFilter.scope = b.dataset.scope;
+    for (const c of view.querySelectorAll('.chips button')) c.toggleAttribute('data-on', c === b);
+    void loadOrders();
+  });
+  void loadOrders();
+}
+
+async function loadOrders() {
+  const box = document.getElementById('orders');
+  if (!box) return;
+  const qs = new URLSearchParams({ scope: orderFilter.scope, q: orderFilter.q });
+  if (orderFilter.supplier) qs.set('supplier', orderFilter.supplier);
+  if (orderFilter.day) qs.set('day', orderFilter.day);
+  let data;
+  try {
+    data = await ops(`/v1/ops/orders?${qs}`);
+  } catch (error) {
+    box.replaceChildren(el(`<div class="none">${esc(error.message)}</div>`));
+    return;
+  }
+  if (!document.getElementById('orders')) return;
+  box.replaceChildren();
+  if (!data.orders.length) box.append(el('<div class="none">Захиалга алга.</div>'));
+  for (const o of data.orders) {
+    const row = el(`
+      <div class="row order" data-order="${o.id}" data-s="${o.state}">
+        <div class="name">№${o.code} · ${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}<small>${
+          [o.supplier.name, o.guest, o.guest_phone, o.receive === 'delivery' ? 'хүргэлт' : 'өөрөө авна', dayLabel(o.receive_on)].filter(Boolean).map(esc).join(' · ')
+        }</small></div>
+        <span class="chip" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span>
+        <span class="amount">${mnt(o.total_mnt)}</span>
+      </div>`);
+    row.addEventListener('click', () => openOrder(o.id));
+    box.append(row);
+  }
+}
+
+/** One order, its money, its story — and the three things ops may do to it. */
+async function openOrder(id) {
+  const view = document.getElementById('view');
+  let d;
+  try {
+    d = await ops(`/v1/ops/orders/${id}`);
+  } catch (error) {
+    toast(error.message, 'bad');
+    return;
+  }
+  const o = d.order;
+  const live = ['PAID', 'PREPARING', 'READY', 'DISPATCHED'].includes(o.state);
+  const page = el(`
+    <section>
+      <button class="back" type="button" id="back">‹ Захиалгууд</button>
+      <div class="detail">
+        <div>
+          <div class="row" data-s="${o.state}">
+            <div class="name">№${o.code} · ${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}<small>
+              ${esc(o.supplier.name)} · ${o.guest ? esc(o.guest) : 'зочин'} · ${esc(o.guest_phone ?? '')}<br>
+              ${o.receive === 'delivery' ? `Хүргэлт ${dayLabel(o.receive_on)}: ${esc(o.address)} · ${esc(o.address_phone)}` : `Өөрөө авна ${dayLabel(o.receive_on)}`}<br>
+              Нийт ${mnt(o.total_mnt)}${o.delivery_fee_mnt ? ` (хүргэлт ${mnt(o.delivery_fee_mnt)})` : ''} · нийлүүлэгчид ${mnt(o.payout_mnt)}${
+                o.cancel_reason ? `<br>Цуцлалт: ${REASON[o.cancel_reason] ?? o.cancel_reason} · буцаалт ${mnt(o.refund_mnt ?? 0)}${o.forfeit_mnt ? ` · суутгал ${mnt(o.forfeit_mnt)}` : ''}` : ''
+              }</small></div>
+            <span class="chip" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span>
+          </div>
+          <div class="lab" style="margin:14px 0 6px">Мөнгө</div>
+          <div class="rows" id="money">${d.settlements.length ? '' : '<div class="none">Тооцоо үүсээгүй.</div>'}</div>
+          <div class="lab" style="margin:14px 0 6px">Явц</div>
+          <ol class="story">${d.events
+            .map((e) => `<li><span class="t">${when(e.at)} ${clockOf(e.at)}</span><b>${EVENT_WORD[e.type] ?? e.type}</b><small>${actorWord(e.actor)}${e.payload?.reason ? ` · ${REASON[e.payload.reason] ?? e.payload.reason}` : ''}${e.payload?.state ? ` · ${STATE_WORD[e.payload.state] ?? ''}` : ''}</small></li>`)
+            .join('')}</ol>
+        </div>
+        <div class="card acts" id="acts">
+          <h3>Ops-ийн үйлдэл</h3>
+          ${live ? `
+          <input id="note" placeholder="Тэмдэглэл (бүртгэлд үлдэнэ)">
+          <button class="btn" type="button" data-a="resend">Мэдэгдэл дахин илгээх</button>
+          ${['READY', 'DISPATCHED'].includes(o.state) ? '<button class="btn" data-v="primary" type="button" data-a="hand">Хүлээлгэн өгсөн гэж тэмдэглэх</button>' : ''}
+          <select id="reason"><option value="">Цуцлах шалтгаан…</option>${Object.entries(REASON).filter(([k]) => k !== 'draft_expired').map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
+          <button class="btn" data-v="danger" type="button" data-a="cancel" disabled>Нийлүүлэгчийн өмнөөс цуцлах</button>
+          ` : '<div class="none">Дууссан захиалгад үйлдэл алга.</div>'}
+        </div>
+      </div>
+    </section>`);
+  for (const t of d.settlements) page.querySelector('#money').append(renderSettlement(t));
+  page.querySelector('#back').addEventListener('click', () => show('orders'));
+  const acts = page.querySelector('#acts');
+  const reason = acts.querySelector('#reason');
+  reason?.addEventListener('change', () => (acts.querySelector('[data-a="cancel"]').disabled = !reason.value));
+  acts.addEventListener('click', async (e) => {
+    const b = e.target.closest('button[data-a]');
+    if (!b) return;
+    const action = b.dataset.a;
+    const body = { note: acts.querySelector('#note')?.value ?? '' };
+    if (action === 'cancel') body.reason = reason.value;
+    if (action === 'cancel' && !confirm(`№${o.code}-г «${REASON[reason.value]}» шалтгаанаар цуцлах уу? Буцаалтыг дүрэм тогтооно.`)) return;
+    b.disabled = true;
+    try {
+      await ops(`/v1/ops/orders/${id}/${action}`, { method: 'POST', body });
+      toast('Болсон, бүртгэгдлээ.');
+      await refresh();
+      await openOrder(id);
+    } catch (error) {
+      toast(error.message, 'bad');
+      b.disabled = false;
+    }
+  });
+  view.replaceChildren(page);
+}
+
+function clockOf(iso) {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/* ── suppliers, the money, the record ── */
+
+function renderSuppliers(view) {
+  const applied = cache.suppliers.filter((s) => s.state === 'applied');
+  const rest = cache.suppliers.filter((s) => s.state !== 'applied');
+  view.append(
+    el(`<section id="applied"><h2><span>Хүсэлт</span></h2><div class="rows"></div></section>`),
+    el(`<section id="all"><h2><span>Нийлүүлэгчид</span></h2><div class="rows"></div></section>`),
+    el(`<section id="new"><h2><span>Шинэ нийлүүлэгч, гэрээтэй</span></h2></section>`),
+  );
+  const pending = view.querySelector('#applied .rows');
   if (!applied.length) pending.append(el('<div class="none">Хүлээгдэж буй хүсэлт алга.</div>'));
   for (const s of applied) pending.append(renderRow(s));
-
-  const list = frame.querySelector('#all .rows');
+  const list = view.querySelector('#all .rows');
   if (!rest.length) list.append(el('<div class="none">Нийлүүлэгч алга.</div>'));
   for (const s of rest) list.append(renderRow(s));
+  view.querySelector('#new').append(newForm());
+}
 
-  frame.querySelector('#new').append(newForm());
-  root.replaceChildren(frame);
-  window.scrollTo(0, scroll);
+function renderPay(view) {
+  const toPay = cache.settlements.filter((t) => t.state !== 'paid');
+  view.append(el(`<section id="pay"><h2><span>Олголт, буцаалт</span><span>${mnt(toPay.reduce((sum, t) => sum + t.amount_mnt, 0))}</span></h2><div class="rows"></div></section>`));
+  const pay = view.querySelector('#pay .rows');
+  if (!cache.settlements.length) pay.append(el('<div class="none">Шилжүүлэх зүйл алга.</div>'));
+  for (const t of cache.settlements) pay.append(renderSettlement(t));
+}
+
+async function renderAudit(view) {
+  view.append(el('<section class="audit"><h2><span>Ops-ийн үйлдлийн бүртгэл</span></h2><div class="rows" id="audit"><div class="none">…</div></div></section>'));
+  let data;
+  try {
+    data = await ops('/v1/ops/audit?limit=200');
+  } catch (error) {
+    view.querySelector('#audit').replaceChildren(el(`<div class="none">${esc(error.message)}</div>`));
+    return;
+  }
+  const box = view.querySelector('#audit');
+  if (!box) return;
+  box.replaceChildren();
+  if (!data.audit.length) box.append(el('<div class="none">Одоогоор юу ч хийгээгүй.</div>'));
+  const ACTION = {
+    'order.cancel': 'Захиалга цуцалсан', 'order.hand': 'Хүлээлгэн өгсөн гэж тэмдэглэсэн', 'order.resend': 'Мэдэгдэл дахин илгээсэн',
+    'supplier.suspend': 'Нийлүүлэгчийг түр зогсоосон', 'supplier.activate': 'Нийлүүлэгчийг идэвхжүүлсэн', 'supplier.terms': 'Гэрээний нөхцөл өөрчилсөн', 'listing.hide': 'Зар нуусан',
+  };
+  for (const a of data.audit) {
+    box.append(el(`<div class="row"><div class="name">${ACTION[a.action] ?? esc(a.action)}${a.note ? ` — ${esc(a.note)}` : ''}<small>${esc(a.who)} · ${when(a.at)} ${clockOf(a.at)} · ${a.target_kind} ${esc(a.target_id.slice(0, 8))}</small></div></div>`));
+  }
 }
 
 /**
@@ -231,7 +526,7 @@ function renderRow(s) {
             ? `гэрээ ${when(s.contracted_at)} · ${s.listings} зар · ${s.watched ? 'дэлгэц холбогдсон' : 'дэлгэц холбогдоогүй'}`
             : `татгалзсан ${when(s.decided_at)}: ${esc(s.decline_reason)}`
       }</small></div>
-      <span class="chip" data-s="${s.state === 'contracted' ? 'READY' : s.state === 'applied' ? 'PAID' : 'CANCELLED'}">${STATE[s.state]}</span>
+      <span class="chip" data-s="${s.state === 'contracted' ? (s.active ? 'READY' : 'CANCELLED') : s.state === 'applied' ? 'PAID' : 'CANCELLED'}">${s.state === 'contracted' && !s.active ? 'түр зогссон' : STATE[s.state]}</span>
       <div class="btns"></div>
       ${s.about ? `<div class="about">${esc(s.about)}</div>` : ''}
       ${
@@ -275,6 +570,39 @@ function renderRow(s) {
     const code = el('<button class="btn" type="button" data-a="code">Шинэ код</button>');
     code.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/code`, null, showCode));
     buttons.append(code);
+  }
+  if (s.state === 'contracted') {
+    // Off the market, or back on it — with the reason kept.
+    const toggle = el(`<button class="btn" type="button" data-a="active"${s.active ? ' data-v="danger"' : ''}>${s.active ? 'Түр зогсоох' : 'Идэвхжүүлэх'}</button>`);
+    toggle.addEventListener('click', () => {
+      const note = prompt(s.active ? 'Түр зогсоох шалтгаан (бүртгэлд үлдэнэ):' : 'Идэвхжүүлэх тэмдэглэл:', '');
+      if (note === null) return;
+      act(`/v1/ops/suppliers/${s.id}/active`, { active: !s.active, note });
+    });
+    buttons.append(toggle);
+    // Their listings, to look at and, if need be, hide.
+    const stall = el('<button class="btn" type="button" data-a="listings">Зарууд</button>');
+    stall.addEventListener('click', async () => {
+      if (row.querySelector('.stall')) return row.querySelector('.stall').remove();
+      const { listings } = await ops(`/v1/ops/suppliers/${s.id}/listings`);
+      const box = el('<div class="about stall"></div>');
+      if (!listings.length) box.append(el('<span>Зар алга.</span>'));
+      for (const l of listings) {
+        const line = el(`<div style="display:flex;gap:8px;align-items:center;padding:3px 0${l.active ? '' : ';opacity:.5'}"><span style="flex:1">${esc(l.title)} · ${mnt(l.price_mnt)}/${l.unit === 'kg' ? 'кг' : 'толгой'} · ${l.sold}/${l.quantity}${l.active ? '' : ' · нуусан'}</span></div>`);
+        if (l.active) {
+          const hide = el('<button class="btn" data-v="danger" type="button">Нуух</button>');
+          hide.addEventListener('click', () => {
+            const note = prompt('Нуух шалтгаан (бүртгэлд үлдэнэ):', '');
+            if (note === null) return;
+            act(`/v1/ops/listings/${l.id}/hide`, { note });
+          });
+          line.append(hide);
+        }
+        box.append(line);
+      }
+      row.append(box);
+    });
+    buttons.append(stall);
   }
   if (s.state !== 'declined') {
     // The contract's terms: written in once it is signed, corrected here.

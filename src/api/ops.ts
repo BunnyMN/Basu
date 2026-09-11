@@ -12,6 +12,7 @@ import {
   listAudit,
   listSettlements,
   listSuppliers,
+  listingsOf,
   markHanded,
   markSettled,
   orderForOps,
@@ -317,6 +318,21 @@ export async function registerOpsRoutes(
       by_kind: stats.byKind.map((k) => ({ kind: k.kind, unit: k.unit, qty: k.qty, orders: k.orders, sales_mnt: k.salesMnt })),
     };
   });
+
+  /** One supplier's listings, for the desk to look at and, if need be, hide. */
+  app.get<{ Params: { id: string } }>('/v1/ops/suppliers/:id/listings', asOps, async (request) => ({
+    listings: (await listingsOf(request.params.id)).map((l) => ({
+      id: l.id,
+      kind: l.kind,
+      unit: l.unit,
+      title: l.title,
+      price_mnt: l.priceMnt,
+      quantity: l.quantity,
+      sold: l.sold,
+      active: l.active,
+      ready_from: l.readyFrom,
+    })),
+  }));
 
   /* ── taking things off the market, and the record of it ── */
 

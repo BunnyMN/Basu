@@ -888,6 +888,7 @@ describe('өвлийн идэш', () => {
       Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
     );
     clickText(desk, '.pair button', 'Нэвтрэх');
+    await opsTab(desk, 'pay');
     const line = () =>
       [...desk.window.document.querySelectorAll('#pay .row')].find((r) => r.textContent?.includes(`№${code}`));
     await until(desk, 'the refund to pay', () => Boolean(line()));
@@ -1023,6 +1024,7 @@ describe('нийлүүлэгч болох', () => {
       Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
     );
     clickText(desk, '.pair button', 'Нэвтрэх');
+    await opsTab(desk, 'suppliers');
     await until(desk, 'the applications', (d) =>
       [...d.querySelectorAll('#applied .row')].some((r) => r.textContent?.includes('Түмэн-Өлзий')),
     );
@@ -1054,6 +1056,7 @@ describe('нийлүүлэгч болох', () => {
       Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
     );
     clickText(desk, '.pair button', 'Нэвтрэх');
+    await opsTab(desk, 'suppliers');
     await until(desk, 'the applications', (d) => d.querySelectorAll('#applied .row').length > 0);
     expect(desk.window.document.querySelector('#applied .row')?.textContent).toContain('Завхан');
   });
@@ -1076,6 +1079,12 @@ async function pairingCard(dom: JSDOM): Promise<void> {
   await until(dom, 'the front door', (d) => Boolean(d.querySelector('.apply #back')));
   (dom.window.document.querySelector('.apply #back') as HTMLElement).click();
   await until(dom, 'the pairing form', (d) => d.querySelectorAll('.venues button').length > 0);
+}
+
+/** The desk opens on the numbers; a test goes to the section it is about. */
+async function opsTab(dom: JSDOM, key: string): Promise<void> {
+  await until(dom, 'the desk', (d) => Boolean(d.querySelector(`.tabs button[data-tab="${key}"]`)));
+  (dom.window.document.querySelector(`.tabs button[data-tab="${key}"]`) as HTMLElement).click();
 }
 
 async function ownGuest(phone: string): Promise<void> {
