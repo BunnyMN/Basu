@@ -967,28 +967,204 @@ export async function boardFor(supplierId: string | null, db: Db = getPool()): P
 
   const lanes: Board['lanes'] = { paid: [], preparing: [], ready: [], dispatched: [] };
   for (const r of rows) {
-    const ticket: BoardTicket = {
-      ...summary(r),
-      guest: names.get(r.guest_id) ?? null,
-      guestPhone: contacts.get(r.guest_id)?.phone ?? null,
-      address: r.address,
-      addressPhone: r.address_phone,
-      deliveryFeeMnt: Number(r.delivery_fee_mnt),
-      readyAt: r.ready_at,
-      noShowFrom:
-        r.state === 'READY' && r.receive === 'pickup' && r.ready_at
-          ? noShowFrom(r.ready_at, r.receive_on)
-          : null,
-      payoutMnt:
-        Number(r.total_mnt) - commissionOf(Number(r.unit_price_mnt) * r.qty, Number(r.commission_pct)),
-      addressLat: r.address_lat === null ? null : Number(r.address_lat),
-      addressLon: r.address_lon === null ? null : Number(r.address_lon),
-    };
+    const ticket = ticketOf(r, names, contacts);
     if (r.state === 'PAID') lanes.paid.push(ticket);
     else if (r.state === 'PREPARING') lanes.preparing.push(ticket);
     else if (r.state === 'READY') lanes.ready.push(ticket);
-    else lanes.dispatched.push(ticket);
+    else if (r.state === 'DISPATCHED') lanes.dispatched.push(ticket);
   }
 
   return { supplier, lanes };
+}
+
+/** One row as the supplier's screens read it. */
+function ticketOf(r: OrderRow, names: Map<string, string>, contacts: Map<string, { phone: string }>): BoardTicket {
+  return {
+    ...summary(r),
+    guest: names.get(r.guest_id) ?? null,
+    guestPhone: contacts.get(r.guest_id)?.phone ?? null,
+    address: r.address,
+    addressPhone: r.address_phone,
+    deliveryFeeMnt: Number(r.delivery_fee_mnt),
+    readyAt: r.ready_at,
+    noShowFrom:
+      r.state === 'READY' && r.receive === 'pickup' && r.ready_at ? noShowFrom(r.ready_at, r.receive_on) : null,
+    payoutMnt: Number(r.total_mnt) - commissionOf(Number(r.unit_price_mnt) * r.qty, Number(r.commission_pct)),
+    addressLat: r.address_lat === null ? null : Number(r.address_lat),
+    addressLon: r.address_lon === null ? null : Number(r.address_lon),
+  };
+}
+
+/* ── the supplier's own module: today, the list, one order ─────────── */
+
+export interface SupplierHome {
+  today: string;
+  lanes: { paid: number; preparing: number; ready: number; dispatched: number };
+  /** Live orders whose day is today. */
+  dueToday: number;
+  /** Ready pickups the guest may now be called absent from. */
+  overdue: number;
+  season: {
+    handed: number;
+    cancelled: number;
+    revenueMnt: number;
+    payoutMnt: number;
+    forfeitMnt: number;
+    byKind: Array<{ kind: Kind; unit: Unit; qty: number; orders: number }>;
+  };
+}
+
+/** The numbers a supplier opens the app to: what to do today, how the season is going. */
+export async function homeOf(supplierId: string, now: Date, db: Db = getPool()): Promise<SupplierHome> {
+  const today = dayOf(now);
+  const { rows: live } = await db.query<{
+    state: IdeshState;
+    receive: Receive;
+    receive_on: string;
+    ready_at: Date | null;
+  }>(
+    `SELECT state, receive, to_char(receive_on, 'YYYY-MM-DD') AS receive_on, ready_at
+       FROM idesh.idesh_order WHERE supplier_id = $1 AND state = ANY($2::text[])`,
+    [supplierId, BOARD_STATES],
+  );
+  const lanes = { paid: 0, preparing: 0, ready: 0, dispatched: 0 };
+  let dueToday = 0;
+  let overdue = 0;
+  for (const r of live) {
+    if (r.state === 'PAID') lanes.paid++;
+    else if (r.state === 'PREPARING') lanes.preparing++;
+    else if (r.state === 'READY') lanes.ready++;
+    else if (r.state === 'DISPATCHED') lanes.dispatched++;
+    if (r.receive_on === today) dueToday++;
+    if (r.state === 'READY' && r.receive === 'pickup' && r.ready_at && noShowFrom(r.ready_at, r.receive_on) <= now) overdue++;
+  }
+
+  const { rows: done } = await db.query<{
+    handed: number;
+    cancelled: number;
+    revenue: string;
+    payout: string;
+    forfeit: string;
+  }>(
+    `SELECT count(*) FILTER (WHERE state IN ('HANDED','CLOSED'))::int AS handed,
+            count(*) FILTER (WHERE state IN ('CANCELLED','REFUNDED'))::int AS cancelled,
+            COALESCE(sum(total_mnt) FILTER (WHERE state IN ('HANDED','CLOSED')), 0) AS revenue,
+            COALESCE(sum(COALESCE(payout_mnt, total_mnt)) FILTER (WHERE state IN ('HANDED','CLOSED')), 0) AS payout,
+            COALESCE(sum(forfeit_mnt) FILTER (WHERE state IN ('CANCELLED','REFUNDED')), 0) AS forfeit
+       FROM idesh.idesh_order WHERE supplier_id = $1`,
+    [supplierId],
+  );
+  const { rows: kinds } = await db.query<{ kind: Kind; unit: Unit; qty: string; orders: number }>(
+    `SELECT kind, unit, sum(qty) AS qty, count(*)::int AS orders
+       FROM idesh.idesh_order
+      WHERE supplier_id = $1 AND state IN ('HANDED','CLOSED')
+      GROUP BY kind, unit ORDER BY sum(total_mnt) DESC`,
+    [supplierId],
+  );
+  const d = done[0]!;
+  return {
+    today,
+    lanes,
+    dueToday,
+    overdue,
+    season: {
+      handed: d.handed,
+      cancelled: d.cancelled,
+      revenueMnt: Number(d.revenue),
+      payoutMnt: Number(d.payout),
+      forfeitMnt: Number(d.forfeit),
+      byKind: kinds.map((k) => ({ kind: k.kind, unit: k.unit, qty: Number(k.qty), orders: k.orders })),
+    },
+  };
+}
+
+export interface SupplierOrder extends BoardTicket {
+  handedAt: Date | null;
+  cancelledAt: Date | null;
+  cancelReason: CancelReason | null;
+  refundMnt: number | null;
+  forfeitMnt: number | null;
+  createdAt: Date;
+}
+
+export type OrderScope = 'live' | 'done' | 'all';
+
+const SCOPE_STATES: Record<OrderScope, readonly IdeshState[]> = {
+  live: ['PAID', 'PREPARING', 'READY', 'DISPATCHED', 'HANDED'],
+  done: ['CLOSED', 'CANCELLED', 'REFUNDED'],
+  all: ['PAID', 'PREPARING', 'READY', 'DISPATCHED', 'HANDED', 'CLOSED', 'CANCELLED', 'REFUNDED'],
+};
+
+/**
+ * The supplier's orders, newest first, by scope, searched by whatever a
+ * person has in front of them: a code, a phone number, a guest's name, the
+ * meat. The search runs here after the fetch because two of those live in
+ * identity, which is a module and not a join.
+ */
+export async function ordersOf(
+  supplierId: string,
+  opts: { scope?: OrderScope; q?: string; limit?: number } = {},
+  db: Db = getPool(),
+): Promise<SupplierOrder[]> {
+  const scope = opts.scope ?? 'all';
+  const { rows } = await db.query<OrderRow & { handed_at: Date | null; cancelled_at: Date | null; created_at: Date }>(
+    `${ORDER_SELECT.replace('o.cancel_reason,', 'o.cancel_reason, o.cancelled_at, o.created_at,')}
+      WHERE o.supplier_id = $1 AND o.state = ANY($2::text[])
+      ORDER BY o.created_at DESC
+      LIMIT 500`,
+    [supplierId, SCOPE_STATES[scope]],
+  );
+  const names = await displayNamesFor(rows.map((r) => r.guest_id));
+  const contacts = await contactsFor(rows.map((r) => r.guest_id));
+  const q = (opts.q ?? '').trim().toLowerCase().replace(/\s+/g, '');
+  const digits = q.replace(/\D/g, '');
+  const all = rows.map((r) => ({
+    ...ticketOf(r, names, contacts),
+    handedAt: r.handed_at,
+    cancelledAt: r.cancelled_at,
+    cancelReason: r.cancel_reason,
+    refundMnt: r.refund_mnt === null ? null : Number(r.refund_mnt),
+    forfeitMnt: r.forfeit_mnt === null ? null : Number(r.forfeit_mnt),
+    createdAt: r.created_at,
+  }));
+  const hits = q
+    ? all.filter(
+        (o) =>
+          o.code.includes(q) ||
+          o.title.toLowerCase().replace(/\s+/g, '').includes(q) ||
+          (o.guest ?? '').toLowerCase().replace(/\s+/g, '').includes(q) ||
+          (digits.length >= 4 &&
+            ((o.guestPhone ?? '').replace(/\D/g, '').includes(digits) ||
+              (o.addressPhone ?? '').replace(/\D/g, '').includes(digits))),
+      )
+    : all;
+  return hits.slice(0, opts.limit ?? 100);
+}
+
+export interface OrderEvent {
+  seq: number;
+  type: string;
+  actor: string;
+  payload: Record<string, unknown>;
+  at: Date;
+}
+
+/** One order of the supplier's, with everything that ever happened to it. */
+export async function orderForSupplier(
+  supplierId: string,
+  orderId: string,
+  db: Db = getPool(),
+): Promise<{ order: SupplierOrder; events: OrderEvent[] } | null> {
+  const [order] = await ordersOf(supplierId, { scope: 'all', limit: 1000 }, db).then((list) =>
+    list.filter((o) => o.id === orderId),
+  );
+  if (!order) return null;
+  const { rows } = await db.query<{ seq: number; type: string; actor: string; payload: Record<string, unknown>; created_at: Date }>(
+    'SELECT seq, type, actor, payload, created_at FROM idesh.order_event WHERE order_id = $1 ORDER BY seq',
+    [orderId],
+  );
+  return {
+    order,
+    events: rows.map((e) => ({ seq: e.seq, type: e.type, actor: e.actor, payload: e.payload, at: e.created_at })),
+  };
 }

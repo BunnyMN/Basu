@@ -40,8 +40,17 @@ import {
   setRefundAccount,
   settlementsOf,
   type CancelReason,
+  supplierOf,
+  homeOf,
+  ordersOf,
+  orderForSupplier,
+  supplierById,
+  updateSupplierProfile,
+  type SupplierOrder,
+  type OrderScope,
 } from '../idesh/index.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
+import { resolveGuest } from '../platform/identity/index.js';
 import type { Ctx } from '../ports.js';
 import { shapeSettlement } from './ops.js';
 
@@ -192,11 +201,24 @@ export async function registerIdeshRoutes(
 ): Promise<void> {
   const guarded = { preHandler: opts.requireGuest };
 
+  /**
+   * Two ways onto the supplier's side: a screen paired by code, or the
+   * person whose phone the supplier is, signed in like any guest. Both land
+   * on the same routes and the same ownership checks; the actor string tells
+   * them apart in the order's events.
+   */
   const requireSupplier = async (request: FastifyRequest, reply: FastifyReply) => {
     const token = bearer(request);
-    const device = token ? await resolveSupplierDevice(ctx, token) : null;
-    if (!device) return unauthorized(reply);
-    request.supplierDevice = device;
+    if (!token) return unauthorized(reply);
+    const device = await resolveSupplierDevice(ctx, token);
+    if (device) {
+      request.supplierDevice = device;
+      return undefined;
+    }
+    const guestId = await resolveGuest(ctx, token);
+    const mine = guestId ? await supplierOf(guestId) : null;
+    if (!mine || mine.state !== 'contracted') return unauthorized(reply);
+    request.supplierDevice = { deviceId: `owner:${guestId}`, supplierId: mine.id };
     return undefined;
   };
   const asSupplier = { preHandler: requireSupplier };
@@ -428,6 +450,115 @@ export async function registerIdeshRoutes(
   app.get('/v1/supplier/board', asSupplier, async (request) =>
     screen(request.supplierDevice!.supplierId),
   );
+
+  /* ── the supplier as a person ──────────────────────────────────── */
+
+  /** Does this guest own a supplier? What the launcher asks before drawing the tile. */
+  app.get('/v1/supplier/me', guarded, async (request) => {
+    const mine = await supplierOf(request.guestId!);
+    return { supplier: mine ? { id: mine.id, name: mine.name, state: mine.state } : null };
+  });
+
+  const shapeOrder = (o: SupplierOrder) => ({
+    ...shapeSummary(o),
+    guest: o.guest,
+    guest_phone: o.guestPhone,
+    address: o.address,
+    address_phone: o.addressPhone,
+    address_lat: o.addressLat,
+    address_lon: o.addressLon,
+    delivery_fee_mnt: o.deliveryFeeMnt,
+    ready_at: o.readyAt?.toISOString() ?? null,
+    handed_at: o.handedAt?.toISOString() ?? null,
+    cancelled_at: o.cancelledAt?.toISOString() ?? null,
+    cancel_reason: o.cancelReason,
+    refund_mnt: o.refundMnt,
+    forfeit_mnt: o.forfeitMnt,
+    no_show_from: o.noShowFrom?.toISOString() ?? null,
+    payout_mnt: o.payoutMnt,
+    created_at: o.createdAt.toISOString(),
+  });
+
+  /** The numbers the supplier opens the app to. */
+  app.get('/v1/supplier/home', asSupplier, async (request) => {
+    const home = await homeOf(request.supplierDevice!.supplierId, ctx.clock.now());
+    return {
+      today: home.today,
+      lanes: home.lanes,
+      due_today: home.dueToday,
+      overdue: home.overdue,
+      season: {
+        handed: home.season.handed,
+        cancelled: home.season.cancelled,
+        revenue_mnt: home.season.revenueMnt,
+        payout_mnt: home.season.payoutMnt,
+        forfeit_mnt: home.season.forfeitMnt,
+        by_kind: home.season.byKind,
+      },
+    };
+  });
+
+  /** Every order, or the live ones, or the finished ones — searched by what is in front of the person. */
+  app.get<{ Querystring: { scope?: string; q?: string } }>('/v1/supplier/orders', asSupplier, async (request) => {
+    const raw = request.query.scope;
+    const scope: OrderScope = raw === 'live' || raw === 'done' ? raw : 'all';
+    const orders = await ordersOf(request.supplierDevice!.supplierId, { scope, q: request.query.q ?? '' });
+    return { scope, orders: orders.map(shapeOrder) };
+  });
+
+  app.get<{ Params: { id: string } }>('/v1/supplier/orders/:id', asSupplier, async (request, reply) => {
+    const found = await orderForSupplier(request.supplierDevice!.supplierId, request.params.id);
+    if (!found) return sendError(reply, new IdeshError('NOT_FOUND', 'no such order of yours'));
+    return reply.send({
+      order: shapeOrder(found.order),
+      events: found.events.map((e) => ({ seq: e.seq, type: e.type, actor: e.actor, payload: e.payload, at: e.at.toISOString() })),
+    });
+  });
+
+  const shapeProfile = (s: NonNullable<Awaited<ReturnType<typeof supplierById>>>) => ({
+    id: s.id,
+    name: s.name,
+    phone: s.phone,
+    merchant_tin: s.merchantTin,
+    pickup_address: s.pickupAddress,
+    about: s.about,
+    lat: s.lat,
+    lon: s.lon,
+    state: s.state,
+    contracted_at: s.contractedAt?.toISOString() ?? null,
+    commission_pct: s.commissionPct,
+    bank_name: s.bankName,
+    bank_account: s.bankAccount,
+    bank_holder: s.bankHolder,
+  });
+
+  app.get('/v1/supplier/profile', asSupplier, async (request, reply) => {
+    const row = await supplierById(request.supplierDevice!.supplierId);
+    if (!row) return sendError(reply, new IdeshError('NOT_FOUND', 'no such supplier'));
+    return reply.send(shapeProfile(row));
+  });
+
+  app.patch<{
+    Body: { name?: string; address?: string; about?: string | null; lat?: number | null; lon?: number | null; bank_name?: string; bank_account?: string; bank_holder?: string };
+  }>('/v1/supplier/profile', asSupplier, async (request, reply) => {
+    const body = request.body ?? {};
+    try {
+      await updateSupplierProfile(request.supplierDevice!.supplierId, {
+        name: body.name,
+        pickupAddress: body.address,
+        about: body.about,
+        lat: typeof body.lat === 'number' ? body.lat : body.lat === null ? null : undefined,
+        lon: typeof body.lon === 'number' ? body.lon : body.lon === null ? null : undefined,
+        bankName: body.bank_name,
+        bankAccount: body.bank_account,
+        bankHolder: body.bank_holder,
+      });
+      const row = await supplierById(request.supplierDevice!.supplierId);
+      return reply.send(row ? shapeProfile(row) : { ok: true });
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
 
   /** The supplier's money: their rate, what they are owed, what was sent. */
   app.get('/v1/supplier/money', asSupplier, async (request) => {

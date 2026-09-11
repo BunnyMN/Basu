@@ -370,6 +370,56 @@ export async function listSuppliers(db: Db = getPool()): Promise<SupplierRow[]> 
   }));
 }
 
+/** One supplier, as ops sees the row. */
+export async function supplierById(supplierId: string, db: Db = getPool()): Promise<SupplierRow | null> {
+  return (await listSuppliers(db)).find((s) => s.id === supplierId) ?? null;
+}
+
+export interface ProfileEdit extends BankDetails {
+  name?: string | undefined;
+  pickupAddress?: string | undefined;
+  about?: string | null | undefined;
+  lat?: number | null | undefined;
+  lon?: number | null | undefined;
+}
+
+/** What a supplier may change about themselves: how they are named and found, and where the money goes. */
+export async function updateSupplierProfile(supplierId: string, edit: ProfileEdit, db: Db = getPool()): Promise<void> {
+  if (edit.name !== undefined && edit.name.trim().length < 2) throw new IdeshError('WRONG_STATE', 'a supplier needs a name');
+  if (edit.pickupAddress !== undefined && edit.pickupAddress.trim().length < 4) {
+    throw new IdeshError('WRONG_STATE', 'a supplier needs a pickup address');
+  }
+  if (edit.bankAccount && !/^\d{6,20}$/.test(edit.bankAccount.replace(/\s+/g, ''))) {
+    throw new IdeshError('WRONG_STATE', 'an account number is 6 to 20 digits');
+  }
+  const { rowCount } = await db.query(
+    `UPDATE idesh.supplier
+        SET name           = COALESCE($2, name),
+            pickup_address = COALESCE($3, pickup_address),
+            about          = CASE WHEN $4::boolean THEN $5 ELSE about END,
+            lat            = CASE WHEN $6::boolean THEN $7 ELSE lat END,
+            lon            = CASE WHEN $6::boolean THEN $8 ELSE lon END,
+            bank_name      = COALESCE($9, bank_name),
+            bank_account   = COALESCE($10, bank_account),
+            bank_holder    = COALESCE($11, bank_holder)
+      WHERE id = $1`,
+    [
+      supplierId,
+      edit.name?.trim() || null,
+      edit.pickupAddress?.trim() || null,
+      edit.about !== undefined,
+      edit.about?.trim() || null,
+      edit.lat !== undefined || edit.lon !== undefined,
+      edit.lat ?? null,
+      edit.lon ?? null,
+      edit.bankName?.trim() || null,
+      edit.bankAccount?.replace(/\s+/g, '') || null,
+      edit.bankHolder?.trim() || null,
+    ],
+  );
+  if (!rowCount) throw new IdeshError('NOT_FOUND', 'no such supplier');
+}
+
 export interface SupplierPatch extends BankDetails {
   commissionPct?: number | undefined;
   merchantTin?: string | null | undefined;

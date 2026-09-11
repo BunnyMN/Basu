@@ -443,3 +443,70 @@ describe('the demo surface', () => {
     expect(all.json().lanes.paid).toHaveLength(1);
   });
 });
+
+/**
+ * The supplier as a person: signed in with the phone the contract names,
+ * they see their own numbers, their own orders, one order's whole story,
+ * and may change how they are found. A guest who owns nothing sees none of it.
+ */
+describe('the supplier’s own module', () => {
+  it('opens to the owner’s phone and to nobody else', async () => {
+    const owner = await signIn('+97688010001');
+    const me = await app.inject({ method: 'GET', url: '/v1/supplier/me', headers: auth(owner) });
+    expect(me.json().supplier).toMatchObject({ id: supplierId, state: 'contracted' });
+
+    const nobody = await signIn('+97699007777');
+    expect((await app.inject({ method: 'GET', url: '/v1/supplier/me', headers: auth(nobody) })).json()).toEqual({ supplier: null });
+    expect((await app.inject({ method: 'GET', url: '/v1/supplier/home', headers: auth(nobody) })).statusCode).toBe(401);
+  });
+
+  it('shows today, the season, the list, and one order with its story', async () => {
+    const guest = await signIn('+97699004004');
+    await topUp(guest, 500_000);
+    const { id, code } = await placeAndPay(guest);
+    const owner = await signIn('+97688010001');
+
+    const home = await app.inject({ method: 'GET', url: '/v1/supplier/home', headers: auth(owner) });
+    expect(home.json()).toMatchObject({ lanes: { paid: 1, preparing: 0 }, season: { handed: 0, revenue_mnt: 0 } });
+
+    const live = await app.inject({ method: 'GET', url: '/v1/supplier/orders?scope=live', headers: auth(owner) });
+    expect(live.json().orders.map((o: { id: string }) => o.id)).toEqual([id]);
+    expect(live.json().orders[0]).toMatchObject({ code, guest_phone: '+97699004004', payout_mnt: 460_000 - 9_200 });
+    // Searched by the guest's number, with the spaces a person types.
+    const byPhone = await app.inject({ method: 'GET', url: '/v1/supplier/orders?q=9900%204004', headers: auth(owner) });
+    expect(byPhone.json().orders).toHaveLength(1);
+    const miss = await app.inject({ method: 'GET', url: '/v1/supplier/orders?q=0000', headers: auth(owner) });
+    expect(miss.json().orders).toHaveLength(0);
+
+    // The owner walks it through from their phone, and the story says who.
+    await app.inject({ method: 'POST', url: `/v1/supplier/orders/${id}/prepare`, headers: auth(owner), payload: {} });
+    await app.inject({ method: 'POST', url: `/v1/supplier/orders/${id}/ready`, headers: auth(owner), payload: {} });
+    await app.inject({ method: 'POST', url: `/v1/supplier/orders/${id}/hand`, headers: auth(owner), payload: {} });
+    const one = await app.inject({ method: 'GET', url: `/v1/supplier/orders/${id}`, headers: auth(owner) });
+    expect(one.json().order).toMatchObject({ state: 'HANDED', payout_mnt: 450_800 });
+    expect(one.json().events.map((e: { type: string }) => e.type)).toEqual(['CREATED', 'PAID', 'PREPARING', 'READY', 'HANDED']);
+    expect(one.json().events.at(-1).actor).toMatch(/^supplier:owner:/);
+
+    const after = await app.inject({ method: 'GET', url: '/v1/supplier/home', headers: auth(owner) });
+    expect(after.json().season).toMatchObject({ handed: 1, revenue_mnt: 460_000, payout_mnt: 450_800 });
+    expect(after.json().season.by_kind).toEqual([{ kind: 'sheep', unit: 'whole', qty: 1, orders: 1 }]);
+
+    // Another supplier's owner sees none of it.
+    const rival = await signIn('+97688010002');
+    expect((await app.inject({ method: 'GET', url: `/v1/supplier/orders/${id}`, headers: auth(rival) })).statusCode).toBe(404);
+  });
+
+  it('lets the owner change how they are found and where the money goes', async () => {
+    const owner = await signIn('+97688010001');
+    const changed = await app.inject({
+      method: 'PATCH',
+      url: '/v1/supplier/profile',
+      headers: auth(owner),
+      payload: { address: 'Нарантуул, урд хаалга', about: 'Архангайн хонь', bank_name: 'Хаан банк', bank_account: '5012 3456 78', bank_holder: 'Дорж' },
+    });
+    expect(changed.statusCode, changed.body).toBe(200);
+    expect(changed.json()).toMatchObject({ pickup_address: 'Нарантуул, урд хаалга', bank_account: '5012345678', commission_pct: 2 });
+    const short = await app.inject({ method: 'PATCH', url: '/v1/supplier/profile', headers: auth(owner), payload: { name: 'X' } });
+    expect(short.statusCode).toBe(409);
+  });
+});
