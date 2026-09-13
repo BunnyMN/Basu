@@ -918,7 +918,7 @@ describe('өвлийн идэш', () => {
     expect((screen.window.document.querySelector('.pair input') as HTMLInputElement).value).toMatch(/^\d{8}$/);
 
     clickText(screen, '.venues button', 'Бүх нийлүүлэгч');
-    await until(screen, 'the board', (d) => d.querySelectorAll('.lane').length === 4);
+    await until(screen, 'the work', (d) => Boolean(d.querySelector('#board[data-ready]')));
     await until(screen, 'our order', (d) =>
       [...d.querySelectorAll('.ticket')].some((t) => t.textContent?.includes(`№${code}`)),
     );
@@ -957,7 +957,7 @@ describe('өвлийн идэш', () => {
     await until(screen, 'the stall', (d) => d.querySelectorAll('.stall .row[data-listing]').length > 0);
     const before = screen.window.document.querySelectorAll('.stall .row[data-listing]').length;
     expect(before).toBeGreaterThan(0);
-    expect(screen.window.document.querySelector('.new h3')?.textContent).toBe('Шинэ зар');
+    expect(screen.window.document.querySelector('.new h3')?.textContent).toBe('Шинэ зар нэмэх');
 
     const form = screen.window.document.querySelector('.new')!;
     const set = (name: string, value: string) => {
@@ -1044,9 +1044,9 @@ describe('нийлүүлэгч болох', () => {
     const again = await openPage('supplier.html');
     // Approved, the same phone now opens the supplier's own module — no
     // code to type: the phone is the proof.
-    await until(again, 'the module', (d) => d.querySelectorAll('.lane').length === 4);
+    await until(again, 'the module', (d) => Boolean(d.querySelector('#board[data-ready]')));
     await until(again, 'the name', (d) => d.querySelector('#supplier')?.textContent === 'Хөвсгөл · Түмэн-Өлзий');
-    expect(again.window.document.querySelectorAll('.tabs button')).toHaveLength(5);
+    expect(again.window.document.querySelectorAll('.tabs button[data-tab]')).toHaveLength(5);
   });
 
   it('shows the seeded application waiting on the ops page', async () => {
@@ -1076,8 +1076,8 @@ describe('нийлүүлэгч болох', () => {
 async function pairingCard(dom: JSDOM): Promise<void> {
   // Whichever card the door showed — sign-in, the application form, or the
   // application's status — carries the way through to the pairing code.
-  await until(dom, 'the front door', (d) => Boolean(d.querySelector('.apply #back')));
-  (dom.window.document.querySelector('.apply #back') as HTMLElement).click();
+  await until(dom, 'the front door', (d) => Boolean(d.querySelector('.door #back')));
+  (dom.window.document.querySelector('.door #back') as HTMLElement).click();
   await until(dom, 'the pairing form', (d) => d.querySelectorAll('.venues button').length > 0);
 }
 
