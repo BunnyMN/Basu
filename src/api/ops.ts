@@ -28,6 +28,7 @@ import {
   type SupplierRow,
   type Tally,
 } from '../idesh/index.js';
+import { limits } from './hardening.js';
 import { shapeOrder, shapeSettlement } from './shapes.js';
 import { mode } from '../mode.js';
 import { badRequest, sendError, unauthorized } from './errors.js';
@@ -110,7 +111,7 @@ export async function registerOpsRoutes(
     if (!sent || !same(sent, token)) return unauthorized(reply);
     return undefined;
   };
-  const asOps = { preHandler: requireOps };
+  const asOps = { preHandler: requireOps, config: { rateLimit: limits().ops } };
 
   /** Who at ops: the token is one secret, so a name may ride on a header. */
   const who = (request: FastifyRequest) => {

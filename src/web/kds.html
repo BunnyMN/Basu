@@ -123,6 +123,11 @@ body{background:var(--sunk)}
 import { api, store, toast, mountClock, hhmm } from '/api.js';
 
 const root = document.getElementById('root');
+const esc = (value) => {
+  const node = document.createElement('span');
+  node.textContent = value ?? '';
+  return node.innerHTML;
+};
 const el = (html) => {
   const t = document.createElement('template');
   t.innerHTML = html.trim();
@@ -308,7 +313,7 @@ function renderTicket(ticket, lane) {
       <div class="lines">${ticket.lines
         .map(
           (l) =>
-            `<div>${l.image ? `<img src="${l.image}" alt="">` : ''}<span>${l.name}</span><b>×${l.qty}</b></div>`,
+            `<div>${l.image ? `<img src="${l.image}" alt="">` : ''}<span>${esc(l.name)}</span><b>×${l.qty}</b></div>`,
         )
         .join('')}</div>
       <div class="btns"></div>

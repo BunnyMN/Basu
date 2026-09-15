@@ -56,8 +56,25 @@ export interface OtpIssued {
   code: string;
 }
 
+/**
+ * Codes the whole service may send in a day. Every code is an SMS somebody
+ * pays for; a script feeding numbers in is a bill, not a sign-up wave. The
+ * demo, which has no SMS, is not held to it.
+ */
+export const OTP_PER_DAY = 2000;
+
 export async function requestOtp(ctx: Ctx, phone: string): Promise<OtpIssued> {
   const now = ctx.clock.now();
+
+  if (mode() === 'production') {
+    const { rows: day } = await getPool().query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM identity.otp_challenge WHERE created_at > $1::timestamptz - interval '24 hours'`,
+      [now],
+    );
+    if ((day[0]?.n ?? 0) >= OTP_PER_DAY) {
+      throw new AuthError('RATE_LIMITED', 'the day’s allowance of codes is spent');
+    }
+  }
 
   const { rows } = await getPool().query<{ n: number }>(
     `SELECT count(*)::int AS n FROM identity.otp_challenge
@@ -98,6 +115,15 @@ export async function guestForPhone(phone: string): Promise<string> {
     await client.query(`INSERT INTO identity.profile (guest_id) VALUES ($1) ON CONFLICT DO NOTHING`, [guestId]);
     return guestId;
   });
+}
+
+/** Challenges older than a day are neither valid nor evidence. Swept by the scheduler. */
+export async function purgeChallenges(now: Date): Promise<number> {
+  const { rowCount } = await getPool().query(
+    `DELETE FROM identity.otp_challenge WHERE created_at < $1::timestamptz - interval '24 hours'`,
+    [now],
+  );
+  return rowCount ?? 0;
 }
 
 export interface GuestSession {

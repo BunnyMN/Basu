@@ -1,3 +1,6 @@
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import { getPool } from '../db/pool.js';
 import { hhmm } from '../domain/time.js';
@@ -38,6 +41,7 @@ import {
   restaurantRatings,
 } from '../services/reviews.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
+import { errorHandler, limits, securityHeaders, tooManyRequests } from './hardening.js';
 import { registerMapRoutes } from './tiles.js';
 import { registerDishRoutes } from './dishes.js';
 import { registerRouteRoutes } from './route.js';
@@ -76,6 +80,8 @@ function bearer(request: FastifyRequest): string | undefined {
 
 export interface ServerOptions {
   logger?: boolean;
+  /** Behind nginx the caller's address is in X-Forwarded-For; only there. */
+  trustProxy?: boolean;
   /**
    * Mounts the two demo pages and the clock controls they need. Never on in
    * production: it would let anyone move the kitchen's idea of time.
@@ -84,8 +90,21 @@ export interface ServerOptions {
 }
 
 export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promise<FastifyInstance> {
-  const app = Fastify({ logger: options.logger ?? false });
+  const app = Fastify({ logger: options.logger ?? false, trustProxy: options.trustProxy ?? false, bodyLimit: 64 * 1024 });
   const db = getPool();
+
+  // Every response, the same headers; every address, a ceiling on how often
+  // it may knock. See src/api/hardening.ts.
+  const webRoot = join(dirname(fileURLToPath(import.meta.url)), '..', 'web');
+  securityHeaders(app, webRoot);
+  const rate = limits();
+  await app.register(rateLimit, {
+    global: true,
+    max: rate.global.max,
+    timeWindow: rate.global.timeWindow,
+    errorResponseBuilder: tooManyRequests,
+  });
+  app.setErrorHandler(errorHandler);
 
   // Tiles and glyphs, same-origin. See src/api/tiles.ts for why they are
   // proxied rather than fetched straight from the tile host.
@@ -202,7 +221,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
 
   /* ── auth ───────────────────────────────────────────────────────── */
 
-  app.post<{ Body: { phone?: string } }>('/v1/auth/otp', async (request, reply) => {
+  app.post<{ Body: { phone?: string } }>('/v1/auth/otp', { config: { rateLimit: rate.otp } }, async (request, reply) => {
     const phone = request.body?.phone;
     if (!phone || !/^\+976\d{8}$/.test(phone)) {
       return badRequest(reply, 'Утасны дугаараа шалгана уу.', 'phone must be +976XXXXXXXX');
@@ -224,6 +243,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
 
   app.post<{ Body: { phone?: string; code?: string; device?: string } }>(
     '/v1/auth/verify',
+    { config: { rateLimit: rate.verify } },
     async (request, reply) => {
       const { phone, code, device } = request.body ?? {};
       if (!phone || !code) {

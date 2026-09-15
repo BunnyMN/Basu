@@ -52,6 +52,7 @@ import {
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import { resolveGuest } from '../platform/identity/index.js';
 import type { Ctx } from '../ports.js';
+import { limits } from './hardening.js';
 import { shapeOrder, shapeSettlement, shapeSummary } from './shapes.js';
 
 /**
@@ -384,7 +385,7 @@ export async function registerIdeshRoutes(
 
   /* ── the supplier ──────────────────────────────────────────────── */
 
-  app.post<{ Body: { pairing_code?: string } }>('/v1/supplier/pair', async (request, reply) => {
+  app.post<{ Body: { pairing_code?: string } }>('/v1/supplier/pair', { config: { rateLimit: limits().pair } }, async (request, reply) => {
     const code = request.body?.pairing_code;
     if (!code) return badRequest(reply, 'Холбох код оруулна уу.', 'pairing_code is required');
     try {

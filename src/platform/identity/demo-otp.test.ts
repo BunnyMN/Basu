@@ -4,7 +4,8 @@ import { at } from '../../domain/fixtures.js';
 import { VirtualClock } from '../../domain/time.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../../ports.js';
 import { truncateAll } from '../../test/seed.js';
-import { DEMO_OTP, requestOtp, verifyOtp } from './index.js';
+import { getPool } from '../../db/pool.js';
+import { DEMO_OTP, purgeChallenges, requestOtp, verifyOtp } from './index.js';
 
 /**
  * The demo server has no SMS, so its one-time code is always the same one —
@@ -46,5 +47,17 @@ describe('the one-time code', () => {
     const second = await requestOtp(ctx, '+97699000003');
     expect(first.code).toMatch(/^\d{6}$/);
     expect([first.code, second.code]).not.toEqual([DEMO_OTP, DEMO_OTP]);
+  });
+});
+
+describe('yesterday’s codes', () => {
+  it('are swept out after a day, today’s left alone', async () => {
+    await requestOtp(ctx, '+97699000004');
+    const clock = ctx.clock as VirtualClock;
+    clock.advanceMinutes(25 * 60);
+    await requestOtp(ctx, '+97699000005');
+    expect(await purgeChallenges(clock.now())).toBe(1);
+    const { rows } = await getPool().query<{ n: number }>('SELECT count(*)::int AS n FROM identity.otp_challenge');
+    expect(rows[0]?.n).toBe(1);
   });
 });

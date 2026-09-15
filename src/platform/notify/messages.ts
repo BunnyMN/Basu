@@ -31,6 +31,19 @@ export interface OutgoingRequest {
   dedupeKey?: string;
 }
 
+/**
+ * A one-time code, once sent, is a secret with nothing to protect: it
+ * expires in minutes and the row that carried it should not outlive the
+ * day. Everything else in the inbox is the guest's to keep.
+ */
+export async function purgeCodes(now: Date): Promise<number> {
+  const { rowCount } = await getPool().query(
+    `DELETE FROM notify.message WHERE template = 'auth.otp' AND created_at < $1::timestamptz - interval '1 day'`,
+    [now],
+  );
+  return rowCount ?? 0;
+}
+
 export async function enqueue(ctx: Ctx, req: OutgoingRequest): Promise<void> {
   void ctx;
   const key = req.dedupeKey ?? `${req.subjectId ?? req.guestId}:${req.template}`;

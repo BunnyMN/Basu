@@ -116,6 +116,13 @@ h2.sec{
 <script type="module">
 import { api, store, hhmm, mountClock, HEADLINE, IDESH_HEADLINE, dayShort } from '/api.js';
 
+/** Text into markup, never the other way: a supplier's name is a name. */
+const esc = (value) => {
+  const node = document.createElement('span');
+  node.textContent = value ?? '';
+  return node.innerHTML;
+};
+
 const $ = (id) => document.getElementById(id);
 const el = (html) => {
   const t = document.createElement('template');
@@ -263,7 +270,7 @@ function ideshRow(order) {
     href: `/idesh?order=${order.id}`,
     source: 'Идэш',
     title: order.supplier.name,
-    what: `${order.title} ×${order.qty} · ${cap}`,
+    what: `${esc(order.title)} ×${order.qty} · ${cap}`,
     code: order.code,
     state: order.state,
     word,
@@ -319,7 +326,7 @@ function paint(rows) {
     const card = el(`
       <a class="card" href="${row.href}" data-source="${row.source}">
         <span class="who">
-          <span class="venue">${row.title}</span>
+          <span class="venue">${esc(row.title)}</span>
           <span class="what">${row.what}</span>
           <span class="code">${row.source} · №${row.code}<span class="chip" data-s="${row.state}">${row.word}</span></span>
         </span>

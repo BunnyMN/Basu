@@ -10,6 +10,8 @@ export {
   OTP_PER_PHONE_PER_HOUR,
   requestOtp,
   DEMO_OTP,
+  OTP_PER_DAY,
+  purgeChallenges,
   verifyOtp,
   startSession,
   guestForPhone,

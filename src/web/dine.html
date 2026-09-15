@@ -769,7 +769,7 @@ function renderSheet() {
       <div class="item"${item.sold_out ? ' data-sold' : ''}>
         <img src="${item.image_url ?? '/dishes/unknown.svg'}" alt="" loading="lazy" width="56" height="56">
         <div class="who">
-          <div class="name">${item.name}</div>
+          <div class="name">${escapeHtml(item.name)}</div>
           ${item.description ? `<div class="desc">${item.description}</div>` : ''}
           <div class="meta">${item.station} · ${item.prep_minutes} мин${
             item.rating?.count ? ` · ★ ${item.rating.stars.toFixed(1)}` : ''

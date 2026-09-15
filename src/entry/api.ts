@@ -16,7 +16,7 @@ const running = mode();
 
 const ctx = buildProviders((line) => console.log(line.replace('[providers]', '[api]')));
 
-const app = await buildServer(ctx, { logger: false, dev: running === 'demo' });
+const app = await buildServer(ctx, { logger: false, dev: running === 'demo', trustProxy: running === 'production' });
 const port = Number(process.env['PORT'] ?? 3000);
 await app.listen({ port, host: '0.0.0.0' });
 

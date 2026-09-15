@@ -12,6 +12,7 @@ export {
   inbox,
   markRead,
   preferences,
+  purgeCodes,
   relay,
   setPreferences,
   unreadCount,
