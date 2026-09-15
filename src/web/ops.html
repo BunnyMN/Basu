@@ -2,102 +2,187 @@
 <html lang="mn">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Ops — Basu</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="/app.css">
 <style>
-/* Ops is two or three people in one room signing contracts. A table and a
-   form, no more chrome than a spreadsheet. */
-body{background:var(--sunk)}
-.top{display:flex;align-items:baseline;gap:14px;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--bg);flex-wrap:wrap}
-.top h1{font-size:1rem;font-weight:700}
-.top .lab{margin-left:auto}
-.top .swap{
-  font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;
-  color:var(--ink-3);background:none;border:1px solid var(--line-2);border-radius:2px;padding:3px 8px;
+/* ── The desk ──────────────────────────────────────────────────────
+   Two or three people, all day, at a computer. A sidebar that never
+   moves, one page at a time with a title, numbers you can read across a
+   room, tables that line up, and one clear button per thing to do. */
+:root{--r:12px;--r-s:8px;--side:240px;--shadow:0 1px 2px rgba(20,24,27,.04),0 4px 16px rgba(20,24,27,.04)}
+html{font-size:15px}
+body{background:var(--bg);font-family:"Golos Text",system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
+h1,h2,h3,p{margin:0}
+button{font:inherit;cursor:pointer}
+input,select{font:inherit}
+.mono{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+
+/* buttons */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:"Golos Text",sans-serif;
+  font-size:.9rem;font-weight:600;letter-spacing:0;text-transform:none;padding:9px 14px;border-radius:var(--r-s);
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink);min-height:38px;white-space:nowrap;
 }
-.wrap{padding:14px;display:flex;flex-direction:column;gap:18px;max-width:960px}
-section > h2{
-  font-family:"IBM Plex Mono",monospace;font-size:.68rem;text-transform:uppercase;letter-spacing:.14em;
-  color:var(--ink-3);font-weight:500;margin-bottom:10px;display:flex;justify-content:space-between;
+.btn:hover{border-color:var(--ink-3);background:var(--surface)}
+.btn[data-v="primary"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn[data-v="primary"]:hover{filter:brightness(1.06)}
+.btn[data-v="danger"]{background:transparent;border-color:transparent;color:var(--stop)}
+.btn[data-v="danger"]:hover{background:var(--stop-soft)}
+.btn[data-v="quiet"]{background:transparent;border-color:transparent;color:var(--ink-2)}
+.btn[data-v="quiet"]:hover{background:var(--surface-2)}
+.btn[data-size="sm"]{padding:6px 10px;min-height:32px;font-size:.84rem}
+.btn[data-size="lg"]{width:100%;padding:12px 16px;min-height:46px;font-size:1rem}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+/* pills, labels, cards */
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:600;padding:3px 10px;border-radius:99px;background:var(--surface-2);color:var(--ink-2);white-space:nowrap}
+.pill::before{content:"";width:6px;height:6px;border-radius:99px;background:currentColor;opacity:.7}
+.pill[data-s="PAID"],.pill[data-s="DISPATCHED"],.pill[data-s="applied"]{background:var(--route-soft);color:var(--route)}
+.pill[data-s="PREPARING"],.pill[data-s="due"]{background:var(--accent-soft);color:var(--accent-ink)}
+.pill[data-s="READY"],.pill[data-s="HANDED"],.pill[data-s="CLOSED"],.pill[data-s="contracted"],.pill[data-s="paid"]{background:var(--ready-soft);color:var(--ready)}
+.pill[data-s="CANCELLED"],.pill[data-s="REFUNDED"],.pill[data-s="declined"],.pill[data-s="off"],.pill[data-s="warn"]{background:var(--stop-soft);color:var(--stop)}
+.pill[data-s="hold"],.pill[data-s="needs_account"]{background:var(--hold-soft);color:var(--hold)}
+.lab{font-family:"Golos Text",sans-serif;font-size:.76rem;font-weight:600;letter-spacing:.01em;text-transform:none;color:var(--ink-3)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.card-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.card-head h3{font-size:.98rem;font-weight:700;flex:1}
+.card-body{padding:18px}
+.empty{padding:40px 20px;text-align:center;color:var(--ink-3);font-size:.92rem;line-height:1.5}
+.empty b{display:block;color:var(--ink-2);font-weight:600;margin-bottom:2px}
+.muted{color:var(--ink-3)}
+.money{color:var(--accent-ink);font-weight:700}
+a.tel{color:var(--accent-ink);font-weight:600;text-decoration:none}
+
+/* fields */
+.field{display:block}
+.field span{display:block;font-size:.8rem;font-weight:600;color:var(--ink-2);margin-bottom:5px}
+.field input,.field select{width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);color:var(--ink);font-size:.92rem}
+.field input:focus,.field select:focus,.tools input:focus,.tools select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.fields .wide{grid-column:1 / -1}
+.form-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+
+/* ── the door ── */
+.door{min-height:100vh;display:grid;place-items:center;padding:24px}
+.pair{width:100%;max-width:400px;padding:30px 28px}
+.pair .brand{font-size:1.4rem;font-weight:800;letter-spacing:-.03em;color:var(--accent-ink);margin-bottom:16px}
+.pair .brand small{font-size:.8rem;font-weight:600;color:var(--ink-3);letter-spacing:.06em;margin-left:8px;text-transform:uppercase}
+.pair h2{font-size:1.25rem;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
+.pair p{color:var(--ink-2);font-size:.92rem;line-height:1.5;margin-bottom:18px}
+.pair input{width:100%;box-sizing:border-box;padding:12px 13px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);color:var(--ink);font-size:1rem;margin-bottom:10px}
+.pair input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.pair input[hidden]{display:none}
+
+/* ── the frame ── */
+.app{display:grid;grid-template-columns:var(--side) 1fr;min-height:100vh}
+.side{position:sticky;top:0;height:100vh;box-sizing:border-box;display:flex;flex-direction:column;padding:22px 14px 18px;background:var(--surface);border-right:1px solid var(--line)}
+.side .brand{display:flex;align-items:baseline;gap:8px;padding:0 10px 22px}
+.side .brand b{font-size:1.25rem;font-weight:800;letter-spacing:-.03em;color:var(--accent-ink)}
+.side .brand span{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.tabs{display:flex;flex-direction:column;gap:2px}
+.tabs button{
+  display:flex;align-items:center;gap:11px;width:100%;text-align:left;font-size:.94rem;font-weight:600;color:var(--ink-2);
+  background:none;border:none;padding:10px 12px;border-radius:var(--r-s);
 }
-.rows{display:flex;flex-direction:column;gap:8px}
-.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:11px 13px}
-.row[data-state="applied"]{border-left:3px solid var(--hold)}
-.row[data-state="contracted"]{border-left:3px solid var(--ready)}
-.row[data-state="declined"]{border-left:3px solid var(--line-2);opacity:.6}
-.row .name{font-weight:700;font-size:.94rem;flex:1;min-width:200px}
-.row .name small{display:block;font-family:"IBM Plex Mono",monospace;font-size:.66rem;color:var(--ink-3);font-weight:400;margin-top:3px;line-height:1.5;overflow-wrap:anywhere}
-.row .about{flex-basis:100%;font-size:.82rem;color:var(--ink-2);line-height:1.45;padding:6px 0 0;border-top:1px dashed var(--line)}
-.row .btns{display:flex;gap:6px;flex-wrap:wrap}
-.row .amount{font-family:"IBM Plex Mono",monospace;font-weight:600;font-size:.95rem;font-variant-numeric:tabular-nums;color:var(--accent-ink)}
-.row[data-kind="refund"]{border-left:3px solid var(--stop)}
-.row[data-kind="payout"]{border-left:3px solid var(--ready)}
+.tabs button svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;opacity:.85}
+.tabs button:hover{background:var(--surface-2);color:var(--ink)}
+.tabs button[data-on]{background:var(--accent-soft);color:var(--accent-ink)}
+.tabs button .n{margin-left:auto;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--surface-2);color:var(--ink-3)}
+.tabs button .n[data-hot]{background:var(--accent);color:#fff}
+.side .me{margin-top:auto;padding:12px 12px 4px;border-top:1px solid var(--line)}
+.side .me b{display:block;font-size:.9rem;font-weight:700}
+.side .me span{display:block;font-size:.78rem;color:var(--ink-3);margin-top:2px}
+.side .out{margin-top:8px;width:100%;text-align:left;font-size:.86rem;font-weight:600;color:var(--ink-3);background:none;border:none;padding:8px 12px;border-radius:var(--r-s)}
+.side .out:hover{background:var(--surface-2);color:var(--ink)}
+.main{min-width:0}
+.page{max-width:1180px;margin:0 auto;padding:30px 34px 60px}
+.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
+.page-head h1{font-size:1.55rem;font-weight:800;letter-spacing:-.025em;line-height:1.2}
+.page-head p{color:var(--ink-3);font-size:.92rem;margin-top:4px}
+.section{margin-top:22px}
+.section > h2{font-size:.8rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:0 0 10px}
+@media(max-width:900px){
+  .app{grid-template-columns:1fr}
+  .side{position:static;height:auto;flex-direction:row;align-items:center;gap:6px;padding:10px 12px;overflow-x:auto;border-right:none;border-bottom:1px solid var(--line)}
+  .side .brand{padding:0 8px 0 0}.side .brand span{display:none}
+  .tabs{flex-direction:row}.tabs button{width:auto;padding:8px 10px;font-size:.86rem}.tabs button span.t{display:none}
+  .side .me{display:none}.side .out{margin:0 0 0 auto;width:auto;flex:none}
+  .page{padding:18px 16px 40px}
+}
+
+/* ── the numbers ── */
+.seg{display:inline-flex;background:var(--surface-2);border-radius:var(--r-s);padding:3px}
+.seg button{font-size:.86rem;font-weight:600;padding:7px 14px;border:none;border-radius:6px;background:none;color:var(--ink-3)}
+.seg button[data-on]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kpi{padding:16px 18px}
+.kpi .lab{margin-bottom:8px}
+.kpi b{display:block;font-size:1.65rem;font-weight:800;letter-spacing:-.03em;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi span{display:block;font-size:.8rem;color:var(--ink-3);margin-top:6px;line-height:1.4}
+
+/* tables */
+.table{width:100%;border-collapse:collapse;font-size:.9rem}
+.table th{text-align:left;font-size:.74rem;font-weight:600;letter-spacing:.02em;color:var(--ink-3);padding:10px 18px;border-bottom:1px solid var(--line);white-space:nowrap}
+.table td{padding:12px 18px;border-bottom:1px solid var(--line);vertical-align:middle}
+.table tr:last-child td{border-bottom:none}
+.table tbody tr:hover td{background:var(--surface-2)}
+.table .num,.table th.num{text-align:right;font-variant-numeric:tabular-nums}
+.table tr[data-off] td{color:var(--ink-3)}
+.table .sub{display:block;font-size:.8rem;color:var(--ink-3);margin-top:2px}
+.table tr[data-link]{cursor:pointer}
+
+/* toolbars, lists, rows */
+.tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
+.tools input,.tools select{font-size:.92rem;padding:9px 12px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);color:var(--ink)}
+.tools input[type="search"]{flex:1;min-width:220px}
+.rows{display:flex;flex-direction:column;gap:10px}
+.row{display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:center;padding:14px 18px}
+.row .name{font-size:1rem;font-weight:700;line-height:1.3;min-width:0}
+.row .name small{display:block;font-size:.84rem;color:var(--ink-2);font-weight:400;margin-top:3px;line-height:1.5;overflow-wrap:anywhere}
+.row .right{display:flex;align-items:center;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.row .btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.row .about{grid-column:1 / -1;font-size:.88rem;color:var(--ink-2);line-height:1.5;padding-top:10px;border-top:1px dashed var(--line)}
+.row .about b{color:var(--ink)}
 .row[data-paid]{opacity:.6}
-.row .terms{flex-basis:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;padding-top:8px;border-top:1px dashed var(--line)}
-.row .terms label{font-size:.72rem;color:var(--ink-3);display:flex;flex-direction:column;gap:3px}
-.row .terms input{font:inherit;font-size:.84rem;padding:7px 8px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface);color:var(--ink)}
-.row .terms .foot{grid-column:1 / -1;display:flex;gap:6px}
-.row .code{
-  flex-basis:100%;font-family:"IBM Plex Mono",monospace;font-size:.86rem;padding:8px 10px;
-  background:var(--ready-soft);border:1px solid var(--ready-line);border-radius:3px;color:var(--ready);
-}
-.row .code b{font-size:1.2rem;letter-spacing:.14em}
-.none{color:var(--ink-3);font-size:.84rem;padding:10px 0}
-.new{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:14px}
-.new .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
-.new label{display:flex;flex-direction:column;gap:4px;font-family:"IBM Plex Mono",monospace;font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3)}
-.new label.wide{grid-column:1 / -1}
-.new input,.new select{width:100%;padding:8px 9px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);color:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:.86rem;letter-spacing:0;text-transform:none}
-.new .foot{display:flex;justify-content:flex-end;margin-top:10px;gap:10px;align-items:center}
-/* ── the desk's sections, one at a time ── */
-.tabs{display:flex;gap:4px;padding:8px 14px 0;border-bottom:1px solid var(--line);background:var(--bg);overflow-x:auto}
-.tabs button{font-family:"Golos Text",sans-serif;font-size:.86rem;font-weight:600;padding:9px 12px;border:none;background:none;color:var(--ink-3);border-bottom:2px solid transparent;white-space:nowrap}
-.tabs button[data-on]{color:var(--accent-ink);border-bottom-color:var(--accent)}
-.tabs .name{margin-left:auto;font:inherit;font-size:.8rem;padding:6px 8px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface);color:var(--ink);width:150px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:12px 14px}
-.card h3{font-family:"IBM Plex Mono",monospace;font-size:.66rem;text-transform:uppercase;letter-spacing:.14em;color:var(--ink-3);font-weight:500;margin:0 0 8px}
-.card dl{display:grid;grid-template-columns:1fr auto;gap:4px 12px;margin:0;font-size:.86rem}
-.card dt{color:var(--ink-2)}
-.card dd{margin:0;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;text-align:right}
-.card dd.money{color:var(--accent-ink);font-weight:600}
-table.grid{width:100%;border-collapse:collapse;background:var(--surface);border:1px solid var(--line);border-radius:4px;font-size:.84rem}
-table.grid th{font-family:"IBM Plex Mono",monospace;font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3);font-weight:500;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
-table.grid td{padding:8px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
-table.grid td.n{font-family:"IBM Plex Mono",monospace;text-align:right}
-table.grid tr[data-off] td{opacity:.55}
-.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
-.filters input,.filters select{font:inherit;font-size:.86rem;padding:8px 10px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface);color:var(--ink)}
-.filters input[type="search"]{flex:1;min-width:200px}
-.chips{display:flex;gap:6px}
-.chips button{font-family:"IBM Plex Mono",monospace;font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;padding:6px 10px;border:1px solid var(--line-2);border-radius:99px;background:var(--surface);color:var(--ink-3)}
-.chips button[data-on]{background:var(--ink);border-color:var(--ink);color:var(--bg)}
-.row.order{cursor:pointer}
-.row.order:hover{border-color:var(--ink-3)}
-.chip[data-s="PAID"]{color:var(--route);border-color:var(--route-line)}
-.chip[data-s="PREPARING"]{color:var(--accent-ink);border-color:var(--accent-line)}
-.chip[data-s="READY"],.chip[data-s="HANDED"],.chip[data-s="CLOSED"]{color:var(--ready);border-color:var(--ready-line)}
-.chip[data-s="CANCELLED"],.chip[data-s="REFUNDED"]{color:var(--stop);border-color:var(--stop-line)}
-.detail{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,360px);gap:14px;align-items:start}
-@media(max-width:800px){.detail{grid-template-columns:1fr}}
-.detail .back{background:none;border:none;color:var(--accent-ink);font-family:"Golos Text",sans-serif;font-weight:600;font-size:.9rem;padding:0 0 8px;cursor:pointer}
-.story{list-style:none;padding:0;margin:0 0 0 6px;border-left:2px solid var(--line)}
-.story li{position:relative;padding:3px 0 9px 14px;font-size:.86rem}
-.story li::before{content:"";position:absolute;left:-6px;top:9px;width:10px;height:10px;border-radius:99px;background:var(--ready)}
-.story .t{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--ink-3);margin-right:8px}
-.story small{display:block;font-size:.74rem;color:var(--ink-3)}
-.acts{display:flex;flex-direction:column;gap:8px}
-.acts select,.acts input{font:inherit;font-size:.86rem;padding:8px 10px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface);color:var(--ink);width:100%}
-.audit .row small{font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--ink-3)}
-.pair{max-width:420px;margin:60px auto;background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:26px 24px;text-align:center}
-.pair h2{font-size:1.1rem;margin-bottom:6px}
-.pair p{color:var(--ink-2);font-size:.86rem;margin:0 0 18px;line-height:1.5}
-.pair input{width:100%;font-family:"IBM Plex Mono",monospace;font-size:.95rem;padding:11px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);color:var(--ink);margin-bottom:12px}
-.pair .hint{font-size:.74rem;color:var(--ink-3);margin-top:14px;line-height:1.5}
+.row .amount{font-variant-numeric:tabular-nums;font-weight:700;font-size:1.05rem}
+.row .code{grid-column:1 / -1;padding:10px 12px;border-radius:var(--r-s);background:var(--ready-soft);border:1px solid var(--ready-line);color:var(--ready);font-size:.88rem}
+.row .code b{font-family:"IBM Plex Mono",monospace;font-size:1.15rem;letter-spacing:.14em;margin-left:6px}
+.drawer{grid-column:1 / -1;padding:14px;border-radius:var(--r-s);background:var(--surface-2);border:1px solid var(--line)}
+.drawer .fields{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.stall-line{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:.9rem}
+.stall-line span{flex:1}
+.stall-line[data-off]{color:var(--ink-3)}
+
+/* one order */
+.detail{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+@media(max-width:1000px){.detail{grid-template-columns:1fr}}
+.back{background:none;border:none;color:var(--accent-ink);font-size:.92rem;font-weight:600;padding:0;margin-bottom:12px;display:inline-flex;align-items:center;gap:4px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px 20px;padding:18px}
+.facts .lab{margin-bottom:3px}
+.facts div{font-size:.95rem;line-height:1.45;overflow-wrap:anywhere}
+.facts b{font-weight:700}
+.story{list-style:none;padding:0;margin:0}
+.story li{position:relative;padding:0 0 14px 22px;font-size:.92rem}
+.story li::before{content:"";position:absolute;left:4px;top:6px;width:9px;height:9px;border-radius:99px;background:var(--ready)}
+.story li::after{content:"";position:absolute;left:8px;top:16px;bottom:-4px;width:1px;background:var(--line)}
+.story li:last-child::after{display:none}
+.story b{font-weight:700}
+.story small{display:block;font-size:.8rem;color:var(--ink-3);margin-top:1px}
+.acts{display:flex;flex-direction:column;gap:10px}
+.acts .hint{font-size:.82rem;color:var(--ink-3);line-height:1.45}
+.acts .sep{height:1px;background:var(--line);margin:4px 0}
+
+/* audit */
+.log{list-style:none;padding:0;margin:0}
+.log li{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);font-size:.92rem}
+.log li:last-child{border-bottom:none}
+.log .who{font-weight:600;color:var(--ink-2);white-space:nowrap}
+.log .when{font-family:"IBM Plex Mono",monospace;font-size:.78rem;color:var(--ink-3);white-space:nowrap}
+.log small{display:block;color:var(--ink-3);font-size:.8rem}
 </style>
 </head>
 <body>
@@ -118,20 +203,48 @@ const esc = (value) => {
   return node.innerHTML;
 };
 const when = (iso) => (iso ? dayLabel(iso.slice(0, 10)) : '—');
-
+const clockOf = (iso) => {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
 const STATE = { applied: 'хүлээгдэж байна', contracted: 'гэрээт', declined: 'татгалзсан' };
+const ROLE_WORD = { admin: 'админ', finance: 'санхүү', ops: 'ops', viewer: 'зөвхөн харах' };
+const STATE_WORD = {
+  PAID: 'Төлсөн', PREPARING: 'Бэлтгэж байна', READY: 'Бэлэн', DISPATCHED: 'Замд',
+  HANDED: 'Өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан', REFUNDED: 'Буцаасан',
+};
+const EVENT_WORD = {
+  CREATED: 'Үүссэн', PAID: 'Төлсөн', PREPARING: 'Бэлтгэж эхэлсэн', READY: 'Бэлэн болсон', DISPATCHED: 'Замд гарсан',
+  HANDED: 'Хүлээлгэн өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан', REFUND_DUE: 'Буцаалт үүссэн', REFUNDED: 'Буцаалт шилжүүлсэн', RESENT: 'Мэдэгдэл дахин илгээсэн',
+};
+const REASON = {
+  guest_asked: 'Зочин хүссэн', vet: 'Мал эмнэлгийн шалгалт', cannot_fulfil: 'Нийлүүлэгч биелүүлж чадахгүй',
+  no_show: 'Зочин ирээгүй', unreachable: 'Хаяг дээр холбогдоогүй', draft_expired: 'Төлөгдөөгүй',
+};
+const actorWord = (a) =>
+  a.startsWith('guest:') ? 'зочин' : a.startsWith('supplier:owner:') ? 'нийлүүлэгч (утас)' : a.startsWith('supplier:') ? 'нийлүүлэгчийн дэлгэц' : a.startsWith('ops') ? a.replace('ops:', 'ops · ') : 'систем';
+const ICON = {
+  stats: '<svg viewBox="0 0 24 24"><path d="M4 19h16M7 16V9M12 16V5M17 16v-6"/></svg>',
+  orders: '<svg viewBox="0 0 24 24"><path d="M6 4h12v16l-3-2-3 2-3-2-3 2z"/><path d="M9 9h6M9 13h4"/></svg>',
+  suppliers: '<svg viewBox="0 0 24 24"><path d="M4 9l1.5-4h13L20 9"/><path d="M4 9c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3"/><path d="M6 12v8h12v-8"/></svg>',
+  pay: '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M15.5 15h2"/></svg>',
+  audit: '<svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>',
+  members: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c.8-3.2 3-4.8 6-4.8s5.2 1.6 6 4.8"/><circle cx="17" cy="9.5" r="2.4"/><path d="M15.5 15.2c2.6.2 4.4 1.6 5 4.8"/></svg>',
+};
 
-/* ── the secret ──────────────────────────────────────────────────── */
+/* ── the door ─────────────────────────────────────────────────────── */
 
 async function showToken() {
   root.replaceChildren();
   // The demo hands its secret out; anywhere else a member signs in by phone.
   const demo = await api('/dev/ops-token').catch(() => null);
+  const door = el('<div class="door"></div>');
   if (demo?.token) {
     const card = el(`
-      <div class="pair">
-        <h2>Ops · демо</h2>
-        <p>Демо горим: нууц үг автоматаар орлоо.</p>
+      <div class="card pair">
+        <div class="brand">Basu<small>Ops</small></div>
+        <h2>Демо горим</h2>
+        <p>Нууц үг автоматаар орлоо. Нэвтрэхэд л болно.</p>
         <input type="password" placeholder="OPS_TOKEN" aria-label="Ops нууц" autocomplete="off">
         <button class="btn" data-v="primary" data-size="lg" type="button">Нэвтрэх</button>
       </div>`);
@@ -149,12 +262,14 @@ async function showToken() {
     };
     card.querySelector('button').addEventListener('click', submit);
     input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
-    root.append(card);
+    door.append(card);
+    root.append(door);
     return;
   }
   const card = el(`
-    <div class="pair">
-      <h2>Ops</h2>
+    <div class="card pair">
+      <div class="brand">Basu<small>Ops</small></div>
+      <h2>Нэвтрэх</h2>
       <p>Гишүүн утасны дугаараараа нэвтэрнэ. Дугаар руу нэг удаагийн код очно.</p>
       <input name="phone" inputmode="tel" placeholder="+976 XXXX XXXX" aria-label="Утас" autocomplete="tel">
       <input name="code" inputmode="numeric" maxlength="6" placeholder="Ирсэн код" aria-label="Код" autocomplete="one-time-code" hidden>
@@ -193,11 +308,12 @@ async function showToken() {
   send.addEventListener('click', submit);
   code.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
   phone.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
-  root.append(card);
+  door.append(card);
+  root.append(door);
   phone.focus();
 }
 
-/* ── the desk ────────────────────────────────────────────────────── */
+/* ── the desk ─────────────────────────────────────────────────────── */
 
 /**
  * The desk's own session: the demo's secret, or a member's sign-in — kept
@@ -210,12 +326,12 @@ const ops = (path, options = {}) => api(path, { ...options, token: token() });
 let me = null;
 
 const TABS = [
-  { key: 'stats', label: 'Тоон үзүүлэлт' },
-  { key: 'orders', label: 'Захиалгууд' },
-  { key: 'suppliers', label: 'Нийлүүлэгчид' },
-  { key: 'pay', label: 'Олголт, буцаалт' },
-  { key: 'audit', label: 'Бүртгэл' },
-  { key: 'members', label: 'Гишүүд', admin: true },
+  { key: 'stats', label: 'Тоон үзүүлэлт', icon: ICON.stats },
+  { key: 'orders', label: 'Захиалгууд', icon: ICON.orders },
+  { key: 'suppliers', label: 'Нийлүүлэгчид', icon: ICON.suppliers },
+  { key: 'pay', label: 'Олголт, буцаалт', icon: ICON.pay },
+  { key: 'audit', label: 'Бүртгэл', icon: ICON.audit },
+  { key: 'members', label: 'Гишүүд', icon: ICON.members, admin: true },
 ];
 let tab = localStorage.getItem('basu.ops.tab') ?? 'stats';
 let cache = { suppliers: [], settlements: [] };
@@ -235,23 +351,23 @@ async function refresh() {
     toast(error.message, 'bad');
     return;
   }
-  if (!document.querySelector('.tabs')) frame();
+  if (!document.querySelector('.app')) frame();
+  badges();
   show(tab);
 }
 
 function frame() {
   const f = el(`
-    <div>
-      <div class="top">
-        <h1>Ops · идэш</h1>
-        <span class="lab" id="tally"></span>
-        <span class="lab" id="me">${esc(me?.name ?? '')}${me ? ` · ${ROLE_WORD[me.role] ?? me.role}` : ''}</span>
-        <button class="swap" type="button" id="out">Гарах</button>
-      </div>
-      <nav class="tabs" aria-label="Хэсгүүд">
-        ${TABS.filter((t) => !t.admin || me?.role === 'admin').map((t) => `<button type="button" data-tab="${t.key}">${t.label}</button>`).join('')}
-      </nav>
-      <div class="wrap" id="view"></div>
+    <div class="app">
+      <aside class="side">
+        <div class="brand"><b>Basu</b><span>Ops</span></div>
+        <nav class="tabs" aria-label="Хэсгүүд">
+          ${TABS.filter((t) => !t.admin || me?.role === 'admin').map((t) => `<button type="button" data-tab="${t.key}">${t.icon}<span class="t">${t.label}</span><span class="n" data-badge="${t.key}" hidden></span></button>`).join('')}
+        </nav>
+        <div class="me"><b id="me-name">${esc(me?.name ?? '')}</b><span>${me ? ROLE_WORD[me.role] ?? me.role : ''}${me?.phone ? ` · ${esc(me.phone)}` : ''}</span></div>
+        <button class="out" type="button" id="out">Гарах</button>
+      </aside>
+      <main class="main"><div class="page" id="view"></div></main>
     </div>`);
   f.querySelector('#out').addEventListener('click', () => {
     store.opsToken = null;
@@ -265,92 +381,106 @@ function frame() {
   root.replaceChildren(f);
 }
 
+/** What waits, in the sidebar: applications to answer, money to send. */
+function badges() {
+  const applied = cache.suppliers.filter((s) => s.state === 'applied').length;
+  const due = cache.settlements.filter((t) => t.state === 'due').length;
+  const set = (key, n, hot) => {
+    const b = document.querySelector(`[data-badge="${key}"]`);
+    if (!b) return;
+    b.hidden = !n;
+    b.textContent = String(n);
+    b.toggleAttribute('data-hot', Boolean(hot));
+  };
+  set('suppliers', applied, applied > 0);
+  set('pay', due, due > 0);
+}
+
 function show(key) {
   tab = key;
   localStorage.setItem('basu.ops.tab', key);
   for (const b of document.querySelectorAll('.tabs button')) b.toggleAttribute('data-on', b.dataset.tab === key);
-  const applied = cache.suppliers.filter((s) => s.state === 'applied').length;
-  const toPay = cache.settlements.filter((t) => t.state !== 'paid').length;
-  const tally = document.getElementById('tally');
-  if (tally) tally.textContent = `${applied} хүсэлт · ${cache.suppliers.filter((s) => s.state === 'contracted').length} гэрээт · ${toPay} шилжүүлэх`;
   const view = document.getElementById('view');
-  const scroll = window.scrollY;
   view.replaceChildren();
+  window.scrollTo(0, 0);
   ({ stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers })[key]?.(view);
-  window.scrollTo(0, scroll);
 }
+
+const head = (title, sub, right = '') =>
+  el(`<div class="page-head"><div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${right}</div>`);
 
 /* ── the numbers ── */
 
+let period = localStorage.getItem('basu.ops.period') ?? 'today';
+
 async function renderStats(view) {
-  view.append(el('<div class="none">…</div>'));
+  view.append(head('Тоон үзүүлэлт', 'Захиалга, борлуулалт, шимтгэл, буцаалт — өнөөдөр, долоо хоног, улирал.'));
+  view.append(el('<div class="empty">…</div>'));
   let st;
   try {
     st = await ops('/v1/ops/stats');
   } catch (error) {
-    view.replaceChildren(el(`<div class="none">${esc(error.message)}</div>`));
+    view.lastElementChild.replaceWith(el(`<div class="card empty">${esc(error.message)}</div>`));
     return;
   }
   if (tab !== 'stats') return;
-  const tally = (title, t) => `
-    <div class="card"><h3>${title}</h3><dl>
-      <dt>Төлсөн захиалга</dt><dd>${t.paid}</dd>
-      <dt>Борлуулалт</dt><dd class="money">${mnt(t.sales_mnt)}</dd>
-      <dt>Хүлээлгэн өгсөн</dt><dd>${t.handed}</dd>
-      <dt>Шимтгэл (Basu)</dt><dd class="money">${mnt(t.commission_mnt)}</dd>
-      <dt>Цуцлагдсан</dt><dd>${t.cancelled}${t.cancelled ? ` <small>(нийлүүлэгч ${t.supplier_fault} · зочин ${t.guest_fault})</small>` : ''}</dd>
-      <dt>Буцаалт</dt><dd>${mnt(t.refund_mnt)}</dd>
-      <dt>Суутгал</dt><dd>${mnt(t.forfeit_mnt)}</dd>
-    </dl></div>`;
-  view.replaceChildren(
-    el(`<section class="cards">${tally('Өнөөдөр', st.today)}${tally('Сүүлийн 7 хоног', st.week)}${tally('Улирал', st.season)}</section>`),
-    el(`<section><h2><span>Нийлүүлэгч бүрээр</span></h2>
-          <table class="grid"><thead><tr><th>Нийлүүлэгч</th><th>Төлсөн</th><th>Өгсөн</th><th>Цуцалсан</th><th>Өөрийн буруу</th><th>Ирээгүй зочин</th><th>Бэлэн болтол, цаг</th><th>Борлуулалт</th><th>Шимтгэл</th></tr></thead>
+  view.lastElementChild.remove();
+  const PERIODS = [['today', 'Өнөөдөр'], ['week', '7 хоног'], ['season', 'Улирал']];
+  const seg = el(`<div class="seg">${PERIODS.map(([k, l]) => `<button type="button" data-p="${k}"${period === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
+  const kpis = el('<div class="kpis section" style="margin-top:0"></div>');
+  const draw = () => {
+    const t = st[period];
+    kpis.replaceChildren(
+      el(`<div class="card kpi"><div class="lab">Төлсөн захиалга</div><b>${t.paid}</b><span>${t.handed} хүлээлгэн өгсөн</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Борлуулалт</div><b class="money">${mnt(t.sales_mnt)}</b><span>төлөгдсөн захиалгын дүн</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Шимтгэл (Basu)</div><b>${mnt(t.commission_mnt)}</b><span>хүлээлгэн өгсөн захиалгаас</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Цуцлагдсан</div><b>${t.cancelled}</b><span>${t.cancelled ? `нийлүүлэгчийн буруу ${t.supplier_fault} · зочны ${t.guest_fault}` : 'цуцлалт алга'}</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Буцаалт</div><b>${mnt(t.refund_mnt)}</b><span>зочдод буцах дүн</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Суутгал</div><b>${mnt(t.forfeit_mnt)}</b><span>нийлүүлэгчид үлдсэн</span></div>`),
+    );
+  };
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-p]');
+    if (!b) return;
+    period = b.dataset.p;
+    localStorage.setItem('basu.ops.period', period);
+    for (const c of seg.querySelectorAll('button')) c.toggleAttribute('data-on', c === b);
+    draw();
+  });
+  view.querySelector('.page-head').append(seg);
+  draw();
+  view.append(
+    kpis,
+    el(`<section class="section"><h2>Нийлүүлэгч бүрээр</h2><div class="card" style="overflow:auto">
+          <table class="table"><thead><tr><th>Нийлүүлэгч</th><th class="num">Төлсөн</th><th class="num">Өгсөн</th><th class="num">Цуцалсан</th><th class="num">Өөрийн буруу</th><th class="num">Ирээгүй зочин</th><th class="num">Бэлэн болтол, цаг</th><th class="num">Борлуулалт</th><th class="num">Шимтгэл</th></tr></thead>
           <tbody>${st.suppliers
-            .map(
-              (r) => `<tr${r.active ? '' : ' data-off'}><td>${esc(r.name)}${r.active ? '' : ' · <b>түр зогссон</b>'}</td><td class="n">${r.paid}</td><td class="n">${r.handed}</td><td class="n">${r.cancelled}</td><td class="n">${r.supplier_fault}</td><td class="n">${r.no_shows}</td><td class="n">${r.ready_hours ?? '—'}</td><td class="n">${mnt(r.sales_mnt)}</td><td class="n">${mnt(r.commission_mnt)}</td></tr>`,
-            )
-            .join('') || '<tr><td colspan="9" class="none">Гэрээт нийлүүлэгч алга.</td></tr>'}</tbody></table>
-        </section>`),
-    el(`<section><h2><span>Махны төрлөөр (хүлээлгэн өгсөн)</span></h2>
-          <table class="grid"><thead><tr><th>Төрөл</th><th>Хэмжээ</th><th>Захиалга</th><th>Борлуулалт</th></tr></thead>
+            .map((r) => `<tr${r.active ? '' : ' data-off'}><td>${esc(r.name)}${r.active ? '' : ' <span class="pill" data-s="off">түр зогссон</span>'}</td><td class="num">${r.paid}</td><td class="num">${r.handed}</td><td class="num">${r.cancelled}</td><td class="num">${r.supplier_fault}</td><td class="num">${r.no_shows}</td><td class="num">${r.ready_hours ?? '—'}</td><td class="num">${mnt(r.sales_mnt)}</td><td class="num">${mnt(r.commission_mnt)}</td></tr>`)
+            .join('') || '<tr><td colspan="9" class="empty">Гэрээт нийлүүлэгч алга.</td></tr>'}</tbody></table></div></section>`),
+    el(`<section class="section"><h2>Махны төрлөөр · хүлээлгэн өгсөн</h2><div class="card" style="overflow:auto">
+          <table class="table"><thead><tr><th>Төрөл</th><th class="num">Хэмжээ</th><th class="num">Захиалга</th><th class="num">Борлуулалт</th></tr></thead>
           <tbody>${st.by_kind
-            .map((k) => `<tr><td>${KIND[k.kind] ?? k.kind}</td><td class="n">${k.qty} ${k.unit === 'kg' ? 'кг' : 'толгой'}</td><td class="n">${k.orders}</td><td class="n">${mnt(k.sales_mnt)}</td></tr>`)
-            .join('') || '<tr><td colspan="4" class="none">Одоогоор алга.</td></tr>'}</tbody></table>
-        </section>`),
+            .map((k) => `<tr><td>${KIND[k.kind] ?? k.kind}</td><td class="num">${k.qty} ${k.unit === 'kg' ? 'кг' : 'толгой'}</td><td class="num">${k.orders}</td><td class="num">${mnt(k.sales_mnt)}</td></tr>`)
+            .join('') || '<tr><td colspan="4" class="empty">Одоогоор алга.</td></tr>'}</tbody></table></div></section>`),
   );
 }
 
 /* ── every order ── */
 
 let orderFilter = { scope: 'live', supplier: '', day: '', q: '' };
-const STATE_WORD = {
-  PAID: 'Төлсөн', PREPARING: 'Бэлтгэж байна', READY: 'Бэлэн', DISPATCHED: 'Замд',
-  HANDED: 'Өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан', REFUNDED: 'Буцаасан',
-};
-const EVENT_WORD = {
-  CREATED: 'Үүссэн', PAID: 'Төлсөн', PREPARING: 'Бэлтгэж эхэлсэн', READY: 'Бэлэн болсон', DISPATCHED: 'Замд гарсан',
-  HANDED: 'Хүлээлгэн өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан', REFUND_DUE: 'Буцаалт үүссэн', REFUNDED: 'Буцаалт шилжүүлсэн', RESENT: 'Мэдэгдэл дахин илгээсэн',
-};
-const REASON = {
-  guest_asked: 'Зочин хүссэн', vet: 'Мал эмнэлгийн шалгалт', cannot_fulfil: 'Нийлүүлэгч биелүүлж чадахгүй',
-  no_show: 'Зочин ирээгүй', unreachable: 'Хаяг дээр холбогдоогүй', draft_expired: 'Төлөгдөөгүй',
-};
-const actorWord = (a) =>
-  a.startsWith('guest:') ? 'зочин' : a.startsWith('supplier:owner:') ? 'нийлүүлэгч (утас)' : a.startsWith('supplier:') ? 'нийлүүлэгчийн дэлгэц' : a.startsWith('ops') ? a.replace('ops:', 'ops · ') : 'систем';
 
 function renderOrders(view) {
   const suppliers = cache.suppliers.filter((s) => s.state === 'contracted');
+  view.append(head('Захиалгууд', 'Бүх нийлүүлэгчийн захиалга нэг цонхонд.'));
   view.append(el(`
-    <section>
-      <div class="filters">
+    <div class="card">
+      <div class="tools">
         <input type="search" id="q" placeholder="Код, утас, зочин, нийлүүлэгч, мах…" value="${esc(orderFilter.q)}" autocomplete="off">
         <select id="supplier"><option value="">Бүх нийлүүлэгч</option>${suppliers.map((s) => `<option value="${s.id}"${orderFilter.supplier === s.id ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
-        <input type="date" id="day" value="${esc(orderFilter.day)}" title="Авах/хүргэх өдөр">
-        <div class="chips">${[['live', 'Идэвхтэй'], ['done', 'Дууссан'], ['all', 'Бүгд']].map(([k, l]) => `<button type="button" data-scope="${k}"${orderFilter.scope === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>
+        <input type="date" id="day" value="${esc(orderFilter.day)}" title="Авах, хүргэх өдөр">
+        <div class="seg">${[['live', 'Идэвхтэй'], ['done', 'Дууссан'], ['all', 'Бүгд']].map(([k, l]) => `<button type="button" data-scope="${k}"${orderFilter.scope === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>
       </div>
-      <div class="rows" id="orders"><div class="none">…</div></div>
-    </section>`));
+      <div id="orders"><div class="empty">…</div></div>
+    </div>`));
   let timer;
   view.querySelector('#q').addEventListener('input', (e) => {
     orderFilter.q = e.target.value;
@@ -359,11 +489,11 @@ function renderOrders(view) {
   });
   view.querySelector('#supplier').addEventListener('change', (e) => ((orderFilter.supplier = e.target.value), loadOrders()));
   view.querySelector('#day').addEventListener('change', (e) => ((orderFilter.day = e.target.value), loadOrders()));
-  view.querySelector('.chips').addEventListener('click', (e) => {
+  view.querySelector('.seg').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-scope]');
     if (!b) return;
     orderFilter.scope = b.dataset.scope;
-    for (const c of view.querySelectorAll('.chips button')) c.toggleAttribute('data-on', c === b);
+    for (const c of view.querySelectorAll('.seg button')) c.toggleAttribute('data-on', c === b);
     void loadOrders();
   });
   void loadOrders();
@@ -379,24 +509,30 @@ async function loadOrders() {
   try {
     data = await ops(`/v1/ops/orders?${qs}`);
   } catch (error) {
-    box.replaceChildren(el(`<div class="none">${esc(error.message)}</div>`));
+    box.replaceChildren(el(`<div class="empty">${esc(error.message)}</div>`));
     return;
   }
   if (!document.getElementById('orders')) return;
-  box.replaceChildren();
-  if (!data.orders.length) box.append(el('<div class="none">Захиалга алга.</div>'));
-  for (const o of data.orders) {
-    const row = el(`
-      <div class="row order" data-order="${o.id}" data-s="${o.state}">
-        <div class="name">№${o.code} · ${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}<small>${
-          [o.supplier.name, o.guest, o.guest_phone, o.receive === 'delivery' ? 'хүргэлт' : 'өөрөө авна', dayLabel(o.receive_on)].filter(Boolean).map(esc).join(' · ')
-        }</small></div>
-        <span class="chip" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span>
-        <span class="amount">${mnt(o.total_mnt)}</span>
-      </div>`);
-    row.addEventListener('click', () => openOrder(o.id));
-    box.append(row);
+  if (!data.orders.length) {
+    box.replaceChildren(el('<div class="empty"><b>Захиалга алга</b>Шүүлтэд тохирох захиалга байхгүй.</div>'));
+    return;
   }
+  const table = el(`<table class="table"><thead><tr><th>Захиалга</th><th>Нийлүүлэгч</th><th>Зочин</th><th>Өдөр</th><th>Төлөв</th><th class="num">Дүн</th></tr></thead><tbody></tbody></table>`);
+  const body = table.querySelector('tbody');
+  for (const o of data.orders) {
+    const tr = el(`
+      <tr data-link data-order="${o.id}">
+        <td><b class="mono">№${o.code}</b><span class="sub">${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}</span></td>
+        <td>${esc(o.supplier.name)}</td>
+        <td>${esc(o.guest ?? 'зочин')}<span class="sub">${esc(o.guest_phone ?? '')}</span></td>
+        <td>${dayLabel(o.receive_on)}<span class="sub">${o.receive === 'delivery' ? 'хүргэлт' : 'өөрөө авна'}</span></td>
+        <td><span class="pill" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span></td>
+        <td class="num">${mnt(o.total_mnt)}</td>
+      </tr>`);
+    tr.addEventListener('click', () => openOrder(o.id));
+    body.append(tr);
+  }
+  box.replaceChildren(table);
 }
 
 /** One order, its money, its story — and the three things ops may do to it. */
@@ -411,41 +547,44 @@ async function openOrder(id) {
   }
   const o = d.order;
   const live = ['PAID', 'PREPARING', 'READY', 'DISPATCHED'].includes(o.state);
+  view.replaceChildren();
+  const back = el('<button class="back" type="button" id="back">‹ Захиалгууд</button>');
+  back.addEventListener('click', () => show('orders'));
+  view.append(back);
+  view.append(head(`№${o.code} <span class="pill" data-s="${o.state}" style="vertical-align:middle;margin-left:8px">${STATE_WORD[o.state] ?? o.state}</span>`, `${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''} · ${esc(o.supplier.name)}`));
   const page = el(`
-    <section>
-      <button class="back" type="button" id="back">‹ Захиалгууд</button>
-      <div class="detail">
-        <div>
-          <div class="row" data-s="${o.state}">
-            <div class="name">№${o.code} · ${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}<small>
-              ${esc(o.supplier.name)} · ${o.guest ? esc(o.guest) : 'зочин'} · ${esc(o.guest_phone ?? '')}<br>
-              ${o.receive === 'delivery' ? `Хүргэлт ${dayLabel(o.receive_on)}: ${esc(o.address)} · ${esc(o.address_phone)}` : `Өөрөө авна ${dayLabel(o.receive_on)}`}<br>
-              Нийт ${mnt(o.total_mnt)}${o.delivery_fee_mnt ? ` (хүргэлт ${mnt(o.delivery_fee_mnt)})` : ''} · нийлүүлэгчид ${mnt(o.payout_mnt)}${
-                o.cancel_reason ? `<br>Цуцлалт: ${REASON[o.cancel_reason] ?? o.cancel_reason} · буцаалт ${mnt(o.refund_mnt ?? 0)}${o.forfeit_mnt ? ` · суутгал ${mnt(o.forfeit_mnt)}` : ''}` : ''
-              }</small></div>
-            <span class="chip" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span>
+    <div class="detail">
+      <div>
+        <div class="card">
+          <div class="facts">
+            <div><div class="lab">Зочин</div><b>${esc(o.guest ?? 'зочин')}</b><br>${o.guest_phone ? `<a class="tel" href="tel:${esc(o.guest_phone)}">${esc(o.guest_phone)}</a>` : ''}</div>
+            <div><div class="lab">${o.receive === 'delivery' ? 'Хүргэх' : 'Өөрөө авах'}</div><b>${dayLabel(o.receive_on)}</b><br>${o.receive === 'delivery' ? `${esc(o.address)} · ${esc(o.address_phone)}` : 'нийлүүлэгчийн авах цэгээс'}</div>
+            <div><div class="lab">Нийт төлсөн</div><b>${mnt(o.total_mnt)}</b><br>${o.delivery_fee_mnt ? `хүргэлт ${mnt(o.delivery_fee_mnt)} орсон` : 'хүргэлтгүй'}</div>
+            <div><div class="lab">Нийлүүлэгчид</div><b>${mnt(o.payout_mnt)}</b><br>шимтгэл хассан</div>
+            ${o.cancel_reason ? `<div><div class="lab">Цуцлалт</div><b>${REASON[o.cancel_reason] ?? o.cancel_reason}</b><br>буцаалт ${mnt(o.refund_mnt ?? 0)}${o.forfeit_mnt ? ` · суутгал ${mnt(o.forfeit_mnt)}` : ''}</div>` : ''}
           </div>
-          <div class="lab" style="margin:14px 0 6px">Мөнгө</div>
-          <div class="rows" id="money">${d.settlements.length ? '' : '<div class="none">Тооцоо үүсээгүй.</div>'}</div>
-          <div class="lab" style="margin:14px 0 6px">Явц</div>
-          <ol class="story">${d.events
-            .map((e) => `<li><span class="t">${when(e.at)} ${clockOf(e.at)}</span><b>${EVENT_WORD[e.type] ?? e.type}</b><small>${actorWord(e.actor)}${e.payload?.reason ? ` · ${REASON[e.payload.reason] ?? e.payload.reason}` : ''}${e.payload?.state ? ` · ${STATE_WORD[e.payload.state] ?? ''}` : ''}</small></li>`)
-            .join('')}</ol>
         </div>
-        <div class="card acts" id="acts">
-          <h3>Ops-ийн үйлдэл</h3>
+        <section class="section"><h2>Мөнгө</h2><div class="rows" id="money">${d.settlements.length ? '' : '<div class="card empty">Тооцоо үүсээгүй — хүлээлгэн өгснөөс хойш нэг хоногт үүснэ.</div>'}</div></section>
+        <section class="section"><h2>Явц</h2><div class="card card-body"><ol class="story">${d.events
+          .map((e) => `<li><b>${EVENT_WORD[e.type] ?? e.type}</b><small>${when(e.at)} ${clockOf(e.at)} · ${actorWord(e.actor)}${e.payload?.reason ? ` · ${REASON[e.payload.reason] ?? e.payload.reason}` : ''}${e.payload?.state ? ` · ${STATE_WORD[e.payload.state] ?? ''}` : ''}</small></li>`)
+          .join('')}</ol></div></section>
+      </div>
+      <div class="card" id="acts">
+        <div class="card-head"><h3>Ops-ийн үйлдэл</h3></div>
+        <div class="card-body acts">
           ${live ? `
-          <input id="note" placeholder="Тэмдэглэл (бүртгэлд үлдэнэ)">
+          <label class="field"><span>Тэмдэглэл</span><input id="note" placeholder="Бүртгэлд үлдэнэ"></label>
           <button class="btn" type="button" data-a="resend">Мэдэгдэл дахин илгээх</button>
           ${['READY', 'DISPATCHED'].includes(o.state) ? '<button class="btn" data-v="primary" type="button" data-a="hand">Хүлээлгэн өгсөн гэж тэмдэглэх</button>' : ''}
-          <select id="reason"><option value="">Цуцлах шалтгаан…</option>${Object.entries(REASON).filter(([k]) => k !== 'draft_expired').map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
-          <button class="btn" data-v="danger" type="button" data-a="cancel" disabled>Нийлүүлэгчийн өмнөөс цуцлах</button>
-          ` : '<div class="none">Дууссан захиалгад үйлдэл алга.</div>'}
+          <div class="sep"></div>
+          <label class="field"><span>Нийлүүлэгчийн өмнөөс цуцлах</span><select id="reason"><option value="">Шалтгаан сонгох…</option>${Object.entries(REASON).filter(([k]) => k !== 'draft_expired').map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
+          <button class="btn" data-v="danger" type="button" data-a="cancel" disabled>Цуцлах</button>
+          <div class="hint">Буцаалтын дүнг шалтгаан ба дүрэм тогтооно; хүн сонгохгүй.</div>
+          ` : '<div class="hint">Дууссан захиалгад үйлдэл алга.</div>'}
         </div>
       </div>
-    </section>`);
+    </div>`);
   for (const t of d.settlements) page.querySelector('#money').append(renderSettlement(t));
-  page.querySelector('#back').addEventListener('click', () => show('orders'));
   const acts = page.querySelector('#acts');
   const reason = acts.querySelector('#reason');
   reason?.addEventListener('change', () => (acts.querySelector('[data-a="cancel"]').disabled = !reason.value));
@@ -467,108 +606,33 @@ async function openOrder(id) {
       b.disabled = false;
     }
   });
-  view.replaceChildren(page);
+  view.append(page);
 }
 
-function clockOf(iso) {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-/* ── suppliers, the money, the record ── */
+/* ── suppliers ── */
 
 function renderSuppliers(view) {
   const applied = cache.suppliers.filter((s) => s.state === 'applied');
   const rest = cache.suppliers.filter((s) => s.state !== 'applied');
+  view.append(head('Нийлүүлэгчид', `${applied.length} хүсэлт · ${rest.filter((s) => s.state === 'contracted').length} гэрээт`));
   view.append(
-    el(`<section id="applied"><h2><span>Хүсэлт</span></h2><div class="rows"></div></section>`),
-    el(`<section id="all"><h2><span>Нийлүүлэгчид</span></h2><div class="rows"></div></section>`),
-    el(`<section id="new"><h2><span>Шинэ нийлүүлэгч, гэрээтэй</span></h2></section>`),
+    el(`<section class="section" id="applied" style="margin-top:0"><h2>Хүсэлт</h2><div class="rows"></div></section>`),
+    el(`<section class="section" id="all"><h2>Нийлүүлэгчид</h2><div class="rows"></div></section>`),
+    el(`<section class="section" id="new"><h2>Шинэ нийлүүлэгч, гэрээтэй</h2></section>`),
   );
   const pending = view.querySelector('#applied .rows');
-  if (!applied.length) pending.append(el('<div class="none">Хүлээгдэж буй хүсэлт алга.</div>'));
+  if (!applied.length) pending.append(el('<div class="card empty">Хүлээгдэж буй хүсэлт алга.</div>'));
   for (const s of applied) pending.append(renderRow(s));
   const list = view.querySelector('#all .rows');
-  if (!rest.length) list.append(el('<div class="none">Нийлүүлэгч алга.</div>'));
+  if (!rest.length) list.append(el('<div class="card empty">Нийлүүлэгч алга.</div>'));
   for (const s of rest) list.append(renderRow(s));
   view.querySelector('#new').append(newForm());
 }
 
-function renderPay(view) {
-  const toPay = cache.settlements.filter((t) => t.state !== 'paid');
-  view.append(el(`<section id="pay"><h2><span>Олголт, буцаалт</span><span>${mnt(toPay.reduce((sum, t) => sum + t.amount_mnt, 0))}</span></h2><div class="rows"></div></section>`));
-  const pay = view.querySelector('#pay .rows');
-  if (!cache.settlements.length) pay.append(el('<div class="none">Шилжүүлэх зүйл алга.</div>'));
-  for (const t of cache.settlements) pay.append(renderSettlement(t));
-}
-
-async function renderAudit(view) {
-  view.append(el('<section class="audit"><h2><span>Ops-ийн үйлдлийн бүртгэл</span></h2><div class="rows" id="audit"><div class="none">…</div></div></section>'));
-  let data;
-  try {
-    data = await ops('/v1/ops/audit?limit=200');
-  } catch (error) {
-    view.querySelector('#audit').replaceChildren(el(`<div class="none">${esc(error.message)}</div>`));
-    return;
-  }
-  const box = view.querySelector('#audit');
-  if (!box) return;
-  box.replaceChildren();
-  if (!data.audit.length) box.append(el('<div class="none">Одоогоор юу ч хийгээгүй.</div>'));
-  const ACTION = {
-    'order.cancel': 'Захиалга цуцалсан', 'order.hand': 'Хүлээлгэн өгсөн гэж тэмдэглэсэн', 'order.resend': 'Мэдэгдэл дахин илгээсэн',
-    'supplier.suspend': 'Нийлүүлэгчийг түр зогсоосон', 'supplier.activate': 'Нийлүүлэгчийг идэвхжүүлсэн', 'supplier.terms': 'Гэрээний нөхцөл өөрчилсөн', 'listing.hide': 'Зар нуусан',
-  };
-  for (const a of data.audit) {
-    box.append(el(`<div class="row"><div class="name">${ACTION[a.action] ?? esc(a.action)}${a.note ? ` — ${esc(a.note)}` : ''}<small>${esc(a.who)} · ${when(a.at)} ${clockOf(a.at)} · ${a.target_kind} ${esc(a.target_id.slice(0, 8))}</small></div></div>`));
-  }
-}
-
-/**
- * One thing to pay: who, how much, to which account, and the button that
- * says it was done. A refund without an account yet is shown but cannot be
- * paid — the guest has not said where.
- */
-function renderSettlement(t) {
-  const who = t.kind === 'payout' ? esc(t.supplier?.name ?? '') : `${esc(t.guest?.name ?? 'Зочин')} (зочин)`;
-  const bank = t.bank_account ? `${esc(t.bank_name)} · ${esc(t.bank_account)} · ${esc(t.bank_holder)}` : 'данс алга';
-  const row = el(`
-    <div class="row" data-kind="${t.kind}" data-settlement="${t.id}"${t.state === 'paid' ? ' data-paid' : ''}>
-      <div class="name">${esc(t.memo)} · ${who}<small>№${esc(t.order_code)} · ${bank}<br>${
-        t.state === 'paid'
-          ? `шилжүүлсэн ${when(t.paid_at)}${t.reference ? ` · ${esc(t.reference)}` : ''}`
-          : t.state === 'needs_account'
-            ? 'зочин дансаа оруулаагүй байна'
-            : `үүссэн ${when(t.created_at)}`
-      }</small></div>
-      <span class="amount">${mnt(t.amount_mnt)}</span>
-      <div class="btns"></div>
-    </div>`);
-  if (t.state === 'due' && !t.bank_verified) {
-    row.querySelector('.btns').append(el('<span class="chip" data-s="CANCELLED">данс баталгаажаагүй</span>'));
-  } else if (t.state === 'due') {
-    const paid = el('<button class="btn" data-v="primary" type="button" data-a="paid">Шилжүүлсэн</button>');
-    paid.addEventListener('click', async () => {
-      const reference = prompt(`${mnt(t.amount_mnt)} → ${bank}\nБанкны гүйлгээний дугаар (заавал биш):`, '');
-      if (reference === null) return;
-      paid.disabled = true;
-      try {
-        await ops(`/v1/ops/settlements/${t.id}/paid`, { method: 'POST', body: { reference } });
-        toast('Тэмдэглэгдлээ, мэдэгдэл явлаа.');
-        await refresh();
-      } catch (error) {
-        toast(error.message, 'bad');
-        paid.disabled = false;
-      }
-    });
-    row.querySelector('.btns').append(paid);
-  }
-  return row;
-}
-
 function renderRow(s) {
+  const status = s.state === 'contracted' ? (s.active ? 'contracted' : 'off') : s.state;
   const row = el(`
-    <div class="row" data-state="${s.state}" data-supplier="${s.id}">
+    <div class="card row" data-state="${s.state}" data-supplier="${s.id}">
       <div class="name">${esc(s.name)}<small>${esc(s.phone)}${s.merchant_tin ? ` · ТТД ${esc(s.merchant_tin)}` : ' · ТТД алга'} · ${esc(s.pickup_address)}<br>${
         s.state === 'applied'
           ? `хүсэлт ${when(s.applied_at)}`
@@ -576,13 +640,12 @@ function renderRow(s) {
             ? `гэрээ ${when(s.contracted_at)} · ${s.listings} зар · ${s.watched ? 'дэлгэц холбогдсон' : 'дэлгэц холбогдоогүй'}`
             : `татгалзсан ${when(s.decided_at)}: ${esc(s.decline_reason)}`
       }</small></div>
-      <span class="chip" data-s="${s.state === 'contracted' ? (s.active ? 'READY' : 'CANCELLED') : s.state === 'applied' ? 'PAID' : 'CANCELLED'}">${s.state === 'contracted' && !s.active ? 'түр зогссон' : STATE[s.state]}</span>
-      <div class="btns"></div>
+      <div class="right"><span class="pill" data-s="${status}">${s.state === 'contracted' && !s.active ? 'түр зогссон' : STATE[s.state]}</span><div class="btns"></div></div>
       ${s.about ? `<div class="about">${esc(s.about)}</div>` : ''}
       ${
         s.state !== 'declined'
           ? `<div class="about">Шимтгэл <b>${s.commission_pct}%</b> · Данс: ${
-              s.bank_account ? `${esc(s.bank_name)} ${esc(s.bank_account)} · ${esc(s.bank_holder)}${s.bank_verified ? '' : ' · <b style="color:var(--stop)">баталгаажаагүй</b>'}` : '<b>алга</b>'
+              s.bank_account ? `<b>${esc(s.bank_name)} ${esc(s.bank_account)}</b> · ${esc(s.bank_holder)}${s.bank_verified ? '' : ' <span class="pill" data-s="warn">баталгаажаагүй</span>'}` : '<b>алга</b>'
             }</div>`
           : ''
       }
@@ -605,42 +668,43 @@ function renderRow(s) {
       sessionStorage.setItem(`ops.code.${s.id}`, code);
     }
   };
+  const small = (label, attrs = '') => el(`<button class="btn" data-size="sm" type="button" ${attrs}>${label}</button>`);
 
   if (s.state === 'applied') {
-    const ok = el('<button class="btn" data-v="primary" type="button" data-a="approve">Батлах</button>');
+    const ok = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
     ok.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/approve`, null, showCode));
-    const no = el('<button class="btn" data-v="danger" type="button" data-a="decline">Татгалзах</button>');
+    const no = el('<button class="btn" data-v="danger" data-size="sm" type="button" data-a="decline">Татгалзах</button>');
     no.addEventListener('click', () => {
       const reason = prompt('Шалтгаан (нийлүүлэгчид SMS-ээр очно):', '');
       if (reason === null) return;
       act(`/v1/ops/suppliers/${s.id}/decline`, { reason });
     });
     buttons.append(ok, no);
-  } else if (s.state === 'contracted') {
-    const code = el('<button class="btn" type="button" data-a="code">Шинэ код</button>');
-    code.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/code`, null, showCode));
-    buttons.append(code);
+  }
+  if (s.state === 'contracted' && s.bank_account && !s.bank_verified) {
+    // A changed account pays out nothing until somebody holds it up against the contract.
+    const check = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="bank-verify">Данс баталгаажуулах</button>');
+    check.addEventListener('click', () => {
+      if (!confirm(`${s.name}: ${s.bank_name} ${s.bank_account} (${s.bank_holder}) гэрээний данстай таарч байна уу?`)) return;
+      act(`/v1/ops/suppliers/${s.id}/bank-verify`, { note: 'гэрээтэй тулгасан' });
+    });
+    buttons.append(check);
   }
   if (s.state === 'contracted') {
-    // Off the market, or back on it — with the reason kept.
-    const toggle = el(`<button class="btn" type="button" data-a="active"${s.active ? ' data-v="danger"' : ''}>${s.active ? 'Түр зогсоох' : 'Идэвхжүүлэх'}</button>`);
-    toggle.addEventListener('click', () => {
-      const note = prompt(s.active ? 'Түр зогсоох шалтгаан (бүртгэлд үлдэнэ):' : 'Идэвхжүүлэх тэмдэглэл:', '');
-      if (note === null) return;
-      act(`/v1/ops/suppliers/${s.id}/active`, { active: !s.active, note });
-    });
-    buttons.append(toggle);
+    const code = small('Шинэ код', 'data-a="code"');
+    code.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/code`, null, showCode));
+    buttons.append(code);
     // Their listings, to look at and, if need be, hide.
-    const stall = el('<button class="btn" type="button" data-a="listings">Зарууд</button>');
+    const stall = small('Зарууд', 'data-a="listings"');
     stall.addEventListener('click', async () => {
       if (row.querySelector('.stall')) return row.querySelector('.stall').remove();
       const { listings } = await ops(`/v1/ops/suppliers/${s.id}/listings`);
-      const box = el('<div class="about stall"></div>');
-      if (!listings.length) box.append(el('<span>Зар алга.</span>'));
+      const box = el('<div class="drawer stall"></div>');
+      if (!listings.length) box.append(el('<span class="muted">Зар алга.</span>'));
       for (const l of listings) {
-        const line = el(`<div style="display:flex;gap:8px;align-items:center;padding:3px 0${l.active ? '' : ';opacity:.5'}"><span style="flex:1">${esc(l.title)} · ${mnt(l.price_mnt)}/${l.unit === 'kg' ? 'кг' : 'толгой'} · ${l.sold}/${l.quantity}${l.active ? '' : ' · нуусан'}</span></div>`);
+        const line = el(`<div class="stall-line"${l.active ? '' : ' data-off'}><span>${esc(l.title)} · ${mnt(l.price_mnt)}/${l.unit === 'kg' ? 'кг' : 'толгой'} · ${l.sold}/${l.quantity}${l.active ? '' : ' · нуусан'}</span></div>`);
         if (l.active) {
-          const hide = el('<button class="btn" data-v="danger" type="button">Нуух</button>');
+          const hide = el('<button class="btn" data-v="danger" data-size="sm" type="button">Нуух</button>');
           hide.addEventListener('click', () => {
             const note = prompt('Нуух шалтгаан (бүртгэлд үлдэнэ):', '');
             if (note === null) return;
@@ -653,31 +717,32 @@ function renderRow(s) {
       row.append(box);
     });
     buttons.append(stall);
-  }
-  if (s.state === 'contracted' && s.bank_account && !s.bank_verified) {
-    // A changed account pays out nothing until somebody holds it up against the contract.
-    const check = el('<button class="btn" data-v="primary" type="button" data-a="bank-verify">Данс баталгаажуулах</button>');
-    check.addEventListener('click', () => {
-      if (!confirm(`${s.name}: ${s.bank_name} ${s.bank_account} (${s.bank_holder}) гэрээний данстай таарч байна уу?`)) return;
-      act(`/v1/ops/suppliers/${s.id}/bank-verify`, { note: 'гэрээтэй тулгасан' });
+    // Off the market, or back on it — with the reason kept.
+    const toggle = el(`<button class="btn" data-size="sm" type="button" data-a="active"${s.active ? ' data-v="danger"' : ' data-v="primary"'}>${s.active ? 'Түр зогсоох' : 'Идэвхжүүлэх'}</button>`);
+    toggle.addEventListener('click', () => {
+      const note = prompt(s.active ? 'Түр зогсоох шалтгаан (бүртгэлд үлдэнэ):' : 'Идэвхжүүлэх тэмдэглэл:', '');
+      if (note === null) return;
+      act(`/v1/ops/suppliers/${s.id}/active`, { active: !s.active, note });
     });
-    buttons.append(check);
+    buttons.append(toggle);
   }
   if (s.state !== 'declined') {
     // The contract's terms: written in once it is signed, corrected here.
-    const terms = el('<button class="btn" type="button" data-a="terms">Нөхцөл</button>');
+    const terms = small('Нөхцөл', 'data-a="terms"');
     terms.addEventListener('click', () => {
-      if (row.querySelector('.terms')) return;
+      if (row.querySelector('.terms')) return row.querySelector('.terms').remove();
       const form = el(`
-        <div class="terms">
-          <label>Шимтгэл, %<input name="commission_pct" inputmode="decimal" value="${s.commission_pct}"></label>
-          <label>ТТД<input name="tin" value="${esc(s.merchant_tin ?? '')}" placeholder="7–14 орон"></label>
-          <label>Банк<input name="bank_name" value="${esc(s.bank_name ?? '')}"></label>
-          <label>Данс<input name="bank_account" value="${esc(s.bank_account ?? '')}"></label>
-          <label>Эзэмшигч<input name="bank_holder" value="${esc(s.bank_holder ?? '')}"></label>
-          <div class="foot">
+        <div class="drawer terms">
+          <div class="fields">
+            <label class="field"><span>Шимтгэл, %</span><input name="commission_pct" inputmode="decimal" value="${s.commission_pct}"></label>
+            <label class="field"><span>ТТД</span><input name="tin" value="${esc(s.merchant_tin ?? '')}" placeholder="7–14 орон"></label>
+            <label class="field"><span>Банк</span><input name="bank_name" value="${esc(s.bank_name ?? '')}"></label>
+            <label class="field"><span>Данс</span><input name="bank_account" value="${esc(s.bank_account ?? '')}"></label>
+            <label class="field"><span>Эзэмшигч</span><input name="bank_holder" value="${esc(s.bank_holder ?? '')}"></label>
+          </div>
+          <div class="form-foot">
+            <button class="btn" data-v="quiet" type="button" data-a="close">Болих</button>
             <button class="btn" data-v="primary" type="button" data-a="save">Хадгалах</button>
-            <button class="btn" type="button" data-a="close">Болих</button>
           </div>
         </div>`);
       form.querySelector('[data-a="close"]').addEventListener('click', () => form.remove());
@@ -700,26 +765,29 @@ function renderRow(s) {
 
   const remembered = sessionStorage.getItem(`ops.code.${s.id}`);
   if (remembered && s.state === 'contracted' && !s.watched) {
-    row.append(el(`<div class="code">Дэлгэц холбох код <b>${remembered}</b> · 24 цаг</div>`));
+    row.append(el(`<div class="code">Дэлгэц холбох код<b>${remembered}</b> · 24 цаг</div>`));
   }
   return row;
 }
 
 function newForm() {
   const form = el(`
-    <div class="new">
-      <div class="grid">
-        <label class="wide">Нэр<input name="name" placeholder="Хэнтий · «Хэрлэн» хоршоо"></label>
-        <label>Утас<input name="phone" placeholder="+976…"></label>
-        <label>ТТД<input name="tin" placeholder="7–10 орон"></label>
-        <label class="wide">Авах цэг<input name="address" placeholder="Дүүрэг, зах, хаалга"></label>
-        <label>Өргөрөг<input name="lat" placeholder="47.9…"></label>
-        <label>Уртраг<input name="lon" placeholder="106.9…"></label>
-        <label>Банк<input name="bank_name" placeholder="Хаан банк"></label>
-        <label>Данс<input name="bank_account" inputmode="numeric" placeholder="5012345678"></label>
-        <label>Эзэмшигч<input name="bank_holder" placeholder="Гэрээний нэр"></label>
+    <div class="card">
+      <div class="card-head"><h3>Гэрээ байгуулсан нийлүүлэгчийг бүртгэх</h3><span class="muted" style="font-size:.84rem">Бүртгэмэгц дэлгэц холбох код SMS-ээр очно</span></div>
+      <div class="card-body">
+        <div class="fields">
+          <label class="field wide"><span>Нэр</span><input name="name" placeholder="Хэнтий · «Хэрлэн» хоршоо"></label>
+          <label class="field"><span>Утас</span><input name="phone" placeholder="+976XXXXXXXX"></label>
+          <label class="field"><span>ТТД</span><input name="tin" placeholder="7–10 орон"></label>
+          <label class="field wide"><span>Авах цэг</span><input name="address" placeholder="Дүүрэг, зах, хаалга"></label>
+          <label class="field"><span>Өргөрөг</span><input name="lat" placeholder="47.9…"></label>
+          <label class="field"><span>Уртраг</span><input name="lon" placeholder="106.9…"></label>
+          <label class="field"><span>Банк</span><input name="bank_name" placeholder="Хаан банк"></label>
+          <label class="field"><span>Данс</span><input name="bank_account" inputmode="numeric" placeholder="5012345678"></label>
+          <label class="field"><span>Эзэмшигч</span><input name="bank_holder" placeholder="Гэрээний нэр"></label>
+        </div>
+        <div class="form-foot"><button class="btn" data-v="primary" type="button" id="add">Бүртгээд код авах</button></div>
       </div>
-      <div class="foot"><button class="btn" data-v="primary" type="button" id="add">Бүртгээд код авах</button></div>
     </div>`);
   form.querySelector('#add').addEventListener('click', async () => {
     const v = (name) => form.querySelector(`[name="${name}"]`).value.trim();
@@ -746,25 +814,112 @@ function newForm() {
   return form;
 }
 
-const ROLE_WORD = { admin: 'админ', finance: 'санхүү', ops: 'ops', viewer: 'зөвхөн харах' };
+/* ── the money ── */
 
-/** Who sits at the desk. Admin only: add by phone, take away. */
+function renderPay(view) {
+  const due = cache.settlements.filter((t) => t.state === 'due');
+  const waiting = cache.settlements.filter((t) => t.state === 'needs_account');
+  const paid = cache.settlements.filter((t) => t.state === 'paid');
+  view.append(head('Олголт, буцаалт', 'Basu-гийн банкаар гараар шилжүүлж, энд «Шилжүүлсэн» гэж тэмдэглэнэ.'));
+  view.append(el(`<div class="kpis" style="margin-bottom:22px">
+    <div class="card kpi"><div class="lab">Шилжүүлэх ёстой</div><b class="money">${mnt(due.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${due.length} мөр, данс бэлэн</span></div>
+    <div class="card kpi"><div class="lab">Данс хүлээж байна</div><b>${mnt(waiting.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${waiting.length} буцаалт — зочин дансаа оруулаагүй</span></div>
+    <div class="card kpi"><div class="lab">Шилжүүлсэн (30 хоног)</div><b>${mnt(paid.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${paid.length} мөр</span></div>
+  </div>`));
+  const section = el('<section id="pay"><div class="rows"></div></section>');
+  const rows = section.querySelector('.rows');
+  if (!cache.settlements.length) rows.append(el('<div class="card empty"><b>Шилжүүлэх зүйл алга</b>Хүлээлгэн өгсөн захиалгын олголт, цуцлагдсан захиалгын буцаалт энд гарна.</div>'));
+  for (const t of cache.settlements) rows.append(renderSettlement(t));
+  view.append(section);
+}
+
+/**
+ * One thing to pay: who, how much, to which account, and the button that
+ * says it was done. A refund without an account yet is shown but cannot be
+ * paid — the guest has not said where.
+ */
+function renderSettlement(t) {
+  const who = t.kind === 'payout' ? esc(t.supplier?.name ?? '') : `${esc(t.guest?.name ?? 'Зочин')} (зочин)`;
+  const bank = t.bank_account ? `${esc(t.bank_name)} · ${esc(t.bank_account)} · ${esc(t.bank_holder)}` : 'данс алга';
+  const status = t.state === 'paid' ? ['paid', 'шилжүүлсэн'] : t.state === 'needs_account' ? ['needs_account', 'данс хүлээж байна'] : !t.bank_verified ? ['warn', 'данс баталгаажаагүй'] : ['due', 'шилжүүлэх'];
+  const row = el(`
+    <div class="card row" data-kind="${t.kind}" data-settlement="${t.id}"${t.state === 'paid' ? ' data-paid' : ''}>
+      <div class="name">${esc(t.memo)} · ${who}<small><span class="mono">№${esc(t.order_code)}</span> · ${bank}<br>${
+        t.state === 'paid'
+          ? `шилжүүлсэн ${when(t.paid_at)}${t.reference ? ` · гүйлгээ ${esc(t.reference)}` : ''}`
+          : t.state === 'needs_account'
+            ? 'зочин аппаар дансаа оруулмагц шилжүүлж болно'
+            : `үүссэн ${when(t.created_at)}`
+      }</small></div>
+      <div class="right"><span class="amount">${mnt(t.amount_mnt)}</span><span class="pill" data-s="${status[0]}">${status[1]}</span><div class="btns"></div></div>
+    </div>`);
+  if (t.state === 'due' && t.bank_verified) {
+    const paid = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="paid">Шилжүүлсэн</button>');
+    paid.addEventListener('click', async () => {
+      const reference = prompt(`${mnt(t.amount_mnt)} → ${bank}\nБанкны гүйлгээний дугаар (заавал биш):`, '');
+      if (reference === null) return;
+      paid.disabled = true;
+      try {
+        await ops(`/v1/ops/settlements/${t.id}/paid`, { method: 'POST', body: { reference } });
+        toast('Тэмдэглэгдлээ, мэдэгдэл явлаа.');
+        await refresh();
+      } catch (error) {
+        toast(error.message, 'bad');
+        paid.disabled = false;
+      }
+    });
+    row.querySelector('.btns').append(paid);
+  }
+  return row;
+}
+
+/* ── the record ── */
+
+const ACTION = {
+  'order.cancel': 'Захиалга цуцалсан', 'order.hand': 'Хүлээлгэн өгсөн гэж тэмдэглэсэн', 'order.resend': 'Мэдэгдэл дахин илгээсэн',
+  'supplier.suspend': 'Нийлүүлэгчийг түр зогсоосон', 'supplier.activate': 'Нийлүүлэгчийг идэвхжүүлсэн', 'supplier.terms': 'Гэрээний нөхцөл өөрчилсөн',
+  'supplier.bank_verify': 'Данс баталгаажуулсан', 'listing.hide': 'Зар нуусан', 'member.upsert': 'Гишүүн нэмсэн', 'member.activate': 'Гишүүн нээсэн', 'member.deactivate': 'Гишүүн хаасан',
+};
+
+async function renderAudit(view) {
+  view.append(head('Бүртгэл', 'Ops-ийн хийсэн үйлдэл бүр — хэн, хэзээ, юуг, ямар тэмдэглэлтэй.'));
+  view.append(el('<div class="card"><ul class="log" id="audit"><li class="empty">…</li></ul></div>'));
+  let data;
+  try {
+    data = await ops('/v1/ops/audit?limit=200');
+  } catch (error) {
+    view.querySelector('#audit').replaceChildren(el(`<li class="empty">${esc(error.message)}</li>`));
+    return;
+  }
+  const box = view.querySelector('#audit');
+  if (!box) return;
+  box.replaceChildren();
+  if (!data.audit.length) box.append(el('<li class="empty">Одоогоор юу ч хийгээгүй.</li>'));
+  for (const a of data.audit) {
+    box.append(el(`<li><span class="who">${esc(a.who.replace('ops:', ''))}</span><div>${ACTION[a.action] ?? esc(a.action)}${a.note ? `<small>${esc(a.note)}</small>` : ''}</div><span class="when">${when(a.at)} ${clockOf(a.at)}</span></li>`));
+  }
+}
+
+/* ── the members ── */
+
 async function renderMembers(view) {
-  view.append(el('<section><h2><span>Гишүүд</span></h2><div class="rows" id="members"><div class="none">…</div></div></section>'));
+  view.append(head('Гишүүд', 'Хэн энэ хуудсанд орж, юу хийж болох вэ.'));
+  view.append(el('<div class="card"><table class="table"><thead><tr><th>Нэр</th><th>Утас</th><th>Эрх</th><th>Төлөв</th><th></th></tr></thead><tbody id="members"><tr><td colspan="5" class="empty">…</td></tr></tbody></table></div>'));
   let data;
   try {
     data = await ops('/v1/ops/members');
   } catch (error) {
-    view.querySelector('#members').replaceChildren(el(`<div class="none">${esc(error.message)}</div>`));
+    view.querySelector('#members').replaceChildren(el(`<tr><td colspan="5" class="empty">${esc(error.message)}</td></tr>`));
     return;
   }
-  const box = view.querySelector('#members');
-  if (!box) return;
-  box.replaceChildren();
+  const body = view.querySelector('#members');
+  if (!body) return;
+  body.replaceChildren();
+  if (!data.members.length) body.append(el('<tr><td colspan="5" class="empty">Бүртгэлтэй гишүүн алга. Доорх маягтаар нэмнэ.</td></tr>'));
   for (const m of data.members) {
-    const row = el(`<div class="row"${m.active ? '' : ' data-paid'}><div class="name">${esc(m.name)}<small>${esc(m.phone)} · ${ROLE_WORD[m.role] ?? m.role}${m.active ? '' : ' · идэвхгүй'}</small></div><div class="btns"></div></div>`);
+    const tr = el(`<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td class="mono">${esc(m.phone)}</td><td>${ROLE_WORD[m.role] ?? m.role}</td><td><span class="pill" data-s="${m.active ? 'contracted' : 'off'}">${m.active ? 'идэвхтэй' : 'хаасан'}</span></td><td class="num"></td></tr>`);
     if (m.id !== me?.id) {
-      const b = el(`<button class="btn" type="button">${m.active ? 'Хаах' : 'Нээх'}</button>`);
+      const b = el(`<button class="btn" data-size="sm" type="button"${m.active ? ' data-v="danger"' : ''}>${m.active ? 'Хаах' : 'Нээх'}</button>`);
       b.addEventListener('click', async () => {
         try {
           await ops(`/v1/ops/members/${m.id}/active`, { method: 'POST', body: { active: !m.active } });
@@ -773,19 +928,19 @@ async function renderMembers(view) {
           toast(error.message, 'bad');
         }
       });
-      row.querySelector('.btns').append(b);
+      tr.lastElementChild.append(b);
     }
-    box.append(row);
+    body.append(tr);
   }
   const form = el(`
-    <div class="new">
-      <div class="grid">
-        <label>Утас<input name="phone" placeholder="+976XXXXXXXX"></label>
-        <label>Нэр<input name="name" placeholder="Нэр"></label>
-        <label>Эрх<select name="role"><option value="ops">ops — захиалга, нийлүүлэгч</option><option value="finance">санхүү — олголт, буцаалт</option><option value="viewer">зөвхөн харах</option><option value="admin">админ</option></select></label>
+    <section class="section"><h2>Гишүүн нэмэх</h2><div class="card"><div class="card-body">
+      <div class="fields">
+        <label class="field"><span>Утас</span><input name="phone" placeholder="+976XXXXXXXX"></label>
+        <label class="field"><span>Нэр</span><input name="name" placeholder="Нэр"></label>
+        <label class="field"><span>Эрх</span><select name="role"><option value="ops">ops — захиалга, нийлүүлэгч</option><option value="finance">санхүү — олголт, буцаалт, данс</option><option value="viewer">зөвхөн харах</option><option value="admin">админ</option></select></label>
       </div>
-      <div class="foot"><button class="btn" data-v="primary" type="button" id="add-member">Гишүүн нэмэх</button></div>
-    </div>`);
+      <div class="form-foot"><button class="btn" data-v="primary" type="button" id="add-member">Гишүүн нэмэх</button></div>
+    </div></div></section>`);
   form.querySelector('#add-member').addEventListener('click', async () => {
     const v = (n) => form.querySelector(`[name="${n}"]`).value.trim();
     try {
@@ -799,7 +954,7 @@ async function renderMembers(view) {
   view.append(form);
 }
 
-/* ── boot ────────────────────────────────────────────────────────── */
+/* ── boot ─────────────────────────────────────────────────────────── */
 
 function boot() {
   root.replaceChildren();
