@@ -8,6 +8,7 @@ import { opsToken } from './ops.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
 import { createListing, markReady, registerSupplier, startPreparing } from '../idesh/index.js';
+import { listMembers, syncMembersFromEnv, upsertMember } from '../ops/index.js';
 
 /**
  * Becoming a supplier, over HTTP: the guest's side, the ops desk, and the
@@ -71,15 +72,15 @@ describe('the ops desk', () => {
     expect(handed.json().token).toBe('ops-secret-for-the-test');
   });
 
-  it('stays shut in production until somebody sets the secret', async () => {
-    delete process.env['OPS_TOKEN'];
+  it('opens to members only in production — a secret, set or not, is no key', async () => {
     const before = process.env['BASU_MODE'];
     process.env['BASU_MODE'] = 'production';
     try {
       expect(opsToken()).toBeNull();
-      const response = await app.inject({ method: 'GET', url: '/v1/ops/suppliers', headers: auth('anything') });
-      expect(response.statusCode).toBe(503);
-      expect(response.json().error.code).toBe('OPS_CLOSED');
+      for (const sent of ['anything', 'ops-secret-for-the-test']) {
+        const response = await app.inject({ method: 'GET', url: '/v1/ops/suppliers', headers: auth(sent) });
+        expect(response.statusCode, sent).toBe(401);
+      }
     } finally {
       if (before === undefined) delete process.env['BASU_MODE'];
       else process.env['BASU_MODE'] = before;
@@ -319,11 +320,11 @@ describe('the desk’s window onto orders', () => {
     expect(cancelled.json()).toEqual({ state: 'CANCELLED', refund_mnt: 460_000, forfeit_mnt: 0 });
 
     const one = await app.inject({ method: 'GET', url: `/v1/ops/orders/${id}`, headers: desk() });
-    expect(one.json().events.at(-2)).toMatchObject({ type: 'CANCELLED', actor: 'ops:Bayaraa' });
+    expect(one.json().events.at(-2)).toMatchObject({ type: 'CANCELLED', actor: 'ops:Демо' });
     expect(one.json().settlements).toEqual([expect.objectContaining({ kind: 'refund', state: 'needs_account', amount_mnt: 460_000 })]);
 
     const audit = await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() });
-    expect(audit.json().audit[0]).toMatchObject({ who: 'ops:Bayaraa', action: 'order.cancel', target_id: id, note: 'зочин утсаар хүссэн, нийлүүлэгч холбогдохгүй' });
+    expect(audit.json().audit[0]).toMatchObject({ who: 'ops:Демо', action: 'order.cancel', target_id: id, note: 'зочин утсаар хүссэн, нийлүүлэгч холбогдохгүй' });
   });
 
   it('says a message again, and hands over on the supplier’s behalf', async () => {
@@ -373,6 +374,82 @@ describe('the desk’s window onto orders', () => {
 
     const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() })).json().audit;
     expect(audit.map((a: { action: string }) => a.action)).toEqual(['supplier.activate', 'supplier.suspend', 'listing.hide']);
-    expect(audit[1]).toMatchObject({ who: 'ops:Bayaraa', note: 'гэрээ зөрчсөн' });
+    expect(audit[1]).toMatchObject({ who: 'ops:Демо', note: 'гэрээ зөрчсөн' });
+  });
+});
+
+/* ── who sits at the desk ── */
+
+describe('the desk’s members', () => {
+  it('lets a member in by their own phone, and records them by name', async () => {
+    await upsertMember({ phone: '+97688102856', name: 'Баярцогт', role: 'admin' });
+    const token = await signIn('+97688102856');
+    const me = await app.inject({ method: 'GET', url: '/v1/ops/me', headers: auth(token) });
+    expect(me.json().member).toMatchObject({ name: 'Баярцогт', role: 'admin', phone: '+97688102856' });
+
+    const made = await app.inject({
+      method: 'POST',
+      url: '/v1/ops/suppliers',
+      headers: auth(token),
+      payload: { name: 'Хэрлэн', phone: '+97688010002', address: 'Эмээлт' },
+    });
+    expect(made.statusCode, made.body).toBe(201);
+    // Nobody else gets in on a phone that is not on the list.
+    const stranger = await signIn('+97699001234');
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/me', headers: auth(stranger) })).statusCode).toBe(401);
+  });
+
+  it('keeps each role to its own: a viewer looks, ops runs, finance pays, admin decides who', async () => {
+    await upsertMember({ phone: '+97699000011', name: 'Харагч', role: 'viewer' });
+    await upsertMember({ phone: '+97699000012', name: 'Ажилтан', role: 'ops' });
+    await upsertMember({ phone: '+97699000013', name: 'Санхүү', role: 'finance' });
+    const viewer = await signIn('+97699000011');
+    const worker = await signIn('+97699000012');
+    const finance = await signIn('+97699000013');
+    const { id, supplierId } = await aPaidOrder();
+
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/orders', headers: auth(viewer) })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'POST', url: `/v1/ops/orders/${id}/resend`, headers: auth(viewer), payload: {} })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'POST', url: `/v1/ops/orders/${id}/resend`, headers: auth(worker), payload: {} })).statusCode).toBe(200);
+
+    const nobodys = '00000000-0000-0000-0000-000000000000';
+    expect((await app.inject({ method: 'POST', url: `/v1/ops/settlements/${nobodys}/paid`, headers: auth(worker), payload: {} })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'POST', url: `/v1/ops/settlements/${nobodys}/paid`, headers: auth(finance), payload: {} })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'PATCH', url: `/v1/ops/suppliers/${supplierId}`, headers: auth(worker), payload: { commission_pct: 3 } })).statusCode).toBe(403);
+    expect((await app.inject({ method: 'PATCH', url: `/v1/ops/suppliers/${supplierId}`, headers: auth(finance), payload: { commission_pct: 3 } })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/members', headers: auth(finance) })).statusCode).toBe(403);
+
+    const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: auth(viewer) })).json().audit;
+    expect(audit.map((a: { who: string }) => a.who)).toEqual(['ops:Санхүү', 'ops:Ажилтан']);
+  });
+
+  it('is seeded from the environment, and an admin may add and close members', async () => {
+    expect(await syncMembersFromEnv('+97699000021:Аа:admin, +97699000022:Бб:finance')).toBe(2);
+    expect((await listMembers()).map((m) => [m.name, m.role])).toEqual([['Аа', 'admin'], ['Бб', 'finance']]);
+
+    const admin = await signIn('+97699000021');
+    const added = await app.inject({ method: 'POST', url: '/v1/ops/members', headers: auth(admin), payload: { phone: '+9769900 0023', name: 'Вв', role: 'viewer' } });
+    expect(added.statusCode, added.body).toBe(201);
+    expect(added.json()).toMatchObject({ phone: '+97699000023', role: 'viewer', active: true });
+    const closed = await app.inject({ method: 'POST', url: `/v1/ops/members/${added.json().id}/active`, headers: auth(admin), payload: { active: false } });
+    expect(closed.json()).toEqual({ id: added.json().id, active: false });
+    const shut = await signIn('+97699000023');
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/me', headers: auth(shut) })).statusCode).toBe(401);
+    // Not yourself: the desk must keep at least the person closing doors.
+    const self = (await app.inject({ method: 'GET', url: '/v1/ops/me', headers: auth(admin) })).json().member.id;
+    expect((await app.inject({ method: 'POST', url: `/v1/ops/members/${self}/active`, headers: auth(admin), payload: { active: false } })).statusCode).toBe(400);
+  });
+
+  it('opens to no shared secret in production', async () => {
+    const before = process.env['BASU_MODE'];
+    process.env['BASU_MODE'] = 'production';
+    try {
+      expect(opsToken()).toBeNull();
+      const res = await app.inject({ method: 'GET', url: '/v1/ops/suppliers', headers: auth('ops-secret-for-the-test') });
+      expect(res.statusCode).toBe(401);
+    } finally {
+      if (before === undefined) delete process.env['BASU_MODE'];
+      else process.env['BASU_MODE'] = before;
+    }
   });
 });

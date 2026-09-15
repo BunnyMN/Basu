@@ -3,6 +3,7 @@ import { closePool } from '../db/pool.js';
 import { mode } from '../mode.js';
 import { buildServer } from '../api/server.js';
 import { buildProviders } from './providers.js';
+import { syncMembersFromEnv } from '../ops/index.js';
 
 /**
  * The API process. The scheduler runs separately — see src/entry/scheduler.ts
@@ -16,6 +17,7 @@ const running = mode();
 
 const ctx = buildProviders((line) => console.log(line.replace('[providers]', '[api]')));
 
+await syncMembersFromEnv(process.env['OPS_MEMBERS']);
 const app = await buildServer(ctx, { logger: false, dev: running === 'demo', trustProxy: running === 'production' });
 const port = Number(process.env['PORT'] ?? 3000);
 await app.listen({ port, host: '0.0.0.0' });

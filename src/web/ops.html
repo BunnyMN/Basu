@@ -51,7 +51,7 @@ section > h2{
 .new .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px}
 .new label{display:flex;flex-direction:column;gap:4px;font-family:"IBM Plex Mono",monospace;font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3)}
 .new label.wide{grid-column:1 / -1}
-.new input{width:100%;padding:8px 9px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);color:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:.86rem;letter-spacing:0;text-transform:none}
+.new input,.new select{width:100%;padding:8px 9px;border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);color:var(--ink);font-family:"IBM Plex Mono",monospace;font-size:.86rem;letter-spacing:0;text-transform:none}
 .new .foot{display:flex;justify-content:flex-end;margin-top:10px;gap:10px;align-items:center}
 /* ── the desk's sections, one at a time ── */
 .tabs{display:flex;gap:4px;padding:8px 14px 0;border-bottom:1px solid var(--line);background:var(--bg);overflow-x:auto}
@@ -125,43 +125,89 @@ const STATE = { applied: 'хүлээгдэж байна', contracted: 'гэрэ�
 
 async function showToken() {
   root.replaceChildren();
-  // The demo hands its secret out; production types it once.
+  // The demo hands its secret out; anywhere else a member signs in by phone.
   const demo = await api('/dev/ops-token').catch(() => null);
+  if (demo?.token) {
+    const card = el(`
+      <div class="pair">
+        <h2>Ops · демо</h2>
+        <p>Демо горим: нууц үг автоматаар орлоо.</p>
+        <input type="password" placeholder="OPS_TOKEN" aria-label="Ops нууц" autocomplete="off">
+        <button class="btn" data-v="primary" data-size="lg" type="button">Нэвтрэх</button>
+      </div>`);
+    const input = card.querySelector('input');
+    input.value = demo.token;
+    const submit = async () => {
+      store.opsToken = input.value.trim();
+      try {
+        ({ member: me } = await api('/v1/ops/me', { token: store.opsToken }));
+        boot();
+      } catch (error) {
+        store.opsToken = null;
+        toast(error.message, 'bad');
+      }
+    };
+    card.querySelector('button').addEventListener('click', submit);
+    input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+    root.append(card);
+    return;
+  }
   const card = el(`
     <div class="pair">
       <h2>Ops</h2>
-      <p>Сервер дээрх <code>OPS_TOKEN</code>-ыг оруулна уу. Нийлүүлэгчийн хүсэлтийг батлах, шинэ нийлүүлэгч бүртгэх нь эндээс.</p>
-      <input type="password" placeholder="OPS_TOKEN" aria-label="Ops нууц" autocomplete="off">
-      <button class="btn" data-v="primary" data-size="lg" type="button">Нэвтрэх</button>
+      <p>Гишүүн утасны дугаараараа нэвтэрнэ. Дугаар руу нэг удаагийн код очно.</p>
+      <input name="phone" inputmode="tel" placeholder="+976 XXXX XXXX" aria-label="Утас" autocomplete="tel">
+      <input name="code" inputmode="numeric" maxlength="6" placeholder="Ирсэн код" aria-label="Код" autocomplete="one-time-code" hidden>
+      <button class="btn" data-v="primary" data-size="lg" type="button" id="send">Код авах</button>
     </div>`);
-  const input = card.querySelector('input');
-  if (demo?.token) {
-    input.value = demo.token;
-    card.append(el('<div class="hint">Демо горим: нууц үг автоматаар орлоо.</div>'));
-  }
+  const phone = card.querySelector('[name="phone"]');
+  const code = card.querySelector('[name="code"]');
+  const send = card.querySelector('#send');
+  let asked = false;
   const submit = async () => {
-    store.opsToken = input.value.trim();
     try {
-      await api('/v1/ops/suppliers', { token: store.opsToken });
+      if (!asked) {
+        await api('/v1/auth/otp', { method: 'POST', body: { phone: phone.value.replace(/\s+/g, '') } });
+        asked = true;
+        code.hidden = false;
+        send.textContent = 'Нэвтрэх';
+        code.focus();
+        return;
+      }
+      const { token: t } = await api('/v1/auth/verify', {
+        method: 'POST',
+        body: { phone: phone.value.replace(/\s+/g, ''), code: code.value.trim(), device: 'Ops' },
+      });
+      try {
+        ({ member: me } = await api('/v1/ops/me', { token: t }));
+      } catch {
+        toast('Энэ дугаар ops-ийн гишүүн биш байна.', 'bad');
+        return;
+      }
+      store.opsToken = t;
       boot();
     } catch (error) {
-      store.opsToken = null;
       toast(error.message, 'bad');
-      input.select();
     }
   };
-  card.querySelector('button').addEventListener('click', submit);
-  input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+  send.addEventListener('click', submit);
+  code.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+  phone.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
   root.append(card);
-  input.focus();
+  phone.focus();
 }
 
 /* ── the desk ────────────────────────────────────────────────────── */
 
-const opsName = () => localStorage.getItem('basu.ops.name') ?? '';
-/** Every call from the desk carries the desk's secret and, when given, the person's name. */
-const ops = (path, options = {}) =>
-  api(path, { ...options, token: store.opsToken, headers: opsName() ? { 'x-ops-name': opsName() } : {} });
+/**
+ * The desk's own session: the demo's secret, or a member's sign-in — kept
+ * under its own key, never the guest's, so a person who is both a guest
+ * and a member keeps both, and a browser that is only a guest is simply
+ * shown the door here.
+ */
+const token = () => store.opsToken;
+const ops = (path, options = {}) => api(path, { ...options, token: token() });
+let me = null;
 
 const TABS = [
   { key: 'stats', label: 'Тоон үзүүлэлт' },
@@ -169,18 +215,20 @@ const TABS = [
   { key: 'suppliers', label: 'Нийлүүлэгчид' },
   { key: 'pay', label: 'Олголт, буцаалт' },
   { key: 'audit', label: 'Бүртгэл' },
+  { key: 'members', label: 'Гишүүд', admin: true },
 ];
 let tab = localStorage.getItem('basu.ops.tab') ?? 'stats';
 let cache = { suppliers: [], settlements: [] };
 
 async function refresh() {
   try {
-    const [{ suppliers }, { settlements }] = await Promise.all([ops('/v1/ops/suppliers'), ops('/v1/ops/settlements')]);
+    const [{ suppliers }, { settlements }, whoami] = await Promise.all([ops('/v1/ops/suppliers'), ops('/v1/ops/settlements'), ops('/v1/ops/me')]);
     cache = { suppliers, settlements };
+    me = whoami.member;
   } catch (error) {
     if (error.status === 401 || error.status === 503) {
       store.opsToken = null;
-      toast(error.message, 'bad');
+      me = null;
       showToken();
       return;
     }
@@ -197,23 +245,23 @@ function frame() {
       <div class="top">
         <h1>Ops · идэш</h1>
         <span class="lab" id="tally"></span>
+        <span class="lab" id="me">${esc(me?.name ?? '')}${me ? ` · ${ROLE_WORD[me.role] ?? me.role}` : ''}</span>
         <button class="swap" type="button" id="out">Гарах</button>
       </div>
       <nav class="tabs" aria-label="Хэсгүүд">
-        ${TABS.map((t) => `<button type="button" data-tab="${t.key}">${t.label}</button>`).join('')}
-        <input class="name" id="who" placeholder="Таны нэр (бүртгэлд)" value="${esc(opsName())}">
+        ${TABS.filter((t) => !t.admin || me?.role === 'admin').map((t) => `<button type="button" data-tab="${t.key}">${t.label}</button>`).join('')}
       </nav>
       <div class="wrap" id="view"></div>
     </div>`);
   f.querySelector('#out').addEventListener('click', () => {
     store.opsToken = null;
+    me = null;
     showToken();
   });
   f.querySelector('.tabs').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-tab]');
     if (b) show(b.dataset.tab);
   });
-  f.querySelector('#who').addEventListener('change', (e) => localStorage.setItem('basu.ops.name', e.target.value.trim()));
   root.replaceChildren(f);
 }
 
@@ -228,7 +276,7 @@ function show(key) {
   const view = document.getElementById('view');
   const scroll = window.scrollY;
   view.replaceChildren();
-  ({ stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit })[key]?.(view);
+  ({ stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers })[key]?.(view);
   window.scrollTo(0, scroll);
 }
 
@@ -687,11 +735,64 @@ function newForm() {
   return form;
 }
 
+const ROLE_WORD = { admin: 'админ', finance: 'санхүү', ops: 'ops', viewer: 'зөвхөн харах' };
+
+/** Who sits at the desk. Admin only: add by phone, take away. */
+async function renderMembers(view) {
+  view.append(el('<section><h2><span>Гишүүд</span></h2><div class="rows" id="members"><div class="none">…</div></div></section>'));
+  let data;
+  try {
+    data = await ops('/v1/ops/members');
+  } catch (error) {
+    view.querySelector('#members').replaceChildren(el(`<div class="none">${esc(error.message)}</div>`));
+    return;
+  }
+  const box = view.querySelector('#members');
+  if (!box) return;
+  box.replaceChildren();
+  for (const m of data.members) {
+    const row = el(`<div class="row"${m.active ? '' : ' data-paid'}><div class="name">${esc(m.name)}<small>${esc(m.phone)} · ${ROLE_WORD[m.role] ?? m.role}${m.active ? '' : ' · идэвхгүй'}</small></div><div class="btns"></div></div>`);
+    if (m.id !== me?.id) {
+      const b = el(`<button class="btn" type="button">${m.active ? 'Хаах' : 'Нээх'}</button>`);
+      b.addEventListener('click', async () => {
+        try {
+          await ops(`/v1/ops/members/${m.id}/active`, { method: 'POST', body: { active: !m.active } });
+          show('members');
+        } catch (error) {
+          toast(error.message, 'bad');
+        }
+      });
+      row.querySelector('.btns').append(b);
+    }
+    box.append(row);
+  }
+  const form = el(`
+    <div class="new">
+      <div class="grid">
+        <label>Утас<input name="phone" placeholder="+976XXXXXXXX"></label>
+        <label>Нэр<input name="name" placeholder="Нэр"></label>
+        <label>Эрх<select name="role"><option value="ops">ops — захиалга, нийлүүлэгч</option><option value="finance">санхүү — олголт, буцаалт</option><option value="viewer">зөвхөн харах</option><option value="admin">админ</option></select></label>
+      </div>
+      <div class="foot"><button class="btn" data-v="primary" type="button" id="add-member">Гишүүн нэмэх</button></div>
+    </div>`);
+  form.querySelector('#add-member').addEventListener('click', async () => {
+    const v = (n) => form.querySelector(`[name="${n}"]`).value.trim();
+    try {
+      await ops('/v1/ops/members', { method: 'POST', body: { phone: v('phone'), name: v('name'), role: v('role') } });
+      toast('Нэмэгдлээ.');
+      show('members');
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  view.append(form);
+}
+
 /* ── boot ────────────────────────────────────────────────────────── */
 
 function boot() {
   root.replaceChildren();
-  if (!store.opsToken) {
+  if (!token()) {
     showToken();
     return;
   }

@@ -31,33 +31,36 @@ import {
 import { limits } from './hardening.js';
 import { shapeOrder, shapeSettlement } from './shapes.js';
 import { mode } from '../mode.js';
-import { badRequest, sendError, unauthorized } from './errors.js';
+import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
+import { listMembers, memberByPhone, setMemberActive, upsertMember, type Member, type Role } from '../ops/index.js';
+import { contactsFor, resolveGuest } from '../platform/identity/index.js';
 import type { Ctx } from '../ports.js';
 
 /**
- * Ops: the few people at Basu who sign contracts.
+ * Ops: the few people at Basu who sign contracts and move money.
  *
- * One shared secret, `OPS_TOKEN` in the server's `.env`, sent as a bearer
- * token by the ops page. Not a user system — there are two or three of these
- * people and they sit in one room — and deliberately not a guest with a
- * flag, which would put «who may approve a supplier» into a table anybody
- * with the database could edit. A secret in the environment is exactly as
- * hard to change as the deploy, which is the right amount.
- *
- * In demo mode the token is minted at boot and handed out by `/dev/ops-token`
- * so a walkthrough can approve somebody. In production it has to be set; if
- * it is not, the ops surface says so and stays shut rather than opening.
+ * They sign in like anybody — phone and a one-time code — and what makes
+ * the session ops is that the phone is a member's, on the desk's own list,
+ * with a role. Every action is recorded under that member. The shared
+ * `OPS_TOKEN` of the first weeks is kept only for the demo, where a
+ * walkthrough needs a desk without a phone; in production it opens nothing.
  */
 
 type Guard = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
 
+declare module 'fastify' {
+  interface FastifyRequest {
+    ops?: { id: string; name: string; role: Role; phone: string | null };
+  }
+}
+
 let minted: string | null = null;
 
-/** The token in force, or null when production has none configured. */
+/** The demo's shared secret, or null when there is none to hand out. */
 export function opsToken(): string | null {
+  if (mode() === 'production') return null;
   const configured = process.env['OPS_TOKEN']?.trim();
   if (configured) return configured;
-  if (mode() === 'production') return null;
   minted ??= randomBytes(18).toString('base64url');
   return minted;
 }
@@ -73,6 +76,14 @@ function same(a: string, b: string): boolean {
   const right = Buffer.from(b);
   return left.length === right.length && timingSafeEqual(left, right);
 }
+
+/** What each role may do. Admin may do all of it. */
+const MAY: Record<string, readonly Role[]> = {
+  look: ['admin', 'finance', 'ops', 'viewer'],
+  run: ['admin', 'ops'],
+  money: ['admin', 'finance'],
+  members: ['admin'],
+};
 
 const shape = (s: SupplierRow) => ({
   id: s.id,
@@ -103,21 +114,68 @@ export async function registerOpsRoutes(
   opts: { dev: boolean },
 ): Promise<void> {
   const requireOps: Guard = async (request, reply) => {
-    const token = opsToken();
-    if (!token) {
-      return sendError(reply, new IdeshError('OPS_CLOSED', 'OPS_TOKEN is not configured'));
-    }
     const sent = bearer(request);
-    if (!sent || !same(sent, token)) return unauthorized(reply);
+    if (!sent) return unauthorized(reply);
+    const shared = opsToken();
+    if (shared && same(sent, shared)) {
+      request.ops = { id: 'demo', name: 'Демо', role: 'admin', phone: null };
+      return undefined;
+    }
+    const guestId = await resolveGuest(ctx, sent);
+    if (!guestId) return unauthorized(reply);
+    const phone = (await contactsFor([guestId])).get(guestId)?.phone;
+    const member = phone ? await memberByPhone(phone) : null;
+    if (!member?.active) return unauthorized(reply);
+    request.ops = { id: member.id, name: member.name, role: member.role, phone: member.phone };
     return undefined;
   };
-  const asOps = { preHandler: requireOps, config: { rateLimit: limits().ops } };
-
-  /** Who at ops: the token is one secret, so a name may ride on a header. */
-  const who = (request: FastifyRequest) => {
-    const name = String(request.headers['x-ops-name'] ?? '').trim();
-    return name ? `ops:${name.slice(0, 40)}` : 'ops';
+  /** A route that needs more than a seat at the desk. */
+  const may = (what: keyof typeof MAY): Guard => async (request, reply) => {
+    if (!request.ops || !MAY[what]!.includes(request.ops.role)) return forbidden(reply, `this needs one of ${MAY[what]!.join(', ')}`);
+    return undefined;
   };
+  const limit = { rateLimit: limits().ops };
+  const asOps = { preHandler: requireOps, config: limit };
+  const asRunner = { preHandler: [requireOps, may('run')], config: limit };
+  const asFinance = { preHandler: [requireOps, may('money')], config: limit };
+  const asAdmin = { preHandler: [requireOps, may('members')], config: limit };
+
+  /** Who is acting, for the record: the member the session belongs to. */
+  const who = (request: FastifyRequest) => `ops:${request.ops?.name ?? '?'}`;
+
+  /** Who am I at the desk — what the page asks after signing in. */
+  app.get('/v1/ops/me', asOps, async (request) => ({
+    member: { id: request.ops!.id, name: request.ops!.name, role: request.ops!.role, phone: request.ops!.phone },
+  }));
+
+  /* ── the members, admin only ── */
+
+  const shapeMember = (m: Member) => ({ id: m.id, phone: m.phone, name: m.name, role: m.role, active: m.active, created_at: m.createdAt.toISOString() });
+
+  app.get('/v1/ops/members', asAdmin, async () => ({ members: (await listMembers()).map(shapeMember) }));
+
+  app.post<{ Body: { phone?: string; name?: string; role?: string } }>('/v1/ops/members', asAdmin, async (request, reply) => {
+    const body = request.body ?? {};
+    try {
+      const member = await upsertMember({ phone: body.phone ?? '', name: body.name ?? '', role: (body.role ?? 'ops') as Role });
+      await recordAudit({ who: who(request), action: 'member.upsert', targetKind: 'supplier', targetId: member.id, note: `${member.name} · ${member.role}` });
+      return reply.status(201).send(shapeMember(member));
+    } catch (error) {
+      return badRequest(reply, 'Утас (+976XXXXXXXX), нэр, эрхээ шалгана уу.', (error as Error).message);
+    }
+  });
+
+  app.post<{ Params: { id: string }; Body: { active?: boolean } }>('/v1/ops/members/:id/active', asAdmin, async (request, reply) => {
+    if (typeof request.body?.active !== 'boolean') return badRequest(reply, 'active: true эсвэл false.', 'active must be a boolean');
+    if (request.params.id === request.ops!.id && !request.body.active) return badRequest(reply, 'Өөрийгөө хаах боломжгүй.', 'cannot deactivate yourself');
+    try {
+      await setMemberActive(request.params.id, request.body.active);
+      await recordAudit({ who: who(request), action: request.body.active ? 'member.activate' : 'member.deactivate', targetKind: 'supplier', targetId: request.params.id });
+      return reply.send({ id: request.params.id, active: request.body.active });
+    } catch (error) {
+      return sendError(reply, new IdeshError('NOT_FOUND', (error as Error).message));
+    }
+  });
 
   /** Everybody who is, or asked to be, a supplier. Applications first. */
   app.get('/v1/ops/suppliers', asOps, async () => ({
@@ -137,7 +195,7 @@ export async function registerOpsRoutes(
       bank_account?: string;
       bank_holder?: string;
     };
-  }>('/v1/ops/suppliers', asOps, async (request, reply) => {
+  }>('/v1/ops/suppliers', asRunner, async (request, reply) => {
     const body = request.body ?? {};
     if (!body.name?.trim() || !body.phone || !body.address?.trim()) {
       return badRequest(reply, 'Нэр, утас, авах цэгээ оруулна уу.', 'name, phone and address are required');
@@ -164,7 +222,7 @@ export async function registerOpsRoutes(
     }
   });
 
-  app.post<{ Params: { id: string } }>('/v1/ops/suppliers/:id/approve', asOps, async (request, reply) => {
+  app.post<{ Params: { id: string } }>('/v1/ops/suppliers/:id/approve', asRunner, async (request, reply) => {
     try {
       const { pairingCode } = await approveSupplier(ctx, request.params.id);
       return reply.send({ state: 'contracted', pairing_code: pairingCode });
@@ -175,7 +233,7 @@ export async function registerOpsRoutes(
 
   app.post<{ Params: { id: string }; Body: { reason?: string } }>(
     '/v1/ops/suppliers/:id/decline',
-    asOps,
+    asRunner,
     async (request, reply) => {
       try {
         await declineSupplier(ctx, request.params.id, request.body?.reason ?? '');
@@ -190,7 +248,7 @@ export async function registerOpsRoutes(
   app.patch<{
     Params: { id: string };
     Body: { commission_pct?: number; tin?: string; bank_name?: string; bank_account?: string; bank_holder?: string };
-  }>('/v1/ops/suppliers/:id', asOps, async (request, reply) => {
+  }>('/v1/ops/suppliers/:id', asFinance, async (request, reply) => {
     const body = request.body ?? {};
     if (body.commission_pct !== undefined && typeof body.commission_pct !== 'number') {
       return badRequest(reply, 'Шимтгэл тоо байх ёстой.', 'commission_pct must be a number');
@@ -248,7 +306,7 @@ export async function registerOpsRoutes(
    */
   app.post<{ Params: { id: string; action: string }; Body: { reason?: string; note?: string } }>(
     '/v1/ops/orders/:id/:action',
-    asOps,
+    asRunner,
     async (request, reply) => {
       const { id, action } = request.params;
       const body = request.body ?? {};
@@ -339,7 +397,7 @@ export async function registerOpsRoutes(
 
   app.post<{ Params: { id: string }; Body: { active?: boolean; note?: string } }>(
     '/v1/ops/suppliers/:id/active',
-    asOps,
+    asRunner,
     async (request, reply) => {
       const active = request.body?.active;
       if (typeof active !== 'boolean') return badRequest(reply, 'active: true эсвэл false.', 'active must be a boolean');
@@ -354,7 +412,7 @@ export async function registerOpsRoutes(
     },
   );
 
-  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/listings/:id/hide', asOps, async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/listings/:id/hide', asRunner, async (request, reply) => {
     try {
       await hideListing(request.params.id, ctx.clock.now());
       await recordAudit({ who: who(request), action: 'listing.hide', targetKind: 'listing', targetId: request.params.id, note: request.body?.note ?? null });
@@ -386,7 +444,7 @@ export async function registerOpsRoutes(
   /** «Шилжүүлсэн»: the bank transfer was made by hand; the ledger and the person owed hear of it. */
   app.post<{ Params: { id: string }; Body: { reference?: string } }>(
     '/v1/ops/settlements/:id/paid',
-    asOps,
+    asFinance,
     async (request, reply) => {
       try {
         const paid = await markSettled(ctx, request.params.id, 'ops', request.body?.reference ?? '');
@@ -398,7 +456,7 @@ export async function registerOpsRoutes(
   );
 
   /** A fresh code — a lost phone, a code that expired unread. */
-  app.post<{ Params: { id: string } }>('/v1/ops/suppliers/:id/code', asOps, async (request, reply) => {
+  app.post<{ Params: { id: string } }>('/v1/ops/suppliers/:id/code', asRunner, async (request, reply) => {
     const known = (await listSuppliers()).find((s) => s.id === request.params.id);
     if (!known || known.state !== 'contracted') {
       return sendError(reply, new IdeshError('NOT_FOUND', 'no contracted supplier under that id'));
