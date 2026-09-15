@@ -10,6 +10,8 @@ export type IdeshErrorCode =
   | 'PAYMENT_FAILED'
   | 'BAD_REASON'
   | 'NEEDS_ACCOUNT'
+  | 'OTP_REQUIRED'
+  | 'BANK_UNVERIFIED'
   | 'ALREADY_APPLIED'
   | 'NOT_PENDING'
   | 'OPS_CLOSED';

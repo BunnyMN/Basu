@@ -1128,6 +1128,8 @@ function refundPanel(order) {
               <input id="account" inputmode="numeric" placeholder="5012345678"></div>
             <div class="field"><label for="holder">Данс эзэмшигчийн нэр</label>
               <input id="holder" placeholder="Банкинд бүртгэлтэй нэр"></div>
+            <div class="field" id="otp-step" hidden><label for="otp">Утсанд тань ирсэн код</label>
+              <input id="otp" inputmode="numeric" maxlength="6" placeholder="6 оронтой код" autocomplete="one-time-code"></div>
             <p class="why" data-calm id="refund-why">${MARK.warn}Гурвууланг нь бичнэ үү.</p>
             <button class="btn" data-v="primary" data-size="lg" type="button" id="send-account" disabled>Данс илгээх</button>
           </div></div>`),
@@ -1154,14 +1156,24 @@ function refundPanel(order) {
     send.addEventListener('click', async () => {
       send.disabled = true;
       try {
+        const otp = panel.querySelector('#otp').value.trim();
         await guestApi(`/v1/idesh/${state.orderId}/refund-account`, {
           method: 'POST',
-          body: { bank_name: bank.value, bank_account: account.value, bank_holder: holder.value },
+          body: { bank_name: bank.value, bank_account: account.value, bank_holder: holder.value, otp_code: otp || undefined },
         });
         toast('Данс бүртгэгдлээ. Шилжүүлмэгц SMS ирнэ.');
         shell.ordersChanged();
         if (!gone) await Promise.all([showStatus(true), loadMine()]);
       } catch (error) {
+        if (error.code === 'OTP_REQUIRED') {
+          // Money is about to be sent to this account: a code went to the phone.
+          panel.querySelector('#otp-step').hidden = false;
+          panel.querySelector('#otp').focus();
+          why.hidden = false;
+          why.innerHTML = `${MARK.warn}Утсанд тань код илгээлээ. Кодоо оруулаад дахин дарна уу.`;
+          send.disabled = false;
+          return;
+        }
         toast(error.message, 'bad');
         send.disabled = false;
       }

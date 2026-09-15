@@ -52,6 +52,7 @@ export const shapeSettlement = (t: Settlement) => ({
   bank_name: t.bank?.bankName ?? null,
   bank_account: t.bank?.bankAccount ?? null,
   bank_holder: t.bank?.bankHolder ?? null,
+  bank_verified: t.bankVerified,
   reference: t.reference,
   paid_at: t.paidAt?.toISOString() ?? null,
   created_at: t.createdAt.toISOString(),

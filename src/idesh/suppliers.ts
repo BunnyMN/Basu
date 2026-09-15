@@ -48,8 +48,8 @@ export async function registerSupplier(input: SupplierInput, db: Db = getPool())
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO idesh.supplier
        (name, phone, ebarimt_merchant_tin, pickup_address, lat, lon, state, contracted_at,
-        bank_name, bank_account, bank_holder, owner_guest_id)
-     VALUES ($1, $2, $3, $4, $5, $6, 'contracted', now(), $7, $8, $9, $10) RETURNING id`,
+        bank_name, bank_account, bank_holder, owner_guest_id, bank_verified_at)
+     VALUES ($1, $2, $3, $4, $5, $6, 'contracted', now(), $7, $8, $9, $10, CASE WHEN $8::text IS NULL THEN NULL ELSE now() END) RETURNING id`,
     [
       input.name.trim(),
       input.phone,
@@ -248,7 +248,8 @@ export async function approveSupplier(ctx: Ctx, supplierId: string): Promise<{ p
   const approved = await tx(async (client) => {
     const { rows } = await client.query<{ owner_guest_id: string | null; name: string }>(
       `UPDATE idesh.supplier
-          SET state = 'contracted', contracted_at = $2, decided_at = $2, decline_reason = NULL
+          SET state = 'contracted', contracted_at = $2, decided_at = $2,
+             bank_verified_at = CASE WHEN bank_account IS NOT NULL THEN $2::timestamptz ELSE NULL END, decline_reason = NULL
         WHERE id = $1 AND state = 'applied'
         RETURNING owner_guest_id, name`,
       [supplierId, now],
@@ -326,6 +327,9 @@ export interface SupplierRow {
   bankName: string | null;
   bankAccount: string | null;
   bankHolder: string | null;
+  /** Checked against the contract by finance; a changed account is not, until they do. */
+  bankVerified: boolean;
+  bankChangedAt: Date | null;
   /** Whether a screen is currently paired — «холбогдсон» on the demo list. */
   watched: boolean;
   listings: number;
@@ -351,12 +355,14 @@ export async function listSuppliers(db: Db = getPool()): Promise<SupplierRow[]> 
     bank_name: string | null;
     bank_account: string | null;
     bank_holder: string | null;
+    bank_verified_at: Date | null;
+    bank_changed_at: Date | null;
     watched: boolean;
     listings: number;
   }>(
     `SELECT s.id, s.name, s.phone, s.ebarimt_merchant_tin, s.pickup_address, s.about,
             s.lat, s.lon, s.state, s.active, s.applied_at, s.contracted_at, s.decline_reason,
-            s.commission_pct, s.bank_name, s.bank_account, s.bank_holder,
+            s.commission_pct, s.bank_name, s.bank_account, s.bank_holder, s.bank_verified_at, s.bank_changed_at,
             EXISTS (SELECT 1 FROM idesh.supplier_device d
                      WHERE d.supplier_id = s.id AND d.revoked_at IS NULL
                        AND d.paired_at IS NOT NULL) AS watched,
@@ -382,6 +388,8 @@ export async function listSuppliers(db: Db = getPool()): Promise<SupplierRow[]> 
     bankName: r.bank_name,
     bankAccount: r.bank_account,
     bankHolder: r.bank_holder,
+    bankVerified: r.bank_verified_at !== null,
+    bankChangedAt: r.bank_changed_at,
     watched: r.watched,
     listings: r.listings,
   }));
@@ -400,15 +408,24 @@ export interface ProfileEdit extends BankDetails {
   lon?: number | null | undefined;
 }
 
-/** What a supplier may change about themselves: how they are named and found, and where the money goes. */
-export async function updateSupplierProfile(supplierId: string, edit: ProfileEdit, db: Db = getPool()): Promise<void> {
+/**
+ * What a supplier may change about themselves: how they are named and
+ * found, and where the money goes. A changed account comes back flagged —
+ * the caller tells the owner and finance checks it before anything is paid
+ * to it.
+ */
+export async function updateSupplierProfile(
+  supplierId: string,
+  edit: ProfileEdit,
+  db: Db = getPool(),
+): Promise<{ bankChanged: boolean }> {
   if (edit.name !== undefined && edit.name.trim().length < 2) throw new IdeshError('WRONG_STATE', 'a supplier needs a name');
   if (edit.pickupAddress !== undefined && edit.pickupAddress.trim().length < 4) {
     throw new IdeshError('WRONG_STATE', 'a supplier needs a pickup address');
   }
-  if (edit.bankAccount && !/^\d{6,20}$/.test(edit.bankAccount.replace(/\s+/g, ''))) {
-    throw new IdeshError('WRONG_STATE', 'an account number is 6 to 20 digits');
-  }
+  const account = edit.bankAccount?.replace(/\s+/g, '') || null;
+  if (account && !/^\d{6,20}$/.test(account)) throw new IdeshError('WRONG_STATE', 'an account number is 6 to 20 digits');
+  const bankChanged = await bankWouldChange(supplierId, edit, db);
   const { rowCount } = await db.query(
     `UPDATE idesh.supplier
         SET name           = COALESCE($2, name),
@@ -418,7 +435,9 @@ export async function updateSupplierProfile(supplierId: string, edit: ProfileEdi
             lon            = CASE WHEN $6::boolean THEN $8 ELSE lon END,
             bank_name      = COALESCE($9, bank_name),
             bank_account   = COALESCE($10, bank_account),
-            bank_holder    = COALESCE($11, bank_holder)
+            bank_holder    = COALESCE($11, bank_holder),
+            bank_changed_at  = CASE WHEN $12::boolean THEN now() ELSE bank_changed_at END,
+            bank_verified_at = CASE WHEN $12::boolean THEN NULL ELSE bank_verified_at END
       WHERE id = $1`,
     [
       supplierId,
@@ -430,11 +449,38 @@ export async function updateSupplierProfile(supplierId: string, edit: ProfileEdi
       edit.lat ?? null,
       edit.lon ?? null,
       edit.bankName?.trim() || null,
-      edit.bankAccount?.replace(/\s+/g, '') || null,
+      account,
       edit.bankHolder?.trim() || null,
+      bankChanged,
     ],
   );
   if (!rowCount) throw new IdeshError('NOT_FOUND', 'no such supplier');
+  return { bankChanged };
+}
+
+/** Would this edit move the money somewhere else than it goes today? */
+export async function bankWouldChange(supplierId: string, edit: BankDetails, db: Db = getPool()): Promise<boolean> {
+  const { rows } = await db.query<{ bank_name: string | null; bank_account: string | null; bank_holder: string | null }>(
+    'SELECT bank_name, bank_account, bank_holder FROM idesh.supplier WHERE id = $1',
+    [supplierId],
+  );
+  const now = rows[0];
+  if (!now) return false;
+  const next = {
+    name: edit.bankName?.trim() || now.bank_name,
+    account: edit.bankAccount?.replace(/\s+/g, '') || now.bank_account,
+    holder: edit.bankHolder?.trim() || now.bank_holder,
+  };
+  return next.name !== now.bank_name || next.account !== now.bank_account || next.holder !== now.bank_holder;
+}
+
+/** Finance has checked the account against the contract: money may go there. */
+export async function verifySupplierBank(supplierId: string, db: Db = getPool()): Promise<void> {
+  const { rowCount } = await db.query(
+    'UPDATE idesh.supplier SET bank_verified_at = now() WHERE id = $1 AND bank_account IS NOT NULL',
+    [supplierId],
+  );
+  if (!rowCount) throw new IdeshError('NEEDS_ACCOUNT', 'nothing on file to verify');
 }
 
 /** Ops takes a supplier off the market, or puts them back. Their orders in flight are untouched. */
@@ -462,7 +508,8 @@ export async function updateSupplier(supplierId: string, patch: SupplierPatch, d
             bank_name            = COALESCE($3, bank_name),
             bank_account         = COALESCE($4, bank_account),
             bank_holder          = COALESCE($5, bank_holder),
-            ebarimt_merchant_tin = COALESCE($6, ebarimt_merchant_tin)
+            ebarimt_merchant_tin = COALESCE($6, ebarimt_merchant_tin),
+            bank_verified_at     = CASE WHEN $4::text IS NOT NULL THEN now() ELSE bank_verified_at END
       WHERE id = $1`,
     [
       supplierId,

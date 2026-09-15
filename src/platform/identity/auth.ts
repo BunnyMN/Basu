@@ -143,6 +143,25 @@ export async function verifyOtp(
   code: string,
   label?: string | null,
 ): Promise<GuestSession> {
+  await checkOtp(ctx, phone, code);
+  return startSession(ctx, phone, label);
+}
+
+/**
+ * Request a code and send it, the one way a code ever leaves: by SMS to
+ * the phone itself. Never returned, never stored in the clear.
+ */
+export async function sendOtp(ctx: Ctx, phone: string): Promise<void> {
+  const { code } = await requestOtp(ctx, phone);
+  await ctx.notifier.send({ channel: 'sms', to: phone, template: 'auth.otp', body: `Таны код: ${code}` });
+}
+
+/**
+ * Is this the code we sent this phone? Consumed on success, counted on
+ * failure. Signing in uses it; so does anything a person must be at their
+ * phone for — changing where their money goes.
+ */
+export async function checkOtp(ctx: Ctx, phone: string, code: string): Promise<void> {
   const now = ctx.clock.now();
 
   /**
@@ -162,7 +181,7 @@ export async function verifyOtp(
     }>(
       `SELECT id, code_hash, attempts, expires_at, consumed_at
          FROM identity.otp_challenge
-        WHERE phone_e164 = $1
+        WHERE phone_e164 = $1 AND consumed_at IS NULL
         ORDER BY created_at DESC
         LIMIT 1
         FOR UPDATE`,
@@ -196,8 +215,6 @@ export async function verifyOtp(
     }
     throw new AuthError('INVALID_CODE', 'that code is not right');
   }
-
-  return startSession(ctx, phone, label);
 }
 
 /**

@@ -11,6 +11,7 @@ import {
   requestOtp,
   resolveGuest,
   verifyOtp,
+  sendOtp,
 } from '../platform/identity/index.js';
 import { receiptsFor } from '../platform/ledger/index.js';
 import {
@@ -227,14 +228,8 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
       return badRequest(reply, 'Утасны дугаараа шалгана уу.', 'phone must be +976XXXXXXXX');
     }
     try {
-      const { code } = await requestOtp(ctx, phone);
       // The code goes out by SMS and is never returned in the response body.
-      await ctx.notifier.send({
-        channel: 'sms',
-        to: phone,
-        template: 'auth.otp',
-        body: `Таны код: ${code}`,
-      });
+      await sendOtp(ctx, phone);
       return reply.status(202).send({ sent: true });
     } catch (error) {
       return sendError(reply, error);

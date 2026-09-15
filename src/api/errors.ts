@@ -74,6 +74,8 @@ const IDESH_ERRORS: Record<IdeshErrorCode, Spec> = {
   PAYMENT_FAILED: { status: 402, mn: 'Төлбөр амжилтгүй боллоо. Дахин оролдоно уу.' },
   BAD_REASON: { status: 409, mn: 'Энэ шалтгаанаар одоо цуцлах боломжгүй.' },
   NEEDS_ACCOUNT: { status: 409, mn: 'Шилжүүлэх данс оруулаагүй байна.' },
+  OTP_REQUIRED: { status: 409, mn: 'Баталгаажуулах код утсанд тань илгээлээ. Кодоо оруулна уу.' },
+  BANK_UNVERIFIED: { status: 409, mn: 'Данс баталгаажаагүй байна. Санхүү гэрээтэй тулгаж баталгаажуулна.' },
   ALREADY_APPLIED: {
     status: 409,
     mn: 'Та аль хэдийн хүсэлт гаргасан эсвэл нийлүүлэгч байна.',

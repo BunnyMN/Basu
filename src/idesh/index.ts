@@ -80,6 +80,8 @@ export {
   supplierById,
   updateSupplierProfile,
   setSupplierActive,
+  bankWouldChange,
+  verifySupplierBank,
   createSupplierCode,
   pairSupplier,
   resolveSupplierDevice,

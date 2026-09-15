@@ -22,6 +22,7 @@ import {
   setSupplierActive,
   statsFor,
   updateSupplier,
+  verifySupplierBank,
   type CancelReason,
   type IdeshState,
   type OrderScope,
@@ -103,6 +104,8 @@ const shape = (s: SupplierRow) => ({
   bank_name: s.bankName,
   bank_account: s.bankAccount,
   bank_holder: s.bankHolder,
+  bank_verified: s.bankVerified,
+  bank_changed_at: s.bankChangedAt?.toISOString() ?? null,
   watched: s.watched,
   listings: s.listings,
 });
@@ -411,6 +414,18 @@ export async function registerOpsRoutes(
       }
     },
   );
+
+  /** Finance has held the account up against the contract: money may go there now. */
+  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/suppliers/:id/bank-verify', asFinance, async (request, reply) => {
+    try {
+      await verifySupplierBank(request.params.id);
+      await recordAudit({ who: who(request), action: 'supplier.bank_verify', targetKind: 'supplier', targetId: request.params.id, note: request.body?.note ?? null });
+      const row = (await listSuppliers()).find((s) => s.id === request.params.id);
+      return reply.send(row ? shape(row) : { id: request.params.id, bank_verified: true });
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
 
   app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/listings/:id/hide', asRunner, async (request, reply) => {
     try {

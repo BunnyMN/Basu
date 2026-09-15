@@ -259,11 +259,18 @@ describe('ordering', () => {
     const live = await app.inject({ method: 'GET', url: '/v1/idesh', headers: auth(token) });
     expect(live.json().orders.map((o: { id: string }) => o.id)).toEqual([id]);
 
+    // Naming an account takes a code at the guest's own phone: a stolen
+    // session may look, not redirect money.
+    const account = { bank_name: 'Хаан банк', bank_account: '5012 3456 78', bank_holder: 'Бат' };
+    const asked = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/refund-account`, headers: auth(token), payload: account });
+    expect(asked.statusCode).toBe(409);
+    expect(asked.json().error.code).toBe('OTP_REQUIRED');
+    const code = /(\d{6})/.exec(notifier.of('auth.otp').at(-1)?.body ?? '')?.[1];
     const named = await app.inject({
       method: 'POST',
       url: `/v1/idesh/${id}/refund-account`,
       headers: auth(token),
-      payload: { bank_name: 'Хаан банк', bank_account: '5012 3456 78', bank_holder: 'Бат' },
+      payload: { ...account, otp_code: code },
     });
     expect(named.statusCode, named.body).toBe(200);
     expect(named.json().refund).toMatchObject({ state: 'due', bank_account: '5012345678', amount_mnt: 460_000 });
@@ -498,14 +505,24 @@ describe('the supplier’s own module', () => {
 
   it('lets the owner change how they are found and where the money goes', async () => {
     const owner = await signIn('+97688010001');
-    const changed = await app.inject({
-      method: 'PATCH',
-      url: '/v1/supplier/profile',
-      headers: auth(owner),
-      payload: { address: 'Нарантуул, урд хаалга', about: 'Архангайн хонь', bank_name: 'Хаан банк', bank_account: '5012 3456 78', bank_holder: 'Дорж' },
-    });
+    const edit = { address: 'Нарантуул, урд хаалга', about: 'Архангайн хонь', bank_name: 'Хаан банк', bank_account: '5012 3456 78', bank_holder: 'Дорж' };
+    // Moving the money somewhere new takes a code at the supplier's phone…
+    const asked = await app.inject({ method: 'PATCH', url: '/v1/supplier/profile', headers: auth(owner), payload: edit });
+    expect(asked.statusCode).toBe(409);
+    expect(asked.json().error.code).toBe('OTP_REQUIRED');
+    const sms = notifier.of('auth.otp').at(-1);
+    expect(sms?.to).toBe('+97688010001');
+    const wrong = await app.inject({ method: 'PATCH', url: '/v1/supplier/profile', headers: auth(owner), payload: { ...edit, otp_code: '000000' } });
+    expect(wrong.statusCode).toBe(400);
+    expect(wrong.json().error.code).toBe('INVALID_CODE');
+    const code = /(\d{6})/.exec(sms?.body ?? '')?.[1];
+    const changed = await app.inject({ method: 'PATCH', url: '/v1/supplier/profile', headers: auth(owner), payload: { ...edit, otp_code: code } });
     expect(changed.statusCode, changed.body).toBe(200);
-    expect(changed.json()).toMatchObject({ pickup_address: 'Нарантуул, урд хаалга', bank_account: '5012345678', commission_pct: 2 });
+    // …and the new account is on file but not yet trusted.
+    expect(changed.json()).toMatchObject({ pickup_address: 'Нарантуул, урд хаалга', bank_account: '5012345678', commission_pct: 2, bank_verified: false });
+    // A name change alone asks for nothing.
+    const quiet = await app.inject({ method: 'PATCH', url: '/v1/supplier/profile', headers: auth(owner), payload: { about: 'Архангайн хонь, ямаа' } });
+    expect(quiet.statusCode).toBe(200);
     const short = await app.inject({ method: 'PATCH', url: '/v1/supplier/profile', headers: auth(owner), payload: { name: 'X' } });
     expect(short.statusCode).toBe(409);
   });

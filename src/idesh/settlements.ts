@@ -37,6 +37,8 @@ export interface Settlement {
   guest: { id: string; name: string | null } | null;
   /** Where it goes: the supplier's contract account, or what the guest typed. */
   bank: BankAccount | null;
+  /** A supplier's account finance has checked; a guest's own, once typed at their phone. */
+  bankVerified: boolean;
   reference: string | null;
   paidAt: Date | null;
   createdAt: Date;
@@ -133,6 +135,7 @@ interface Row {
   bank_name: string | null;
   bank_account: string | null;
   bank_holder: string | null;
+  bank_verified: boolean;
   reference: string | null;
   paid_at: Date | null;
   created_at: Date;
@@ -144,6 +147,7 @@ const SELECT = `
          COALESCE(t.bank_name, s.bank_name) AS bank_name,
          COALESCE(t.bank_account, s.bank_account) AS bank_account,
          COALESCE(t.bank_holder, s.bank_holder) AS bank_holder,
+         (t.kind = 'refund' OR s.bank_verified_at IS NOT NULL) AS bank_verified,
          t.reference, t.paid_at, t.created_at
     FROM idesh.settlement t
     JOIN idesh.idesh_order o ON o.id = t.order_id
@@ -165,6 +169,7 @@ async function shape(rows: Row[]): Promise<Settlement[]> {
       r.bank_name && r.bank_account && r.bank_holder
         ? { bankName: r.bank_name, bankAccount: r.bank_account, bankHolder: r.bank_holder }
         : null,
+    bankVerified: r.bank_verified,
     reference: r.reference,
     paidAt: r.paid_at,
     createdAt: r.created_at,
@@ -221,6 +226,7 @@ export async function markSettled(
   if (row.state === 'needs_account' || !row.bank_account) {
     throw new IdeshError('NEEDS_ACCOUNT', 'nowhere to send it yet');
   }
+  if (!row.bank_verified) throw new IdeshError('BANK_UNVERIFIED', 'the account has not been checked against the contract');
 
   const payout = await payOut({
     payee: payeeOf({ kind: row.kind, supplierId: row.supplier_id, guestId: row.guest_id }),

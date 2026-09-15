@@ -36,6 +36,8 @@ import {
   setRefundAccount,
   settlementsOf,
   startPreparing,
+  updateSupplierProfile,
+  verifySupplierBank,
   type Listing,
 } from './index.js';
 
@@ -414,10 +416,11 @@ describe('the supplier’s share', () => {
 
     // No account on the contract yet: ops writes it in, then pays.
     await expect(markSettled(ctx, payout!.id, 'ops:test', 'GB-1')).rejects.toMatchObject({ code: 'NEEDS_ACCOUNT' });
-    await getPool().query(
-      `UPDATE idesh.supplier SET bank_name = 'Голомт', bank_account = '1105012345', bank_holder = 'Дорж' WHERE id = $1`,
-      [supplierId],
-    );
+    // The supplier types one in from their phone: on file, not yet trusted.
+    await updateSupplierProfile(supplierId, { bankName: 'Голомт', bankAccount: '1105012345', bankHolder: 'Дорж' });
+    await expect(markSettled(ctx, payout!.id, 'ops:test', 'GB-1')).rejects.toMatchObject({ code: 'BANK_UNVERIFIED' });
+    // Finance holds it up against the contract, and only then it pays.
+    await verifySupplierBank(supplierId);
     const paid = await markSettled(ctx, payout!.id, 'ops:test', 'GB-1');
     expect(paid.state).toBe('paid');
     expect(paid.bank?.bankName).toBe('Голомт');

@@ -48,9 +48,12 @@ import {
   updateSupplierProfile,
   type SupplierOrder,
   type OrderScope,
+  bankWouldChange,
+  ownerOf,
 } from '../idesh/index.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
-import { resolveGuest } from '../platform/identity/index.js';
+import { checkOtp, contactsFor, resolveGuest, sendOtp } from '../platform/identity/index.js';
+import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
 import { limits } from './hardening.js';
 import { shapeOrder, shapeSettlement, shapeSummary } from './shapes.js';
@@ -296,7 +299,7 @@ export async function registerIdeshRoutes(
   // the supplier, and the supplier cancels from their own screen.
 
   /** Where the refund goes: the guest's own bank account, in their words. */
-  app.post<{ Params: { id: string }; Body: { bank_name?: string; bank_account?: string; bank_holder?: string } }>(
+  app.post<{ Params: { id: string }; Body: { bank_name?: string; bank_account?: string; bank_holder?: string; otp_code?: string } }>(
     '/v1/idesh/:id/refund-account',
     guarded,
     async (request, reply) => {
@@ -308,10 +311,29 @@ export async function registerIdeshRoutes(
         return badRequest(reply, 'Банк, дансны дугаар, эзэмшигчийн нэрээ оруулна уу.', 'bank, account and holder are required');
       }
       try {
+        // Money going to an account is the one thing a stolen session would
+        // do here, so the account is confirmed with a code at the guest's phone.
+        const phone = (await contactsFor([request.guestId!])).get(request.guestId!)?.phone;
+        if (!phone) return sendError(reply, new IdeshError('NOT_FOUND', 'no phone on this guest'));
+        if (!body.otp_code) {
+          await sendOtp(ctx, phone);
+          return sendError(reply, new IdeshError('OTP_REQUIRED', 'a code was sent to the guest’s phone'));
+        }
+        await checkOtp(ctx, phone, body.otp_code);
         await setRefundAccount(request.params.id, request.guestId!, {
           bankName: body.bank_name,
           bankAccount: body.bank_account,
           bankHolder: body.bank_holder,
+        });
+        await enqueue(ctx, {
+          guestId: request.guestId!,
+          subject: 'idesh',
+          subjectId: request.params.id,
+          template: 'idesh.refund_account',
+          channel: 'sms',
+          dedupeKey: `idesh:${request.params.id}:refund-account:${Date.now()}`,
+          title: 'Буцаалтын данс',
+          body: `Basu: буцаалт авах данс бүртгэгдлээ — ${body.bank_name.trim()} …${body.bank_account.replace(/\s+/g, '').slice(-4)}. Та биш бол Basu-д хэлнэ үү.`,
         });
         const detail = await detailFor(request.guestId!, request.params.id);
         return reply.send(detail ? shapeDetail(detail) : { ok: true });
@@ -498,6 +520,7 @@ export async function registerIdeshRoutes(
     bank_name: s.bankName,
     bank_account: s.bankAccount,
     bank_holder: s.bankHolder,
+    bank_verified: s.bankVerified,
   });
 
   app.get('/v1/supplier/profile', asSupplier, async (request, reply) => {
@@ -506,12 +529,30 @@ export async function registerIdeshRoutes(
     return reply.send(shapeProfile(row));
   });
 
+  /**
+   * Where the money goes is the one field a stolen phone would change, so
+   * changing it takes a fresh code at the supplier's own phone, and the
+   * owner is told. Finance then checks the account against the contract
+   * before anything is paid to it.
+   */
   app.patch<{
-    Body: { name?: string; address?: string; about?: string | null; lat?: number | null; lon?: number | null; bank_name?: string; bank_account?: string; bank_holder?: string };
+    Body: { name?: string; address?: string; about?: string | null; lat?: number | null; lon?: number | null; bank_name?: string; bank_account?: string; bank_holder?: string; otp_code?: string };
   }>('/v1/supplier/profile', asSupplier, async (request, reply) => {
     const body = request.body ?? {};
+    const supplierId = request.supplierDevice!.supplierId;
     try {
-      await updateSupplierProfile(request.supplierDevice!.supplierId, {
+      const bank = { bankName: body.bank_name, bankAccount: body.bank_account, bankHolder: body.bank_holder };
+      const changing = (bank.bankName !== undefined || bank.bankAccount !== undefined || bank.bankHolder !== undefined) && (await bankWouldChange(supplierId, bank));
+      if (changing) {
+        const me = await supplierById(supplierId);
+        if (!me) return sendError(reply, new IdeshError('NOT_FOUND', 'no such supplier'));
+        if (!body.otp_code) {
+          await sendOtp(ctx, me.phone);
+          return sendError(reply, new IdeshError('OTP_REQUIRED', 'a code was sent to the supplier’s phone'));
+        }
+        await checkOtp(ctx, me.phone, body.otp_code);
+      }
+      const { bankChanged } = await updateSupplierProfile(supplierId, {
         name: body.name,
         pickupAddress: body.address,
         about: body.about,
@@ -521,7 +562,22 @@ export async function registerIdeshRoutes(
         bankAccount: body.bank_account,
         bankHolder: body.bank_holder,
       });
-      const row = await supplierById(request.supplierDevice!.supplierId);
+      const row = await supplierById(supplierId);
+      if (bankChanged && row) {
+        const owner = await ownerOf(supplierId);
+        if (owner) {
+          await enqueue(ctx, {
+            guestId: owner,
+            subject: 'idesh',
+            subjectId: supplierId,
+            template: 'supplier.bank',
+            channel: 'sms',
+            dedupeKey: `supplier:${supplierId}:bank:${Date.now()}`,
+            title: 'Данс солигдлоо',
+            body: `Basu: олголтын данс солигдлоо — ${row.bankName ?? ''} …${(row.bankAccount ?? '').slice(-4)}. Та биш бол яаралтай Basu-д хэлнэ үү. Санхүү баталгаажуулах хүртэл олголт хийгдэхгүй.`,
+          });
+        }
+      }
       return reply.send(row ? shapeProfile(row) : { ok: true });
     } catch (error) {
       return sendError(reply, error);

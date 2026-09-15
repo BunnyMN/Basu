@@ -13,6 +13,8 @@ export {
   OTP_PER_DAY,
   purgeChallenges,
   verifyOtp,
+  checkOtp,
+  sendOtp,
   startSession,
   guestForPhone,
   resolveGuest,

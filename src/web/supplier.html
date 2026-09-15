@@ -1234,6 +1234,8 @@ async function renderProfile(view) {
         <datalist id="banks">${BANKS.map((b) => `<option value="${b}">`).join('')}</datalist>
         <label class="field"><span>Дансны дугаар</span><input name="bank_account" inputmode="numeric" value="${esc(p.bank_account ?? '')}"></label>
         <label class="field"><span>Данс эзэмшигчийн нэр</span><input name="bank_holder" value="${esc(p.bank_holder ?? '')}"></label>
+        ${p.bank_account && !p.bank_verified ? '<p class="hint">Шинэ дансыг Basu санхүү гэрээтэй тулгаж баталгаажуулах хүртэл олголт хийгдэхгүй.</p>' : ''}
+        <div id="otp-step" hidden><label class="field"><span>Утсанд тань ирсэн код</span><input name="otp_code" inputmode="numeric" maxlength="6" placeholder="6 оронтой код" autocomplete="one-time-code"><small>Данс солиход өөрийн утсаар баталгаажуулна.</small></label></div>
         <button class="btn" data-v="primary" data-size="lg" type="button" id="save">Хадгалах</button>
       </div>
     </section>`);
@@ -1243,11 +1245,19 @@ async function renderProfile(view) {
       await api('/v1/supplier/profile', {
         method: 'PATCH',
         token: token(),
-        body: { name: v('name'), address: v('address'), about: v('about'), bank_name: v('bank_name'), bank_account: v('bank_account'), bank_holder: v('bank_holder') },
+        body: { name: v('name'), address: v('address'), about: v('about'), bank_name: v('bank_name'), bank_account: v('bank_account'), bank_holder: v('bank_holder'), otp_code: v('otp_code') || undefined },
       });
       toast('Хадгалагдлаа.');
       for (const n of document.querySelectorAll('#supplier')) n.textContent = v('name');
+      show('profile');
     } catch (error) {
+      if (error.code === 'OTP_REQUIRED') {
+        // The money is moving somewhere new: a code went to the phone.
+        form.querySelector('#otp-step').hidden = false;
+        form.querySelector('[name="otp_code"]').focus();
+        toast(error.message);
+        return;
+      }
       toast(error.message, 'bad');
     }
   });

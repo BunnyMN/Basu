@@ -878,6 +878,11 @@ describe('өвлийн идэш', () => {
     type('holder', 'Бат Дорж');
     expect(send.disabled).toBe(false);
     send.click();
+    // Money is about to go to this account: a code went to the phone first.
+    // The demo's code is the one everybody gets.
+    await until(guest, 'the code step', (d) => !(d.querySelector('#otp-step') as HTMLElement | null)?.hidden);
+    type('otp', '123456');
+    send.click();
     await until(guest, 'the account to be kept', (d) => d.querySelector('#refund')?.textContent?.includes('5012345678') ?? false);
     expect(guest.window.document.querySelector('#refund')?.textContent).toContain('Basu ажлын өдөрт');
 

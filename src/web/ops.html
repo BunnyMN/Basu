@@ -544,7 +544,9 @@ function renderSettlement(t) {
       <span class="amount">${mnt(t.amount_mnt)}</span>
       <div class="btns"></div>
     </div>`);
-  if (t.state === 'due') {
+  if (t.state === 'due' && !t.bank_verified) {
+    row.querySelector('.btns').append(el('<span class="chip" data-s="CANCELLED">данс баталгаажаагүй</span>'));
+  } else if (t.state === 'due') {
     const paid = el('<button class="btn" data-v="primary" type="button" data-a="paid">Шилжүүлсэн</button>');
     paid.addEventListener('click', async () => {
       const reference = prompt(`${mnt(t.amount_mnt)} → ${bank}\nБанкны гүйлгээний дугаар (заавал биш):`, '');
@@ -580,7 +582,7 @@ function renderRow(s) {
       ${
         s.state !== 'declined'
           ? `<div class="about">Шимтгэл <b>${s.commission_pct}%</b> · Данс: ${
-              s.bank_account ? `${esc(s.bank_name)} ${esc(s.bank_account)} · ${esc(s.bank_holder)}` : '<b>алга</b>'
+              s.bank_account ? `${esc(s.bank_name)} ${esc(s.bank_account)} · ${esc(s.bank_holder)}${s.bank_verified ? '' : ' · <b style="color:var(--stop)">баталгаажаагүй</b>'}` : '<b>алга</b>'
             }</div>`
           : ''
       }
@@ -651,6 +653,15 @@ function renderRow(s) {
       row.append(box);
     });
     buttons.append(stall);
+  }
+  if (s.state === 'contracted' && s.bank_account && !s.bank_verified) {
+    // A changed account pays out nothing until somebody holds it up against the contract.
+    const check = el('<button class="btn" data-v="primary" type="button" data-a="bank-verify">Данс баталгаажуулах</button>');
+    check.addEventListener('click', () => {
+      if (!confirm(`${s.name}: ${s.bank_name} ${s.bank_account} (${s.bank_holder}) гэрээний данстай таарч байна уу?`)) return;
+      act(`/v1/ops/suppliers/${s.id}/bank-verify`, { note: 'гэрээтэй тулгасан' });
+    });
+    buttons.append(check);
   }
   if (s.state !== 'declined') {
     // The contract's terms: written in once it is signed, corrected here.

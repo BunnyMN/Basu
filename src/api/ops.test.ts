@@ -453,3 +453,20 @@ describe('the desk’s members', () => {
     }
   });
 });
+
+describe('an account nobody has checked', () => {
+  it('is paid nothing until finance has held it up against the contract', async () => {
+    const { supplierId } = await aPaidOrder();
+    const before = (await app.inject({ method: 'GET', url: '/v1/ops/suppliers', headers: desk() })).json().suppliers.find((s: { id: string }) => s.id === supplierId);
+    expect(before.bank_verified).toBe(false);
+    expect(before.bank_account).toBeNull();
+    // Written in from the contract by the desk: trusted as it is written.
+    const terms = await app.inject({ method: 'PATCH', url: `/v1/ops/suppliers/${supplierId}`, headers: desk(), payload: { bank_name: 'Голомт', bank_account: '1105012345', bank_holder: 'Дорж' } });
+    expect(terms.json()).toMatchObject({ bank_account: '1105012345', bank_verified: true });
+    // The verify button, and the record of who pressed it.
+    const nothing = await app.inject({ method: 'POST', url: `/v1/ops/suppliers/${supplierId}/bank-verify`, headers: desk(), payload: {} });
+    expect(nothing.statusCode).toBe(200);
+    const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() })).json().audit;
+    expect(audit[0]).toMatchObject({ action: 'supplier.bank_verify', target_id: supplierId });
+  });
+});
