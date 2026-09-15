@@ -245,6 +245,11 @@ basu.burzai.cloud → nginx → 127.0.0.1:3210 → basu-api.service
 холбох. Хаалттай байх шаардлагатай бол `BASU_MODE=production` болгож,
 `basu-scheduler`-ыг асаана.
 
+Бодит худалдаанд шилжих бүрэн дараалал — `docs/production-switch.md`; гаднаас
+шалгах нь `npm run check:prod -- https://basu.burzai.cloud` (демо замууд 404,
+хамгаалалтын толгойнууд, ops хаалга). Хамгаалалт, нууцлал, админ системийн
+архитектур — `docs/security-and-admin-architecture.md`.
+
 ### Байршуулалт нь main руу push
 
 Сервер дээр `/opt/basu/app` бол энэ репогийн `main`-ийн git checkout. `main`
