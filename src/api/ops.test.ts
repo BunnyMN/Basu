@@ -356,6 +356,30 @@ describe('the desk’s window onto orders', () => {
     expect(stats.by_kind).toEqual([{ kind: 'sheep', unit: 'whole', qty: 1, orders: 1, sales_mnt: 460_000 }]);
   });
 
+  it('lays the whole house on one page, and says what needs somebody', async () => {
+    const { id } = await aPaidOrder();
+    const view = (await app.inject({ method: 'GET', url: '/v1/ops/overview', headers: desk() })).json();
+    // Two phones verified: the supplier's owner and the guest.
+    expect(view.guests).toMatchObject({ total: 2, closed: 0, joined: { season: 2 }, active: { season: 1 } });
+    expect(view.wallet).toMatchObject({
+      drift: 0,
+      liability_mnt: 40_000,
+      topups: { pending: 0, stuck: 0, settled: { season: 1 }, settled_mnt: { season: 500_000 } },
+      purchases: { count: { season: 1 }, mnt: { season: 460_000 } },
+      refunds: { count: { season: 0 } },
+    });
+    expect(view.idesh).toMatchObject({ live: 1, applied: 0, settlements: { due: 0, needs_account: 0 }, paid: { today: 1, week: 1, season: 1 }, sales_mnt: { today: 460_000 } });
+    expect(view.dine).toMatchObject({ live: 0, held: 0, late: 0, restaurants: { active: 0, offline: 0 }, placed: { season: 0 } });
+    expect(view.notify).toMatchObject({ stuck: 0 });
+    expect(view.alerts).toEqual([]);
+
+    // A cancellation puts a refund on the list, and the page says so.
+    await app.inject({ method: 'POST', url: `/v1/ops/orders/${id}/cancel`, headers: desk(), payload: { reason: 'guest_asked', note: 'зочин хүссэн' } });
+    const again = (await app.inject({ method: 'GET', url: '/v1/ops/overview', headers: desk() })).json();
+    expect(again.idesh).toMatchObject({ live: 0, settlements: { needs_account: 1 }, cancelled: { today: 1 }, refund_mnt: { today: 460_000 } });
+    expect(again.alerts).toEqual([{ level: 'info', text: '1 буцаалт зочны дансыг хүлээж байна.', tab: 'pay' }]);
+  });
+
   it('takes a supplier off the market, and a listing out of sight, with the reason kept', async () => {
     const { supplierId, listingId } = await aPaidOrder();
     expect((await app.inject({ method: 'GET', url: '/v1/idesh/listings' })).json().listings).toHaveLength(1);

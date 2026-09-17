@@ -88,3 +88,30 @@ export function hhmm(d: Date, timeZone = 'Asia/Ulaanbaatar'): string {
     timeZone,
   }).format(d);
 }
+
+/* ── the desk's three windows ──────────────────────────────────────── */
+
+/** Today, the last seven days, the whole season: what every desk number is cut by. */
+export interface Periods {
+  /** Midnight in Ulaanbaatar, the start of today. */
+  today: Date;
+  /** Six midnights before that: the window is seven days including today. */
+  week: Date;
+  /** Midnight tomorrow; every window ends here. */
+  end: Date;
+}
+
+export type PerPeriod<T = number> = { today: T; week: T; season: T };
+
+/** Where midnight falls for a desk in Ulaanbaatar, whatever the server's own zone. */
+export function periodsOf(now: Date, timeZone = 'Asia/Ulaanbaatar'): Periods {
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+  const today = new Date(`${day}T00:00:00+08:00`);
+  const dayMs = 24 * 60 * 60 * 1000;
+  return { today, week: new Date(today.getTime() - 6 * dayMs), end: new Date(today.getTime() + dayMs) };
+}
+
+/** The three windows as one parameter list, for a query that FILTERs by all of them. */
+export function periodParams(p: Periods): [Date, Date, Date] {
+  return [p.today, p.week, p.end];
+}

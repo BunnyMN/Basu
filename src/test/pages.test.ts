@@ -1067,6 +1067,29 @@ describe('нийлүүлэгч болох', () => {
     await until(desk, 'the applications', (d) => d.querySelectorAll('#applied .row').length > 0);
     expect(desk.window.document.querySelector('#applied .row')?.textContent).toContain('Завхан');
   });
+
+  it('opens on the whole house: what needs somebody, what is held, what the day brought', async () => {
+    storage.removeItem('basu.ops');
+    storage.removeItem('basu.ops.tab');
+    const desk = await openPage('ops.html');
+    await until(desk, 'the secret prefilled', (d) =>
+      Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
+    );
+    clickText(desk, '.pair button', 'Нэвтрэх');
+    await until(desk, 'the front page', (d) => d.querySelectorAll('#now .kpi').length === 6);
+    const doc = desk.window.document;
+    expect(doc.querySelector('.tabs button[data-tab="overview"]')?.hasAttribute('data-on')).toBe(true);
+    expect(doc.querySelector('.tabs .grp')?.textContent).toBe('Basu');
+    // The seeded application is waiting, and the page says so before anything else.
+    expect([...doc.querySelectorAll('#alerts .alert')].map((a) => a.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining('нийлүүлэгчийн өргөдөл')]),
+    );
+    expect(doc.querySelector('#now')?.textContent).toContain('Зочдын түрийвч');
+    expect(doc.querySelector('#cross')?.textContent).toContain('Борлуулалт');
+    // The alert's button goes to the section that answers it.
+    (doc.querySelector('#alerts button[data-go="suppliers"]') as HTMLElement).click();
+    await until(desk, 'the applications', (d) => d.querySelectorAll('#applied .row').length > 0);
+  });
 });
 
 /**

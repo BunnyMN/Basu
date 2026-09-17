@@ -93,6 +93,19 @@ a.tel{color:var(--accent-ink);font-weight:600;text-decoration:none}
 .tabs button[data-on]{background:var(--accent-soft);color:var(--accent-ink)}
 .tabs button .n{margin-left:auto;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--surface-2);color:var(--ink-3)}
 .tabs button .n[data-hot]{background:var(--accent);color:#fff}
+.tabs .grp{font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:16px 12px 6px}
+.tabs .grp:first-child{padding-top:0}
+.alerts{display:flex;flex-direction:column;gap:8px}
+.alert{display:flex;align-items:center;gap:12px;padding:12px 16px;font-size:.92rem;line-height:1.4}
+.alert::before{content:"";width:10px;height:10px;border-radius:50%;flex:none;background:var(--ink-3)}
+.alert[data-level=bad]::before{background:var(--stop)}
+.alert[data-level=warn]::before{background:var(--hold)}
+.alert[data-level=info]::before{background:var(--accent)}
+.alert[data-level=ok]::before{background:var(--ready)}
+.alert .btn{margin-left:auto;flex:none}
+.pair-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:0 16px;align-items:start}
+.kpi[data-tone=bad] b{color:var(--stop)}
+.kpi[data-tone=warn] b{color:var(--hold)}
 .side .me{margin-top:auto;padding:12px 12px 4px;border-top:1px solid var(--line)}
 .side .me b{display:block;font-size:.9rem;font-weight:700}
 .side .me span{display:block;font-size:.78rem;color:var(--ink-3);margin-top:2px}
@@ -109,7 +122,7 @@ a.tel{color:var(--accent-ink);font-weight:600;text-decoration:none}
   .app{grid-template-columns:1fr}
   .side{position:static;height:auto;flex-direction:row;align-items:center;gap:6px;padding:10px 12px;overflow-x:auto;border-right:none;border-bottom:1px solid var(--line)}
   .side .brand{padding:0 8px 0 0}.side .brand span{display:none}
-  .tabs{flex-direction:row}.tabs button{width:auto;padding:8px 10px;font-size:.86rem}.tabs button span.t{display:none}
+  .tabs{flex-direction:row}.tabs button{width:auto;padding:8px 10px;font-size:.86rem}.tabs button span.t{display:none}.tabs .grp{display:none}
   .side .me{display:none}.side .out{margin:0 0 0 auto;width:auto;flex:none}
   .page{padding:18px 16px 40px}
 }
@@ -224,6 +237,7 @@ const REASON = {
 const actorWord = (a) =>
   a.startsWith('guest:') ? 'зочин' : a.startsWith('supplier:owner:') ? 'нийлүүлэгч (утас)' : a.startsWith('supplier:') ? 'нийлүүлэгчийн дэлгэц' : a.startsWith('ops') ? a.replace('ops:', 'ops · ') : 'систем';
 const ICON = {
+  overview: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>',
   stats: '<svg viewBox="0 0 24 24"><path d="M4 19h16M7 16V9M12 16V5M17 16v-6"/></svg>',
   orders: '<svg viewBox="0 0 24 24"><path d="M6 4h12v16l-3-2-3 2-3-2-3 2z"/><path d="M9 9h6M9 13h4"/></svg>',
   suppliers: '<svg viewBox="0 0 24 24"><path d="M4 9l1.5-4h13L20 9"/><path d="M4 9c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3"/><path d="M6 12v8h12v-8"/></svg>',
@@ -326,14 +340,15 @@ const ops = (path, options = {}) => api(path, { ...options, token: token() });
 let me = null;
 
 const TABS = [
-  { key: 'stats', label: 'Тоон үзүүлэлт', icon: ICON.stats },
-  { key: 'orders', label: 'Захиалгууд', icon: ICON.orders },
-  { key: 'suppliers', label: 'Нийлүүлэгчид', icon: ICON.suppliers },
-  { key: 'pay', label: 'Олголт, буцаалт', icon: ICON.pay },
-  { key: 'audit', label: 'Бүртгэл', icon: ICON.audit },
-  { key: 'members', label: 'Гишүүд', icon: ICON.members, admin: true },
+  { key: 'overview', label: 'Самбар', icon: ICON.overview, group: 'Basu' },
+  { key: 'stats', label: 'Тоон үзүүлэлт', icon: ICON.stats, group: 'Идэш' },
+  { key: 'orders', label: 'Захиалгууд', icon: ICON.orders, group: 'Идэш' },
+  { key: 'suppliers', label: 'Нийлүүлэгчид', icon: ICON.suppliers, group: 'Идэш' },
+  { key: 'pay', label: 'Олголт, буцаалт', icon: ICON.pay, group: 'Идэш' },
+  { key: 'audit', label: 'Бүртгэл', icon: ICON.audit, group: 'Ширээ' },
+  { key: 'members', label: 'Гишүүд', icon: ICON.members, group: 'Ширээ', admin: true },
 ];
-let tab = localStorage.getItem('basu.ops.tab') ?? 'stats';
+let tab = localStorage.getItem('basu.ops.tab') ?? 'overview';
 let cache = { suppliers: [], settlements: [] };
 
 async function refresh() {
@@ -362,7 +377,9 @@ function frame() {
       <aside class="side">
         <div class="brand"><b>Basu</b><span>Ops</span></div>
         <nav class="tabs" aria-label="Хэсгүүд">
-          ${TABS.filter((t) => !t.admin || me?.role === 'admin').map((t) => `<button type="button" data-tab="${t.key}">${t.icon}<span class="t">${t.label}</span><span class="n" data-badge="${t.key}" hidden></span></button>`).join('')}
+          ${TABS.filter((t) => !t.admin || me?.role === 'admin')
+            .map((t, i, all) => `${t.group !== all[i - 1]?.group ? `<div class="grp">${t.group}</div>` : ''}<button type="button" data-tab="${t.key}">${t.icon}<span class="t">${t.label}</span><span class="n" data-badge="${t.key}" hidden></span></button>`)
+            .join('')}
         </nav>
         <div class="me"><b id="me-name">${esc(me?.name ?? '')}</b><span>${me ? ROLE_WORD[me.role] ?? me.role : ''}${me?.phone ? ` · ${esc(me.phone)}` : ''}</span></div>
         <button class="out" type="button" id="out">Гарах</button>
@@ -403,15 +420,111 @@ function show(key) {
   const view = document.getElementById('view');
   view.replaceChildren();
   window.scrollTo(0, 0);
-  ({ stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers })[key]?.(view);
+  ({ overview: renderOverview, stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers })[key]?.(view);
 }
 
 const head = (title, sub, right = '') =>
   el(`<div class="page-head"><div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${right}</div>`);
 
-/* ── the numbers ── */
+/* ── the whole house ── */
 
+const PERIODS = [['today', 'Өнөөдөр'], ['week', '7 хоног'], ['season', 'Улирал']];
 let period = localStorage.getItem('basu.ops.period') ?? 'today';
+
+/** The period switch every numbers page shares; `draw` is called again on each change. */
+function periodSeg(draw) {
+  const seg = el(`<div class="seg">${PERIODS.map(([k, l]) => `<button type="button" data-p="${k}"${period === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-p]');
+    if (!b) return;
+    period = b.dataset.p;
+    localStorage.setItem('basu.ops.period', period);
+    for (const c of seg.querySelectorAll('button')) c.toggleAttribute('data-on', c === b);
+    draw();
+  });
+  return seg;
+}
+
+const periodWord = () => PERIODS.find(([k]) => k === period)?.[1] ?? '';
+
+async function renderOverview(view) {
+  view.append(head('Самбар', 'Бүх систем нэг дэлгэцэнд: зочид, түрийвч, хоол, идэш, мэдэгдэл.'));
+  view.append(el('<div class="empty">…</div>'));
+  let v;
+  try {
+    v = await ops('/v1/ops/overview');
+  } catch (error) {
+    view.lastElementChild.replaceWith(el(`<div class="card empty">${esc(error.message)}</div>`));
+    return;
+  }
+  if (tab !== 'overview') return;
+  view.lastElementChild.remove();
+
+  const alerts = el('<section class="section" style="margin-top:0"><h2>Анхаарах</h2><div class="alerts" id="alerts"></div></section>');
+  const list = alerts.querySelector('#alerts');
+  if (v.alerts.length) {
+    for (const a of v.alerts) {
+      list.append(el(`<div class="card alert" data-level="${a.level}"><span>${esc(a.text)}</span>${a.tab ? `<button type="button" class="btn" data-v="quiet" data-size="sm" data-go="${a.tab}">Очих</button>` : ''}</div>`));
+    }
+    list.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-go]');
+      if (b) show(b.dataset.go);
+    });
+  } else {
+    list.append(el('<div class="card alert" data-level="ok"><span>Бүх зүйл хэвийн. Анхаарах зүйл алга.</span></div>'));
+  }
+
+  const w = v.wallet;
+  const nowSection = el('<section class="section"><h2>Одоо</h2><div class="kpis" id="now"></div></section>');
+  const drift = w.drift === 0 ? 'ledger тэнцсэн' : `ledger зөрүү ${mnt(w.drift)}`;
+  nowSection.querySelector('#now').append(
+    el(`<div class="card kpi"><div class="lab">Зочдын түрийвч</div><b class="money">${mnt(w.liability_mnt)}</b><span>зочдод өгөх өр · нийлүүлэгчид өгөх ${mnt(w.payable_mnt)}</span></div>`),
+    el(`<div class="card kpi"${w.drift === 0 ? '' : ' data-tone="bad"'}><div class="lab">Basu-гийн данс</div><b class="money">${mnt(w.revenue_mnt)}</b><span>${drift}</span></div>`),
+    el(`<div class="card kpi"><div class="lab">Идэвхтэй захиалга</div><b>${v.dine.live + v.idesh.live}</b><span>хоол ${v.dine.live} · идэш ${v.idesh.live}${v.dine.held ? ` · түр зогсоосон ${v.dine.held}` : ''}</span></div>`),
+    el(`<div class="card kpi"><div class="lab">Зочид</div><b>${v.guests.total}</b><span>нээлттэй сесс ${v.guests.sessions_open} · push утас ${v.notify.devices}</span></div>`),
+    el(`<div class="card kpi"${v.dine.restaurants.offline ? ' data-tone="warn"' : ''}><div class="lab">Ресторан</div><b>${v.dine.restaurants.active}</b><span>${v.dine.restaurants.offline ? `дэлгэц холбогдоогүй ${v.dine.restaurants.offline}` : 'бүх дэлгэц холбоотой'}</span></div>`),
+    el(`<div class="card kpi"${v.notify.stuck ? ' data-tone="bad"' : ''}><div class="lab">Мэдэгдлийн дараалал</div><b>${v.notify.queued}</b><span>${v.notify.stuck ? `гацсан ${v.notify.stuck}` : 'илгээгдэхийг хүлээж буй'}${w.topups.pending ? ` · цэнэглэлт хүлээгдэж буй ${w.topups.pending}` : ''}</span></div>`),
+  );
+
+  const flowSection = el('<section class="section"><h2></h2><div class="kpis"></div></section>');
+  const flowHead = flowSection.querySelector('h2');
+  const flow = flowSection.querySelector('.kpis');
+  const pair = el(`<div class="pair-cols">
+      <section class="section"><h2>Хоол ба идэш</h2><div class="card" style="overflow:auto" id="cross"></div></section>
+      <section class="section"><h2>Мэдэгдэл</h2><div class="card" style="overflow:auto" id="msgs"></div></section>
+    </div>`);
+  const cross = pair.querySelector('#cross');
+  const msgs = pair.querySelector('#msgs');
+  const draw = () => {
+    const t = (o) => o[period];
+    flowHead.textContent = periodWord();
+    flow.replaceChildren(
+      el(`<div class="card kpi"><div class="lab">Шинэ зочин</div><b>${t(v.guests.joined)}</b><span>апп нээсэн ${t(v.guests.active)}</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Хоолны захиалга</div><b>${t(v.dine.placed)}</b><span>${mnt(t(v.dine.sales_mnt))}${t(v.dine.cancelled) ? ` · цуцлагдсан ${t(v.dine.cancelled)}` : ''}</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Идэшний захиалга</div><b>${t(v.idesh.paid)}</b><span>${mnt(t(v.idesh.sales_mnt))}${t(v.idesh.cancelled) ? ` · цуцлагдсан ${t(v.idesh.cancelled)}` : ''}</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Цэнэглэлт</div><b class="money">${mnt(t(w.topups.settled_mnt))}</b><span>${t(w.topups.settled)} удаа${t(w.topups.failed) ? ` · амжилтгүй ${t(w.topups.failed)}` : ''}</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Орлого (Basu)</div><b class="money">${mnt(t(w.revenue))}</b><span>идэшний шимтгэл ${mnt(t(v.idesh.commission_mnt))}</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Буцаалт</div><b>${mnt(t(w.refunds.mnt) + t(v.idesh.refund_mnt))}</b><span>түрийвчид ${t(w.refunds.count)} удаа · идэшний данс руу ${mnt(t(v.idesh.refund_mnt))}</span></div>`),
+    );
+    cross.replaceChildren(el(`<table class="table"><thead><tr><th></th><th class="num">Хоол</th><th class="num">Идэш</th></tr></thead><tbody>
+      <tr><td>Захиалга</td><td class="num">${t(v.dine.placed)}</td><td class="num">${t(v.idesh.paid)}</td></tr>
+      <tr><td>Борлуулалт</td><td class="num">${mnt(t(v.dine.sales_mnt))}</td><td class="num">${mnt(t(v.idesh.sales_mnt))}</td></tr>
+      <tr><td>Дууссан</td><td class="num">${t(v.dine.closed)}</td><td class="num">${t(v.idesh.handed)}</td></tr>
+      <tr><td>Цуцлагдсан</td><td class="num">${t(v.dine.cancelled)}</td><td class="num">${t(v.idesh.cancelled)}</td></tr>
+      <tr><td>Ирээгүй зочин</td><td class="num">${t(v.dine.no_shows)}</td><td class="num">—</td></tr>
+    </tbody></table>`));
+    msgs.replaceChildren(el(`<table class="table"><thead><tr><th></th><th class="num">Илгээсэн</th><th class="num">Амжилтгүй</th></tr></thead><tbody>
+      <tr><td>SMS</td><td class="num">${t(v.notify.sms.sent)}</td><td class="num">${t(v.notify.sms.failed)}</td></tr>
+      <tr><td>Push</td><td class="num">${t(v.notify.push.sent)}</td><td class="num">${t(v.notify.push.failed)}</td></tr>
+      <tr><td>Нийт</td><td class="num">${t(v.notify.sent)}</td><td class="num">${t(v.notify.failed)}</td></tr>
+    </tbody></table>`));
+  };
+  view.querySelector('.page-head').append(periodSeg(draw));
+  draw();
+  view.append(alerts, nowSection, flowSection, pair);
+}
+
+/* ── the numbers ── */
 
 async function renderStats(view) {
   view.append(head('Тоон үзүүлэлт', 'Захиалга, борлуулалт, шимтгэл, буцаалт — өнөөдөр, долоо хоног, улирал.'));
@@ -425,8 +538,6 @@ async function renderStats(view) {
   }
   if (tab !== 'stats') return;
   view.lastElementChild.remove();
-  const PERIODS = [['today', 'Өнөөдөр'], ['week', '7 хоног'], ['season', 'Улирал']];
-  const seg = el(`<div class="seg">${PERIODS.map(([k, l]) => `<button type="button" data-p="${k}"${period === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
   const kpis = el('<div class="kpis section" style="margin-top:0"></div>');
   const draw = () => {
     const t = st[period];
@@ -439,15 +550,7 @@ async function renderStats(view) {
       el(`<div class="card kpi"><div class="lab">Суутгал</div><b>${mnt(t.forfeit_mnt)}</b><span>нийлүүлэгчид үлдсэн</span></div>`),
     );
   };
-  seg.addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-p]');
-    if (!b) return;
-    period = b.dataset.p;
-    localStorage.setItem('basu.ops.period', period);
-    for (const c of seg.querySelectorAll('button')) c.toggleAttribute('data-on', c === b);
-    draw();
-  });
-  view.querySelector('.page-head').append(seg);
+  view.querySelector('.page-head').append(periodSeg(draw));
   draw();
   view.append(
     kpis,

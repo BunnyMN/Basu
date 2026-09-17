@@ -40,3 +40,5 @@ export {
   sessionsOf,
   type DeviceSession,
 } from './sessions.js';
+
+export { guestCensus, type GuestCensus } from './census.js';

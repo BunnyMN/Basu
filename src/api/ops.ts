@@ -31,6 +31,7 @@ import {
 } from '../idesh/index.js';
 import { limits } from './hardening.js';
 import { shapeOrder, shapeSettlement } from './shapes.js';
+import { overviewAt } from './overview.js';
 import { mode } from '../mode.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import { listMembers, memberByPhone, setMemberActive, upsertMember, type Member, type Role } from '../ops/index.js';
@@ -357,6 +358,9 @@ export async function registerOpsRoutes(
     refund_mnt: t.refundMnt,
     forfeit_mnt: t.forfeitMnt,
   });
+
+  /** The whole house, cut three ways, and what needs somebody today. */
+  app.get('/v1/ops/overview', asOps, async () => overviewAt(ctx.clock.now()));
 
   app.get('/v1/ops/stats', asOps, async () => {
     const stats = await statsFor(ctx.clock.now());
