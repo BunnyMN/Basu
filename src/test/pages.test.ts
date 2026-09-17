@@ -612,8 +612,10 @@ describe('the kitchen display', () => {
         (t) => t.textContent?.includes('Хуушуур') && t.textContent?.includes('Одоо тавь'),
       ),
     );
-    const accepted = [...kds.window.document.querySelectorAll('.ticket')].find((t) =>
-      t.textContent?.includes('Хуушуур'),
+    // The same ticket the wait just saw — the seed has other хуушуур tickets
+    // in other lanes, and which one comes first depends on the clock.
+    const accepted = [...kds.window.document.querySelectorAll('.ticket')].find(
+      (t) => t.textContent?.includes('Хуушуур') && t.textContent?.includes('Одоо тавь'),
     )!;
     expect(accepted.textContent).toContain('+5 мин');
   });
