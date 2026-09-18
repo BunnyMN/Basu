@@ -13,3 +13,6 @@ export {
   type Member,
   type Role,
 } from './members.js';
+
+export { recordTick, lastTicks, pulse, type Tick, type Pulse } from './ticks.js';
+export { SETTINGS, SettingError, settings, setting, setSetting, type Setting, type SettingSpec } from './settings.js';

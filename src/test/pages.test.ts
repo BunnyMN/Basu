@@ -1164,6 +1164,34 @@ describe('нийлүүлэгч болох', () => {
     expect(doc.querySelector('#transfers')?.textContent).toContain('→');
     expect(doc.querySelector('#csv')?.textContent).toBe('CSV татах');
   });
+
+  it('shows what we told people, then how the machine is, and lets an admin turn a knob', async () => {
+    storage.removeItem('basu.ops');
+    storage.removeItem('basu.ops.notify');
+    const desk = await openPage('ops.html');
+    await until(desk, 'the secret prefilled', (d) =>
+      Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
+    );
+    clickText(desk, '.pair button', 'Нэвтрэх');
+    await opsTab(desk, 'notify');
+    await until(desk, 'the log', (d) => d.querySelectorAll('#messages li[data-message]').length > 0);
+    const doc = desk.window.document;
+    expect(doc.querySelector('#messages li[data-message]')?.textContent).toMatch(/SMS|Push/);
+
+    await opsTab(desk, 'system');
+    await until(desk, 'the machine', (d) => d.querySelectorAll('#integrations [data-integration]').length === 4);
+    expect(doc.querySelector('#integrations .kpi')?.textContent).toContain('Scheduler');
+    expect(doc.querySelector('#settings input[data-key="desk_banner"]')).not.toBeNull();
+    const banner = doc.querySelector('#settings input[data-key="desk_banner"]') as HTMLInputElement;
+    banner.value = 'Маргааш ажиллахгүй';
+    (doc.querySelector('#save-settings') as HTMLElement).click();
+    await until(desk, 'the knob turned', (d) => d.querySelector('#settings')?.textContent?.includes('Демо') ?? false);
+
+    // The front page carries the word to everyone at the desk.
+    await opsTab(desk, 'overview');
+    await until(desk, 'the banner', (d) => Boolean(d.querySelector('#banner')));
+    expect(doc.querySelector('#banner')?.textContent).toContain('Маргааш ажиллахгүй');
+  });
 });
 
 /**

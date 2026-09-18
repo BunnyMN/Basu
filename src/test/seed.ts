@@ -27,7 +27,7 @@ export async function truncateAll(db: Db = getPool()): Promise<void> {
              dine.order_line, dine.station_reservation, dine.dish_review, dine.order_review,
              dine.dining_order, dine.slot, dine.dining_table, dine.menu_item, dine.station,
              dine.trust_profile, dine.kds_device, dine.restaurant,
-             ops.member, idesh.audit, idesh.settlement, idesh.order_event, idesh.idesh_order, idesh.listing, idesh.supplier_device,
+             ops.member, ops.tick, ops.setting, idesh.audit, idesh.settlement, idesh.order_event, idesh.idesh_order, idesh.listing, idesh.supplier_device,
              idesh.supplier,
              identity.profile, identity.guest_session, identity.guest, identity.otp_challenge
     RESTART IDENTITY CASCADE
@@ -141,4 +141,9 @@ export async function seedOrder(
 /** A receipt the tax authority has given up on, for tests of what the desk does next. */
 export async function failReceipt(receiptId: string, db: Db = getPool()): Promise<void> {
   await db.query(`UPDATE ledger.ebarimt_receipt SET state = 'failed', attempts = 5, last_error = 'PosAPI 503' WHERE id = $1`, [receiptId]);
+}
+
+/** A message the gateway gave up on, for tests of what the desk does next. */
+export async function failMessage(messageId: string, db: Db = getPool()): Promise<void> {
+  await db.query(`UPDATE notify.message SET state = 'failed' WHERE id = $1`, [messageId]);
 }

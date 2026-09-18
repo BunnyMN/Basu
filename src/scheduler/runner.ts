@@ -5,6 +5,7 @@ import { findPlannable, planAndSchedule } from '../services/planning.js';
 import { purgeCodes, relay as relayNotifications } from '../platform/notify/index.js';
 import { purgeChallenges } from '../platform/identity/index.js';
 import { processReceipts } from '../platform/ledger/index.js';
+import { recordTick } from '../ops/index.js';
 import { housekeeping as ideshHousekeeping } from '../idesh/index.js';
 import { claimDueJobs, findOverdue, fireOne } from './fireJobs.js';
 import type { Ctx } from '../ports.js';
@@ -72,6 +73,7 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
   const { workerId = `worker-${process.pid}`, batch = 50, spacingMs = FIRE_SPACING_MS } = opts;
   const now = ctx.clock.now();
   const report: TickReport = { ...EMPTY };
+  const startedMs = Date.now();
   const db = getPool();
 
   /* 1. Arm everything inside its last fifteen minutes. */
@@ -137,6 +139,8 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
   report.activitiesUpdated = activities.updated;
   report.activitiesEnded = activities.ended;
 
+  // The desk reads this line to know the machine is alive; it must never be the reason it is not.
+  await recordTick(now, { ...report }, Date.now() - startedMs).catch(() => undefined);
   return report;
 }
 

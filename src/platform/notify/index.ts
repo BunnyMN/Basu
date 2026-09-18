@@ -37,3 +37,5 @@ export {
 export { ApnsClient, ApnsNotifier, apnsConfigFromEnv, type ApnsConfig } from './apns.js';
 
 export { notifyOverview, type NotifyOverview } from './overview.js';
+
+export { messagesForDesk, retryMessage, channelPulse, monthlyVolume, type DeskMessage, type ChannelPulse, type MonthVolume } from './desk.js';

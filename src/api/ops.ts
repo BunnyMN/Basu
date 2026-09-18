@@ -35,6 +35,7 @@ import { overviewAt } from './overview.js';
 import { closeGuest, guestFile, guestSearch } from './guests.js';
 import { registerDineDesk } from './dineDesk.js';
 import { registerMoneyDesk } from './moneyDesk.js';
+import { registerSystemDesk } from './systemDesk.js';
 import { revokeSession } from '../platform/identity/index.js';
 import { mode } from '../mode.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
@@ -351,6 +352,7 @@ export async function registerOpsRoutes(
 
   registerDineDesk(app, ctx, { asOps, asRunner, who });
   registerMoneyDesk(app, ctx, { asOps, asFinance, who });
+  registerSystemDesk(app, ctx, { asOps, asRunner, asAdmin, who });
 
   /* ── the guests ── */
 

@@ -238,6 +238,8 @@ const REASON = {
 const actorWord = (a) =>
   a.startsWith('guest:') ? 'зочин' : a.startsWith('supplier:owner:') ? 'нийлүүлэгч (утас)' : a.startsWith('supplier:') ? 'нийлүүлэгчийн дэлгэц' : a.startsWith('ops') ? a.replace('ops:', 'ops · ') : 'систем';
 const ICON = {
+  notify: '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>',
+  system: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4M7 10l2 2 2-2 2 2 2-2"/></svg>',
   money: '<svg viewBox="0 0 24 24"><path d="M4 7h16v11H4z"/><path d="M4 11h16M8 7V5h8v2"/><circle cx="12" cy="14.5" r="1.6"/></svg>',
   venues: '<svg viewBox="0 0 24 24"><path d="M4 10l1.5-5h13L20 10"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>',
   lunches: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/></svg>',
@@ -349,6 +351,8 @@ const TABS = [
   { key: 'overview', label: 'Самбар', icon: ICON.overview, group: 'Basu' },
   { key: 'guests', label: 'Зочид', icon: ICON.guests, group: 'Basu' },
   { key: 'money', label: 'Мөнгө', icon: ICON.money, group: 'Basu' },
+  { key: 'notify', label: 'Мэдэгдэл', icon: ICON.notify, group: 'Basu' },
+  { key: 'system', label: 'Систем', icon: ICON.system, group: 'Basu' },
   { key: 'venues', label: 'Ресторан', icon: ICON.venues, group: 'Хоол' },
   { key: 'lunches', label: 'Захиалга', icon: ICON.lunches, group: 'Хоол' },
   { key: 'reviews', label: 'Үнэлгээ', icon: ICON.reviews, group: 'Хоол' },
@@ -431,7 +435,7 @@ function show(key) {
   const view = document.getElementById('view');
   view.replaceChildren();
   window.scrollTo(0, 0);
-  ({ overview: renderOverview, guests: renderGuests, money: renderMoney, venues: renderVenues, lunches: renderLunches, reviews: renderReviews, stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers })[key]?.(view);
+  ({ overview: renderOverview, guests: renderGuests, money: renderMoney, notify: renderNotify, system: renderSystem, venues: renderVenues, lunches: renderLunches, reviews: renderReviews, stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers })[key]?.(view);
 }
 
 const head = (title, sub, right = '') =>
@@ -473,6 +477,7 @@ async function renderOverview(view) {
 
   const alerts = el('<section class="section" style="margin-top:0"><h2>Анхаарах</h2><div class="alerts" id="alerts"></div></section>');
   const list = alerts.querySelector('#alerts');
+  if (v.banner) list.append(el(`<div class="card alert" data-level="info" id="banner"><span><b>Зарлал.</b> ${esc(v.banner)}</span></div>`));
   if (v.alerts.length) {
     for (const a of v.alerts) {
       list.append(el(`<div class="card alert" data-level="${a.level}"><span>${esc(a.text)}</span>${a.tab ? `<button type="button" class="btn" data-v="quiet" data-size="sm" data-go="${a.tab}">Очих</button>` : ''}</div>`));
@@ -1137,6 +1142,187 @@ async function moneyReceipts() {
   });
   page.append(table);
   return page;
+}
+
+/* ── what we told people ── */
+
+const TEMPLATE_WORD = {
+  welcome: 'Тавтай морил', 'auth.otp': 'Нэвтрэх код', 'arrival.arm': 'Замд гарсан уу', 'order.cooking': 'Гал дээр', 'order.ready': 'Бэлэн', 'order.held': 'Түр зогсоосон',
+  'idesh.paid': 'Идэш баталгаажлаа', 'idesh.preparing': 'Мал бэлтгэгдэж байна', 'idesh.ready': 'Идэш бэлэн', 'idesh.dispatched': 'Идэш замд', 'idesh.handed': 'Идэш хүлээлгэн өглөө', 'idesh.cancelled': 'Идэш цуцлагдлаа',
+  'supplier.approved': 'Нийлүүлэгч батлагдлаа', 'supplier.declined': 'Нийлүүлэгч татгалзлаа', 'supplier.order': 'Нийлүүлэгчид захиалга', 'supplier.code': 'Нийлүүлэгчийн код',
+};
+const MSG_WORD = { queued: 'дараалалд', sent: 'илгээсэн', acked: 'хүрсэн', failed: 'амжилтгүй' };
+const MSG_PILL = { queued: 'PAID', sent: 'contracted', acked: 'contracted', failed: 'declined' };
+let notifyView = localStorage.getItem('basu.ops.notify') ?? 'log';
+let msgFilter = { q: '', state: '', channel: '' };
+
+function renderNotify(view) {
+  view.append(head('Мэдэгдэл', 'Зочдод илгээсэн SMS, push бүр. Амжилтгүйг дахин илгээх, сарын зардлыг харах.'));
+  const seg = el(`<div class="seg">${[['log', 'Лог'], ['volume', 'Сарын хэмжээ']].map(([k, l]) => `<button type="button" data-n="${k}"${notifyView === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-n]');
+    if (!b) return;
+    notifyView = b.dataset.n;
+    localStorage.setItem('basu.ops.notify', notifyView);
+    for (const c of seg.querySelectorAll('button')) c.toggleAttribute('data-on', c === b);
+    void drawNotify();
+  });
+  view.querySelector('.page-head').append(seg);
+  view.append(el('<div id="notify"><div class="empty">…</div></div>'));
+  void drawNotify();
+}
+
+async function drawNotify() {
+  const box = document.getElementById('notify');
+  if (!box) return;
+  try {
+    const page = await (notifyView === 'volume' ? notifyVolume() : notifyLog());
+    if (!document.getElementById('notify')) return;
+    box.replaceChildren(page);
+    if (notifyView === 'log') await loadMessages();
+  } catch (error) {
+    box.replaceChildren(el(`<div class="card empty">${esc(error.message)}</div>`));
+  }
+}
+
+async function notifyLog() {
+  const page = el(`<div class="card">
+    <div class="tools">
+      <input type="search" id="q" placeholder="Утас эсвэл нэр…" value="${esc(msgFilter.q)}" autocomplete="off">
+      <select id="channel"><option value="">SMS ба push</option><option value="sms"${msgFilter.channel === 'sms' ? ' selected' : ''}>SMS</option><option value="push"${msgFilter.channel === 'push' ? ' selected' : ''}>Push</option></select>
+      <select id="state"><option value="">Бүх төлөв</option>${Object.entries(MSG_WORD).map(([k, l]) => `<option value="${k}"${msgFilter.state === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
+    </div>
+    <div id="messages"><div class="empty">…</div></div>
+  </div>`);
+  let timer;
+  page.querySelector('#q').addEventListener('input', (e) => {
+    msgFilter.q = e.target.value;
+    clearTimeout(timer);
+    timer = setTimeout(loadMessages, 250);
+  });
+  page.querySelector('#channel').addEventListener('change', (e) => ((msgFilter.channel = e.target.value), loadMessages()));
+  page.querySelector('#state').addEventListener('change', (e) => ((msgFilter.state = e.target.value), loadMessages()));
+  return page;
+}
+
+async function loadMessages() {
+  const box = document.getElementById('messages');
+  if (!box) return;
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(msgFilter)) if (v) qs.set(k, v);
+  let data;
+  try {
+    data = await ops(`/v1/ops/notify/messages?${qs}`);
+  } catch (error) {
+    box.replaceChildren(el(`<div class="empty">${esc(error.message)}</div>`));
+    return;
+  }
+  if (!document.getElementById('messages')) return;
+  if (!data.messages.length) {
+    box.replaceChildren(el('<div class="empty"><b>Мэдэгдэл алга</b>Шүүлтэд тохирох мэдэгдэл байхгүй.</div>'));
+    return;
+  }
+  const list = el('<ul class="log"></ul>');
+  for (const m of data.messages) {
+    list.append(el(`<li data-message="${m.id}"><span class="who">${m.channel === 'sms' ? 'SMS' : 'Push'}<small>${esc(m.guest ?? 'зочин')}<br>${esc(m.guest_phone ?? '')}</small></span>
+      <div>${esc(TEMPLATE_WORD[m.template] ?? m.title ?? m.template)}<small>${esc(m.body)}</small></div>
+      <span class="when" style="text-align:right">${when(m.created_at)} ${clockOf(m.created_at)}<br><span class="pill" data-s="${MSG_PILL[m.state] ?? 'off'}">${MSG_WORD[m.state] ?? m.state}</span>${m.read_at ? ' <span class="sub" style="display:inline">уншсан</span>' : ''}${m.state === 'failed' ? ` <button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${m.id}">Дахин</button>` : ''}</span></li>`));
+  }
+  list.addEventListener('click', async (e) => {
+    const b = e.target.closest('button[data-retry]');
+    if (!b) return;
+    try {
+      await ops(`/v1/ops/notify/messages/${b.dataset.retry}/retry`, { method: 'POST', body: {} });
+      toast('Дараалалд буцаалаа. Дараагийн тойрогт илгээгдэнэ.', 'good');
+      await loadMessages();
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  box.replaceChildren(list);
+}
+
+async function notifyVolume() {
+  const v = await ops('/v1/ops/notify/volume');
+  return el(`<div class="card" style="overflow:auto"><table class="table"><thead><tr><th>Сар</th><th class="num">SMS илгээсэн</th><th class="num">SMS амжилтгүй</th><th class="num">Push илгээсэн</th><th class="num">Push амжилтгүй</th><th class="num">Зардал</th></tr></thead><tbody>${v.months
+    .map((m) => `<tr><td><b>${esc(m.month)}</b></td><td class="num">${m.sms.sent}</td><td class="num">${m.sms.failed}</td><td class="num">${m.push.sent}</td><td class="num">${m.push.failed}</td><td class="num">${mnt(m.cost_mnt)}</td></tr>`)
+    .join('') || '<tr><td colspan="6" class="empty">Одоогоор мэдэгдэл илгээгээгүй.</td></tr>'}</tbody></table>
+    <div class="tools" style="border-top:1px solid var(--line);border-bottom:none"><span class="sub" style="display:inline">Нэгж үнэ: SMS ${mnt(v.unit.sms_mnt)} · push ${mnt(v.unit.push_mnt)}. «Систем» хэсгээс өөрчилнө.</span></div></div>`);
+}
+
+/* ── the machine ── */
+
+const FLAVOUR = { fake: 'туршилтын', real: 'бодит' };
+const REPORT_WORD = { armed: 'бэлтгэлд', planned: 'төлөвлөсөн', held: 'түр зогсоосон', fired: 'галласан', lateFires: 'хоцорсон', superseded: 'дахин төлөвлөсөн', relayed: 'outbox', notified: 'мэдэгдэл', receipts: 'е-баримт', abandoned: 'орхисон', ideshExpired: 'идэш хугацаа дууссан', ideshClosed: 'идэш хаагдсан', purged: 'цэвэрлэсэн', activitiesUpdated: 'карт шинэчилсэн', activitiesEnded: 'карт хаасан' };
+/** Against the server's own clock: in the demo it runs ahead of the wall. */
+const ago = (iso, nowIso) => {
+  if (!iso) return 'хэзээ ч үгүй';
+  const s = Math.max(0, Math.round((new Date(nowIso).getTime() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return `${s} сек өмнө`;
+  if (s < 3600) return `${Math.round(s / 60)} мин өмнө`;
+  if (s < 86400) return `${Math.round(s / 3600)} цаг өмнө`;
+  return `${Math.round(s / 86400)} хоног өмнө`;
+};
+
+async function renderSystem(view) {
+  view.append(head('Систем', 'Холболтууд, scheduler, өгөгдлийн сан, тохиргоо. Ямар нэг зүйл унавал энд эхлээд харагдана.'));
+  view.append(el('<div id="system"><div class="empty">…</div></div>'));
+  await drawSystem();
+}
+
+async function drawSystem() {
+  const box = document.getElementById('system');
+  if (!box) return;
+  let s;
+  try {
+    s = await ops('/v1/ops/system');
+  } catch (error) {
+    box.replaceChildren(el(`<div class="card empty">${esc(error.message)}</div>`));
+    return;
+  }
+  if (!document.getElementById('system')) return;
+  const sch = s.scheduler;
+  const page = el(`<div>
+    <div class="kpis" id="integrations">
+      <div class="card kpi"${sch.ok ? '' : ' data-tone="bad"'}><div class="lab">Scheduler</div><b>${sch.ok ? 'ажиллаж байна' : 'зогссон'}</b><span>сүүлийн тойрог ${ago(sch.last_at, s.now)}${sch.last_took_ms !== null ? ` · ${sch.last_took_ms} мс` : ''} · цагт ${sch.ticks_last_hour}${s.mode === 'demo' ? ' · demo: тойрог гараар' : ''}</span></div>
+      ${s.integrations.map((i) => `<div class="card kpi"${i.ok ? '' : ' data-tone="bad"'} data-integration="${i.key}"><div class="lab">${esc(i.name)}</div><b>${i.flavour === 'fake' ? 'туршилтын' : i.ok ? 'хэвийн' : 'алдаатай'}</b><span>${i.detail.last_ok_at !== undefined ? `сүүлд ${ago(i.detail.last_ok_at, s.now)} · ` : ''}${Object.entries(i.detail).filter(([k]) => k !== 'last_ok_at').map(([k, v]) => `${{ pending: 'хүлээгдэж', stuck: 'гацсан', gap_mnt: 'зөрүү', queued: 'дараалалд', issued: 'гарсан', failed: 'амжилтгүй', sent_day: '24ц илгээсэн', failed_day: '24ц амжилтгүй' }[k] ?? k} ${k === 'gap_mnt' ? mnt(v) : v}`).join(' · ')}</span></div>`).join('')}
+      <div class="card kpi"><div class="lab">Өгөгдлийн сан</div><b>${esc(s.database.size)}</b><span>${s.database.migrations} migration · сүүлийнх ${esc(s.database.last_migration ?? '—')}</span></div>
+    </div>
+    <div class="pair-cols">
+      <section class="section"><h2>Сүүлийн 24 цаг</h2><div class="card" style="overflow:auto"><table class="table"><tbody>
+        <tr><td>Галласан</td><td class="num">${sch.day.fired}</td></tr>
+        <tr><td>Хоцорч галласан</td><td class="num"${sch.day.lateFires ? ' style="color:var(--stop)"' : ''}>${sch.day.lateFires}</td></tr>
+        <tr><td>Түр зогсоосон</td><td class="num">${sch.day.held}</td></tr>
+        <tr><td>Мэдэгдэл илгээсэн</td><td class="num">${sch.day.notified}</td></tr>
+        <tr><td>Е-баримт гаргасан</td><td class="num">${sch.day.receipts}</td></tr>
+      </tbody></table></div>
+      <h2 style="margin-top:22px">Процесс</h2><div class="card" style="overflow:auto"><table class="table"><tbody>
+        <tr><td>Горим</td><td class="num"><span class="pill" data-s="${s.mode === 'production' ? 'contracted' : 'PAID'}">${s.mode === 'production' ? 'production' : 'demo'}</span></td></tr>
+        <tr><td>Хувилбар</td><td class="num mono">${esc(s.version)} · node ${esc(s.node)}</td></tr>
+        <tr><td>Асаасан</td><td class="num">${when(s.started_at)} ${clockOf(s.started_at)}</td></tr>
+        <tr><td>Идэшний дүрэм</td><td class="num">шимтгэл ${s.rules.commission_pct}% · суутгал ${s.rules.forfeit_pct}% · ирээгүй ${s.rules.no_show_days} хоног</td></tr>
+      </tbody></table></div></section>
+      <section class="section"><h2>Тохиргоо</h2><div class="card card-body" id="settings">${s.settings
+        .map((k) => `<label class="field"><span>${esc(k.label)}</span><input data-key="${k.key}" ${k.kind === 'number' ? 'type="number" min="0" step="1"' : 'type="text" maxlength="500"'} value="${esc(String(k.value))}"${me?.role === 'admin' ? '' : ' disabled'}><small style="color:var(--ink-3);font-size:.8rem;line-height:1.4">${esc(k.hint)}${k.updated_by ? ` · ${esc(k.updated_by.replace('ops:', ''))}, ${when(k.updated_at)}` : ''}</small></label>`)
+        .join('')}${me?.role === 'admin' ? '<div class="form-foot"><button class="btn" data-v="primary" type="button" id="save-settings">Хадгалах</button></div>' : '<div class="hint">Тохиргоог зөвхөн админ өөрчилнө.</div>'}</div></section>
+    </div>
+  </div>`);
+  page.querySelector('#save-settings')?.addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    try {
+      for (const input of page.querySelectorAll('#settings input[data-key]')) {
+        const before = s.settings.find((k) => k.key === input.dataset.key);
+        if (String(before.value) === input.value) continue;
+        await ops(`/v1/ops/system/settings/${input.dataset.key}`, { method: 'PUT', body: { value: input.value } });
+      }
+      toast('Хадгаллаа.', 'good');
+      await drawSystem();
+    } catch (error) {
+      toast(error.message, 'bad');
+      e.target.disabled = false;
+    }
+  });
+  box.replaceChildren(page);
 }
 
 /* ── the numbers ── */

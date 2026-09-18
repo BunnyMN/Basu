@@ -3,6 +3,7 @@ import { guestCensus } from '../platform/identity/index.js';
 import { ledgerOverview } from '../platform/ledger/index.js';
 import { notifyOverview } from '../platform/notify/index.js';
 import { dineOverview } from '../services/overview.js';
+import { setting } from '../ops/index.js';
 import type { PerPeriod } from '../domain/time.js';
 
 /**
@@ -29,7 +30,7 @@ const pick = (tallies: { today: Tally; week: Tally; season: Tally }, key: keyof 
 });
 
 export async function overviewAt(now: Date) {
-  const [guests, wallet, notify, dine, idesh, live, suppliers, settlements] = await Promise.all([
+  const [guests, wallet, notify, dine, idesh, live, suppliers, settlements, banner] = await Promise.all([
     guestCensus(now),
     ledgerOverview(now),
     notifyOverview(now),
@@ -38,6 +39,7 @@ export async function overviewAt(now: Date) {
     allOrders({ scope: 'live' }),
     listSuppliers(),
     listSettlements(),
+    setting<string>('desk_banner'),
   ]);
   const applied = suppliers.filter((s) => s.state === 'applied').length;
   const due = settlements.filter((t) => t.state === 'due').length;
@@ -58,6 +60,7 @@ export async function overviewAt(now: Date) {
 
   return {
     as_of: now.toISOString(),
+    banner: banner || null,
     guests: {
       total: guests.total,
       closed: guests.closed,
