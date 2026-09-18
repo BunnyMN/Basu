@@ -6,7 +6,7 @@ import { getPool, type Db } from '../db/pool.js';
  * ever edited, because its only use is being believed later.
  */
 
-export type AuditTarget = 'supplier' | 'listing' | 'order' | 'settlement';
+export type AuditTarget = 'supplier' | 'listing' | 'order' | 'settlement' | 'guest' | 'member';
 
 export interface AuditEntry {
   id: number;

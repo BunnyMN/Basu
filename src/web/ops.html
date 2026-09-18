@@ -188,6 +188,7 @@ a.tel{color:var(--accent-ink);font-weight:600;text-decoration:none}
 .acts{display:flex;flex-direction:column;gap:10px}
 .acts .hint{font-size:.82rem;color:var(--ink-3);line-height:1.45}
 .acts .sep{height:1px;background:var(--line);margin:4px 0}
+.sess{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.92rem}
 
 /* audit */
 .log{list-style:none;padding:0;margin:0}
@@ -202,7 +203,7 @@ a.tel{color:var(--accent-ink);font-weight:600;text-decoration:none}
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mnt, KIND, dayLabel } from '/api.js';
+import { api, store, toast, mnt, KIND, HEADLINE, dayLabel } from '/api.js';
 
 const root = document.getElementById('root');
 const el = (html) => {
@@ -237,6 +238,7 @@ const REASON = {
 const actorWord = (a) =>
   a.startsWith('guest:') ? 'зочин' : a.startsWith('supplier:owner:') ? 'нийлүүлэгч (утас)' : a.startsWith('supplier:') ? 'нийлүүлэгчийн дэлгэц' : a.startsWith('ops') ? a.replace('ops:', 'ops · ') : 'систем';
 const ICON = {
+  guests: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.8 3.5-5.6 7-5.6s6.1 1.8 7 5.6"/></svg>',
   overview: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>',
   stats: '<svg viewBox="0 0 24 24"><path d="M4 19h16M7 16V9M12 16V5M17 16v-6"/></svg>',
   orders: '<svg viewBox="0 0 24 24"><path d="M6 4h12v16l-3-2-3 2-3-2-3 2z"/><path d="M9 9h6M9 13h4"/></svg>',
@@ -341,6 +343,7 @@ let me = null;
 
 const TABS = [
   { key: 'overview', label: 'Самбар', icon: ICON.overview, group: 'Basu' },
+  { key: 'guests', label: 'Зочид', icon: ICON.guests, group: 'Basu' },
   { key: 'stats', label: 'Тоон үзүүлэлт', icon: ICON.stats, group: 'Идэш' },
   { key: 'orders', label: 'Захиалгууд', icon: ICON.orders, group: 'Идэш' },
   { key: 'suppliers', label: 'Нийлүүлэгчид', icon: ICON.suppliers, group: 'Идэш' },
@@ -420,7 +423,7 @@ function show(key) {
   const view = document.getElementById('view');
   view.replaceChildren();
   window.scrollTo(0, 0);
-  ({ overview: renderOverview, stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers })[key]?.(view);
+  ({ overview: renderOverview, guests: renderGuests, stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers })[key]?.(view);
 }
 
 const head = (title, sub, right = '') =>
@@ -522,6 +525,157 @@ async function renderOverview(view) {
   view.querySelector('.page-head').append(periodSeg(draw));
   draw();
   view.append(alerts, nowSection, flowSection, pair);
+}
+
+/* ── the guests ── */
+
+const DINE_WORD = {
+  ...Object.fromEntries(Object.entries(HEADLINE).map(([k, [w]]) => [k, w])),
+  ACCEPTED: 'Батлагдсан', SCHEDULED: 'Товлогдсон', ARMED: 'Бэлтгэлтэй', COOKING: 'Хийгдэж байна', SERVED: 'Үйлчилсэн', CLOSED: 'Дууссан',
+};
+const LINE_WORD = { topup: 'Цэнэглэлт', purchase: 'Төлбөр', refund: 'Буцаалт', promotion: 'Урамшуулал', adjustment: 'Залруулга' };
+const PLATFORM_WORD = { ios: 'iPhone', android: 'Android', web: 'Вэб' };
+let guestQ = '';
+
+function renderGuests(view) {
+  view.append(head('Зочид', 'Утас эсвэл нэрээр ол. Түрийвч, сесс, хоёр талын захиалга, илгээсэн мэдэгдэл — нэг хуудсанд.'));
+  view.append(el(`
+    <div class="card">
+      <div class="tools">
+        <input type="search" id="q" placeholder="Утасны дугаар эсвэл нэр…" value="${esc(guestQ)}" autocomplete="off" autofocus>
+      </div>
+      <div id="guests"><div class="empty">…</div></div>
+    </div>`));
+  let timer;
+  view.querySelector('#q').addEventListener('input', (e) => {
+    guestQ = e.target.value;
+    clearTimeout(timer);
+    timer = setTimeout(loadGuests, 250);
+  });
+  void loadGuests();
+}
+
+async function loadGuests() {
+  const box = document.getElementById('guests');
+  if (!box) return;
+  let data;
+  try {
+    data = await ops(`/v1/ops/guests?${new URLSearchParams({ q: guestQ })}`);
+  } catch (error) {
+    box.replaceChildren(el(`<div class="empty">${esc(error.message)}</div>`));
+    return;
+  }
+  if (!document.getElementById('guests')) return;
+  if (!data.guests.length) {
+    box.replaceChildren(el('<div class="empty"><b>Зочин олдсонгүй</b>Утасны дор хаяж 4 орон эсвэл нэрийн хэсгийг бич.</div>'));
+    return;
+  }
+  const table = el('<table class="table"><thead><tr><th>Зочин</th><th>Утас</th><th>Бүртгүүлсэн</th><th>Төлөв</th></tr></thead><tbody></tbody></table>');
+  const body = table.querySelector('tbody');
+  for (const g of data.guests) {
+    const tr = el(`
+      <tr data-link data-guest="${g.id}">
+        <td><b>${esc(g.name ?? (g.closed_at ? 'Хаагдсан бүртгэл' : 'Нэргүй зочин'))}</b></td>
+        <td class="mono">${esc(g.phone ?? '—')}</td>
+        <td>${when(g.joined_at)}</td>
+        <td>${g.closed_at ? `<span class="pill" data-s="off">хаагдсан ${when(g.closed_at)}</span>` : '<span class="pill" data-s="contracted">идэвхтэй</span>'}</td>
+      </tr>`);
+    tr.addEventListener('click', () => openGuest(g.id));
+    body.append(tr);
+  }
+  box.replaceChildren(table);
+}
+
+async function openGuest(id) {
+  const view = document.getElementById('view');
+  let f;
+  try {
+    f = await ops(`/v1/ops/guests/${id}`);
+  } catch (error) {
+    toast(error.message, 'bad');
+    return;
+  }
+  const g = f.guest;
+  const closed = Boolean(g.closed_at);
+  view.replaceChildren();
+  const back = el('<button class="back" type="button" id="back">‹ Зочид</button>');
+  back.addEventListener('click', () => show('guests'));
+  view.append(back);
+  view.append(head(
+    `${esc(g.name ?? (closed ? 'Хаагдсан бүртгэл' : 'Нэргүй зочин'))}${closed ? ' <span class="pill" data-s="off" style="vertical-align:middle;margin-left:8px">хаагдсан</span>' : ''}`,
+    `${g.phone ? `<a class="tel" href="tel:${esc(g.phone)}">${esc(g.phone)}</a> · ` : ''}бүртгүүлсэн ${when(g.joined_at)}`,
+  ));
+  const page = el(`
+    <div class="detail">
+      <div>
+        <div class="card">
+          <div class="facts">
+            <div><div class="lab">Түрийвч</div><b>${mnt(f.wallet.balance_mnt)}</b><br>${f.wallet.lines.length} гүйлгээ</div>
+            <div><div class="lab">Хоол</div><b>${f.dine_orders.length} захиалга</b><br>${f.dine_orders.filter((o) => ['PLACED', 'ACCEPTED', 'SCHEDULED', 'ARMED', 'HELD', 'FIRED', 'COOKING', 'READY', 'SERVED'].includes(o.state)).length} идэвхтэй</div>
+            <div><div class="lab">Идэш</div><b>${f.idesh_orders.length} захиалга</b><br>${f.idesh_orders.filter((o) => ['PAID', 'PREPARING', 'READY', 'DISPATCHED'].includes(o.state)).length} идэвхтэй</div>
+            <div><div class="lab">Нэвтэрсэн</div><b>${f.sessions.length} сесс</b><br>${f.devices.length} push утас</div>
+          </div>
+        </div>
+        <section class="section"><h2>Түрийвчийн хуулга</h2><div class="card" style="overflow:auto">
+          <table class="table"><thead><tr><th>Огноо</th><th>Юу</th><th class="num">Дүн</th></tr></thead>
+          <tbody>${f.wallet.lines
+            .map((l) => `<tr><td>${when(l.at)} <span class="sub">${clockOf(l.at)}</span></td><td>${LINE_WORD[l.kind] ?? l.kind}<span class="sub">${esc(l.memo ?? '')}</span></td><td class="num"${l.amount_mnt < 0 ? '' : ' style="color:var(--ready)"'}>${l.amount_mnt > 0 ? '+' : ''}${mnt(l.amount_mnt)}</td></tr>`)
+            .join('') || '<tr><td colspan="3" class="empty">Гүйлгээ алга.</td></tr>'}</tbody></table></div></section>
+        <section class="section"><h2>Хоолны захиалга</h2><div class="card" style="overflow:auto">
+          <table class="table"><thead><tr><th>Захиалга</th><th>Ресторан</th><th>Цаг</th><th>Төлөв</th><th class="num">Дүн</th></tr></thead>
+          <tbody>${f.dine_orders
+            .map((o) => `<tr><td><b class="mono">№${esc(o.code)}</b><span class="sub">${o.party_size} хүн</span></td><td>${esc(o.restaurant.name)}</td><td>${when(o.slot_starts_at)} ${clockOf(o.slot_starts_at)}</td><td><span class="pill" data-s="${o.state}">${DINE_WORD[o.state] ?? o.state}</span></td><td class="num">${mnt(o.total_mnt)}</td></tr>`)
+            .join('') || '<tr><td colspan="5" class="empty">Хоолны захиалга алга.</td></tr>'}</tbody></table></div></section>
+        <section class="section"><h2>Идэшний захиалга</h2><div class="card" style="overflow:auto">
+          <table class="table"><thead><tr><th>Захиалга</th><th>Нийлүүлэгч</th><th>Өдөр</th><th>Төлөв</th><th class="num">Дүн</th></tr></thead>
+          <tbody id="idesh-rows">${f.idesh_orders
+            .map((o) => `<tr data-link data-order="${o.id}"><td><b class="mono">№${esc(o.code)}</b><span class="sub">${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}</span></td><td>${esc(o.supplier.name)}</td><td>${dayLabel(o.receive_on)}</td><td><span class="pill" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span></td><td class="num">${mnt(o.total_mnt)}</td></tr>`)
+            .join('') || '<tr><td colspan="5" class="empty">Идэшний захиалга алга.</td></tr>'}</tbody></table></div></section>
+        <section class="section"><h2>Мэдэгдэл</h2><div class="card"><ul class="log">${f.messages
+          .map((m) => `<li><span class="who">${m.channel === 'sms' ? 'SMS' : 'Push'}</span><span>${esc(m.title ?? '')}<small>${esc(m.body)}</small></span><span class="when">${when(m.created_at)} ${clockOf(m.created_at)}${m.state === 'failed' ? ' · алдсан' : m.state === 'queued' ? ' · дараалалд' : ''}</span></li>`)
+          .join('') || '<li class="empty">Мэдэгдэл алга.</li>'}</ul></div></section>
+      </div>
+      <div class="card" id="acts">
+        <div class="card-head"><h3>Сесс ба төхөөрөмж</h3></div>
+        <div class="card-body acts">
+          ${f.sessions.length ? f.sessions.map((s) => `
+            <div class="sess"><span>${esc(s.label ?? 'Утас')}<small style="display:block;color:var(--ink-3);font-size:.8rem">сүүлд ${when(s.last_seen_at ?? s.created_at)} ${clockOf(s.last_seen_at ?? s.created_at)}</small></span>
+            <button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-sid="${s.id}">Гаргах</button></div>`).join('') : '<div class="hint">Нээлттэй сесс алга.</div>'}
+          ${f.devices.length ? `<div class="hint">Push: ${f.devices.map((d) => `${PLATFORM_WORD[d.platform] ?? d.platform}${d.label ? ` · ${esc(d.label)}` : ''}`).join(', ')}</div>` : ''}
+          ${closed ? '' : `
+          <div class="sep"></div>
+          ${me?.role === 'admin' ? `
+          <label class="field"><span>Бүртгэл хаах шалтгаан</span><input id="why" placeholder="Зочин бичгээр хүссэн…"></label>
+          <button class="btn" data-v="danger" type="button" data-a="close">Бүртгэл хаах</button>
+          <div class="hint">Түрийвчид мөнгөтэй эсвэл идэвхтэй захиалгатай бол хаагдахгүй. Нэр, утас арилна; захиалга, гүйлгээ бүртгэлд үлдэнэ.</div>` : '<div class="hint">Бүртгэл хаахыг зөвхөн админ хийнэ.</div>'}`}
+        </div>
+      </div>
+    </div>`);
+  page.querySelector('#idesh-rows').addEventListener('click', (e) => {
+    const tr = e.target.closest('tr[data-order]');
+    if (tr) openOrder(tr.dataset.order);
+  });
+  page.querySelector('#acts').addEventListener('click', async (e) => {
+    const b = e.target.closest('button[data-a]');
+    if (!b) return;
+    try {
+      if (b.dataset.a === 'revoke') {
+        if (!confirm('Энэ сессийг гаргах уу? Тэр утсан дээр дахин нэвтрэх шаардлагатай болно.')) return;
+        await ops(`/v1/ops/guests/${id}/sessions/${b.dataset.sid}/revoke`, { method: 'POST', body: {} });
+        toast('Сесс гаргалаа.', 'good');
+      } else if (b.dataset.a === 'close') {
+        const note = page.querySelector('#why').value.trim();
+        if (!note) return toast('Шалтгаан бичнэ үү.', 'bad');
+        if (!confirm(`${g.phone ?? 'Энэ'} бүртгэлийг хаах уу? Буцаах боломжгүй.`)) return;
+        await ops(`/v1/ops/guests/${id}/close`, { method: 'POST', body: { note } });
+        toast('Бүртгэл хаагдлаа.', 'good');
+      }
+      await openGuest(id);
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  view.append(page);
 }
 
 /* ── the numbers ── */

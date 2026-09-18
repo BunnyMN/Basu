@@ -380,6 +380,58 @@ describe('the desk’s window onto orders', () => {
     expect(again.alerts).toEqual([{ level: 'info', text: '1 буцаалт зочны дансыг хүлээж байна.', tab: 'pay' }]);
   });
 
+  it('finds a person by phone or name, and reads their whole file', async () => {
+    const { id, code, guest } = await aPaidOrder();
+    await app.inject({ method: 'PATCH', url: '/v1/me', headers: auth(guest), payload: { display_name: 'Сараа' } });
+
+    const byPhone = (await app.inject({ method: 'GET', url: '/v1/ops/guests?q=9900 4009', headers: desk() })).json().guests;
+    expect(byPhone).toEqual([expect.objectContaining({ phone: '+97699004009', name: 'Сараа', closed_at: null })]);
+    const byName = (await app.inject({ method: 'GET', url: '/v1/ops/guests?q=сар', headers: desk() })).json().guests;
+    expect(byName.map((g: { id: string }) => g.id)).toEqual([byPhone[0].id]);
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/guests?q=123', headers: desk() })).json().guests).toEqual([]);
+    // No question: everybody, newest first.
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/guests', headers: desk() })).json().guests).toHaveLength(2);
+
+    const file = (await app.inject({ method: 'GET', url: `/v1/ops/guests/${byPhone[0].id}`, headers: desk() })).json();
+    expect(file.guest).toMatchObject({ phone: '+97699004009', name: 'Сараа' });
+    expect(file.wallet.balance_mnt).toBe(40_000);
+    expect(file.wallet.lines.map((l: { kind: string; amount_mnt: number }) => [l.kind, l.amount_mnt])).toEqual([['purchase', -460_000], ['topup', 500_000]]);
+    expect(file.sessions).toHaveLength(1);
+    expect(file.dine_orders).toEqual([]);
+    expect(file.idesh_orders).toEqual([expect.objectContaining({ id, code, state: 'PAID' })]);
+    expect(file.messages.length).toBeGreaterThan(0);
+
+    const nobody = await app.inject({ method: 'GET', url: '/v1/ops/guests/00000000-0000-0000-0000-000000000000', headers: desk() });
+    expect(nobody.statusCode).toBe(404);
+  });
+
+  it('signs a lost phone out, and closes an account with a reason — or refuses while money is held', async () => {
+    const { guest } = await aPaidOrder();
+    const [me] = (await app.inject({ method: 'GET', url: '/v1/ops/guests?q=99004009', headers: desk() })).json().guests;
+    const file = (await app.inject({ method: 'GET', url: `/v1/ops/guests/${me.id}`, headers: desk() })).json();
+
+    const out = await app.inject({ method: 'POST', url: `/v1/ops/guests/${me.id}/sessions/${file.sessions[0].id}/revoke`, headers: desk(), payload: { note: 'утсаа гээсэн гэж залгасан' } });
+    expect(out.json()).toEqual({ revoked: true });
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: auth(guest) })).statusCode).toBe(401);
+    expect((await app.inject({ method: 'POST', url: `/v1/ops/guests/${me.id}/sessions/${file.sessions[0].id}/revoke`, headers: desk(), payload: {} })).statusCode).toBe(404);
+
+    // Money in the wallet: the desk is refused the same way the app is.
+    const held = await app.inject({ method: 'POST', url: `/v1/ops/guests/${me.id}/close`, headers: desk(), payload: { note: 'зочин хүссэн' } });
+    expect(held.statusCode).toBe(409);
+    const unsaid = await app.inject({ method: 'POST', url: `/v1/ops/guests/${me.id}/close`, headers: desk(), payload: {} });
+    expect(unsaid.statusCode).toBe(400);
+
+    // The supplier's owner holds nothing and has nothing running: closed, and gone from the directory by phone.
+    const [owner] = (await app.inject({ method: 'GET', url: '/v1/ops/guests?q=88010001', headers: desk() })).json().guests;
+    const closed = await app.inject({ method: 'POST', url: `/v1/ops/guests/${owner.id}/close`, headers: desk('Bayaraa'), payload: { note: 'бичгээр хүссэн' } });
+    expect(closed.json()).toEqual({ closed: true });
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/guests?q=88010001', headers: desk() })).json().guests).toEqual([]);
+    expect((await app.inject({ method: 'GET', url: `/v1/ops/guests/${owner.id}`, headers: desk() })).json().guest).toMatchObject({ phone: null, name: null });
+    const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() })).json().audit;
+    expect(audit.map((a: { action: string }) => a.action)).toEqual(['guest.close', 'guest.session_revoke']);
+    expect(audit[0]).toMatchObject({ who: 'ops:Демо', target_kind: 'guest', target_id: owner.id, note: 'бичгээр хүссэн' });
+  });
+
   it('takes a supplier off the market, and a listing out of sight, with the reason kept', async () => {
     const { supplierId, listingId } = await aPaidOrder();
     expect((await app.inject({ method: 'GET', url: '/v1/idesh/listings' })).json().listings).toHaveLength(1);

@@ -1090,6 +1090,33 @@ describe('нийлүүлэгч болох', () => {
     (doc.querySelector('#alerts button[data-go="suppliers"]') as HTMLElement).click();
     await until(desk, 'the applications', (d) => d.querySelectorAll('#applied .row').length > 0);
   });
+
+  it('finds a guest by phone and opens their file: wallet, lunches, meat, messages', async () => {
+    storage.removeItem('basu.ops');
+    const desk = await openPage('ops.html');
+    await until(desk, 'the secret prefilled', (d) =>
+      Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
+    );
+    clickText(desk, '.pair button', 'Нэвтрэх');
+    await opsTab(desk, 'guests');
+    await until(desk, 'the directory', (d) => d.querySelectorAll('#guests tr[data-guest]').length > 0);
+    const q = desk.window.document.querySelector('#q') as HTMLInputElement;
+    q.value = '99001122';
+    q.dispatchEvent(new desk.window.Event('input', { bubbles: true }));
+    await until(desk, 'one guest', (d) => d.querySelectorAll('#guests tr[data-guest]').length === 1);
+    const row = desk.window.document.querySelector('#guests tr[data-guest]')!;
+    expect(row.textContent).toContain('+97699001122');
+    (row as HTMLElement).click();
+    await until(desk, 'the file', (d) => Boolean(d.querySelector('.detail .facts')));
+    const doc = desk.window.document;
+    expect(doc.querySelector('.page-head')?.textContent).toContain('+97699001122');
+    expect(doc.querySelector('.facts')?.textContent).toContain('Түрийвч');
+    expect([...doc.querySelectorAll('.section > h2')].map((h) => h.textContent)).toEqual(
+      expect.arrayContaining(['Түрийвчийн хуулга', 'Хоолны захиалга', 'Идэшний захиалга', 'Мэдэгдэл']),
+    );
+    // The demo's guest has lunch on the books, and the desk can see it.
+    expect(doc.querySelectorAll('.section table tbody tr').length).toBeGreaterThan(0);
+  });
 });
 
 /**

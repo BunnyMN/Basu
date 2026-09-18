@@ -42,3 +42,4 @@ export {
 } from './sessions.js';
 
 export { guestCensus, type GuestCensus } from './census.js';
+export { findGuests, guestCard, type GuestCard } from './directory.js';

@@ -32,6 +32,8 @@ import {
 import { limits } from './hardening.js';
 import { shapeOrder, shapeSettlement } from './shapes.js';
 import { overviewAt } from './overview.js';
+import { closeGuest, guestFile, guestSearch } from './guests.js';
+import { revokeSession } from '../platform/identity/index.js';
 import { mode } from '../mode.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import { listMembers, memberByPhone, setMemberActive, upsertMember, type Member, type Role } from '../ops/index.js';
@@ -162,7 +164,7 @@ export async function registerOpsRoutes(
     const body = request.body ?? {};
     try {
       const member = await upsertMember({ phone: body.phone ?? '', name: body.name ?? '', role: (body.role ?? 'ops') as Role });
-      await recordAudit({ who: who(request), action: 'member.upsert', targetKind: 'supplier', targetId: member.id, note: `${member.name} · ${member.role}` });
+      await recordAudit({ who: who(request), action: 'member.upsert', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
       return reply.status(201).send(shapeMember(member));
     } catch (error) {
       return badRequest(reply, 'Утас (+976XXXXXXXX), нэр, эрхээ шалгана уу.', (error as Error).message);
@@ -174,7 +176,7 @@ export async function registerOpsRoutes(
     if (request.params.id === request.ops!.id && !request.body.active) return badRequest(reply, 'Өөрийгөө хаах боломжгүй.', 'cannot deactivate yourself');
     try {
       await setMemberActive(request.params.id, request.body.active);
-      await recordAudit({ who: who(request), action: request.body.active ? 'member.activate' : 'member.deactivate', targetKind: 'supplier', targetId: request.params.id });
+      await recordAudit({ who: who(request), action: request.body.active ? 'member.activate' : 'member.deactivate', targetKind: 'member', targetId: request.params.id });
       return reply.send({ id: request.params.id, active: request.body.active });
     } catch (error) {
       return sendError(reply, new IdeshError('NOT_FOUND', (error as Error).message));
@@ -344,6 +346,41 @@ export async function registerOpsRoutes(
       }
     },
   );
+
+  /* ── the guests ── */
+
+  app.get<{ Querystring: { q?: string } }>('/v1/ops/guests', asOps, async (request) => guestSearch(request.query.q ?? ''));
+
+  app.get<{ Params: { id: string } }>('/v1/ops/guests/:id', asOps, async (request, reply) => {
+    const file = await guestFile(request.params.id);
+    if (!file) return sendError(reply, new IdeshError('NOT_FOUND', 'no such guest'));
+    return reply.send(file);
+  });
+
+  /** A phone is gone: sign that one out. */
+  app.post<{ Params: { id: string; sid: string }; Body: { note?: string } }>(
+    '/v1/ops/guests/:id/sessions/:sid/revoke',
+    asRunner,
+    async (request, reply) => {
+      const gone = await revokeSession(request.params.id, request.params.sid, ctx.clock.now());
+      if (!gone) return sendError(reply, new IdeshError('NOT_FOUND', 'no such open session'));
+      await recordAudit({ who: who(request), action: 'guest.session_revoke', targetKind: 'guest', targetId: request.params.id, note: request.body?.note ?? null });
+      return reply.send({ revoked: true });
+    },
+  );
+
+  /** Closing on somebody's behalf: admin only, a reason required, the same two refusals the app has. */
+  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/guests/:id/close', asAdmin, async (request, reply) => {
+    const note = request.body?.note?.trim();
+    if (!note) return badRequest(reply, 'Шалтгаан бичнэ үү.', 'note required');
+    try {
+      await closeGuest(request.params.id, ctx.clock.now());
+      await recordAudit({ who: who(request), action: 'guest.close', targetKind: 'guest', targetId: request.params.id, note });
+      return reply.send({ closed: true });
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
 
   /* ── the numbers ── */
 

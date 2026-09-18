@@ -23,7 +23,8 @@ export interface DeviceSession {
   current: boolean;
 }
 
-export async function sessionsOf(guestId: string, token: string): Promise<DeviceSession[]> {
+/** With no token — the desk looking in — nothing is `current`. */
+export async function sessionsOf(guestId: string, token?: string): Promise<DeviceSession[]> {
   const { rows } = await getPool().query<{
     id: string;
     label: string | null;
@@ -33,11 +34,11 @@ export async function sessionsOf(guestId: string, token: string): Promise<Device
     current: boolean;
   }>(
     `SELECT id, label, created_at, last_seen_at, expires_at,
-            token_hash = $2 AS current
+            token_hash = COALESCE($2, '') AS current
        FROM identity.guest_session
       WHERE guest_id = $1 AND revoked_at IS NULL AND expires_at > now()
       ORDER BY COALESCE(last_seen_at, created_at) DESC`,
-    [guestId, sha256(token)],
+    [guestId, token ? sha256(token) : null],
   );
   return rows.map((r) => ({
     id: r.id,

@@ -1114,6 +1114,7 @@ export interface OrderFilter {
   /** One state, when the scope is too wide. */
   state?: IdeshState | undefined;
   supplierId?: string | undefined;
+  guestId?: string | undefined;
   /** `YYYY-MM-DD` — orders to be received that day. */
   day?: string | undefined;
   q?: string | undefined;
@@ -1133,9 +1134,10 @@ async function listOrders(opts: OrderFilter, db: Db): Promise<SupplierOrder[]> {
       WHERE o.state = ANY($1::text[])
         AND ($2::uuid IS NULL OR o.supplier_id = $2::uuid)
         AND ($3::date IS NULL OR o.receive_on = $3::date)
+        AND ($4::uuid IS NULL OR o.guest_id = $4::uuid)
       ORDER BY o.created_at DESC
       LIMIT 500`,
-    [states, opts.supplierId ?? null, opts.day ?? null],
+    [states, opts.supplierId ?? null, opts.day ?? null, opts.guestId ?? null],
   );
   const names = await displayNamesFor(rows.map((r) => r.guest_id));
   const contacts = await contactsFor(rows.map((r) => r.guest_id));
