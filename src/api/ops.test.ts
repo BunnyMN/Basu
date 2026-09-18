@@ -60,6 +60,16 @@ afterAll(async () => {
 });
 
 describe('the ops desk', () => {
+  it('lives at /dashboard, and the old /ops address still leads there', async () => {
+    const page = await app.inject({ method: 'GET', url: '/dashboard' });
+    expect(page.statusCode).toBe(200);
+    expect(page.headers['content-type']).toContain('text/html');
+    expect(page.body).toContain('renderOverview');
+    const old = await app.inject({ method: 'GET', url: '/ops' });
+    expect(old.statusCode).toBe(301);
+    expect(old.headers.location).toBe('/dashboard');
+  });
+
   it('opens only to the secret', async () => {
     const none = await app.inject({ method: 'GET', url: '/v1/ops/suppliers' });
     expect(none.statusCode).toBe(401);

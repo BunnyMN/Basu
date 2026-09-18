@@ -867,7 +867,9 @@ async function mountDevRoutes(
   // The second app on the home screen, and the screen its suppliers hold.
   app.get('/idesh', (_request, reply) => reply.sendFile('idesh.html'));
   app.get('/supplier', (_request, reply) => reply.sendFile('supplier.html'));
-  app.get('/ops', (_request, reply) => reply.sendFile('ops.html'));
+  app.get('/dashboard', (_request, reply) => reply.sendFile('ops.html'));
+  // The desk's old address, kept so that a bookmark from the first weeks still opens it.
+  app.get('/ops', (_request, reply) => reply.redirect('/dashboard', 301));
   app.get('/terms', (_request, reply) => reply.sendFile('terms.html'));
   app.get('/privacy', (_request, reply) => reply.sendFile('privacy.html'));
 
