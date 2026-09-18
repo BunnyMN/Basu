@@ -33,6 +33,7 @@ import { limits } from './hardening.js';
 import { shapeOrder, shapeSettlement } from './shapes.js';
 import { overviewAt } from './overview.js';
 import { closeGuest, guestFile, guestSearch } from './guests.js';
+import { registerDineDesk } from './dineDesk.js';
 import { revokeSession } from '../platform/identity/index.js';
 import { mode } from '../mode.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
@@ -346,6 +347,8 @@ export async function registerOpsRoutes(
       }
     },
   );
+
+  registerDineDesk(app, ctx, { asOps, asRunner, who });
 
   /* ── the guests ── */
 

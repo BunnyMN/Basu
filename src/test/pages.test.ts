@@ -1117,6 +1117,32 @@ describe('нийлүүлэгч болох', () => {
     // The demo's guest has lunch on the books, and the desk can see it.
     expect(doc.querySelectorAll('.section table tbody tr').length).toBeGreaterThan(0);
   });
+
+  it('shows every kitchen with its tablets, then the day’s lunches and one lunch’s story', async () => {
+    storage.removeItem('basu.ops');
+    const desk = await openPage('ops.html');
+    await until(desk, 'the secret prefilled', (d) =>
+      Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
+    );
+    clickText(desk, '.pair button', 'Нэвтрэх');
+    await opsTab(desk, 'venues');
+    await until(desk, 'the kitchens', (d) => d.querySelectorAll('#venues [data-venue]').length > 0);
+    const doc = desk.window.document;
+    const venue = doc.querySelector('#venues [data-venue]')!;
+    expect(venue.textContent).toContain('Өнөөдөр');
+    expect(venue.querySelector('button[data-a="tablet"]')).not.toBeNull();
+    // The menu unfolds under the kitchen, with the switch for each dish.
+    (venue.querySelector('button[data-a="menu"]') as HTMLElement).click();
+    await until(desk, 'the menu', (d) => d.querySelectorAll('#venues .drawer tbody tr').length > 0);
+    expect(doc.querySelector('#venues .drawer button[data-item]')?.textContent).toBe('Нуух');
+
+    await opsTab(desk, 'lunches');
+    await until(desk, 'the lunches', (d) => d.querySelectorAll('#lunches tr[data-lunch]').length > 0);
+    (doc.querySelector('#lunches tr[data-lunch]') as HTMLElement).click();
+    await until(desk, 'one lunch', (d) => Boolean(d.querySelector('.detail .story')));
+    expect(doc.querySelector('.page-head h1')?.textContent).toContain('№');
+    expect([...doc.querySelectorAll('.section > h2')].map((h) => h.textContent)).toEqual(expect.arrayContaining(['Хоол', 'Явц']));
+  });
 });
 
 /**

@@ -809,16 +809,6 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
 
   /* ── ops ────────────────────────────────────────────────────────── */
 
-  app.post<{ Body: { restaurant_id?: string; label?: string } }>(
-    '/v1/ops/devices',
-    async (request, reply) => {
-      const { restaurant_id: restaurantId, label } = request.body ?? {};
-      if (!restaurantId) return badRequest(reply, 'Ресторан заана уу.', 'restaurant_id required');
-      const code = await createPairingCode(ctx, restaurantId, label ?? 'Гал тогооны таблет');
-      return reply.status(201).send({ pairing_code: code, expires_in_minutes: 10 });
-    },
-  );
-
   /** What the lunchtime watch actually looks at: three numbers. */
   app.get('/v1/ops/health', async () => {
     const { rows } = await db.query<{

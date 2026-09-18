@@ -238,6 +238,9 @@ const REASON = {
 const actorWord = (a) =>
   a.startsWith('guest:') ? 'зочин' : a.startsWith('supplier:owner:') ? 'нийлүүлэгч (утас)' : a.startsWith('supplier:') ? 'нийлүүлэгчийн дэлгэц' : a.startsWith('ops') ? a.replace('ops:', 'ops · ') : 'систем';
 const ICON = {
+  venues: '<svg viewBox="0 0 24 24"><path d="M4 10l1.5-5h13L20 10"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>',
+  lunches: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/></svg>',
+  reviews: '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>',
   guests: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.8 3.5-5.6 7-5.6s6.1 1.8 7 5.6"/></svg>',
   overview: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>',
   stats: '<svg viewBox="0 0 24 24"><path d="M4 19h16M7 16V9M12 16V5M17 16v-6"/></svg>',
@@ -344,6 +347,9 @@ let me = null;
 const TABS = [
   { key: 'overview', label: 'Самбар', icon: ICON.overview, group: 'Basu' },
   { key: 'guests', label: 'Зочид', icon: ICON.guests, group: 'Basu' },
+  { key: 'venues', label: 'Ресторан', icon: ICON.venues, group: 'Хоол' },
+  { key: 'lunches', label: 'Захиалга', icon: ICON.lunches, group: 'Хоол' },
+  { key: 'reviews', label: 'Үнэлгээ', icon: ICON.reviews, group: 'Хоол' },
   { key: 'stats', label: 'Тоон үзүүлэлт', icon: ICON.stats, group: 'Идэш' },
   { key: 'orders', label: 'Захиалгууд', icon: ICON.orders, group: 'Идэш' },
   { key: 'suppliers', label: 'Нийлүүлэгчид', icon: ICON.suppliers, group: 'Идэш' },
@@ -423,7 +429,7 @@ function show(key) {
   const view = document.getElementById('view');
   view.replaceChildren();
   window.scrollTo(0, 0);
-  ({ overview: renderOverview, guests: renderGuests, stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers })[key]?.(view);
+  ({ overview: renderOverview, guests: renderGuests, venues: renderVenues, lunches: renderLunches, reviews: renderReviews, stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers })[key]?.(view);
 }
 
 const head = (title, sub, right = '') =>
@@ -676,6 +682,296 @@ async function openGuest(id) {
     }
   });
   view.append(page);
+}
+
+/* ── lunch: the restaurants ── */
+
+const DINE_LIVE = ['PLACED', 'ACCEPTED', 'SCHEDULED', 'ARMED', 'HELD', 'FIRED', 'COOKING', 'READY', 'SERVED'];
+const DINE_FREE = ['PLACED', 'ACCEPTED', 'SCHEDULED', 'ARMED', 'HELD', 'RESLOTTED'];
+const DINE_EVENT = {
+  CREATED: 'Үүссэн', PAID: 'Төлсөн', PLANNED: 'Төлөвлөсөн', ACCEPTED: 'Ресторан баталсан', REJECTED: 'Ресторан татгалзсан', ARMED: 'Бэлтгэлд орсон',
+  HELD: 'Түр зогсоосон', HELD_BY_KITCHEN: 'Гал тогоо түр зогсоосон', FIRED: 'Гал дээр гарсан', READY: 'Бэлэн болсон', SERVED: 'Үйлчилсэн', CLOSED: 'Дууссан',
+  CANCELLED: 'Цуцлагдсан', REFUNDED: 'Буцаалт хийсэн', NO_SHOW: 'Зочин ирээгүй', REVIEWED: 'Үнэлгээ өгсөн', SEATED: 'Суусан', RESLOTTED: 'Цаг солигдсон',
+};
+const dineActor = (a) => {
+  if (!a) return '';
+  if (a.startsWith('guest:')) return 'зочин';
+  if (a.startsWith('kds:')) return 'гал тогооны дэлгэц';
+  if (a.startsWith('ops:')) return `ops · ${a.slice(4)}`;
+  return { 'system:planner': 'төлөвлөгч', 'system:scheduler': 'хуваарьлагч' }[a] ?? a;
+};
+const stars = (n) => `<span style="color:var(--hold)">${'★'.repeat(n)}</span><span style="color:var(--line-2)">${'★'.repeat(5 - n)}</span>`;
+let venueCache = [];
+
+async function renderVenues(view) {
+  view.append(head('Ресторан', 'Гал тогоо бүр: таблет холбоотой эсэх, өнөөдрийн захиалга, цэс, үнэлгээ.'));
+  view.append(el('<div class="rows" id="venues"><div class="empty">…</div></div>'));
+  await loadVenues();
+}
+
+async function loadVenues() {
+  const box = document.getElementById('venues');
+  if (!box) return;
+  try {
+    ({ restaurants: venueCache } = await ops('/v1/ops/dine/restaurants'));
+  } catch (error) {
+    box.replaceChildren(el(`<div class="card empty">${esc(error.message)}</div>`));
+    return;
+  }
+  if (!document.getElementById('venues')) return;
+  box.replaceChildren(...(venueCache.length ? venueCache.map(renderVenue) : [el('<div class="card empty"><b>Ресторан алга</b>Хоолны талд ресторан бүртгэгдээгүй.</div>')]));
+}
+
+function renderVenue(r) {
+  const card = el(`
+    <div class="card row" data-venue="${r.id}" data-state="${r.active ? 'on' : 'off'}">
+      <div class="name">${esc(r.name)}
+        ${r.active ? '' : ' <span class="pill" data-s="off">зогссон</span>'}
+        <span class="pill" data-s="${r.online ? 'contracted' : 'declined'}">${r.online ? 'дэлгэц холбоотой' : 'дэлгэц холбогдоогүй'}</span>
+        <small>${r.rating ? `${stars(Math.round(r.rating.stars))} ${r.rating.stars} · ${r.rating.count} үнэлгээ${r.rating.on_time_share === null ? '' : ` · цагтаа ${Math.round(r.rating.on_time_share * 100)}%`}` : 'үнэлгээ алга'} · ${r.slot_minutes} мин цаг · ${r.auto_accept ? 'автоматаар батална' : 'гараар батална'}${r.merchant_tin ? '' : ' · <b style="color:var(--stop)">е-баримтын ТТД алга</b>'}</small>
+      </div>
+      <div class="right"><div class="btns">
+        <button class="btn" data-size="sm" type="button" data-a="tablet">Шинэ таблет</button>
+        <button class="btn" data-size="sm" data-v="quiet" type="button" data-a="menu">Цэс</button>
+        <button class="btn" data-size="sm" data-v="${r.active ? 'danger' : 'primary'}" type="button" data-a="active">${r.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>
+      </div></div>
+      <div class="about">Өнөөдөр <b>${r.today.placed}</b> захиалга · <b>${r.today.live}</b> идэвхтэй${r.today.held ? ` · <b style="color:var(--hold)">${r.today.held} түр зогсоосон</b>` : ''} · <b>${mnt(r.today.sales_mnt)}</b> · цэс ${r.menu.active}/${r.menu.total}${r.menu.sold_out ? ` (${r.menu.sold_out} дууссан)` : ''}
+        <div class="sess-list" style="margin-top:8px">${r.devices.length ? r.devices.map((d) => `
+          <div class="sess"><span>${d.pairing_code ? `Код <b class="mono">${d.pairing_code}</b> · ${esc(d.label ?? '')} · ${clockOf(d.pairing_expires_at)} хүртэл` : `${esc(d.label ?? 'Таблет')} · ${d.online ? '<span class="pill" data-s="contracted">онлайн</span>' : `сүүлд ${d.last_seen_at ? `${when(d.last_seen_at)} ${clockOf(d.last_seen_at)}` : 'хэзээ ч үгүй'}`}`}</span>
+          <button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-device="${d.id}">Салгах</button></div>`).join('') : '<span style="color:var(--ink-3)">Таблет холбогдоогүй.</span>'}</div>
+      </div>
+    </div>`);
+  card.addEventListener('click', async (e) => {
+    const b = e.target.closest('button[data-a]');
+    if (!b) return;
+    try {
+      if (b.dataset.a === 'tablet') {
+        const label = prompt('Таблетын нэр (жишээ нь «Хойд гал тогоо»):', 'Гал тогооны таблет');
+        if (label === null) return;
+        const { pairing_code } = await ops(`/v1/ops/dine/restaurants/${r.id}/devices`, { method: 'POST', body: { label } });
+        toast(`Код ${pairing_code} — 10 минутын дотор таблет дээр оруулна.`, 'good');
+      } else if (b.dataset.a === 'revoke') {
+        if (!confirm('Энэ таблетыг салгах уу? Дэлгэц дахин холбох код шаардана.')) return;
+        await ops(`/v1/ops/dine/devices/${b.dataset.device}/revoke`, { method: 'POST', body: {} });
+      } else if (b.dataset.a === 'active') {
+        const note = prompt(r.active ? 'Зогсоох шалтгаан:' : 'Идэвхжүүлэх тэмдэглэл:', '');
+        if (note === null) return;
+        await ops(`/v1/ops/dine/restaurants/${r.id}/active`, { method: 'POST', body: { active: !r.active, note } });
+      } else if (b.dataset.a === 'menu') {
+        const open = card.querySelector('.drawer');
+        if (open) return open.remove();
+        return card.append(await menuDrawer(r));
+      }
+      await loadVenues();
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  return card;
+}
+
+async function menuDrawer(r) {
+  const { items } = await ops(`/v1/ops/dine/restaurants/${r.id}/menu`);
+  const d = el(`<div class="drawer"><table class="table"><thead><tr><th>Хоол</th><th>Цех</th><th class="num">Үнэ</th><th class="num">Бэлтгэх, мин</th><th>Төлөв</th><th></th></tr></thead><tbody>${items
+    .map((m) => `<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td>${esc(m.station)}</td><td class="num">${mnt(m.price_mnt)}</td><td class="num">${m.prep_minutes}</td><td>${m.active ? (m.sold_out_until ? '<span class="pill" data-s="off">дууссан</span>' : '<span class="pill" data-s="contracted">цэсэнд</span>') : '<span class="pill" data-s="declined">нуусан</span>'}</td><td class="num"><button class="btn" data-size="sm" data-v="quiet" type="button" data-item="${m.id}" data-on="${m.active}">${m.active ? 'Нуух' : 'Харуулах'}</button></td></tr>`)
+    .join('') || '<tr><td colspan="6" class="empty">Цэс хоосон.</td></tr>'}</tbody></table></div>`);
+  d.addEventListener('click', async (e) => {
+    const b = e.target.closest('button[data-item]');
+    if (!b) return;
+    e.stopPropagation();
+    const active = b.dataset.on !== 'true';
+    const note = prompt(active ? 'Цэсэнд буцаах тэмдэглэл:' : 'Нуух шалтгаан:', '');
+    if (note === null) return;
+    try {
+      await ops(`/v1/ops/dine/menu/${b.dataset.item}/active`, { method: 'POST', body: { active, note } });
+      d.replaceWith(await menuDrawer(r));
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  return d;
+}
+
+/* ── lunch: the orders ── */
+
+let lunchFilter = { scope: 'live', restaurant: '', day: '', q: '' };
+
+async function renderLunches(view) {
+  view.append(head('Хоолны захиалга', 'Өнөөдрийн болон өмнөх захиалгууд. Дарж дэлгэрэнгүйг үзнэ.'));
+  if (!venueCache.length) {
+    try {
+      ({ restaurants: venueCache } = await ops('/v1/ops/dine/restaurants'));
+    } catch { /* the list still works without the filter */ }
+  }
+  if (tab !== 'lunches') return;
+  view.append(el(`
+    <div class="card">
+      <div class="tools">
+        <input type="search" id="q" placeholder="Код, утас, зочин, ресторан…" value="${esc(lunchFilter.q)}" autocomplete="off">
+        <select id="restaurant"><option value="">Бүх ресторан</option>${venueCache.map((r) => `<option value="${r.id}"${lunchFilter.restaurant === r.id ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select>
+        <input type="date" id="day" value="${esc(lunchFilter.day)}" title="Хоолны өдөр">
+        <div class="seg">${[['live', 'Идэвхтэй'], ['done', 'Дууссан'], ['all', 'Бүгд']].map(([k, l]) => `<button type="button" data-scope="${k}"${lunchFilter.scope === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>
+      </div>
+      <div id="lunches"><div class="empty">…</div></div>
+    </div>`));
+  let timer;
+  view.querySelector('#q').addEventListener('input', (e) => {
+    lunchFilter.q = e.target.value;
+    clearTimeout(timer);
+    timer = setTimeout(loadLunches, 250);
+  });
+  view.querySelector('#restaurant').addEventListener('change', (e) => ((lunchFilter.restaurant = e.target.value), loadLunches()));
+  view.querySelector('#day').addEventListener('change', (e) => ((lunchFilter.day = e.target.value), loadLunches()));
+  view.querySelector('.seg').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-scope]');
+    if (!b) return;
+    lunchFilter.scope = b.dataset.scope;
+    for (const c of view.querySelectorAll('.seg button')) c.toggleAttribute('data-on', c === b);
+    void loadLunches();
+  });
+  void loadLunches();
+}
+
+async function loadLunches() {
+  const box = document.getElementById('lunches');
+  if (!box) return;
+  const qs = new URLSearchParams({ scope: lunchFilter.scope, q: lunchFilter.q });
+  if (lunchFilter.restaurant) qs.set('restaurant', lunchFilter.restaurant);
+  if (lunchFilter.day) qs.set('day', lunchFilter.day);
+  let data;
+  try {
+    data = await ops(`/v1/ops/dine/orders?${qs}`);
+  } catch (error) {
+    box.replaceChildren(el(`<div class="empty">${esc(error.message)}</div>`));
+    return;
+  }
+  if (!document.getElementById('lunches')) return;
+  if (!data.orders.length) {
+    box.replaceChildren(el('<div class="empty"><b>Захиалга алга</b>Шүүлтэд тохирох хоолны захиалга байхгүй.</div>'));
+    return;
+  }
+  const table = el('<table class="table"><thead><tr><th>Захиалга</th><th>Ресторан</th><th>Зочин</th><th>Цаг</th><th>Гал</th><th>Төлөв</th><th class="num">Дүн</th></tr></thead><tbody></tbody></table>');
+  const body = table.querySelector('tbody');
+  for (const o of data.orders) {
+    const tr = el(`
+      <tr data-link data-lunch="${o.id}">
+        <td><b class="mono">№${esc(o.code)}</b><span class="sub">${o.party_size} хүн</span></td>
+        <td>${esc(o.restaurant.name)}</td>
+        <td>${esc(o.guest ?? 'зочин')}<span class="sub">${esc(o.guest_phone ?? '')}</span></td>
+        <td>${when(o.slot_starts_at)}<span class="sub">${clockOf(o.slot_starts_at)}</span></td>
+        <td>${o.fire_at ? clockOf(o.fire_at) : '—'}${o.late ? ' <span class="pill" data-s="declined">хоцорсон</span>' : ''}</td>
+        <td><span class="pill" data-s="${o.state}">${DINE_WORD[o.state] ?? o.state}</span></td>
+        <td class="num">${mnt(o.total_mnt)}</td>
+      </tr>`);
+    tr.addEventListener('click', () => openLunch(o.id));
+    body.append(tr);
+  }
+  box.replaceChildren(table);
+}
+
+async function openLunch(id) {
+  const view = document.getElementById('view');
+  let d;
+  try {
+    d = await ops(`/v1/ops/dine/orders/${id}`);
+  } catch (error) {
+    toast(error.message, 'bad');
+    return;
+  }
+  const o = d.order;
+  view.replaceChildren();
+  const back = el('<button class="back" type="button" id="back">‹ Хоолны захиалга</button>');
+  back.addEventListener('click', () => show('lunches'));
+  view.append(back);
+  view.append(head(`№${esc(o.code)} <span class="pill" data-s="${o.state}" style="vertical-align:middle;margin-left:8px">${DINE_WORD[o.state] ?? o.state}</span>`, `${esc(o.restaurant.name)} · ${when(o.slot_starts_at)} ${clockOf(o.slot_starts_at)} · ${o.party_size} хүн`));
+  const page = el(`
+    <div class="detail">
+      <div>
+        <div class="card">
+          <div class="facts">
+            <div><div class="lab">Зочин</div><b>${esc(o.guest ?? 'зочин')}</b><br>${o.guest_phone ? `<a class="tel" href="tel:${esc(o.guest_phone)}">${esc(o.guest_phone)}</a>` : ''}</div>
+            <div><div class="lab">Ширээ</div><b>${o.table ? esc(o.table) : '—'}</b><br>${o.seated_at ? `суусан ${clockOf(o.seated_at)}` : 'суугаагүй'}</div>
+            <div><div class="lab">Гал</div><b>${o.fire_at ? clockOf(o.fire_at) : '—'}</b><br>${o.fired_at ? `гарсан ${clockOf(o.fired_at)}` : o.late ? '<span style="color:var(--stop)">хоцорч байна</span>' : o.fire_mode ?? 'товлоогүй'}</div>
+            <div><div class="lab">Бэлэн</div><b>${o.ready_at ? clockOf(o.ready_at) : '—'}</b><br>${o.eta_at ? `ирэх ${clockOf(o.eta_at)}` : ''}</div>
+            <div><div class="lab">Дүн</div><b>${mnt(o.total_mnt)}</b><br>түрийвчээс</div>
+          </div>
+        </div>
+        <section class="section"><h2>Хоол</h2><div class="card" style="overflow:auto"><table class="table"><thead><tr><th>Нэр</th><th>Цех</th><th class="num">Тоо</th><th class="num">Үнэ</th></tr></thead><tbody>${d.lines
+          .map((l) => `<tr${l.cancelled ? ' data-off' : ''}><td><b>${esc(l.name)}</b>${l.notes ? `<span class="sub">${esc(l.notes)}</span>` : ''}</td><td>${esc(l.station ?? '')}</td><td class="num">${l.qty}</td><td class="num">${mnt(l.unit_price_mnt * l.qty)}</td></tr>`)
+          .join('')}</tbody></table></div></section>
+        ${d.review ? `<section class="section"><h2>Үнэлгээ</h2><div class="card card-body">${stars(d.review.stars)} ${d.review.on_time === null ? '' : d.review.on_time ? '· цагтаа' : '· хоцорсон'}${d.review.comment ? `<br>${esc(d.review.comment)}` : ''}</div></section>` : ''}
+        <section class="section"><h2>Явц</h2><div class="card card-body"><ol class="story">${d.events
+          .map((e) => `<li><b>${DINE_EVENT[e.type] ?? e.type}</b><small>${when(e.at)} ${clockOf(e.at)}${e.actor ? ` · ${esc(dineActor(e.actor))}` : ''}${e.payload?.reason ? ` · ${esc(e.payload.reason)}` : ''}</small></li>`)
+          .join('')}</ol></div></section>
+      </div>
+      <div class="card" id="acts">
+        <div class="card-head"><h3>Ops-ийн үйлдэл</h3></div>
+        <div class="card-body acts">
+          ${DINE_FREE.includes(o.state) || ['ARMED', 'HELD', 'FIRED', 'COOKING', 'READY'].includes(o.state) ? `
+          <label class="field"><span>Тэмдэглэл</span><input id="note" placeholder="Бүртгэлд үлдэнэ"></label>
+          ${DINE_FREE.includes(o.state) ? '<button class="btn" data-v="danger" type="button" data-a="cancel">Зочны өмнөөс цуцлах</button><div class="hint">Гал дээр гараагүй тул мөнгө бүтэн түрийвч рүү буцна.</div>' : '<div class="hint">Гал дээр гарсан: цуцлах боломжгүй.</div>'}
+          ${['ARMED', 'HELD', 'FIRED', 'COOKING', 'READY'].includes(o.state) ? '<div class="sep"></div><button class="btn" type="button" data-a="no-show">Зочин ирээгүй гэж тэмдэглэх</button><div class="hint">Ширээ суллагдана; мөнгө буцахгүй.</div>' : ''}
+          ` : `<div class="hint">${DINE_LIVE.includes(o.state) ? 'Үйлчилсэн: ops-ийн үйлдэл алга.' : 'Дууссан захиалгад үйлдэл алга.'}</div>`}
+        </div>
+      </div>
+    </div>`);
+  page.querySelector('#acts').addEventListener('click', async (e) => {
+    const b = e.target.closest('button[data-a]');
+    if (!b) return;
+    const note = page.querySelector('#note')?.value.trim() ?? '';
+    if (b.dataset.a === 'cancel' && !note) return toast('Шалтгаан бичнэ үү.', 'bad');
+    if (!confirm(b.dataset.a === 'cancel' ? `№${o.code}-г цуцалж, ${mnt(o.total_mnt)}-г буцаах уу?` : `№${o.code}: зочин ирээгүй гэж тэмдэглэх үү?`)) return;
+    try {
+      await ops(`/v1/ops/dine/orders/${id}/${b.dataset.a}`, { method: 'POST', body: { note } });
+      toast(b.dataset.a === 'cancel' ? 'Цуцлагдлаа, мөнгө буцлаа.' : 'Тэмдэглэлээ.', 'good');
+      await openLunch(id);
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  view.append(page);
+}
+
+/* ── lunch: what people said ── */
+
+let reviewVenue = '';
+
+async function renderReviews(view) {
+  view.append(head('Үнэлгээ', 'Зочдын одоор өгсөн үнэлгээ ба сэтгэгдэл, сүүлийнх нь эхэндээ.'));
+  if (!venueCache.length) {
+    try {
+      ({ restaurants: venueCache } = await ops('/v1/ops/dine/restaurants'));
+    } catch { /* fine without the filter */ }
+  }
+  if (tab !== 'reviews') return;
+  view.append(el(`<div class="card"><div class="tools"><select id="restaurant"><option value="">Бүх ресторан</option>${venueCache.map((r) => `<option value="${r.id}"${reviewVenue === r.id ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div><div id="reviews"><div class="empty">…</div></div></div>`));
+  view.querySelector('#restaurant').addEventListener('change', (e) => ((reviewVenue = e.target.value), loadReviews()));
+  void loadReviews();
+}
+
+async function loadReviews() {
+  const box = document.getElementById('reviews');
+  if (!box) return;
+  let data;
+  try {
+    data = await ops(`/v1/ops/dine/reviews?${new URLSearchParams(reviewVenue ? { restaurant: reviewVenue } : {})}`);
+  } catch (error) {
+    box.replaceChildren(el(`<div class="empty">${esc(error.message)}</div>`));
+    return;
+  }
+  if (!document.getElementById('reviews')) return;
+  if (!data.reviews.length) {
+    box.replaceChildren(el('<div class="empty"><b>Үнэлгээ алга</b>Хооллосон зочид үнэлгээ өгөөгүй байна.</div>'));
+    return;
+  }
+  const table = el('<table class="table"><thead><tr><th>Огноо</th><th>Ресторан</th><th>Захиалга</th><th>Зочин</th><th>Од</th><th>Сэтгэгдэл</th></tr></thead><tbody></tbody></table>');
+  const body = table.querySelector('tbody');
+  for (const v of data.reviews) {
+    const tr = el(`<tr data-link data-lunch="${v.order_id}"><td>${when(v.at)}</td><td>${esc(v.restaurant.name)}</td><td class="mono">№${esc(v.order_code)}</td><td>${esc(v.guest ?? 'зочин')}</td><td>${stars(v.stars)}${v.on_time === null ? '' : v.on_time ? ' <span class="sub">цагтаа</span>' : ' <span class="sub" style="color:var(--stop)">хоцорсон</span>'}</td><td>${esc(v.comment ?? '')}</td></tr>`);
+    tr.addEventListener('click', () => openLunch(v.order_id));
+    body.append(tr);
+  }
+  box.replaceChildren(table);
 }
 
 /* ── the numbers ── */
