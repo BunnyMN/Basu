@@ -1143,6 +1143,27 @@ describe('нийлүүлэгч болох', () => {
     expect(doc.querySelector('.page-head h1')?.textContent).toContain('№');
     expect([...doc.querySelectorAll('.section > h2')].map((h) => h.textContent)).toEqual(expect.arrayContaining(['Хоол', 'Явц']));
   });
+
+  it('opens the books: the checks, every account, then the movements with a CSV to take away', async () => {
+    storage.removeItem('basu.ops');
+    storage.removeItem('basu.ops.money');
+    const desk = await openPage('ops.html');
+    await until(desk, 'the secret prefilled', (d) =>
+      Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
+    );
+    clickText(desk, '.pair button', 'Нэвтрэх');
+    await opsTab(desk, 'money');
+    await until(desk, 'the checks', (d) => d.querySelectorAll('#money .kpi').length === 6);
+    const doc = desk.window.document;
+    expect(doc.querySelector('#money .kpi')?.textContent).toContain('тэнцсэн');
+    expect(doc.querySelector('#money table')?.textContent).toContain('QPay · клиринг');
+    expect(doc.querySelector('#run')).not.toBeNull();
+
+    clickText(desk, '.page-head .seg button', 'Гүйлгээ');
+    await until(desk, 'the movements', (d) => d.querySelectorAll('#transfers tr').length > 0);
+    expect(doc.querySelector('#transfers')?.textContent).toContain('→');
+    expect(doc.querySelector('#csv')?.textContent).toBe('CSV татах');
+  });
 });
 
 /**

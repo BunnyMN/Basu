@@ -137,3 +137,8 @@ export async function seedOrder(
   );
   return { orderId: rows[0]!.id, code };
 }
+
+/** A receipt the tax authority has given up on, for tests of what the desk does next. */
+export async function failReceipt(receiptId: string, db: Db = getPool()): Promise<void> {
+  await db.query(`UPDATE ledger.ebarimt_receipt SET state = 'failed', attempts = 5, last_error = 'PosAPI 503' WHERE id = $1`, [receiptId]);
+}

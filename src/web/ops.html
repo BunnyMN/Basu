@@ -238,6 +238,7 @@ const REASON = {
 const actorWord = (a) =>
   a.startsWith('guest:') ? 'зочин' : a.startsWith('supplier:owner:') ? 'нийлүүлэгч (утас)' : a.startsWith('supplier:') ? 'нийлүүлэгчийн дэлгэц' : a.startsWith('ops') ? a.replace('ops:', 'ops · ') : 'систем';
 const ICON = {
+  money: '<svg viewBox="0 0 24 24"><path d="M4 7h16v11H4z"/><path d="M4 11h16M8 7V5h8v2"/><circle cx="12" cy="14.5" r="1.6"/></svg>',
   venues: '<svg viewBox="0 0 24 24"><path d="M4 10l1.5-5h13L20 10"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>',
   lunches: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/></svg>',
   reviews: '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>',
@@ -347,6 +348,7 @@ let me = null;
 const TABS = [
   { key: 'overview', label: 'Самбар', icon: ICON.overview, group: 'Basu' },
   { key: 'guests', label: 'Зочид', icon: ICON.guests, group: 'Basu' },
+  { key: 'money', label: 'Мөнгө', icon: ICON.money, group: 'Basu' },
   { key: 'venues', label: 'Ресторан', icon: ICON.venues, group: 'Хоол' },
   { key: 'lunches', label: 'Захиалга', icon: ICON.lunches, group: 'Хоол' },
   { key: 'reviews', label: 'Үнэлгээ', icon: ICON.reviews, group: 'Хоол' },
@@ -429,7 +431,7 @@ function show(key) {
   const view = document.getElementById('view');
   view.replaceChildren();
   window.scrollTo(0, 0);
-  ({ overview: renderOverview, guests: renderGuests, venues: renderVenues, lunches: renderLunches, reviews: renderReviews, stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers })[key]?.(view);
+  ({ overview: renderOverview, guests: renderGuests, money: renderMoney, venues: renderVenues, lunches: renderLunches, reviews: renderReviews, stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers })[key]?.(view);
 }
 
 const head = (title, sub, right = '') =>
@@ -972,6 +974,169 @@ async function loadReviews() {
     body.append(tr);
   }
   box.replaceChildren(table);
+}
+
+/* ── the books ── */
+
+const KIND_WORD = { topup: 'Цэнэглэлт', purchase: 'Төлбөр', refund: 'Буцаалт', promotion: 'Урамшуулал', adjustment: 'Залруулга' };
+const TOPUP_WORD = { pending: 'хүлээгдэж буй', settled: 'орсон', failed: 'амжилтгүй', expired: 'хугацаа дууссан' };
+const RECEIPT_WORD = { queued: 'дараалалд', issued: 'гарсан', failed: 'амжилтгүй' };
+const TOPUP_PILL = { pending: 'PAID', settled: 'contracted', failed: 'declined', expired: 'off' };
+const RECEIPT_PILL = { queued: 'PAID', issued: 'contracted', failed: 'declined' };
+let moneyView = localStorage.getItem('basu.ops.money') ?? 'checks';
+let moneyFilter = { kind: '', from: '', to: '', topupState: '', receiptState: '' };
+const canMoney = () => ['admin', 'finance'].includes(me?.role);
+
+/** A CSV the browser saves, fetched with the desk's token because a plain link cannot carry one. */
+async function download(path, name) {
+  const res = await fetch(path, { headers: { authorization: `Bearer ${token()}` } });
+  if (!res.ok) throw new Error('Экспорт амжилтгүй.');
+  const url = URL.createObjectURL(await res.blob());
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function renderMoney(view) {
+  view.append(head('Мөнгө', 'Ledger данс бүрээр, гүйлгээ, QPay цэнэглэлт, е-баримт. Нягтлан руу CSV.'));
+  const seg = el(`<div class="seg">${[['checks', 'Нэгтгэл'], ['transfers', 'Гүйлгээ'], ['topups', 'Цэнэглэлт'], ['receipts', 'Е-баримт']].map(([k, l]) => `<button type="button" data-m="${k}"${moneyView === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-m]');
+    if (!b) return;
+    moneyView = b.dataset.m;
+    localStorage.setItem('basu.ops.money', moneyView);
+    for (const c of seg.querySelectorAll('button')) c.toggleAttribute('data-on', c === b);
+    void drawMoney();
+  });
+  view.querySelector('.page-head').append(seg);
+  view.append(el('<div id="money"><div class="empty">…</div></div>'));
+  void drawMoney();
+}
+
+async function drawMoney() {
+  const box = document.getElementById('money');
+  if (!box) return;
+  try {
+    const page = await ({ checks: moneyChecks, transfers: moneyTransfers, topups: moneyTopups, receipts: moneyReceipts })[moneyView]();
+    if (document.getElementById('money')) box.replaceChildren(page);
+  } catch (error) {
+    box.replaceChildren(el(`<div class="card empty">${esc(error.message)}</div>`));
+  }
+}
+
+async function moneyChecks() {
+  const m = await ops('/v1/ops/money');
+  const c = m.checks;
+  const ok = (good) => (good ? '' : ' data-tone="bad"');
+  const page = el(`<div>
+    <div class="kpis">
+      <div class="card kpi"${ok(c.drift === 0)}><div class="lab">Ledger</div><b>${c.drift === 0 ? 'тэнцсэн' : mnt(c.drift)}</b><span>${c.accounts} данс · бүх бичилтийн нийлбэр ${c.drift === 0 ? '0' : 'тэг биш'}</span></div>
+      <div class="card kpi"${ok(c.qpay.gap_mnt === 0)}><div class="lab">QPay ↔ ledger</div><b>${c.qpay.gap_mnt === 0 ? 'таарсан' : mnt(c.qpay.gap_mnt)}</b><span>орсон ${mnt(c.qpay.settled_mnt)} · клиринг ${mnt(c.qpay.clearing_mnt)}</span></div>
+      <div class="card kpi"${c.qpay.stuck ? ' data-tone="warn"' : ''}><div class="lab">Хүлээгдэж буй цэнэглэлт</div><b>${c.qpay.pending}</b><span>${c.qpay.stuck ? `${c.qpay.stuck} нь хагас цагаас дээш` : 'гацсан алга'}</span></div>
+      <div class="card kpi"><div class="lab">Зочдын түрийвч</div><b class="money">${mnt(c.wallets.liability_mnt)}</b><span>${m.wallets.holding} түрийвчид мөнгөтэй · нийт ${m.wallets.count}</span></div>
+      <div class="card kpi"><div class="lab">Гадагш өгөх</div><b class="money">${mnt(c.wallets.payable_mnt)}</b><span>нийлүүлэгч, буцаалт · банкаар гарсан ${mnt(c.bank.out_mnt)}</span></div>
+      <div class="card kpi"${ok(c.receipts.failed === 0)}><div class="lab">Е-баримт</div><b>${c.receipts.gap === 0 ? 'бүрэн' : `${c.receipts.gap} дутуу`}</b><span>гарсан ${c.receipts.issued} · дараалалд ${c.receipts.queued} · амжилтгүй ${c.receipts.failed}</span></div>
+    </div>
+    ${canMoney() ? '<div style="margin-top:14px"><button class="btn" type="button" id="run">Шалгалт одоо ажиллуулах</button> <span class="sub" style="display:inline">Ledger, е-баримтын нэгтгэл ба дараалал. Ердийн үедээ 23:30-д автоматаар.</span></div>' : ''}
+    <section class="section"><h2>Данс бүрээр</h2><div class="card" style="overflow:auto"><table class="table"><thead><tr><th>Данс</th><th>Төрөл</th><th class="num">Үлдэгдэл</th><th class="num">Бичилт</th><th>Сүүлд</th></tr></thead><tbody>
+      <tr><td><b>Зочдын түрийвч</b><span class="sub">${m.wallets.count} данс нэг мөрөнд</span></td><td>guest</td><td class="num">${mnt(m.wallets.balance_mnt)}</td><td class="num">—</td><td>—</td></tr>
+      ${m.accounts.map((a) => `<tr><td><b>${esc(a.name)}</b><span class="sub mono">${esc(a.label ?? '')}</span></td><td>${esc(a.kind)}</td><td class="num">${mnt(a.balance_mnt)}</td><td class="num">${a.entries}</td><td>${a.last_at ? `${when(a.last_at)} ${clockOf(a.last_at)}` : '—'}</td></tr>`).join('')}
+    </tbody></table></div></section>
+  </div>`);
+  page.querySelector('#run')?.addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    try {
+      const r = await ops('/v1/ops/money/checks', { method: 'POST', body: {} });
+      toast(`Ledger зөрүү ${r.ledger.drift} · е-баримт дутуу ${r.receipts.gap} · гаргасан ${r.pushed.issued}, амжилтгүй ${r.pushed.failed}`, r.ledger.drift === 0 && r.pushed.failed === 0 ? 'good' : 'bad');
+      await drawMoney();
+    } catch (error) {
+      toast(error.message, 'bad');
+      e.target.disabled = false;
+    }
+  });
+  return page;
+}
+
+function moneyTools(fields, onChange) {
+  const t = el(`<div class="tools">${fields}</div>`);
+  t.addEventListener('change', onChange);
+  return t;
+}
+
+async function moneyTransfers() {
+  const qs = new URLSearchParams();
+  if (moneyFilter.kind) qs.set('kind', moneyFilter.kind);
+  if (moneyFilter.from) qs.set('from', moneyFilter.from);
+  if (moneyFilter.to) qs.set('to', moneyFilter.to);
+  const { transfers } = await ops(`/v1/ops/money/transfers?${qs}`);
+  const page = el('<div class="card"></div>');
+  page.append(moneyTools(`
+      <select id="kind"><option value="">Бүх төрөл</option>${Object.entries(KIND_WORD).map(([k, l]) => `<option value="${k}"${moneyFilter.kind === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
+      <input type="date" id="from" value="${esc(moneyFilter.from)}" title="Эхлэх өдөр"> <input type="date" id="to" value="${esc(moneyFilter.to)}" title="Дуусах өдөр">
+      ${canMoney() ? '<button class="btn" data-size="sm" type="button" id="csv" style="margin-left:auto">CSV татах</button>' : ''}`,
+    (e) => {
+      if (e.target.id in moneyFilter) moneyFilter[e.target.id] = e.target.value;
+      void drawMoney();
+    }));
+  page.querySelector('#csv')?.addEventListener('click', () => download(`/v1/ops/money/transfers.csv?${qs}`, `basu-transfers-${moneyFilter.from || 'all'}-${moneyFilter.to || 'all'}.csv`).catch((error) => toast(error.message, 'bad')));
+  page.append(el(`<div style="overflow:auto"><table class="table"><thead><tr><th>Огноо</th><th>Төрөл</th><th>Хаанаас → хаашаа</th><th>Тайлбар</th><th class="num">Дүн</th></tr></thead><tbody id="transfers">${transfers
+    .map((t) => `<tr><td>${when(t.at)}<span class="sub">${clockOf(t.at)}</span></td><td><span class="pill" data-s="${t.kind === 'refund' ? 'declined' : t.kind === 'topup' ? 'contracted' : 'PAID'}">${KIND_WORD[t.kind] ?? t.kind}</span></td><td>${esc(t.from.name)} <span style="color:var(--ink-3)">→</span> ${esc(t.to.name)}</td><td>${esc(t.memo ?? '')}<span class="sub mono">${esc(t.id.slice(0, 8))}</span></td><td class="num">${mnt(t.amount_mnt)}</td></tr>`)
+    .join('') || '<tr><td colspan="5" class="empty">Гүйлгээ алга.</td></tr>'}</tbody></table></div>`));
+  return page;
+}
+
+async function moneyTopups() {
+  const qs = new URLSearchParams();
+  if (moneyFilter.topupState) qs.set('state', moneyFilter.topupState);
+  if (moneyFilter.from) qs.set('from', moneyFilter.from);
+  if (moneyFilter.to) qs.set('to', moneyFilter.to);
+  const { topups } = await ops(`/v1/ops/money/topups?${qs}`);
+  const page = el('<div class="card"></div>');
+  page.append(moneyTools(`
+      <select id="topupState"><option value="">Бүх төлөв</option>${Object.entries(TOPUP_WORD).map(([k, l]) => `<option value="${k}"${moneyFilter.topupState === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
+      <input type="date" id="from" value="${esc(moneyFilter.from)}"> <input type="date" id="to" value="${esc(moneyFilter.to)}">
+      ${canMoney() ? '<button class="btn" data-size="sm" type="button" id="csv" style="margin-left:auto">CSV татах</button>' : ''}`,
+    (e) => {
+      if (e.target.id in moneyFilter) moneyFilter[e.target.id] = e.target.value;
+      void drawMoney();
+    }));
+  page.querySelector('#csv')?.addEventListener('click', () => download(`/v1/ops/money/topups.csv?${qs}`, `basu-topups-${moneyFilter.from || 'all'}-${moneyFilter.to || 'all'}.csv`).catch((error) => toast(error.message, 'bad')));
+  page.append(el(`<div style="overflow:auto"><table class="table"><thead><tr><th>Эхэлсэн</th><th>Зочин</th><th>Суваг</th><th>Төлөв</th><th>Орсон</th><th class="num">Дүн</th></tr></thead><tbody id="topups">${topups
+    .map((t) => `<tr><td>${when(t.created_at)}<span class="sub">${clockOf(t.created_at)}</span></td><td>${esc(t.guest ?? 'зочин')}<span class="sub">${esc(t.guest_phone ?? '')}</span></td><td>${esc(t.provider)}<span class="sub mono">${esc(t.provider_ref ?? '')}</span></td><td><span class="pill" data-s="${TOPUP_PILL[t.state] ?? 'off'}">${TOPUP_WORD[t.state] ?? t.state}</span></td><td>${t.settled_at ? `${when(t.settled_at)} ${clockOf(t.settled_at)}` : '—'}</td><td class="num">${mnt(t.amount_mnt)}</td></tr>`)
+    .join('') || '<tr><td colspan="6" class="empty">Цэнэглэлт алга.</td></tr>'}</tbody></table></div>`));
+  return page;
+}
+
+async function moneyReceipts() {
+  const qs = new URLSearchParams();
+  if (moneyFilter.receiptState) qs.set('state', moneyFilter.receiptState);
+  const { receipts } = await ops(`/v1/ops/money/receipts?${qs}`);
+  const page = el('<div class="card"></div>');
+  page.append(moneyTools(
+    `<select id="receiptState"><option value="">Бүх төлөв</option>${Object.entries(RECEIPT_WORD).map(([k, l]) => `<option value="${k}"${moneyFilter.receiptState === k ? ' selected' : ''}>${l}</option>`).join('')}</select>`,
+    (e) => {
+      if (e.target.id in moneyFilter) moneyFilter[e.target.id] = e.target.value;
+      void drawMoney();
+    },
+  ));
+  const table = el(`<div style="overflow:auto"><table class="table"><thead><tr><th>Огноо</th><th>Захиалга</th><th>ТТД</th><th>Төлөв</th><th>Баримт</th><th class="num">Дүн</th><th></th></tr></thead><tbody id="receipts">${receipts
+    .map((r) => `<tr><td>${when(r.created_at)}<span class="sub">${clockOf(r.created_at)}</span></td><td><b class="mono">№${esc(r.order_code ?? '')}</b><span class="sub">${r.kind === 'RETURN' ? 'буцаалт' : 'борлуулалт'}</span></td><td class="mono">${esc(r.merchant_tin ?? '—')}</td><td><span class="pill" data-s="${RECEIPT_PILL[r.state] ?? 'off'}">${RECEIPT_WORD[r.state] ?? r.state}</span>${r.state === 'failed' ? `<span class="sub">${r.attempts} оролдлого · ${esc(r.last_error ?? '')}</span>` : ''}</td><td>${r.bill_id ? `<span class="mono">${esc(r.bill_id)}</span><span class="sub">сугалаа ${esc(r.lottery ?? '')}</span>` : '—'}</td><td class="num">${mnt(r.amount_mnt)}</td><td class="num">${r.state === 'failed' && canMoney() ? `<button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${r.id}">Дахин</button>` : ''}</td></tr>`)
+    .join('') || '<tr><td colspan="7" class="empty">Е-баримт алга.</td></tr>'}</tbody></table></div>`);
+  table.addEventListener('click', async (e) => {
+    const b = e.target.closest('button[data-retry]');
+    if (!b) return;
+    try {
+      await ops(`/v1/ops/money/receipts/${b.dataset.retry}/retry`, { method: 'POST', body: {} });
+      toast('Дараалалд буцаалаа.', 'good');
+      await drawMoney();
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  page.append(table);
+  return page;
 }
 
 /* ── the numbers ── */

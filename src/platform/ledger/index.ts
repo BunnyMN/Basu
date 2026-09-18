@@ -36,3 +36,17 @@ export {
 } from './ebarimt.js';
 
 export { ledgerOverview, type LedgerOverview } from './overview.js';
+
+export {
+  accountsForDesk,
+  transfersForDesk,
+  topupsForDesk,
+  receiptsForDesk,
+  retryReceipt,
+  reconciliationForDesk,
+  type DeskAccount,
+  type DeskTransfer,
+  type DeskTopup,
+  type DeskReceipt,
+  type Reconciliation,
+} from './desk.js';

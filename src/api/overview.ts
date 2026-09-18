@@ -44,12 +44,12 @@ export async function overviewAt(now: Date) {
   const needsAccount = settlements.filter((t) => t.state === 'needs_account').length;
 
   const alerts: Alert[] = [];
-  if (wallet.drift !== 0) alerts.push({ level: 'bad', text: `Ledger тэнцэхгүй байна: зөрүү ${mnt(wallet.drift)}. Гараар бичсэн нэг талын бичилт орсон.`, tab: 'pay' });
+  if (wallet.drift !== 0) alerts.push({ level: 'bad', text: `Ledger тэнцэхгүй байна: зөрүү ${mnt(wallet.drift)}. Гараар бичсэн нэг талын бичилт орсон.`, tab: 'money' });
   if (dine.late > 0) alerts.push({ level: 'bad', text: `Гал тавих ${dine.late} ажил хугацаанаасаа хоцорч байна. Scheduler ажиллаж байгаа эсэхийг шалга.` });
   if (notify.stuck > 0) alerts.push({ level: 'bad', text: `${notify.stuck} мэдэгдэл 10 минутаас дээш дараалалд гацсан. Relay ажиллахгүй байна.` });
   if (notify.failed.today > 0) alerts.push({ level: 'warn', text: `Өнөөдөр ${notify.failed.today} мэдэгдэл илгээгдэж чадсангүй.` });
-  if (wallet.receipts.failed > 0) alerts.push({ level: 'warn', text: `${wallet.receipts.failed} е-баримт гаргаж чадсангүй. PosAPI-г шалга.`, tab: 'pay' });
-  if (wallet.topups.stuck > 0) alerts.push({ level: 'warn', text: `${wallet.topups.stuck} цэнэглэлт хагас цагаас дээш хүлээгдэж байна. QPay callback ирэхгүй байж магадгүй.` });
+  if (wallet.receipts.failed > 0) alerts.push({ level: 'warn', text: `${wallet.receipts.failed} е-баримт гаргаж чадсангүй. PosAPI-г шалга.`, tab: 'money' });
+  if (wallet.topups.stuck > 0) alerts.push({ level: 'warn', text: `${wallet.topups.stuck} цэнэглэлт хагас цагаас дээш хүлээгдэж байна. QPay callback ирэхгүй байж магадгүй.`, tab: 'money' });
   if (dine.held > 0) alerts.push({ level: 'warn', text: `Хоолны ${dine.held} захиалга түр зогсоосон байна.` });
   if (dine.restaurants.offline > 0) alerts.push({ level: 'warn', text: `${dine.restaurants.offline} рестораны гал тогооны дэлгэц холбогдоогүй.` });
   if (due > 0) alerts.push({ level: 'warn', text: `Шилжүүлэх ${due} мөнгө хүлээж байна.`, tab: 'pay' });
