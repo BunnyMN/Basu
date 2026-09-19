@@ -30,6 +30,7 @@
   --ground:linear-gradient(176deg,#EFF1F2 0%,#E9EBEC 46%,#DFE3E4 100%);
   --glass:rgba(255,255,255,.74); --blur:blur(12px) saturate(1.05);
   --scrim:rgba(20,24,27,.40);
+  --map-dim:0;            /* veil over light map tiles; .35 in dark until mapStyle.js has a dark palette */
 
   /* ink + lines. ink-3 is lifted from the shell's #78868E (3.75:1) to 4.99:1
      on white; port the same value to BasuColor.ink3 so both halves agree. */
@@ -71,6 +72,7 @@
   --h-sm:36px; --h-md:44px; --h-lg:52px; --target:44px;
   --ctl-h:44px; --ctl-fs:1rem;
   --bar-h:52px; --tabbar-h:64px; --toast-lift:0px;
+  --clock-h:32px;         /* the demo clock strip; top-pinned chrome steps down by it when the strip is mounted */
 
   /* type, rem on a 16px root */
   --t-display:2rem;        /* 32 mono: KPI, countdown */
@@ -85,6 +87,7 @@
   --t-meta:.71875rem;      /* 11.5 mono meta */
   --t-eyebrow:.6875rem;    /* 11 mono section label — the floor */
   --t-live:1.4375rem;      /* 23 live-row corner time */
+  --t-headline:1.5rem;     /* 24 status headline (.status .big on dine/idesh) */
   --lh-tight:1.15; --lh-snug:1.3; --lh-body:1.5; --lh-prose:1.6;
   --track-eyebrow:.14em;
 
@@ -93,6 +96,7 @@
   --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
   --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2362727A' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
   --mask-chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
+  --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2362727A' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
 
   /* motion + layers */
   --ease:cubic-bezier(.2,.8,.3,1); --dur:200ms; --dur-sheet:260ms;
@@ -107,6 +111,7 @@
     --ground:linear-gradient(176deg,#141B1E 0%,#0E1315 46%,#0A0E10 100%);
     --glass:rgba(22,29,32,.74);
     --scrim:rgba(4,7,8,.60);
+    --map-dim:.35;
     --ink:#E7ECED; --ink-2:#A2B0B6; --ink-3:#84949B; --ink-inverse:#14181B;
     --line:#283236; --line-2:#374348;
     --accent:#FF8A3D; --accent-ink:#FF9B57; --accent-soft:#33200F; --accent-line:#5E3A1B;
@@ -122,6 +127,7 @@
     --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2384949B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23160B03' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
     --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2384949B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+    --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2384949B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
   }
 }
 :root[data-theme="dark"]{
@@ -130,6 +136,7 @@
   --ground:linear-gradient(176deg,#141B1E 0%,#0E1315 46%,#0A0E10 100%);
   --glass:rgba(22,29,32,.74);
   --scrim:rgba(4,7,8,.60);
+  --map-dim:.35;
   --ink:#E7ECED; --ink-2:#A2B0B6; --ink-3:#84949B; --ink-inverse:#14181B;
   --line:#283236; --line-2:#374348;
   --accent:#FF8A3D; --accent-ink:#FF9B57; --accent-soft:#33200F; --accent-line:#5E3A1B;
@@ -145,6 +152,7 @@
   --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2384949B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23160B03' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
   --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2384949B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+  --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2384949B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
 }
 :root[data-theme="light"]{color-scheme:light}
 
@@ -222,18 +230,25 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
 .section-label:first-child{margin-top:0}
 .section-label .n{font-weight:400;letter-spacing:0;text-transform:none}
 .section-label .link{min-height:0;font-family:var(--sans);font-size:var(--t-cap);letter-spacing:0;text-transform:none}
-.section-title{font-size:var(--t-title-3);font-weight:600;line-height:var(--lh-snug);margin:24px 0 12px}
+.section-title{font-size:var(--t-title-3);font-weight:600;line-height:var(--lh-snug);letter-spacing:0;margin:24px 0 12px}
 .section-title .n{font-family:var(--mono);font-size:var(--t-meta);font-weight:500;color:var(--ink-3);margin-right:8px;vertical-align:middle}
 .section-title small{display:block;font-size:var(--t-cap);font-weight:400;color:var(--ink-2);margin-top:4px;max-width:40ch}
 .section{margin-top:32px}
 .cap{font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}
 .meta{font-family:var(--mono);font-size:var(--t-meta);line-height:1.35;color:var(--ink-3);font-variant-numeric:tabular-nums}
+/* A meta line that is a caption, not a timestamp — the KDS ticket's
+   «12:30 · 4 хүн · Бат», dine's «12 мин» — is sans 13 on --ink-2. */
+.meta[data-sans],.ticket .meta{font-family:var(--sans);font-size:var(--t-cap);line-height:1.45;letter-spacing:0;color:var(--ink-2);white-space:normal}
 .muted{color:var(--ink-3)}
 .wordmark{font-family:var(--sans);font-size:1.6875rem;font-weight:600;letter-spacing:-.025em;line-height:1;color:var(--ink)}
 .wordmark[data-size="sm"]{font-size:1.125rem;letter-spacing:-.02em}
 .wordmark small{font-family:var(--mono);font-size:var(--t-eyebrow);font-weight:500;letter-spacing:var(--track-eyebrow);text-transform:uppercase;color:var(--ink-3);margin-left:10px;vertical-align:middle}
 .link{display:inline-flex;align-items:center;gap:6px;min-height:var(--target);font-size:var(--t-body-lg);font-weight:500;color:var(--accent-ink);background:none;border:0;padding:0}
 .link svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+/* A phone number is ink, never link-coloured; the 14px glyph says it dials.
+   <a class="tel" href="tel:…"><svg>…</svg>+976 8801 0011</a> */
+.tel{display:inline-flex;align-items:center;gap:4px;color:var(--ink);font-family:var(--mono);font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap;text-decoration:none}
+.tel svg{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3)}
 .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ink-3);vertical-align:middle;margin-right:6px;flex:none}
 .dot[data-tone="route"]{background:var(--route)}
 .dot[data-tone="hold"]{background:var(--hold)}
@@ -252,7 +267,7 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
    pages keep a sheet, a footer or a tab bar at the bottom. */
 .clockbar{
   position:sticky;top:0;z-index:var(--z-dev);display:flex;align-items:center;gap:8px;
-  min-height:32px;padding:0 12px;flex-wrap:nowrap;overflow-x:auto;
+  min-height:var(--clock-h);padding:0 12px;flex-wrap:nowrap;overflow-x:auto;
   background:var(--surface-2);border-bottom:1px dashed var(--line-2);
 }
 .clockbar .lab{margin-right:auto;flex:none;white-space:nowrap}
@@ -308,6 +323,30 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
 .btn[data-v="primary"][data-busy]::after{border-color:color-mix(in srgb,var(--on-accent) 35%,transparent);border-top-color:var(--on-accent)}
 @keyframes spin{to{transform:rotate(360deg)}}
 
+/* ── overflow menu ────────────────────────────────────────────────── */
+/* One visible secondary and a ⋯ for the rest, on desk rows:
+     <details class="more"><summary class="btn" data-size="sm" data-icon aria-label="Бусад үйлдэл"><svg>…</svg></summary>
+       <div class="menu"><button class="btn" data-v="quiet">…</button></div></details>
+   Closing on an outside click is the page's JS. A [data-rows] container
+   clips to its corners, so it lets go of overflow only while a menu is open. */
+.more{position:relative;display:inline-flex}
+.more > summary{list-style:none}
+.more > summary::-webkit-details-marker{display:none}
+.more > summary svg{fill:currentColor;stroke:none}
+.more[open] > summary{background:var(--surface-2)}
+.more > .menu{
+  position:absolute;right:0;top:calc(100% + 4px);z-index:var(--z-bar);min-width:220px;
+  display:flex;flex-direction:column;gap:2px;padding:4px;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r-ctl);box-shadow:var(--shadow-float);
+}
+.more > .menu .btn{width:100%;justify-content:flex-start;border-color:transparent;background:none}
+.more > .menu .btn.ink-stop,.more > .menu .btn[data-tone="stop"]{color:var(--stop)}
+@media (hover:hover){
+  .more > .menu .btn:hover{background:var(--surface-2);border-color:transparent}
+  .more > .menu .btn.ink-stop:hover,.more > .menu .btn[data-tone="stop"]:hover{background:var(--stop-soft)}
+}
+[data-rows]:has(.more[open]){overflow:visible}
+
 /* ── cards ────────────────────────────────────────────────────────── */
 /* A card is a group. It holds rows, a table, a form or one fact block, and
    never another card; nesting is expressed with .inset or a hairline. */
@@ -317,6 +356,8 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
 .card-body{padding:16px}
 .card > .section-label,[data-rows] > .section-label{padding:14px 16px 8px;margin:0}
 .inset{background:var(--surface-2);border-radius:var(--r-ctl);padding:12px 14px}
+.inset[data-demo]{border:1px dashed var(--line-2)}   /* the folded «Демо» group on supplier, kds, ops */
+.card > .table-wrap{border-radius:inherit}           /* so row hovers clip to the card's corners */
 .card[data-link]{cursor:pointer}
 .card[data-link]:active{background:var(--surface-2)}
 @media (hover:hover){.card[data-link]:hover{background:var(--surface-2)}}
@@ -346,13 +387,18 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
 [data-rows] :where(a,button).row:active{background:var(--surface-2)}
 @media (hover:hover){[data-rows] :where(a,button).row:hover{background:var(--surface-2)}}
 .row > .lead{flex:none;display:grid;place-items:center}
+.row > .lead > .dot{margin:0}
 .row > .lead img,.row .thumb{width:40px;height:40px;border-radius:var(--r-sm);object-fit:cover;background:var(--surface-2);display:block}
 .row > .lead .thumb[data-size="lg"]{width:64px;height:64px}
 .row > .main{flex:1;min-width:0}
 .row .title{display:block;font-size:var(--t-row);font-weight:600;line-height:var(--lh-snug);color:var(--ink);overflow-wrap:break-word}
 .row .title[data-weight="normal"]{font-weight:400}
 .row .sub{display:block;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2);margin-top:2px}
+.row .sub:empty{display:none}
 .row .meta{display:block;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* A plain meta is one truncated line; one that carries a state chip may
+   wrap, so the chip moves to a second line rather than being elided whole. */
+.row .meta:has(.chip){white-space:normal;overflow:visible;text-overflow:clip}
 .row .meta .chip{vertical-align:middle;margin-left:6px}
 .row > .end{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:2px;text-align:right}
 .row .val{font-family:var(--mono);font-size:var(--t-body-lg);font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);line-height:1.1}
@@ -388,6 +434,7 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
 .input.search{padding-left:38px;background-color:var(--surface-2);background-image:var(--icon-search);background-repeat:no-repeat;background-position:12px center;background-size:16px}
 /* value plus a unit, ₮ or кг, drawn after the digits */
 .affix{position:relative;display:block}
+.field > .affix{font-size:inherit;font-weight:400;line-height:inherit;color:inherit;margin-bottom:0}   /* it is a wrapper, not the label */
 .affix > input{padding-right:52px}
 .affix > i{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-style:normal;font-size:var(--t-body);color:var(--ink-3);pointer-events:none}
 /* codes: pairing, OTP, hand-over — one big tracked input, not eight boxes */
@@ -413,6 +460,13 @@ input[type="radio"]{border-radius:50%}
 input[type="checkbox"]:checked{background:var(--accent) var(--check) center/13px no-repeat;border-color:var(--accent)}
 input[type="radio"]:checked{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 0 0 4px var(--surface)}
 input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor:not-allowed}
+/* the same radio drawn as a span inside a button[role=radio] (idesh .choice, dine slots) */
+.radio-mark{
+  display:inline-grid;place-items:center;width:20px;height:20px;flex:none;border-radius:50%;
+  border:1px solid var(--line-2);background:var(--surface);transition:background var(--dur),border-color var(--dur);
+}
+.radio-mark[data-on],[role="radio"][aria-checked="true"] .radio-mark{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 0 0 4px var(--surface)}
+[role="radio"][disabled] .radio-mark,[role="radio"][aria-disabled="true"] .radio-mark{opacity:.5}
 .check,.choice-row{display:flex;align-items:center;gap:12px;min-height:var(--target);font-size:var(--t-body-lg);cursor:pointer}
 
 /* ── chips (state pills) ──────────────────────────────────────────── */
@@ -430,6 +484,9 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .chip::before,.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--tone);flex:none;opacity:1}
 .chip[data-size="sm"],.pill[data-size="sm"]{height:20px;padding:0 7px 0 6px;font-size:var(--t-meta)}
 .chip[data-size="sm"]::before,.pill[data-size="sm"]::before{width:5px;height:5px}
+/* a large label pill («Ширээ A3» on a KDS band): sans 15/600 on the surface, no tone dot */
+.chip[data-size="lg"],.pill[data-size="lg"]{height:28px;padding:0 10px;gap:0;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:var(--t-body-lg);font-weight:600}
+.chip[data-size="lg"]::before,.pill[data-size="lg"]::before{display:none}
 /* route: queued, waiting on the system, in transit */
 .chip[data-s="PLACED"],.chip[data-s="ACCEPTED"],.chip[data-s="SCHEDULED"],.chip[data-s="PAID"],.chip[data-s="DISPATCHED"],.chip[data-s="queued"],.chip[data-s="info"],.chip[data-tone="route"],
 .pill[data-s="PLACED"],.pill[data-s="ACCEPTED"],.pill[data-s="SCHEDULED"],.pill[data-s="PAID"],.pill[data-s="DISPATCHED"],.pill[data-s="queued"],.pill[data-s="info"],.pill[data-tone="route"]{
@@ -507,7 +564,9 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .table .sub{display:block;font-size:var(--t-cap);font-weight:400;color:var(--ink-3);margin-top:2px}
 .table .chip,.table .pill{height:20px;padding:0 7px 0 6px;font-size:var(--t-meta)}
 .table tr[data-link]{cursor:pointer}
-.table tr[data-link] td:last-child{padding-right:32px;background-image:var(--mask-chev);background-repeat:no-repeat;background-position:right 12px center;background-size:14px}
+.table tr[data-link] td:last-child{padding-right:32px;background-image:var(--chev-r);background-repeat:no-repeat;background-position:right 12px center;background-size:14px}
+.table:has(tr[data-link]) th:last-child{padding-right:32px}   /* the heading sits over its numbers, not over the chevron */
+.table td.end,.table th.end{text-align:right}                  /* a right-aligned sans value in a numbers column */
 .table tr[data-off] td{color:var(--ink-3)}
 .table[data-dense] td{padding:8px 16px}
 .table td.empty{padding:20px 16px;text-align:left;color:var(--ink-2)}
@@ -533,7 +592,8 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
   font-variant-numeric:tabular-nums;color:var(--ink);
 }
 .kpi-band .kpi b .cur{font-size:.65em}
-.kpi-band .kpi span{display:block;font-size:var(--t-cap);font-weight:400;line-height:1.4;color:var(--ink-3)}
+.kpi-band .kpi > span{display:block;font-size:var(--t-cap);font-weight:400;line-height:1.4;color:var(--ink-3)}
+.kpi-band .kpi b .money{color:inherit}   /* the cell's tone, not .money's ink */
 .kpi-band .kpi[data-tone="bad"] b{color:var(--stop)}
 .kpi-band .kpi[data-tone="warn"] b{color:var(--hold)}
 .kpi-band .kpi[data-tone="good"] b{color:var(--ready)}
@@ -693,6 +753,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 @media (min-width:900px){
   .sheet[data-dock]{top:0;bottom:0;right:0;left:auto;width:440px;max-height:none;border-radius:0;border-top:0;border-left:1px solid var(--line);box-shadow:var(--shadow-float);transform:translateX(102%)}
   .sheet[data-dock][data-open]{transform:none}
+  body:has(> .clockbar) .sheet[data-dock]{top:var(--clock-h)}
   .scrim[data-dock]{display:none}
 }
 
@@ -720,7 +781,11 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .empty .btn{margin-top:12px}
 .card.empty{background:none;border:0;border-top:1px solid var(--line);border-radius:0;box-shadow:none}
 .card > .empty:first-child,[data-rows] > .empty:first-child{border-top:0}
-.empty[data-center]{text-align:center;max-width:32ch;margin:0 auto}
+.empty[data-center]{text-align:center;max-width:32ch;margin:0 auto;width:100%}
+/* A container holding nothing but the empty row is not a hollow card:
+   the frame goes, the hairline and the sentence stay. */
+[data-rows]:has(> .empty:only-child),.card:has(> .empty:only-child){background:none;border:0;border-radius:0;box-shadow:none}
+[data-rows] > .empty:only-child,.card > .empty:only-child{border-top:1px solid var(--line);padding-left:0;padding-right:0}
 .skel{display:block;position:relative;overflow:hidden;background:var(--surface-2);border-radius:var(--r-sm);color:transparent;min-height:14px}
 .skel::after{
   content:"";position:absolute;inset:0;transform:translateX(-100%);
@@ -766,6 +831,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .callout > svg,.note[data-k] > svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;margin-top:2px}
 .callout b,.note[data-k] b{display:block;color:var(--ink);font-weight:600;font-size:inherit;margin:0 0 2px}
 .callout span,.note[data-k] span{display:block;font-size:inherit;line-height:inherit;color:inherit}
+.callout:not(:has(> svg)),.note[data-k]:not(:has(> svg)){flex-direction:column;gap:2px}   /* no icon: the bold line stacks over the sentence */
 .callout[data-k="info"],.note[data-k="info"]{background:var(--route-soft);border-color:var(--route-line);color:var(--route)}
 .callout[data-k="warn"],.note[data-k="warn"]{background:var(--hold-soft);border-color:var(--hold-line);color:var(--hold)}
 .callout[data-k="stop"],.note[data-k="stop"]{background:var(--stop-soft);border-color:var(--stop-line);color:var(--stop)}
@@ -799,9 +865,11 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .stepper .w{grid-column:2;grid-row:1;font-size:var(--t-body-lg);font-weight:400;line-height:1.35;color:var(--ink-3)}
 .stepper li[data-done] .w{color:var(--ink)}
 .stepper li[data-next] .w{color:var(--ink);font-weight:500}
-.stepper .s{display:block;font-size:var(--t-cap);font-weight:400;color:var(--ink-2);margin-top:2px;line-height:1.4}
+.stepper .s{grid-column:2;display:block;font-size:var(--t-cap);font-weight:400;color:var(--ink-2);margin-top:2px;line-height:1.4}
 .stepper .t{grid-column:3;grid-row:1;font-family:var(--mono);font-size:var(--t-cap);color:var(--ink-3);font-variant-numeric:tabular-nums;line-height:1.35;text-align:right;min-width:2.5em}
-/* story: the desk's event log, dot tone by event kind */
+/* story: the desk's event log — every past event is data-done, so plain
+   history is neutral and only the toned kinds colour their dot */
+.story[data-stepper] li[data-done]:not([data-k])::after{background:var(--ink-3);border-color:var(--ink-3)}
 .story[data-stepper] li[data-k="stop"]::after{background:var(--stop);border-color:var(--stop)}
 .story[data-stepper] li[data-k="route"]::after{background:var(--route);border-color:var(--route)}
 .story[data-stepper] li[data-k="ready"]::after{background:var(--ready);border-color:var(--ready)}
@@ -813,6 +881,13 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .codebox .eyebrow,.codebox .lab{display:block;margin:0 0 8px}
 .codebox b{display:block;font-family:var(--mono);font-size:2rem;font-weight:600;letter-spacing:.12em;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;margin:0}
 .codebox small{display:block;font-size:var(--t-cap);color:var(--ink-2);margin-top:8px;line-height:1.4}
+
+/* ── map ──────────────────────────────────────────────────────────── */
+/* dine's #map and idesh's .mapbox add class map-dim. Until mapStyle.js has a
+   dark palette the light tiles are veiled by --map-dim (0 light, .35 dark);
+   the veil sits above the canvas, below MapLibre's controls, and takes no taps. */
+.map-dim{position:relative}
+.map-dim::after{content:"";position:absolute;inset:0;z-index:1;background:var(--bg);opacity:var(--map-dim);pointer-events:none}
 
 /* ── documents (terms, privacy) ───────────────────────────────────── */
 .doc{width:100%;max-width:var(--col);margin:0 auto;padding:16px var(--gutter) calc(32px + var(--safe-b))}
@@ -833,13 +908,19 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .doc-meta{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 16px;margin:16px 0 20px;font-size:var(--t-body)}
 .doc-meta dt{font-family:var(--mono);font-size:var(--t-eyebrow);font-weight:500;letter-spacing:var(--track-eyebrow);text-transform:uppercase;color:var(--ink-3);padding-top:3px}
 .doc-meta dd{margin:0;color:var(--ink)}
-.doc-summary{display:grid;gap:8px;padding:14px 16px;margin:0 0 20px;border-radius:var(--r-ctl);background:var(--surface-2);border:1px solid var(--line)}
+.doc-summary{display:grid;gap:8px;padding:14px 16px;margin:0 0 20px;border-radius:var(--r-ctl);background:var(--surface-2)}
 .doc-summary div{display:flex;justify-content:space-between;gap:12px;font-size:var(--t-body);color:var(--ink-2)}
+.doc-summary div > .v{color:var(--ink);text-align:right}
 .doc-summary div b{color:var(--ink);font-family:var(--mono);font-weight:500;white-space:nowrap}
 .doc .toc{display:flex;flex-direction:column;gap:0;margin:0 0 8px;padding:0;list-style:none}
 .doc .toc li{margin:0;padding:0}
-.doc .toc a{display:flex;align-items:center;min-height:40px;font-size:var(--t-body-lg);font-weight:500;color:var(--accent-ink)}
+/* Seven rows of contents in ink, the number in mono beside them, so the
+   topbar's back link stays the page's one accent. */
+.doc .toc a{display:flex;align-items:center;min-height:40px;font-size:var(--t-body-lg);font-weight:500;color:var(--ink)}
+.doc .toc .n{flex:none;width:28px;font-family:var(--mono);font-size:var(--t-cap);font-weight:500;color:var(--ink-3);font-variant-numeric:tabular-nums}
+@media (hover:hover){.doc .toc a:hover{color:var(--accent-ink)}}
 .doc .en{margin-top:36px;padding-top:18px;border-top:1px solid var(--line)}
+.doc .en > h2{margin-top:0;padding-top:0;border-top:0}   /* .en already draws the hairline */
 .doc .en p{font-size:var(--t-body)}
 .doc .back{display:inline-flex;align-items:center;gap:6px;min-height:var(--target);margin-top:24px;font-size:var(--t-body-lg);font-weight:500;color:var(--accent-ink);text-decoration:none}
 .doc .back svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}

@@ -1,209 +1,141 @@
 <!doctype html>
-<html lang="mn" data-theme="light">
+<html lang="mn" data-theme="light" data-desk>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#E9EBEC">
 <title>Dashboard — Basu</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <link rel="stylesheet" href="/app.css">
 <style>
 /* ── The desk ──────────────────────────────────────────────────────
-   Two or three people, all day, at a computer. A sidebar that never
-   moves, one page at a time with a title, numbers you can read across a
-   room, tables that line up, and one clear button per thing to do. */
-:root{color-scheme:light;--r:12px;--r-s:8px;--side:240px;--shadow:0 1px 2px rgba(20,24,27,.04),0 4px 16px rgba(20,24,27,.04)}
-html{font-size:15px}
-body{background:var(--bg);font-family:"Golos Text",system-ui,sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased}
-h1,h2,h3,p{margin:0}
-button{font:inherit;cursor:pointer}
-input,select{font:inherit}
-.mono{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums}
+   Two or three people, all day, at a computer. Tokens, type, buttons,
+   chips, cards, rows, tables and the sidebar all come from /app.css;
+   what is left here is where things sit. */
+p{margin:0}
 
-/* buttons */
-.btn{
-  display:inline-flex;align-items:center;justify-content:center;gap:6px;font-family:"Golos Text",sans-serif;
-  font-size:.9rem;font-weight:600;letter-spacing:0;text-transform:none;padding:9px 14px;border-radius:var(--r-s);
-  border:1px solid var(--line-2);background:var(--surface);color:var(--ink);min-height:38px;white-space:nowrap;
-}
-.btn:hover{border-color:var(--ink-3);background:var(--surface)}
-.btn[data-v="primary"]{background:var(--accent);border-color:var(--accent);color:#fff}
-.btn[data-v="primary"]:hover{filter:brightness(1.06)}
-.btn[data-v="danger"]{background:transparent;border-color:transparent;color:var(--stop)}
-.btn[data-v="danger"]:hover{background:var(--stop-soft)}
-.btn[data-v="quiet"]{background:transparent;border-color:transparent;color:var(--ink-2)}
-.btn[data-v="quiet"]:hover{background:var(--surface-2)}
-.btn[data-size="sm"]{padding:6px 10px;min-height:32px;font-size:.84rem}
-.btn[data-size="lg"]{width:100%;padding:12px 16px;min-height:46px;font-size:1rem}
-.btn[disabled]{opacity:.45;cursor:not-allowed}
+/* the door */
+.door{min-height:100dvh;display:grid;place-items:center;padding:var(--s-6) var(--gutter)}
+.pair{width:100%;max-width:420px;padding:28px}
+.pair .brand{margin-bottom:20px}
+.pair h2{margin-bottom:6px}
+.pair p{color:var(--ink-2);margin-bottom:20px}
+.pair .input{margin-bottom:10px}
 
-/* pills, labels, cards */
-.pill{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:600;padding:3px 10px;border-radius:99px;background:var(--surface-2);color:var(--ink-2);white-space:nowrap}
-.pill::before{content:"";width:6px;height:6px;border-radius:99px;background:currentColor;opacity:.7}
-.pill[data-s="PAID"],.pill[data-s="DISPATCHED"],.pill[data-s="applied"]{background:var(--route-soft);color:var(--route)}
-.pill[data-s="PREPARING"],.pill[data-s="due"]{background:var(--accent-soft);color:var(--accent-ink)}
-.pill[data-s="READY"],.pill[data-s="HANDED"],.pill[data-s="CLOSED"],.pill[data-s="contracted"],.pill[data-s="paid"]{background:var(--ready-soft);color:var(--ready)}
-.pill[data-s="CANCELLED"],.pill[data-s="REFUNDED"],.pill[data-s="declined"],.pill[data-s="off"],.pill[data-s="warn"]{background:var(--stop-soft);color:var(--stop)}
-.pill[data-s="hold"],.pill[data-s="needs_account"]{background:var(--hold-soft);color:var(--hold)}
-.lab{font-family:"Golos Text",sans-serif;font-size:.76rem;font-weight:600;letter-spacing:.01em;text-transform:none;color:var(--ink-3)}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
-.card-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
-.card-head h3{font-size:.98rem;font-weight:700;flex:1}
-.card-body{padding:18px}
-.empty{padding:40px 20px;text-align:center;color:var(--ink-3);font-size:.92rem;line-height:1.5}
-.empty b{display:block;color:var(--ink-2);font-weight:600;margin-bottom:2px}
-.muted{color:var(--ink-3)}
-.money{color:var(--accent-ink);font-weight:700}
-a.tel{color:var(--accent-ink);font-weight:600;text-decoration:none}
-
-/* fields */
-.field{display:block}
-.field span{display:block;font-size:.8rem;font-weight:600;color:var(--ink-2);margin-bottom:5px}
-.field input,.field select{width:100%;box-sizing:border-box;padding:9px 11px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);color:var(--ink);font-size:.92rem}
-.field input:focus,.field select:focus,.tools input:focus,.tools select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
-.fields .wide{grid-column:1 / -1}
-.form-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
-
-/* ── the door ── */
-.door{min-height:100vh;display:grid;place-items:center;padding:24px}
-.pair{width:100%;max-width:400px;padding:30px 28px}
-.pair .brand{font-size:1.4rem;font-weight:800;letter-spacing:-.03em;color:var(--accent-ink);margin-bottom:16px}
-.pair .brand small{font-size:.8rem;font-weight:600;color:var(--ink-3);letter-spacing:.06em;margin-left:8px;text-transform:uppercase}
-.pair h2{font-size:1.25rem;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
-.pair p{color:var(--ink-2);font-size:.92rem;line-height:1.5;margin-bottom:18px}
-.pair input{width:100%;box-sizing:border-box;padding:12px 13px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);color:var(--ink);font-size:1rem;margin-bottom:10px}
-.pair input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-.pair input[hidden]{display:none}
-
-/* ── the frame ── */
-.app{display:grid;grid-template-columns:var(--side) 1fr;min-height:100vh}
-.side{position:sticky;top:0;height:100vh;box-sizing:border-box;display:flex;flex-direction:column;padding:22px 14px 18px;background:var(--surface);border-right:1px solid var(--line)}
-.side .brand{display:flex;align-items:baseline;gap:8px;padding:0 10px 22px}
-.side .brand b{font-size:1.25rem;font-weight:800;letter-spacing:-.03em;color:var(--accent-ink)}
-.side .brand span{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
-.tabs{display:flex;flex-direction:column;gap:2px}
-.tabs button{
-  display:flex;align-items:center;gap:11px;width:100%;text-align:left;font-size:.94rem;font-weight:600;color:var(--ink-2);
-  background:none;border:none;padding:10px 12px;border-radius:var(--r-s);
-}
-.tabs button svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none;opacity:.85}
-.tabs button:hover{background:var(--surface-2);color:var(--ink)}
-.tabs button[data-on]{background:var(--accent-soft);color:var(--accent-ink)}
-.tabs button .n{margin-left:auto;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--surface-2);color:var(--ink-3)}
-.tabs button .n[data-hot]{background:var(--accent);color:#fff}
-.tabs .grp{font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);padding:16px 12px 6px}
-.tabs .grp:first-child{padding-top:0}
-.alerts{display:flex;flex-direction:column;gap:8px}
-.alert{display:flex;align-items:center;gap:12px;padding:12px 16px;font-size:.92rem;line-height:1.4}
-.alert::before{content:"";width:10px;height:10px;border-radius:50%;flex:none;background:var(--ink-3)}
-.alert[data-level=bad]::before{background:var(--stop)}
-.alert[data-level=warn]::before{background:var(--hold)}
-.alert[data-level=info]::before{background:var(--accent)}
-.alert[data-level=ok]::before{background:var(--ready)}
-.alert .btn{margin-left:auto;flex:none}
-.pair-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:0 16px;align-items:start}
-.kpi[data-tone=bad] b{color:var(--stop)}
-.kpi[data-tone=warn] b{color:var(--hold)}
-.side .me{margin-top:auto;padding:12px 12px 4px;border-top:1px solid var(--line)}
-.side .me b{display:block;font-size:.9rem;font-weight:700}
-.side .me span{display:block;font-size:.78rem;color:var(--ink-3);margin-top:2px}
-.side .out{margin-top:8px;width:100%;text-align:left;font-size:.86rem;font-weight:600;color:var(--ink-3);background:none;border:none;padding:8px 12px;border-radius:var(--r-s)}
-.side .out:hover{background:var(--surface-2);color:var(--ink)}
+/* the frame */
+.app{display:grid;grid-template-columns:var(--side) minmax(0,1fr);min-height:100dvh}
 .main{min-width:0}
-.page{max-width:1180px;margin:0 auto;padding:30px 34px 60px}
-.page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px;flex-wrap:wrap}
-.page-head h1{font-size:1.55rem;font-weight:800;letter-spacing:-.025em;line-height:1.2}
-.page-head p{color:var(--ink-3);font-size:.92rem;margin-top:4px}
-.section{margin-top:22px}
-.section > h2{font-size:.8rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:0 0 10px}
-@media(max-width:900px){
-  .app{grid-template-columns:1fr}
-  .side{position:static;height:auto;flex-direction:row;align-items:center;gap:6px;padding:10px 12px;overflow-x:auto;border-right:none;border-bottom:1px solid var(--line)}
-  .side .brand{padding:0 8px 0 0}.side .brand span{display:none}
-  .tabs{flex-direction:row}.tabs button{width:auto;padding:8px 10px;font-size:.86rem}.tabs button span.t{display:none}.tabs .grp{display:none}
-  .side .me{display:none}.side .out{margin:0 0 0 auto;width:auto;flex:none}
-  .page{padding:18px 16px 40px}
+.page{max-width:var(--col-desk);margin:0 auto;padding:var(--s-7) var(--gutter) 64px}
+.page > .back{margin-bottom:4px}
+.page-head + .section{margin-top:0}
+.pair-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:0 16px;align-items:start}
+@media (max-width:900px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .sidebar{position:sticky;top:0;z-index:var(--z-bar);height:auto;width:auto;min-width:0;max-width:100%;flex-direction:row;align-items:center;gap:8px;padding:8px 12px;border-right:0;border-bottom:1px solid var(--line)}
+  .sidebar .brand{padding:0 8px 0 4px;flex:none}
+  .sidebar .brand span{display:none}
+  .sidebar > nav.tabs{flex-direction:row;flex:1;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;gap:2px}
+  .sidebar > nav.tabs::-webkit-scrollbar{display:none}
+  .sidebar .grp{display:none}
+  .sidebar .tabs button[data-tab]{width:auto;flex:none;padding:0 10px}
+  .sidebar .me{display:none}
+  .sidebar .out{margin:0;width:auto;flex:none}
+  .page{padding:var(--s-5) var(--s-5) var(--s-8)}
 }
 
-/* ── the numbers ── */
-.seg{display:inline-flex;background:var(--surface-2);border-radius:var(--r-s);padding:3px}
-.seg button{font-size:.86rem;font-weight:600;padding:7px 14px;border:none;border-radius:6px;background:none;color:var(--ink-3)}
-.seg button[data-on]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
-.kpi{padding:16px 18px}
-.kpi .lab{margin-bottom:8px}
-.kpi b{display:block;font-size:1.65rem;font-weight:800;letter-spacing:-.03em;line-height:1.1;font-variant-numeric:tabular-nums}
-.kpi span{display:block;font-size:.8rem;color:var(--ink-3);margin-top:6px;line-height:1.4}
+/* toolbars, tables, KPI rows */
+.card > .tools{padding:14px 20px;border-bottom:1px solid var(--line)}
+.tools > .input{width:auto;min-width:0;flex:none}
+.tools > .input.search{flex:1 1 220px}
+.tools > [data-end]{margin-left:auto}
+.card > .table-wrap{border-radius:inherit}
+.card-foot{padding:12px 20px;border-top:1px solid var(--line)}
+.table:has(tr[data-link]) th:last-child{padding-right:32px}
+.table td.end{text-align:right}
+.run-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}
+/* Until app.css scopes `.kpi-band .kpi span` to `> span`: money() inside a
+   KPI value keeps the value's size, weight and tone instead of the caption's. */
+.kpi-band .kpi b span{display:inline;font-size:inherit;color:inherit;line-height:inherit}
+.kpi-band .kpi b .cur{font-size:.65em;font-weight:500}
 
-/* tables */
-.table{width:100%;border-collapse:collapse;font-size:.9rem}
-.table th{text-align:left;font-size:.74rem;font-weight:600;letter-spacing:.02em;color:var(--ink-3);padding:10px 18px;border-bottom:1px solid var(--line);white-space:nowrap}
-.table td{padding:12px 18px;border-bottom:1px solid var(--line);vertical-align:middle}
-.table tr:last-child td{border-bottom:none}
-.table tbody tr:hover td{background:var(--surface-2)}
-.table .num,.table th.num{text-align:right;font-variant-numeric:tabular-nums}
-.table tr[data-off] td{color:var(--ink-3)}
-.table .sub{display:block;font-size:.8rem;color:var(--ink-3);margin-top:2px}
-.table tr[data-link]{cursor:pointer}
-
-/* toolbars, lists, rows */
-.tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
-.tools input,.tools select{font-size:.92rem;padding:9px 12px;border:1px solid var(--line-2);border-radius:var(--r-s);background:var(--surface);color:var(--ink)}
-.tools input[type="search"]{flex:1;min-width:220px}
-.rows{display:flex;flex-direction:column;gap:10px}
-.row{display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:center;padding:14px 18px}
-.row .name{font-size:1rem;font-weight:700;line-height:1.3;min-width:0}
-.row .name small{display:block;font-size:.84rem;color:var(--ink-2);font-weight:400;margin-top:3px;line-height:1.5;overflow-wrap:anywhere}
-.row .right{display:flex;align-items:center;gap:10px;justify-content:flex-end;flex-wrap:wrap}
-.row .btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-.row .about{grid-column:1 / -1;font-size:.88rem;color:var(--ink-2);line-height:1.5;padding-top:10px;border-top:1px dashed var(--line)}
-.row .about b{color:var(--ink)}
-.row[data-paid]{opacity:.6}
-.row .amount{font-variant-numeric:tabular-nums;font-weight:700;font-size:1.05rem}
-.row .code{grid-column:1 / -1;padding:10px 12px;border-radius:var(--r-s);background:var(--ready-soft);border:1px solid var(--ready-line);color:var(--ready);font-size:.88rem}
-.row .code b{font-family:"IBM Plex Mono",monospace;font-size:1.15rem;letter-spacing:.14em;margin-left:6px}
-.drawer{grid-column:1 / -1;padding:14px;border-radius:var(--r-s);background:var(--surface-2);border:1px solid var(--line)}
-.drawer .fields{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
-.stall-line{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:.9rem}
+/* rows: suppliers, kitchens, settlements — hairline rows in one container */
+.rows[data-rows]{overflow:visible}
+/* a list with nothing in it is a hairline and one line, not a boxed card */
+.rows[data-rows]:has(> .empty:only-child){background:none;border:0;border-radius:0;box-shadow:none}
+.rows[data-rows] > .empty:only-child{border-top:1px solid var(--line);padding-left:0;padding-right:0}
+.rows[data-rows] > .row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:center;padding:14px 20px}
+.row .name{font-size:var(--t-row);font-weight:600;line-height:var(--lh-snug);min-width:0}
+.row .name .pill{margin-left:6px}
+.row .name small{display:block;font-size:var(--t-cap);font-weight:400;line-height:1.5;color:var(--ink-2);margin-top:3px}
+.row .right{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.row .btns{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.row .amount{font-size:var(--t-title-3)}
+.row[data-paid] .name{color:var(--ink-2)}
+.row[data-paid] .amount .money{color:var(--ink-3)}
+.row .about{grid-column:1 / -1;font-size:var(--t-cap);line-height:1.5;color:var(--ink-2)}
+.row .about b{font-weight:500;color:var(--ink)}
+.row .drawer{grid-column:1 / -1;padding-top:12px;border-top:1px solid var(--line)}
+.row .drawer .table th:first-child,.row .drawer .table td:first-child{padding-left:0}
+.row .drawer .table th:last-child,.row .drawer .table td:last-child{padding-right:0}
+.row .code{grid-column:1 / -1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;border-radius:var(--r-ctl);background:var(--ready-soft);border:1px solid var(--ready-line);color:var(--ready);font-size:var(--t-cap)}
+.row .code b{font-size:var(--t-title-3);font-weight:600;letter-spacing:.12em;color:inherit}
+.stall-line{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:var(--t-body)}
+.stall-line + .stall-line{border-top:1px solid var(--line)}
 .stall-line span{flex:1}
 .stall-line[data-off]{color:var(--ink-3)}
+.sess-list{margin-top:8px}
+.sess{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:var(--t-body)}
+.sess small{display:block;font-size:var(--t-cap);color:var(--ink-3)}
+@media (max-width:720px){
+  .rows[data-rows] > .row{grid-template-columns:1fr}
+  .row .right,.row .btns{justify-content:flex-start}
+  /* a wide table scrolls inside its wrap instead of squeezing every cell */
+  .table:has(th:nth-child(4)){min-width:640px}
+  .table:has(th:nth-child(4)) td:first-child,.table:has(th:nth-child(4)) .sub{white-space:nowrap}
+  .tools > .input,.tools > .seg{flex:1 1 100%;width:100%}
+}
 
-/* one order */
+/* the overflow menu: every action stays in the DOM, one is in view */
+.more{position:relative;display:inline-flex}
+.more > summary{list-style:none}
+.more > summary::-webkit-details-marker{display:none}
+.more > summary svg{fill:currentColor;stroke:none}
+.more > .menu{position:absolute;right:0;top:calc(100% + 4px);z-index:var(--z-bar);min-width:220px;display:flex;flex-direction:column;gap:2px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-ctl);box-shadow:var(--shadow-float)}
+.more > .menu .btn{width:100%;justify-content:flex-start}
+.more > .menu .btn.ink-stop{color:var(--stop)}
+
+/* one order, one guest */
 .detail{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
-@media(max-width:1000px){.detail{grid-template-columns:1fr}}
-.back{background:none;border:none;color:var(--accent-ink);font-size:.92rem;font-weight:600;padding:0;margin-bottom:12px;display:inline-flex;align-items:center;gap:4px}
-.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px 20px;padding:18px}
-.facts .lab{margin-bottom:3px}
-.facts div{font-size:.95rem;line-height:1.45;overflow-wrap:anywhere}
-.facts b{font-weight:700}
-.story{list-style:none;padding:0;margin:0}
-.story li{position:relative;padding:0 0 14px 22px;font-size:.92rem}
-.story li::before{content:"";position:absolute;left:4px;top:6px;width:9px;height:9px;border-radius:99px;background:var(--ready)}
-.story li::after{content:"";position:absolute;left:8px;top:16px;bottom:-4px;width:1px;background:var(--line)}
-.story li:last-child::after{display:none}
-.story b{font-weight:700}
-.story small{display:block;font-size:.8rem;color:var(--ink-3);margin-top:1px}
+@media (max-width:1000px){.detail{grid-template-columns:1fr}}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px 20px;padding:20px;font-size:var(--t-body);line-height:1.45;color:var(--ink-2)}
+.facts .lab{display:block;margin-bottom:4px}
+.facts b{font-size:var(--t-row);font-weight:600;color:var(--ink)}
+a.tel{display:inline-flex;align-items:center;gap:4px;color:var(--ink);font-weight:500}
+a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .acts{display:flex;flex-direction:column;gap:10px}
-.acts .hint{font-size:.82rem;color:var(--ink-3);line-height:1.45}
+.acts .hint{font-size:var(--t-cap);line-height:1.45;color:var(--ink-3)}
 .acts .sep{height:1px;background:var(--line);margin:4px 0}
-.sess{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.92rem}
+.stars{display:inline-flex;gap:1px;vertical-align:middle}
+.stars svg{width:14px;height:14px;fill:var(--star)}
+.stars svg[data-off]{fill:var(--line-2)}
 
-/* audit */
-.log{list-style:none;padding:0;margin:0}
-.log li{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);font-size:.92rem}
-.log li:last-child{border-bottom:none}
-.log .who{font-weight:600;color:var(--ink-2);white-space:nowrap}
-.log .when{font-family:"IBM Plex Mono",monospace;font-size:.78rem;color:var(--ink-3);white-space:nowrap}
-.log small{display:block;color:var(--ink-3);font-size:.8rem}
+/* the log: who, what, when */
+.log li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 20px;font-size:var(--t-body)}
+.log li.empty{display:block}
+.log .who{font-weight:500;color:var(--ink-2);white-space:nowrap}
+.log .when{white-space:nowrap;text-align:right}
+.log small{display:block;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}
+.log .when .pill{margin-top:4px}
+
+/* one toned word inside a sentence */
+.ink-stop{color:var(--stop)}
+.ink-hold{color:var(--hold)}
 </style>
 </head>
 <body>
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mnt, KIND, HEADLINE, dayLabel } from '/api.js';
+import { api, store, toast, mnt, money, KIND, HEADLINE, dayLabel } from '/api.js';
 
 const root = document.getElementById('root');
 const el = (html) => {
@@ -221,6 +153,29 @@ const clockOf = (iso) => {
   const d = new Date(iso);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
+/** A date with its time, as one mono run: the table's "өнөөдөр 11:16". */
+const stamp = (iso) => `<span class="mono">${when(iso)} ${clockOf(iso)}</span>`;
+const CHEV = '<svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg>';
+const PHONE = '<svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>';
+const STAR = '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>';
+const tel = (phone) => `<a class="tel mono" href="tel:${esc(phone)}">${PHONE}${esc(phone)}</a>`;
+/** Three rows of the shape that is coming, while it loads. */
+const busy = () => el(`<div role="status" aria-busy="true">${'<div class="skel-row"><span class="skel"></span><span class="skel-lines"><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></div>'.repeat(3)}</div>`);
+/** The rest of a row's actions, folded behind one button; every button stays in the DOM. */
+const more = () => el('<details class="more"><summary class="btn" data-size="sm" data-icon aria-label="Бусад үйлдэл"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></summary><div class="menu"></div></details>');
+document.addEventListener('click', (e) => {
+  for (const d of document.querySelectorAll('details.more[open]')) {
+    if (!d.contains(e.target) || e.target.closest('.menu button')) d.open = false;
+  }
+});
+/** The dot's tone on the story: red for a cancellation, blue for on the road, green for handed over. */
+const STORY_K = {
+  CANCELLED: 'stop', REFUNDED: 'stop', REFUND_DUE: 'stop', HELD: 'stop', HELD_BY_KITCHEN: 'stop', REJECTED: 'stop', NO_SHOW: 'stop',
+  DISPATCHED: 'route', RESLOTTED: 'route', RESENT: 'route', PAID: 'route',
+  HANDED: 'ready', CLOSED: 'ready', SERVED: 'ready', READY: 'ready',
+};
+const step = (type, title, sub, at) =>
+  `<li data-done${STORY_K[type] ? ` data-k="${STORY_K[type]}"` : ''}><span class="w">${title}<span class="s">${sub}</span></span><span class="t">${when(at)} ${clockOf(at)}</span></li>`;
 const STATE = { applied: 'хүлээгдэж байна', contracted: 'гэрээт', declined: 'татгалзсан' };
 const ROLE_WORD = { admin: 'админ', finance: 'санхүү', ops: 'ops', viewer: 'зөвхөн харах' };
 const STATE_WORD = {
@@ -264,10 +219,10 @@ async function showToken() {
   if (demo?.token) {
     const card = el(`
       <div class="card pair">
-        <div class="brand">Basu<small>Ops</small></div>
+        <div class="brand wordmark">Basu<small>Ops</small></div>
         <h2>Демо горим</h2>
         <p>Нууц үг автоматаар орлоо. Нэвтрэхэд л болно.</p>
-        <input type="password" placeholder="OPS_TOKEN" aria-label="Ops нууц" autocomplete="off">
+        <input class="input" type="password" placeholder="OPS_TOKEN" aria-label="Ops нууц" autocomplete="off">
         <button class="btn" data-v="primary" data-size="lg" type="button">Нэвтрэх</button>
       </div>`);
     const input = card.querySelector('input');
@@ -290,11 +245,11 @@ async function showToken() {
   }
   const card = el(`
     <div class="card pair">
-      <div class="brand">Basu<small>Ops</small></div>
+      <div class="brand wordmark">Basu<small>Ops</small></div>
       <h2>Нэвтрэх</h2>
       <p>Гишүүн утасны дугаараараа нэвтэрнэ. Дугаар руу нэг удаагийн код очно.</p>
-      <input name="phone" inputmode="tel" placeholder="+976 XXXX XXXX" aria-label="Утас" autocomplete="tel">
-      <input name="code" inputmode="numeric" maxlength="6" placeholder="Ирсэн код" aria-label="Код" autocomplete="one-time-code" hidden>
+      <input class="input" name="phone" type="tel" inputmode="tel" placeholder="+976 XXXX XXXX" aria-label="Утас" autocomplete="tel">
+      <input class="input code" name="code" inputmode="numeric" maxlength="6" placeholder="Ирсэн код" aria-label="Код" autocomplete="one-time-code" hidden>
       <button class="btn" data-v="primary" data-size="lg" type="button" id="send">Код авах</button>
     </div>`);
   const phone = card.querySelector('[name="phone"]');
@@ -389,7 +344,7 @@ async function refresh() {
 function frame() {
   const f = el(`
     <div class="app">
-      <aside class="side">
+      <aside class="side sidebar">
         <div class="brand"><b>Basu</b><span>Ops</span></div>
         <nav class="tabs" aria-label="Хэсгүүд">
           ${TABS.filter((t) => !t.admin || me?.role === 'admin')
@@ -431,7 +386,12 @@ function badges() {
 function show(key) {
   tab = key;
   localStorage.setItem('basu.ops.tab', key);
-  for (const b of document.querySelectorAll('.tabs button')) b.toggleAttribute('data-on', b.dataset.tab === key);
+  for (const b of document.querySelectorAll('.tabs button')) {
+    const on = b.dataset.tab === key;
+    b.toggleAttribute('data-on', on);
+    if (on) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
+  }
   const view = document.getElementById('view');
   view.replaceChildren();
   window.scrollTo(0, 0);
@@ -464,7 +424,7 @@ const periodWord = () => PERIODS.find(([k]) => k === period)?.[1] ?? '';
 
 async function renderOverview(view) {
   view.append(head('Самбар', 'Бүх систем нэг дэлгэцэнд: зочид, түрийвч, хоол, идэш, мэдэгдэл.'));
-  view.append(el('<div class="empty">…</div>'));
+  view.append(busy());
   let v;
   try {
     v = await ops('/v1/ops/overview');
@@ -475,7 +435,7 @@ async function renderOverview(view) {
   if (tab !== 'overview') return;
   view.lastElementChild.remove();
 
-  const alerts = el('<section class="section" style="margin-top:0"><h2>Анхаарах</h2><div class="alerts" id="alerts"></div></section>');
+  const alerts = el('<section class="section"><h2 class="section-label">Анхаарах</h2><div class="alerts" id="alerts" data-rows></div></section>');
   const list = alerts.querySelector('#alerts');
   if (v.banner) list.append(el(`<div class="card alert" data-level="info" id="banner"><span><b>Зарлал.</b> ${esc(v.banner)}</span></div>`));
   if (v.alerts.length) {
@@ -491,23 +451,23 @@ async function renderOverview(view) {
   }
 
   const w = v.wallet;
-  const nowSection = el('<section class="section"><h2>Одоо</h2><div class="kpis" id="now"></div></section>');
+  const nowSection = el('<section class="section"><h2 class="section-label">Одоо</h2><div class="kpis kpi-band" id="now"></div></section>');
   const drift = w.drift === 0 ? 'ledger тэнцсэн' : `ledger зөрүү ${mnt(w.drift)}`;
   nowSection.querySelector('#now').append(
-    el(`<div class="card kpi"><div class="lab">Зочдын түрийвч</div><b class="money">${mnt(w.liability_mnt)}</b><span>зочдод өгөх өр · нийлүүлэгчид өгөх ${mnt(w.payable_mnt)}</span></div>`),
-    el(`<div class="card kpi"${w.drift === 0 ? '' : ' data-tone="bad"'}><div class="lab">Basu-гийн данс</div><b class="money">${mnt(w.revenue_mnt)}</b><span>${drift}</span></div>`),
+    el(`<div class="card kpi"><div class="lab">Зочдын түрийвч</div><b>${money(w.liability_mnt)}</b><span>зочдод өгөх өр · нийлүүлэгчид өгөх ${mnt(w.payable_mnt)}</span></div>`),
+    el(`<div class="card kpi"${w.drift === 0 ? '' : ' data-tone="bad"'}><div class="lab">Basu-гийн данс</div><b>${money(w.revenue_mnt)}</b><span>${drift}</span></div>`),
     el(`<div class="card kpi"><div class="lab">Идэвхтэй захиалга</div><b>${v.dine.live + v.idesh.live}</b><span>хоол ${v.dine.live} · идэш ${v.idesh.live}${v.dine.held ? ` · түр зогсоосон ${v.dine.held}` : ''}</span></div>`),
     el(`<div class="card kpi"><div class="lab">Зочид</div><b>${v.guests.total}</b><span>нээлттэй сесс ${v.guests.sessions_open} · push утас ${v.notify.devices}</span></div>`),
     el(`<div class="card kpi"${v.dine.restaurants.offline ? ' data-tone="warn"' : ''}><div class="lab">Ресторан</div><b>${v.dine.restaurants.active}</b><span>${v.dine.restaurants.offline ? `дэлгэц холбогдоогүй ${v.dine.restaurants.offline}` : 'бүх дэлгэц холбоотой'}</span></div>`),
     el(`<div class="card kpi"${v.notify.stuck ? ' data-tone="bad"' : ''}><div class="lab">Мэдэгдлийн дараалал</div><b>${v.notify.queued}</b><span>${v.notify.stuck ? `гацсан ${v.notify.stuck}` : 'илгээгдэхийг хүлээж буй'}${w.topups.pending ? ` · цэнэглэлт хүлээгдэж буй ${w.topups.pending}` : ''}</span></div>`),
   );
 
-  const flowSection = el('<section class="section"><h2></h2><div class="kpis"></div></section>');
+  const flowSection = el('<section class="section"><h2 class="section-label"></h2><div class="kpis kpi-band"></div></section>');
   const flowHead = flowSection.querySelector('h2');
   const flow = flowSection.querySelector('.kpis');
   const pair = el(`<div class="pair-cols">
-      <section class="section"><h2>Хоол ба идэш</h2><div class="card" style="overflow:auto" id="cross"></div></section>
-      <section class="section"><h2>Мэдэгдэл</h2><div class="card" style="overflow:auto" id="msgs"></div></section>
+      <section class="section"><h2 class="section-label">Хоол ба идэш</h2><div class="card"><div class="table-wrap" id="cross"></div></div></section>
+      <section class="section"><h2 class="section-label">Мэдэгдэл</h2><div class="card"><div class="table-wrap" id="msgs"></div></div></section>
     </div>`);
   const cross = pair.querySelector('#cross');
   const msgs = pair.querySelector('#msgs');
@@ -518,13 +478,13 @@ async function renderOverview(view) {
       el(`<div class="card kpi"><div class="lab">Шинэ зочин</div><b>${t(v.guests.joined)}</b><span>апп нээсэн ${t(v.guests.active)}</span></div>`),
       el(`<div class="card kpi"><div class="lab">Хоолны захиалга</div><b>${t(v.dine.placed)}</b><span>${mnt(t(v.dine.sales_mnt))}${t(v.dine.cancelled) ? ` · цуцлагдсан ${t(v.dine.cancelled)}` : ''}</span></div>`),
       el(`<div class="card kpi"><div class="lab">Идэшний захиалга</div><b>${t(v.idesh.paid)}</b><span>${mnt(t(v.idesh.sales_mnt))}${t(v.idesh.cancelled) ? ` · цуцлагдсан ${t(v.idesh.cancelled)}` : ''}</span></div>`),
-      el(`<div class="card kpi"><div class="lab">Цэнэглэлт</div><b class="money">${mnt(t(w.topups.settled_mnt))}</b><span>${t(w.topups.settled)} удаа${t(w.topups.failed) ? ` · амжилтгүй ${t(w.topups.failed)}` : ''}</span></div>`),
-      el(`<div class="card kpi"><div class="lab">Орлого (Basu)</div><b class="money">${mnt(t(w.revenue))}</b><span>идэшний шимтгэл ${mnt(t(v.idesh.commission_mnt))}</span></div>`),
-      el(`<div class="card kpi"><div class="lab">Буцаалт</div><b>${mnt(t(w.refunds.mnt) + t(v.idesh.refund_mnt))}</b><span>түрийвчид ${t(w.refunds.count)} удаа · идэшний данс руу ${mnt(t(v.idesh.refund_mnt))}</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Цэнэглэлт</div><b>${money(t(w.topups.settled_mnt))}</b><span>${t(w.topups.settled)} удаа${t(w.topups.failed) ? ` · амжилтгүй ${t(w.topups.failed)}` : ''}</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Орлого (Basu)</div><b>${money(t(w.revenue))}</b><span>идэшний шимтгэл ${mnt(t(v.idesh.commission_mnt))}</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Буцаалт</div><b>${money(t(w.refunds.mnt) + t(v.idesh.refund_mnt))}</b><span>түрийвчид ${t(w.refunds.count)} удаа · идэшний данс руу ${mnt(t(v.idesh.refund_mnt))}</span></div>`),
     );
     cross.replaceChildren(el(`<table class="table"><thead><tr><th></th><th class="num">Хоол</th><th class="num">Идэш</th></tr></thead><tbody>
       <tr><td>Захиалга</td><td class="num">${t(v.dine.placed)}</td><td class="num">${t(v.idesh.paid)}</td></tr>
-      <tr><td>Борлуулалт</td><td class="num">${mnt(t(v.dine.sales_mnt))}</td><td class="num">${mnt(t(v.idesh.sales_mnt))}</td></tr>
+      <tr><td>Борлуулалт</td><td class="num">${money(t(v.dine.sales_mnt))}</td><td class="num">${money(t(v.idesh.sales_mnt))}</td></tr>
       <tr><td>Дууссан</td><td class="num">${t(v.dine.closed)}</td><td class="num">${t(v.idesh.handed)}</td></tr>
       <tr><td>Цуцлагдсан</td><td class="num">${t(v.dine.cancelled)}</td><td class="num">${t(v.idesh.cancelled)}</td></tr>
       <tr><td>Ирээгүй зочин</td><td class="num">${t(v.dine.no_shows)}</td><td class="num">—</td></tr>
@@ -555,10 +515,11 @@ function renderGuests(view) {
   view.append(el(`
     <div class="card">
       <div class="tools">
-        <input type="search" id="q" placeholder="Утасны дугаар эсвэл нэр…" value="${esc(guestQ)}" autocomplete="off" autofocus>
+        <input class="input search" type="search" id="q" placeholder="Утасны дугаар эсвэл нэр…" value="${esc(guestQ)}" autocomplete="off">
       </div>
-      <div id="guests"><div class="empty">…</div></div>
+      <div id="guests" class="table-wrap"></div>
     </div>`));
+  view.querySelector('#guests').append(busy());
   let timer;
   view.querySelector('#q').addEventListener('input', (e) => {
     guestQ = e.target.value;
@@ -589,8 +550,8 @@ async function loadGuests() {
     const tr = el(`
       <tr data-link data-guest="${g.id}">
         <td><b>${esc(g.name ?? (g.closed_at ? 'Хаагдсан бүртгэл' : 'Нэргүй зочин'))}</b></td>
-        <td class="mono">${esc(g.phone ?? '—')}</td>
-        <td>${when(g.joined_at)}</td>
+        <td><span class="mono">${esc(g.phone ?? '—')}</span></td>
+        <td><span class="mono">${when(g.joined_at)}</span></td>
         <td>${g.closed_at ? `<span class="pill" data-s="off">хаагдсан ${when(g.closed_at)}</span>` : '<span class="pill" data-s="contracted">идэвхтэй</span>'}</td>
       </tr>`);
     tr.addEventListener('click', () => openGuest(g.id));
@@ -611,48 +572,48 @@ async function openGuest(id) {
   const g = f.guest;
   const closed = Boolean(g.closed_at);
   view.replaceChildren();
-  const back = el('<button class="back" type="button" id="back">‹ Зочид</button>');
+  const back = el(`<button class="back link" type="button" id="back">${CHEV}Зочид</button>`);
   back.addEventListener('click', () => show('guests'));
   view.append(back);
   view.append(head(
-    `${esc(g.name ?? (closed ? 'Хаагдсан бүртгэл' : 'Нэргүй зочин'))}${closed ? ' <span class="pill" data-s="off" style="vertical-align:middle;margin-left:8px">хаагдсан</span>' : ''}`,
-    `${g.phone ? `<a class="tel" href="tel:${esc(g.phone)}">${esc(g.phone)}</a> · ` : ''}бүртгүүлсэн ${when(g.joined_at)}`,
+    `${esc(g.name ?? (closed ? 'Хаагдсан бүртгэл' : 'Нэргүй зочин'))}${closed ? ' <span class="pill" data-s="off">хаагдсан</span>' : ''}`,
+    `${g.phone ? `${tel(g.phone)} · ` : ''}бүртгүүлсэн ${when(g.joined_at)}`,
   ));
   const page = el(`
     <div class="detail">
       <div>
         <div class="card">
           <div class="facts">
-            <div><div class="lab">Түрийвч</div><b>${mnt(f.wallet.balance_mnt)}</b><br>${f.wallet.lines.length} гүйлгээ</div>
+            <div><div class="lab">Түрийвч</div><b>${money(f.wallet.balance_mnt)}</b><br>${f.wallet.lines.length} гүйлгээ</div>
             <div><div class="lab">Хоол</div><b>${f.dine_orders.length} захиалга</b><br>${f.dine_orders.filter((o) => ['PLACED', 'ACCEPTED', 'SCHEDULED', 'ARMED', 'HELD', 'FIRED', 'COOKING', 'READY', 'SERVED'].includes(o.state)).length} идэвхтэй</div>
             <div><div class="lab">Идэш</div><b>${f.idesh_orders.length} захиалга</b><br>${f.idesh_orders.filter((o) => ['PAID', 'PREPARING', 'READY', 'DISPATCHED'].includes(o.state)).length} идэвхтэй</div>
             <div><div class="lab">Нэвтэрсэн</div><b>${f.sessions.length} сесс</b><br>${f.devices.length} push утас</div>
           </div>
         </div>
-        <section class="section"><h2>Түрийвчийн хуулга</h2><div class="card" style="overflow:auto">
-          <table class="table"><thead><tr><th>Огноо</th><th>Юу</th><th class="num">Дүн</th></tr></thead>
+        <section class="section"><h2 class="section-label">Түрийвчийн хуулга</h2><div class="card"><div class="table-wrap">
+          <table class="table"${f.wallet.lines.length ? '' : ' data-empty'}><thead><tr><th>Огноо</th><th>Юу</th><th class="num">Дүн</th></tr></thead>
           <tbody>${f.wallet.lines
-            .map((l) => `<tr><td>${when(l.at)} <span class="sub">${clockOf(l.at)}</span></td><td>${LINE_WORD[l.kind] ?? l.kind}<span class="sub">${esc(l.memo ?? '')}</span></td><td class="num"${l.amount_mnt < 0 ? '' : ' style="color:var(--ready)"'}>${l.amount_mnt > 0 ? '+' : ''}${mnt(l.amount_mnt)}</td></tr>`)
-            .join('') || '<tr><td colspan="3" class="empty">Гүйлгээ алга.</td></tr>'}</tbody></table></div></section>
-        <section class="section"><h2>Хоолны захиалга</h2><div class="card" style="overflow:auto">
-          <table class="table"><thead><tr><th>Захиалга</th><th>Ресторан</th><th>Цаг</th><th>Төлөв</th><th class="num">Дүн</th></tr></thead>
+            .map((l) => `<tr><td>${stamp(l.at)}</td><td>${LINE_WORD[l.kind] ?? l.kind}<span class="sub">${esc(l.memo ?? '')}</span></td><td class="num">${money(l.amount_mnt, l.amount_mnt > 0 ? 'credit' : undefined)}</td></tr>`)
+            .join('') || '<tr><td colspan="3" class="empty">Гүйлгээ алга.</td></tr>'}</tbody></table></div></div></section>
+        <section class="section"><h2 class="section-label">Хоолны захиалга</h2><div class="card"><div class="table-wrap">
+          <table class="table"${f.dine_orders.length ? '' : ' data-empty'}><thead><tr><th>Захиалга</th><th>Ресторан</th><th>Цаг</th><th>Төлөв</th><th class="num">Дүн</th></tr></thead>
           <tbody>${f.dine_orders
-            .map((o) => `<tr><td><b class="mono">№${esc(o.code)}</b><span class="sub">${o.party_size} хүн</span></td><td>${esc(o.restaurant.name)}</td><td>${when(o.slot_starts_at)} ${clockOf(o.slot_starts_at)}</td><td><span class="pill" data-s="${o.state}">${DINE_WORD[o.state] ?? o.state}</span></td><td class="num">${mnt(o.total_mnt)}</td></tr>`)
-            .join('') || '<tr><td colspan="5" class="empty">Хоолны захиалга алга.</td></tr>'}</tbody></table></div></section>
-        <section class="section"><h2>Идэшний захиалга</h2><div class="card" style="overflow:auto">
-          <table class="table"><thead><tr><th>Захиалга</th><th>Нийлүүлэгч</th><th>Өдөр</th><th>Төлөв</th><th class="num">Дүн</th></tr></thead>
+            .map((o) => `<tr><td><b class="mono">№${esc(o.code)}</b><span class="sub">${o.party_size} хүн</span></td><td>${esc(o.restaurant.name)}</td><td>${stamp(o.slot_starts_at)}</td><td><span class="pill" data-s="${o.state}">${DINE_WORD[o.state] ?? o.state}</span></td><td class="num">${money(o.total_mnt)}</td></tr>`)
+            .join('') || '<tr><td colspan="5" class="empty">Хоолны захиалга алга.</td></tr>'}</tbody></table></div></div></section>
+        <section class="section"><h2 class="section-label">Идэшний захиалга</h2><div class="card"><div class="table-wrap">
+          <table class="table"${f.idesh_orders.length ? '' : ' data-empty'}><thead><tr><th>Захиалга</th><th>Нийлүүлэгч</th><th>Өдөр</th><th>Төлөв</th><th class="num">Дүн</th></tr></thead>
           <tbody id="idesh-rows">${f.idesh_orders
-            .map((o) => `<tr data-link data-order="${o.id}"><td><b class="mono">№${esc(o.code)}</b><span class="sub">${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}</span></td><td>${esc(o.supplier.name)}</td><td>${dayLabel(o.receive_on)}</td><td><span class="pill" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span></td><td class="num">${mnt(o.total_mnt)}</td></tr>`)
-            .join('') || '<tr><td colspan="5" class="empty">Идэшний захиалга алга.</td></tr>'}</tbody></table></div></section>
-        <section class="section"><h2>Мэдэгдэл</h2><div class="card"><ul class="log">${f.messages
-          .map((m) => `<li><span class="who">${m.channel === 'sms' ? 'SMS' : 'Push'}</span><span>${esc(m.title ?? '')}<small>${esc(m.body)}</small></span><span class="when">${when(m.created_at)} ${clockOf(m.created_at)}${m.state === 'failed' ? ' · алдсан' : m.state === 'queued' ? ' · дараалалд' : ''}</span></li>`)
-          .join('') || '<li class="empty">Мэдэгдэл алга.</li>'}</ul></div></section>
+            .map((o) => `<tr data-link data-order="${o.id}"><td><b class="mono">№${esc(o.code)}</b><span class="sub">${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}</span></td><td>${esc(o.supplier.name)}</td><td><span class="mono">${dayLabel(o.receive_on)}</span></td><td><span class="pill" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span></td><td class="num">${money(o.total_mnt)}</td></tr>`)
+            .join('') || '<tr><td colspan="5" class="empty">Идэшний захиалга алга.</td></tr>'}</tbody></table></div></div></section>
+        <section class="section"><h2 class="section-label">Мэдэгдэл</h2><ul class="log" data-rows>${f.messages
+          .map((m) => `<li><span class="who">${m.channel === 'sms' ? 'SMS' : 'Push'}</span><span>${esc(m.title ?? '')}<small>${esc(m.body)}</small></span><span class="when meta">${when(m.created_at)} ${clockOf(m.created_at)}${m.state === 'failed' ? ' · алдсан' : m.state === 'queued' ? ' · дараалалд' : ''}</span></li>`)
+          .join('') || '<li class="empty">Мэдэгдэл алга.</li>'}</ul></section>
       </div>
       <div class="card" id="acts">
         <div class="card-head"><h3>Сесс ба төхөөрөмж</h3></div>
         <div class="card-body acts">
           ${f.sessions.length ? f.sessions.map((s) => `
-            <div class="sess"><span>${esc(s.label ?? 'Утас')}<small style="display:block;color:var(--ink-3);font-size:.8rem">сүүлд ${when(s.last_seen_at ?? s.created_at)} ${clockOf(s.last_seen_at ?? s.created_at)}</small></span>
+            <div class="sess"><span>${esc(s.label ?? 'Утас')}<small>сүүлд ${when(s.last_seen_at ?? s.created_at)} ${clockOf(s.last_seen_at ?? s.created_at)}</small></span>
             <button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-sid="${s.id}">Гаргах</button></div>`).join('') : '<div class="hint">Нээлттэй сесс алга.</div>'}
           ${f.devices.length ? `<div class="hint">Push: ${f.devices.map((d) => `${PLATFORM_WORD[d.platform] ?? d.platform}${d.label ? ` · ${esc(d.label)}` : ''}`).join(', ')}</div>` : ''}
           ${closed ? '' : `
@@ -707,12 +668,13 @@ const dineActor = (a) => {
   if (a.startsWith('ops:')) return `ops · ${a.slice(4)}`;
   return { 'system:planner': 'төлөвлөгч', 'system:scheduler': 'хуваарьлагч' }[a] ?? a;
 };
-const stars = (n) => `<span style="color:var(--hold)">${'★'.repeat(n)}</span><span style="color:var(--line-2)">${'★'.repeat(5 - n)}</span>`;
+const stars = (n) => `<span class="stars" aria-label="${n} од">${Array.from({ length: 5 }, (_, i) => (i < n ? STAR : STAR.replace('<svg', '<svg data-off'))).join('')}</span>`;
 let venueCache = [];
 
 async function renderVenues(view) {
   view.append(head('Ресторан', 'Гал тогоо бүр: таблет холбоотой эсэх, өнөөдрийн захиалга, цэс, үнэлгээ.'));
-  view.append(el('<div class="rows" id="venues"><div class="empty">…</div></div>'));
+  view.append(el('<div class="rows" id="venues" data-rows></div>'));
+  view.querySelector('#venues').append(busy());
   await loadVenues();
 }
 
@@ -735,17 +697,19 @@ function renderVenue(r) {
       <div class="name">${esc(r.name)}
         ${r.active ? '' : ' <span class="pill" data-s="off">зогссон</span>'}
         <span class="pill" data-s="${r.online ? 'contracted' : 'declined'}">${r.online ? 'дэлгэц холбоотой' : 'дэлгэц холбогдоогүй'}</span>
-        <small>${r.rating ? `${stars(Math.round(r.rating.stars))} ${r.rating.stars} · ${r.rating.count} үнэлгээ${r.rating.on_time_share === null ? '' : ` · цагтаа ${Math.round(r.rating.on_time_share * 100)}%`}` : 'үнэлгээ алга'} · ${r.slot_minutes} мин цаг · ${r.auto_accept ? 'автоматаар батална' : 'гараар батална'}${r.merchant_tin ? '' : ' · <b style="color:var(--stop)">е-баримтын ТТД алга</b>'}</small>
+        <small>${r.rating ? `${stars(Math.round(r.rating.stars))} ${r.rating.stars} · ${r.rating.count} үнэлгээ${r.rating.on_time_share === null ? '' : ` · цагтаа ${Math.round(r.rating.on_time_share * 100)}%`}` : 'үнэлгээ алга'} · ${r.slot_minutes} мин цаг · ${r.auto_accept ? 'автоматаар батална' : 'гараар батална'}${r.merchant_tin ? '' : ' · <b class="ink-stop">е-баримтын ТТД алга</b>'}</small>
       </div>
       <div class="right"><div class="btns">
-        <button class="btn" data-size="sm" type="button" data-a="tablet">Шинэ таблет</button>
-        <button class="btn" data-size="sm" data-v="quiet" type="button" data-a="menu">Цэс</button>
-        <button class="btn" data-size="sm" data-v="${r.active ? 'danger' : 'primary'}" type="button" data-a="active">${r.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>
+        <button class="btn" data-size="sm" type="button" data-a="menu">Цэс</button>
+        <details class="more"><summary class="btn" data-size="sm" data-icon aria-label="Бусад үйлдэл"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></summary><div class="menu">
+          <button class="btn" data-size="sm" data-v="quiet" type="button" data-a="tablet">Шинэ таблет</button>
+          <button class="btn${r.active ? ' ink-stop' : ''}" data-size="sm" data-v="quiet" type="button" data-a="active">${r.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>
+        </div></details>
       </div></div>
-      <div class="about">Өнөөдөр <b>${r.today.placed}</b> захиалга · <b>${r.today.live}</b> идэвхтэй${r.today.held ? ` · <b style="color:var(--hold)">${r.today.held} түр зогсоосон</b>` : ''} · <b>${mnt(r.today.sales_mnt)}</b> · цэс ${r.menu.active}/${r.menu.total}${r.menu.sold_out ? ` (${r.menu.sold_out} дууссан)` : ''}
-        <div class="sess-list" style="margin-top:8px">${r.devices.length ? r.devices.map((d) => `
+      <div class="about">Өнөөдөр <b>${r.today.placed}</b> захиалга · <b>${r.today.live}</b> идэвхтэй${r.today.held ? ` · <b class="ink-hold">${r.today.held} түр зогсоосон</b>` : ''} · <b>${money(r.today.sales_mnt)}</b> · цэс ${r.menu.active}/${r.menu.total}${r.menu.sold_out ? ` (${r.menu.sold_out} дууссан)` : ''}
+        <div class="sess-list">${r.devices.length ? r.devices.map((d) => `
           <div class="sess"><span>${d.pairing_code ? `Код <b class="mono">${d.pairing_code}</b> · ${esc(d.label ?? '')} · ${clockOf(d.pairing_expires_at)} хүртэл` : `${esc(d.label ?? 'Таблет')} · ${d.online ? '<span class="pill" data-s="contracted">онлайн</span>' : `сүүлд ${d.last_seen_at ? `${when(d.last_seen_at)} ${clockOf(d.last_seen_at)}` : 'хэзээ ч үгүй'}`}`}</span>
-          <button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-device="${d.id}">Салгах</button></div>`).join('') : '<span style="color:var(--ink-3)">Таблет холбогдоогүй.</span>'}</div>
+          <button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-device="${d.id}">Салгах</button></div>`).join('') : '<span class="muted">Таблет холбогдоогүй.</span>'}</div>
       </div>
     </div>`);
   card.addEventListener('click', async (e) => {
@@ -779,8 +743,8 @@ function renderVenue(r) {
 
 async function menuDrawer(r) {
   const { items } = await ops(`/v1/ops/dine/restaurants/${r.id}/menu`);
-  const d = el(`<div class="drawer"><table class="table"><thead><tr><th>Хоол</th><th>Цех</th><th class="num">Үнэ</th><th class="num">Бэлтгэх, мин</th><th>Төлөв</th><th></th></tr></thead><tbody>${items
-    .map((m) => `<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td>${esc(m.station)}</td><td class="num">${mnt(m.price_mnt)}</td><td class="num">${m.prep_minutes}</td><td>${m.active ? (m.sold_out_until ? '<span class="pill" data-s="off">дууссан</span>' : '<span class="pill" data-s="contracted">цэсэнд</span>') : '<span class="pill" data-s="declined">нуусан</span>'}</td><td class="num"><button class="btn" data-size="sm" data-v="quiet" type="button" data-item="${m.id}" data-on="${m.active}">${m.active ? 'Нуух' : 'Харуулах'}</button></td></tr>`)
+  const d = el(`<div class="drawer table-wrap"><table class="table"${items.length ? '' : ' data-empty'}><thead><tr><th>Хоол</th><th>Цех</th><th class="num">Үнэ</th><th class="num">Бэлтгэх, мин</th><th>Төлөв</th><th></th></tr></thead><tbody>${items
+    .map((m) => `<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td>${esc(m.station)}</td><td class="num">${money(m.price_mnt)}</td><td class="num">${m.prep_minutes}</td><td>${m.active ? (m.sold_out_until ? '<span class="pill" data-s="off">дууссан</span>' : '<span class="pill" data-s="contracted">цэсэнд</span>') : '<span class="pill" data-s="declined">нуусан</span>'}</td><td class="num"><button class="btn" data-size="sm" data-v="quiet" type="button" data-item="${m.id}" data-on="${m.active}">${m.active ? 'Нуух' : 'Харуулах'}</button></td></tr>`)
     .join('') || '<tr><td colspan="6" class="empty">Цэс хоосон.</td></tr>'}</tbody></table></div>`);
   d.addEventListener('click', async (e) => {
     const b = e.target.closest('button[data-item]');
@@ -814,13 +778,14 @@ async function renderLunches(view) {
   view.append(el(`
     <div class="card">
       <div class="tools">
-        <input type="search" id="q" placeholder="Код, утас, зочин, ресторан…" value="${esc(lunchFilter.q)}" autocomplete="off">
-        <select id="restaurant"><option value="">Бүх ресторан</option>${venueCache.map((r) => `<option value="${r.id}"${lunchFilter.restaurant === r.id ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select>
-        <input type="date" id="day" value="${esc(lunchFilter.day)}" title="Хоолны өдөр">
+        <input class="input search" type="search" id="q" placeholder="Код, утас, зочин, ресторан…" value="${esc(lunchFilter.q)}" autocomplete="off">
+        <select class="input" id="restaurant"><option value="">Бүх ресторан</option>${venueCache.map((r) => `<option value="${r.id}"${lunchFilter.restaurant === r.id ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select>
+        <input class="input" type="date" id="day" value="${esc(lunchFilter.day)}" title="Хоолны өдөр">
         <div class="seg">${[['live', 'Идэвхтэй'], ['done', 'Дууссан'], ['all', 'Бүгд']].map(([k, l]) => `<button type="button" data-scope="${k}"${lunchFilter.scope === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>
       </div>
-      <div id="lunches"><div class="empty">…</div></div>
+      <div id="lunches" class="table-wrap"></div>
     </div>`));
+  view.querySelector('#lunches').append(busy());
   let timer;
   view.querySelector('#q').addEventListener('input', (e) => {
     lunchFilter.q = e.target.value;
@@ -864,11 +829,11 @@ async function loadLunches() {
       <tr data-link data-lunch="${o.id}">
         <td><b class="mono">№${esc(o.code)}</b><span class="sub">${o.party_size} хүн</span></td>
         <td>${esc(o.restaurant.name)}</td>
-        <td>${esc(o.guest ?? 'зочин')}<span class="sub">${esc(o.guest_phone ?? '')}</span></td>
-        <td>${when(o.slot_starts_at)}<span class="sub">${clockOf(o.slot_starts_at)}</span></td>
-        <td>${o.fire_at ? clockOf(o.fire_at) : '—'}${o.late ? ' <span class="pill" data-s="declined">хоцорсон</span>' : ''}</td>
+        <td>${esc(o.guest ?? 'зочин')}<span class="sub mono">${esc(o.guest_phone ?? '')}</span></td>
+        <td>${stamp(o.slot_starts_at)}</td>
+        <td>${o.fire_at ? `<span class="mono">${clockOf(o.fire_at)}</span>` : '—'}${o.late ? ' <span class="pill" data-s="declined">хоцорсон</span>' : ''}</td>
         <td><span class="pill" data-s="${o.state}">${DINE_WORD[o.state] ?? o.state}</span></td>
-        <td class="num">${mnt(o.total_mnt)}</td>
+        <td class="num">${money(o.total_mnt)}</td>
       </tr>`);
     tr.addEventListener('click', () => openLunch(o.id));
     body.append(tr);
@@ -887,28 +852,28 @@ async function openLunch(id) {
   }
   const o = d.order;
   view.replaceChildren();
-  const back = el('<button class="back" type="button" id="back">‹ Хоолны захиалга</button>');
+  const back = el(`<button class="back link" type="button" id="back">${CHEV}Хоолны захиалга</button>`);
   back.addEventListener('click', () => show('lunches'));
   view.append(back);
-  view.append(head(`№${esc(o.code)} <span class="pill" data-s="${o.state}" style="vertical-align:middle;margin-left:8px">${DINE_WORD[o.state] ?? o.state}</span>`, `${esc(o.restaurant.name)} · ${when(o.slot_starts_at)} ${clockOf(o.slot_starts_at)} · ${o.party_size} хүн`));
+  view.append(head(`№${esc(o.code)} <span class="pill" data-s="${o.state}">${DINE_WORD[o.state] ?? o.state}</span>`, `${esc(o.restaurant.name)} · ${when(o.slot_starts_at)} ${clockOf(o.slot_starts_at)} · ${o.party_size} хүн`));
   const page = el(`
     <div class="detail">
       <div>
         <div class="card">
           <div class="facts">
-            <div><div class="lab">Зочин</div><b>${esc(o.guest ?? 'зочин')}</b><br>${o.guest_phone ? `<a class="tel" href="tel:${esc(o.guest_phone)}">${esc(o.guest_phone)}</a>` : ''}</div>
+            <div><div class="lab">Зочин</div><b>${esc(o.guest ?? 'зочин')}</b><br>${o.guest_phone ? tel(o.guest_phone) : ''}</div>
             <div><div class="lab">Ширээ</div><b>${o.table ? esc(o.table) : '—'}</b><br>${o.seated_at ? `суусан ${clockOf(o.seated_at)}` : 'суугаагүй'}</div>
-            <div><div class="lab">Гал</div><b>${o.fire_at ? clockOf(o.fire_at) : '—'}</b><br>${o.fired_at ? `гарсан ${clockOf(o.fired_at)}` : o.late ? '<span style="color:var(--stop)">хоцорч байна</span>' : o.fire_mode ?? 'товлоогүй'}</div>
-            <div><div class="lab">Бэлэн</div><b>${o.ready_at ? clockOf(o.ready_at) : '—'}</b><br>${o.eta_at ? `ирэх ${clockOf(o.eta_at)}` : ''}</div>
-            <div><div class="lab">Дүн</div><b>${mnt(o.total_mnt)}</b><br>түрийвчээс</div>
+            <div><div class="lab">Гал</div><b class="mono">${o.fire_at ? clockOf(o.fire_at) : '—'}</b><br>${o.fired_at ? `гарсан ${clockOf(o.fired_at)}` : o.late ? '<span class="ink-stop">хоцорч байна</span>' : o.fire_mode ?? 'товлоогүй'}</div>
+            <div><div class="lab">Бэлэн</div><b class="mono">${o.ready_at ? clockOf(o.ready_at) : '—'}</b><br>${o.eta_at ? `ирэх ${clockOf(o.eta_at)}` : ''}</div>
+            <div><div class="lab">Дүн</div><b>${money(o.total_mnt)}</b><br>түрийвчээс</div>
           </div>
         </div>
-        <section class="section"><h2>Хоол</h2><div class="card" style="overflow:auto"><table class="table"><thead><tr><th>Нэр</th><th>Цех</th><th class="num">Тоо</th><th class="num">Үнэ</th></tr></thead><tbody>${d.lines
-          .map((l) => `<tr${l.cancelled ? ' data-off' : ''}><td><b>${esc(l.name)}</b>${l.notes ? `<span class="sub">${esc(l.notes)}</span>` : ''}</td><td>${esc(l.station ?? '')}</td><td class="num">${l.qty}</td><td class="num">${mnt(l.unit_price_mnt * l.qty)}</td></tr>`)
-          .join('')}</tbody></table></div></section>
-        ${d.review ? `<section class="section"><h2>Үнэлгээ</h2><div class="card card-body">${stars(d.review.stars)} ${d.review.on_time === null ? '' : d.review.on_time ? '· цагтаа' : '· хоцорсон'}${d.review.comment ? `<br>${esc(d.review.comment)}` : ''}</div></section>` : ''}
-        <section class="section"><h2>Явц</h2><div class="card card-body"><ol class="story">${d.events
-          .map((e) => `<li><b>${DINE_EVENT[e.type] ?? e.type}</b><small>${when(e.at)} ${clockOf(e.at)}${e.actor ? ` · ${esc(dineActor(e.actor))}` : ''}${e.payload?.reason ? ` · ${esc(e.payload.reason)}` : ''}</small></li>`)
+        <section class="section"><h2 class="section-label">Хоол</h2><div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Нэр</th><th>Цех</th><th class="num">Тоо</th><th class="num">Үнэ</th></tr></thead><tbody>${d.lines
+          .map((l) => `<tr${l.cancelled ? ' data-off' : ''}><td><b>${esc(l.name)}</b>${l.notes ? `<span class="sub">${esc(l.notes)}</span>` : ''}</td><td>${esc(l.station ?? '')}</td><td class="num">${l.qty}</td><td class="num">${money(l.unit_price_mnt * l.qty)}</td></tr>`)
+          .join('')}</tbody></table></div></div></section>
+        ${d.review ? `<section class="section"><h2 class="section-label">Үнэлгээ</h2><div class="card card-body">${stars(d.review.stars)} ${d.review.on_time === null ? '' : d.review.on_time ? '· цагтаа' : '· хоцорсон'}${d.review.comment ? `<br>${esc(d.review.comment)}` : ''}</div></section>` : ''}
+        <section class="section"><h2 class="section-label">Явц</h2><div class="card card-body"><ol class="story stepper" data-stepper>${d.events
+          .map((e) => step(e.type, DINE_EVENT[e.type] ?? e.type, `${e.actor ? esc(dineActor(e.actor)) : ''}${e.payload?.reason ? ` · ${esc(e.payload.reason)}` : ''}`, e.at))
           .join('')}</ol></div></section>
       </div>
       <div class="card" id="acts">
@@ -951,7 +916,8 @@ async function renderReviews(view) {
     } catch { /* fine without the filter */ }
   }
   if (tab !== 'reviews') return;
-  view.append(el(`<div class="card"><div class="tools"><select id="restaurant"><option value="">Бүх ресторан</option>${venueCache.map((r) => `<option value="${r.id}"${reviewVenue === r.id ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div><div id="reviews"><div class="empty">…</div></div></div>`));
+  view.append(el(`<div class="card"><div class="tools"><select class="input" id="restaurant"><option value="">Бүх ресторан</option>${venueCache.map((r) => `<option value="${r.id}"${reviewVenue === r.id ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div><div id="reviews" class="table-wrap"></div></div>`));
+  view.querySelector('#reviews').append(busy());
   view.querySelector('#restaurant').addEventListener('change', (e) => ((reviewVenue = e.target.value), loadReviews()));
   void loadReviews();
 }
@@ -974,7 +940,7 @@ async function loadReviews() {
   const table = el('<table class="table"><thead><tr><th>Огноо</th><th>Ресторан</th><th>Захиалга</th><th>Зочин</th><th>Од</th><th>Сэтгэгдэл</th></tr></thead><tbody></tbody></table>');
   const body = table.querySelector('tbody');
   for (const v of data.reviews) {
-    const tr = el(`<tr data-link data-lunch="${v.order_id}"><td>${when(v.at)}</td><td>${esc(v.restaurant.name)}</td><td class="mono">№${esc(v.order_code)}</td><td>${esc(v.guest ?? 'зочин')}</td><td>${stars(v.stars)}${v.on_time === null ? '' : v.on_time ? ' <span class="sub">цагтаа</span>' : ' <span class="sub" style="color:var(--stop)">хоцорсон</span>'}</td><td>${esc(v.comment ?? '')}</td></tr>`);
+    const tr = el(`<tr data-link data-lunch="${v.order_id}"><td><span class="mono">${when(v.at)}</span></td><td>${esc(v.restaurant.name)}</td><td><span class="mono">№${esc(v.order_code)}</span></td><td>${esc(v.guest ?? 'зочин')}</td><td>${stars(v.stars)}${v.on_time === null ? '' : v.on_time ? ' <span class="sub">цагтаа</span>' : ' <span class="sub ink-stop">хоцорсон</span>'}</td><td>${esc(v.comment ?? '')}</td></tr>`);
     tr.addEventListener('click', () => openLunch(v.order_id));
     body.append(tr);
   }
@@ -1016,7 +982,8 @@ function renderMoney(view) {
     void drawMoney();
   });
   view.querySelector('.page-head').append(seg);
-  view.append(el('<div id="money"><div class="empty">…</div></div>'));
+  view.append(el('<div id="money"></div>'));
+  view.querySelector('#money').append(busy());
   void drawMoney();
 }
 
@@ -1036,19 +1003,19 @@ async function moneyChecks() {
   const c = m.checks;
   const ok = (good) => (good ? '' : ' data-tone="bad"');
   const page = el(`<div>
-    <div class="kpis">
-      <div class="card kpi"${ok(c.drift === 0)}><div class="lab">Ledger</div><b>${c.drift === 0 ? 'тэнцсэн' : mnt(c.drift)}</b><span>${c.accounts} данс · бүх бичилтийн нийлбэр ${c.drift === 0 ? '0' : 'тэг биш'}</span></div>
-      <div class="card kpi"${ok(c.qpay.gap_mnt === 0)}><div class="lab">QPay ↔ ledger</div><b>${c.qpay.gap_mnt === 0 ? 'таарсан' : mnt(c.qpay.gap_mnt)}</b><span>орсон ${mnt(c.qpay.settled_mnt)} · клиринг ${mnt(c.qpay.clearing_mnt)}</span></div>
+    <div class="kpis kpi-band">
+      <div class="card kpi"${c.drift === 0 ? ' data-word data-tone="good"' : ' data-tone="bad"'}><div class="lab">Ledger</div><b>${c.drift === 0 ? 'тэнцсэн' : money(c.drift)}</b><span>${c.accounts} данс · бүх бичилтийн нийлбэр ${c.drift === 0 ? '0' : 'тэг биш'}</span></div>
+      <div class="card kpi"${c.qpay.gap_mnt === 0 ? ' data-word data-tone="good"' : ' data-tone="bad"'}><div class="lab">QPay ↔ ledger</div><b>${c.qpay.gap_mnt === 0 ? 'таарсан' : money(c.qpay.gap_mnt)}</b><span>орсон ${mnt(c.qpay.settled_mnt)} · клиринг ${mnt(c.qpay.clearing_mnt)}</span></div>
       <div class="card kpi"${c.qpay.stuck ? ' data-tone="warn"' : ''}><div class="lab">Хүлээгдэж буй цэнэглэлт</div><b>${c.qpay.pending}</b><span>${c.qpay.stuck ? `${c.qpay.stuck} нь хагас цагаас дээш` : 'гацсан алга'}</span></div>
-      <div class="card kpi"><div class="lab">Зочдын түрийвч</div><b class="money">${mnt(c.wallets.liability_mnt)}</b><span>${m.wallets.holding} түрийвчид мөнгөтэй · нийт ${m.wallets.count}</span></div>
-      <div class="card kpi"><div class="lab">Гадагш өгөх</div><b class="money">${mnt(c.wallets.payable_mnt)}</b><span>нийлүүлэгч, буцаалт · банкаар гарсан ${mnt(c.bank.out_mnt)}</span></div>
-      <div class="card kpi"${ok(c.receipts.failed === 0)}><div class="lab">Е-баримт</div><b>${c.receipts.gap === 0 ? 'бүрэн' : `${c.receipts.gap} дутуу`}</b><span>гарсан ${c.receipts.issued} · дараалалд ${c.receipts.queued} · амжилтгүй ${c.receipts.failed}</span></div>
+      <div class="card kpi"><div class="lab">Зочдын түрийвч</div><b>${money(c.wallets.liability_mnt)}</b><span>${m.wallets.holding} түрийвчид мөнгөтэй · нийт ${m.wallets.count}</span></div>
+      <div class="card kpi"><div class="lab">Гадагш өгөх</div><b>${money(c.wallets.payable_mnt)}</b><span>нийлүүлэгч, буцаалт · банкаар гарсан ${mnt(c.bank.out_mnt)}</span></div>
+      <div class="card kpi" data-word${ok(c.receipts.failed === 0) || (c.receipts.gap === 0 ? ' data-tone="good"' : ' data-tone="warn"')}><div class="lab">Е-баримт</div><b>${c.receipts.gap === 0 ? 'бүрэн' : `${c.receipts.gap} дутуу`}</b><span>гарсан ${c.receipts.issued} · дараалалд ${c.receipts.queued} · амжилтгүй ${c.receipts.failed}</span></div>
     </div>
-    ${canMoney() ? '<div style="margin-top:14px"><button class="btn" type="button" id="run">Шалгалт одоо ажиллуулах</button> <span class="sub" style="display:inline">Ledger, е-баримтын нэгтгэл ба дараалал. Ердийн үедээ 23:30-д автоматаар.</span></div>' : ''}
-    <section class="section"><h2>Данс бүрээр</h2><div class="card" style="overflow:auto"><table class="table"><thead><tr><th>Данс</th><th>Төрөл</th><th class="num">Үлдэгдэл</th><th class="num">Бичилт</th><th>Сүүлд</th></tr></thead><tbody>
-      <tr><td><b>Зочдын түрийвч</b><span class="sub">${m.wallets.count} данс нэг мөрөнд</span></td><td>guest</td><td class="num">${mnt(m.wallets.balance_mnt)}</td><td class="num">—</td><td>—</td></tr>
-      ${m.accounts.map((a) => `<tr><td><b>${esc(a.name)}</b><span class="sub mono">${esc(a.label ?? '')}</span></td><td>${esc(a.kind)}</td><td class="num">${mnt(a.balance_mnt)}</td><td class="num">${a.entries}</td><td>${a.last_at ? `${when(a.last_at)} ${clockOf(a.last_at)}` : '—'}</td></tr>`).join('')}
-    </tbody></table></div></section>
+    ${canMoney() ? '<div class="run-row"><button class="btn" type="button" id="run">Шалгалт одоо ажиллуулах</button><span class="cap">Ledger, е-баримтын нэгтгэл ба дараалал. Ердийн үедээ 23:30-д автоматаар.</span></div>' : ''}
+    <section class="section"><h2 class="section-label">Данс бүрээр</h2><div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Данс</th><th>Төрөл</th><th class="num">Үлдэгдэл</th><th class="num">Бичилт</th><th>Сүүлд</th></tr></thead><tbody>
+      <tr><td><b>Зочдын түрийвч</b><span class="sub">${m.wallets.count} данс нэг мөрөнд</span></td><td><span class="mono">guest</span></td><td class="num">${money(m.wallets.balance_mnt)}</td><td class="num">—</td><td>—</td></tr>
+      ${m.accounts.map((a) => `<tr><td><b>${esc(a.name)}</b><span class="sub mono">${esc(a.label ?? '')}</span></td><td><span class="mono">${esc(a.kind)}</span></td><td class="num">${money(a.balance_mnt)}</td><td class="num">${a.entries}</td><td>${a.last_at ? stamp(a.last_at) : '—'}</td></tr>`).join('')}
+    </tbody></table></div></div></section>
   </div>`);
   page.querySelector('#run')?.addEventListener('click', async (e) => {
     e.target.disabled = true;
@@ -1078,16 +1045,16 @@ async function moneyTransfers() {
   const { transfers } = await ops(`/v1/ops/money/transfers?${qs}`);
   const page = el('<div class="card"></div>');
   page.append(moneyTools(`
-      <select id="kind"><option value="">Бүх төрөл</option>${Object.entries(KIND_WORD).map(([k, l]) => `<option value="${k}"${moneyFilter.kind === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
-      <input type="date" id="from" value="${esc(moneyFilter.from)}" title="Эхлэх өдөр"> <input type="date" id="to" value="${esc(moneyFilter.to)}" title="Дуусах өдөр">
-      ${canMoney() ? '<button class="btn" data-size="sm" type="button" id="csv" style="margin-left:auto">CSV татах</button>' : ''}`,
+      <select class="input" id="kind"><option value="">Бүх төрөл</option>${Object.entries(KIND_WORD).map(([k, l]) => `<option value="${k}"${moneyFilter.kind === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
+      <input class="input" type="date" id="from" value="${esc(moneyFilter.from)}" title="Эхлэх өдөр"> <input class="input" type="date" id="to" value="${esc(moneyFilter.to)}" title="Дуусах өдөр">
+      ${canMoney() ? '<button class="btn" data-size="sm" type="button" id="csv" data-end>CSV татах</button>' : ''}`,
     (e) => {
       if (e.target.id in moneyFilter) moneyFilter[e.target.id] = e.target.value;
       void drawMoney();
     }));
   page.querySelector('#csv')?.addEventListener('click', () => download(`/v1/ops/money/transfers.csv?${qs}`, `basu-transfers-${moneyFilter.from || 'all'}-${moneyFilter.to || 'all'}.csv`).catch((error) => toast(error.message, 'bad')));
-  page.append(el(`<div style="overflow:auto"><table class="table"><thead><tr><th>Огноо</th><th>Төрөл</th><th>Хаанаас → хаашаа</th><th>Тайлбар</th><th class="num">Дүн</th></tr></thead><tbody id="transfers">${transfers
-    .map((t) => `<tr><td>${when(t.at)}<span class="sub">${clockOf(t.at)}</span></td><td><span class="pill" data-s="${t.kind === 'refund' ? 'declined' : t.kind === 'topup' ? 'contracted' : 'PAID'}">${KIND_WORD[t.kind] ?? t.kind}</span></td><td>${esc(t.from.name)} <span style="color:var(--ink-3)">→</span> ${esc(t.to.name)}</td><td>${esc(t.memo ?? '')}<span class="sub mono">${esc(t.id.slice(0, 8))}</span></td><td class="num">${mnt(t.amount_mnt)}</td></tr>`)
+  page.append(el(`<div class="table-wrap"><table class="table"${transfers.length ? '' : ' data-empty'}><thead><tr><th>Огноо</th><th>Төрөл</th><th>Хаанаас → хаашаа</th><th>Тайлбар</th><th class="num">Дүн</th></tr></thead><tbody id="transfers">${transfers
+    .map((t) => `<tr><td>${stamp(t.at)}</td><td><span class="pill" data-s="${t.kind === 'refund' ? 'declined' : t.kind === 'topup' ? 'contracted' : 'PAID'}">${KIND_WORD[t.kind] ?? t.kind}</span></td><td>${esc(t.from.name)} <span class="muted">→</span> ${esc(t.to.name)}</td><td>${esc(t.memo ?? '')}<span class="sub mono">${esc(t.id.slice(0, 8))}</span></td><td class="num">${money(t.amount_mnt)}</td></tr>`)
     .join('') || '<tr><td colspan="5" class="empty">Гүйлгээ алга.</td></tr>'}</tbody></table></div>`));
   return page;
 }
@@ -1100,16 +1067,16 @@ async function moneyTopups() {
   const { topups } = await ops(`/v1/ops/money/topups?${qs}`);
   const page = el('<div class="card"></div>');
   page.append(moneyTools(`
-      <select id="topupState"><option value="">Бүх төлөв</option>${Object.entries(TOPUP_WORD).map(([k, l]) => `<option value="${k}"${moneyFilter.topupState === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
-      <input type="date" id="from" value="${esc(moneyFilter.from)}"> <input type="date" id="to" value="${esc(moneyFilter.to)}">
-      ${canMoney() ? '<button class="btn" data-size="sm" type="button" id="csv" style="margin-left:auto">CSV татах</button>' : ''}`,
+      <select class="input" id="topupState"><option value="">Бүх төлөв</option>${Object.entries(TOPUP_WORD).map(([k, l]) => `<option value="${k}"${moneyFilter.topupState === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
+      <input class="input" type="date" id="from" value="${esc(moneyFilter.from)}"> <input class="input" type="date" id="to" value="${esc(moneyFilter.to)}">
+      ${canMoney() ? '<button class="btn" data-size="sm" type="button" id="csv" data-end>CSV татах</button>' : ''}`,
     (e) => {
       if (e.target.id in moneyFilter) moneyFilter[e.target.id] = e.target.value;
       void drawMoney();
     }));
   page.querySelector('#csv')?.addEventListener('click', () => download(`/v1/ops/money/topups.csv?${qs}`, `basu-topups-${moneyFilter.from || 'all'}-${moneyFilter.to || 'all'}.csv`).catch((error) => toast(error.message, 'bad')));
-  page.append(el(`<div style="overflow:auto"><table class="table"><thead><tr><th>Эхэлсэн</th><th>Зочин</th><th>Суваг</th><th>Төлөв</th><th>Орсон</th><th class="num">Дүн</th></tr></thead><tbody id="topups">${topups
-    .map((t) => `<tr><td>${when(t.created_at)}<span class="sub">${clockOf(t.created_at)}</span></td><td>${esc(t.guest ?? 'зочин')}<span class="sub">${esc(t.guest_phone ?? '')}</span></td><td>${esc(t.provider)}<span class="sub mono">${esc(t.provider_ref ?? '')}</span></td><td><span class="pill" data-s="${TOPUP_PILL[t.state] ?? 'off'}">${TOPUP_WORD[t.state] ?? t.state}</span></td><td>${t.settled_at ? `${when(t.settled_at)} ${clockOf(t.settled_at)}` : '—'}</td><td class="num">${mnt(t.amount_mnt)}</td></tr>`)
+  page.append(el(`<div class="table-wrap"><table class="table"${topups.length ? '' : ' data-empty'}><thead><tr><th>Эхэлсэн</th><th>Зочин</th><th>Суваг</th><th>Төлөв</th><th>Орсон</th><th class="num">Дүн</th></tr></thead><tbody id="topups">${topups
+    .map((t) => `<tr><td>${stamp(t.created_at)}</td><td>${esc(t.guest ?? 'зочин')}<span class="sub mono">${esc(t.guest_phone ?? '')}</span></td><td>${esc(t.provider)}<span class="sub mono">${esc(t.provider_ref ?? '')}</span></td><td><span class="pill" data-s="${TOPUP_PILL[t.state] ?? 'off'}">${TOPUP_WORD[t.state] ?? t.state}</span></td><td>${t.settled_at ? stamp(t.settled_at) : '—'}</td><td class="num">${money(t.amount_mnt)}</td></tr>`)
     .join('') || '<tr><td colspan="6" class="empty">Цэнэглэлт алга.</td></tr>'}</tbody></table></div>`));
   return page;
 }
@@ -1120,14 +1087,14 @@ async function moneyReceipts() {
   const { receipts } = await ops(`/v1/ops/money/receipts?${qs}`);
   const page = el('<div class="card"></div>');
   page.append(moneyTools(
-    `<select id="receiptState"><option value="">Бүх төлөв</option>${Object.entries(RECEIPT_WORD).map(([k, l]) => `<option value="${k}"${moneyFilter.receiptState === k ? ' selected' : ''}>${l}</option>`).join('')}</select>`,
+    `<select class="input" id="receiptState"><option value="">Бүх төлөв</option>${Object.entries(RECEIPT_WORD).map(([k, l]) => `<option value="${k}"${moneyFilter.receiptState === k ? ' selected' : ''}>${l}</option>`).join('')}</select>`,
     (e) => {
       if (e.target.id in moneyFilter) moneyFilter[e.target.id] = e.target.value;
       void drawMoney();
     },
   ));
-  const table = el(`<div style="overflow:auto"><table class="table"><thead><tr><th>Огноо</th><th>Захиалга</th><th>ТТД</th><th>Төлөв</th><th>Баримт</th><th class="num">Дүн</th><th></th></tr></thead><tbody id="receipts">${receipts
-    .map((r) => `<tr><td>${when(r.created_at)}<span class="sub">${clockOf(r.created_at)}</span></td><td><b class="mono">№${esc(r.order_code ?? '')}</b><span class="sub">${r.kind === 'RETURN' ? 'буцаалт' : 'борлуулалт'}</span></td><td class="mono">${esc(r.merchant_tin ?? '—')}</td><td><span class="pill" data-s="${RECEIPT_PILL[r.state] ?? 'off'}">${RECEIPT_WORD[r.state] ?? r.state}</span>${r.state === 'failed' ? `<span class="sub">${r.attempts} оролдлого · ${esc(r.last_error ?? '')}</span>` : ''}</td><td>${r.bill_id ? `<span class="mono">${esc(r.bill_id)}</span><span class="sub">сугалаа ${esc(r.lottery ?? '')}</span>` : '—'}</td><td class="num">${mnt(r.amount_mnt)}</td><td class="num">${r.state === 'failed' && canMoney() ? `<button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${r.id}">Дахин</button>` : ''}</td></tr>`)
+  const table = el(`<div class="table-wrap"><table class="table"${receipts.length ? '' : ' data-empty'}><thead><tr><th>Огноо</th><th>Захиалга</th><th>ТТД</th><th>Төлөв</th><th>Баримт</th><th class="num">Дүн</th><th></th></tr></thead><tbody id="receipts">${receipts
+    .map((r) => `<tr><td>${stamp(r.created_at)}</td><td><b class="mono">№${esc(r.order_code ?? '')}</b><span class="sub">${r.kind === 'RETURN' ? 'буцаалт' : 'борлуулалт'}</span></td><td><span class="mono">${esc(r.merchant_tin ?? '—')}</span></td><td><span class="pill" data-s="${RECEIPT_PILL[r.state] ?? 'off'}">${RECEIPT_WORD[r.state] ?? r.state}</span>${r.state === 'failed' ? `<span class="sub">${r.attempts} оролдлого · ${esc(r.last_error ?? '')}</span>` : ''}</td><td>${r.bill_id ? `<span class="mono">${esc(r.bill_id)}</span><span class="sub mono">сугалаа ${esc(r.lottery ?? '')}</span>` : '—'}</td><td class="num">${money(r.amount_mnt)}</td><td class="num">${r.state === 'failed' && canMoney() ? `<button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${r.id}">Дахин</button>` : ''}</td></tr>`)
     .join('') || '<tr><td colspan="7" class="empty">Е-баримт алга.</td></tr>'}</tbody></table></div>`);
   table.addEventListener('click', async (e) => {
     const b = e.target.closest('button[data-retry]');
@@ -1168,7 +1135,8 @@ function renderNotify(view) {
     void drawNotify();
   });
   view.querySelector('.page-head').append(seg);
-  view.append(el('<div id="notify"><div class="empty">…</div></div>'));
+  view.append(el('<div id="notify"></div>'));
+  view.querySelector('#notify').append(busy());
   void drawNotify();
 }
 
@@ -1188,12 +1156,13 @@ async function drawNotify() {
 async function notifyLog() {
   const page = el(`<div class="card">
     <div class="tools">
-      <input type="search" id="q" placeholder="Утас эсвэл нэр…" value="${esc(msgFilter.q)}" autocomplete="off">
-      <select id="channel"><option value="">SMS ба push</option><option value="sms"${msgFilter.channel === 'sms' ? ' selected' : ''}>SMS</option><option value="push"${msgFilter.channel === 'push' ? ' selected' : ''}>Push</option></select>
-      <select id="state"><option value="">Бүх төлөв</option>${Object.entries(MSG_WORD).map(([k, l]) => `<option value="${k}"${msgFilter.state === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
+      <input class="input search" type="search" id="q" placeholder="Утас эсвэл нэр…" value="${esc(msgFilter.q)}" autocomplete="off">
+      <select class="input" id="channel"><option value="">SMS ба push</option><option value="sms"${msgFilter.channel === 'sms' ? ' selected' : ''}>SMS</option><option value="push"${msgFilter.channel === 'push' ? ' selected' : ''}>Push</option></select>
+      <select class="input" id="state"><option value="">Бүх төлөв</option>${Object.entries(MSG_WORD).map(([k, l]) => `<option value="${k}"${msgFilter.state === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
     </div>
-    <div id="messages"><div class="empty">…</div></div>
+    <div id="messages"></div>
   </div>`);
+  page.querySelector('#messages').append(busy());
   let timer;
   page.querySelector('#q').addEventListener('input', (e) => {
     msgFilter.q = e.target.value;
@@ -1224,9 +1193,9 @@ async function loadMessages() {
   }
   const list = el('<ul class="log"></ul>');
   for (const m of data.messages) {
-    list.append(el(`<li data-message="${m.id}"><span class="who">${m.channel === 'sms' ? 'SMS' : 'Push'}<small>${esc(m.guest ?? 'зочин')}<br>${esc(m.guest_phone ?? '')}</small></span>
+    list.append(el(`<li data-message="${m.id}"><span class="who">${m.channel === 'sms' ? 'SMS' : 'Push'}<small>${esc(m.guest ?? 'зочин')}<br><span class="mono">${esc(m.guest_phone ?? '')}</span></small></span>
       <div>${esc(TEMPLATE_WORD[m.template] ?? m.title ?? m.template)}<small>${esc(m.body)}</small></div>
-      <span class="when" style="text-align:right">${when(m.created_at)} ${clockOf(m.created_at)}<br><span class="pill" data-s="${MSG_PILL[m.state] ?? 'off'}">${MSG_WORD[m.state] ?? m.state}</span>${m.read_at ? ' <span class="sub" style="display:inline">уншсан</span>' : ''}${m.state === 'failed' ? ` <button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${m.id}">Дахин</button>` : ''}</span></li>`));
+      <span class="when meta">${when(m.created_at)} ${clockOf(m.created_at)}<br><span class="pill" data-s="${MSG_PILL[m.state] ?? 'off'}">${MSG_WORD[m.state] ?? m.state}</span>${m.read_at ? ' <span class="cap">уншсан</span>' : ''}${m.state === 'failed' ? ` <button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${m.id}">Дахин</button>` : ''}</span></li>`));
   }
   list.addEventListener('click', async (e) => {
     const b = e.target.closest('button[data-retry]');
@@ -1244,10 +1213,10 @@ async function loadMessages() {
 
 async function notifyVolume() {
   const v = await ops('/v1/ops/notify/volume');
-  return el(`<div class="card" style="overflow:auto"><table class="table"><thead><tr><th>Сар</th><th class="num">SMS илгээсэн</th><th class="num">SMS амжилтгүй</th><th class="num">Push илгээсэн</th><th class="num">Push амжилтгүй</th><th class="num">Зардал</th></tr></thead><tbody>${v.months
-    .map((m) => `<tr><td><b>${esc(m.month)}</b></td><td class="num">${m.sms.sent}</td><td class="num">${m.sms.failed}</td><td class="num">${m.push.sent}</td><td class="num">${m.push.failed}</td><td class="num">${mnt(m.cost_mnt)}</td></tr>`)
-    .join('') || '<tr><td colspan="6" class="empty">Одоогоор мэдэгдэл илгээгээгүй.</td></tr>'}</tbody></table>
-    <div class="tools" style="border-top:1px solid var(--line);border-bottom:none"><span class="sub" style="display:inline">Нэгж үнэ: SMS ${mnt(v.unit.sms_mnt)} · push ${mnt(v.unit.push_mnt)}. «Систем» хэсгээс өөрчилнө.</span></div></div>`);
+  return el(`<div class="card"><div class="table-wrap"><table class="table"${v.months.length ? '' : ' data-empty'}><thead><tr><th>Сар</th><th class="num">SMS илгээсэн</th><th class="num">SMS амжилтгүй</th><th class="num">Push илгээсэн</th><th class="num">Push амжилтгүй</th><th class="num">Зардал</th></tr></thead><tbody>${v.months
+    .map((m) => `<tr><td><b class="mono">${esc(m.month)}</b></td><td class="num">${m.sms.sent}</td><td class="num">${m.sms.failed}</td><td class="num">${m.push.sent}</td><td class="num">${m.push.failed}</td><td class="num">${money(m.cost_mnt)}</td></tr>`)
+    .join('') || '<tr><td colspan="6" class="empty">Одоогоор мэдэгдэл илгээгээгүй.</td></tr>'}</tbody></table></div>
+    <div class="card-foot"><span class="cap">Нэгж үнэ: SMS ${mnt(v.unit.sms_mnt)} · push ${mnt(v.unit.push_mnt)}. «Систем» хэсгээс өөрчилнө.</span></div></div>`);
 }
 
 /* ── the machine ── */
@@ -1266,7 +1235,8 @@ const ago = (iso, nowIso) => {
 
 async function renderSystem(view) {
   view.append(head('Систем', 'Холболтууд, scheduler, өгөгдлийн сан, тохиргоо. Ямар нэг зүйл унавал энд эхлээд харагдана.'));
-  view.append(el('<div id="system"><div class="empty">…</div></div>'));
+  view.append(el('<div id="system"></div>'));
+  view.querySelector('#system').append(busy());
   await drawSystem();
 }
 
@@ -1283,27 +1253,27 @@ async function drawSystem() {
   if (!document.getElementById('system')) return;
   const sch = s.scheduler;
   const page = el(`<div>
-    <div class="kpis" id="integrations">
-      <div class="card kpi"${sch.ok ? '' : ' data-tone="bad"'}><div class="lab">Scheduler</div><b>${sch.ok ? 'ажиллаж байна' : 'зогссон'}</b><span>сүүлийн тойрог ${ago(sch.last_at, s.now)}${sch.last_took_ms !== null ? ` · ${sch.last_took_ms} мс` : ''} · цагт ${sch.ticks_last_hour}${s.mode === 'demo' ? ' · demo: тойрог гараар' : ''}</span></div>
-      ${s.integrations.map((i) => `<div class="card kpi"${i.ok ? '' : ' data-tone="bad"'} data-integration="${i.key}"><div class="lab">${esc(i.name)}</div><b>${i.flavour === 'fake' ? 'туршилтын' : i.ok ? 'хэвийн' : 'алдаатай'}</b><span>${i.detail.last_ok_at !== undefined ? `сүүлд ${ago(i.detail.last_ok_at, s.now)} · ` : ''}${Object.entries(i.detail).filter(([k]) => k !== 'last_ok_at').map(([k, v]) => `${{ pending: 'хүлээгдэж', stuck: 'гацсан', gap_mnt: 'зөрүү', queued: 'дараалалд', issued: 'гарсан', failed: 'амжилтгүй', sent_day: '24ц илгээсэн', failed_day: '24ц амжилтгүй' }[k] ?? k} ${k === 'gap_mnt' ? mnt(v) : v}`).join(' · ')}</span></div>`).join('')}
+    <div class="kpis kpi-band" id="integrations">
+      <div class="card kpi" data-word data-tone="${sch.ok ? 'good' : 'bad'}"><div class="lab">Scheduler</div><b>${sch.ok ? 'ажиллаж байна' : 'зогссон'}</b><span>сүүлийн тойрог ${ago(sch.last_at, s.now)}${sch.last_took_ms !== null ? ` · ${sch.last_took_ms} мс` : ''} · цагт ${sch.ticks_last_hour}${s.mode === 'demo' ? ' · demo: тойрог гараар' : ''}</span></div>
+      ${s.integrations.map((i) => `<div class="card kpi" data-word${i.flavour === 'fake' ? '' : i.ok ? ' data-tone="good"' : ' data-tone="bad"'} data-integration="${i.key}"><div class="lab">${esc(i.name)}</div><b>${i.flavour === 'fake' ? 'туршилтын' : i.ok ? 'хэвийн' : 'алдаатай'}</b><span>${i.detail.last_ok_at !== undefined ? `сүүлд ${ago(i.detail.last_ok_at, s.now)} · ` : ''}${Object.entries(i.detail).filter(([k]) => k !== 'last_ok_at').map(([k, v]) => `${{ pending: 'хүлээгдэж', stuck: 'гацсан', gap_mnt: 'зөрүү', queued: 'дараалалд', issued: 'гарсан', failed: 'амжилтгүй', sent_day: '24ц илгээсэн', failed_day: '24ц амжилтгүй' }[k] ?? k} ${k === 'gap_mnt' ? mnt(v) : v}`).join(' · ')}</span></div>`).join('')}
       <div class="card kpi"><div class="lab">Өгөгдлийн сан</div><b>${esc(s.database.size)}</b><span>${s.database.migrations} migration · сүүлийнх ${esc(s.database.last_migration ?? '—')}</span></div>
     </div>
     <div class="pair-cols">
-      <section class="section"><h2>Сүүлийн 24 цаг</h2><div class="card" style="overflow:auto"><table class="table"><tbody>
+      <section class="section"><h2 class="section-label">Сүүлийн 24 цаг</h2><div class="card"><div class="table-wrap"><table class="table"><tbody>
         <tr><td>Галласан</td><td class="num">${sch.day.fired}</td></tr>
-        <tr><td>Хоцорч галласан</td><td class="num"${sch.day.lateFires ? ' style="color:var(--stop)"' : ''}>${sch.day.lateFires}</td></tr>
+        <tr><td>Хоцорч галласан</td><td class="num${sch.day.lateFires ? ' ink-stop' : ''}">${sch.day.lateFires}</td></tr>
         <tr><td>Түр зогсоосон</td><td class="num">${sch.day.held}</td></tr>
         <tr><td>Мэдэгдэл илгээсэн</td><td class="num">${sch.day.notified}</td></tr>
         <tr><td>Е-баримт гаргасан</td><td class="num">${sch.day.receipts}</td></tr>
-      </tbody></table></div>
-      <h2 style="margin-top:22px">Процесс</h2><div class="card" style="overflow:auto"><table class="table"><tbody>
+      </tbody></table></div></div>
+      <h2 class="section-label">Процесс</h2><div class="card"><div class="table-wrap"><table class="table"><tbody>
         <tr><td>Горим</td><td class="num"><span class="pill" data-s="${s.mode === 'production' ? 'contracted' : 'PAID'}">${s.mode === 'production' ? 'production' : 'demo'}</span></td></tr>
-        <tr><td>Хувилбар</td><td class="num mono">${esc(s.version)} · node ${esc(s.node)}</td></tr>
+        <tr><td>Хувилбар</td><td class="num">${esc(s.version)} · node ${esc(s.node)}</td></tr>
         <tr><td>Асаасан</td><td class="num">${when(s.started_at)} ${clockOf(s.started_at)}</td></tr>
-        <tr><td>Идэшний дүрэм</td><td class="num">шимтгэл ${s.rules.commission_pct}% · суутгал ${s.rules.forfeit_pct}% · ирээгүй ${s.rules.no_show_days} хоног</td></tr>
-      </tbody></table></div></section>
-      <section class="section"><h2>Тохиргоо</h2><div class="card card-body" id="settings">${s.settings
-        .map((k) => `<label class="field"><span>${esc(k.label)}</span><input data-key="${k.key}" ${k.kind === 'number' ? 'type="number" min="0" step="1"' : 'type="text" maxlength="500"'} value="${esc(String(k.value))}"${me?.role === 'admin' ? '' : ' disabled'}><small style="color:var(--ink-3);font-size:.8rem;line-height:1.4">${esc(k.hint)}${k.updated_by ? ` · ${esc(k.updated_by.replace('ops:', ''))}, ${when(k.updated_at)}` : ''}</small></label>`)
+        <tr><td>Идэшний дүрэм</td><td class="end">шимтгэл ${s.rules.commission_pct}% · суутгал ${s.rules.forfeit_pct}% · ирээгүй ${s.rules.no_show_days} хоног</td></tr>
+      </tbody></table></div></div></section>
+      <section class="section"><h2 class="section-label">Тохиргоо</h2><div class="card card-body" id="settings">${s.settings
+        .map((k) => `<label class="field"><span>${esc(k.label)}</span><input data-key="${k.key}" ${k.kind === 'number' ? 'type="number" min="0" step="1"' : 'type="text" maxlength="500"'} value="${esc(String(k.value))}"${me?.role === 'admin' ? '' : ' disabled'}><small>${esc(k.hint)}${k.updated_by ? ` · ${esc(k.updated_by.replace('ops:', ''))}, ${when(k.updated_at)}` : ''}</small></label>`)
         .join('')}${me?.role === 'admin' ? '<div class="form-foot"><button class="btn" data-v="primary" type="button" id="save-settings">Хадгалах</button></div>' : '<div class="hint">Тохиргоог зөвхөн админ өөрчилнө.</div>'}</div></section>
     </div>
   </div>`);
@@ -1329,7 +1299,7 @@ async function drawSystem() {
 
 async function renderStats(view) {
   view.append(head('Тоон үзүүлэлт', 'Захиалга, борлуулалт, шимтгэл, буцаалт — өнөөдөр, долоо хоног, улирал.'));
-  view.append(el('<div class="empty">…</div>'));
+  view.append(busy());
   let st;
   try {
     st = await ops('/v1/ops/stats');
@@ -1339,32 +1309,32 @@ async function renderStats(view) {
   }
   if (tab !== 'stats') return;
   view.lastElementChild.remove();
-  const kpis = el('<div class="kpis section" style="margin-top:0"></div>');
+  const kpis = el('<div class="kpis kpi-band section"></div>');
   const draw = () => {
     const t = st[period];
     kpis.replaceChildren(
       el(`<div class="card kpi"><div class="lab">Төлсөн захиалга</div><b>${t.paid}</b><span>${t.handed} хүлээлгэн өгсөн</span></div>`),
-      el(`<div class="card kpi"><div class="lab">Борлуулалт</div><b class="money">${mnt(t.sales_mnt)}</b><span>төлөгдсөн захиалгын дүн</span></div>`),
-      el(`<div class="card kpi"><div class="lab">Шимтгэл (Basu)</div><b>${mnt(t.commission_mnt)}</b><span>хүлээлгэн өгсөн захиалгаас</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Борлуулалт</div><b>${money(t.sales_mnt)}</b><span>төлөгдсөн захиалгын дүн</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Шимтгэл (Basu)</div><b>${money(t.commission_mnt)}</b><span>хүлээлгэн өгсөн захиалгаас</span></div>`),
       el(`<div class="card kpi"><div class="lab">Цуцлагдсан</div><b>${t.cancelled}</b><span>${t.cancelled ? `нийлүүлэгчийн буруу ${t.supplier_fault} · зочны ${t.guest_fault}` : 'цуцлалт алга'}</span></div>`),
-      el(`<div class="card kpi"><div class="lab">Буцаалт</div><b>${mnt(t.refund_mnt)}</b><span>зочдод буцах дүн</span></div>`),
-      el(`<div class="card kpi"><div class="lab">Суутгал</div><b>${mnt(t.forfeit_mnt)}</b><span>нийлүүлэгчид үлдсэн</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Буцаалт</div><b>${money(t.refund_mnt)}</b><span>зочдод буцах дүн</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Суутгал</div><b>${money(t.forfeit_mnt)}</b><span>нийлүүлэгчид үлдсэн</span></div>`),
     );
   };
   view.querySelector('.page-head').append(periodSeg(draw));
   draw();
   view.append(
     kpis,
-    el(`<section class="section"><h2>Нийлүүлэгч бүрээр</h2><div class="card" style="overflow:auto">
-          <table class="table"><thead><tr><th>Нийлүүлэгч</th><th class="num">Төлсөн</th><th class="num">Өгсөн</th><th class="num">Цуцалсан</th><th class="num">Өөрийн буруу</th><th class="num">Ирээгүй зочин</th><th class="num">Бэлэн болтол, цаг</th><th class="num">Борлуулалт</th><th class="num">Шимтгэл</th></tr></thead>
+    el(`<section class="section"><h2 class="section-label">Нийлүүлэгч бүрээр</h2><div class="card"><div class="table-wrap">
+          <table class="table"${st.suppliers.length ? '' : ' data-empty'}><thead><tr><th>Нийлүүлэгч</th><th class="num">Төлсөн</th><th class="num">Өгсөн</th><th class="num">Цуцалсан</th><th class="num">Өөрийн буруу</th><th class="num">Ирээгүй зочин</th><th class="num">Бэлэн болтол, цаг</th><th class="num">Борлуулалт</th><th class="num">Шимтгэл</th></tr></thead>
           <tbody>${st.suppliers
-            .map((r) => `<tr${r.active ? '' : ' data-off'}><td>${esc(r.name)}${r.active ? '' : ' <span class="pill" data-s="off">түр зогссон</span>'}</td><td class="num">${r.paid}</td><td class="num">${r.handed}</td><td class="num">${r.cancelled}</td><td class="num">${r.supplier_fault}</td><td class="num">${r.no_shows}</td><td class="num">${r.ready_hours ?? '—'}</td><td class="num">${mnt(r.sales_mnt)}</td><td class="num">${mnt(r.commission_mnt)}</td></tr>`)
-            .join('') || '<tr><td colspan="9" class="empty">Гэрээт нийлүүлэгч алга.</td></tr>'}</tbody></table></div></section>`),
-    el(`<section class="section"><h2>Махны төрлөөр · хүлээлгэн өгсөн</h2><div class="card" style="overflow:auto">
-          <table class="table"><thead><tr><th>Төрөл</th><th class="num">Хэмжээ</th><th class="num">Захиалга</th><th class="num">Борлуулалт</th></tr></thead>
+            .map((r) => `<tr${r.active ? '' : ' data-off'}><td>${esc(r.name)}${r.active ? '' : ' <span class="pill" data-s="off">түр зогссон</span>'}</td><td class="num">${r.paid}</td><td class="num">${r.handed}</td><td class="num">${r.cancelled}</td><td class="num">${r.supplier_fault}</td><td class="num">${r.no_shows}</td><td class="num">${r.ready_hours ?? '—'}</td><td class="num">${money(r.sales_mnt)}</td><td class="num">${money(r.commission_mnt)}</td></tr>`)
+            .join('') || '<tr><td colspan="9" class="empty">Гэрээт нийлүүлэгч алга.</td></tr>'}</tbody></table></div></div></section>`),
+    el(`<section class="section"><h2 class="section-label">Махны төрлөөр · хүлээлгэн өгсөн</h2><div class="card"><div class="table-wrap">
+          <table class="table"${st.by_kind.length ? '' : ' data-empty'}><thead><tr><th>Төрөл</th><th class="num">Хэмжээ</th><th class="num">Захиалга</th><th class="num">Борлуулалт</th></tr></thead>
           <tbody>${st.by_kind
-            .map((k) => `<tr><td>${KIND[k.kind] ?? k.kind}</td><td class="num">${k.qty} ${k.unit === 'kg' ? 'кг' : 'толгой'}</td><td class="num">${k.orders}</td><td class="num">${mnt(k.sales_mnt)}</td></tr>`)
-            .join('') || '<tr><td colspan="4" class="empty">Одоогоор алга.</td></tr>'}</tbody></table></div></section>`),
+            .map((k) => `<tr><td>${KIND[k.kind] ?? k.kind}</td><td class="num">${k.qty} ${k.unit === 'kg' ? 'кг' : 'толгой'}</td><td class="num">${k.orders}</td><td class="num">${money(k.sales_mnt)}</td></tr>`)
+            .join('') || '<tr><td colspan="4" class="empty">Одоогоор алга.</td></tr>'}</tbody></table></div></div></section>`),
   );
 }
 
@@ -1378,13 +1348,14 @@ function renderOrders(view) {
   view.append(el(`
     <div class="card">
       <div class="tools">
-        <input type="search" id="q" placeholder="Код, утас, зочин, нийлүүлэгч, мах…" value="${esc(orderFilter.q)}" autocomplete="off">
-        <select id="supplier"><option value="">Бүх нийлүүлэгч</option>${suppliers.map((s) => `<option value="${s.id}"${orderFilter.supplier === s.id ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
-        <input type="date" id="day" value="${esc(orderFilter.day)}" title="Авах, хүргэх өдөр">
+        <input class="input search" type="search" id="q" placeholder="Код, утас, зочин, нийлүүлэгч, мах…" value="${esc(orderFilter.q)}" autocomplete="off">
+        <select class="input" id="supplier"><option value="">Бүх нийлүүлэгч</option>${suppliers.map((s) => `<option value="${s.id}"${orderFilter.supplier === s.id ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
+        <input class="input" type="date" id="day" value="${esc(orderFilter.day)}" title="Авах, хүргэх өдөр">
         <div class="seg">${[['live', 'Идэвхтэй'], ['done', 'Дууссан'], ['all', 'Бүгд']].map(([k, l]) => `<button type="button" data-scope="${k}"${orderFilter.scope === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>
       </div>
-      <div id="orders"><div class="empty">…</div></div>
+      <div id="orders" class="table-wrap"></div>
     </div>`));
+  view.querySelector('#orders').append(busy());
   let timer;
   view.querySelector('#q').addEventListener('input', (e) => {
     orderFilter.q = e.target.value;
@@ -1428,10 +1399,10 @@ async function loadOrders() {
       <tr data-link data-order="${o.id}">
         <td><b class="mono">№${o.code}</b><span class="sub">${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}</span></td>
         <td>${esc(o.supplier.name)}</td>
-        <td>${esc(o.guest ?? 'зочин')}<span class="sub">${esc(o.guest_phone ?? '')}</span></td>
-        <td>${dayLabel(o.receive_on)}<span class="sub">${o.receive === 'delivery' ? 'хүргэлт' : 'өөрөө авна'}</span></td>
+        <td>${esc(o.guest ?? 'зочин')}<span class="sub mono">${esc(o.guest_phone ?? '')}</span></td>
+        <td><span class="mono">${dayLabel(o.receive_on)}</span><span class="sub">${o.receive === 'delivery' ? 'хүргэлт' : 'өөрөө авна'}</span></td>
         <td><span class="pill" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span></td>
-        <td class="num">${mnt(o.total_mnt)}</td>
+        <td class="num">${money(o.total_mnt)}</td>
       </tr>`);
     tr.addEventListener('click', () => openOrder(o.id));
     body.append(tr);
@@ -1452,25 +1423,25 @@ async function openOrder(id) {
   const o = d.order;
   const live = ['PAID', 'PREPARING', 'READY', 'DISPATCHED'].includes(o.state);
   view.replaceChildren();
-  const back = el('<button class="back" type="button" id="back">‹ Захиалгууд</button>');
+  const back = el(`<button class="back link" type="button" id="back">${CHEV}Захиалгууд</button>`);
   back.addEventListener('click', () => show('orders'));
   view.append(back);
-  view.append(head(`№${o.code} <span class="pill" data-s="${o.state}" style="vertical-align:middle;margin-left:8px">${STATE_WORD[o.state] ?? o.state}</span>`, `${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''} · ${esc(o.supplier.name)}`));
+  view.append(head(`№${o.code} <span class="pill" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span>`, `${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''} · ${esc(o.supplier.name)}`));
   const page = el(`
     <div class="detail">
       <div>
         <div class="card">
           <div class="facts">
-            <div><div class="lab">Зочин</div><b>${esc(o.guest ?? 'зочин')}</b><br>${o.guest_phone ? `<a class="tel" href="tel:${esc(o.guest_phone)}">${esc(o.guest_phone)}</a>` : ''}</div>
-            <div><div class="lab">${o.receive === 'delivery' ? 'Хүргэх' : 'Өөрөө авах'}</div><b>${dayLabel(o.receive_on)}</b><br>${o.receive === 'delivery' ? `${esc(o.address)} · ${esc(o.address_phone)}` : 'нийлүүлэгчийн авах цэгээс'}</div>
-            <div><div class="lab">Нийт төлсөн</div><b>${mnt(o.total_mnt)}</b><br>${o.delivery_fee_mnt ? `хүргэлт ${mnt(o.delivery_fee_mnt)} орсон` : 'хүргэлтгүй'}</div>
-            <div><div class="lab">Нийлүүлэгчид</div><b>${mnt(o.payout_mnt)}</b><br>шимтгэл хассан</div>
+            <div><div class="lab">Зочин</div><b>${esc(o.guest ?? 'зочин')}</b><br>${o.guest_phone ? tel(o.guest_phone) : ''}</div>
+            <div><div class="lab">${o.receive === 'delivery' ? 'Хүргэх' : 'Өөрөө авах'}</div><b>${dayLabel(o.receive_on)}</b><br>${o.receive === 'delivery' ? `${esc(o.address)} · <span class="mono">${esc(o.address_phone)}</span>` : 'нийлүүлэгчийн авах цэгээс'}</div>
+            <div><div class="lab">Нийт төлсөн</div><b>${money(o.total_mnt)}</b><br>${o.delivery_fee_mnt ? `хүргэлт ${mnt(o.delivery_fee_mnt)} орсон` : 'хүргэлтгүй'}</div>
+            <div><div class="lab">Нийлүүлэгчид</div><b>${money(o.payout_mnt)}</b><br>шимтгэл хассан</div>
             ${o.cancel_reason ? `<div><div class="lab">Цуцлалт</div><b>${REASON[o.cancel_reason] ?? o.cancel_reason}</b><br>буцаалт ${mnt(o.refund_mnt ?? 0)}${o.forfeit_mnt ? ` · суутгал ${mnt(o.forfeit_mnt)}` : ''}</div>` : ''}
           </div>
         </div>
-        <section class="section"><h2>Мөнгө</h2><div class="rows" id="money">${d.settlements.length ? '' : '<div class="card empty">Тооцоо үүсээгүй — хүлээлгэн өгснөөс хойш нэг хоногт үүснэ.</div>'}</div></section>
-        <section class="section"><h2>Явц</h2><div class="card card-body"><ol class="story">${d.events
-          .map((e) => `<li><b>${EVENT_WORD[e.type] ?? e.type}</b><small>${when(e.at)} ${clockOf(e.at)} · ${actorWord(e.actor)}${e.payload?.reason ? ` · ${REASON[e.payload.reason] ?? e.payload.reason}` : ''}${e.payload?.state ? ` · ${STATE_WORD[e.payload.state] ?? ''}` : ''}</small></li>`)
+        <section class="section"><h2 class="section-label">Мөнгө</h2><div class="rows" id="money" data-rows>${d.settlements.length ? '' : '<div class="card empty">Тооцоо үүсээгүй — хүлээлгэн өгснөөс хойш нэг хоногт үүснэ.</div>'}</div></section>
+        <section class="section"><h2 class="section-label">Явц</h2><div class="card card-body"><ol class="story stepper" data-stepper>${d.events
+          .map((e) => step(e.type, EVENT_WORD[e.type] ?? e.type, `${actorWord(e.actor)}${e.payload?.reason ? ` · ${REASON[e.payload.reason] ?? e.payload.reason}` : ''}${e.payload?.state ? ` · ${STATE_WORD[e.payload.state] ?? ''}` : ''}`, e.at))
           .join('')}</ol></div></section>
       </div>
       <div class="card" id="acts">
@@ -1520,9 +1491,9 @@ function renderSuppliers(view) {
   const rest = cache.suppliers.filter((s) => s.state !== 'applied');
   view.append(head('Нийлүүлэгчид', `${applied.length} хүсэлт · ${rest.filter((s) => s.state === 'contracted').length} гэрээт`));
   view.append(
-    el(`<section class="section" id="applied" style="margin-top:0"><h2>Хүсэлт</h2><div class="rows"></div></section>`),
-    el(`<section class="section" id="all"><h2>Нийлүүлэгчид</h2><div class="rows"></div></section>`),
-    el(`<section class="section" id="new"><h2>Шинэ нийлүүлэгч, гэрээтэй</h2></section>`),
+    el(`<section class="section" id="applied"><h2 class="section-label">Хүсэлт</h2><div class="rows" data-rows></div></section>`),
+    el(`<section class="section" id="all"><h2 class="section-label">Нийлүүлэгчид</h2><div class="rows" data-rows></div></section>`),
+    el(`<section class="section" id="new"><h2 class="section-label">Шинэ нийлүүлэгч, гэрээтэй</h2></section>`),
   );
   const pending = view.querySelector('#applied .rows');
   if (!applied.length) pending.append(el('<div class="card empty">Хүлээгдэж буй хүсэлт алга.</div>'));
@@ -1537,7 +1508,7 @@ function renderRow(s) {
   const status = s.state === 'contracted' ? (s.active ? 'contracted' : 'off') : s.state;
   const row = el(`
     <div class="card row" data-state="${s.state}" data-supplier="${s.id}">
-      <div class="name">${esc(s.name)}<small>${esc(s.phone)}${s.merchant_tin ? ` · ТТД ${esc(s.merchant_tin)}` : ' · ТТД алга'} · ${esc(s.pickup_address)}<br>${
+      <div class="name">${esc(s.name)}<small><span class="mono">${esc(s.phone)}</span>${s.merchant_tin ? ` · ТТД <span class="mono">${esc(s.merchant_tin)}</span>` : ' · ТТД алга'} · ${esc(s.pickup_address)}<br>${
         s.state === 'applied'
           ? `хүсэлт ${when(s.applied_at)}`
           : s.state === 'contracted'
@@ -1549,7 +1520,7 @@ function renderRow(s) {
       ${
         s.state !== 'declined'
           ? `<div class="about">Шимтгэл <b>${s.commission_pct}%</b> · Данс: ${
-              s.bank_account ? `<b>${esc(s.bank_name)} ${esc(s.bank_account)}</b> · ${esc(s.bank_holder)}${s.bank_verified ? '' : ' <span class="pill" data-s="warn">баталгаажаагүй</span>'}` : '<b>алга</b>'
+              s.bank_account ? `<b>${esc(s.bank_name)} <span class="mono">${esc(s.bank_account)}</span></b> · ${esc(s.bank_holder)}${s.bank_verified ? '' : ' <span class="pill" data-s="warn">баталгаажаагүй</span>'}` : '<b>алга</b>'
             }</div>`
           : ''
       }
@@ -1573,11 +1544,18 @@ function renderRow(s) {
     }
   };
   const small = (label, attrs = '') => el(`<button class="btn" data-size="sm" type="button" ${attrs}>${label}</button>`);
+  // One action in view, the rest behind ⋯ — every button stays in the DOM.
+  const folded = more();
+  const menu = folded.querySelector('.menu');
+  const fold = (button) => {
+    button.dataset.v = 'quiet';
+    menu.append(button);
+  };
 
   if (s.state === 'applied') {
     const ok = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
     ok.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/approve`, null, showCode));
-    const no = el('<button class="btn" data-v="danger" data-size="sm" type="button" data-a="decline">Татгалзах</button>');
+    const no = el('<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="decline">Татгалзах</button>');
     no.addEventListener('click', () => {
       const reason = prompt('Шалтгаан (нийлүүлэгчид SMS-ээр очно):', '');
       if (reason === null) return;
@@ -1587,7 +1565,7 @@ function renderRow(s) {
   }
   if (s.state === 'contracted' && s.bank_account && !s.bank_verified) {
     // A changed account pays out nothing until somebody holds it up against the contract.
-    const check = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="bank-verify">Данс баталгаажуулах</button>');
+    const check = el('<button class="btn" data-size="sm" type="button" data-a="bank-verify">Данс баталгаажуулах</button>');
     check.addEventListener('click', () => {
       if (!confirm(`${s.name}: ${s.bank_name} ${s.bank_account} (${s.bank_holder}) гэрээний данстай таарч байна уу?`)) return;
       act(`/v1/ops/suppliers/${s.id}/bank-verify`, { note: 'гэрээтэй тулгасан' });
@@ -1597,7 +1575,7 @@ function renderRow(s) {
   if (s.state === 'contracted') {
     const code = small('Шинэ код', 'data-a="code"');
     code.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/code`, null, showCode));
-    buttons.append(code);
+    fold(code);
     // Their listings, to look at and, if need be, hide.
     const stall = small('Зарууд', 'data-a="listings"');
     stall.addEventListener('click', async () => {
@@ -1606,9 +1584,9 @@ function renderRow(s) {
       const box = el('<div class="drawer stall"></div>');
       if (!listings.length) box.append(el('<span class="muted">Зар алга.</span>'));
       for (const l of listings) {
-        const line = el(`<div class="stall-line"${l.active ? '' : ' data-off'}><span>${esc(l.title)} · ${mnt(l.price_mnt)}/${l.unit === 'kg' ? 'кг' : 'толгой'} · ${l.sold}/${l.quantity}${l.active ? '' : ' · нуусан'}</span></div>`);
+        const line = el(`<div class="stall-line"${l.active ? '' : ' data-off'}><span>${esc(l.title)} · ${money(l.price_mnt)}/${l.unit === 'kg' ? 'кг' : 'толгой'} · <span class="mono">${l.sold}/${l.quantity}</span>${l.active ? '' : ' · нуусан'}</span></div>`);
         if (l.active) {
-          const hide = el('<button class="btn" data-v="danger" data-size="sm" type="button">Нуух</button>');
+          const hide = el('<button class="btn" data-v="quiet" data-size="sm" type="button">Нуух</button>');
           hide.addEventListener('click', () => {
             const note = prompt('Нуух шалтгаан (бүртгэлд үлдэнэ):', '');
             if (note === null) return;
@@ -1622,13 +1600,13 @@ function renderRow(s) {
     });
     buttons.append(stall);
     // Off the market, or back on it — with the reason kept.
-    const toggle = el(`<button class="btn" data-size="sm" type="button" data-a="active"${s.active ? ' data-v="danger"' : ' data-v="primary"'}>${s.active ? 'Түр зогсоох' : 'Идэвхжүүлэх'}</button>`);
+    const toggle = el(`<button class="btn${s.active ? ' ink-stop' : ''}" data-size="sm" type="button" data-a="active">${s.active ? 'Түр зогсоох' : 'Идэвхжүүлэх'}</button>`);
     toggle.addEventListener('click', () => {
       const note = prompt(s.active ? 'Түр зогсоох шалтгаан (бүртгэлд үлдэнэ):' : 'Идэвхжүүлэх тэмдэглэл:', '');
       if (note === null) return;
       act(`/v1/ops/suppliers/${s.id}/active`, { active: !s.active, note });
     });
-    buttons.append(toggle);
+    fold(toggle);
   }
   if (s.state !== 'declined') {
     // The contract's terms: written in once it is signed, corrected here.
@@ -1639,9 +1617,9 @@ function renderRow(s) {
         <div class="drawer terms">
           <div class="fields">
             <label class="field"><span>Шимтгэл, %</span><input name="commission_pct" inputmode="decimal" value="${s.commission_pct}"></label>
-            <label class="field"><span>ТТД</span><input name="tin" value="${esc(s.merchant_tin ?? '')}" placeholder="7–14 орон"></label>
+            <label class="field"><span>ТТД</span><input name="tin" inputmode="numeric" value="${esc(s.merchant_tin ?? '')}" placeholder="7–14 орон"></label>
             <label class="field"><span>Банк</span><input name="bank_name" value="${esc(s.bank_name ?? '')}"></label>
-            <label class="field"><span>Данс</span><input name="bank_account" value="${esc(s.bank_account ?? '')}"></label>
+            <label class="field"><span>Данс</span><input name="bank_account" inputmode="numeric" value="${esc(s.bank_account ?? '')}"></label>
             <label class="field"><span>Эзэмшигч</span><input name="bank_holder" value="${esc(s.bank_holder ?? '')}"></label>
           </div>
           <div class="form-foot">
@@ -1664,12 +1642,13 @@ function renderRow(s) {
       });
       row.append(form);
     });
-    buttons.append(terms);
+    fold(terms);
   }
+  if (menu.childElementCount) buttons.append(folded);
 
   const remembered = sessionStorage.getItem(`ops.code.${s.id}`);
   if (remembered && s.state === 'contracted' && !s.watched) {
-    row.append(el(`<div class="code">Дэлгэц холбох код<b>${remembered}</b> · 24 цаг</div>`));
+    row.append(el(`<div class="code">Дэлгэц холбох код<b class="mono">${remembered}</b> · 24 цаг</div>`));
   }
   return row;
 }
@@ -1677,12 +1656,12 @@ function renderRow(s) {
 function newForm() {
   const form = el(`
     <div class="card">
-      <div class="card-head"><h3>Гэрээ байгуулсан нийлүүлэгчийг бүртгэх</h3><span class="muted" style="font-size:.84rem">Бүртгэмэгц дэлгэц холбох код SMS-ээр очно</span></div>
+      <div class="card-head"><h3>Гэрээ байгуулсан нийлүүлэгчийг бүртгэх</h3><span class="cap muted">Бүртгэмэгц дэлгэц холбох код SMS-ээр очно</span></div>
       <div class="card-body">
         <div class="fields">
           <label class="field wide"><span>Нэр</span><input name="name" placeholder="Хэнтий · «Хэрлэн» хоршоо"></label>
-          <label class="field"><span>Утас</span><input name="phone" placeholder="+976XXXXXXXX"></label>
-          <label class="field"><span>ТТД</span><input name="tin" placeholder="7–10 орон"></label>
+          <label class="field"><span>Утас</span><input name="phone" type="tel" placeholder="+976XXXXXXXX"></label>
+          <label class="field"><span>ТТД</span><input name="tin" inputmode="numeric" placeholder="7–10 орон"></label>
           <label class="field wide"><span>Авах цэг</span><input name="address" placeholder="Дүүрэг, зах, хаалга"></label>
           <label class="field"><span>Өргөрөг</span><input name="lat" placeholder="47.9…"></label>
           <label class="field"><span>Уртраг</span><input name="lon" placeholder="106.9…"></label>
@@ -1690,7 +1669,7 @@ function newForm() {
           <label class="field"><span>Данс</span><input name="bank_account" inputmode="numeric" placeholder="5012345678"></label>
           <label class="field"><span>Эзэмшигч</span><input name="bank_holder" placeholder="Гэрээний нэр"></label>
         </div>
-        <div class="form-foot"><button class="btn" data-v="primary" type="button" id="add">Бүртгээд код авах</button></div>
+        <div class="form-foot"><button class="btn" type="button" id="add">Бүртгээд код авах</button></div>
       </div>
     </div>`);
   form.querySelector('#add').addEventListener('click', async () => {
@@ -1725,12 +1704,12 @@ function renderPay(view) {
   const waiting = cache.settlements.filter((t) => t.state === 'needs_account');
   const paid = cache.settlements.filter((t) => t.state === 'paid');
   view.append(head('Олголт, буцаалт', 'Basu-гийн банкаар гараар шилжүүлж, энд «Шилжүүлсэн» гэж тэмдэглэнэ.'));
-  view.append(el(`<div class="kpis" style="margin-bottom:22px">
-    <div class="card kpi"><div class="lab">Шилжүүлэх ёстой</div><b class="money">${mnt(due.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${due.length} мөр, данс бэлэн</span></div>
-    <div class="card kpi"><div class="lab">Данс хүлээж байна</div><b>${mnt(waiting.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${waiting.length} буцаалт — зочин дансаа оруулаагүй</span></div>
-    <div class="card kpi"><div class="lab">Шилжүүлсэн (30 хоног)</div><b>${mnt(paid.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${paid.length} мөр</span></div>
+  view.append(el(`<div class="kpis kpi-band">
+    <div class="card kpi"><div class="lab">Шилжүүлэх ёстой</div><b>${money(due.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${due.length} мөр, данс бэлэн</span></div>
+    <div class="card kpi"><div class="lab">Данс хүлээж байна</div><b>${money(waiting.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${waiting.length} буцаалт — зочин дансаа оруулаагүй</span></div>
+    <div class="card kpi"><div class="lab">Шилжүүлсэн (30 хоног)</div><b>${money(paid.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${paid.length} мөр</span></div>
   </div>`));
-  const section = el('<section id="pay"><div class="rows"></div></section>');
+  const section = el('<section id="pay" class="section"><div class="rows" data-rows></div></section>');
   const rows = section.querySelector('.rows');
   if (!cache.settlements.length) rows.append(el('<div class="card empty"><b>Шилжүүлэх зүйл алга</b>Хүлээлгэн өгсөн захиалгын олголт, цуцлагдсан захиалгын буцаалт энд гарна.</div>'));
   for (const t of cache.settlements) rows.append(renderSettlement(t));
@@ -1745,17 +1724,18 @@ function renderPay(view) {
 function renderSettlement(t) {
   const who = t.kind === 'payout' ? esc(t.supplier?.name ?? '') : `${esc(t.guest?.name ?? 'Зочин')} (зочин)`;
   const bank = t.bank_account ? `${esc(t.bank_name)} · ${esc(t.bank_account)} · ${esc(t.bank_holder)}` : 'данс алга';
+  const bankHtml = t.bank_account ? `${esc(t.bank_name)} · <span class="mono">${esc(t.bank_account)}</span> · ${esc(t.bank_holder)}` : 'данс алга';
   const status = t.state === 'paid' ? ['paid', 'шилжүүлсэн'] : t.state === 'needs_account' ? ['needs_account', 'данс хүлээж байна'] : !t.bank_verified ? ['warn', 'данс баталгаажаагүй'] : ['due', 'шилжүүлэх'];
   const row = el(`
     <div class="card row" data-kind="${t.kind}" data-settlement="${t.id}"${t.state === 'paid' ? ' data-paid' : ''}>
-      <div class="name">${esc(t.memo)} · ${who}<small><span class="mono">№${esc(t.order_code)}</span> · ${bank}<br>${
+      <div class="name">${esc(t.memo)} · ${who}<small><span class="mono">№${esc(t.order_code)}</span> · ${bankHtml}<br>${
         t.state === 'paid'
-          ? `шилжүүлсэн ${when(t.paid_at)}${t.reference ? ` · гүйлгээ ${esc(t.reference)}` : ''}`
+          ? `шилжүүлсэн ${when(t.paid_at)}${t.reference ? ` · гүйлгээ <span class="mono">${esc(t.reference)}</span>` : ''}`
           : t.state === 'needs_account'
             ? 'зочин аппаар дансаа оруулмагц шилжүүлж болно'
             : `үүссэн ${when(t.created_at)}`
       }</small></div>
-      <div class="right"><span class="amount">${mnt(t.amount_mnt)}</span><span class="pill" data-s="${status[0]}">${status[1]}</span><div class="btns"></div></div>
+      <div class="right"><span class="amount">${money(t.amount_mnt)}</span><span class="pill" data-s="${status[0]}">${status[1]}</span><div class="btns"></div></div>
     </div>`);
   if (t.state === 'due' && t.bank_verified) {
     const paid = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="paid">Шилжүүлсэн</button>');
@@ -1787,7 +1767,7 @@ const ACTION = {
 
 async function renderAudit(view) {
   view.append(head('Бүртгэл', 'Ops-ийн хийсэн үйлдэл бүр — хэн, хэзээ, юуг, ямар тэмдэглэлтэй.'));
-  view.append(el('<div class="card"><ul class="log" id="audit"><li class="empty">…</li></ul></div>'));
+  view.append(el('<ul class="log" id="audit" data-rows><li class="empty">…</li></ul>'));
   let data;
   try {
     data = await ops('/v1/ops/audit?limit=200');
@@ -1800,7 +1780,7 @@ async function renderAudit(view) {
   box.replaceChildren();
   if (!data.audit.length) box.append(el('<li class="empty">Одоогоор юу ч хийгээгүй.</li>'));
   for (const a of data.audit) {
-    box.append(el(`<li><span class="who">${esc(a.who.replace('ops:', ''))}</span><div>${ACTION[a.action] ?? esc(a.action)}${a.note ? `<small>${esc(a.note)}</small>` : ''}</div><span class="when">${when(a.at)} ${clockOf(a.at)}</span></li>`));
+    box.append(el(`<li><span class="who">${esc(a.who.replace('ops:', ''))}</span><div>${ACTION[a.action] ?? esc(a.action)}${a.note ? `<small>${esc(a.note)}</small>` : ''}</div><span class="when meta">${when(a.at)} ${clockOf(a.at)}</span></li>`));
   }
 }
 
@@ -1808,7 +1788,7 @@ async function renderAudit(view) {
 
 async function renderMembers(view) {
   view.append(head('Гишүүд', 'Хэн энэ хуудсанд орж, юу хийж болох вэ.'));
-  view.append(el('<div class="card"><table class="table"><thead><tr><th>Нэр</th><th>Утас</th><th>Эрх</th><th>Төлөв</th><th></th></tr></thead><tbody id="members"><tr><td colspan="5" class="empty">…</td></tr></tbody></table></div>'));
+  view.append(el('<div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Нэр</th><th>Утас</th><th>Эрх</th><th>Төлөв</th><th></th></tr></thead><tbody id="members"><tr><td colspan="5" class="empty">…</td></tr></tbody></table></div></div>'));
   let data;
   try {
     data = await ops('/v1/ops/members');
@@ -1821,9 +1801,9 @@ async function renderMembers(view) {
   body.replaceChildren();
   if (!data.members.length) body.append(el('<tr><td colspan="5" class="empty">Бүртгэлтэй гишүүн алга. Доорх маягтаар нэмнэ.</td></tr>'));
   for (const m of data.members) {
-    const tr = el(`<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td class="mono">${esc(m.phone)}</td><td>${ROLE_WORD[m.role] ?? m.role}</td><td><span class="pill" data-s="${m.active ? 'contracted' : 'off'}">${m.active ? 'идэвхтэй' : 'хаасан'}</span></td><td class="num"></td></tr>`);
+    const tr = el(`<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td><span class="mono">${esc(m.phone)}</span></td><td>${ROLE_WORD[m.role] ?? m.role}</td><td><span class="pill" data-s="${m.active ? 'contracted' : 'off'}">${m.active ? 'идэвхтэй' : 'хаасан'}</span></td><td class="num"></td></tr>`);
     if (m.id !== me?.id) {
-      const b = el(`<button class="btn" data-size="sm" type="button"${m.active ? ' data-v="danger"' : ''}>${m.active ? 'Хаах' : 'Нээх'}</button>`);
+      const b = el(`<button class="btn" data-size="sm" type="button"${m.active ? ' data-v="quiet"' : ''}>${m.active ? 'Хаах' : 'Нээх'}</button>`);
       b.addEventListener('click', async () => {
         try {
           await ops(`/v1/ops/members/${m.id}/active`, { method: 'POST', body: { active: !m.active } });
@@ -1837,9 +1817,9 @@ async function renderMembers(view) {
     body.append(tr);
   }
   const form = el(`
-    <section class="section"><h2>Гишүүн нэмэх</h2><div class="card"><div class="card-body">
+    <section class="section"><h2 class="section-label">Гишүүн нэмэх</h2><div class="card"><div class="card-body">
       <div class="fields">
-        <label class="field"><span>Утас</span><input name="phone" placeholder="+976XXXXXXXX"></label>
+        <label class="field"><span>Утас</span><input name="phone" type="tel" placeholder="+976XXXXXXXX"></label>
         <label class="field"><span>Нэр</span><input name="name" placeholder="Нэр"></label>
         <label class="field"><span>Эрх</span><select name="role"><option value="ops">ops — захиалга, нийлүүлэгч</option><option value="finance">санхүү — олголт, буцаалт, данс</option><option value="viewer">зөвхөн харах</option><option value="admin">админ</option></select></label>
       </div>

@@ -2,274 +2,230 @@
 <html lang="mn">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#E9EBEC">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E1315">
 <title>Basu — үдийн хоол</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.css">
 <link rel="stylesheet" href="/app.css">
 <style>
+/* Layout only. Colour, type, radius, buttons, chips, rows, the sheet and the
+   stepper come from /app.css; what is left here is where things sit. */
 html,body{height:100%;overflow:hidden}
 body{display:flex;flex-direction:column}
 
 /* The map is the page: the product is "which lunch is five minutes away",
-   and that is a question about a place before it is one about a menu. */
-#map{flex:1;min-height:0;position:relative;background:#f5f3ef}
-#map .maplibregl-ctrl-group{border-radius:3px;box-shadow:var(--shadow)}
-#map .maplibregl-ctrl-attrib{font-size:10px}
+   and that is a question about a place before it is one about a menu.
+   MapLibre sets its own 12px Helvetica on the container; the chrome inside
+   it takes the page's face back. */
+#map{flex:1;min-height:0;position:relative;background:var(--bg);font:inherit}
 
-.badge{
-  position:absolute;top:12px;left:12px;z-index:5;
-  background:var(--surface);border:1px solid var(--line);border-radius:3px;
-  padding:8px 12px;box-shadow:var(--shadow);max-width:calc(100% - 24px);
-}
-.badge b{display:block;font-size:.92rem;font-weight:800;letter-spacing:-.02em}
+/* The bar floats over the map. Absolute in the map's box rather than fixed
+   in the viewport, so the demo clock strip above the map keeps its own row;
+   the map fills the rest of the screen, so the two read the same. */
+#map > .topbar[data-fixed]{position:absolute;top:0;left:0;right:0}
 
-/* The way out. This app is one icon inside Basu, so there is always a page
-   above it — and on a phone the browser's back button is not always there. */
-.home{
-  position:absolute;top:12px;right:12px;z-index:5;
-  background:var(--surface);border:1px solid var(--line);border-radius:3px;
-  padding:7px 11px;box-shadow:var(--shadow);text-decoration:none;
-  font-family:"IBM Plex Mono",monospace;font-size:.7rem;font-weight:600;
-  letter-spacing:.02em;color:var(--accent-ink);
+/* Nobody is cooking: said under the bar, over the map. The page's notes are
+   a bold line over a sentence with no icon, so they stack. */
+#map > .note{position:absolute;top:calc(var(--bar-h) + var(--safe-t) + 12px);left:12px;right:12px;z-index:5}
+.note[data-k]{flex-direction:column;gap:2px}
+
+/* MapLibre's controls in the system's material. */
+#map .maplibregl-ctrl-group{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-ctl)}
+#map .maplibregl-ctrl-group:not(:empty){box-shadow:var(--shadow)}
+#map .maplibregl-ctrl-group button{width:40px;height:40px}
+#map .maplibregl-ctrl-group button+button{border-top:1px solid var(--line)}
+#map .maplibregl-ctrl-group button:focus:first-child{border-radius:var(--r-ctl) var(--r-ctl) 0 0}
+#map .maplibregl-ctrl-group button:focus:last-child{border-radius:0 0 var(--r-ctl) var(--r-ctl)}
+#map .maplibregl-ctrl button:not(:disabled):hover,#map .maplibregl-ctrl button:not(:disabled):active{background-color:var(--surface-2)}
+#map .maplibregl-ctrl-attrib{background:var(--glass);color:var(--ink-2);font-size:var(--t-eyebrow);border-radius:var(--r-sm)}
+#map .maplibregl-ctrl-attrib.maplibregl-compact{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-pill)}
+#map .maplibregl-ctrl-attrib.maplibregl-compact-show{border-radius:var(--r-sm)}
+#map .maplibregl-ctrl-attrib a{color:var(--accent-ink)}
+/* Until the map has a dark palette of its own, the daylight tiles sit under
+   a 35% wash of the ground, and the control glyphs are lifted. Both dark
+   blocks, like app.css, so an explicit theme wins either way. */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) #map::after{content:"";position:absolute;inset:0;z-index:1;background:var(--bg);opacity:.35;pointer-events:none}
+  :root:not([data-theme="light"]) #map .maplibregl-ctrl-icon{filter:invert(.88)}
 }
-.home:hover{border-color:var(--accent-line)}
-/* Inside the phone app the way back is where iOS puts one — the leading
-   edge — and the badge steps aside to the right. */
-.in-shell .home{left:12px;right:auto}
-.in-shell .badge{left:auto;right:12px;max-width:calc(100% - 110px);text-align:right}
-.badge span{font-family:"IBM Plex Mono",monospace;font-size:.68rem;color:var(--ink-3)}
+:root[data-theme="dark"] #map::after{content:"";position:absolute;inset:0;z-index:1;background:var(--bg);opacity:.35;pointer-events:none}
+:root[data-theme="dark"] #map .maplibregl-ctrl-icon{filter:invert(.88)}
+/* On a desk the sheet docks on the right; the controls step out from under
+   it, and the dock starts below the demo clock strip when there is one. */
+@media (min-width:900px){
+  body:has(.sheet[data-dock][data-open]) #map .maplibregl-ctrl-bottom-right{right:440px}
+  body:has(> .clockbar) .sheet[data-dock]{top:32px}
+}
 
 /* The walk, when a venue is open and we know where the guest is. */
-.walk{
-  display:flex;align-items:center;gap:8px;margin-top:6px;
-  font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--route);
-}
-.walk b{font-weight:600;font-variant-numeric:tabular-nums}
+.walk{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}
+.walk:empty{display:none}
+.walk svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3)}
+.walk b{font-weight:500;color:var(--ink)}
 .walk .guess{color:var(--ink-3)}
 
-/* ── the sheet a pin opens ──────────────────────────────────────── */
-.scrim{
-  position:fixed;inset:0;z-index:20;background:rgba(10,14,16,.45);
-  opacity:0;pointer-events:none;transition:opacity .2s;
-}
-.scrim[data-open]{opacity:1;pointer-events:auto}
+/* ── inside the sheet ─────────────────────────────────────────────── */
+.sheet > .body > .empty{border-top:0;padding:20px}
+.sheet .note{margin:16px 20px}
 
-.sheet{
-  position:fixed;left:0;right:0;bottom:0;z-index:25;
-  background:var(--surface);border-top:1px solid var(--line);
-  border-radius:10px 10px 0 0;box-shadow:0 -12px 34px -18px rgba(0,0,0,.5);
-  max-height:86vh;display:flex;flex-direction:column;
-  transform:translateY(100%);transition:transform .26s cubic-bezier(.2,.8,.25,1);
-}
-.sheet[data-open]{transform:translateY(0)}
-@media (prefers-reduced-motion:reduce){.sheet,.scrim{transition:none}}
-@media(min-width:640px){
-  .sheet{left:50%;right:auto;width:520px;transform:translate(-50%,100%)}
-  .sheet[data-open]{transform:translate(-50%,0)}
-}
-
-.grip{display:flex;justify-content:center;padding:8px 0 2px;flex:none}
-.grip i{width:38px;height:4px;border-radius:99px;background:var(--line-2)}
-
-.sheet header{
-  display:flex;align-items:flex-start;gap:12px;padding:6px 18px 14px;
-  border-bottom:1px solid var(--line);flex:none;
-}
-.sheet header h2{font-size:1.15rem;font-weight:800;letter-spacing:-.03em}
-.sheet header .sub{font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--ink-3);margin-top:3px}
-.sheet header .x{
-  margin-left:auto;background:none;border:none;color:var(--ink-3);font-size:1.2rem;
-  line-height:1;padding:4px 2px;flex:none;
-}
-.sheet .body{overflow-y:auto;flex:1;min-height:0;-webkit-overflow-scrolling:touch}
-.sheet footer{border-top:1px solid var(--line);padding:12px 18px calc(14px + env(safe-area-inset-bottom));flex:none}
-.sheet footer:empty{display:none}
-.sheet footer .terms{font-size:.74rem;color:var(--ink-2);text-align:center;margin:0 0 9px;line-height:1.45}
-.sheet footer .terms b{color:var(--accent-ink)}
-
-/* ── menu ───────────────────────────────────────────────────────── */
-.item{display:flex;align-items:center;gap:12px;padding:10px 18px;border-bottom:1px solid var(--line)}
-.item:last-child{border-bottom:none}
-.item img{
-  width:56px;height:56px;border-radius:4px;flex:none;object-fit:cover;
-  background:var(--surface-2);border:1px solid var(--line);
-}
-.item .who{min-width:0;flex:1}
-.item .name{font-weight:600;font-size:.94rem;overflow-wrap:anywhere}
-.item .desc{font-size:.76rem;color:var(--ink-2);margin-top:1px;overflow-wrap:anywhere}
-.item .meta{font-family:"IBM Plex Mono",monospace;font-size:.66rem;color:var(--ink-3);margin-top:3px}
-.item .price{font-family:"IBM Plex Mono",monospace;font-size:.82rem;font-variant-numeric:tabular-nums;flex:none}
-.qty{display:flex;border:1px solid var(--line-2);border-radius:3px;overflow:hidden;flex:none}
-.qty button{width:32px;height:32px;background:var(--surface);border:none;color:var(--ink-2);font-size:1.05rem;line-height:1}
-.qty button:hover{background:var(--surface-2);color:var(--ink)}
-.qty span{width:26px;line-height:32px;text-align:center;font-family:"IBM Plex Mono",monospace;font-size:.82rem;font-variant-numeric:tabular-nums}
-.item[data-sold] .name{color:var(--ink-3);text-decoration:line-through}
-
-.slothead{padding:14px 18px 0;font-family:"IBM Plex Mono",monospace;font-size:.66rem;text-transform:uppercase;letter-spacing:.14em;color:var(--ink-3)}
-.slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:7px;padding:10px 18px 16px}
+/* When, first and always in view: the strip sticks under the header while
+   the menu scrolls beneath it. One row of pills, scrolling sideways. Opaque,
+   not glass: a backdrop filter nested inside the sheet's own is not painted
+   everywhere, and rows showing through the strip read as a mistake. */
+.when-strip{position:sticky;top:0;z-index:2;padding:4px 20px 12px;background:var(--surface);border-bottom:1px solid var(--line)}
+.when-strip .section-title{margin:8px 0 10px}
+.slots{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -20px;padding:1px 20px 3px}
+.slots::-webkit-scrollbar{display:none}
 .slot{
-  font-family:"IBM Plex Mono",monospace;font-size:.86rem;padding:11px 4px;border-radius:3px;
-  border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);
-  font-variant-numeric:tabular-nums;
+  flex:none;min-height:44px;padding:0 16px;border-radius:var(--r-pill);
+  border:1px solid var(--line-2);background:var(--surface);color:var(--ink);
+  font-size:var(--t-body-lg);font-weight:500;font-variant-numeric:tabular-nums;
+  transition:background var(--dur),border-color var(--dur),color var(--dur),transform 120ms var(--ease);
 }
-.slot:hover:not([disabled]){border-color:var(--accent-line);color:var(--accent-ink)}
-.slot[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
-.slot[disabled]{opacity:.32;cursor:not-allowed;text-decoration:line-through}
+.slot[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink);font-weight:600}
+.slot[disabled]{background:var(--surface-2);border-color:var(--line);color:var(--ink-3);text-decoration:line-through;cursor:not-allowed}
+.slot:not([disabled]):active{transform:scale(.985)}
+@media (hover:hover){.slot:not([disabled]):not([aria-pressed="true"]):hover{border-color:var(--ink-3)}}
+
+/* The menu: full-bleed rows in the sheet, so the sheet is the card. */
+.sheet .menu{border-left:0;border-right:0;border-radius:0;box-shadow:none;background:none}
+.item .lead img{width:56px;height:56px}
+.item .name{font-size:var(--t-row);font-weight:500;line-height:var(--lh-snug);color:var(--ink)}
+.item .meta{font-size:var(--t-cap);color:var(--ink-2)}
+.item .meta svg{width:12px;height:12px;vertical-align:-1px;fill:var(--star);stroke:none}
+.item > .end{gap:8px}
+.item[data-off] .money{color:var(--ink-3)}
+.item[data-off] .lead img{opacity:.6}
+.qty{display:inline-flex;align-items:stretch;height:40px;border:1px solid var(--line-2);border-radius:var(--r-ctl);background:var(--surface);overflow:hidden}
+.qty button{width:40px;padding:0;border:0;background:none;color:var(--ink-2);display:grid;place-items:center}
+.qty button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+.qty button:active{background:var(--surface-2);color:var(--ink)}
+@media (hover:hover){.qty button:hover{background:var(--surface-2);color:var(--ink)}}
+.qty span{min-width:28px;display:grid;place-items:center;font-weight:600;color:var(--ink)}
+
+/* The footer: what is in the basket, the time, the total, then one button. */
+.sheet > footer .terms{margin:0;text-align:center;font-size:var(--t-cap);line-height:1.45;color:var(--ink-2)}
+.sheet > footer .terms b{color:var(--ink)}
 
 /* ── status, once an order exists ────────────────────────────────── */
 /* A guest walking to the restaurant wants the progress and the route at the
    same time, so this is a sheet over the map rather than a page instead of it.
    Dismissing it leaves a bar at the bottom to bring it back. */
+.status{padding:20px 20px 8px;text-align:center}
+.status .lab{display:inline-flex;align-items:center;gap:6px}
+.status .lab .dot{margin:0}
+.status .big{margin-top:10px;font-size:1.5rem;font-weight:600;line-height:1.15;letter-spacing:-.015em;color:var(--ink);text-wrap:balance}
+.status .big.mono{font-size:var(--t-display);line-height:1.1;letter-spacing:-.01em}
+.status .cap{margin-top:6px}
+.status .cap:empty{display:none}
+.status .timeline{margin-top:16px;padding-top:8px;border-top:1px solid var(--line)}
+
 .orderbar{
-  position:fixed;left:0;right:0;bottom:0;z-index:22;
-  background:var(--surface);border-top:1px solid var(--line);
-  padding:11px 16px calc(12px + env(safe-area-inset-bottom));
-  display:none;align-items:center;gap:12px;text-align:left;width:100%;
-  box-shadow:0 -8px 24px -18px rgba(0,0,0,.45);color:inherit;border-left:none;border-right:none;
+  position:fixed;left:0;right:0;bottom:0;z-index:var(--z-bar);
+  display:none;align-items:center;gap:12px;width:100%;
+  min-height:calc(var(--tabbar-h) + var(--safe-b));padding:10px 20px calc(10px + var(--safe-b));
+  background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
+  border:0;border-top:1px solid var(--line);border-radius:var(--r-md) var(--r-md) 0 0;box-shadow:var(--shadow-sheet);
+  color:inherit;text-align:left;
 }
 .orderbar[data-open]{display:flex}
-@media(min-width:640px){
-  .orderbar{left:50%;right:auto;width:520px;transform:translateX(-50%);border-radius:8px 8px 0 0;border:1px solid var(--line);border-bottom:none}
+.orderbar > span{display:flex;flex-direction:column;flex:1;min-width:0}
+.orderbar .code{font-weight:600;line-height:1.3;color:var(--ink)}
+.orderbar .what{font-size:var(--t-cap);line-height:1.3;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.orderbar .what:empty{display:none}
+.orderbar .when{margin-left:auto;flex:none;font-size:1.25rem;font-weight:600;line-height:1;color:var(--ink)}
+.orderbar .when:not(.mono){font-size:var(--t-body-lg)}
+@media (min-width:640px){
+  .orderbar{left:50%;right:auto;width:520px;max-width:calc(100% - 40px);transform:translateX(-50%);border:1px solid var(--line);border-bottom:0}
 }
-.orderbar .code{font-family:"IBM Plex Mono",monospace;font-size:.86rem;font-weight:600}
-.orderbar .what{font-size:.82rem;color:var(--ink-2);margin-top:1px}
-.orderbar .when{
-  margin-left:auto;font-family:"IBM Plex Mono",monospace;font-size:1.05rem;font-weight:600;
-  font-variant-numeric:tabular-nums;color:var(--accent-ink);
-}
-.status{background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:20px 18px;text-align:center}
-.status .big{font-size:2.2rem;font-weight:900;letter-spacing:-.04em;font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;line-height:1}
-.status .cap{font-size:.8rem;color:var(--ink-3);margin-top:6px}
-.status[data-s="FIRED"] .big,.status[data-s="COOKING"] .big{color:var(--accent-ink)}
-.status[data-s="READY"] .big,.status[data-s="SERVED"] .big{color:var(--ready)}
-.timeline{list-style:none;margin:14px 0 0;padding:0;text-align:left}
-.timeline li{display:grid;grid-template-columns:3.4rem 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
-.timeline .t{font-family:"IBM Plex Mono",monospace;font-size:.8rem;color:var(--ink-3);font-variant-numeric:tabular-nums}
-.timeline .w{font-size:.86rem}
-.timeline li[data-done] .w{color:var(--ink)}
-.timeline li:not([data-done]) .w{color:var(--ink-3)}
-.near{
-  font-family:"IBM Plex Mono",monospace;font-size:.7rem;color:var(--route);
-  background:var(--route-soft);border:1px solid var(--route-line);border-radius:3px;
-  padding:8px 12px;margin-top:10px;text-align:center;
-}
-.back{background:none;border:none;color:var(--ink-3);font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;padding:16px 0 4px;font-family:"IBM Plex Mono",monospace}
 
-.note{
-  background:var(--hold-soft);border:1px solid var(--hold-line);border-left:3px solid var(--hold);
-  border-radius:3px;padding:12px 14px;margin:14px 18px;
-}
-.note b{display:block;font-size:.88rem;color:var(--ink);margin-bottom:3px}
-.note span{font-size:.8rem;color:var(--ink-2);line-height:1.5}
-.note a{color:var(--accent-ink)}
-.empty{padding:26px 18px;text-align:center;color:var(--ink-3);font-size:.86rem}
-
-/* ── stars ──────────────────────────────────────────────────────── */
+/* ── the review ───────────────────────────────────────────────────── */
 /* A row of five buttons rather than a slider or a select: the whole gesture
    is one tap, and the answer is visible without opening anything. */
-.stars{display:flex;gap:2px}
-.stars button{
-  background:none;border:none;padding:2px;line-height:1;font-size:1.5rem;
-  color:var(--line-2);
-}
-.stars button[data-on]{color:#E8A13A}
-.stars button:hover{color:#E8A13A}
-.stars[data-size="sm"] button{font-size:1.05rem;padding:1px}
+.stars{display:flex}
+.stars button{width:44px;height:44px;padding:0;border:0;background:none;color:var(--ink-3);display:grid;place-items:center}
+.stars button svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.stars button[data-on]{color:var(--star)}
+.stars button[data-on] svg{fill:currentColor}
+.stars[data-size="sm"] button{width:32px;height:36px}
+.stars[data-size="sm"] button svg{width:18px;height:18px}
+.rating{display:inline-flex;align-items:center;gap:3px;color:var(--ink-2)}
+.rating i{display:inline-flex;color:var(--star)}
+.rating i svg{width:13px;height:13px;fill:currentColor;stroke:none}
+.rating em{font-style:normal;color:var(--ink-3)}
 
-.rating{
-  display:inline-flex;align-items:center;gap:4px;
-  font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--ink-2);
-}
-.rating i{color:#E8A13A;font-style:normal}
-.rating em{color:var(--ink-3);font-style:normal}
-
-.review{padding:16px 18px;border-top:1px solid var(--line)}
-.review h3{font-size:.95rem;font-weight:700;margin-bottom:3px}
-.review p.lead{font-size:.82rem;color:var(--ink-2);margin:0 0 12px}
-.review .row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
-.review .row:last-of-type{border-bottom:none}
-.review .row img{width:34px;height:34px;border-radius:3px;border:1px solid var(--line);flex:none}
-.review .row .n{flex:1;font-size:.88rem;min-width:0;overflow-wrap:anywhere}
-.review textarea{
-  width:100%;min-height:70px;resize:vertical;margin-top:10px;padding:10px 11px;
-  border:1px solid var(--line-2);border-radius:3px;background:var(--surface-2);
-  color:var(--ink);font-family:inherit;font-size:.88rem;line-height:1.45;
-}
-.review textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
-
+.review{padding:16px 20px 20px;border-top:1px solid var(--line)}
+.review p.lead{margin:2px 0 10px;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}
+.review > .stars{margin:0 -10px}
+.review .row{display:flex;align-items:center;gap:12px;min-height:52px;padding:6px 0;border-top:1px solid var(--line)}
+.review > .stars + .row{margin-top:8px}
+.review .row img{width:40px;height:40px;border-radius:var(--r-sm);background:var(--surface-2);object-fit:cover;flex:none}
+.review .row .n{flex:1;min-width:0;font-size:var(--t-body-lg);color:var(--ink)}
+.review .row .stars{margin-right:-7px}
+.review textarea{margin-top:12px}
 /* The timing question is the product's own metric and is asked separately:
    a four-star lunch that came late is a success by one measure and a failure
    by the other, and one score would hide exactly that. */
-.ontime{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap}
-.ontime span{font-size:.86rem;flex:1;min-width:140px}
-.ontime button{
-  font-family:"IBM Plex Mono",monospace;font-size:.74rem;padding:7px 14px;border-radius:3px;
-  border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);
-}
-.ontime button[data-on="yes"]{background:var(--ready-soft);border-color:var(--ready);color:var(--ready);font-weight:600}
-.ontime button[data-on="no"]{background:var(--stop-soft);border-color:var(--stop);color:var(--stop);font-weight:600}
+.ontime{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;min-height:44px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.ontime > span{flex:1;min-width:140px;font-size:var(--t-body-lg);color:var(--ink)}
 
-.said{padding:12px 18px;border-top:1px solid var(--line)}
-.said > .lab{margin-bottom:8px}
+.said{padding:8px 20px 20px;border-top:1px solid var(--line)}
+.said .section-title{margin:16px 0 10px}
 /* The average and the timing share sit together, because they answer
    different questions and a guest weighs both. */
 .said .summary{
-  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;
-  padding-bottom:10px;margin-bottom:4px;border-bottom:1px solid var(--line);
-  font-family:"IBM Plex Mono",monospace;font-size:.74rem;color:var(--ink-3);
+  display:flex;align-items:baseline;justify-content:flex-start;gap:12px;flex-wrap:wrap;
+  padding-bottom:12px;border-bottom:1px solid var(--line);font-size:var(--t-cap);color:var(--ink-2);
 }
-.said .summary .big{
-  font-family:"Golos Text",sans-serif;font-size:1.35rem;font-weight:800;
-  letter-spacing:-.03em;color:var(--ink);
-}
-.said .summary .big i{color:#E8A13A;font-style:normal;font-size:1.1rem;margin-right:2px}
+.said .summary .big{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-title-2);font-weight:600;line-height:1;letter-spacing:-.015em;color:var(--ink)}
+.said .summary .big i{display:inline-flex;color:var(--star)}
+.said .summary .big i svg{width:18px;height:18px;fill:currentColor;stroke:none}
 .said .summary .pct{color:var(--hold)}
 .said .summary .pct[data-good="true"]{color:var(--ready)}
-.said .none{color:var(--ink-3);font-size:.84rem;padding:6px 0}
-.said .one{padding:9px 0;border-bottom:1px solid var(--line)}
-.said .one:last-child{border-bottom:none}
-.said .who{display:flex;align-items:center;gap:8px;font-size:.76rem;color:var(--ink-3);margin-bottom:3px}
-.said .who b{color:var(--ink-2);font-weight:600}
-.said .txt{font-size:.87rem;line-height:1.5;overflow-wrap:anywhere}
-.said .late{color:var(--hold);font-family:"IBM Plex Mono",monospace;font-size:.68rem}
+.said .none{padding:12px 0 0;font-size:var(--t-body);color:var(--ink-2)}
+.said .one{padding:12px 0;border-top:1px solid var(--line)}
+.said .summary + .one{border-top:0}
+.said .who{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;font-size:var(--t-cap);color:var(--ink-2)}
+.said .who b{font-weight:500;color:var(--ink)}
+.said .txt{font-size:var(--t-body-lg);line-height:1.5;color:var(--ink);overflow-wrap:anywhere}
 </style>
 </head>
 <body>
 <div id="map">
-  <div class="badge" id="badge"><b>Үдийн хоол</b><span>Ирэхээс чинь өмнө гал тавина</span></div>
-  <a class="home" href="/" id="home" aria-label="Basu нүүр">‹ Basu</a>
+  <div class="topbar" data-fixed>
+    <a class="home" href="/" id="home" aria-label="Basu нүүр"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Basu</a>
+    <div class="title" id="badge"><b>Үдийн хоол</b><span>Ирэхээс чинь өмнө гал тавина</span></div>
+    <span class="act"></span>
+  </div>
 </div>
 
-<div class="scrim" id="scrim"></div>
+<div class="scrim" id="scrim" data-dock></div>
 
-<section class="sheet" id="sheet" aria-label="Ресторан">
-  <div class="grip"><i></i></div>
+<section class="sheet" id="sheet" aria-label="Ресторан" data-dock>
   <header>
     <div>
       <h2 id="sheet-name">—</h2>
       <div class="sub" id="sheet-sub"></div>
       <div class="walk" id="sheet-walk"></div>
     </div>
-    <button class="x" type="button" id="sheet-close" aria-label="Хаах">✕</button>
+    <button class="x" type="button" id="sheet-close" aria-label="Хаах"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </header>
   <div class="body" id="sheet-body"></div>
   <footer id="sheet-foot"></footer>
 </section>
 
 <button class="orderbar" id="orderbar" type="button">
-  <div>
-    <div class="code" id="ob-code">—</div>
-    <div class="what" id="ob-what"></div>
-  </div>
-  <div class="when" id="ob-when"></div>
+  <span>
+    <span class="code mono" id="ob-code">—</span>
+    <span class="what" id="ob-what"></span>
+  </span>
+  <span class="when mono" id="ob-when"></span>
 </button>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
 <script type="module">
-import { api, store, shell, toast, mountClock, mnt, hhmm, HEADLINE } from '/api.js';
+import { api, store, shell, toast, mountClock, mnt, money, hhmm, HEADLINE } from '/api.js';
 import { mapStyle, pinImage, ULAANBAATAR, isCovered, metresBetween, walkMinutes } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -285,6 +241,15 @@ const ROUTE = 'walk';
 
 const emptyLine = () => ({ type: 'FeatureCollection', features: [] });
 
+/* The page's own glyphs: 24-unit strokes in currentColor, so they take the
+   colour of whatever they sit in and never a glyph from the text font. */
+const ICON = {
+  star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.6l2.5 5.2 5.7.8-4.1 4 1 5.7-5.1-2.7-5.1 2.7 1-5.7-4.1-4 5.7-.8z"/></svg>',
+  minus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>',
+  walk: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="13.5" cy="4.2" r="1.7"/><path d="M13 7.6l-2.4 4.6 2.6 2.4-2 6.4M13 7.6l3.2 1.9 1.8 3.3M10.6 12.2l-2.6 3.2M13.2 14.6l3.2 2.6 1.4 3.8"/></svg>',
+};
+
 /**
  * Five tappable stars that keep their own state.
  *
@@ -299,7 +264,7 @@ function starPicker(value, onPick, size) {
     box.replaceChildren();
     for (let n = 1; n <= 5; n++) {
       const star = el(
-        `<button type="button" aria-label="${n} од"${n <= picked ? ' data-on' : ''}>★</button>`,
+        `<button type="button" aria-label="${n} од"${n <= picked ? ' data-on' : ''}>${ICON.star}</button>`,
       );
       star.addEventListener('click', () => {
         picked = n;
@@ -314,11 +279,11 @@ function starPicker(value, onPick, size) {
   return box;
 }
 
-/** A rating as one line: ★ 4.6 (12). Null reads as "nobody has said yet". */
+/** A rating as one line: [star] 4.6 (12). Null reads as "nobody has said yet". */
 function ratingLine(rating) {
   if (!rating?.count) return el('<span class="rating"><em>үнэлгээ алга</em></span>');
   return el(
-    `<span class="rating"><i>★</i>${rating.stars.toFixed(1)}<em>(${rating.count})</em></span>`,
+    `<span class="rating"><i>${ICON.star}</i>${rating.stars.toFixed(1)}<em>(${rating.count})</em></span>`,
   );
 }
 
@@ -525,7 +490,7 @@ async function drawWalk(venue) {
   const sub = document.getElementById('sheet-walk');
   if (sub) {
     sub.innerHTML =
-      `<span>🚶</span><b>${km}</b><span>·</span><b>${route.minutes} мин</b>` +
+      `<span>${ICON.walk}</span><b class="mono">${km}</b><span>·</span><b class="mono">${route.minutes} мин</b>` +
       (route.kind === 'direct' ? '<span class="guess">ойролцоогоор</span>' : '');
   }
 
@@ -565,8 +530,20 @@ async function reportProximity() {
 
 let ready = false;
 map.on('load', () => {
-  map.addImage('pin-open', pinImage('#C64E08', false), { pixelRatio: 2 });
-  map.addImage('pin-shut', pinImage('#78868E', true), { pixelRatio: 2 });
+  // The map draws in the page's own tokens, read once when it is ready: an
+  // open pin is the accent, a shut one the third ink, both ringed with the
+  // surface; the walk is the route blue cased in surface.
+  const token = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const palette = {
+    accent: token('--accent'),
+    ink: token('--ink'),
+    ink3: token('--ink-3'),
+    surface: token('--surface'),
+    onAccent: token('--on-accent'),
+    route: token('--route'),
+  };
+  map.addImage('pin-open', pinImage(palette.accent, false, palette.surface, palette.onAccent), { pixelRatio: 2 });
+  map.addImage('pin-shut', pinImage(palette.ink3, true, palette.surface, palette.onAccent), { pixelRatio: 2 });
 
   // The walk, under the pins so a pin is never hidden by its own route.
   map.addSource(ROUTE, { type: 'geojson', data: emptyLine() });
@@ -575,7 +552,7 @@ map.on('load', () => {
     type: 'line',
     source: ROUTE,
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#ffffff', 'line-width': 9, 'line-opacity': 0.9 },
+    paint: { 'line-color': palette.surface, 'line-width': 9, 'line-opacity': 0.9 },
   });
   // Two layers, not one with a data-driven dash.
   //
@@ -590,7 +567,7 @@ map.on('load', () => {
     source: ROUTE,
     filter: ['!', ['get', 'direct']],
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#1B5B8F', 'line-width': 5 },
+    paint: { 'line-color': palette.route, 'line-width': 5 },
   });
   map.addLayer({
     id: 'route-guess',
@@ -599,7 +576,7 @@ map.on('load', () => {
     // A straight line drawn dashed, so a guess never looks surveyed.
     filter: ['get', 'direct'],
     layout: { 'line-cap': 'round', 'line-join': 'round' },
-    paint: { 'line-color': '#1B5B8F', 'line-width': 5, 'line-dasharray': [1.4, 1.2] },
+    paint: { 'line-color': palette.route, 'line-width': 5, 'line-dasharray': [1.4, 1.2] },
   });
 
   map.addSource(SOURCE, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
@@ -620,8 +597,8 @@ map.on('load', () => {
       'text-allow-overlap': true,
     },
     paint: {
-      'text-color': ['case', ['get', 'open'], '#14181B', '#78868E'],
-      'text-halo-color': '#ffffff',
+      'text-color': ['case', ['get', 'open'], palette.ink, palette.ink3],
+      'text-halo-color': palette.surface,
       'text-halo-width': 1.8,
     },
   });
@@ -675,7 +652,7 @@ async function loadVenues() {
   const existing = $('map').querySelector('.note');
   if (open === 0 && !existing) {
     $('map').append(
-      el(`<div class="note" style="position:absolute;top:62px;left:12px;right:12px;z-index:5;margin:0">
+      el(`<div class="note" data-k="warn">
             <b>Одоогоор нэг ч гал тогоо холбогдоогүй</b>
             <span>Тогооч дэлгэцээ нээгээгүй бол захиалга хүлээж авах хүнгүй.
             Демо үзэж байгаа бол <a href="/kds">гал тогооны дэлгэцийг</a> нээнэ үү.</span>
@@ -721,6 +698,8 @@ async function openVenue(venue) {
     : venue.walk_minutes;
 
   $('sheet-name').textContent = venue.name;
+  $('sheet-name').classList.remove('mono'); // a name, not a code
+  delete $('sheet').dataset.busy;
   const sub = $('sheet-sub');
   sub.replaceChildren(
     document.createTextNode(
@@ -744,7 +723,7 @@ async function openVenue(venue) {
 
   if (!venue.accepting_orders) {
     $('sheet-body').replaceChildren(
-      el(`<div class="note"><b>Одоогоор захиалга авахгүй байна</b>
+      el(`<div class="note" data-k="warn"><b>Одоогоор захиалга авахгүй байна</b>
             <span>Гал тогооны дэлгэц холбогдоогүй тул хоол хийх хүн байхгүй.</span></div>`),
     );
     return;
@@ -763,48 +742,15 @@ function renderSheet() {
   const body = $('sheet-body');
   body.replaceChildren();
 
-  for (const item of state.menu) {
-    const qty = state.cart.get(item.id) ?? 0;
-    const row = el(`
-      <div class="item"${item.sold_out ? ' data-sold' : ''}>
-        <img src="${item.image_url ?? '/dishes/unknown.svg'}" alt="" loading="lazy" width="56" height="56">
-        <div class="who">
-          <div class="name">${escapeHtml(item.name)}</div>
-          ${item.description ? `<div class="desc">${item.description}</div>` : ''}
-          <div class="meta">${item.station} · ${item.prep_minutes} мин${
-            item.rating?.count ? ` · ★ ${item.rating.stars.toFixed(1)}` : ''
-          }</div>
-        </div>
-        <div class="price">${mnt(item.price_mnt)}</div>
-      </div>`);
-
-    if (item.sold_out) {
-      row.append(el('<span class="chip">Дууссан</span>'));
-    } else {
-      const stepper = el(`
-        <div class="qty">
-          <button type="button" data-d="-1" aria-label="Хасах">−</button>
-          <span>${qty}</span>
-          <button type="button" data-d="1" aria-label="Нэмэх">+</button>
-        </div>`);
-      stepper.addEventListener('click', (event) => {
-        const button = event.target.closest('button');
-        if (!button) return;
-        const next = Math.max(0, (state.cart.get(item.id) ?? 0) + Number(button.dataset.d));
-        if (next === 0) state.cart.delete(item.id);
-        else state.cart.set(item.id, next);
-        renderSheet();
-      });
-      row.append(stepper);
-    }
-    body.append(row);
-  }
-
-  body.append(el('<div class="slothead">Хэдэн цагт ирэх вэ?</div>'));
+  // When, first and always in view: the strip sticks under the header while
+  // the menu scrolls beneath it, so the time is never a scroll away.
+  const strip = el(
+    '<div class="when-strip"><h3 class="slothead section-title">Хэдэн цагт ирэх вэ?</h3></div>',
+  );
   const grid = el('<div class="slots"></div>');
   for (const slot of state.slots) {
     const button = el(
-      `<button class="slot" type="button" aria-pressed="${state.slot === slot.starts_at}"${
+      `<button class="slot mono" type="button" aria-pressed="${state.slot === slot.starts_at}"${
         slot.available ? '' : ' disabled'
       }>${slot.label}</button>`,
     );
@@ -814,7 +760,48 @@ function renderSheet() {
     });
     grid.append(button);
   }
-  body.append(grid);
+  strip.append(grid);
+  body.append(strip);
+
+  const menu = el('<div class="menu" data-rows></div>');
+  for (const item of state.menu) {
+    const qty = state.cart.get(item.id) ?? 0;
+    const row = el(`
+      <div class="item row"${item.sold_out ? ' data-sold data-off' : ''}>
+        <span class="lead"><img class="thumb" src="${item.image_url ?? '/dishes/unknown.svg'}" alt="" loading="lazy" width="56" height="56"></span>
+        <span class="main">
+          <span class="name title">${escapeHtml(item.name)}</span>
+          ${item.description ? `<span class="sub desc">${escapeHtml(item.description)}</span>` : ''}
+          <span class="meta">${item.prep_minutes} мин${
+            item.rating?.count ? ` · ${ICON.star} ${item.rating.stars.toFixed(1)}` : ''
+          }</span>
+        </span>
+        <span class="end"><span class="price">${money(item.price_mnt)}</span></span>
+      </div>`);
+    const end = row.querySelector('.end');
+
+    if (item.sold_out) {
+      end.append(el('<span class="chip">Дууссан</span>'));
+    } else {
+      const stepper = el(`
+        <div class="qty">
+          <button type="button" data-d="-1" aria-label="Хасах">${ICON.minus}</button>
+          <span class="mono">${qty}</span>
+          <button type="button" data-d="1" aria-label="Нэмэх">${ICON.plus}</button>
+        </div>`);
+      stepper.addEventListener('click', (event) => {
+        const button = event.target.closest('button');
+        if (!button) return;
+        const next = Math.max(0, (state.cart.get(item.id) ?? 0) + Number(button.dataset.d));
+        if (next === 0) state.cart.delete(item.id);
+        else state.cart.set(item.id, next);
+        renderSheet();
+      });
+      end.append(stepper);
+    }
+    menu.append(row);
+  }
+  body.append(menu);
   renderFoot();
   void appendComments(state.venue.id);
 }
@@ -837,9 +824,9 @@ async function appendComments(venueId) {
   const rating = data.rating;
   const said = el(`
     <div class="said">
-      <div class="lab">Хоолтой хүмүүс юу гэсэн бэ</div>
+      <h3 class="section-title">Хоолтой хүмүүс юу гэсэн бэ</h3>
       <div class="summary">
-        <span class="big"><i>★</i>${rating.stars.toFixed(1)}</span>
+        <span class="big"><i>${ICON.star}</i><span class="mono">${rating.stars.toFixed(1)}</span></span>
         <span>${rating.count} үнэлгээ</span>
         ${
           rating.onTimeShare === null
@@ -857,9 +844,9 @@ async function appendComments(venueId) {
     said.append(
       el(`<div class="one">
             <div class="who">
-              <b>${c.by}</b>
-              <span class="rating"><i>${'★'.repeat(c.stars)}</i></span>
-              ${c.onTime === false ? '<span class="late">цагтаа ирээгүй</span>' : ''}
+              <b>${escapeHtml(c.by)}</b>
+              <span class="rating"><i>${ICON.star.repeat(c.stars)}</i></span>
+              ${c.onTime === false ? '<span class="late chip" data-tone="hold" data-inline>цагтаа ирээгүй</span>' : ''}
             </div>
             <div class="txt">${escapeHtml(c.comment)}</div>
           </div>`),
@@ -876,15 +863,34 @@ function escapeHtml(value) {
 }
 
 function renderFoot() {
-  const total = [...state.cart].reduce((sum, [id, qty]) => {
-    const item = state.menu.find((m) => m.id === id);
-    return sum + (item ? item.price_mnt * qty : 0);
-  }, 0);
+  // A POST is in flight: the footer it came from stays put until the server
+  // answers, and the sheet is not taking taps meanwhile.
+  if ($('sheet').hasAttribute('data-busy')) return;
+
+  const lines = [...state.cart]
+    .map(([id, qty]) => ({ item: state.menu.find((m) => m.id === id), qty }))
+    .filter((line) => line.item);
+  const total = lines.reduce((sum, { item, qty }) => sum + item.price_mnt * qty, 0);
   const foot = $('sheet-foot');
   foot.replaceChildren();
   if (total === 0) return;
 
   const chosen = Boolean(state.slot);
+  const slot = state.slots.find((s) => s.starts_at === state.slot);
+  // What the button is about to charge for, line by line, above it.
+  for (const { item, qty } of lines) {
+    foot.append(
+      el(
+        `<div class="summary"><span>${escapeHtml(item.name)} ×${qty}</span>${money(item.price_mnt * qty)}</div>`,
+      ),
+    );
+  }
+  if (slot) {
+    foot.append(
+      el(`<div class="summary"><span>Ирэх цаг</span><span class="mono">${slot.label}</span></div>`),
+    );
+  }
+  foot.append(el(`<div class="summary" data-total><span>Нийт</span>${money(total)}</div>`));
   foot.append(el('<p class="terms">Хоол <b>гал дээр гарахаас өмнө</b> үнэгүй цуцална.</p>'));
   const button = el(
     `<button class="btn" data-v="primary" data-size="lg" type="button"${chosen ? '' : ' disabled'}>
@@ -896,8 +902,12 @@ function renderFoot() {
 }
 
 async function placeOrder() {
+  const sheet = $('sheet');
   const button = $('sheet-foot').querySelector('button');
-  button.disabled = true;
+  // Busy, not disabled: the sheet stops taking taps and the button shows a
+  // spinner over its text, so nothing reads as switched off.
+  sheet.dataset.busy = '1';
+  button.dataset.busy = '1';
   button.textContent = 'Түр хүлээнэ үү…';
   try {
     const order = await guestApi('/v1/orders', {
@@ -918,6 +928,7 @@ async function placeOrder() {
     shell.ordersChanged();
     await showStatus(true);
   } catch (error) {
+    delete sheet.dataset.busy;
     toast(error.message, 'bad');
     renderFoot();
   }
@@ -950,6 +961,26 @@ const WALKING = ['ACCEPTED', 'SCHEDULED', 'ARMED', 'HELD', 'FIRED', 'COOKING', '
  * the sort of thing that makes an app feel broken rather than busy.
  */
 let rendered = null;
+
+/**
+ * The dot beside the eyebrow: route is waiting on the system, hold on the
+ * guest, stop needs attention, accent is on the fire, ready is done. A
+ * finished negative outcome has no tone — it is not an alarm.
+ */
+const TONE = {
+  PLACED: 'route',
+  ACCEPTED: 'route',
+  SCHEDULED: 'route',
+  ARMED: 'hold',
+  HELD: 'stop',
+  FIRED: 'accent',
+  COOKING: 'accent',
+  READY: 'ready',
+  SERVED: 'ready',
+  CLOSED: 'ready',
+};
+const NEGATIVE = ['CANCELLED', 'REFUNDED', 'NO_SHOW', 'REJECTED'];
+const OVER = ['SERVED', 'CLOSED', ...NEGATIVE];
 
 async function showStatus(force) {
   if (!state.orderId) return;
@@ -986,26 +1017,23 @@ async function showStatus(force) {
 
   // The collapsed bar carries the same answer in one line.
   $('ob-code').textContent = `№${order.code}`;
-  $('ob-what').textContent = sub || String(word ?? '');
+  $('ob-what').textContent = sub; // the word is already the bar's right-hand answer
   $('ob-when').textContent = HEADLINE[order.state]?.[0] ?? hhmm(order.fire_at);
+  $('ob-when').classList.toggle('mono', !word); // a time is a number; a word is not
 
   $('orderbar').removeAttribute('data-open');
-  $('sheet').dataset.open = '1';
+  const sheet = $('sheet');
+  delete sheet.dataset.busy;
+  sheet.dataset.open = '1';
   $('scrim').dataset.open = '1';
   $('sheet-name').textContent = `№${order.code}`;
+  $('sheet-name').classList.add('mono'); // a code, not a name
   $('sheet-sub').textContent = [order.restaurant?.name ?? state.venue?.name, order.table && `Ширээ ${order.table}`]
     .filter(Boolean)
     .join(' · ');
 
   const body = $('sheet-body');
   body.replaceChildren();
-
-  const card = el(`
-    <div class="status" data-s="${order.state}">
-      <div class="lab">${order.state}</div>
-      <div class="big">${big}</div>
-      <div class="cap">${sub}</div>
-    </div>`);
 
   const done = {
     placed: true,
@@ -1016,11 +1044,25 @@ async function showStatus(force) {
   };
   const when = { placed: order.slot_starts_at, fired: order.fire_at, ready: order.ready_at };
 
-  const timeline = el('<ul class="timeline"></ul>');
+  // The eyebrow says where the order stands, in the timeline's own words. A
+  // finished negative outcome names itself, and the big line is then what
+  // happens to the money — the thing the guest wants to know.
+  const negative = NEGATIVE.includes(order.state);
+  const lastStep = STEPS.filter(([key]) => done[key]).at(-1)?.[1] ?? '';
+  const tone = TONE[order.state];
+  const card = el(`
+    <div class="status" data-s="${order.state}">
+      <div class="lab"><span class="dot"${tone ? ` data-tone="${tone}"` : ''}></span>${negative ? word : lastStep}</div>
+      <div class="big${word ? '' : ' mono'}">${negative ? cap : big}</div>
+      <div class="cap">${negative ? '' : sub}</div>
+    </div>`);
+
+  const next = negative ? null : STEPS.find(([key]) => !done[key])?.[0];
+  const timeline = el('<ul class="timeline stepper"></ul>');
   for (const [key, wordFor] of STEPS) {
     timeline.append(
-      el(`<li${done[key] ? ' data-done' : ''}>
-            <span class="t">${when[key] ? hhmm(when[key]) : '·'}</span>
+      el(`<li${done[key] ? ' data-done' : ''}${key === next ? ' data-next' : ''}>
+            <span class="t">${when[key] ? hhmm(when[key]) : ''}</span>
             <span class="w">${wordFor}</span>
           </li>`),
     );
@@ -1038,6 +1080,24 @@ async function showStatus(force) {
 
   const foot = $('sheet-foot');
   foot.replaceChildren();
+
+  // One primary: the walk, while it is the guest's move. Cancelling is the
+  // outlined red beneath it, never a second filled button.
+  if (order.state === 'ARMED' || order.state === 'SCHEDULED') {
+    const otw = el(
+      '<button class="btn" data-v="primary" data-size="lg" type="button">Хөдөллөө</button>',
+    );
+    otw.addEventListener('click', async () => {
+      await guestApi(`/v1/orders/${state.orderId}/signal`, {
+        method: 'POST',
+        body: { type: 'on_my_way' },
+      });
+      toast('Мэдэгдлээ. Гал тавих цаг шинэчлэгдэнэ.');
+      await api('/dev/tick', { method: 'POST' }).catch(() => {});
+      void showStatus(true);
+    });
+    foot.append(otw);
+  }
 
   if (order.can_cancel) {
     const cancel = el(
@@ -1057,33 +1117,19 @@ async function showStatus(force) {
     foot.append(cancel);
   }
 
-  if (order.state === 'ARMED' || order.state === 'SCHEDULED') {
-    const otw = el(
-      '<button class="btn" data-size="lg" type="button" style="margin-top:8px">Хөдөллөө</button>',
-    );
-    otw.addEventListener('click', async () => {
-      await guestApi(`/v1/orders/${state.orderId}/signal`, {
-        method: 'POST',
-        body: { type: 'on_my_way' },
-      });
-      toast('Мэдэгдлээ. Гал тавих цаг шинэчлэгдэнэ.');
-      await api('/dev/tick', { method: 'POST' }).catch(() => {});
-      void showStatus(true);
-    });
-    foot.append(otw);
-  }
-
   if (order.receipt) {
     body.append(
-      el(`<div class="note"><b>Е-баримт</b><span>Сугалаа ${order.receipt.lottery}</span></div>`),
+      el(
+        `<div class="note" data-k="info"><b>Е-баримт</b><span>Сугалаа <span class="mono">${escapeHtml(order.receipt.lottery)}</span></span></div>`,
+      ),
     );
   }
 
-  if (order.can_review) appendReview(body, order);
+  if (order.can_review) appendReview(body, foot, order);
 
   // Once there is nothing left to watch, let go of the order and the route.
-  if (['SERVED', 'CLOSED', 'REFUNDED', 'CANCELLED', 'NO_SHOW', 'REJECTED'].includes(order.state)) {
-    const again = el('<button class="btn" data-size="lg" type="button" style="margin-top:8px">Шинэ захиалга</button>');
+  if (OVER.includes(order.state)) {
+    const again = el('<button class="btn" data-size="lg" type="button">Шинэ захиалга</button>');
     again.addEventListener('click', () => {
       state.orderId = null;
       state.route = null;
@@ -1105,8 +1151,11 @@ async function showStatus(force) {
  *
  * Nothing is required. A guest who taps three stars and closes the sheet has
  * told us something useful, and demanding a comment first would lose it.
+ *
+ * The form goes in the body; its one button goes in the footer, where a
+ * sheet's primary lives.
  */
-function appendReview(body, order) {
+function appendReview(body, foot, order) {
   const existing = order.review;
   const draft = {
     stars: existing?.stars ?? 0,
@@ -1124,7 +1173,7 @@ function appendReview(body, order) {
     </div>`);
 
   const send = el(
-    `<button class="btn" data-v="primary" data-size="lg" type="button" style="margin-top:12px"${
+    `<button class="btn" data-v="primary" data-size="lg" type="button"${
       draft.stars ? '' : ' disabled'
     }>${existing ? 'Шинэчлэх' : 'Илгээх'}</button>`,
   );
@@ -1140,7 +1189,7 @@ function appendReview(body, order) {
     const row = el(`
       <div class="row">
         ${line.image_url ? `<img src="${line.image_url}" alt="">` : ''}
-        <div class="n">${line.name}${line.qty > 1 ? ` ×${line.qty}` : ''}</div>
+        <div class="n">${escapeHtml(line.name)}${line.qty > 1 ? ` ×${line.qty}` : ''}</div>
       </div>`);
     row.append(
       starPicker(
@@ -1155,8 +1204,10 @@ function appendReview(body, order) {
   const timing = el(`
     <div class="ontime">
       <span>Хоол цагтаа ирсэн үү?</span>
-      <button type="button" data-a="yes">Тийм</button>
-      <button type="button" data-a="no">Үгүй</button>
+      <div class="seg">
+        <button type="button" data-a="yes">Тийм</button>
+        <button type="button" data-a="no">Үгүй</button>
+      </div>
     </div>`);
   const paintTiming = () => {
     for (const button of timing.querySelectorAll('button')) {
@@ -1177,13 +1228,13 @@ function appendReview(body, order) {
   box.append(timing);
 
   const note = el(
-    `<textarea maxlength="500" placeholder="Сэтгэгдэл (заавал биш)">${draft.comment}</textarea>`,
+    `<textarea class="input" maxlength="500" placeholder="Сэтгэгдэл (заавал биш)">${escapeHtml(draft.comment)}</textarea>`,
   );
   note.addEventListener('input', () => (draft.comment = note.value));
   box.append(note);
 
   send.addEventListener('click', async () => {
-    send.disabled = true;
+    send.dataset.busy = '1';
     send.textContent = 'Илгээж байна…';
     try {
       await guestApi(`/v1/orders/${state.orderId}/review`, {
@@ -1202,8 +1253,8 @@ function appendReview(body, order) {
       void showStatus(true);
     }
   });
-  box.append(send);
   body.append(box);
+  foot.append(send);
 }
 
 /* ── boot ───────────────────────────────────────────────────────── */

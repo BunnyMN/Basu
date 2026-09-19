@@ -116,6 +116,13 @@ if (shell.present && typeof document !== 'undefined') {
 /* ── toast ─────────────────────────────────────────────────────────── */
 
 let toastTimer;
+/**
+ * One line at the bottom of the screen, gone after 3.2s. `kind` is 'good'
+ * (a ready dot before the text) or 'bad' (stop on its own text); it lands on
+ * `#toast` as `data-kind` and is cleared again when the next toast has
+ * none. The element is created on first use with `role=status`, and
+ * `data-show` is what the tests read on a timeout — both stay as they are.
+ */
 export function toast(message, kind) {
   let el = document.getElementById('toast');
   if (!el) {
@@ -130,6 +137,47 @@ export function toast(message, kind) {
   el.dataset.show = '1';
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => delete el.dataset.show, 3200);
+}
+
+/* ── avatar ────────────────────────────────────────────────────────── */
+
+/**
+ * A mark for a person or a place: a 4×4 grid mirrored down the middle, drawn
+ * from the seed alone, so the same phone number gets the same mark on every
+ * page and every device and nobody gets a colour of their own. The seed is
+ * hashed to eight nibbles, one per cell of the left half. Each nibble says
+ * whether its cell is empty (a multiple of three), a circle (odd) or a square
+ * (even); 8 and up is drawn in ink rather than grey; the first at 13 or above
+ * is the one accent. `size` is 'sm' (30) or 'lg' (54); anything else is 40.
+ */
+export function avatar(seed, size) {
+  // FNV-1a over the code points, then murmur3's finaliser so seeds a digit
+  // apart — two phone numbers — do not draw near-identical marks.
+  let h = 0x811c9dc5;
+  for (const ch of String(seed ?? '')) h = Math.imul(h ^ ch.codePointAt(0), 0x01000193);
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  h ^= h >>> 16;
+
+  const nibbles = Array.from({ length: 8 }, (_, i) => (h >>> (i * 4)) & 15);
+  const filled = (v) => v % 3 !== 0;
+  if (!nibbles.some(filled)) nibbles[0] = 2; // never a blank plate
+  const accent = nibbles.findIndex((v) => v >= 13 && filled(v));
+
+  const cell = (i) => {
+    const v = nibbles[i];
+    if (!filled(v)) return '<i data-k="x"></i>';
+    const mark = i === accent ? ' data-a' : v >= 8 ? ' data-hi' : '';
+    return `<i data-k="${v % 2 ? 'o' : ''}"${mark}></i>`;
+  };
+  let cells = '';
+  for (let r = 0; r < 4; r++) {
+    const outer = cell(r * 2);
+    const inner = cell(r * 2 + 1);
+    cells += outer + inner + inner + outer;
+  }
+  const sized = size === 'sm' || size === 'lg' ? ` data-size="${size}"` : '';
+  return `<span class="avatar" data-mark${sized} aria-hidden="true">${cells}</span>`;
 }
 
 /* ── the demo clock ────────────────────────────────────────────────── */
@@ -251,6 +299,25 @@ export const KIND = {
 };
 
 export const mnt = (value) => `${Number(value).toLocaleString('mn-MN')}₮`;
+
+/**
+ * The same amount, for innerHTML: the digits in the mono, the ₮ set in the
+ * sans beside them (the mono has no tugrik). textContent still reads
+ * `28,000₮`, so anything that reads the amount as text sees what mnt() said.
+ *
+ * `tone` names the movement, not a colour: 'credit' is +digits in ready,
+ * 'debit' is −digits (a real minus, not a hyphen) in stop. Either sign goes in
+ * front of the absolute value — the caller says which way the money went and
+ * the number does not get to disagree. Without a tone a negative amount still
+ * gets a real minus in ink.
+ */
+export function money(value, tone) {
+  const n = Number(value);
+  const digits = Math.abs(n).toLocaleString('mn-MN');
+  const sign = tone === 'credit' ? '+' : tone === 'debit' || n < 0 ? '−' : '';
+  const attr = tone === 'credit' || tone === 'debit' ? ` data-tone="${tone}"` : '';
+  return `<span class="money"${attr}>${sign}${digits}<span class="cur">₮</span></span>`;
+}
 
 /** `2026-11-03` → `11-р сарын 3`. The day, said the way a message says it. */
 export function dayLabel(day) {

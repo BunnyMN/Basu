@@ -172,9 +172,11 @@ export function mapStyle() {
  * Generated here rather than shipped as a PNG, because the palette is a product
  * decision that will move and a file in /public would be one more thing to
  * redraw the day it does. Two colours — open and shut — because that is the one
- * distinction a guest has to make before tapping.
+ * distinction a guest has to make before tapping. The page passes its own
+ * tokens: `colour` is the fill (accent open, third ink shut), `ring` the
+ * surface it is drawn on, `glyph` what sits on the fill (on-accent).
  */
-export function pinImage(colour, dim) {
+export function pinImage(colour, dim, ring = '#ffffff', glyph = ring) {
   const W = 44;
   const H = 58;
   const S = 2;
@@ -191,15 +193,15 @@ export function pinImage(colour, dim) {
   g.bezierCurveTo(40, 34, 22, 56, 22, 56);
   g.closePath();
   g.fillStyle = colour;
-  g.globalAlpha = dim ? 0.55 : 1;
+  g.globalAlpha = dim ? 0.7 : 1;
   g.fill();
   g.globalAlpha = 1;
   g.lineWidth = 2;
-  g.strokeStyle = 'rgba(255,255,255,.9)';
+  g.strokeStyle = ring;
   g.stroke();
 
   // A bowl with steam: legible at 22 device pixels, which a fork is not.
-  g.strokeStyle = '#ffffff';
+  g.strokeStyle = glyph;
   g.lineWidth = 2;
   g.lineCap = 'round';
   g.beginPath();
