@@ -5,58 +5,163 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#E9EBEC">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E1315">
-<title>Basu · Нууцлалын бодлого</title>
+<title>Basu · Нууцлал ба тусламж</title>
 <link rel="stylesheet" href="/app.css">
 <style>
 /* Layout only. Faces, colours, radii and weights come from app.css (.doc, .topbar). */
-.en > h2{margin-top:0;padding-top:0;border-top:0}
+.toc .n{flex:none;width:28px}
 .doc-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;margin-top:24px}
 .doc-foot .back{margin-top:0}
+/* The support block is the first thing a person who tapped «Support» needs. */
+.help{display:grid;gap:10px;padding:16px;margin:0 0 20px;border-radius:var(--r-ctl);background:var(--surface-2);border:1px solid var(--line)}
+.help b{font-size:var(--t-title-3);font-weight:600;color:var(--ink)}
+.help p{margin:0;font-size:var(--t-body);line-height:1.5;color:var(--ink-2);max-width:62ch}
+.help a{font-weight:500}
+/* What we keep, and for how long: label left, plain answer right. */
+ul.keeps{display:grid;gap:0;margin:0 0 12px;padding:0;list-style:none}
+.keeps li{display:grid;gap:2px;padding:10px 0;border-top:1px solid var(--line);font-size:var(--t-body);line-height:1.5;color:var(--ink-2);max-width:none}
+.keeps li:first-child{border-top:0}
+.keeps li span:last-child{color:var(--ink);font-weight:500}
+@media (min-width:480px){
+  .keeps li{grid-template-columns:minmax(0,1fr) auto;gap:4px 20px;align-items:baseline}
+  .keeps li span:last-child{text-align:right}
+}
 </style>
 </head>
 <body>
 <header class="topbar">
   <a class="back" href="/" id="back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Буцах</a>
-  <div class="title"><b>Нууцлалын бодлого</b></div>
+  <div class="title"><b>Нууцлал ба тусламж</b></div>
 </header>
 <main class="doc">
   <article class="doc-card">
-    <h1>Basu — нууцлалын бодлого</h1>
-    <p class="sub">Хүчинтэй: 2026 оны 9-р сарын 10. Basu апп болон basu.burzai.cloud хуудсуудад хамаарна.</p>
+    <h1>Нууцлал ба тусламж</h1>
+    <p class="sub">Basu апп болон basu.burzai.cloud хуудсуудад хамаарна. Энд таны ямар мэдээллийг, юунд, хэр удаан хадгалдгийг бичлээ.</p>
 
-    <h2>Юу цуглуулдаг вэ</h2>
-    <ul>
-      <li><b>Утасны дугаар</b> — нэвтрэхэд, нэг удаагийн кодыг SMS-ээр илгээхэд, захиалгын мэдэгдэл явуулахад.</li>
-      <li><b>Нэр</b> — та өөрөө оруулсан бол; нийлүүлэгч, ресторанд захиалгыг таних.</li>
-      <li><b>Захиалгын мэдээлэл</b> — юу, хэзээ, хэдээр захиалсан, төлбөрийн бичилт, е-баримт.</li>
-      <li><b>Хүргэлтийн хаяг, залгах утас</b> — зөвхөн хүргэлттэй захиалгад, та бичсэн бол.</li>
-      <li><b>Байршил</b> — та зөвшөөрсөн үед, ойролцоох ресторан, авах цэгийг харуулах, хүргэлтийн цэг тавихад. Хадгалагдахгүй.</li>
-      <li><b>Банкны данс</b> — зөвхөн буцаалт авахаар та өөрөө оруулсан үед, тэр буцаалтад.</li>
-      <li><b>Төхөөрөмжийн мэдэгдлийн token</b> — та push мэдэгдлийг зөвшөөрсөн бол.</li>
+    <dl class="doc-meta">
+      <dt>Хүчинтэй</dt><dd>2026 оны 9-р сарын 21</dd>
+      <dt>Хувилбар</dt><dd>1.1</dd>
+      <dt>Холбоо барих</dt><dd><a href="mailto:geregevending@gmail.com">geregevending@gmail.com</a></dd>
+    </dl>
+
+    <div class="help">
+      <b>Тусламж хэрэгтэй юу?</b>
+      <p>Захиалга, төлбөр, буцаалт, бүртгэлтэй холбоотой асуудлаа <a href="mailto:geregevending@gmail.com">geregevending@gmail.com</a> хаягаар бичээрэй. Ажлын өдрүүдэд хариулна. Захиалгын дугаараа (жишээ нь №7001) бичвэл хурдан шийднэ.</p>
+      <p>Идэшний захиалгын мах, чанар, хүргэлтийн талаар эхлээд <b>нийлүүлэгч рүү</b> шууд залгана уу — утас нь захиалгын хуудсан дээр байгаа. Шийдэгдэхгүй бол бидэн рүү бичнэ.</p>
+    </div>
+
+    <div class="doc-summary">
+      <div><span>Цуглуулдаг</span><span class="v">утас, нэр, захиалга</span></div>
+      <div><span>Зардаг уу</span><span class="v"><b>үгүй</b></span></div>
+      <div><span>Сурталчилгааны хяналт</span><span class="v"><b>алга</b></span></div>
+      <div><span>Байршил</span><span class="v">зөвшөөрөл өгсөн үед л</span></div>
+      <div><span>Бүртгэл устгах</span><span class="v">аппаас шууд</span></div>
+    </div>
+
+    <ul class="toc">
+      <li><a href="#s1"><span class="n">1</span>Хэн хариуцдаг вэ</a></li>
+      <li><a href="#s2"><span class="n">2</span>Юу цуглуулдаг вэ</a></li>
+      <li><a href="#s3"><span class="n">3</span>Юу цуглуулдаггүй вэ</a></li>
+      <li><a href="#s4"><span class="n">4</span>Яагаад цуглуулдаг вэ</a></li>
+      <li><a href="#s5"><span class="n">5</span>Хэнд дамждаг вэ</a></li>
+      <li><a href="#s6"><span class="n">6</span>Хэр удаан хадгалдаг вэ</a></li>
+      <li><a href="#s7"><span class="n">7</span>Таны эрх</a></li>
+      <li><a href="#s8"><span class="n">8</span>Бүртгэлээ хаах</a></li>
+      <li><a href="#s9"><span class="n">9</span>Хүүхдийн мэдээлэл</a></li>
+      <li><a href="#s10"><span class="n">10</span>Аюулгүй байдал</a></li>
+      <li><a href="#s11"><span class="n">11</span>Төхөөрөмж дээр юу үлддэг вэ</a></li>
+      <li><a href="#s12"><span class="n">12</span>Өөрчлөлт</a></li>
     </ul>
 
-    <h2>Хэнд өгдөг вэ</h2>
+    <h2 id="s1"><span class="n">1.</span> Хэн хариуцдаг вэ</h2>
+    <p>Basu аппыг ажиллуулагч таны мэдээллийг хариуцна. Асуулт, гомдол, мэдээллээ үзэх, засах, устгах хүсэлтээ <a href="mailto:geregevending@gmail.com">geregevending@gmail.com</a> хаягаар илгээнэ.</p>
+
+    <h2 id="s2"><span class="n">2.</span> Юу цуглуулдаг вэ</h2>
+    <p>Зөвхөн үйлчилгээг ажиллуулахад хэрэгтэйг нь. Танаас юу ч нуугдаагүй: доорх бүгд таны өөрийн үйлдлээс үүснэ.</p>
     <ul>
-      <li><b>Нийлүүлэгч, ресторан</b> — таны захиалгыг биелүүлэхэд хэрэгтэй хэмжээнд: захиалгын код, нэр, хүргэлтийн хаяг, залгах утас. Төлсний дараа л.</li>
-      <li><b>Төлбөрийн үйлчилгээ (QPay)</b> — төлбөрийг гүйцэтгэхэд; картын мэдээлэл Basu-д хадгалагдахгүй.</li>
+      <li><b>Утасны дугаар</b> — нэвтрэхэд. Нэг удаагийн кодыг энэ дугаарт SMS-ээр илгээнэ, захиалгын явцыг мөн үүгээр мэдэгдэнэ.</li>
+      <li><b>Нэр</b> — та өөрөө оруулсан бол. Нийлүүлэгч, ресторан захиалгыг тань гэж таних.</li>
+      <li><b>Захиалга</b> — юу, хэзээ, хэдээр, аль ресторан, аль нийлүүлэгчээс; захиалгын код, явцын бүртгэл.</li>
+      <li><b>Түрийвч, төлбөр</b> — цэнэглэсэн, төлсөн, буцаасан дүн бүрийн бичилт, е-баримт.</li>
+      <li><b>Хүргэлтийн хаяг, залгах утас, газрын зураг дээрх цэг</b> — зөвхөн хүргэлттэй захиалга хийх үед, та өөрөө бичсэн бол. Захиалгатай хамт хадгалагдана.</li>
+      <li><b>Банкны данс</b> — зөвхөн буцаалт авахаар та өөрөө оруулсан үед. Тэр буцаалтыг хийхэд л хэрэглэнэ.</li>
+      <li><b>Байршил</b> — та зөвшөөрөл өгсөн үед, ойролцоох ресторан, авах цэгийг харуулах, хүргэлтийн цэгээ тавихад. Хүргэлтийн цэгээс бусад байршлыг <b>хадгалдаггүй</b>, сервер рүү явуулдаггүй.</li>
+      <li><b>Мэдэгдлийн token</b> — та push мэдэгдэл зөвшөөрсөн бол, зөвхөн таны төхөөрөмж рүү мэдэгдэл хүргэхэд.</li>
+      <li><b>Нэвтэрсэн төхөөрөмжүүд</b> — төхөөрөмжийн нэр, сүүлд хэзээ идэвхтэй байсан. Та тэднийг профайлаасаа харж, гаргаж болно.</li>
+      <li><b>Техникийн бүртгэл</b> — сервер рүү хандсан цаг, IP хаяг. Зөвхөн алдаа шалгах, халдлагаас хамгаалахад, богино хугацаанд.</li>
+    </ul>
+
+    <h2 id="s3"><span class="n">3.</span> Юу цуглуулдаггүй вэ</h2>
+    <ul>
+      <li>Сурталчилгааны танигч, хөндлөнгийн хяналтын хэрэгсэл (tracker), analytics SDK <b>байхгүй</b>. Апп доторх зан төлвийг гуравдагч этгээдэд дамжуулдаггүй.</li>
+      <li>Картын дугаар, нууц үг Basu-д <b>хадгалагддаггүй</b>. Төлбөрийг QPay гүйцэтгэнэ.</li>
+      <li>Утасны сан, зураг, микрофон, календарь руу хандахгүй.</li>
+      <li>Апп хаалттай үед байршлыг мөрддөггүй.</li>
+    </ul>
+
+    <h2 id="s4"><span class="n">4.</span> Яагаад цуглуулдаг вэ</h2>
+    <ul>
+      <li><b>Гэрээ биелүүлэх</b> — захиалгыг хүлээн авах, нийлүүлэгчид хүргэх, төлбөр тооцох, мэдэгдэх.</li>
+      <li><b>Хуулийн шаардлага</b> — е-баримт гаргах, нягтлан бодох бүртгэл, татварын хугацаанд бичилт хадгалах.</li>
+      <li><b>Таны зөвшөөрөл</b> — байршил, push мэдэгдэл. Зөвшөөрлөө хэдийд ч утасныхаа тохиргооноос буцаан авч болно.</li>
+      <li><b>Хууль ёсны ашиг сонирхол</b> — залилан, халдлагаас хамгаалах, алдаа засах.</li>
+    </ul>
+
+    <h2 id="s5"><span class="n">5.</span> Хэнд дамждаг вэ</h2>
+    <ul>
+      <li><b>Нийлүүлэгч, ресторан</b> — захиалгыг биелүүлэхэд хэрэгтэй хэмжээнд: захиалгын код, нэр, хүргэлттэй бол хаяг ба залгах утас. Төлбөр хийгдсэний дараа л харагдана.</li>
+      <li><b>QPay</b> — төлбөрийг гүйцэтгэхэд.</li>
       <li><b>Татварын алба (е-баримт)</b> — хуулиар шаардсан баримтыг гаргахад.</li>
-      <li><b>SMS үйлчилгээ</b> — нэвтрэх код, захиалгын мэдэгдлийг хүргэхэд.</li>
+      <li><b>SMS оператор</b> — нэвтрэх код, захиалгын мэдэгдлийг хүргэхэд таны дугаар.</li>
+      <li><b>Apple</b> — push мэдэгдлийг таны төхөөрөмж рүү хүргэхэд (мэдэгдлийн текст дамжина).</li>
+      <li><b>Cloudflare (cdnjs)</b> — газрын зургийн номын санг ачаалахад таны IP хаяг харагдана. Газрын зургийн зургууд өөрсдийн сервереэс ирнэ.</li>
     </ul>
-    <p>Мэдээллийг зарж, сурталчилгаанд ашигладаггүй.</p>
+    <p>Мэдээллийг <b>зардаггүй</b>, сурталчилгаанд ашигладаггүй, гадаадын дата зуучлагчид өгдөггүй.</p>
 
-    <h2>Хэр удаан хадгалдаг вэ</h2>
-    <p>Захиалга, төлбөрийн бичилтийг татварын хуулиар шаардах хугацаанд. Байршлыг хадгалдаггүй. Буцаалтын дансыг тэр буцаалт хийгдсэний дараа зөвхөн бичилтэд үлдээнэ.</p>
+    <h2 id="s6"><span class="n">6.</span> Хэр удаан хадгалдаг вэ</h2>
+    <ul class="keeps">
+      <li><span>Нэг удаагийн нэвтрэх код</span><span>хэдэн минут, дараа нь устана</span></li>
+      <li><span>Нэвтэрсэн сесс</span><span>та гарах эсвэл хугацаа дуустал</span></li>
+      <li><span>Байршил (үзэж байхад)</span><span>хадгалахгүй</span></li>
+      <li><span>Хүргэлтийн хаяг, цэг</span><span>захиалгатай хамт</span></li>
+      <li><span>Захиалга, төлбөр, е-баримт</span><span>татварын хуулиар</span></li>
+      <li><span>Банкны данс (буцаалт)</span><span>тэр буцаалтын бичилтэд</span></li>
+      <li><span>Мэдэгдлийн token</span><span>зөвшөөрлөө цуцлах хүртэл</span></li>
+    </ul>
 
-    <h2>Таны эрх</h2>
-    <p>Мэдээллээ үзэх, засах, бүртгэлээ хаалгах хүсэлтийг доорх хаягаар илгээнэ. Бүртгэл хаагдахад утасны дугаар, нэр, хаяг устаж, төлбөрийн бичилт хуулийн хугацаанд нэргүйгээр үлдэнэ.</p>
+    <h2 id="s7"><span class="n">7.</span> Таны эрх</h2>
+    <p>Та өөрийнхөө мэдээллийг үзэх, засах, устгуулах, боловсруулалтыг хязгаарлуулах эрхтэй. Ихэнхийг аппаасаа шууд хийнэ: нэр, хэлээ профайлаасаа засна; захиалга, түрийвчийн хуулгаа тэндээсээ харна; нэвтэрсэн төхөөрөмжөө гаргана. Бусад хүсэлтээ <a href="mailto:geregevending@gmail.com">geregevending@gmail.com</a> руу бичнэ; бид биечлэн шалгаад ажлын өдрүүдэд хариулна.</p>
 
-    <h2>Холбоо барих</h2>
-    <p><a href="mailto:geregevending@gmail.com">geregevending@gmail.com</a></p>
+    <h2 id="s8"><span class="n">8.</span> Бүртгэлээ хаах</h2>
+    <p>Апп дотор: <b>Профайл → Бүртгэл хаах</b>. Хоёр тохиолдолд түр хүлээлгэнэ, учир нь алдвал гэмших зүйл: түрийвчинд тань мөнгө үлдсэн, эсвэл дуусаагүй захиалга явж байгаа бол эхлээд түүнийг шийднэ.</p>
+    <p>Хаагдахад таны утасны дугаар, нэр, профайл устаж, бүх сесс хаагдана. Захиалга, төлбөрийн бичилт татварын хуулийн хугацаанд <b>нэргүйгээр</b> үлдэнэ — тэдгээрийг танаас салгана. Дараа нь тэр дугаараар шинээр бүртгүүлж болно.</p>
+
+    <h2 id="s9"><span class="n">9.</span> Хүүхдийн мэдээлэл</h2>
+    <p>Апп хүүхдэд зориулаагүй. 18 нас хүрээгүй бол эцэг эх, асран хамгаалагчийнхаа зөвшөөрөлтэйгөөр хэрэглэнэ. Хүүхдийн мэдээллийг зориудаар цуглуулдаггүй; санамсаргүй цугларсныг мэдвэл устгана.</p>
+
+    <h2 id="s10"><span class="n">10.</span> Аюулгүй байдал</h2>
+    <ul>
+      <li>Апп, вэб, сервер хоорондын бүх холбоо <b>HTTPS</b>-ээр шифрлэгдэнэ.</li>
+      <li>Нэвтрэлтийн токеныг задлашгүй хэлбэрээр (hash) хадгална — хулгайлагдсан ч буцааж уншигдахгүй.</li>
+      <li>Нэг удаагийн код хэдхэн минут хүчинтэй, хэрэглэсний дараа хүчингүй болно; нэг дугаарт цагт хэдэн код авахыг хязгаарласан.</li>
+      <li>Ажилтны хандалт эрхээр хязгаарлагдана. Захиалга, мөнгөнд хийсэн <b>үйлдэл бүр</b> хэн хийснээр бүртгэгдэнэ.</li>
+      <li>Өгөгдлийн сангийн нөөцлөлт шифрлэгдэнэ.</li>
+    </ul>
+
+    <h2 id="s11"><span class="n">11.</span> Төхөөрөмж дээр юу үлддэг вэ</h2>
+    <p>Аппын вэб хуудсууд таны төхөөрөмж дээр зөвхөн ажиллахад хэрэгтэйг хадгална: нэвтрэлтийн токен, сүүлд нээсэн таб. Сурталчилгааны cookie, гуравдагч этгээдийн cookie <b>ашигладаггүй</b>. Аппаас гарах, эсвэл аппыг устгахад эдгээр устана.</p>
+
+    <h2 id="s12"><span class="n">12.</span> Өөрчлөлт</h2>
+    <p>Энэ бодлого өөрчлөгдвөл энэ хуудас дээр шинэчилж, дээрх «Хүчинтэй» огноог солино. Чухал өөрчлөлтийг апп дотор эсвэл SMS-ээр мэдэгдэнэ.</p>
 
     <section class="en">
       <div class="section-label">EN</div>
-      <h2>Privacy policy (English summary)</h2>
-      <p>Basu collects your phone number (to sign in by one-time SMS code and to notify you about orders), the name you enter, your orders and payment records, a delivery address and phone when you choose delivery, your location only while you allow it and only to show nearby places (never stored), a bank account only when you enter one to receive a refund, and a push notification token if you allow notifications. Order details are shared with the restaurant or supplier fulfilling your order, payments are processed by QPay, tax receipts are issued to the Mongolian tax authority as required by law, and SMS is delivered through an SMS provider. We do not sell data or use it for advertising. Records are kept as long as tax law requires. To access, correct or delete your data, write to geregevending@gmail.com.</p>
+      <h2>Privacy and support (English summary)</h2>
+      <p><b>Support.</b> Write to <a href="mailto:geregevending@gmail.com">geregevending@gmail.com</a> with your order number; we reply on working days. For questions about the meat itself, call the supplier first — their number is on the order.</p>
+      <p><b>What we collect.</b> Your phone number (to sign in by one-time SMS code and to notify you about orders), the name you enter, your orders and payment records, a delivery address, phone and map point when you choose delivery, a bank account only when you enter one to receive a refund, your location only while you allow it and only to show nearby places (never stored), a push token if you allow notifications, your signed-in devices, and short-lived technical logs.</p>
+      <p><b>What we do not collect.</b> No advertising identifiers, no third-party trackers or analytics SDKs, no card numbers (QPay processes payments), no access to contacts, photos, microphone or background location.</p>
+      <p><b>Who receives it.</b> The restaurant or supplier fulfilling your order (order code, name, and delivery address and phone when relevant), QPay for payment, the Mongolian tax authority for the legally required receipt, an SMS provider to deliver codes and updates, Apple to deliver push notifications, and Cloudflare's cdnjs when the map library loads. We do not sell data or use it for advertising.</p>
+      <p><b>Your rights.</b> Read, correct and delete your data. Delete your account inside the app: Profile → Close account. It is held back only while your wallet still holds money or an order is running. Closing removes your phone number, name and profile and ends every session; order and payment records stay for the period tax law requires, detached from you. For anything else, write to the address above.</p>
     </section>
 
     <footer class="doc-foot">
