@@ -12,6 +12,8 @@ export type IdeshErrorCode =
   | 'NEEDS_ACCOUNT'
   | 'OTP_REQUIRED'
   | 'BANK_UNVERIFIED'
+  | 'NOT_APPROVED'
+  | 'SAME_PERSON'
   | 'ALREADY_APPLIED'
   | 'NOT_PENDING'
   | 'OPS_CLOSED';

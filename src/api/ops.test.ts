@@ -6,8 +6,8 @@ import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
 import { opsToken } from './ops.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
-import { truncateAll } from '../test/seed.js';
-import { createListing, markReady, registerSupplier, startPreparing } from '../idesh/index.js';
+import { storedBankOf, truncateAll } from '../test/seed.js';
+import { createListing, housekeeping, markHanded, markReady, registerSupplier, startPreparing } from '../idesh/index.js';
 import { listMembers, syncMembersFromEnv, upsertMember } from '../ops/index.js';
 
 /**
@@ -52,6 +52,8 @@ beforeEach(async () => {
 
 afterEach(() => {
   delete process.env['OPS_TOKEN'];
+  delete process.env['BASU_MODE'];
+  delete process.env['BANK_KEY'];
 });
 
 afterAll(async () => {
@@ -507,6 +509,97 @@ describe('the desk’s members', () => {
 
     const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: auth(viewer) })).json().audit;
     expect(audit.map((a: { who: string }) => a.who)).toEqual(['ops:Санхүү', 'ops:Ажилтан']);
+  });
+
+  /** A handed-over order, a day later: the supplier's share is a line to pay. */
+  async function aPayout(): Promise<{ id: string; supplierId: string }> {
+    const { id, supplierId } = await aPaidOrder();
+    await app.inject({
+      method: 'PATCH',
+      url: `/v1/ops/suppliers/${supplierId}`,
+      headers: desk(),
+      payload: { bank_name: 'Хаан банк', bank_account: '5012345678', bank_holder: 'Д. Дорж' },
+    });
+    await startPreparing(ctx, id, 'supplier:d1');
+    await markReady(ctx, id, 'supplier:d1');
+    await markHanded(ctx, id, 'supplier:d1');
+    // A day after the handover the share is theirs and a line appears.
+    clock.advanceMinutes(25 * 60);
+    await housekeeping(ctx);
+    return { id, supplierId };
+  }
+
+  it('needs two people to move money out, and says which did which half', async () => {
+    await upsertMember({ phone: '+97699000014', name: 'Санхүү нэг', role: 'finance' });
+    await upsertMember({ phone: '+97699000015', name: 'Санхүү хоёр', role: 'finance' });
+    const one = await signIn('+97699000014');
+    const two = await signIn('+97699000015');
+    await aPayout();
+    // From here the desk is production: two real members, and the rule holds.
+    process.env['BASU_MODE'] = 'production';
+
+    const [payout] = (await app.inject({ method: 'GET', url: '/v1/ops/settlements', headers: auth(one) })).json().settlements;
+    expect(payout).toMatchObject({ kind: 'payout', state: 'due', approved_by: null, approved_at: null });
+
+    // Nobody has released it yet.
+    const early = await app.inject({ method: 'POST', url: `/v1/ops/settlements/${payout.id}/paid`, headers: auth(one), payload: { reference: 'KB-1' } });
+    expect(early.statusCode).toBe(409);
+    expect(early.json().error.code).toBe('NOT_APPROVED');
+
+    const released = await app.inject({ method: 'POST', url: `/v1/ops/settlements/${payout.id}/approve`, headers: auth(one), payload: {} });
+    expect(released.statusCode, released.body).toBe(200);
+    expect(released.json()).toMatchObject({ approved_by: 'ops:Санхүү нэг', state: 'due' });
+
+    // The hand that released it is not the hand that sends it.
+    const same = await app.inject({ method: 'POST', url: `/v1/ops/settlements/${payout.id}/paid`, headers: auth(one), payload: { reference: 'KB-1' } });
+    expect(same.statusCode).toBe(409);
+    expect(same.json().error.code).toBe('SAME_PERSON');
+
+    const paid = await app.inject({ method: 'POST', url: `/v1/ops/settlements/${payout.id}/paid`, headers: auth(two), payload: { reference: 'KB-1' } });
+    expect(paid.statusCode, paid.body).toBe(200);
+    expect(paid.json()).toMatchObject({ state: 'paid', reference: 'KB-1', approved_by: 'ops:Санхүү нэг' });
+
+    const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: auth(one) })).json().audit;
+    expect(audit.slice(0, 2).map((a: { who: string; action: string }) => [a.who, a.action])).toEqual([
+      ['ops:Санхүү хоёр', 'settlement.paid'],
+      ['ops:Санхүү нэг', 'settlement.approve'],
+    ]);
+    expect(audit[0].note).toContain('баталсан ops:Санхүү нэг');
+  });
+
+  it('lets the demo desk, which is one shared identity, do both halves', async () => {
+    await aPayout();
+    const [payout] = (await app.inject({ method: 'GET', url: '/v1/ops/settlements', headers: desk() })).json().settlements;
+    expect((await app.inject({ method: 'POST', url: `/v1/ops/settlements/${payout.id}/approve`, headers: desk(), payload: {} })).statusCode).toBe(200);
+    const paid = await app.inject({ method: 'POST', url: `/v1/ops/settlements/${payout.id}/paid`, headers: desk(), payload: { reference: 'KB-2' } });
+    expect(paid.statusCode, paid.body).toBe(200);
+    expect(paid.json()).toMatchObject({ state: 'paid', approved_by: 'ops:Демо' });
+  });
+
+  it('keeps a bank account out of the clear in the database, and still shows it at the desk', async () => {
+    process.env['BANK_KEY'] = Buffer.alloc(32, 9).toString('base64');
+    const made = await app.inject({
+      method: 'POST',
+      url: '/v1/ops/suppliers',
+      headers: desk(),
+      payload: { name: 'Сэлэнгэ', phone: '+97688010007', address: 'Мандал', bank_name: 'Хаан банк', bank_account: '5012345678', bank_holder: 'Д. Болд' },
+    });
+    expect(made.statusCode, made.body).toBe(201);
+
+    const stored = await storedBankOf(made.json().id);
+    expect(stored.bankAccount).not.toContain('5012345678');
+    expect(stored.bankAccount?.startsWith('v1:')).toBe(true);
+    expect(stored.bankHolder).not.toContain('Болд');
+    // The bank's own name is not a secret and the desk lists by it.
+    expect(stored.bankName).toBe('Хаан банк');
+
+    const row = (await app.inject({ method: 'GET', url: '/v1/ops/suppliers', headers: desk() })).json().suppliers.find((x: { id: string }) => x.id === made.json().id);
+    expect(row).toMatchObject({ bank_account: '5012345678', bank_holder: 'Д. Болд' });
+
+    // Typing the same account again is not a change, so it does not un-verify the contract.
+    const again = await app.inject({ method: 'PATCH', url: `/v1/ops/suppliers/${made.json().id}`, headers: desk(), payload: { bank_account: '5012345678', bank_holder: 'Д. Болд', bank_name: 'Хаан банк' } });
+    expect(again.statusCode, again.body).toBe(200);
+    delete process.env['BANK_KEY'];
   });
 
   it('is seeded from the environment, and an admin may add and close members', async () => {

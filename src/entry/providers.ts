@@ -1,6 +1,7 @@
 import { apnsConfigFromEnv, ApnsNotifier } from '../platform/notify/index.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { buildClock } from '../mode.js';
+import { sealing } from '../secret.js';
 
 /**
  * What the two processes talk to. One place, so the API and the scheduler
@@ -23,6 +24,7 @@ export function buildProviders(log: (line: string) => void = console.log): Ctx {
       : '[providers] push: fake (set APNS_TEAM_ID, APNS_KEY_ID, APNS_KEY_FILE to send)',
   );
   log('[providers] sms: fake · payments: fake · tax: fake');
+  log(sealing() ? '[providers] bank details: encrypted at rest' : '[providers] bank details: PLAIN TEXT (set BANK_KEY to encrypt)');
   return {
     clock: buildClock(),
     payments: new FakePaymentProvider(),

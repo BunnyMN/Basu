@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
   CANCEL_REASONS,
   allOrders,
+  approveSettlement,
   approveSupplier,
   cancelIdesh,
   createSupplierCode,
@@ -504,13 +505,41 @@ export async function registerOpsRoutes(
     settlements: (await listSettlements()).map(shapeSettlement),
   }));
 
+  /** «Батлах»: this one should be paid. The person who presses it may not be the one who pays. */
+  app.post<{ Params: { id: string }; Body: { note?: string } }>(
+    '/v1/ops/settlements/:id/approve',
+    asFinance,
+    async (request, reply) => {
+      try {
+        const released = await approveSettlement(request.params.id, who(request), ctx.clock.now());
+        await recordAudit({
+          who: who(request),
+          action: 'settlement.approve',
+          targetKind: 'settlement',
+          targetId: request.params.id,
+          note: request.body?.note ?? `${released.memo} ${released.amountMnt}₮`,
+        });
+        return reply.send(shapeSettlement(released));
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
   /** «Шилжүүлсэн»: the bank transfer was made by hand; the ledger and the person owed hear of it. */
   app.post<{ Params: { id: string }; Body: { reference?: string } }>(
     '/v1/ops/settlements/:id/paid',
     asFinance,
     async (request, reply) => {
       try {
-        const paid = await markSettled(ctx, request.params.id, 'ops', request.body?.reference ?? '');
+        const paid = await markSettled(ctx, request.params.id, who(request), request.body?.reference ?? '');
+        await recordAudit({
+          who: who(request),
+          action: 'settlement.paid',
+          targetKind: 'settlement',
+          targetId: request.params.id,
+          note: `${paid.memo} ${paid.amountMnt}₮ · ${paid.reference ?? 'лавлахгүй'} · баталсан ${paid.approvedBy ?? '—'}`,
+        });
         return reply.send(shapeSettlement(paid));
       } catch (error) {
         return sendError(reply, error);

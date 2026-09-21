@@ -5,6 +5,7 @@ import { AuthError, contactsFor, guestForPhone } from '../platform/identity/inde
 import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
 import { IdeshError } from './errors.js';
+import { seal, unseal } from '../secret.js';
 
 /**
  * Suppliers, how one becomes one, and the screens they hold.
@@ -58,8 +59,8 @@ export async function registerSupplier(input: SupplierInput, db: Db = getPool())
       input.lat ?? null,
       input.lon ?? null,
       input.bankName?.trim() || null,
-      input.bankAccount?.replace(/\s+/g, '') || null,
-      input.bankHolder?.trim() || null,
+      seal(input.bankAccount?.replace(/\s+/g, '')),
+      seal(input.bankHolder?.trim()),
       await guestForPhone(input.phone),
     ],
   );
@@ -167,8 +168,8 @@ export async function applySupplier(ctx: Ctx, input: ApplicationInput): Promise<
         input.guestId,
         ctx.clock.now(),
         input.bankName?.trim() || null,
-        input.bankAccount?.replace(/\s+/g, '') || null,
-        input.bankHolder?.trim() || null,
+        seal(input.bankAccount?.replace(/\s+/g, '')),
+        seal(input.bankHolder?.trim()),
       ],
     );
     return rows[0]!.id;
@@ -386,8 +387,8 @@ export async function listSuppliers(db: Db = getPool()): Promise<SupplierRow[]> 
     declineReason: r.decline_reason,
     commissionPct: Number(r.commission_pct),
     bankName: r.bank_name,
-    bankAccount: r.bank_account,
-    bankHolder: r.bank_holder,
+    bankAccount: unseal(r.bank_account),
+    bankHolder: unseal(r.bank_holder),
     bankVerified: r.bank_verified_at !== null,
     bankChangedAt: r.bank_changed_at,
     watched: r.watched,
@@ -449,8 +450,8 @@ export async function updateSupplierProfile(
       edit.lat ?? null,
       edit.lon ?? null,
       edit.bankName?.trim() || null,
-      account,
-      edit.bankHolder?.trim() || null,
+      seal(account),
+      seal(edit.bankHolder?.trim()),
       bankChanged,
     ],
   );
@@ -466,12 +467,14 @@ export async function bankWouldChange(supplierId: string, edit: BankDetails, db:
   );
   const now = rows[0];
   if (!now) return false;
+  // Sealed text differs on every write, so the comparison happens in the clear.
+  const held = { name: now.bank_name, account: unseal(now.bank_account), holder: unseal(now.bank_holder) };
   const next = {
-    name: edit.bankName?.trim() || now.bank_name,
-    account: edit.bankAccount?.replace(/\s+/g, '') || now.bank_account,
-    holder: edit.bankHolder?.trim() || now.bank_holder,
+    name: edit.bankName?.trim() || held.name,
+    account: edit.bankAccount?.replace(/\s+/g, '') || held.account,
+    holder: edit.bankHolder?.trim() || held.holder,
   };
-  return next.name !== now.bank_name || next.account !== now.bank_account || next.holder !== now.bank_holder;
+  return next.name !== held.name || next.account !== held.account || next.holder !== held.holder;
 }
 
 /** Finance has checked the account against the contract: money may go there. */
@@ -515,8 +518,8 @@ export async function updateSupplier(supplierId: string, patch: SupplierPatch, d
       supplierId,
       patch.commissionPct ?? null,
       patch.bankName?.trim() || null,
-      patch.bankAccount?.replace(/\s+/g, '') || null,
-      patch.bankHolder?.trim() || null,
+      seal(patch.bankAccount?.replace(/\s+/g, '')),
+      seal(patch.bankHolder?.trim()),
       patch.merchantTin?.trim() || null,
     ],
   );

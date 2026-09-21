@@ -147,3 +147,16 @@ export async function failReceipt(receiptId: string, db: Db = getPool()): Promis
 export async function failMessage(messageId: string, db: Db = getPool()): Promise<void> {
   await db.query(`UPDATE notify.message SET state = 'failed' WHERE id = $1`, [messageId]);
 }
+
+/** What the database actually holds for a supplier's account, sealed or not. */
+export async function storedBankOf(
+  supplierId: string,
+  db: Db = getPool(),
+): Promise<{ bankName: string | null; bankAccount: string | null; bankHolder: string | null }> {
+  const { rows } = await db.query<{ bank_name: string | null; bank_account: string | null; bank_holder: string | null }>(
+    'SELECT bank_name, bank_account, bank_holder FROM idesh.supplier WHERE id = $1',
+    [supplierId],
+  );
+  const r = rows[0];
+  return { bankName: r?.bank_name ?? null, bankAccount: r?.bank_account ?? null, bankHolder: r?.bank_holder ?? null };
+}

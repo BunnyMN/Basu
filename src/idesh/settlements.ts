@@ -4,6 +4,8 @@ import { accrue, payOut } from '../platform/ledger/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
 import { IdeshError } from './errors.js';
+import { mode } from '../mode.js';
+import { seal, unseal } from '../secret.js';
 
 /**
  * Money the house owes outside, per order, and the list ops works through.
@@ -40,6 +42,9 @@ export interface Settlement {
   /** A supplier's account finance has checked; a guest's own, once typed at their phone. */
   bankVerified: boolean;
   reference: string | null;
+  /** Who released it to be paid, and when. Never the person who pays it. */
+  approvedBy: string | null;
+  approvedAt: Date | null;
   paidAt: Date | null;
   createdAt: Date;
 }
@@ -116,7 +121,7 @@ export async function setRefundAccount(
         SET bank_name = $3, bank_account = $4, bank_holder = $5,
             state = CASE WHEN state = 'paid' THEN state ELSE 'due' END
       WHERE order_id = $1 AND kind = 'refund' AND guest_id = $2 AND state <> 'paid'`,
-    [orderId, guestId, name, account, holder],
+    [orderId, guestId, name, seal(account), seal(holder)],
   );
   if (!rowCount) throw new IdeshError('NOT_FOUND', 'no refund waiting on this order');
 }
@@ -137,6 +142,8 @@ interface Row {
   bank_holder: string | null;
   bank_verified: boolean;
   reference: string | null;
+  approved_by: string | null;
+  approved_at: Date | null;
   paid_at: Date | null;
   created_at: Date;
 }
@@ -148,7 +155,7 @@ const SELECT = `
          COALESCE(t.bank_account, s.bank_account) AS bank_account,
          COALESCE(t.bank_holder, s.bank_holder) AS bank_holder,
          (t.kind = 'refund' OR s.bank_verified_at IS NOT NULL) AS bank_verified,
-         t.reference, t.paid_at, t.created_at
+         t.reference, t.approved_by, t.approved_at, t.paid_at, t.created_at
     FROM idesh.settlement t
     JOIN idesh.idesh_order o ON o.id = t.order_id
     LEFT JOIN idesh.supplier s ON s.id = t.supplier_id`;
@@ -167,10 +174,12 @@ async function shape(rows: Row[]): Promise<Settlement[]> {
     guest: r.guest_id ? { id: r.guest_id, name: names.get(r.guest_id) ?? null } : null,
     bank:
       r.bank_name && r.bank_account && r.bank_holder
-        ? { bankName: r.bank_name, bankAccount: r.bank_account, bankHolder: r.bank_holder }
+        ? { bankName: r.bank_name, bankAccount: unseal(r.bank_account)!, bankHolder: unseal(r.bank_holder)! }
         : null,
     bankVerified: r.bank_verified,
     reference: r.reference,
+    approvedBy: r.approved_by,
+    approvedAt: r.approved_at,
     paidAt: r.paid_at,
     createdAt: r.created_at,
   }));
@@ -208,6 +217,40 @@ export async function refundOf(orderId: string, db: Db = getPool()): Promise<Set
 }
 
 /**
+ * «Батлах»: one member releases the money; another sends it.
+ *
+ * The desk's own people are the threat this answers — not a stranger. A
+ * payout is a bank transfer made by hand, so whoever presses «Шилжүүлсэн»
+ * is trusted with both the money and the record of it. Splitting the act in
+ * two means a wrong account has to get past two people who each signed for
+ * their half, and the row says which half each of them did.
+ *
+ * Approving is not a promise that the money moved; it is a promise that it
+ * should. It can only be given to a settlement that has somewhere to go.
+ */
+export async function approveSettlement(settlementId: string, by: string, now: Date): Promise<Settlement> {
+  const { rows } = await getPool().query<Row>(`${SELECT} WHERE t.id = $1`, [settlementId]);
+  const row = rows[0];
+  if (!row) throw new IdeshError('NOT_FOUND', 'no such settlement');
+  if (row.state === 'paid') throw new IdeshError('WRONG_STATE', 'already paid');
+  if (row.state === 'needs_account' || !row.bank_account) {
+    throw new IdeshError('NEEDS_ACCOUNT', 'nowhere to send it yet');
+  }
+  if (!row.bank_verified) throw new IdeshError('BANK_UNVERIFIED', 'the account has not been checked against the contract');
+  // The first approval stands. A second person adds nothing here — their
+  // part is to make the transfer, and that is a different button.
+  if (row.approved_at && row.approved_by !== by) {
+    throw new IdeshError('WRONG_STATE', `already released by ${row.approved_by}`);
+  }
+  await getPool().query(
+    `UPDATE idesh.settlement SET approved_by = $2, approved_at = $3 WHERE id = $1 AND state <> 'paid'`,
+    [row.id, by, row.approved_at ?? now],
+  );
+  const { rows: after } = await getPool().query<Row>(`${SELECT} WHERE t.id = $1`, [settlementId]);
+  return (await shape(after))[0]!;
+}
+
+/**
  * «Шилжүүлсэн»: ops made the transfer. The ledger pays the payable out, the
  * row remembers who said so and the bank's reference, and the person owed is
  * told. A refund paid is what turns the order REFUNDED.
@@ -227,6 +270,13 @@ export async function markSettled(
     throw new IdeshError('NEEDS_ACCOUNT', 'nowhere to send it yet');
   }
   if (!row.bank_verified) throw new IdeshError('BANK_UNVERIFIED', 'the account has not been checked against the contract');
+  if (!row.approved_at) throw new IdeshError('NOT_APPROVED', 'nobody has released this one yet');
+  // The demo desk is one shared identity, so the two halves would be the
+  // same person there and the walkthrough could never finish. Production
+  // has real members and holds the line.
+  if (mode() === 'production' && row.approved_by === by) {
+    throw new IdeshError('SAME_PERSON', 'the person who released it cannot also send it');
+  }
 
   const payout = await payOut({
     payee: payeeOf({ kind: row.kind, supplierId: row.supplier_id, guestId: row.guest_id }),

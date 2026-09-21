@@ -1725,7 +1725,8 @@ function renderSettlement(t) {
   const who = t.kind === 'payout' ? esc(t.supplier?.name ?? '') : `${esc(t.guest?.name ?? 'Зочин')} (зочин)`;
   const bank = t.bank_account ? `${esc(t.bank_name)} · ${esc(t.bank_account)} · ${esc(t.bank_holder)}` : 'данс алга';
   const bankHtml = t.bank_account ? `${esc(t.bank_name)} · <span class="mono">${esc(t.bank_account)}</span> · ${esc(t.bank_holder)}` : 'данс алга';
-  const status = t.state === 'paid' ? ['paid', 'шилжүүлсэн'] : t.state === 'needs_account' ? ['needs_account', 'данс хүлээж байна'] : !t.bank_verified ? ['warn', 'данс баталгаажаагүй'] : ['due', 'шилжүүлэх'];
+  const status = t.state === 'paid' ? ['paid', 'шилжүүлсэн'] : t.state === 'needs_account' ? ['needs_account', 'данс хүлээж байна'] : !t.bank_verified ? ['warn', 'данс баталгаажаагүй'] : t.approved_at ? ['due', 'шилжүүлэх'] : ['hold', 'батлах хүлээж байна'];
+  const releasedBy = t.approved_by ? esc(t.approved_by.replace('ops:', '')) : null;
   const row = el(`
     <div class="card row" data-kind="${t.kind}" data-settlement="${t.id}"${t.state === 'paid' ? ' data-paid' : ''}>
       <div class="name">${esc(t.memo)} · ${who}<small><span class="mono">№${esc(t.order_code)}</span> · ${bankHtml}<br>${
@@ -1733,11 +1734,31 @@ function renderSettlement(t) {
           ? `шилжүүлсэн ${when(t.paid_at)}${t.reference ? ` · гүйлгээ <span class="mono">${esc(t.reference)}</span>` : ''}`
           : t.state === 'needs_account'
             ? 'зочин аппаар дансаа оруулмагц шилжүүлж болно'
-            : `үүссэн ${when(t.created_at)}`
+            : releasedBy
+              ? `<b>${releasedBy}</b> баталсан ${when(t.approved_at)} — өөр гишүүн шилжүүлнэ`
+              : `үүссэн ${when(t.created_at)}`
       }</small></div>
       <div class="right"><span class="amount">${money(t.amount_mnt)}</span><span class="pill" data-s="${status[0]}">${status[1]}</span><div class="btns"></div></div>
     </div>`);
-  if (t.state === 'due' && t.bank_verified) {
+  if (t.state === 'due' && t.bank_verified && !t.approved_at) {
+    // Two people, not one: releasing the money and sending it are different
+    // hands, so the row only ever offers the half that is this member's.
+    const approve = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
+    approve.addEventListener('click', async () => {
+      if (!confirm(`${mnt(t.amount_mnt)} → ${bank}\nЭнэ олголтыг батлах уу? Шилжүүлэхийг өөр гишүүн хийнэ.`)) return;
+      approve.disabled = true;
+      try {
+        await ops(`/v1/ops/settlements/${t.id}/approve`, { method: 'POST', body: {} });
+        toast('Батлагдлаа. Одоо өөр гишүүн шилжүүлж тэмдэглэнэ.', 'good');
+        await refresh();
+      } catch (error) {
+        toast(error.message, 'bad');
+        approve.disabled = false;
+      }
+    });
+    row.querySelector('.btns').append(approve);
+  }
+  if (t.state === 'due' && t.bank_verified && t.approved_at) {
     const paid = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="paid">Шилжүүлсэн</button>');
     paid.addEventListener('click', async () => {
       const reference = prompt(`${mnt(t.amount_mnt)} → ${bank}\nБанкны гүйлгээний дугаар (заавал биш):`, '');

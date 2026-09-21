@@ -29,6 +29,7 @@ import {
   markDispatched,
   markHanded,
   markReady,
+  approveSettlement,
   markSettled,
   payIdesh,
   refundOf,
@@ -295,8 +296,11 @@ describe('cancelling', () => {
     const due = await refundOf(orderId);
     expect(due).toMatchObject({ state: 'due', amountMnt: totalMnt, bank: BANK });
 
-    // Ops pays it by bank and says so: the books close, the order is REFUNDED.
-    const paid = await markSettled(ctx, due!.id, 'ops:test', 'KB-2026-0912-001');
+    // Two people: one releases it, another makes the transfer and says so.
+    // The books close, the order is REFUNDED.
+    await expect(markSettled(ctx, due!.id, 'ops:test', 'KB-2026-0912-001')).rejects.toMatchObject({ code: 'NOT_APPROVED' });
+    await approveSettlement(due!.id, 'ops:нэг', at('12:00'));
+    const paid = await markSettled(ctx, due!.id, 'ops:хоёр', 'KB-2026-0912-001');
     expect(paid.state).toBe('paid');
     expect(await stateOf(orderId)).toBe('REFUNDED');
     expect(await owed(`guest:${guestId}`)).toBe(0);
@@ -419,9 +423,11 @@ describe('the supplier’s share', () => {
     // The supplier types one in from their phone: on file, not yet trusted.
     await updateSupplierProfile(supplierId, { bankName: 'Голомт', bankAccount: '1105012345', bankHolder: 'Дорж' });
     await expect(markSettled(ctx, payout!.id, 'ops:test', 'GB-1')).rejects.toMatchObject({ code: 'BANK_UNVERIFIED' });
-    // Finance holds it up against the contract, and only then it pays.
+    // Finance holds it up against the contract, and only then it pays —
+    // released by one person, transferred by another.
     await verifySupplierBank(supplierId);
-    const paid = await markSettled(ctx, payout!.id, 'ops:test', 'GB-1');
+    await expect(approveSettlement(payout!.id, 'ops:нэг', at('12:00'))).resolves.toMatchObject({ approvedBy: 'ops:нэг' });
+    const paid = await markSettled(ctx, payout!.id, 'ops:хоёр', 'GB-1');
     expect(paid.state).toBe('paid');
     expect(paid.bank?.bankName).toBe('Голомт');
     expect(await owed(`supplier:${supplierId}`)).toBe(0);

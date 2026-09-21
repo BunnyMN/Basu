@@ -41,6 +41,7 @@ export {
 
 export {
   setRefundAccount,
+  approveSettlement,
   listSettlements,
   settlementsOfOrder,
   settlementsOf,

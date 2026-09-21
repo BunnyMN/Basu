@@ -902,6 +902,13 @@ describe('өвлийн идэш', () => {
     expect(line()!.textContent).toContain('Буцаалт');
     expect(line()!.textContent).toContain('5012345678');
     expect(line()!.querySelector('.amount')?.textContent).toBe(total);
+    // Two people, not one: the row offers only «Батлах» until somebody has
+    // released it, and only then the button that says the money moved.
+    expect(line()!.querySelector('[data-a="paid"]')).toBeNull();
+    desk.window.confirm = () => true;
+    (line()!.querySelector('[data-a="approve"]') as HTMLElement).click();
+    await until(desk, 'the line to be released', () => Boolean(line()?.querySelector('[data-a="paid"]')));
+    expect(line()!.textContent).toContain('баталсан');
     desk.window.prompt = () => 'KB-2026-001';
     (line()!.querySelector('[data-a="paid"]') as HTMLElement).click();
     await until(desk, 'the line to be paid', () => line()?.hasAttribute('data-paid') ?? false);
