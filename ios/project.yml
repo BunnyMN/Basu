@@ -82,8 +82,8 @@ targets:
       path: Basu/Info.plist
       properties:
         CFBundleDisplayName: Basu
-        CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "1.0.1"
+        CFBundleVersion: "2"
         UIAppFonts: *fonts
         # The order's progress on the lock screen and in the Dynamic Island.
         NSSupportsLiveActivities: true
@@ -160,8 +160,8 @@ targets:
       path: BasuWidgets/Info.plist
       properties:
         CFBundleDisplayName: Basu
-        CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: "1"
+        CFBundleShortVersionString: "1.0.1"
+        CFBundleVersion: "2"
         BasuAppGroup: group.mn.basu.shared$(BASU_ID_SUFFIX)
         UIAppFonts: *fonts
         NSExtension:
