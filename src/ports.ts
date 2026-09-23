@@ -28,6 +28,16 @@ export interface PaymentProvider {
    */
   authorize(input: { reference: string; amountMnt: number }): Promise<PaymentIntent>;
   capture(providerRef: string): Promise<void>;
+  /**
+   * Has the money actually arrived?
+   *
+   * A provider that can be asked answers here, and a top-up whose answer is
+   * "not yet" stays pending: the phone asking early is the normal case, not
+   * a failure, and marking it failed would strand money the person is about
+   * to send. A provider that cannot be asked leaves this out, and `capture`
+   * is taken at its word.
+   */
+  paid?(providerRef: string): Promise<boolean>;
   refund(input: { providerRef: string; amountMnt: number }): Promise<void>;
 }
 

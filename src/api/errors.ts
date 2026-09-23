@@ -105,6 +105,7 @@ const LEDGER_ERRORS: Record<LedgerError['code'], Spec> = {
     // Says what to do about it, because there is something to do about it.
     mn: 'Түрийвчинд хүрэлцэхгүй байна. Цэнэглээд дахин оролдоно уу.',
   },
+  NOT_PAID_YET: { status: 409, mn: 'Төлбөр хараахан хийгдээгүй байна. Төлсний дараа дахин шалгана уу.' },
   TOPUP_FAILED: {
     status: 402,
     mn: 'Цэнэглэлт амжилтгүй боллоо. Дахин оролдоно уу.',

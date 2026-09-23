@@ -7,7 +7,7 @@ _Pilot сервер (basu.burzai.cloud) демо горимоос бодит х�
 
 - [ ] `OPS_MEMBERS` — ops-ийн гишүүдийн утас, нэр, эрх (`+976…:Нэр:admin`, санхүүгийн хүн `finance`).
 - [ ] CallPro-ийн API түлхүүр (бодит OTP явахгүй бол хэн ч нэвтэрч чадахгүй — **энэгүйгээр шилжиж болохгүй**).
-- [ ] QPay merchant `username`, `password`, `invoice_code` (production).
+- [ ] Wire (wire.mn) дансны `sk_live_…` түлхүүр ба webhook-ийн `whsec_…`. Wire нь QPay-г дамжуулна; dashboard дээр QPay холболт ба орлого татах данс тохируулсан байх ёстой.
 - [ ] PosAPI 3.0 оператор бүртгэл, posNo; эхний нийлүүлэгчийн ТТД зөвшөөрөгдсөн.
 - [ ] Эхний нийлүүлэгчийн гэрээ, данс — ops-оор бүртгэнэ (демо өгөгдөл биш).
 - [ ] Apple review батлагдсан (App Store-д «Release» дарахад бэлэн).
@@ -35,7 +35,9 @@ OPS_MEMBERS=+97688102856:Баярцогт:admin,+976XXXXXXXX:Нэр:finance
 BANK_KEY=              # openssl rand -base64 32 — банкны дансны шифрлэлт
 # OPS_TOKEN — устгана: production-д ямар ч утга хүчингүй
 CALLPRO_…=            # SMS
-QPAY_USERNAME= QPAY_PASSWORD= QPAY_INVOICE_CODE=
+WIRE_SECRET_KEY=       # sk_live_… — Wire → QPay
+WIRE_WEBHOOK_SECRET=   # whsec_… — байхгүй бол апп өөрөө асууж шалгана
+WIRE_RETURN_URL=https://basu.burzai.cloud/
 POSAPI_URL=http://127.0.0.1:7080
 APNS_TEAM_ID= APNS_KEY_ID= APNS_KEY_FILE=/opt/basu/apns.p8 APNS_ENV=production
 ```
@@ -65,6 +67,8 @@ npm run check:prod -- https://basu.burzai.cloud
 - [ ] `/dashboard`-т гишүүний утсаар нэвтрэх, нэр, эрх зөв харагдана.
 - [ ] Нийлүүлэгчийг ops-оор бүртгэж, дансыг «баталгаажуулах», зар нэмэх. Дараа нь `psql -c "select bank_account from idesh.supplier"` — `v1:` -ээр эхэлсэн байх ёстой, цифр харагдвал `BANK_KEY` тавигдаагүй.
 - [ ] Зочны утсаар нэг захиалга: QPay нэхэмжлэл, төлбөр, нийлүүлэгчид SMS + push, е-баримт.
+- [ ] Цэнэглэлтийг **төлөхөөс өмнө** «шалгах» — түрийвч дүүрэхгүй, «Төлбөр хараахан хийгдээгүй» гэж хариулах ёстой. Дүүрвэл бодит provider холбогдоогүй байна.
+- [ ] Webhook: Wire dashboard-аас туршилтын event илгээгээд `journalctl` дээр хүлээж авсан эсэхийг харах.
 - [ ] Нийлүүлэгч дэлгэцээс бэлтгэж → бэлэн → хүлээлгэн өгсөн; маргааш нь олголт ops-д гарна.
 - [ ] Олголтыг нэг гишүүн **батлаад**, өөр гишүүн **шилжүүлсэн** гэж тэмдэглэнэ. Баталсан хүн өөрөө шилжүүлэх гэвэл татгалзана — энэ нь дүрэм ажиллаж байгаагийн шалгуур.
 

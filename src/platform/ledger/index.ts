@@ -18,6 +18,7 @@ export {
   refund,
   settleTopup,
   startTopup,
+  topupByProviderRef,
   wallet,
   type Collected,
   type CollectInput,
@@ -50,3 +51,12 @@ export {
   type DeskReceipt,
   type Reconciliation,
 } from './desk.js';
+
+export {
+  WirePayments,
+  WireError,
+  WIRE_SIGNATURE_HEADER,
+  wireConfigFromEnv,
+  verifyWireWebhook,
+  type WireConfig,
+} from './wire.js';

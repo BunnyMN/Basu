@@ -25,7 +25,7 @@ const OUT = 'bank:out';
 
 export class LedgerError extends Error {
   constructor(
-    readonly code: 'INSUFFICIENT_FUNDS' | 'TOPUP_FAILED' | 'NOT_FOUND' | 'PAYMENT_FAILED',
+    readonly code: 'INSUFFICIENT_FUNDS' | 'TOPUP_FAILED' | 'NOT_PAID_YET' | 'NOT_FOUND' | 'PAYMENT_FAILED',
     message: string,
   ) {
     super(message);
@@ -174,6 +174,15 @@ export async function startTopup(
   return { topupId, amountMnt: input.amountMnt, actionUrl: intent.actionUrl, state: 'pending' };
 }
 
+/** The top-up a provider's callback names, by the reference it gave us. */
+export async function topupByProviderRef(provider: string, providerRef: string): Promise<string | null> {
+  const { rows } = await getPool().query<{ id: string }>(
+    'SELECT id FROM ledger.topup WHERE provider = $1 AND provider_ref = $2',
+    [provider, providerRef],
+  );
+  return rows[0]?.id ?? null;
+}
+
 /**
  * The money arrived. Capture it, then credit the wallet.
  *
@@ -195,6 +204,19 @@ export async function settleTopup(ctx: Ctx, topupId: string): Promise<number> {
   if (!topup) throw new LedgerError('NOT_FOUND', 'no such top-up');
   if (topup.state === 'settled') return balance(topup.guest_id);
   if (topup.state !== 'pending') throw new LedgerError('TOPUP_FAILED', `top-up is ${topup.state}`);
+
+  // Asking too early is what a phone does while a person is still typing
+  // their PIN into a bank app. That leaves the top-up pending, to be asked
+  // about again; only the provider refusing outright fails it.
+  if (topup.provider_ref && ctx.payments.paid) {
+    let arrived: boolean;
+    try {
+      arrived = await ctx.payments.paid(topup.provider_ref);
+    } catch (error) {
+      throw new LedgerError('NOT_PAID_YET', (error as Error).message);
+    }
+    if (!arrived) throw new LedgerError('NOT_PAID_YET', 'the provider has not been paid yet');
+  }
 
   try {
     if (topup.provider_ref) await ctx.payments.capture(topup.provider_ref);
