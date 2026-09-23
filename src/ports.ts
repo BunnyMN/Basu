@@ -152,6 +152,41 @@ export class FakePaymentProvider implements PaymentProvider {
   }
 }
 
+/**
+ * The payment provider a production server gets when none is configured.
+ *
+ * The fake says every top-up succeeded, which on a real server is money
+ * printed out of nothing — and that money can buy real meat from a real
+ * supplier whom the house then really owes. So production without a key
+ * does not get the fake; it gets this, which says no, plainly.
+ */
+export class ClosedPaymentProvider implements PaymentProvider {
+  readonly name = 'qpay' as const;
+
+  async authorize(): Promise<PaymentIntent> {
+    throw new PaymentsClosed();
+  }
+
+  async capture(): Promise<void> {
+    throw new PaymentsClosed();
+  }
+
+  async refund(): Promise<void> {
+    throw new PaymentsClosed();
+  }
+
+  async paid(): Promise<boolean> {
+    return false;
+  }
+}
+
+export class PaymentsClosed extends Error {
+  constructor() {
+    super('payments are not configured on this server');
+    this.name = 'PaymentsClosed';
+  }
+}
+
 export class FakeTaxProvider implements TaxProvider {
   readonly issued: Array<{ orderCode: string; kind: string; amountMnt: number; merchantTin: string }> = [];
   /** The tax API being down must never block a ticket — this proves it. */

@@ -25,7 +25,7 @@ const OUT = 'bank:out';
 
 export class LedgerError extends Error {
   constructor(
-    readonly code: 'INSUFFICIENT_FUNDS' | 'TOPUP_FAILED' | 'NOT_PAID_YET' | 'NOT_FOUND' | 'PAYMENT_FAILED',
+    readonly code: 'INSUFFICIENT_FUNDS' | 'TOPUP_FAILED' | 'NOT_PAID_YET' | 'PAYMENTS_CLOSED' | 'NOT_FOUND' | 'PAYMENT_FAILED',
     message: string,
   ) {
     super(message);
@@ -164,6 +164,8 @@ export async function startTopup(
     intent = await ctx.payments.authorize({ reference: topupId, amountMnt: input.amountMnt });
   } catch (error) {
     await getPool().query(`UPDATE ledger.topup SET state = 'failed' WHERE id = $1`, [topupId]);
+    // "Try again" would be a lie when there is no provider to try.
+    if ((error as Error).name === 'PaymentsClosed') throw new LedgerError('PAYMENTS_CLOSED', (error as Error).message);
     throw new LedgerError('TOPUP_FAILED', (error as Error).message);
   }
 

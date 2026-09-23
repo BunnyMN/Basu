@@ -246,21 +246,49 @@ async function showToken() {
   const card = el(`
     <div class="card pair">
       <div class="brand wordmark">Basu<small>Ops</small></div>
-      <h2>Нэвтрэх</h2>
-      <p>Гишүүн өөрийн утасны дугаар, нууц үгээрээ нэвтэрнэ.</p>
+      <h2 id="door-title">Нэвтрэх</h2>
+      <p id="door-lead">Гишүүн өөрийн утасны дугаар, нууц үгээрээ нэвтэрнэ.</p>
+      <input class="input" name="invite" inputmode="numeric" placeholder="Урилгын код · 12345 67890" aria-label="Урилгын код" autocomplete="one-time-code" hidden>
+      <input class="input" name="name" placeholder="Таны нэр" aria-label="Нэр" autocomplete="name" hidden>
       <input class="input" name="phone" type="tel" inputmode="tel" placeholder="+976 XXXX XXXX" aria-label="Утас" autocomplete="tel">
       <input class="input" name="password" type="password" placeholder="Нууц үг" aria-label="Нууц үг" autocomplete="current-password">
       <button class="btn" data-v="primary" data-size="lg" type="button" id="send">Нэвтрэх</button>
+      <button class="btn" data-v="link" type="button" id="use-invite">Урилгын код байгаа юу?</button>
     </div>`);
   const phone = card.querySelector('[name="phone"]');
   const code = card.querySelector('[name="password"]');
+  const invite = card.querySelector('[name="invite"]');
+  const who = card.querySelector('[name="name"]');
   const send = card.querySelector('#send');
+  // A person the desk has invited redeems the code once, with their own
+  // number and the password they choose; after that the ordinary door.
+  let claiming = false;
+  card.querySelector('#use-invite').addEventListener('click', (e) => {
+    claiming = !claiming;
+    invite.hidden = !claiming;
+    who.hidden = !claiming;
+    code.setAttribute('autocomplete', claiming ? 'new-password' : 'current-password');
+    code.placeholder = claiming ? 'Шинэ нууц үг · дор хаяж 8 тэмдэгт' : 'Нууц үг';
+    card.querySelector('#door-title').textContent = claiming ? 'Урилгаар нэвтрэх' : 'Нэвтрэх';
+    card.querySelector('#door-lead').textContent = claiming
+      ? 'Админаас авсан кодоо, өөрийн утас, шинэ нууц үгээ оруулна. Код нэг удаа хүчинтэй.'
+      : 'Гишүүн өөрийн утасны дугаар, нууц үгээрээ нэвтэрнэ.';
+    send.textContent = claiming ? 'Нэвтрэх' : 'Нэвтрэх';
+    e.target.textContent = claiming ? 'Нууц үгтэй юу? Энгийнээр нэвтрэх' : 'Урилгын код байгаа юу?';
+    (claiming ? invite : phone).focus();
+  });
   const submit = async () => {
     try {
-      const { token: t } = await api('/v1/auth/login', {
-        method: 'POST',
-        body: { phone: phone.value.replace(/\s+/g, ''), password: code.value, device: 'Ops' },
-      });
+      const number = phone.value.replace(/\s+/g, '');
+      const { token: t } = claiming
+        ? await api('/v1/auth/claim', {
+            method: 'POST',
+            body: { code: invite.value, phone: number, password: code.value, name: who.value, device: 'Ops' },
+          })
+        : await api('/v1/auth/login', {
+            method: 'POST',
+            body: { phone: number, password: code.value, device: 'Ops' },
+          });
       try {
         ({ member: me } = await api('/v1/ops/me', { token: t }));
       } catch {
@@ -274,8 +302,7 @@ async function showToken() {
     }
   };
   send.addEventListener('click', submit);
-  code.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
-  phone.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+  for (const input of [code, phone, invite, who]) input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
   door.append(card);
   root.append(door);
   phone.focus();
@@ -1840,9 +1867,15 @@ async function renderMembers(view) {
   form.querySelector('#add-member').addEventListener('click', async () => {
     const v = (n) => form.querySelector(`[name="${n}"]`).value.trim();
     try {
-      await ops('/v1/ops/members', { method: 'POST', body: { phone: v('phone'), name: v('name'), role: v('role') } });
-      toast('Нэмэгдлээ.');
-      show('members');
+      const added = await ops('/v1/ops/members', { method: 'POST', body: { phone: v('phone'), name: v('name'), role: v('role') } });
+      await show('members');
+      // The code is shown once and never again: it lives only as a hash.
+      // The admin reads it to the new member, who redeems it on this door.
+      document.getElementById('view').prepend(el(`
+        <div class="callout" data-k="ok" id="invite-shown" style="margin-bottom:16px">
+          <div><b>${esc(added.name)}-д өгөх урилгын код: <span class="mono" style="font-size:1.25rem;letter-spacing:.08em">${esc(added.invite_code)}</span></b>
+          <span>Энэ кодыг зөвхөн тэр хүнд, нууцаар хэлээрэй. 24 цаг хүчинтэй, нэг удаа. Тэр хүн dashboard-ын хаалган дээр «Урилгын код байгаа юу?» дарж, өөрийн утас (${esc(added.phone)}), шинэ нууц үгтэйгээ оруулна. Энэ код дахин харагдахгүй.</span></div>
+        </div>`));
     } catch (error) {
       toast(error.message, 'bad');
     }

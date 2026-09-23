@@ -40,7 +40,7 @@ import { registerSystemDesk } from './systemDesk.js';
 import { revokeSession } from '../platform/identity/index.js';
 import { mode } from '../mode.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
-import { listMembers, memberByPhone, setMemberActive, upsertMember, type Member, type Role } from '../ops/index.js';
+import { ROLES, createInvite, listMembers, memberByPhone, setMemberActive, upsertMember, type Member, type Role } from '../ops/index.js';
 import { contactsFor, resolveGuest } from '../platform/identity/index.js';
 import type { Ctx } from '../ports.js';
 
@@ -168,10 +168,33 @@ export async function registerOpsRoutes(
     const body = request.body ?? {};
     try {
       const member = await upsertMember({ phone: body.phone ?? '', name: body.name ?? '', role: (body.role ?? 'ops') as Role });
+      // A member signs in with a password they choose, and a phone number is
+      // no proof of who is typing it — so the way in is a one-time code this
+      // admin hands to that one person, bound to their number.
+      const { code, invite } = await createInvite({ phone: member.phone, role: member.role, name: member.name, by: who(request), now: ctx.clock.now() });
       await recordAudit({ who: who(request), action: 'member.upsert', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
-      return reply.status(201).send(shapeMember(member));
+      return reply.status(201).send({ ...shapeMember(member), invite_code: code, invite_expires_at: invite.expiresAt.toISOString() });
     } catch (error) {
       return badRequest(reply, 'Утас (+976XXXXXXXX), нэр, эрхээ шалгана уу.', (error as Error).message);
+    }
+  });
+
+  app.post<{ Body: { phone?: string; role?: string; name?: string } }>('/v1/ops/invites', asAdmin, async (request, reply) => {
+    const body = request.body ?? {};
+    const role = body.role ? (body.role as Role) : null;
+    if (role && !ROLES.includes(role)) return badRequest(reply, 'Эрх буруу байна.', `no such role: ${body.role}`);
+    try {
+      const { code, invite } = await createInvite({ phone: body.phone ?? null, role, name: body.name ?? null, by: who(request), now: ctx.clock.now() });
+      await recordAudit({
+        who: who(request),
+        action: 'member.invite',
+        targetKind: 'member',
+        targetId: '00000000-0000-0000-0000-000000000000',
+        note: `${invite.phone ?? 'дугааргүй'} · ${invite.role ?? 'эрхгүй'}`,
+      });
+      return reply.status(201).send({ code, phone: invite.phone, role: invite.role, expires_at: invite.expiresAt.toISOString() });
+    } catch (error) {
+      return badRequest(reply, 'Утас (+976XXXXXXXX) эсвэл эрхээ шалгана уу.', (error as Error).message);
     }
   });
 

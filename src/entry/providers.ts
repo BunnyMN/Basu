@@ -1,7 +1,7 @@
 import { wireConfigFromEnv, WirePayments } from '../platform/ledger/index.js';
 import { apnsConfigFromEnv, ApnsNotifier } from '../platform/notify/index.js';
-import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
-import { buildClock } from '../mode.js';
+import { ClosedPaymentProvider, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
+import { buildClock, mode } from '../mode.js';
 import { sealing } from '../secret.js';
 
 /**
@@ -29,13 +29,15 @@ export function buildProviders(log: (line: string) => void = console.log): Ctx {
   log(
     wire
       ? `[providers] payments: Wire → QPay (${wire.secretKey.startsWith('sk_test_') ? 'sandbox' : 'live'}${wire.webhookSecret ? ', webhook on' : ', polling only'})`
-      : '[providers] payments: fake (set WIRE_SECRET_KEY to take real money)',
+      : mode() === 'production'
+        ? '[providers] payments: CLOSED — production without WIRE_SECRET_KEY refuses every top-up'
+        : '[providers] payments: fake (set WIRE_SECRET_KEY to take real money)',
   );
   log('[providers] sms: fake · tax: fake');
   log(sealing() ? '[providers] bank details: encrypted at rest' : '[providers] bank details: PLAIN TEXT (set BANK_KEY to encrypt)');
   return {
     clock: buildClock(),
-    payments: wire ? new WirePayments(wire) : new FakePaymentProvider(),
+    payments: wire ? new WirePayments(wire) : mode() === 'production' ? new ClosedPaymentProvider() : new FakePaymentProvider(),
     tax: new FakeTaxProvider(),
     notifier,
   };

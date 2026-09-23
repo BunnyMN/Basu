@@ -277,3 +277,13 @@ async function guestAccount(): Promise<string> {
   );
   return rows[0]!.id;
 }
+
+describe('a server with no payment provider', () => {
+  it('refuses a top-up instead of printing money', async () => {
+    const { ClosedPaymentProvider } = await import('../../ports.js');
+    const closed = { ...ctx, payments: new ClosedPaymentProvider() };
+    const guest = await seedGuest();
+    await expect(startTopup(closed, { guestId: guest, amountMnt: 10_000 })).rejects.toMatchObject({ code: 'PAYMENTS_CLOSED' });
+    expect(await balance(guest)).toBe(0);
+  });
+});

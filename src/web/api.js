@@ -113,6 +113,101 @@ if (shell.present && typeof document !== 'undefined') {
   document.documentElement.classList.add('in-shell');
 }
 
+/* ── signing in on the web ─────────────────────────────────────────── */
+
+/**
+ * A person, in a browser, outside the phone app: a sheet with a number and a
+ * password, which becomes a sign-up when the number is new. Resolves with a
+ * token; rejects if they close it.
+ *
+ * Inside the app the shell signs people in on its own sheet and this never
+ * appears. On a developer's machine /dev/login answers first. On the real
+ * server neither is there, and without this a guest opening /idesh in a
+ * browser had no way in at all.
+ */
+export function signInSheet(reason = 'Үргэлжлүүлэхийн тулд нэвтэрнэ үү.') {
+  return new Promise((resolve, reject) => {
+    const scrim = document.createElement('div');
+    scrim.className = 'scrim';
+    scrim.setAttribute('data-open', '');
+    const sheet = document.createElement('div');
+    sheet.className = 'sheet signin-sheet';
+    sheet.setAttribute('role', 'dialog');
+    sheet.setAttribute('aria-modal', 'true');
+    sheet.setAttribute('aria-labelledby', 'signin-title');
+    sheet.innerHTML = `
+      <header>
+        <div><h2 id="signin-title">Нэвтрэх</h2><div class="sub">${reason}</div></div>
+        <button class="x" type="button" aria-label="Хаах"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </header>
+      <div class="body" style="padding:16px 20px 0">
+        <label class="field"><span>Утасны дугаар</span><input name="phone" type="tel" inputmode="tel" placeholder="+976 XXXX XXXX" autocomplete="tel"></label>
+        <label class="field"><span>Нууц үг</span><input name="password" type="password" placeholder="Дор хаяж 8 тэмдэгт" autocomplete="current-password"></label>
+        <label class="field" data-again hidden><span>Нууц үгээ давтах</span><input name="again" type="password" autocomplete="new-password"></label>
+        <p class="cap" data-hint>Анх удаа бол дугаар, нууц үгээ бичихэд бүртгэл үүснэ.</p>
+      </div>
+      <footer><button class="btn" data-v="primary" data-size="lg" type="button" data-go>Нэвтрэх</button></footer>`;
+    document.body.append(scrim, sheet);
+    requestAnimationFrame(() => sheet.setAttribute('data-open', ''));
+
+    const phone = sheet.querySelector('[name="phone"]');
+    const password = sheet.querySelector('[name="password"]');
+    const again = sheet.querySelector('[name="again"]');
+    const go = sheet.querySelector('[data-go]');
+    let registering = false;
+
+    const close = (token) => {
+      sheet.removeAttribute('data-open');
+      scrim.removeAttribute('data-open');
+      setTimeout(() => {
+        sheet.remove();
+        scrim.remove();
+      }, 260);
+      if (token) resolve(token);
+      else reject(new ApiError(401, { error: { code: 'SIGN_IN', message_mn: 'Нэвтрээгүй байна.' } }));
+    };
+
+    const submit = async () => {
+      const number = phone.value.replace(/\s+/g, '');
+      go.setAttribute('data-busy', '');
+      try {
+        if (registering) {
+          if (again.value !== password.value) {
+            toast('Хоёр нууц үг таарахгүй байна.', 'bad');
+            return;
+          }
+          const { token } = await api('/v1/auth/register', { method: 'POST', body: { phone: number, password: password.value, device: 'Вэб' } });
+          store.guestToken = token;
+          return close(token);
+        }
+        const { token } = await api('/v1/auth/login', { method: 'POST', body: { phone: number, password: password.value, device: 'Вэб' } });
+        store.guestToken = token;
+        close(token);
+      } catch (error) {
+        // A number nobody has claimed: the same sheet becomes the sign-up.
+        if (error.code === 'BAD_CREDENTIALS' && !registering && password.value.length >= 8) {
+          registering = true;
+          sheet.querySelector('#signin-title').textContent = 'Бүртгүүлэх';
+          sheet.querySelector('[data-again]').hidden = false;
+          sheet.querySelector('[data-hint]').textContent = 'Энэ дугаар шинэ байна. Нууц үгээ давтаад бүртгүүлнэ үү. Бүртгэлтэй бол нууц үгээ шалгана уу.';
+          go.textContent = 'Бүртгүүлэх';
+          again.focus();
+          return;
+        }
+        toast(error.message, 'bad');
+      } finally {
+        go.removeAttribute('data-busy');
+      }
+    };
+
+    go.addEventListener('click', submit);
+    for (const input of [phone, password, again]) input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+    sheet.querySelector('.x').addEventListener('click', () => close(null));
+    scrim.addEventListener('click', () => close(null));
+    phone.focus();
+  });
+}
+
 /* ── toast ─────────────────────────────────────────────────────────── */
 
 let toastTimer;

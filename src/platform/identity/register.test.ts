@@ -70,6 +70,19 @@ describe('signing up', () => {
     });
   });
 
+  it('will not attach a password to an account that exists without one', async () => {
+    // An account made some other way — the desk, an older sign-in — has no
+    // password. Knowing its number must not be enough to take it.
+    const { guestForPhone } = await import('./auth.js');
+    await guestForPhone('+97688010001');
+    await expect(registerGuest(ctx, { phone: '+97688010001', password: 'булаах гэсэн' })).rejects.toMatchObject({
+      code: 'PHONE_TAKEN',
+    });
+    await expect(signInWithPassword(ctx, { phone: '+97688010001', password: 'булаах гэсэн' })).rejects.toMatchObject({
+      code: 'BAD_CREDENTIALS',
+    });
+  });
+
   it('refuses a number that is not Mongolian, and a password that is too short', async () => {
     await expect(registerGuest(ctx, { phone: '+15551234567', password: 'сайн нууц үг' })).rejects.toMatchObject({ code: 'BAD_PHONE' });
     await expect(registerGuest(ctx, { phone: '+97699001122', password: 'богино' })).rejects.toMatchObject({ code: 'TOO_SHORT' });

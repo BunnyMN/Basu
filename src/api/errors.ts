@@ -1,5 +1,6 @@
 import type { FastifyReply } from 'fastify';
 import { AuthError, PasswordError } from '../platform/identity/index.js';
+import { InviteError } from '../ops/index.js';
 import { LedgerError } from '../platform/ledger/index.js';
 import { ClosureError } from '../platform/identity/index.js';
 import { IdeshError, type IdeshErrorCode } from '../idesh/index.js';
@@ -116,6 +117,7 @@ const LEDGER_ERRORS: Record<LedgerError['code'], Spec> = {
     // Says what to do about it, because there is something to do about it.
     mn: 'Түрийвчинд хүрэлцэхгүй байна. Цэнэглээд дахин оролдоно уу.',
   },
+  PAYMENTS_CLOSED: { status: 503, mn: 'Төлбөр одоогоор хаалттай байна. Удахгүй нээгдэнэ.' },
   NOT_PAID_YET: { status: 409, mn: 'Төлбөр хараахан хийгдээгүй байна. Төлсний дараа дахин шалгана уу.' },
   TOPUP_FAILED: {
     status: 402,
@@ -162,6 +164,12 @@ export function sendError(reply: FastifyReply, error: unknown): FastifyReply {
   }
   // A password that is too short is the person's typing, not our fault, and
   // must read as such rather than as «Алдаа гарлаа».
+  // Every way an invite can fail reads the same, so the door cannot be used
+  // to learn which codes exist.
+  if (error instanceof InviteError) {
+    return reply.status(400).send(envelope(error.code, 'Урилгын код буруу эсвэл хугацаа нь дууссан байна.', error.message));
+  }
+
   if (error instanceof PasswordError) {
     const spec = PASSWORD_ERRORS[error.code];
     return reply.status(spec.status).send(envelope(error.code, spec.mn, error.message));

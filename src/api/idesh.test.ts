@@ -4,6 +4,7 @@ import { closePool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
+import { createInvite } from '../ops/index.js';
 import { createListing, createSupplierCode, registerSupplier, type Listing } from '../idesh/index.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
@@ -34,8 +35,14 @@ async function signIn(phone = '+97699001122'): Promise<string> {
   const made = await app.inject({ method: 'POST', url: '/v1/auth/register', payload: { phone, password: PASSWORD } });
   if (made.statusCode === 201) return made.json().token as string;
   const back = await app.inject({ method: 'POST', url: '/v1/auth/login', payload: { phone, password: PASSWORD } });
-  expect(back.statusCode, back.body).toBe(200);
-  return back.json().token as string;
+  if (back.statusCode === 200) return back.json().token as string;
+  // A supplier's owner is made by the desk from a phone number and has no
+  // password; registering on that number is refused. The way in is the one a
+  // real owner takes: an invite from the desk, bound to their number.
+  const { code } = await createInvite({ phone, by: 'ops:test', now: clock.now() });
+  const claimed = await app.inject({ method: 'POST', url: '/v1/auth/claim', payload: { code, phone, password: PASSWORD } });
+  expect(claimed.statusCode, claimed.body).toBe(201);
+  return claimed.json().token as string;
 }
 
 async function topUp(token: string, amountMnt: number): Promise<void> {

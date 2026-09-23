@@ -225,7 +225,7 @@ body{display:flex;flex-direction:column}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
 <script type="module">
-import { api, store, shell, toast, mountClock, mnt, money, hhmm, HEADLINE } from '/api.js';
+import { api, store, shell, toast, mountClock, mnt, money, hhmm, HEADLINE, signInSheet } from '/api.js';
 import { mapStyle, pinImage, ULAANBAATAR, isCovered, metresBetween, walkMinutes } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -314,9 +314,15 @@ let gone = false;
 async function signIn() {
   // Inside the phone app the sheet is the shell's, and so is the token.
   if (shell.present) return shell.signIn();
-  const { token } = await api('/dev/login', { method: 'POST', body: {} });
-  store.guestToken = token;
-  return token;
+  // A developer's machine answers this; the real server does not have it.
+  try {
+    const { token } = await api('/dev/login', { method: 'POST', body: {} });
+    store.guestToken = token;
+    return token;
+  } catch (error) {
+    if (error.status !== 404) throw error;
+  }
+  return signInSheet();
 }
 
 /**

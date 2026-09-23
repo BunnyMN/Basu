@@ -310,7 +310,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
 <script type="module">
-import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, KIND, dayLabel, dayShort } from '/api.js';
+import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, KIND, dayLabel, dayShort, signInSheet } from '/api.js';
 import { mapStyle, ULAANBAATAR } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -407,9 +407,15 @@ let gone = false;
 async function signIn() {
   // Inside the phone app the sheet is the shell's, and so is the token.
   if (shell.present) return shell.signIn();
-  const { token } = await api('/dev/login', { method: 'POST', body: {} });
-  store.guestToken = token;
-  return token;
+  // A developer's machine answers this; the real server does not have it.
+  try {
+    const { token } = await api('/dev/login', { method: 'POST', body: {} });
+    store.guestToken = token;
+    return token;
+  } catch (error) {
+    if (error.status !== 404) throw error;
+  }
+  return signInSheet();
 }
 
 /** Every call that needs a guest. A dead token means sign in again — once. */
