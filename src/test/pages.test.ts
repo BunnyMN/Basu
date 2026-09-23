@@ -183,11 +183,19 @@ function memoryStorage() {
 }
 
 /** Wait until the DOM says what we are waiting for, or give up loudly. */
+/**
+ * A shared runner is two to three times slower than a laptop, and every one
+ * of these waits is a page fetching over HTTP while the rest of the suite
+ * runs beside it. The deadline is here to fail fast while somebody is
+ * watching, not to call a slow machine a broken product.
+ */
+const PATIENCE = process.env['CI'] ? 25_000 : 8_000;
+
 async function until(
   dom: JSDOM,
   label: string,
   predicate: (doc: Document) => boolean,
-  timeoutMs = 8000,
+  timeoutMs = PATIENCE,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
