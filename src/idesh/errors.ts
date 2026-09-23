@@ -11,6 +11,8 @@ export type IdeshErrorCode =
   | 'BAD_REASON'
   | 'NEEDS_ACCOUNT'
   | 'OTP_REQUIRED'
+  | 'PASSWORD_REQUIRED'
+  | 'BAD_PASSWORD'
   | 'BANK_UNVERIFIED'
   | 'NOT_APPROVED'
   | 'SAME_PERSON'

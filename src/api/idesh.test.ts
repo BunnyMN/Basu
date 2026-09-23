@@ -27,12 +27,15 @@ let sheep: Listing;
 
 const auth = (token: string) => ({ authorization: `Bearer ${token}` });
 
+/** What every test account is opened with, the way a person's would be. */
+const PASSWORD = 'туршилтын нууц үг';
+
 async function signIn(phone = '+97699001122'): Promise<string> {
-  await app.inject({ method: 'POST', url: '/v1/auth/otp', payload: { phone } });
-  const code = /(\d{6})/.exec(notifier.of('auth.otp').at(-1)?.body ?? '')?.[1];
-  const verified = await app.inject({ method: 'POST', url: '/v1/auth/verify', payload: { phone, code } });
-  expect(verified.statusCode).toBe(200);
-  return verified.json().token as string;
+  const made = await app.inject({ method: 'POST', url: '/v1/auth/register', payload: { phone, password: PASSWORD } });
+  if (made.statusCode === 201) return made.json().token as string;
+  const back = await app.inject({ method: 'POST', url: '/v1/auth/login', payload: { phone, password: PASSWORD } });
+  expect(back.statusCode, back.body).toBe(200);
+  return back.json().token as string;
 }
 
 async function topUp(token: string, amountMnt: number): Promise<void> {
@@ -259,18 +262,25 @@ describe('ordering', () => {
     const live = await app.inject({ method: 'GET', url: '/v1/idesh', headers: auth(token) });
     expect(live.json().orders.map((o: { id: string }) => o.id)).toEqual([id]);
 
-    // Naming an account takes a code at the guest's own phone: a stolen
-    // session may look, not redirect money.
+    // Naming an account takes the password again: a stolen session may
+    // look, not redirect money.
     const account = { bank_name: 'Хаан банк', bank_account: '5012 3456 78', bank_holder: 'Бат' };
     const asked = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/refund-account`, headers: auth(token), payload: account });
     expect(asked.statusCode).toBe(409);
-    expect(asked.json().error.code).toBe('OTP_REQUIRED');
-    const code = /(\d{6})/.exec(notifier.of('auth.otp').at(-1)?.body ?? '')?.[1];
+    expect(asked.json().error.code).toBe('PASSWORD_REQUIRED');
+    const wrong = await app.inject({
+      method: 'POST',
+      url: `/v1/idesh/${id}/refund-account`,
+      headers: auth(token),
+      payload: { ...account, password: 'өөр хүний таамаг' },
+    });
+    expect(wrong.statusCode).toBe(401);
+    expect(wrong.json().error.code).toBe('BAD_PASSWORD');
     const named = await app.inject({
       method: 'POST',
       url: `/v1/idesh/${id}/refund-account`,
       headers: auth(token),
-      payload: { ...account, otp_code: code },
+      payload: { ...account, password: PASSWORD },
     });
     expect(named.statusCode, named.body).toBe(200);
     expect(named.json().refund).toMatchObject({ state: 'due', bank_account: '5012345678', amount_mnt: 460_000 });
@@ -506,17 +516,14 @@ describe('the supplier’s own module', () => {
   it('lets the owner change how they are found and where the money goes', async () => {
     const owner = await signIn('+97688010001');
     const edit = { address: 'Нарантуул, урд хаалга', about: 'Архангайн хонь', bank_name: 'Хаан банк', bank_account: '5012 3456 78', bank_holder: 'Дорж' };
-    // Moving the money somewhere new takes a code at the supplier's phone…
+    // Moving the money somewhere new takes the owner's password…
     const asked = await app.inject({ method: 'PATCH', url: '/v1/supplier/profile', headers: auth(owner), payload: edit });
     expect(asked.statusCode).toBe(409);
-    expect(asked.json().error.code).toBe('OTP_REQUIRED');
-    const sms = notifier.of('auth.otp').at(-1);
-    expect(sms?.to).toBe('+97688010001');
-    const wrong = await app.inject({ method: 'PATCH', url: '/v1/supplier/profile', headers: auth(owner), payload: { ...edit, otp_code: '000000' } });
-    expect(wrong.statusCode).toBe(400);
-    expect(wrong.json().error.code).toBe('INVALID_CODE');
-    const code = /(\d{6})/.exec(sms?.body ?? '')?.[1];
-    const changed = await app.inject({ method: 'PATCH', url: '/v1/supplier/profile', headers: auth(owner), payload: { ...edit, otp_code: code } });
+    expect(asked.json().error.code).toBe('PASSWORD_REQUIRED');
+    const wrong = await app.inject({ method: 'PATCH', url: '/v1/supplier/profile', headers: auth(owner), payload: { ...edit, password: 'таамаг' } });
+    expect(wrong.statusCode).toBe(401);
+    expect(wrong.json().error.code).toBe('BAD_PASSWORD');
+    const changed = await app.inject({ method: 'PATCH', url: '/v1/supplier/profile', headers: auth(owner), payload: { ...edit, password: PASSWORD } });
     expect(changed.statusCode, changed.body).toBe(200);
     // …and the new account is on file but not yet trusted.
     expect(changed.json()).toMatchObject({ pickup_address: 'Нарантуул, урд хаалга', bank_account: '5012345678', commission_pct: 2, bank_verified: false });

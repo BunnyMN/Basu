@@ -52,7 +52,7 @@ import {
   ownerOf,
 } from '../idesh/index.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
-import { checkOtp, contactsFor, resolveGuest, sendOtp } from '../platform/identity/index.js';
+import { confirmPassword, contactsFor, resolveGuest } from '../platform/identity/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
 import { limits } from './hardening.js';
@@ -299,7 +299,7 @@ export async function registerIdeshRoutes(
   // the supplier, and the supplier cancels from their own screen.
 
   /** Where the refund goes: the guest's own bank account, in their words. */
-  app.post<{ Params: { id: string }; Body: { bank_name?: string; bank_account?: string; bank_holder?: string; otp_code?: string } }>(
+  app.post<{ Params: { id: string }; Body: { bank_name?: string; bank_account?: string; bank_holder?: string; password?: string } }>(
     '/v1/idesh/:id/refund-account',
     guarded,
     async (request, reply) => {
@@ -311,15 +311,16 @@ export async function registerIdeshRoutes(
         return badRequest(reply, 'Банк, дансны дугаар, эзэмшигчийн нэрээ оруулна уу.', 'bank, account and holder are required');
       }
       try {
-        // Money going to an account is the one thing a stolen session would
-        // do here, so the account is confirmed with a code at the guest's phone.
-        const phone = (await contactsFor([request.guestId!])).get(request.guestId!)?.phone;
-        if (!phone) return sendError(reply, new IdeshError('NOT_FOUND', 'no phone on this guest'));
-        if (!body.otp_code) {
-          await sendOtp(ctx, phone);
-          return sendError(reply, new IdeshError('OTP_REQUIRED', 'a code was sent to the guest’s phone'));
+        // Money leaving for an account somebody typed is the one thing a
+        // stolen phone would do here, so the person types their password
+        // again. It used to be a code by SMS, which needed a gateway the
+        // server may not have; a password needs nothing but the person.
+        if (!body.password) {
+          return sendError(reply, new IdeshError('PASSWORD_REQUIRED', 'the account is confirmed with the password'));
         }
-        await checkOtp(ctx, phone, body.otp_code);
+        if (!(await confirmPassword(request.guestId!, body.password))) {
+          return sendError(reply, new IdeshError('BAD_PASSWORD', 'that is not the password on this account'));
+        }
         await setRefundAccount(request.params.id, request.guestId!, {
           bankName: body.bank_name,
           bankAccount: body.bank_account,
@@ -531,12 +532,12 @@ export async function registerIdeshRoutes(
 
   /**
    * Where the money goes is the one field a stolen phone would change, so
-   * changing it takes a fresh code at the supplier's own phone, and the
-   * owner is told. Finance then checks the account against the contract
-   * before anything is paid to it.
+   * changing it takes the owner's password again, and the owner is told.
+   * Finance then checks the account against the contract before anything is
+   * paid to it.
    */
   app.patch<{
-    Body: { name?: string; address?: string; about?: string | null; lat?: number | null; lon?: number | null; bank_name?: string; bank_account?: string; bank_holder?: string; otp_code?: string };
+    Body: { name?: string; address?: string; about?: string | null; lat?: number | null; lon?: number | null; bank_name?: string; bank_account?: string; bank_holder?: string; password?: string };
   }>('/v1/supplier/profile', asSupplier, async (request, reply) => {
     const body = request.body ?? {};
     const supplierId = request.supplierDevice!.supplierId;
@@ -546,11 +547,13 @@ export async function registerIdeshRoutes(
       if (changing) {
         const me = await supplierById(supplierId);
         if (!me) return sendError(reply, new IdeshError('NOT_FOUND', 'no such supplier'));
-        if (!body.otp_code) {
-          await sendOtp(ctx, me.phone);
-          return sendError(reply, new IdeshError('OTP_REQUIRED', 'a code was sent to the supplier’s phone'));
+        const owner = await ownerOf(supplierId);
+        if (!body.password) {
+          return sendError(reply, new IdeshError('PASSWORD_REQUIRED', 'changing the account takes the password'));
         }
-        await checkOtp(ctx, me.phone, body.otp_code);
+        if (!owner || !(await confirmPassword(owner, body.password))) {
+          return sendError(reply, new IdeshError('BAD_PASSWORD', 'that is not the password on this account'));
+        }
       }
       const { bankChanged } = await updateSupplierProfile(supplierId, {
         name: body.name,

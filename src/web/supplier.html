@@ -244,52 +244,72 @@ const DOOR_FOOT = '<div class="door-foot"><a href="/terms">Үйлчилгээн�
 
 /* ── the doors ─────────────────────────────────────────────────────── */
 
-/** Phone and a one-time code, the way the app signs in. No password. */
+/**
+ * Phone and a password — the same door the app uses.
+ *
+ * It was a one-time code, which needs an SMS gateway the server may not
+ * have; a password is a door the person carries. The same card registers
+ * and signs in: a number nobody has claimed makes an account, and one that
+ * is claimed asks for its password.
+ */
 function signInCard() {
   const card = el(`
     <div class="door">
       <div class="card" id="signin">
         <div class="brand wordmark" data-size="sm">Basu</div>
         <h2>Нийлүүлэгчийн хэсэг</h2>
-        <p>Гэрээний утасны дугаараараа нэвтэрнэ үү. Дугаар руу тань нэг удаагийн код очно.</p>
+        <p>Гэрээний утасны дугаар, нууц үгээрээ нэвтэрнэ үү.</p>
         <label class="field"><span>Утасны дугаар</span><input name="phone" type="tel" inputmode="tel" placeholder="+976 XXXX XXXX" autocomplete="tel"></label>
-        <div class="otp" hidden><label class="field"><span>Ирсэн код</span><input name="code" inputmode="numeric" maxlength="6" placeholder="6 оронтой код" autocomplete="one-time-code"></label></div>
+        <label class="field"><span>Нууц үг</span><input name="password" type="password" placeholder="Дор хаяж 8 тэмдэгт" autocomplete="current-password"></label>
+        <div class="otp" hidden><label class="field"><span>Нууц үгээ давтах</span><input name="again" type="password" placeholder="Дахин бичнэ үү" autocomplete="new-password"></label></div>
         <div class="foot">
-          <button class="btn" data-v="primary" data-size="lg" type="button" id="send">Код авах</button>
+          <button class="btn" data-v="primary" data-size="lg" type="button" id="send">Нэвтрэх</button>
         </div>
         <div class="links">
-          <p class="cap">Шинээр нийлүүлэгч болох бол мөн утсаараа нэвтэрнэ.</p>
+          <p class="cap">Анх удаа бол дугаар, нууц үгээ бичихэд бүртгэл үүснэ.</p>
           <button class="link" type="button" id="back">Таблет дээр кодоор холбох${ICON.right}</button>
         </div>
       </div>
       ${DOOR_FOOT}
     </div>`);
   const phone = card.querySelector('[name="phone"]');
-  const code = card.querySelector('[name="code"]');
+  const password = card.querySelector('[name="password"]');
+  const again = card.querySelector('[name="again"]');
   const send = card.querySelector('#send');
-  let asked = false;
+  let registering = false;
   send.addEventListener('click', async () => {
+    const number = phone.value.replace(/\s+/g, '');
     try {
-      if (!asked) {
-        await api('/v1/auth/otp', { method: 'POST', body: { phone: phone.value.replace(/\s+/g, '') } });
-        asked = true;
-        card.querySelector('.otp').hidden = false;
-        send.textContent = 'Нэвтрэх';
-        code.focus();
-        toast('Код илгээгдлээ.');
-        return;
+      if (registering) {
+        if (again.value !== password.value) return toast('Хоёр нууц үг таарахгүй байна.', 'bad');
+        const { token } = await api('/v1/auth/register', {
+          method: 'POST',
+          body: { phone: number, password: password.value, device: 'Нийлүүлэгчийн дэлгэц' },
+        });
+        store.guestToken = token;
+        return boot();
       }
-      const { token } = await api('/v1/auth/verify', {
+      const { token } = await api('/v1/auth/login', {
         method: 'POST',
-        body: { phone: phone.value.replace(/\s+/g, ''), code: code.value.trim(), device: 'Нийлүүлэгчийн дэлгэц' },
+        body: { phone: number, password: password.value, device: 'Нийлүүлэгчийн дэлгэц' },
       });
       store.guestToken = token;
       boot();
     } catch (error) {
+      // Nobody has this number yet: the same card becomes the sign-up.
+      if (error.code === 'BAD_CREDENTIALS' && !registering && password.value.length >= 8) {
+        registering = true;
+        card.querySelector('.otp').hidden = false;
+        send.textContent = 'Бүртгүүлэх';
+        again.focus();
+        toast('Шинэ дугаар. Нууц үгээ давтаад бүртгүүлнэ үү.');
+        return;
+      }
       toast(error.message, 'bad');
     }
   });
-  code.addEventListener('keydown', (e) => e.key === 'Enter' && send.click());
+  password.addEventListener('keydown', (e) => e.key === 'Enter' && send.click());
+  again.addEventListener('keydown', (e) => e.key === 'Enter' && send.click());
   phone.addEventListener('keydown', (e) => e.key === 'Enter' && send.click());
   // The demo has no SMS to read a code from; a walkthrough skips straight in.
   api('/dev/clock')

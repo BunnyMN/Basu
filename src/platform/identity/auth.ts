@@ -34,7 +34,7 @@ function constantTimeEquals(a: string, b: string): boolean {
 
 export class AuthError extends Error {
   constructor(
-    readonly code: 'RATE_LIMITED' | 'INVALID_CODE' | 'EXPIRED' | 'UNAUTHORIZED',
+    readonly code: 'RATE_LIMITED' | 'INVALID_CODE' | 'EXPIRED' | 'UNAUTHORIZED' | 'BAD_PHONE' | 'PHONE_TAKEN' | 'BAD_CREDENTIALS' | 'LOCKED',
     message: string,
   ) {
     super(message);
@@ -43,9 +43,6 @@ export class AuthError extends Error {
 }
 
 /* ── guests ────────────────────────────────────────────────────────── */
-
-/** The one-time code every demo sign-in gets. Never used in production. */
-export const DEMO_OTP = '123456';
 
 export interface OtpIssued {
   challengeId: string;
@@ -88,7 +85,7 @@ export async function requestOtp(ctx: Ctx, phone: string): Promise<OtpIssued> {
   // The demo has no SMS: its code is the same every time, so a phone with a
   // store build, a reviewer at Apple and a tester on TestFlight can all get
   // in against the demo server. Production draws a real one.
-  const code = mode() === 'demo' ? DEMO_OTP : String(randomInt(0, 1_000_000)).padStart(6, '0');
+  const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
   const inserted = await getPool().query<{ id: string }>(
     `INSERT INTO identity.otp_challenge (phone_e164, code_hash, expires_at, created_at)
      VALUES ($1, $2, $3, $4) RETURNING id`,

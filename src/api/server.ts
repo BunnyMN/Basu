@@ -12,6 +12,8 @@ import {
   resolveGuest,
   verifyOtp,
   sendOtp,
+  registerGuest,
+  signInWithPassword,
 } from '../platform/identity/index.js';
 import { receiptsFor, wireConfigFromEnv } from '../platform/ledger/index.js';
 import {
@@ -239,6 +241,51 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
       return sendError(reply, error);
     }
   });
+
+  /**
+   * Making an account, and opening it again later.
+   *
+   * The password path exists so that a person can sign up on a server with
+   * no SMS gateway — which is every Basu server today. The one-time code
+   * path stays beside it for the day a gateway arrives.
+   */
+  app.post<{ Body: { phone?: string; password?: string; name?: string; device?: string } }>(
+    '/v1/auth/register',
+    { config: { rateLimit: rate.verify } },
+    async (request, reply) => {
+      const { phone, password, name, device } = request.body ?? {};
+      if (!phone || !password) return badRequest(reply, 'Утас, нууц үгээ оруулна уу.', 'phone and password are required');
+      try {
+        const session = await registerGuest(ctx, { phone, password, name: name ?? null, device: device ?? null });
+        return reply.status(201).send({
+          token: session.token,
+          guest_id: session.guestId,
+          expires_at: session.expiresAt.toISOString(),
+        });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  app.post<{ Body: { phone?: string; password?: string; device?: string } }>(
+    '/v1/auth/login',
+    { config: { rateLimit: rate.verify } },
+    async (request, reply) => {
+      const { phone, password, device } = request.body ?? {};
+      if (!phone || !password) return badRequest(reply, 'Утас, нууц үгээ оруулна уу.', 'phone and password are required');
+      try {
+        const session = await signInWithPassword(ctx, { phone, password, device: device ?? null });
+        return reply.send({
+          token: session.token,
+          guest_id: session.guestId,
+          expires_at: session.expiresAt.toISOString(),
+        });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
 
   app.post<{ Body: { phone?: string; code?: string; device?: string } }>(
     '/v1/auth/verify',

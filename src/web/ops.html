@@ -247,28 +247,19 @@ async function showToken() {
     <div class="card pair">
       <div class="brand wordmark">Basu<small>Ops</small></div>
       <h2>Нэвтрэх</h2>
-      <p>Гишүүн утасны дугаараараа нэвтэрнэ. Дугаар руу нэг удаагийн код очно.</p>
+      <p>Гишүүн өөрийн утасны дугаар, нууц үгээрээ нэвтэрнэ.</p>
       <input class="input" name="phone" type="tel" inputmode="tel" placeholder="+976 XXXX XXXX" aria-label="Утас" autocomplete="tel">
-      <input class="input code" name="code" inputmode="numeric" maxlength="6" placeholder="Ирсэн код" aria-label="Код" autocomplete="one-time-code" hidden>
-      <button class="btn" data-v="primary" data-size="lg" type="button" id="send">Код авах</button>
+      <input class="input" name="password" type="password" placeholder="Нууц үг" aria-label="Нууц үг" autocomplete="current-password">
+      <button class="btn" data-v="primary" data-size="lg" type="button" id="send">Нэвтрэх</button>
     </div>`);
   const phone = card.querySelector('[name="phone"]');
-  const code = card.querySelector('[name="code"]');
+  const code = card.querySelector('[name="password"]');
   const send = card.querySelector('#send');
-  let asked = false;
   const submit = async () => {
     try {
-      if (!asked) {
-        await api('/v1/auth/otp', { method: 'POST', body: { phone: phone.value.replace(/\s+/g, '') } });
-        asked = true;
-        code.hidden = false;
-        send.textContent = 'Нэвтрэх';
-        code.focus();
-        return;
-      }
-      const { token: t } = await api('/v1/auth/verify', {
+      const { token: t } = await api('/v1/auth/login', {
         method: 'POST',
-        body: { phone: phone.value.replace(/\s+/g, ''), code: code.value.trim(), device: 'Ops' },
+        body: { phone: phone.value.replace(/\s+/g, ''), password: code.value, device: 'Ops' },
       });
       try {
         ({ member: me } = await api('/v1/ops/me', { token: t }));

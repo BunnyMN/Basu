@@ -75,6 +75,8 @@ const IDESH_ERRORS: Record<IdeshErrorCode, Spec> = {
   BAD_REASON: { status: 409, mn: 'Энэ шалтгаанаар одоо цуцлах боломжгүй.' },
   NEEDS_ACCOUNT: { status: 409, mn: 'Шилжүүлэх данс оруулаагүй байна.' },
   OTP_REQUIRED: { status: 409, mn: 'Баталгаажуулах код утсанд тань илгээлээ. Кодоо оруулна уу.' },
+  PASSWORD_REQUIRED: { status: 409, mn: 'Нууц үгээ оруулж баталгаажуулна уу.' },
+  BAD_PASSWORD: { status: 401, mn: 'Нууц үг буруу байна.' },
   BANK_UNVERIFIED: { status: 409, mn: 'Данс баталгаажаагүй байна. Санхүү гэрээтэй тулгаж баталгаажуулна.' },
   NOT_APPROVED: { status: 409, mn: 'Эхлээд өөр гишүүн олголтыг батална. Дараа нь шилжүүлсэн гэж тэмдэглэнэ.' },
   SAME_PERSON: { status: 409, mn: 'Баталсан хүн өөрөө шилжүүлж болохгүй. Өөр гишүүн тэмдэглэнэ.' },
@@ -90,6 +92,10 @@ const IDESH_ERRORS: Record<IdeshErrorCode, Spec> = {
 };
 
 const AUTH_ERRORS: Record<AuthError['code'], Spec> = {
+  BAD_PHONE: { status: 400, mn: 'Утасны дугаараа шалгана уу (+976XXXXXXXX).' },
+  PHONE_TAKEN: { status: 409, mn: 'Энэ дугаар аль хэдийн бүртгэлтэй. Нэвтэрнэ үү.' },
+  BAD_CREDENTIALS: { status: 401, mn: 'Дугаар эсвэл нууц үг буруу байна.' },
+  LOCKED: { status: 429, mn: 'Нууц үг хэд хэдэн удаа буруу орлоо. 15 минутын дараа дахин оролдоно уу.' },
   RATE_LIMITED: {
     status: 429,
     mn: 'Хэт олон удаа оролдлоо. Хэсэг хүлээгээд дахин оролдоно уу.',

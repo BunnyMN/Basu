@@ -9,7 +9,6 @@ export {
   AuthError,
   OTP_PER_PHONE_PER_HOUR,
   requestOtp,
-  DEMO_OTP,
   OTP_PER_DAY,
   purgeChallenges,
   verifyOtp,
@@ -43,3 +42,6 @@ export {
 
 export { guestCensus, type GuestCensus } from './census.js';
 export { findGuests, guestCard, type GuestCard } from './directory.js';
+
+export { MIN_PASSWORD, PasswordError, checkPassword, hashPassword, verifyPassword } from './password.js';
+export { registerGuest, signInWithPassword, changePassword, confirmPassword, hasPassword } from './register.js';

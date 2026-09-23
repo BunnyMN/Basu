@@ -880,10 +880,10 @@ describe('өвлийн идэш', () => {
     type('holder', 'Бат Дорж');
     expect(send.disabled).toBe(false);
     send.click();
-    // Money is about to go to this account: a code went to the phone first.
-    // The demo's code is the one everybody gets.
-    await until(guest, 'the code step', (d) => !(d.querySelector('#otp-step') as HTMLElement | null)?.hidden);
-    type('otp', '123456');
+    // Money is about to go to this account, so the person proves it is still
+    // them: the password again, not a code the server cannot send.
+    await until(guest, 'the confirm step', (d) => !(d.querySelector('#otp-step') as HTMLElement | null)?.hidden);
+    type('otp', GUEST_PASSWORD);
     send.click();
     await until(guest, 'the account to be kept', (d) => d.querySelector('#refund')?.textContent?.includes('5012345678') ?? false);
     expect(guest.window.document.querySelector('#refund')?.textContent).toContain('Basu ажлын өдөрт');
@@ -1226,11 +1226,14 @@ async function opsTab(dom: JSDOM, key: string): Promise<void> {
   (dom.window.document.querySelector(`.tabs button[data-tab="${key}"]`) as HTMLElement).click();
 }
 
+/** Every test guest signs up the way a person does, with the same password. */
+const GUEST_PASSWORD = 'туршилтын нууц үг';
+
 async function ownGuest(phone: string): Promise<void> {
-  const response = await fetch(`${base}/dev/login`, {
+  const response = await fetch(`${base}/v1/auth/register`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ phone }),
+    body: JSON.stringify({ phone, password: GUEST_PASSWORD }),
   });
   const { token } = (await response.json()) as { token: string };
   storage.setItem('basu.guest', token);
