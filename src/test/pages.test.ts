@@ -337,6 +337,11 @@ describe('the guest app', () => {
   });
 
   it('walks a person from a pin to a paid order', async () => {
+    // A guest of its own. This test leaves a live order at the paired
+    // kitchen; on the shared demo guest that order was still there when a
+    // later test signed back in as the same person, and its menu turned into
+    // somebody else's order screen — on CI, where the timing lined up.
+    await ownGuest('+97699003009');
     const dom = await openPage('dine.html');
     await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
 
