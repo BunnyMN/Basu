@@ -15,6 +15,7 @@ import {
   registerGuest,
   signInWithPassword,
   claimAccount,
+  phoneE164,
 } from '../platform/identity/index.js';
 import { releaseInvite, takeInvite, upsertMember } from '../ops/index.js';
 import { receiptsFor, wireConfigFromEnv } from '../platform/ledger/index.js';
@@ -284,7 +285,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
       if (!code || !phone || !password) {
         return badRequest(reply, 'Код, утас, нууц үгээ оруулна уу.', 'code, phone and password are required');
       }
-      const number = phone.replace(/\s+/g, '');
+      const number = phoneE164(phone);
       try {
         const invite = await takeInvite(code, number, ctx.clock.now());
         let session;
@@ -923,6 +924,10 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     return rows[0];
   });
 
+  /* ── the pages ──────────────────────────────────────────────────── */
+
+  await mountPages(app);
+
   /* ── development only ───────────────────────────────────────────── */
 
   if (options.dev) await mountDevRoutes(app, ctx, board);
@@ -931,19 +936,14 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
 }
 
 /**
- * The demo surface: the two pages, and the ability to move the clock.
+ * The web: the home screen, each app on it, the supplier's screen, the desk.
  *
- * Lunch runs 11:30–14:00 and the gap between firing and seating is fifteen
- * minutes, so watching the product work in real time means either eating lunch
- * at the right hour or waiting around. Being able to jump to 12:14 and step
- * forward a minute at a time is what makes the whole thing demonstrable.
+ * These are the product on every server, not a piece of the demo — a real
+ * guest on the production server opens the same `/idesh` a walkthrough does.
+ * What differs between the two is only what the pages find when they ask
+ * for the developer's shortcuts under `/dev`, which production never mounts.
  */
-async function mountDevRoutes(
-  app: FastifyInstance,
-  ctx: Ctx,
-  /** The same board `/v1/kds/tickets` serves, but for every kitchen at once. */
-  board: (restaurantId: string | null) => Promise<unknown>,
-): Promise<void> {
+async function mountPages(app: FastifyInstance): Promise<void> {
   const staticPlugin = await import('@fastify/static');
   const { fileURLToPath } = await import('node:url');
   const { dirname, join } = await import('node:path');
@@ -964,7 +964,22 @@ async function mountDevRoutes(
   app.get('/ops', (_request, reply) => reply.redirect('/dashboard', 301));
   app.get('/terms', (_request, reply) => reply.sendFile('terms.html'));
   app.get('/privacy', (_request, reply) => reply.sendFile('privacy.html'));
+}
 
+/**
+ * The demo surface: shortcuts past the door, and the ability to move the clock.
+ *
+ * Lunch runs 11:30–14:00 and the gap between firing and seating is fifteen
+ * minutes, so watching the product work in real time means either eating lunch
+ * at the right hour or waiting around. Being able to jump to 12:14 and step
+ * forward a minute at a time is what makes the whole thing demonstrable.
+ */
+async function mountDevRoutes(
+  app: FastifyInstance,
+  ctx: Ctx,
+  /** The same board `/v1/kds/tickets` serves, but for every kitchen at once. */
+  board: (restaurantId: string | null) => Promise<unknown>,
+): Promise<void> {
   const clock = ctx.clock as { setTo?: (v: string) => void; advanceMinutes?: (m: number) => void };
 
   app.get('/dev/clock', async () => ({

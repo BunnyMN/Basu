@@ -19,6 +19,13 @@ APP=/opt/basu/app
 RUN_AS=basu
 PORT=3210
 KEEP_BACKUPS=10
+PG=/usr/lib/postgresql/16/bin
+PROD_DB=basu_prod
+# The first admin's way onto a fresh desk: the sha256 of a one-time invite
+# code (thirty digits, so this hash in a public repo cannot be walked back to
+# it). The code itself went to the owner privately. Used only while the
+# production database has no active admin; after that it is inert.
+BOOTSTRAP_INVITE_SHA256=7ef25995cf1e6e64cbb5891e8fe0df3189032019d51719affd0a8d3430bafdf7
 
 cd "$APP"
 # git is run as the checkout's owner throughout; root in another user's repo is
@@ -32,9 +39,65 @@ sudo -u "$RUN_AS" npm ci --no-audit --no-fund --silent
 echo "→ build"
 sudo -u "$RUN_AS" npm run build --silent
 
+env_url() { sudo -u "$RUN_AS" sh -c 'sed -n "s/^DATABASE_URL=//p" .env'; }
+
+# ── Leaving the demo, once ─────────────────────────────────────────────
+# The pilot ran as a walkthrough: a demo clock, a shared desk token, a
+# seeded catalogue of restaurants and suppliers nobody owns, a door that let
+# anybody in without a password. Real people start on an empty database with
+# nothing seeded. The demo database stays beside it, untouched, and is
+# dumped once more for good measure. Nothing printed here may carry the
+# database URL: this log is public.
+flipped=0
+if ! sudo -u "$RUN_AS" grep -q '^BASU_MODE=production$' .env; then
+  echo "→ production (once): a fresh database, the demo one kept"
+  demo_url=$(env_url)
+  [ -n "$demo_url" ] || { echo "no DATABASE_URL in $APP/.env"; exit 1; }
+  read -r db_user db_port < <(node -e 'const u = new URL(process.argv[1]); console.log(decodeURIComponent(u.username), u.port || 5432)' "$demo_url")
+  prod_url=$(node -e 'const u = new URL(process.argv[1]); u.pathname = "/" + process.argv[2]; console.log(u.toString())' "$demo_url" "$PROD_DB")
+
+  [ -f /root/basu-demo-final.sql.gz ] || "$PG/pg_dump" "$demo_url" | gzip > /root/basu-demo-final.sql.gz
+
+  if ! sudo -u postgres "$PG/psql" -p "$db_port" -tAc "SELECT 1 FROM pg_database WHERE datname = '$PROD_DB'" | grep -q 1; then
+    sudo -u postgres "$PG/psql" -p "$db_port" -v ON_ERROR_STOP=1 -q -c "CREATE DATABASE $PROD_DB OWNER \"$db_user\""
+  fi
+  # Extensions want a superuser; everything after them is the app's own.
+  sudo -u postgres "$PG/psql" -p "$db_port" -d "$PROD_DB" -v ON_ERROR_STOP=1 -q \
+    -c 'CREATE EXTENSION IF NOT EXISTS btree_gist' -c 'CREATE EXTENSION IF NOT EXISTS pgcrypto'
+
+  # The demo .env is kept whole as .env.demo, which is also the way back.
+  cp -p .env .env.demo
+  {
+    grep -v -E '^(BASU_MODE|NODE_ENV|DATABASE_URL|OPS_TOKEN)=' .env.demo || true
+    echo 'BASU_MODE=production'
+    echo 'NODE_ENV=production'
+    printf 'DATABASE_URL=%s\n' "$prod_url"
+  } > .env.next
+  # Bank details are sealed with this; production refuses to store one without it.
+  grep -q '^BANK_KEY=.' .env.next || printf 'BANK_KEY=%s\n' "$(openssl rand -base64 32)" >> .env.next
+  chown --reference=.env .env.next && chmod 600 .env.next && mv .env.next .env
+
+  # The scheduler sat out the demo (its clock came from the page); now it is
+  # what fires every lunch on time, so it runs, and starts with the machine.
+  if systemctl cat basu-scheduler >/dev/null 2>&1; then
+    systemctl enable -q basu-scheduler
+  else
+    echo "! no basu-scheduler unit on this server — orders will not fire on their own"
+  fi
+  flipped=1
+  # Any failure from here until the API answers puts the demo back as it
+  # was, rather than leave the pilot dark or half-switched.
+  trap 'if [ "$flipped" = 1 ]; then
+          echo "↩ back to the demo .env"
+          cp -p .env.demo .env
+          systemctl disable -q --now basu-scheduler 2>/dev/null || true
+          systemctl restart basu-api
+        fi' EXIT
+fi
+
 # The migration runner does not load .env on its own, and the backup needs
 # the same URL, so read it once here.
-DATABASE_URL=$(sudo -u "$RUN_AS" sh -c 'sed -n "s/^DATABASE_URL=//p" .env')
+DATABASE_URL=$(env_url)
 [ -n "$DATABASE_URL" ] || { echo "no DATABASE_URL in $APP/.env"; exit 1; }
 
 echo "→ backup"
@@ -46,6 +109,16 @@ ls -1t /root/basu-predeploy-*.sql.gz | tail -n +$((KEEP_BACKUPS + 1)) | xargs -r
 echo "→ migrate"
 sudo -u "$RUN_AS" node --env-file=.env dist/db/migrate.js
 
+if sudo -u "$RUN_AS" grep -q '^BASU_MODE=production$' .env; then
+  # A desk with no admin can be entered only with the bootstrap invite; one
+  # with an admin ignores it. Re-running this is harmless either way.
+  sudo -u "$RUN_AS" "$PG/psql" "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "
+    INSERT INTO ops.invite (code_hash, role, created_by, expires_at)
+    SELECT '$BOOTSTRAP_INVITE_SHA256', 'admin', 'deploy:first-admin', now() + interval '72 hours'
+     WHERE NOT EXISTS (SELECT 1 FROM ops.member WHERE role = 'admin' AND active)
+    ON CONFLICT (code_hash) DO NOTHING"
+fi
+
 echo "→ restart"
 systemctl restart basu-api
 if systemctl is-enabled --quiet basu-scheduler 2>/dev/null; then
@@ -56,6 +129,7 @@ echo "→ health"
 for _ in $(seq 1 30); do
   if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
     echo "✓ $sha is up on :$PORT"
+    flipped=0
     exit 0
   fi
   sleep 1

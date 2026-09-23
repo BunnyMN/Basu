@@ -32,8 +32,21 @@ interface Row {
 
 const PHONE = /^\+976\d{8}$/;
 
-function requirePhone(phone: string): void {
+/**
+ * A Mongolian number as people actually type it — «8811 2233», «976…»,
+ * «+976 8811-2233» — in the one form the rest of Basu stores.
+ */
+export function phoneE164(raw: string): string {
+  const typed = raw.replace(/[\s\-().]/g, '');
+  if (/^\d{8}$/.test(typed)) return `+976${typed}`;
+  if (/^(00)?976\d{8}$/.test(typed)) return `+${typed.replace(/^00/, '')}`;
+  return typed;
+}
+
+function requirePhone(raw: string): string {
+  const phone = phoneE164(raw);
   if (!PHONE.test(phone)) throw new AuthError('BAD_PHONE', 'phone must be +976XXXXXXXX');
+  return phone;
 }
 
 /**
@@ -48,7 +61,7 @@ export async function registerGuest(
   ctx: Ctx,
   input: { phone: string; password: string; name?: string | null; device?: string | null },
 ): Promise<GuestSession> {
-  requirePhone(input.phone);
+  const phone = requirePhone(input.phone);
   checkPassword(input.password);
   const name = input.name?.trim() || null;
   const hash = await hashPassword(input.password);
@@ -56,7 +69,7 @@ export async function registerGuest(
   const taken = await tx(async (client) => {
     const { rows } = await client.query<Row>(
       'SELECT id, password_hash, failed_sign_ins, locked_until, closed_at FROM identity.guest WHERE phone_e164 = $1 FOR UPDATE',
-      [input.phone],
+      [phone],
     );
     // Any account on this number, with a password or without, is somebody's.
     // Registering proves nothing about who holds the phone, so it must never
@@ -68,7 +81,7 @@ export async function registerGuest(
     const made = await client.query<{ id: string }>(
       `INSERT INTO identity.guest (phone_e164, name, password_hash, password_set_at)
        VALUES ($1, $2, $3, $4) RETURNING id`,
-      [input.phone, name, hash, ctx.clock.now()],
+      [phone, name, hash, ctx.clock.now()],
     );
     await client.query('INSERT INTO identity.profile (guest_id, display_name) VALUES ($1, $2) ON CONFLICT DO NOTHING', [
       made.rows[0]!.id,
@@ -78,7 +91,7 @@ export async function registerGuest(
   });
   if (taken) throw new AuthError('PHONE_TAKEN', 'that number already has an account');
 
-  return startSession(ctx, input.phone, input.device ?? null);
+  return startSession(ctx, phone, input.device ?? null);
 }
 
 /**
@@ -93,12 +106,12 @@ export async function claimAccount(
   ctx: Ctx,
   input: { phone: string; password: string; name?: string | null; device?: string | null },
 ): Promise<GuestSession> {
-  requirePhone(input.phone);
+  const phone = requirePhone(input.phone);
   checkPassword(input.password);
   const name = input.name?.trim() || null;
   const { rows } = await getPool().query<Row>(
     'SELECT id, password_hash, failed_sign_ins, locked_until, closed_at FROM identity.guest WHERE phone_e164 = $1',
-    [input.phone],
+    [phone],
   );
   const existing = rows[0];
   if (existing?.password_hash) {
@@ -111,9 +124,9 @@ export async function claimAccount(
       [existing.id, await hashPassword(input.password), ctx.clock.now(), name],
     );
   } else {
-    return registerGuest(ctx, input);
+    return registerGuest(ctx, { ...input, phone });
   }
-  return startSession(ctx, input.phone, input.device ?? null);
+  return startSession(ctx, phone, input.device ?? null);
 }
 
 /** Sign in. Wrong phone and wrong password are the same answer on purpose. */
@@ -121,11 +134,11 @@ export async function signInWithPassword(
   ctx: Ctx,
   input: { phone: string; password: string; device?: string | null },
 ): Promise<GuestSession> {
-  requirePhone(input.phone);
+  const phone = requirePhone(input.phone);
   const now = ctx.clock.now();
   const { rows } = await getPool().query<Row>(
     'SELECT id, password_hash, failed_sign_ins, locked_until, closed_at FROM identity.guest WHERE phone_e164 = $1',
-    [input.phone],
+    [phone],
   );
   const guest = rows[0];
 
@@ -150,7 +163,7 @@ export async function signInWithPassword(
   }
 
   await getPool().query('UPDATE identity.guest SET failed_sign_ins = 0, locked_until = NULL WHERE id = $1', [guest!.id]);
-  return startSession(ctx, input.phone, input.device ?? null);
+  return startSession(ctx, phone, input.device ?? null);
 }
 
 /** Change it, knowing the old one. Every other session is ended. */

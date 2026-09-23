@@ -62,6 +62,24 @@ describe('security headers', () => {
   });
 });
 
+describe('a server with no demo in it', () => {
+  it('serves every page, and none of the shortcuts past the door', async () => {
+    const real = await buildServer(ctx, { dev: false });
+    try {
+      for (const url of ['/', '/idesh', '/dine', '/supplier', '/dashboard', '/kds', '/privacy', '/terms', '/api.js', '/app.css']) {
+        const res = await real.inject({ method: 'GET', url });
+        expect(res.statusCode, url).toBe(200);
+      }
+      for (const url of ['/dev/ops-token', '/dev/clock']) {
+        expect((await real.inject({ method: 'GET', url })).statusCode, url).toBe(404);
+      }
+      expect((await real.inject({ method: 'POST', url: '/dev/login', payload: {} })).statusCode).toBe(404);
+    } finally {
+      await real.close();
+    }
+  });
+});
+
 describe('rate limits', () => {
   it('shut the pairing door after too many tries from one address, in the API’s own words', async () => {
     const { max } = limits().pair;

@@ -89,6 +89,15 @@ describe('signing up', () => {
   });
 });
 
+describe('a number as people type it', () => {
+  it('is one account whether it was typed with +976, without, or with spaces', async () => {
+    const made = await registerGuest(ctx, { phone: '8811 2233', password: 'нэг хоёр гурав' });
+    await expect(registerGuest(ctx, { phone: '+97688112233', password: 'нэг хоёр гурав' })).rejects.toMatchObject({ code: 'PHONE_TAKEN' });
+    const session = await signInWithPassword(ctx, { phone: '976-8811-2233', password: 'нэг хоёр гурав' });
+    expect(await resolveGuest(ctx, session.token)).toBe(made.guestId);
+  });
+});
+
 describe('signing in', () => {
   beforeEach(async () => {
     await registerGuest(ctx, { phone: '+97699001122', password: 'сайн нууц үг' });
