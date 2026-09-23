@@ -41,6 +41,24 @@ sudo -u "$RUN_AS" npm run build --silent
 
 env_url() { sudo -u "$RUN_AS" sh -c 'sed -n "s/^DATABASE_URL=//p" .env'; }
 
+# The units were written for the demo and may carry a BASU_MODE of their own,
+# and a variable already in the process environment beats one in .env. So
+# the mode .env names is pinned into both units with a drop-in whose
+# EnvironmentFile is read last — later files win, and files beat Environment=.
+pin_mode() {
+  local mode node_env unit
+  mode=$(sed -n 's/^BASU_MODE=//p' .env | tail -n 1)
+  node_env=$(sed -n 's/^NODE_ENV=//p' .env | tail -n 1)
+  { echo "BASU_MODE=${mode:-demo}"; [ -z "$node_env" ] || echo "NODE_ENV=$node_env"; } > /opt/basu/mode.env
+  chmod 644 /opt/basu/mode.env
+  for unit in basu-api basu-scheduler; do
+    systemctl cat "$unit" >/dev/null 2>&1 || continue
+    mkdir -p "/etc/systemd/system/$unit.service.d"
+    printf '[Service]\nEnvironmentFile=/opt/basu/mode.env\n' > "/etc/systemd/system/$unit.service.d/zz-mode.conf"
+  done
+  systemctl daemon-reload
+}
+
 # ── Leaving the demo, once ─────────────────────────────────────────────
 # The pilot ran as a walkthrough: a demo clock, a shared desk token, a
 # seeded catalogue of restaurants and suppliers nobody owns, a door that let
@@ -90,6 +108,7 @@ if ! sudo -u "$RUN_AS" grep -q '^BASU_MODE=production$' .env; then
   trap 'if [ "$flipped" = 1 ]; then
           echo "↩ back to the demo .env"
           cp -p .env.demo .env
+          pin_mode
           systemctl disable -q --now basu-scheduler 2>/dev/null || true
           systemctl restart basu-api
         fi' EXIT
@@ -120,6 +139,7 @@ if sudo -u "$RUN_AS" grep -q '^BASU_MODE=production$' .env; then
 fi
 
 echo "→ restart"
+pin_mode
 systemctl restart basu-api
 if systemctl is-enabled --quiet basu-scheduler 2>/dev/null; then
   systemctl restart basu-scheduler
@@ -129,6 +149,19 @@ echo "→ health"
 for _ in $(seq 1 30); do
   if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
     echo "✓ $sha is up on :$PORT"
+    if grep -q '^BASU_MODE=production$' .env; then
+      dev=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/dev/clock")
+      if [ "$dev" != 404 ]; then
+        # Demo shortcuts on the real database let anybody in as anybody.
+        # Dark is better than that.
+        echo "✗ production, yet /dev answers $dev — stopping the API"
+        echo "  unit environment names: $(systemctl show -p Environment --value basu-api | tr ' ' '\n' | cut -d= -f1 | paste -sd' ' -)"
+        echo "  unit environment files: $(systemctl show -p EnvironmentFiles --value basu-api)"
+        systemctl stop basu-api
+        exit 1
+      fi
+      echo "✓ production: no /dev on :$PORT"
+    fi
     flipped=0
     exit 0
   fi
