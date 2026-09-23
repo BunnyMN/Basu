@@ -12,7 +12,11 @@ export default defineConfig({
     env: { DATABASE_URL: TEST_DATABASE_URL },
     globalSetup: ['src/test/globalSetup.ts'],
     // The page tests drive a real DOM against a real server and poll for the
-    // result, so they need more room than a unit test.
-    testTimeout: 20_000,
+    // result, so they need more room than a unit test — and a shared CI
+    // runner is two to three times slower than a laptop. The ceiling has to
+    // stay above the longest wait inside a test (see PATIENCE in
+    // pages.test.ts), or vitest kills the test before the wait can report
+    // what it was waiting for.
+    testTimeout: process.env['CI'] ? 60_000 : 20_000,
   },
 });
