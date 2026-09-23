@@ -114,6 +114,28 @@ afterAll(async () => {
   await closePool();
 });
 
+describe('making an account', () => {
+  it('says what is wrong with the password instead of failing opaquely', async () => {
+    const short = await app.inject({ method: 'POST', url: '/v1/auth/register', payload: { phone: '+97699004242', password: 'богино' } });
+    expect(short.statusCode).toBe(400);
+    expect(short.json().error).toMatchObject({ code: 'TOO_SHORT' });
+    expect(short.json().error.message_mn).toContain('8 тэмдэгт');
+
+    const missing = await app.inject({ method: 'POST', url: '/v1/auth/register', payload: { phone: '+97699004242' } });
+    expect(missing.statusCode).toBe(400);
+
+    const made = await app.inject({ method: 'POST', url: '/v1/auth/register', payload: { phone: '+97699004242', password: 'болохуйц нууц үг' } });
+    expect(made.statusCode, made.body).toBe(201);
+    const again = await app.inject({ method: 'POST', url: '/v1/auth/register', payload: { phone: '+97699004242', password: 'өөр нууц үг' } });
+    expect(again.statusCode).toBe(409);
+    expect(again.json().error.code).toBe('PHONE_TAKEN');
+
+    const back = await app.inject({ method: 'POST', url: '/v1/auth/login', payload: { phone: '+97699004242', password: 'болохуйц нууц үг' } });
+    expect(back.statusCode, back.body).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: { authorization: `Bearer ${back.json().token}` } })).statusCode).toBe(200);
+  });
+});
+
 describe('signing in', () => {
   it('sends a code by SMS and never puts it in the response', async () => {
     const asked = await app.inject({

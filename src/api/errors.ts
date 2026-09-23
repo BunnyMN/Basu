@@ -1,5 +1,5 @@
 import type { FastifyReply } from 'fastify';
-import { AuthError } from '../platform/identity/index.js';
+import { AuthError, PasswordError } from '../platform/identity/index.js';
 import { LedgerError } from '../platform/ledger/index.js';
 import { ClosureError } from '../platform/identity/index.js';
 import { IdeshError, type IdeshErrorCode } from '../idesh/index.js';
@@ -91,6 +91,11 @@ const IDESH_ERRORS: Record<IdeshErrorCode, Spec> = {
   },
 };
 
+const PASSWORD_ERRORS: Record<PasswordError['code'], Spec> = {
+  TOO_SHORT: { status: 400, mn: 'Нууц үг дор хаяж 8 тэмдэгт байх ёстой.' },
+  TOO_LONG: { status: 400, mn: 'Нууц үг хэт урт байна.' },
+};
+
 const AUTH_ERRORS: Record<AuthError['code'], Spec> = {
   BAD_PHONE: { status: 400, mn: 'Утасны дугаараа шалгана уу (+976XXXXXXXX).' },
   PHONE_TAKEN: { status: 409, mn: 'Энэ дугаар аль хэдийн бүртгэлтэй. Нэвтэрнэ үү.' },
@@ -155,6 +160,13 @@ export function sendError(reply: FastifyReply, error: unknown): FastifyReply {
     const mn = error.code === 'BAD_REASON' ? `${spec.mn.replace(/\.$/, '')}: ${error.message}.` : spec.mn;
     return reply.status(spec.status).send(envelope(error.code, mn, error.message));
   }
+  // A password that is too short is the person's typing, not our fault, and
+  // must read as such rather than as «Алдаа гарлаа».
+  if (error instanceof PasswordError) {
+    const spec = PASSWORD_ERRORS[error.code];
+    return reply.status(spec.status).send(envelope(error.code, spec.mn, error.message));
+  }
+
   if (error instanceof AuthError) {
     const spec = AUTH_ERRORS[error.code];
     const body = envelope(error.code, spec.mn, error.message);
