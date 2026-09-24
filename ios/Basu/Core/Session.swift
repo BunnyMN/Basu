@@ -13,7 +13,11 @@ import UIKit
 @Observable
 final class Session {
   private(set) var token: String?
+  /// What the person signed in with, when the sheet knows it: the number,
+  /// or the address. Google and Apple say it only to the server, so after
+  /// those both are nil and the profile's `Me` has it instead.
   private(set) var phone: String?
+  private(set) var email: String?
 
   private let api: API
   private let store: Keychain
@@ -23,17 +27,70 @@ final class Session {
     self.store = store
     token = store.read("guest.token")
     phone = store.read("guest.phone")
+    email = store.read("guest.email")
   }
 
   var isSignedIn: Bool { token != nil }
 
-  func requestCode(phone: String) async throws {
-    try await api.requestCode(phone: phone)
+  /// Which ways in the server has open, for the sheet to draw.
+  func methods() async -> AuthMethods { await api.authMethods() }
+
+  /// Where the system's sign-in sheet goes for Google.
+  var googleStart: URL { api.googleStart }
+
+  // MARK: without a phone
+
+  /// A code to the address. It goes to the inbox, never back here.
+  func requestCode(email: String) async throws {
+    try await api.emailStart(email: Self.address(email))
   }
 
-  func verify(phone: String, code: String) async throws {
-    let token = try await api.verify(phone: phone, code: code, device: Self.deviceName)
-    keep(token: token, phone: phone)
+  /// The code from the letter. An address nobody has used becomes an account.
+  func signIn(email: String, code: String) async throws {
+    let address = Self.address(email)
+    let token = try await api.emailVerify(email: address, code: code, device: Self.deviceName)
+    keep(token: token, phone: nil, email: address)
+  }
+
+  /// The session Google's round trip ended with, taken from the fragment.
+  func signedInWithGoogle(token: String) {
+    keep(token: token, phone: nil, email: nil)
+  }
+
+  /// Apple's identity token, and the nonce whose hash Apple put in it.
+  func signIn(appleToken: String, nonce: String, name: String?) async throws {
+    let token = try await api.apple(identityToken: appleToken, nonce: nonce, name: name, device: Self.deviceName)
+    keep(token: token, phone: nil, email: nil)
+  }
+
+  /// An address the one way the server stores it.
+  nonisolated static func address(_ typed: String) -> String {
+    typed.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+  }
+
+  // MARK: with a phone
+
+  /// The number and the password it already has.
+  func signIn(phone: String, password: String) async throws {
+    let number = PhoneNumber.e164(phone)
+    let token = try await api.signIn(phone: number, password: password, device: Self.deviceName)
+    keep(token: token, phone: number, email: nil)
+  }
+
+  /// A new account, for a number nobody has used.
+  func register(phone: String, password: String) async throws {
+    let number = PhoneNumber.e164(phone)
+    let token = try await api.register(phone: number, password: password, device: Self.deviceName)
+    keep(token: token, phone: number, email: nil)
+  }
+
+  /// A code from Basu: the way into an account somebody else made for this
+  /// number — a supplier's owner, registered by the desk — which has no
+  /// password until its owner chooses one here.
+  func claim(code: String, phone: String, password: String) async throws {
+    let number = PhoneNumber.e164(phone)
+    let token = try await api.claim(code: code, phone: number, password: password, device: Self.deviceName)
+    keep(token: token, phone: number, email: nil)
   }
 
   /// What this phone calls itself — «Батаагийн iPhone». It goes to identity so
@@ -41,17 +98,17 @@ final class Session {
   @MainActor static var deviceName: String { UIDevice.current.name }
 
   #if DEBUG
-    /// The demo way in: the walkthrough cannot read an SMS that went to a fake
-    /// gateway, and putting the code in the response would be a hole that
-    /// shipped. Debug builds only — the button does not exist in a release.
+    /// A developer's own server lets a walkthrough straight in. Debug builds
+    /// pointed away from the pilot only — the real server has no such door,
+    /// and a release build has no such button.
     func demoSignIn(phone: String = "+97699001122") async throws {
       let token = try await api.demoLogin(phone: phone, device: Self.deviceName)
-      keep(token: token, phone: phone)
+      keep(token: token, phone: phone, email: nil)
     }
   #endif
 
   /// A stored token outlives the thing it points at — sessions expire, get
-  /// revoked, or vanish when the demo database is reseeded. A 401 means this
+  /// revoked, or vanish with the database they were made in. A 401 means this
   /// one is dead, not that the guest did anything wrong.
   func forget() {
     token = nil
@@ -61,14 +118,19 @@ final class Session {
   func signOut() {
     forget()
     phone = nil
+    email = nil
     store.delete("guest.phone")
+    store.delete("guest.email")
   }
 
-  private func keep(token: String, phone: String) {
+  private func keep(token: String, phone: String?, email: String?) {
     self.token = token
     self.phone = phone
+    self.email = email
     store.write(token, for: "guest.token")
-    store.write(phone, for: "guest.phone")
+    for (key, value) in [("guest.phone", phone), ("guest.email", email)] {
+      if let value { store.write(value, for: key) } else { store.delete(key) }
+    }
   }
 }
 
@@ -108,5 +170,26 @@ struct Keychain: Sendable {
       kSecAttrService as String: service,
       kSecAttrAccount as String: key,
     ]
+  }
+}
+
+/// A Mongolian number the way people type it — «8811 2233», «976…»,
+/// «+976 8811-2233» — in the one form the server stores. The server does the
+/// same; doing it here too means the number the profile shows is that one.
+enum PhoneNumber {
+  static func e164(_ typed: String) -> String {
+    let kept = typed.filter { !" -().".contains($0) }
+    let digits = kept.hasPrefix("+") ? String(kept.dropFirst()) : kept
+    guard digits.allSatisfy(\.isASCII), digits.allSatisfy(\.isNumber) else { return kept }
+    if digits.count == 8 { return "+976" + digits }
+    if digits.count == 11, digits.hasPrefix("976") { return "+" + digits }
+    if digits.count == 13, digits.hasPrefix("00976") { return "+" + digits.dropFirst(2) }
+    return kept
+  }
+
+  /// Enough of a number to be worth sending: eight digits, with or without +976.
+  static func looksComplete(_ typed: String) -> Bool {
+    let number = e164(typed)
+    return number.count == 12 && number.hasPrefix("+976")
   }
 }

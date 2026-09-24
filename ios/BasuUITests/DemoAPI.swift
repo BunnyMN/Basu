@@ -83,6 +83,20 @@ struct DemoAPI {
     return Running(id: id, token: token)
   }
 
+  /// The code in the last letter the developer's server "sent" to an
+  /// address — read the way a person reads it off their inbox.
+  func emailCode(to address: String) async throws -> String {
+    var components = URLComponents(url: base.appendingPathComponent("/dev/mail"), resolvingAgainstBaseURL: false)!
+    components.queryItems = [URLQueryItem(name: "to", value: address)]
+    let (data, _) = try await URLSession.shared.data(from: components.url!)
+    let letter = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    let text = letter["text"] as? String ?? ""
+    guard let range = text.range(of: #"\d{6}"#, options: .regularExpression) else {
+      throw XCTSkip("No letter to \(address) on \(base) — the server has a real mailer, or none.")
+    }
+    return String(text[range])
+  }
+
   /// Take it back. Past the fire the server refuses, and that is its call.
   func cancel(_ order: Running) async {
     _ = try? await post("/v1/orders/\(order.id)/cancel", nil, token: order.token)

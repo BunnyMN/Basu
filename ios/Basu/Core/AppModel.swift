@@ -76,6 +76,7 @@ final class AppModel {
       live = try await lunches
       noted(nil)
       await OrderActivity.shared.sync(live: live)
+      if live.contains(where: { $0.state == .served }) { ReviewMoment.noteFinished() }
     } catch let error as APIError where error.isUnauthorised {
       // A token from a reseeded database is dead, not a reason to shout at
       // somebody who has only just opened the app.
@@ -92,6 +93,7 @@ final class AppModel {
     // empty list, not an outage. Likewise a server without the supplier's
     // side: no tile, not an error.
     liveIdesh = (try? await provisions) ?? []
+    if liveIdesh.contains(where: { $0.state == .handed }) { ReviewMoment.noteFinished() }
     supplier = (try? await mine) ?? nil
   }
 

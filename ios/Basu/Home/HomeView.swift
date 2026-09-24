@@ -1,4 +1,5 @@
 import BasuKit
+import StoreKit
 import SwiftUI
 
 /**
@@ -21,6 +22,7 @@ struct HomeView: View {
   @Environment(AppModel.self) private var model
   @Environment(Session.self) private var session
   @Environment(Platform.self) private var platform
+  @Environment(\.requestReview) private var requestReview
   @State private var signingIn = false
   @State private var query = ""
 
@@ -70,6 +72,15 @@ struct HomeView: View {
     .task(id: session.token) {
       await model.refreshLive()
       await platform.refresh()
+    }
+    .task {
+      // Back on the launcher after something went right: a moment to settle
+      // first, so the ask is not the first thing that happens on arrival.
+      guard ReviewMoment.due else { return }
+      try? await Task.sleep(for: .seconds(2))
+      guard !Task.isCancelled, ReviewMoment.due else { return }
+      ReviewMoment.markAsked()
+      requestReview()
     }
   }
 

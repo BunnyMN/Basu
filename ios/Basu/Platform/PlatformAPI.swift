@@ -13,7 +13,9 @@ import Foundation
 
 struct Me: Decodable, Sendable, Equatable {
   let id: String
-  let phone: String
+  /// Nil for an account made by email, Google or Apple.
+  let phone: String?
+  let email: String?
   let displayName: String?
   let locale: String
   let avatarSeed: String
@@ -22,7 +24,7 @@ struct Me: Decodable, Sendable, Equatable {
   let unread: Int
 
   enum CodingKeys: String, CodingKey {
-    case id, phone, locale, wallet, unread
+    case id, phone, email, locale, wallet, unread
     case displayName = "display_name"
     case avatarSeed = "avatar_seed"
     case memberSince = "member_since"

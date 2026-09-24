@@ -1,0 +1,179 @@
+import XCTest
+
+/**
+ The way in, the way a person takes it.
+
+ By email: an address nobody has used asks for a code, reads it off the
+ inbox, and is in — the six digits go without another tap. Apple's button is
+ on the same sheet, as the App Store asks.
+
+ By phone: a new number signs up with a password, signs out, and comes back
+ with the same password — and a wrong one is told so, with the way to sign up
+ offered beside it.
+
+ The password is in Cyrillic on purpose. A secure field on iOS offers only
+ keyboards that type Latin, so a password chosen on the web in Mongolian can
+ only be typed here with the field shown — which is what this checks.
+
+ Runs against the developer's server on localhost and skips when nothing is
+ listening, like the other flows. Every run uses a number nobody has used, so
+ it never trips over an account from an earlier run.
+ */
+@MainActor
+final class SignInFlowTests: XCTestCase {
+  private let base = URL(string: ProcessInfo.processInfo.environment["BASU_API"] ?? "http://localhost:3000")!
+
+  private struct Stop: Error {}
+
+  /// An async test carries on past a failed assertion; this one should not.
+  private func check(_ ok: Bool, _ message: String) throws {
+    XCTAssertTrue(ok, message)
+    guard !ok else { return }
+    shot("failed-here")
+    let tree = XCTAttachment(string: XCUIApplication().debugDescription)
+    tree.name = "tree"
+    tree.lifetime = .keepAlways
+    add(tree)
+    throw Stop()
+  }
+
+  private func shot(_ name: String) {
+    let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+    attachment.name = name
+    attachment.lifetime = .keepAlways
+    add(attachment)
+  }
+
+  func testANewAddressAsksForACodeAndIsIn() async throws {
+    let api = DemoAPI(base: base)
+    try await api.requireServer()
+
+    let app = XCUIApplication()
+    app.launchEnvironment["BASU_API"] = base.absoluteString
+    app.launch()
+    try check(app.buttons["app.Хоол"].waitForExistence(timeout: 10), "the launcher should be up")
+    try signOutIfSignedIn(app)
+
+    app.buttons["home.account"].firstMatch.tap()
+    try check(app.buttons["signin.apple"].waitForExistence(timeout: 5), "Apple's button is on the first face of the sheet")
+    let field = app.textFields["signin.email"]
+    guard field.waitForExistence(timeout: 5) else {
+      throw XCTSkip("The server on \(base) has no email door.")
+    }
+    shot("1-doors")
+
+    let address = "ui\(Int.random(in: 100_000..<999_999))@example.mn"
+    try type(field, address)
+    app.buttons["signin.emailGo"].tap()
+    let codeField = app.textFields["signin.emailCode"]
+    try check(codeField.waitForExistence(timeout: 10), "a code went out, and the sheet asks for it")
+    shot("2-code-sent")
+
+    let code = try await api.emailCode(to: address)
+    codeField.typeText(code)
+    try check(app.buttons["home.inbox"].waitForExistence(timeout: 10), "six digits, and the person is in")
+    shot("3-in")
+
+    // The profile says who they are: the address, not a number.
+    app.buttons["tab.profile"].tap()
+    try check(app.staticTexts[address].waitForExistence(timeout: 10), "the profile shows the address")
+    shot("4-profile")
+    app.buttons["tab.home"].tap()
+    try signOutIfSignedIn(app)
+  }
+
+  func testANewNumberSignsUpSignsOutAndComesBack() async throws {
+    try await DemoAPI(base: base).requireServer()
+
+    let app = XCUIApplication()
+    app.launchEnvironment["BASU_API"] = base.absoluteString
+    app.launch()
+    try check(app.buttons["app.Хоол"].waitForExistence(timeout: 10), "the launcher should be up")
+    try signOutIfSignedIn(app)
+
+    let number = "88" + String(format: "%06d", Int.random(in: 0..<1_000_000))
+    let password = "Хонь \(Int.random(in: 1000..<9999)) идэш"
+
+    // ── sign up, in Cyrillic, with the field shown ────────────────────
+    app.buttons["home.account"].firstMatch.tap()
+    try openThePhoneDoor(app)
+    let doors = app.segmentedControls["signin.door"]
+    try check(doors.waitForExistence(timeout: 5), "the sheet should open on its two doors")
+    doors.buttons["Бүртгүүлэх"].tap()
+    app.buttons["signin.reveal"].tap()
+    try type(app.textFields["signin.phone"], number)
+    try type(app.textFields["signin.password"], password)
+    try type(app.textFields["signin.again"], password)
+    shot("1-sign-up")
+    app.buttons["signin.go"].tap()
+    try check(app.buttons["home.inbox"].waitForExistence(timeout: 10), "signed up, the bell replaces the way in")
+    declineSavingThePassword(app)
+
+    // ── out, and a wrong password ─────────────────────────────────────
+    try signOutIfSignedIn(app)
+    app.buttons["home.account"].firstMatch.tap()
+    try openThePhoneDoor(app)
+    try type(app.textFields["signin.phone"], number)
+    try type(app.secureTextFields["signin.password"], "wrong-password-1")
+    app.buttons["signin.go"].tap()
+    try check(app.staticTexts["signin.trouble"].waitForExistence(timeout: 10), "a wrong password is said out loud")
+    try check(app.buttons["signin.offerSignUp"].exists, "and the way to sign up is offered beside it")
+    shot("2-wrong-password")
+
+    // ── back in, with the right one ───────────────────────────────────
+    // Shown, while the keyboard is still up: the field keeps it, and the
+    // keyboard's own «go» is the way to send, as a thumb would.
+    app.buttons["signin.reveal"].tap()
+    try replace(app.textFields["signin.password"], with: password + "\n")
+    try check(app.buttons["home.inbox"].waitForExistence(timeout: 10), "the same password opens the same account")
+    declineSavingThePassword(app)
+    shot("3-back-in")
+
+    // Out again: the keychain outlives the run, and the next suite expects
+    // the demo guest or nobody, not this stranger.
+    try signOutIfSignedIn(app)
+  }
+
+  /// iOS offers to keep a password it has just seen work, over the launcher.
+  /// Not now: a test's simulator has nothing to fill it into.
+  private func declineSavingThePassword(_ app: XCUIApplication) {
+    let notNow = app.buttons["Not Now"]
+    if notNow.waitForExistence(timeout: 3) { notNow.tap() }
+  }
+
+  /// The phone is one tap past the first face of the sheet — unless the
+  /// server has no other door, and the sheet opens on it.
+  private func openThePhoneDoor(_ app: XCUIApplication) throws {
+    let way = app.buttons["signin.phoneWay"]
+    if way.waitForExistence(timeout: 5) { way.tap() }
+    try check(app.segmentedControls["signin.door"].waitForExistence(timeout: 5), "the phone door should be open")
+  }
+
+  private func type(_ element: XCUIElement, _ text: String) throws {
+    try check(element.waitForExistence(timeout: 5), "\(element) should be on the sheet")
+    element.tap()
+    element.typeText(text)
+  }
+
+  private func replace(_ element: XCUIElement, with text: String) throws {
+    try check(element.waitForExistence(timeout: 5), "\(element) should be on the sheet")
+    // The field was just swapped from hidden to shown; let the swap settle.
+    let settled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "isHittable == true"), object: element)
+    _ = XCTWaiter.wait(for: [settled], timeout: 3)
+    element.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+    let old = (element.value as? String) ?? ""
+    element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: old.count))
+    element.typeText(text)
+  }
+
+  /// Signed in from an earlier run: out through the profile, the one place that says «Гарах».
+  private func signOutIfSignedIn(_ app: XCUIApplication) throws {
+    guard app.buttons["home.inbox"].waitForExistence(timeout: 2) else { return }
+    app.buttons["tab.profile"].tap()
+    let out = app.buttons["profile.signout"]
+    if !out.waitForExistence(timeout: 5) { app.swipeUp() }
+    out.tap()
+    app.buttons["tab.home"].tap()
+    try check(app.buttons["home.account"].waitForExistence(timeout: 10), "signed out, the way in is back")
+  }
+}

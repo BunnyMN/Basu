@@ -1,6 +1,15 @@
 import { wireConfigFromEnv, WirePayments } from '../platform/ledger/index.js';
 import { apnsConfigFromEnv, ApnsNotifier, SmtpMailer, smtpConfigFromEnv, smtpHost } from '../platform/notify/index.js';
-import { ClosedPaymentProvider, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx, type Mailer } from '../ports.js';
+import {
+  ClosedPaymentProvider,
+  FakeMailer,
+  FakeNotifier,
+  FakePaymentProvider,
+  FakeTaxProvider,
+  type Ctx,
+  type Mailer,
+  type OutgoingMail,
+} from '../ports.js';
 import { buildClock, mode } from '../mode.js';
 import { sealing } from '../secret.js';
 
@@ -16,6 +25,21 @@ import { sealing } from '../secret.js';
  * gateway yet, so the push notifier hands that channel to the fake, which is
  * where the relay ladder's last rung ends today.
  */
+/**
+ * A developer's mail server: the letter is printed, and kept, so /dev/mail
+ * can hand a UI test the code the way an inbox hands it to a person.
+ */
+class ConsoleMailer extends FakeMailer {
+  constructor(private readonly log: (line: string) => void) {
+    super();
+  }
+
+  override async send(mail: OutgoingMail): Promise<{ providerRef: string }> {
+    this.log(`[providers] mail to ${mail.to}: ${mail.subject}`);
+    return super.send(mail);
+  }
+}
+
 export function buildProviders(log: (line: string) => void = console.log): Ctx {
   const wire = wireConfigFromEnv();
   const apns = apnsConfigFromEnv();
@@ -27,13 +51,7 @@ export function buildProviders(log: (line: string) => void = console.log): Ctx {
     ? new SmtpMailer(smtp)
     : mode() === 'production'
       ? undefined
-      : {
-          name: 'console',
-          async send(mail) {
-            log(`[providers] mail to ${mail.to}: ${mail.subject}`);
-            return { providerRef: 'console' };
-          },
-        };
+      : new ConsoleMailer(log);
   const sms = new FakeNotifier();
   const notifier = apns ? new ApnsNotifier(apns, sms) : sms;
   log(

@@ -38,6 +38,48 @@ enum Endpoint {
   }()
 }
 
+/// Which ways in the server has open.
+struct AuthMethods: Decodable, Sendable, Equatable {
+  let password: Bool
+  let email: Bool
+  let google: Bool
+  let apple: Bool
+
+  static let unknown = AuthMethods(password: true, email: false, google: false, apple: true)
+}
+
+/**
+ What Google's round trip came back with: `basu://auth#auth=<token>`, or
+ `#auth_error=<why>`. The session rides in the fragment, which no server or
+ log ever sees.
+ */
+enum GoogleReturn: Equatable, Sendable {
+  case token(String)
+  /// The person backed out at Google. Nothing to say about it.
+  case cancelled
+  case refused(String)
+
+  static let scheme = "basu"
+  static let callback = "basu://auth"
+
+  static func parse(_ url: URL) -> GoogleReturn {
+    guard url.scheme == scheme, url.host == "auth",
+          let fragment = URLComponents(url: url, resolvingAgainstBaseURL: false)?.fragment,
+          let items = URLComponents(string: "?" + fragment)?.queryItems
+    else { return .refused("SOCIAL_REFUSED") }
+    if let token = items.first(where: { $0.name == "auth" })?.value, !token.isEmpty { return .token(token) }
+    let why = items.first(where: { $0.name == "auth_error" })?.value ?? "SOCIAL_REFUSED"
+    return why == "CANCELLED" ? .cancelled : .refused(why)
+  }
+
+  /// A refusal in the words the web page uses for the same thing.
+  static func words(for code: String) -> String {
+    code == "SOCIAL_CLOSED"
+      ? "Google-ээр нэвтрэх одоогоор нээгдээгүй байна."
+      : "Google-ээр нэвтэрч чадсангүй. Дахин оролдоно уу."
+  }
+}
+
 /// A refusal from the server, already written in Mongolian.
 ///
 /// The API sends `message_mn` precisely so that no client has to invent a
@@ -94,22 +136,74 @@ struct API: Sendable {
   }
 
   // MARK: signing in
+  //
+  // A phone number and a password. Each call names the device — what this
+  // phone calls itself — so the session list on the profile screen is four
+  // different rows rather than four identical ones.
 
-  func requestCode(phone: String) async throws {
-    _ = try await send(.init(path: "/v1/auth/otp", method: "POST", body: ["phone": phone]), as: Blank.self)
+  func signIn(phone: String, password: String, device: String) async throws -> String {
+    try await send(
+      .init(path: "/v1/auth/login", method: "POST", body: ["phone": phone, "password": password, "device": device]),
+      as: Token.self,
+    ).token
   }
 
-  func verify(phone: String, code: String, device: String) async throws -> String {
-    let answer: Token = try await send(
+  func register(phone: String, password: String, device: String) async throws -> String {
+    try await send(
+      .init(path: "/v1/auth/register", method: "POST", body: ["phone": phone, "password": password, "device": device]),
+      as: Token.self,
+    ).token
+  }
+
+  func claim(code: String, phone: String, password: String, device: String) async throws -> String {
+    try await send(
       .init(
-        path: "/v1/auth/verify",
+        path: "/v1/auth/claim",
         method: "POST",
-        // What this phone calls itself, so the session list on the profile
-        // screen is four different rows rather than four identical ones.
-        body: ["phone": phone, "code": code, "device": device],
+        body: ["code": code, "phone": phone, "password": password, "device": device],
       ),
-    )
-    return answer.token
+      as: Token.self,
+    ).token
+  }
+
+  // MARK: signing in without a phone
+  //
+  // A code by email, Google through the system's sign-in sheet, and Apple.
+  // The server says which of them it has open; the sheet draws only those.
+
+  /// A server that does not answer is taken to have what every one of them
+  /// has: Apple and the phone. Google and email wait until it says so.
+  func authMethods() async -> AuthMethods {
+    (try? await send(.init(path: "/v1/auth/methods"), as: AuthMethods.self)) ?? .unknown
+  }
+
+  /// The code goes to the inbox, never back here.
+  func emailStart(email: String) async throws {
+    _ = try await send(.init(path: "/v1/auth/email/start", method: "POST", body: ["email": email]), as: Blank.self)
+  }
+
+  func emailVerify(email: String, code: String, device: String) async throws -> String {
+    try await send(
+      .init(path: "/v1/auth/email/verify", method: "POST", body: ["email": email, "code": code, "device": device]),
+      as: Token.self,
+    ).token
+  }
+
+  /// The identity token Apple handed the app, and the nonce whose hash Apple
+  /// was asked to put in it.
+  func apple(identityToken: String, nonce: String, name: String?, device: String) async throws -> String {
+    var body: [String: Any] = ["identity_token": identityToken, "nonce": nonce, "device": device]
+    if let name { body["name"] = name }
+    return try await send(.init(path: "/v1/auth/apple", method: "POST", body: body), as: Token.self).token
+  }
+
+  /// Where the system's sign-in sheet opens for Google. The server sends the
+  /// person on to Google, and back to `basu://auth` — which the sheet
+  /// catches before any other app could.
+  var googleStart: URL {
+    var components = URLComponents(url: base.appendingPathComponent("/v1/auth/google/start"), resolvingAgainstBaseURL: false)!
+    components.queryItems = [URLQueryItem(name: "return", value: GoogleReturn.callback)]
+    return components.url!
   }
 
   // MARK: what is running
@@ -129,8 +223,8 @@ struct API: Sendable {
     try await send(.init(path: "/v1/orders", token: token), as: Wrapped<[LiveOrder]>.self, key: "orders").value
   }
 
-  /// Straight to a session, the way the demo pages do it. Debug builds only:
-  /// the real way in is an SMS.
+  /// Straight to a session, the way a developer's own server allows. Debug
+  /// builds only: the real way in is a password.
   func demoLogin(phone: String, device: String) async throws -> String {
     try await send(
       .init(path: "/dev/login", method: "POST", body: ["phone": phone, "device": device]),

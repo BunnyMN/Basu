@@ -56,7 +56,7 @@ import { registerIdeshRoutes } from './idesh.js';
 import { registerOpsRoutes } from './ops.js';
 import { registerPaymentRoutes } from './payments.js';
 import { registerAuthRoutes } from './auth.js';
-import type { Ctx } from '../ports.js';
+import { FakeMailer, type Ctx } from '../ports.js';
 
 /**
  * The HTTP surface.
@@ -1018,6 +1018,18 @@ async function mountDevRoutes(
     } catch (error) {
       return sendError(reply, error);
     }
+  });
+
+  /**
+   * The last letter the console mailer "sent" to an address, so a UI test on
+   * a developer's machine can read the code out of it the way a person reads
+   * their inbox. Only a recording mailer has letters to show; a real one
+   * sends them and keeps nothing.
+   */
+  app.get<{ Querystring: { to?: string } }>('/dev/mail', async (request, reply) => {
+    const letter = ctx.mailer instanceof FakeMailer ? ctx.mailer.to(request.query.to?.trim().toLowerCase() ?? '') : undefined;
+    if (!letter) return reply.status(404).send({ error: { code: 'NOT_FOUND', message_mn: 'Захидал алга.', message_en: 'no letter to that address' } });
+    return { to: letter.to, subject: letter.subject, text: letter.text };
   });
 
   /** The pairing codes the seed just printed, so the tablet can self-pair. */

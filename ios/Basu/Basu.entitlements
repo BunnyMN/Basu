@@ -1,15 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  The release build's entitlements: the App Group the widget shares, and
-  push — for the device token and for each Live Activity's own. Signing this
-  needs an Apple Developer Program team; a personal team builds Debug, with
-  Basu.debug.entitlements, and gets everything but push.
+  The release build's entitlements: the App Group the widget shares, push —
+  for the device token and for each Live Activity's own — and Sign in with
+  Apple. Signing this needs an Apple Developer Program team; a personal team
+  builds Debug, with Basu.debug.entitlements, and gets everything but push
+  and Apple's sign-in (its button then answers with an error).
 -->
 <plist version="1.0">
 <dict>
 	<key>aps-environment</key>
 	<string>development</string>
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>group.mn.basu.shared$(BASU_ID_SUFFIX)</string>

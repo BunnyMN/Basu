@@ -95,10 +95,19 @@ struct ProfileView: View {
           .tracking(-0.02 * 24)
           .foregroundStyle(Color.ink)
           .fixedSize(horizontal: false, vertical: true)
-        Text(spaced(platform.me?.phone ?? session.phone ?? "—"))
-          .font(.mono(14))
-          .monospacedDigit()
-          .foregroundStyle(Color.ink2)
+        // The number in the mono, the way every number is; an address is words.
+        if let phone = platform.me?.phone ?? (platform.me == nil ? session.phone : nil) {
+          Text(spaced(phone))
+            .font(.mono(14))
+            .monospacedDigit()
+            .foregroundStyle(Color.ink2)
+        } else if let email = platform.me?.email ?? session.email {
+          Text(email)
+            .font(.sans(14))
+            .foregroundStyle(Color.ink2)
+            .lineLimit(1)
+            .truncationMode(.middle)
+        }
         if let me = platform.me {
           // The seed is on the screen because the avatar is derived from it:
           // somebody who wonders where their mark came from can see the answer.
