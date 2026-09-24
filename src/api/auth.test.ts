@@ -302,24 +302,41 @@ describe('Google', () => {
 });
 
 describe('Apple, from the iPhone', () => {
+  /** What the app does: a random nonce, its hash to Apple, the nonce itself to us. */
+  const NONCE = 'a-random-nonce-from-the-app';
+  const hashed = createHash('sha256').update(NONCE).digest('hex');
   const signIn = (token: string, extra: Record<string, string> = {}) =>
-    app.inject({ method: 'POST', url: '/v1/auth/apple', payload: { identity_token: token, ...extra } });
+    app.inject({ method: 'POST', url: '/v1/auth/apple', payload: { identity_token: token, nonce: NONCE, ...extra } });
 
   it('signs in with the token Apple gave the app, and keeps the name Apple sends only once', async () => {
-    const first = await signIn(idToken(applePerson({ sub: 'apple-1', email: 'x1@privaterelay.appleid.com', email_verified: 'true' })), {
-      name: 'Дорж',
-    });
+    const first = await signIn(
+      idToken(applePerson({ sub: 'apple-1', nonce: hashed, email: 'x1@privaterelay.appleid.com', email_verified: 'true' })),
+      { name: 'Дорж' },
+    );
     expect(first.statusCode, first.body).toBe(200);
-    const again = await signIn(idToken(applePerson({ sub: 'apple-1' })));
+    const again = await signIn(idToken(applePerson({ sub: 'apple-1', nonce: hashed })));
     expect(again.json().guest_id).toBe(first.json().guest_id);
     expect(await whoIs(again.json().token)).toMatchObject({ display_name: 'Дорж', email: 'x1@privaterelay.appleid.com' });
   });
 
   it('refuses a token made for another app, or one that is not Apple’s', async () => {
-    const other = await signIn(idToken(applePerson({ sub: 'apple-1', aud: 'com.someone.else' })));
+    const other = await signIn(idToken(applePerson({ sub: 'apple-1', nonce: hashed, aud: 'com.someone.else' })));
     expect(other.statusCode).toBe(401);
     expect(other.json().error.code).toBe('SOCIAL_REFUSED');
-    const google = await signIn(idToken(googlePerson({ sub: 'apple-1' })));
+    const google = await signIn(idToken(googlePerson({ sub: 'apple-1', nonce: hashed })));
     expect(google.json().error.code).toBe('SOCIAL_REFUSED');
+  });
+
+  it('refuses a token this sign-in did not ask for', async () => {
+    const elsewhere = await signIn(idToken(applePerson({ sub: 'apple-1', nonce: 'somebody-elses-hash' })));
+    expect(elsewhere.json().error.code).toBe('SOCIAL_REFUSED');
+    const none = await signIn(idToken(applePerson({ sub: 'apple-1' })));
+    expect(none.json().error.code).toBe('SOCIAL_REFUSED');
+    const missing = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/apple',
+      payload: { identity_token: idToken(applePerson({ sub: 'apple-1', nonce: hashed })) },
+    });
+    expect(missing.statusCode).toBe(400);
   });
 });

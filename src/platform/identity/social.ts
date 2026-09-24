@@ -183,11 +183,16 @@ export function appleConfigFromEnv(): AppleConfig {
  * The token the app got from Apple. Apple sends a person's name only the
  * first time, and only to the app — so the app passes it along, and it is
  * kept if the account has none.
+ *
+ * The app asks Apple with the hash of a random nonce and sends us the nonce
+ * itself; the token must carry that hash. A token lifted from somewhere else
+ * — issued for another request, another sign-in — carries another, and is
+ * refused.
  */
 export async function signInWithApple(
   ctx: Ctx,
   config: AppleConfig,
-  input: { identityToken: string; name?: string | null; label?: string | null },
+  input: { identityToken: string; nonce: string; name?: string | null; label?: string | null },
 ): Promise<GuestSession> {
   let claims: IdClaims;
   try {
@@ -200,6 +205,10 @@ export async function signInWithApple(
     });
   } catch (error) {
     throw new AuthError('SOCIAL_REFUSED', `Apple's token did not check out: ${(error as IdTokenError).message}`);
+  }
+  const expected = createHash('sha256').update(input.nonce).digest('hex');
+  if (!input.nonce || claims.nonce !== expected) {
+    throw new AuthError('SOCIAL_REFUSED', 'Apple’s token was not asked for by this sign-in');
   }
   return signInWithIdentity(
     ctx,

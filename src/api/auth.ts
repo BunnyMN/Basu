@@ -150,15 +150,18 @@ export async function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): Promis
 
   /* ── Apple, from the iPhone app ── */
 
-  app.post<{ Body: { identity_token?: string; name?: string; device?: string } }>(
+  app.post<{ Body: { identity_token?: string; nonce?: string; name?: string; device?: string } }>(
     '/v1/auth/apple',
     { config: { rateLimit: rate.verify } },
     async (request, reply) => {
-      const { identity_token: identityToken, name, device } = request.body ?? {};
-      if (!identityToken) return badRequest(reply, 'Apple-аас ирсэн токен алга.', 'identity_token is required');
+      const { identity_token: identityToken, nonce, name, device } = request.body ?? {};
+      if (!identityToken || !nonce) {
+        return badRequest(reply, 'Apple-аас ирсэн токен алга.', 'identity_token and nonce are required');
+      }
       try {
         const session = await signInWithApple(ctx, appleConfigFromEnv(), {
           identityToken,
+          nonce,
           name: name ?? null,
           label: device ?? 'iPhone · Apple',
         });
