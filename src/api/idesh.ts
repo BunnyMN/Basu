@@ -347,13 +347,14 @@ export async function registerIdeshRoutes(
   /* ── becoming a supplier ───────────────────────────────────────── */
 
   /**
-   * Ask. The guest is signed in — the phone on the application is the one
-   * they proved by OTP, never one typed into a box — and ops answers from
-   * their own page.
+   * Ask. The guest is signed in — the phone on the application is the
+   * account's own, or, for an account made without one, the number typed
+   * here — and ops answers from their own page.
    */
   app.post<{
     Body: {
       name?: string;
+      phone?: string;
       tin?: string;
       address?: string;
       about?: string;
@@ -372,6 +373,7 @@ export async function registerIdeshRoutes(
       const id = await applySupplier(ctx, {
         guestId: request.guestId!,
         name: body.name,
+        phone: body.phone ?? null,
         merchantTin: body.tin?.trim() || null,
         pickupAddress: body.address,
         about: body.about ?? null,

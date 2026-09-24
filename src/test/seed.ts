@@ -29,7 +29,7 @@ export async function truncateAll(db: Db = getPool()): Promise<void> {
              dine.trust_profile, dine.kds_device, dine.restaurant,
              ops.member, ops.invite, ops.tick, ops.setting, idesh.audit, idesh.settlement, idesh.order_event, idesh.idesh_order, idesh.listing, idesh.supplier_device,
              idesh.supplier,
-             identity.profile, identity.guest_session, identity.guest, identity.otp_challenge
+             identity.profile, identity.guest_session, identity.guest, identity.otp_challenge, identity.oauth_state
     RESTART IDENTITY CASCADE
   `);
   // The house accounts are reference data the migration created; only the
@@ -105,6 +105,19 @@ export async function seedGuest(
   const guestId = rows[0]!.id;
   await db.query(`INSERT INTO dine.trust_profile (guest_id, tier) VALUES ($1, $2)`, [guestId, tier]);
   return guestId;
+}
+
+/** A person with exactly the ways of reaching them a test names — no phone, if it names none. */
+export async function seedPerson(
+  contact: { phone?: string; email?: string },
+  db: Db = getPool(),
+): Promise<string> {
+  const { rows } = await db.query<{ id: string }>(
+    `INSERT INTO identity.guest (phone_e164, email, email_verified_at)
+     VALUES ($1, $2, CASE WHEN $2::text IS NULL THEN NULL ELSE now() END) RETURNING id`,
+    [contact.phone ?? null, contact.email ?? null],
+  );
+  return rows[0]!.id;
 }
 
 export interface SeedOrderOptions {

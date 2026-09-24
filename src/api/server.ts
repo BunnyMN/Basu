@@ -55,6 +55,7 @@ import { registerPlatformRoutes } from './platform.js';
 import { registerIdeshRoutes } from './idesh.js';
 import { registerOpsRoutes } from './ops.js';
 import { registerPaymentRoutes } from './payments.js';
+import { registerAuthRoutes } from './auth.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -150,6 +151,8 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
   // Where the payment provider calls back. Mounted only when there is a
   // webhook secret to check the call against.
   await registerPaymentRoutes(app, ctx, wireConfigFromEnv());
+  // The ways in that need no phone: email codes, Google, Apple.
+  await registerAuthRoutes(app, ctx);
 
   /** A guest may only ever touch their own order. */
   const ownedByGuest = async (orderId: string, guestId: string): Promise<boolean> => {

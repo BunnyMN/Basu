@@ -978,7 +978,7 @@ export async function boardFor(supplierId: string | null, db: Db = getPool()): P
 }
 
 /** One row as the supplier's screens read it. */
-function ticketOf(r: OrderRow, names: Map<string, string>, contacts: Map<string, { phone: string }>): BoardTicket {
+function ticketOf(r: OrderRow, names: Map<string, string>, contacts: Map<string, { phone: string | null }>): BoardTicket {
   return {
     ...summary(r),
     guest: names.get(r.guest_id) ?? null,

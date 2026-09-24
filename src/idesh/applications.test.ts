@@ -4,8 +4,8 @@ import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { startSession } from '../platform/identity/index.js';
 import { relay } from '../platform/notify/index.js';
-import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
-import { truncateAll } from '../test/seed.js';
+import { FakeMailer, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
+import { seedPerson, truncateAll } from '../test/seed.js';
 import {
   applicationOf,
   applySupplier,
@@ -99,6 +99,34 @@ describe('asking to become a supplier', () => {
     await expect(
       applySupplier(ctx, { guestId, name: 'X', merchantTin: '12', pickupAddress: 'somewhere' }),
     ).rejects.toMatchObject({ code: 'WRONG_STATE' });
+  });
+});
+
+describe('an account made without a phone', () => {
+  const input = () => ({ name: 'Говь-Алтай · Дорж', pickupAddress: 'Нарантуул, 3-р хаалга' });
+
+  it('applies with the number it types, and is told when it types none or a wrong one', async () => {
+    const byEmail = await seedPerson({ email: 'dorj@example.mn' });
+    await expect(applySupplier(ctx, { guestId: byEmail, ...input() })).rejects.toMatchObject({ code: 'NEEDS_PHONE' });
+    await expect(applySupplier(ctx, { guestId: byEmail, ...input(), phone: '12345' })).rejects.toMatchObject({ code: 'BAD_PHONE' });
+    const id = await applySupplier(ctx, { guestId: byEmail, ...input(), phone: '9911 2233' });
+    expect((await listSuppliers()).find((s) => s.id === id)).toMatchObject({ phone: '+97699112233', state: 'applied' });
+  });
+
+  it('never lets a typed number stand in for the one an account already has', async () => {
+    const id = await applySupplier(ctx, { guestId, ...input(), phone: '+97699999999' });
+    expect((await listSuppliers()).find((s) => s.id === id)).toMatchObject({ phone: PHONE });
+  });
+
+  it('hears the yes by email, code and all', async () => {
+    const mailer = new FakeMailer();
+    const withMail: Ctx = { ...ctx, mailer };
+    const byEmail = await seedPerson({ email: 'dorj@example.mn' });
+    const id = await applySupplier(withMail, { guestId: byEmail, ...input(), phone: '99112233' });
+    const { pairingCode } = await approveSupplier(withMail, id);
+    await relay(withMail);
+    expect(mailer.to('dorj@example.mn')?.text).toContain(pairingCode);
+    expect(notifier.of('supplier.approved')).toEqual([]);
   });
 });
 

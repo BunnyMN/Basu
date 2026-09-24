@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { getPool, tx } from '../../db/pool.js';
+import type { PoolClient } from 'pg';
 import { addMinutes } from '../../domain/time.js';
 import { mode } from '../../mode.js';
 import type { Ctx } from '../../ports.js';
@@ -34,7 +35,20 @@ function constantTimeEquals(a: string, b: string): boolean {
 
 export class AuthError extends Error {
   constructor(
-    readonly code: 'RATE_LIMITED' | 'INVALID_CODE' | 'EXPIRED' | 'UNAUTHORIZED' | 'BAD_PHONE' | 'PHONE_TAKEN' | 'BAD_CREDENTIALS' | 'LOCKED',
+    readonly code:
+      | 'RATE_LIMITED'
+      | 'INVALID_CODE'
+      | 'EXPIRED'
+      | 'UNAUTHORIZED'
+      | 'BAD_PHONE'
+      | 'PHONE_TAKEN'
+      | 'BAD_CREDENTIALS'
+      | 'LOCKED'
+      | 'BAD_EMAIL'
+      | 'EMAIL_CLOSED'
+      | 'EMAIL_FAILED'
+      | 'SOCIAL_CLOSED'
+      | 'SOCIAL_REFUSED',
     message: string,
   ) {
     super(message);
@@ -114,6 +128,127 @@ export async function guestForPhone(phone: string): Promise<string> {
   });
 }
 
+/* ── email ─────────────────────────────────────────────────────────── */
+
+/** An address, as a person types it, into the one spelling we store. */
+export function emailAddress(raw: string): string {
+  const email = raw.trim().toLowerCase();
+  // Deliberately plain: one @, something either side, a dot in the domain, no
+  // spaces. The code we send is the real test of whether an address works.
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new AuthError('BAD_EMAIL', 'that does not look like an email address');
+  }
+  return email;
+}
+
+/** A mailbox can be slower than a phone; a code by email lives twice as long. */
+const EMAIL_CODE_TTL_MINUTES = 10;
+/** Letters can go to spam and be re-asked for; a few more than SMS, still few. */
+export const CODES_PER_EMAIL_PER_HOUR = 5;
+
+export async function requestEmailCode(ctx: Ctx, rawEmail: string): Promise<OtpIssued> {
+  const email = emailAddress(rawEmail);
+  const now = ctx.clock.now();
+
+  if (mode() === 'production') {
+    const { rows: day } = await getPool().query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM identity.otp_challenge WHERE created_at > $1::timestamptz - interval '24 hours'`,
+      [now],
+    );
+    if ((day[0]?.n ?? 0) >= OTP_PER_DAY) throw new AuthError('RATE_LIMITED', 'the day’s allowance of codes is spent');
+  }
+  const { rows } = await getPool().query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM identity.otp_challenge
+      WHERE email = $1 AND created_at > $2::timestamptz - interval '1 hour'`,
+    [email, now],
+  );
+  if ((rows[0]?.n ?? 0) >= CODES_PER_EMAIL_PER_HOUR) {
+    throw new AuthError('RATE_LIMITED', 'too many codes requested for this address');
+  }
+
+  const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+  const inserted = await getPool().query<{ id: string }>(
+    `INSERT INTO identity.otp_challenge (email, code_hash, expires_at, created_at)
+     VALUES ($1, $2, $3, $4) RETURNING id`,
+    [email, sha256(code), addMinutes(now, EMAIL_CODE_TTL_MINUTES), now],
+  );
+  return { challengeId: inserted.rows[0]!.id, code };
+}
+
+/**
+ * The code, by email — the one way it leaves. The subject carries it too,
+ * so it can be read off the notification without opening the letter.
+ */
+export async function sendEmailCode(ctx: Ctx, rawEmail: string): Promise<void> {
+  if (!ctx.mailer) throw new AuthError('EMAIL_CLOSED', 'this server has nothing to send email with');
+  const email = emailAddress(rawEmail);
+  const { code } = await requestEmailCode(ctx, email);
+  try {
+    await ctx.mailer.send({
+      to: email,
+      subject: `Basu нэвтрэх код: ${code}`,
+      text: [
+        `Таны Basu-д нэвтрэх код: ${code}`,
+        '',
+        `Код ${EMAIL_CODE_TTL_MINUTES} минут хүчинтэй. Хэнд ч бүү хэлээрэй — Basu-гийн ажилтан ч танаас код асуухгүй.`,
+        '',
+        'Та нэвтрэх гэж оролдоогүй бол энэ захидлыг үл тоомсорлоорой.',
+      ].join('\n'),
+      html: `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.6;color:#14181B">
+<p>Таны Basu-д нэвтрэх код:</p>
+<p style="font-family:ui-monospace,Menlo,monospace;font-size:28px;font-weight:600;letter-spacing:.12em;margin:8px 0 16px">${code}</p>
+<p style="color:#4A555C">Код ${EMAIL_CODE_TTL_MINUTES} минут хүчинтэй. Хэнд ч бүү хэлээрэй — Basu-гийн ажилтан ч танаас код асуухгүй.</p>
+<p style="color:#62727A;font-size:13px">Та нэвтрэх гэж оролдоогүй бол энэ захидлыг үл тоомсорлоорой.</p>
+</div>`,
+    });
+  } catch (error) {
+    throw new AuthError('EMAIL_FAILED', `the letter did not go out: ${(error as Error).message}`);
+  }
+}
+
+/** Is this the code we sent this address? Consumed on success, counted on failure. */
+export async function checkEmailCode(ctx: Ctx, rawEmail: string, code: string): Promise<void> {
+  return checkCode(ctx, { column: 'email', value: emailAddress(rawEmail) }, code);
+}
+
+/**
+ * Sign in by the code in the letter. An address nobody has used becomes an
+ * account here, the way a phone number used to: proving you can read the
+ * inbox is the whole of signing up.
+ */
+export async function verifyEmailCode(
+  ctx: Ctx,
+  rawEmail: string,
+  code: string,
+  label?: string | null,
+): Promise<GuestSession> {
+  const email = emailAddress(rawEmail);
+  await checkEmailCode(ctx, email, code);
+  const now = ctx.clock.now();
+  return tx(async (client) => {
+    const guestId = await guestForEmail(client, email, now);
+    return mintSession(client, guestId, now, label);
+  });
+}
+
+/** The account behind a proved address, made if there is none. */
+export async function guestForEmail(client: PoolClient, email: string, now: Date, name?: string | null): Promise<string> {
+  const { rows } = await client.query<{ id: string }>(
+    `INSERT INTO identity.guest (email, email_verified_at, name) VALUES ($1, $2, $3)
+     ON CONFLICT ((lower(email))) WHERE email IS NOT NULL
+     DO UPDATE SET email_verified_at = COALESCE(identity.guest.email_verified_at, EXCLUDED.email_verified_at),
+                   name = COALESCE(identity.guest.name, EXCLUDED.name)
+     RETURNING id`,
+    [email, now, name?.trim() || null],
+  );
+  const guestId = rows[0]!.id;
+  await client.query('INSERT INTO identity.profile (guest_id, display_name) VALUES ($1, $2) ON CONFLICT DO NOTHING', [
+    guestId,
+    name?.trim() || null,
+  ]);
+  return guestId;
+}
+
 /** Challenges older than a day are neither valid nor evidence. Swept by the scheduler. */
 export async function purgeChallenges(now: Date): Promise<number> {
   const { rowCount } = await getPool().query(
@@ -159,6 +294,13 @@ export async function sendOtp(ctx: Ctx, phone: string): Promise<void> {
  * phone for — changing where their money goes.
  */
 export async function checkOtp(ctx: Ctx, phone: string, code: string): Promise<void> {
+  return checkCode(ctx, { column: 'phone_e164', value: phone }, code);
+}
+
+/** Where a code went: a phone or an address. The column name is ours, never input. */
+type CodeAddress = { column: 'phone_e164' | 'email'; value: string };
+
+async function checkCode(ctx: Ctx, where: CodeAddress, code: string): Promise<void> {
   const now = ctx.clock.now();
 
   /**
@@ -178,11 +320,11 @@ export async function checkOtp(ctx: Ctx, phone: string, code: string): Promise<v
     }>(
       `SELECT id, code_hash, attempts, expires_at, consumed_at
          FROM identity.otp_challenge
-        WHERE phone_e164 = $1 AND consumed_at IS NULL
+        WHERE ${where.column} = $1 AND consumed_at IS NULL
         ORDER BY created_at DESC
         LIMIT 1
         FOR UPDATE`,
-      [phone],
+      [where.value],
     );
     const challenge = rows[0];
     if (!challenge || challenge.consumed_at) return { ok: false, code: 'INVALID_CODE' } as const;
@@ -246,18 +388,30 @@ export async function startSession(
       `INSERT INTO identity.profile (guest_id) VALUES ($1) ON CONFLICT DO NOTHING`,
       [guestId],
     );
-
-    const token = randomBytes(32).toString('base64url');
-    const expiresAt = addMinutes(now, SESSION_DAYS * 24 * 60);
-    await client.query(
-      `INSERT INTO identity.guest_session
-         (guest_id, token_hash, expires_at, created_at, last_seen_at, label)
-       VALUES ($1, $2, $3, $4, $4, $5)`,
-      [guestId, sha256(token), expiresAt, now, label?.slice(0, 60) || null],
-    );
-
-    return { token, guestId, expiresAt };
+    return mintSession(client, guestId, now, label);
   });
+}
+
+/** A session for an account that is already known — by email, Google or Apple. */
+export async function startSessionFor(ctx: Ctx, guestId: string, label?: string | null): Promise<GuestSession> {
+  return tx((client) => mintSession(client, guestId, ctx.clock.now(), label));
+}
+
+async function mintSession(
+  client: PoolClient,
+  guestId: string,
+  now: Date,
+  label?: string | null,
+): Promise<GuestSession> {
+  const token = randomBytes(32).toString('base64url');
+  const expiresAt = addMinutes(now, SESSION_DAYS * 24 * 60);
+  await client.query(
+    `INSERT INTO identity.guest_session
+       (guest_id, token_hash, expires_at, created_at, last_seen_at, label)
+     VALUES ($1, $2, $3, $4, $4, $5)`,
+    [guestId, sha256(token), expiresAt, now, label?.slice(0, 60) || null],
+  );
+  return { token, guestId, expiresAt };
 }
 
 /**

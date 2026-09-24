@@ -86,6 +86,7 @@ const IDESH_ERRORS: Record<IdeshErrorCode, Spec> = {
     mn: 'Та аль хэдийн хүсэлт гаргасан эсвэл нийлүүлэгч байна.',
   },
   NOT_PENDING: { status: 409, mn: 'Энэ хүсэлт хүлээгдэж байгаа төлөвт биш байна.' },
+  NEEDS_PHONE: { status: 400, mn: 'Холбогдох утасны дугаараа оруулна уу.' },
   OPS_CLOSED: {
     status: 503,
     mn: 'Ops хаалттай байна: сервер дээр OPS_TOKEN тохируулаагүй.',
@@ -98,6 +99,11 @@ const PASSWORD_ERRORS: Record<PasswordError['code'], Spec> = {
 };
 
 const AUTH_ERRORS: Record<AuthError['code'], Spec> = {
+  BAD_EMAIL: { status: 400, mn: 'Имэйл хаягаа шалгана уу.' },
+  EMAIL_CLOSED: { status: 503, mn: 'Имэйлээр нэвтрэх түр ажиллахгүй байна. Өөр аргаар нэвтэрнэ үү.' },
+  EMAIL_FAILED: { status: 502, mn: 'Код илгээж чадсангүй. Хэсэг хүлээгээд дахин оролдоно уу.' },
+  SOCIAL_CLOSED: { status: 503, mn: 'Энэ аргаар нэвтрэх түр ажиллахгүй байна.' },
+  SOCIAL_REFUSED: { status: 401, mn: 'Нэвтрэлт баталгаажсангүй. Дахин оролдоно уу.' },
   BAD_PHONE: { status: 400, mn: 'Утасны дугаараа шалгана уу (+976XXXXXXXX).' },
   PHONE_TAKEN: { status: 409, mn: 'Энэ дугаар аль хэдийн бүртгэлтэй. Нэвтэрнэ үү.' },
   BAD_CREDENTIALS: { status: 401, mn: 'Дугаар эсвэл нууц үг буруу байна.' },

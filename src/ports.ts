@@ -107,6 +107,28 @@ export interface Notifier {
   pushActivity(push: ActivityPush): Promise<{ providerRef: string }>;
 }
 
+/* ── email ─────────────────────────────────────────────────────────── */
+
+export interface OutgoingMail {
+  to: string;
+  subject: string;
+  /** Plain text is what arrives everywhere; html is a nicety on top. */
+  text: string;
+  html?: string;
+}
+
+/**
+ * Anything that can put a letter in somebody's inbox.
+ *
+ * Sign-in codes go out this way now that the phone is not the only way in,
+ * and so do messages for a person who never gave a phone.
+ */
+export interface Mailer {
+  /** 'smtp' for a real one, 'fake' for the recording double. */
+  readonly name: string;
+  send(mail: OutgoingMail): Promise<{ providerRef: string }>;
+}
+
 /* ── the bundle services take ──────────────────────────────────────── */
 
 export interface Ctx {
@@ -114,6 +136,12 @@ export interface Ctx {
   payments: PaymentProvider;
   tax: TaxProvider;
   notifier: Notifier;
+  /**
+   * Absent where nothing can send email. A production server without one
+   * says so — the email door is closed — rather than handing codes to a fake
+   * that would swallow them.
+   */
+  mailer?: Mailer;
 }
 
 /* ── fakes ─────────────────────────────────────────────────────────── */
@@ -242,5 +270,33 @@ export class FakeNotifier implements Notifier {
 
   of(template: string): OutgoingMessage[] {
     return this.sent.filter((m) => m.template === template);
+  }
+}
+
+/** Keeps every letter it was asked to send, so a test can read the code in it. */
+export class FakeMailer implements Mailer {
+  readonly name = 'fake';
+  readonly sent: OutgoingMail[] = [];
+  /** Flip on to rehearse a mail server that refuses. */
+  failNext = false;
+  #seq = 0;
+
+  async send(mail: OutgoingMail): Promise<{ providerRef: string }> {
+    if (this.failNext) {
+      this.failNext = false;
+      throw new Error('mail server unavailable');
+    }
+    this.sent.push(mail);
+    return { providerRef: `mail-${++this.#seq}` };
+  }
+
+  /** The last letter to this address. */
+  to(address: string): OutgoingMail | undefined {
+    return [...this.sent].reverse().find((m) => m.to === address);
+  }
+
+  /** The six-digit code in the last letter to this address. */
+  codeFor(address: string): string | undefined {
+    return /(\d{6})/.exec(this.to(address)?.text ?? '')?.[1];
   }
 }

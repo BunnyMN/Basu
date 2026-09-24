@@ -115,15 +115,226 @@ if (shell.present && typeof document !== 'undefined') {
 
 /* ── signing in on the web ─────────────────────────────────────────── */
 
+/** Which doors this server has open. Asked once; a failed ask leaves the phone door alone. */
+let doorsAsked;
+export function authMethods() {
+  doorsAsked ??= api('/v1/auth/methods').catch(() => ({ password: true, email: false, google: false, apple: false }));
+  return doorsAsked;
+}
+
+/** Why a round trip to Google came back without a session. */
+const GOOGLE_REFUSALS = {
+  CANCELLED: 'Google-ээр нэвтрэхийг цуцаллаа.',
+  SOCIAL_CLOSED: 'Google-ээр нэвтрэх одоогоор нээгдээгүй байна.',
+  SOCIAL_REFUSED: 'Google-ээр нэвтэрч чадсангүй. Дахин оролдоно уу.',
+};
+
 /**
- * A person, in a browser, outside the phone app: a sheet with a number and a
- * password, which becomes a sign-up when the number is new. Resolves with a
- * token; rejects if they close it.
+ * Back from Google. The server sends the person to the page they started on
+ * with the session in the address's fragment — `/idesh#auth=…` — which never
+ * reaches a server or a log. It is taken here, before the page's own script
+ * runs, and wiped from the address bar and the history entry, so a copied
+ * link or a screenshot of the address carries nothing.
+ */
+export const authReturn = (() => {
+  if (typeof location === 'undefined' || !location.hash.includes('auth')) return null;
+  const fragment = new URLSearchParams(location.hash.slice(1));
+  const token = fragment.get('auth');
+  const refused = fragment.get('auth_error');
+  if (!token && !refused) return null;
+  history.replaceState(null, '', location.pathname + location.search);
+  if (token) {
+    store.guestToken = token;
+    return { token };
+  }
+  setTimeout(() => toast(GOOGLE_REFUSALS[refused] ?? GOOGLE_REFUSALS.SOCIAL_REFUSED, 'bad'), 0);
+  return { refused };
+})();
+
+/** Google's mark, in Google's colours — its button guidelines ask for exactly this. */
+const GOOGLE_MARK = `<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>`;
+
+/**
+ * The ways in, as one block a page puts in a sheet or on a card.
+ *
+ * Google first: one tap for most people here. Then a code by email, which
+ * needs nothing but an inbox — the address becomes the account the first
+ * time a code sent to it comes back. The phone and a password stay for the
+ * accounts made that way, one fold down. Only the doors this server has open
+ * are drawn; with neither Google nor email set up, the phone door is the
+ * whole block, open.
+ *
+ * `onToken(token)` is called once there is a session. Google does not call
+ * it: the page is left for Google's and comes back to `returnTo`, signed in,
+ * by way of `authReturn` above.
+ */
+export function signInDoors({ device = 'Вэб', returnTo = location.pathname, onToken }) {
+  const box = document.createElement('div');
+  box.className = 'ways';
+  box.innerHTML = `
+    <a class="btn" data-size="lg" data-google hidden>${GOOGLE_MARK}<span>Google-ээр нэвтрэх</span></a>
+    <div class="or" data-or hidden>эсвэл</div>
+    <div data-email hidden>
+      <label class="field"><span>Имэйл хаяг</span><input name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com"></label>
+      <p class="cap" data-email-hint>Хаяг руу тань 6 оронтой код илгээнэ. Анх удаа бол бүртгэл шууд үүснэ.</p>
+      <div data-code hidden><input name="code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" aria-label="Имэйлд ирсэн код"></div>
+      <button class="btn" data-v="primary" data-size="lg" type="button" data-email-go>Код авах</button>
+      <div class="again" data-again-row hidden>
+        <button class="link" type="button" data-resend>Код дахин авах</button>
+        <button class="link" type="button" data-change>Хаяг солих</button>
+      </div>
+    </div>
+    <details class="fold" data-phone>
+      <summary>Утас, нууц үгээр нэвтрэх</summary>
+      <div class="body">
+        <label class="field"><span>Утасны дугаар</span><input name="phone" type="tel" inputmode="tel" placeholder="+976 XXXX XXXX" autocomplete="tel"></label>
+        <label class="field"><span>Нууц үг</span><input name="password" type="password" placeholder="Дор хаяж 8 тэмдэгт" autocomplete="current-password"></label>
+        <label class="field" data-again hidden><span>Нууц үгээ давтах</span><input name="again" type="password" autocomplete="new-password"></label>
+        <p class="cap" data-hint>Анх удаа бол дугаар, нууц үгээ бичихэд бүртгэл үүснэ.</p>
+        <button class="btn" data-size="lg" type="button" data-go>Нэвтрэх</button>
+      </div>
+    </details>`;
+  const $ = (selector) => box.querySelector(selector);
+  const done = (token) => {
+    store.guestToken = token;
+    onToken(token);
+  };
+
+  /* Google: a plain link, so the browser does the leaving. */
+  const google = $('[data-google]');
+  google.href = `/v1/auth/google/start?return=${encodeURIComponent(returnTo)}`;
+
+  /* a code by email */
+  const email = $('[name="email"]');
+  const code = $('[name="code"]');
+  const emailGo = $('[data-email-go]');
+  const hint = $('[data-email-hint]');
+  let sentTo = null;
+
+  const askForCode = async () => {
+    const address = email.value.trim();
+    if (!address) {
+      email.focus();
+      return;
+    }
+    emailGo.setAttribute('data-busy', '');
+    try {
+      await api('/v1/auth/email/start', { method: 'POST', body: { email: address } });
+      sentTo = address;
+      $('[data-code]').hidden = false;
+      $('[data-again-row]').hidden = false;
+      hint.textContent = `${address} хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Spam хавтсаа шалгаарай.`;
+      emailGo.textContent = 'Нэвтрэх';
+      code.value = '';
+      code.focus();
+    } catch (error) {
+      toast(error.message, 'bad');
+    } finally {
+      emailGo.removeAttribute('data-busy');
+    }
+  };
+
+  const checkCode = async () => {
+    const typed = code.value.replace(/\D/g, '');
+    if (typed.length !== 6) {
+      code.focus();
+      return;
+    }
+    emailGo.setAttribute('data-busy', '');
+    try {
+      const { token } = await api('/v1/auth/email/verify', { method: 'POST', body: { email: sentTo, code: typed, device } });
+      done(token);
+    } catch (error) {
+      toast(error.message, 'bad');
+      code.select();
+    } finally {
+      emailGo.removeAttribute('data-busy');
+    }
+  };
+
+  const startOver = () => {
+    sentTo = null;
+    $('[data-code]').hidden = true;
+    $('[data-again-row]').hidden = true;
+    hint.textContent = 'Хаяг руу тань 6 оронтой код илгээнэ. Анх удаа бол бүртгэл шууд үүснэ.';
+    emailGo.textContent = 'Код авах';
+  };
+
+  emailGo.addEventListener('click', () => (sentTo ? checkCode() : askForCode()));
+  email.addEventListener('keydown', (e) => e.key === 'Enter' && askForCode());
+  // Another address after a code went out is a new start, not a code for the old one.
+  email.addEventListener('input', () => sentTo && email.value.trim() !== sentTo && startOver());
+  code.addEventListener('keydown', (e) => e.key === 'Enter' && checkCode());
+  // Six digits is the whole code: pasted or typed, it goes without another tap.
+  code.addEventListener('input', () => code.value.replace(/\D/g, '').length === 6 && checkCode());
+  $('[data-resend]').addEventListener('click', askForCode);
+  $('[data-change]').addEventListener('click', () => {
+    startOver();
+    email.select();
+  });
+
+  /* the phone and a password */
+  const phone = $('[name="phone"]');
+  const password = $('[name="password"]');
+  const again = $('[name="again"]');
+  const go = $('[data-go]');
+  let registering = false;
+
+  const passwordDoor = async () => {
+    const number = phone.value.replace(/\s+/g, '');
+    go.setAttribute('data-busy', '');
+    try {
+      if (registering) {
+        if (again.value !== password.value) {
+          toast('Хоёр нууц үг таарахгүй байна.', 'bad');
+          return;
+        }
+        const { token } = await api('/v1/auth/register', { method: 'POST', body: { phone: number, password: password.value, device } });
+        return done(token);
+      }
+      const { token } = await api('/v1/auth/login', { method: 'POST', body: { phone: number, password: password.value, device } });
+      done(token);
+    } catch (error) {
+      // A number nobody has claimed: the same fold becomes the sign-up.
+      if (error.code === 'BAD_CREDENTIALS' && !registering && password.value.length >= 8) {
+        registering = true;
+        $('[data-again]').hidden = false;
+        $('[data-hint]').textContent = 'Энэ дугаар шинэ байна. Нууц үгээ давтаад бүртгүүлнэ үү. Бүртгэлтэй бол нууц үгээ шалгана уу.';
+        go.textContent = 'Бүртгүүлэх';
+        again.focus();
+        return;
+      }
+      toast(error.message, 'bad');
+    } finally {
+      go.removeAttribute('data-busy');
+    }
+  };
+  go.addEventListener('click', passwordDoor);
+  for (const input of [phone, password, again]) input.addEventListener('keydown', (e) => e.key === 'Enter' && passwordDoor());
+
+  /* only the doors that are open */
+  box.ready = authMethods().then((open) => {
+    // Google will not sign anybody in inside an app's web view; the app has its own sheet.
+    const googleOpen = Boolean(open.google) && !shell.present;
+    google.hidden = !googleOpen;
+    $('[data-email]').hidden = !open.email;
+    $('[data-or]').hidden = !(googleOpen && open.email);
+    const phoneAlone = !googleOpen && !open.email;
+    const fold = $('[data-phone]');
+    fold.open = phoneAlone;
+    fold.toggleAttribute('data-alone', phoneAlone);
+    (open.email ? email : phoneAlone ? phone : google).focus?.();
+  });
+  return box;
+}
+
+/**
+ * A person, in a browser, outside the phone app: the ways in, on a sheet.
+ * Resolves with a token; rejects if they close it.
  *
  * Inside the app the shell signs people in on its own sheet and this never
  * appears. On a developer's machine /dev/login answers first. On the real
- * server neither is there, and without this a guest opening /idesh in a
- * browser had no way in at all.
+ * server neither is there, and this is the way in.
  */
 export function signInSheet(reason = 'Үргэлжлүүлэхийн тулд нэвтэрнэ үү.') {
   return new Promise((resolve, reject) => {
@@ -140,23 +351,12 @@ export function signInSheet(reason = 'Үргэлжлүүлэхийн тулд н
         <div><h2 id="signin-title">Нэвтрэх</h2><div class="sub">${reason}</div></div>
         <button class="x" type="button" aria-label="Хаах"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       </header>
-      <div class="body" style="padding:16px 20px 0">
-        <label class="field"><span>Утасны дугаар</span><input name="phone" type="tel" inputmode="tel" placeholder="+976 XXXX XXXX" autocomplete="tel"></label>
-        <label class="field"><span>Нууц үг</span><input name="password" type="password" placeholder="Дор хаяж 8 тэмдэгт" autocomplete="current-password"></label>
-        <label class="field" data-again hidden><span>Нууц үгээ давтах</span><input name="again" type="password" autocomplete="new-password"></label>
-        <p class="cap" data-hint>Анх удаа бол дугаар, нууц үгээ бичихэд бүртгэл үүснэ.</p>
-      </div>
-      <footer><button class="btn" data-v="primary" data-size="lg" type="button" data-go>Нэвтрэх</button></footer>`;
-    document.body.append(scrim, sheet);
-    requestAnimationFrame(() => sheet.setAttribute('data-open', ''));
+      <div class="body" style="padding:16px 20px 20px"></div>`;
 
-    const phone = sheet.querySelector('[name="phone"]');
-    const password = sheet.querySelector('[name="password"]');
-    const again = sheet.querySelector('[name="again"]');
-    const go = sheet.querySelector('[data-go]');
-    let registering = false;
-
+    let settled = false;
     const close = (token) => {
+      if (settled) return;
+      settled = true;
       sheet.removeAttribute('data-open');
       scrim.removeAttribute('data-open');
       setTimeout(() => {
@@ -167,44 +367,11 @@ export function signInSheet(reason = 'Үргэлжлүүлэхийн тулд н
       else reject(new ApiError(401, { error: { code: 'SIGN_IN', message_mn: 'Нэвтрээгүй байна.' } }));
     };
 
-    const submit = async () => {
-      const number = phone.value.replace(/\s+/g, '');
-      go.setAttribute('data-busy', '');
-      try {
-        if (registering) {
-          if (again.value !== password.value) {
-            toast('Хоёр нууц үг таарахгүй байна.', 'bad');
-            return;
-          }
-          const { token } = await api('/v1/auth/register', { method: 'POST', body: { phone: number, password: password.value, device: 'Вэб' } });
-          store.guestToken = token;
-          return close(token);
-        }
-        const { token } = await api('/v1/auth/login', { method: 'POST', body: { phone: number, password: password.value, device: 'Вэб' } });
-        store.guestToken = token;
-        close(token);
-      } catch (error) {
-        // A number nobody has claimed: the same sheet becomes the sign-up.
-        if (error.code === 'BAD_CREDENTIALS' && !registering && password.value.length >= 8) {
-          registering = true;
-          sheet.querySelector('#signin-title').textContent = 'Бүртгүүлэх';
-          sheet.querySelector('[data-again]').hidden = false;
-          sheet.querySelector('[data-hint]').textContent = 'Энэ дугаар шинэ байна. Нууц үгээ давтаад бүртгүүлнэ үү. Бүртгэлтэй бол нууц үгээ шалгана уу.';
-          go.textContent = 'Бүртгүүлэх';
-          again.focus();
-          return;
-        }
-        toast(error.message, 'bad');
-      } finally {
-        go.removeAttribute('data-busy');
-      }
-    };
-
-    go.addEventListener('click', submit);
-    for (const input of [phone, password, again]) input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+    sheet.querySelector('.body').append(signInDoors({ device: 'Вэб', onToken: close }));
+    document.body.append(scrim, sheet);
+    requestAnimationFrame(() => sheet.setAttribute('data-open', ''));
     sheet.querySelector('.x').addEventListener('click', () => close(null));
     scrim.addEventListener('click', () => close(null));
-    phone.focus();
   });
 }
 

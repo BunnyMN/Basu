@@ -124,7 +124,15 @@ export async function closeAccount(input: {
       `UPDATE identity.guest
           SET closed_at = $2,
               name = NULL,
-              phone_e164 = 'closed:' || id::text
+              phone_e164 = 'closed:' || id::text,
+              -- Every way back in goes, so the address and the Google or Apple
+              -- account are free to open a new account, and none of them can
+              -- reopen this one.
+              email = NULL,
+              email_verified_at = NULL,
+              google_sub = NULL,
+              apple_sub = NULL,
+              password_hash = NULL
         WHERE id = $1 AND closed_at IS NULL`,
       [input.guestId, input.at],
     );

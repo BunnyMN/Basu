@@ -161,6 +161,8 @@ for _ in $(seq 1 30); do
         exit 1
       fi
       echo "✓ production: no /dev on :$PORT"
+      # Which ways in are open — Google and email wait on keys in .env.
+      echo "  sign-in: $(curl -s "http://127.0.0.1:$PORT/v1/auth/methods")"
     fi
     flipped=0
     exit 0

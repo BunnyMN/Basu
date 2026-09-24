@@ -39,6 +39,18 @@ try {
   const foreign = await fetch(`${base}/v1/auth/otp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"phone":"+15550001111"}' });
   check('гадаад дугаарт код илгээхгүй', foreign.status === 400, `HTTP ${foreign.status}`);
 
+  // Which ways in are open: Google and email need keys only the server holds.
+  const methods = await head('/v1/auth/methods');
+  const open = methods.status === 200 ? JSON.parse(methods.text) : null;
+  check('нэвтрэх хаалга бүртгэлтэй', Boolean(open), `HTTP ${methods.status}`);
+  if (open) {
+    check('имэйл код нээлттэй (SMTP_URL, MAIL_FROM)', open.email === true);
+    check('Google нээлттэй (GOOGLE_CLIENT_ID, _SECRET)', open.google === true);
+    const google = await head('/v1/auth/google/start?return=https://evil.example');
+    const to = google.headers.get('location') ?? '';
+    check('Google эхлэл Google руу, state cookie-тэй', !open.google || (to.startsWith('https://accounts.google.com/') && (google.headers.get('set-cookie') ?? '').includes('HttpOnly')), `HTTP ${google.status}`);
+  }
+
   const tls = base.startsWith('https://');
   check('HTTPS', tls, tls ? '' : 'http-ээр шалгаж байна');
 } catch (error) {

@@ -43,7 +43,8 @@ export function phoneE164(raw: string): string {
   return typed;
 }
 
-function requirePhone(raw: string): string {
+/** The same, refused unless it is a Mongolian mobile number. */
+export function requirePhone(raw: string): string {
   const phone = phoneE164(raw);
   if (!PHONE.test(phone)) throw new AuthError('BAD_PHONE', 'phone must be +976XXXXXXXX');
   return phone;

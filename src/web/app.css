@@ -757,6 +757,29 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
   .scrim[data-dock]{display:none}
 }
 
+/* ── the ways in ──────────────────────────────────────────────────── */
+/* Google, a code by email, and the phone folded under them: one block
+   (api.js signInDoors), the same on the web sheet and the supplier's door.
+   Google's button is Google's own — white, a hairline, the four-colour mark
+   — as its guidelines ask; the one primary is the email step. */
+.ways .btn[data-google]{width:100%;gap:12px}
+.ways .btn[data-google] svg{width:18px;height:18px;stroke:none}
+.ways .or{display:flex;align-items:center;gap:12px;margin:18px 0;font-size:var(--t-cap);color:var(--ink-3)}
+.ways .or::before,.ways .or::after{content:"";flex:1;height:1px;background:var(--line)}
+.ways [data-code]{margin:0 0 12px}
+.ways .cap{margin:-4px 0 14px}
+.ways .again{display:flex;justify-content:space-between;gap:12px;margin-top:4px}
+.ways .again .link{font-size:var(--t-cap)}
+.ways .fold{margin-top:20px;border-top:1px solid var(--line)}
+.ways .fold > summary{list-style:none;display:flex;align-items:center;justify-content:center;min-height:var(--target);font-size:var(--t-cap);font-weight:500;color:var(--ink-2);cursor:pointer;-webkit-user-select:none;user-select:none}
+.ways .fold > summary::-webkit-details-marker{display:none}
+.ways .fold[open] > summary{color:var(--ink)}
+.ways .fold > .body{padding-top:12px}
+/* The phone as the only door is not a fold: no line, no summary. */
+.ways .fold[data-alone]{margin-top:0;border-top:0}
+.ways .fold[data-alone] > summary{display:none}
+.ways .fold[data-alone] > .body{padding-top:0}
+
 /* ── toast ────────────────────────────────────────────────────────── */
 /* Ink on the ground; bad is stop on its own text. Pages with a bottom bar
    raise it with --toast-lift. It never carries a code a person must keep. */

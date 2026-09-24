@@ -80,11 +80,12 @@ export async function relay(ctx: Ctx, limit = 100): Promise<number> {
   const { rows } = await getPool().query<{
     id: string;
     guest_id: string;
-    channel: 'push' | 'sms';
+    channel: 'push' | 'sms' | 'email';
     template: string;
+    title: string | null;
     body: string;
   }>(
-    `SELECT id, guest_id, channel, template, body
+    `SELECT id, guest_id, channel, template, title, body
        FROM notify.message
       WHERE state = 'queued'
       ORDER BY created_at
@@ -108,23 +109,38 @@ export async function relay(ctx: Ctx, limit = 100): Promise<number> {
     }
 
     const pref = prefs.get(row.guest_id) ?? { push: true, sms: true };
-    const wanted: Array<'push' | 'sms'> = row.channel === 'sms' ? ['sms'] : ['push', 'sms'];
+    // Push first where the app can be reached; then email, which reaches
+    // anybody who signed up with an address; the phone last, and only where
+    // there is one. A message asked for as SMS skips push — it was meant to
+    // arrive even with the app closed — but not email.
+    const wanted: Array<'push' | 'email' | 'sms'> = row.channel === 'push' ? ['push', 'email', 'sms'] : ['email', 'sms'];
     const ladder = wanted.filter((c) =>
-      c === 'push' ? pref.push && pushable.has(row.guest_id) : pref.sms,
+      c === 'push'
+        ? pref.push && pushable.has(row.guest_id)
+        : c === 'email'
+          ? Boolean(contact.email && ctx.mailer)
+          : pref.sms && Boolean(contact.phone),
     );
 
     const body = row.body || row.template;
     let ref: string | null = null;
-    let channel: 'push' | 'sms' = row.channel;
+    let channel: 'push' | 'sms' | 'email' = row.channel;
 
     for (const attempt of ladder) {
       try {
-        const result = await ctx.notifier.send({
-          channel: attempt,
-          to: attempt === 'push' ? (pushable.get(row.guest_id) ?? contact.phone) : contact.phone,
-          template: row.template,
-          body,
-        });
+        const result =
+          attempt === 'email'
+            ? await ctx.mailer!.send({
+                to: contact.email!,
+                subject: row.title ? `Basu · ${row.title}` : 'Basu',
+                text: body,
+              })
+            : await ctx.notifier.send({
+                channel: attempt,
+                to: attempt === 'push' ? (pushable.get(row.guest_id) ?? contact.phone ?? '') : contact.phone!,
+                template: row.template,
+                body,
+              });
         ref = result.providerRef;
         channel = attempt;
         break;

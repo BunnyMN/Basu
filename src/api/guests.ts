@@ -15,6 +15,8 @@ import { shapeOrder } from './shapes.js';
 const shapeCard = (g: NonNullable<Awaited<ReturnType<typeof guestCard>>>) => ({
   id: g.id,
   phone: g.phone,
+  email: g.email,
+  ways: g.ways,
   name: g.name,
   joined_at: g.joinedAt.toISOString(),
   closed_at: g.closedAt?.toISOString() ?? null,

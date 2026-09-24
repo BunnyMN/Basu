@@ -15,7 +15,14 @@ export {
   checkOtp,
   sendOtp,
   startSession,
+  startSessionFor,
   guestForPhone,
+  emailAddress,
+  requestEmailCode,
+  sendEmailCode,
+  checkEmailCode,
+  verifyEmailCode,
+  CODES_PER_EMAIL_PER_HOUR,
   resolveGuest,
   type GuestSession,
   type OtpIssued,
@@ -44,4 +51,17 @@ export { guestCensus, type GuestCensus } from './census.js';
 export { findGuests, guestCard, type GuestCard } from './directory.js';
 
 export { MIN_PASSWORD, PasswordError, checkPassword, hashPassword, verifyPassword } from './password.js';
-export { registerGuest, signInWithPassword, claimAccount, changePassword, confirmPassword, hasPassword, phoneE164 } from './register.js';
+export { registerGuest, signInWithPassword, claimAccount, changePassword, confirmPassword, hasPassword, phoneE164, requirePhone } from './register.js';
+export { verifyIdToken, emailVerified, IdTokenError, type IdClaims } from './idtoken.js';
+export {
+  APP_RETURN,
+  appleConfigFromEnv,
+  beginGoogle,
+  takeGoogleState,
+  completeGoogle,
+  googleConfigFromEnv,
+  safeReturn,
+  signInWithApple,
+  type AppleConfig,
+  type GoogleConfig,
+} from './social.js';

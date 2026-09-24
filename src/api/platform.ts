@@ -59,6 +59,7 @@ const MIN_TOPUP_MNT = 1_000;
 const shape = (profile: Profile) => ({
   id: profile.guestId,
   phone: profile.phone,
+  email: profile.email,
   display_name: profile.displayName,
   locale: profile.locale,
   avatar_seed: profile.avatarSeed,

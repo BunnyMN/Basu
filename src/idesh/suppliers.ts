@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { getPool, tx, type Db } from '../db/pool.js';
 import { addMinutes } from '../domain/time.js';
-import { AuthError, contactsFor, guestForPhone } from '../platform/identity/index.js';
+import { AuthError, contactsFor, guestForPhone, requirePhone } from '../platform/identity/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
 import { IdeshError } from './errors.js';
@@ -124,6 +124,8 @@ export async function supplierOf(
 export interface ApplicationInput extends BankDetails {
   guestId: string;
   name: string;
+  /** Only for an account made without a phone; an account's own always wins. */
+  phone?: string | null;
   merchantTin?: string | null;
   pickupAddress: string;
   lat?: number | null;
@@ -134,10 +136,11 @@ export interface ApplicationInput extends BankDetails {
 /**
  * Ask to become a supplier.
  *
- * The phone is the one the guest signed in with, not one typed into the form:
- * it is the number a guest will ring about their meat, and the OTP is the
- * only proof anybody has that it is really theirs. One open application per
- * person; a declined one may ask again.
+ * The phone is the number a guest will ring about their meat. An account
+ * made with one applies with that one, never a number typed over it. An
+ * account made by email, Google or Apple has none, so it types one — and ops,
+ * ringing it before saying yes, is the proof it is theirs. One open
+ * application per person; a declined one may ask again.
  */
 export async function applySupplier(ctx: Ctx, input: ApplicationInput): Promise<string> {
   const name = input.name.trim();
@@ -150,6 +153,9 @@ export async function applySupplier(ctx: Ctx, input: ApplicationInput): Promise<
 
   const contact = (await contactsFor([input.guestId])).get(input.guestId);
   if (!contact) throw new IdeshError('NOT_FOUND', 'no such guest');
+  const typed = input.phone?.trim();
+  const phone = contact.phone ?? (typed ? requirePhone(typed) : null);
+  if (!phone) throw new IdeshError('NEEDS_PHONE', 'an account without a phone gives one to apply');
 
   try {
     const { rows } = await getPool().query<{ id: string }>(
@@ -159,7 +165,7 @@ export async function applySupplier(ctx: Ctx, input: ApplicationInput): Promise<
        VALUES ($1, $2, $3, $4, $5, $6, $7, 'applied', $8, $9, true, $10, $11, $12) RETURNING id`,
       [
         name,
-        contact.phone,
+        phone,
         input.merchantTin || null,
         address,
         input.lat ?? null,

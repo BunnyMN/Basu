@@ -11,7 +11,9 @@ import { getPool } from '../../db/pool.js';
 
 export interface Profile {
   guestId: string;
-  phone: string;
+  /** Null for an account made by email, Google or Apple. */
+  phone: string | null;
+  email: string | null;
   displayName: string | null;
   locale: 'mn' | 'en';
   avatarSeed: string;
@@ -21,19 +23,22 @@ export interface Profile {
 /** What a person can be reached on. The only thing notify needs from here. */
 export interface Contact {
   guestId: string;
-  phone: string;
+  /** Null when the account was made without one. */
+  phone: string | null;
+  email: string | null;
 }
 
 export async function profileOf(guestId: string): Promise<Profile | null> {
   const { rows } = await getPool().query<{
     guest_id: string;
-    phone_e164: string;
+    phone_e164: string | null;
+    email: string | null;
     display_name: string | null;
     locale: 'mn' | 'en';
     avatar_seed: string;
     created_at: Date;
   }>(
-    `SELECT g.id AS guest_id, g.phone_e164, g.created_at,
+    `SELECT g.id AS guest_id, g.phone_e164, g.email, g.created_at,
             COALESCE(p.display_name, g.name) AS display_name,
             COALESCE(p.locale, 'mn')         AS locale,
             COALESCE(p.avatar_seed, substr(md5(g.id::text), 1, 8)) AS avatar_seed
@@ -47,6 +52,7 @@ export async function profileOf(guestId: string): Promise<Profile | null> {
   return {
     guestId: row.guest_id,
     phone: row.phone_e164,
+    email: row.email,
     displayName: row.display_name,
     locale: row.locale,
     avatarSeed: row.avatar_seed,
@@ -93,11 +99,13 @@ export async function updateProfile(
  */
 export async function contactsFor(guestIds: readonly string[]): Promise<Map<string, Contact>> {
   if (guestIds.length === 0) return new Map();
-  const { rows } = await getPool().query<{ id: string; phone_e164: string }>(
-    'SELECT id, phone_e164 FROM identity.guest WHERE id = ANY($1::uuid[])',
+  const { rows } = await getPool().query<{ id: string; phone_e164: string | null; email: string | null }>(
+    // A closed account keeps neither: its phone column holds a tombstone.
+    `SELECT id, CASE WHEN closed_at IS NULL THEN phone_e164 END AS phone_e164, email
+       FROM identity.guest WHERE id = ANY($1::uuid[])`,
     [[...new Set(guestIds)]],
   );
-  return new Map(rows.map((r) => [r.id, { guestId: r.id, phone: r.phone_e164 }]));
+  return new Map(rows.map((r) => [r.id, { guestId: r.id, phone: r.phone_e164, email: r.email }]));
 }
 
 /**
@@ -113,14 +121,20 @@ export async function displayNamesFor(
   guestIds: readonly string[],
 ): Promise<Map<string, string>> {
   if (guestIds.length === 0) return new Map();
-  const { rows } = await getPool().query<{ id: string; name: string | null; phone: string }>(
-    `SELECT g.id, COALESCE(p.display_name, g.name) AS name, g.phone_e164 AS phone
+  const { rows } = await getPool().query<{ id: string; name: string | null; phone: string | null; email: string | null }>(
+    `SELECT g.id, COALESCE(p.display_name, g.name) AS name, g.phone_e164 AS phone, g.email
        FROM identity.guest g
        LEFT JOIN identity.profile p ON p.guest_id = g.id
       WHERE g.id = ANY($1::uuid[])`,
     [[...new Set(guestIds)]],
   );
-  return new Map(
-    rows.map((r) => [r.id, r.name?.trim().split(' ')[0] || `\u00b7\u00b7\u00b7${r.phone.slice(-4)}`]),
-  );
+  // Never the whole number or the whole address: the last four digits, or the
+  // first letters of the mailbox, is enough to tell two strangers apart.
+  const fallback = (r: { phone: string | null; email: string | null }) =>
+    r.phone && !r.phone.startsWith('closed:')
+      ? `\u00b7\u00b7\u00b7${r.phone.slice(-4)}`
+      : r.email
+        ? `${r.email.split('@')[0]!.slice(0, 3)}\u00b7\u00b7\u00b7`
+        : '\u00b7\u00b7\u00b7';
+  return new Map(rows.map((r) => [r.id, r.name?.trim().split(' ')[0] || fallback(r)]));
 }

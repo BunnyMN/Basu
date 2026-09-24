@@ -17,6 +17,7 @@ export type IdeshErrorCode =
   | 'NOT_APPROVED'
   | 'SAME_PERSON'
   | 'ALREADY_APPLIED'
+  | 'NEEDS_PHONE'
   | 'NOT_PENDING'
   | 'OPS_CLOSED';
 

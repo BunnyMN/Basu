@@ -39,3 +39,5 @@ export { ApnsClient, ApnsNotifier, apnsConfigFromEnv, type ApnsConfig } from './
 export { notifyOverview, type NotifyOverview } from './overview.js';
 
 export { messagesForDesk, retryMessage, channelPulse, monthlyVolume, type DeskMessage, type ChannelPulse, type MonthVolume } from './desk.js';
+
+export { SmtpMailer, smtpConfigFromEnv, smtpHost, type SmtpConfig } from './mail.js';

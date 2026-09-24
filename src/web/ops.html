@@ -533,7 +533,7 @@ function renderGuests(view) {
   view.append(el(`
     <div class="card">
       <div class="tools">
-        <input class="input search" type="search" id="q" placeholder="Утасны дугаар эсвэл нэр…" value="${esc(guestQ)}" autocomplete="off">
+        <input class="input search" type="search" id="q" placeholder="Утас, имэйл эсвэл нэр…" value="${esc(guestQ)}" autocomplete="off">
       </div>
       <div id="guests" class="table-wrap"></div>
     </div>`));
@@ -559,16 +559,16 @@ async function loadGuests() {
   }
   if (!document.getElementById('guests')) return;
   if (!data.guests.length) {
-    box.replaceChildren(el('<div class="empty"><b>Зочин олдсонгүй</b>Утасны дор хаяж 4 орон эсвэл нэрийн хэсгийг бич.</div>'));
+    box.replaceChildren(el('<div class="empty"><b>Зочин олдсонгүй</b>Утасны дор хаяж 4 орон, имэйл эсвэл нэрийн хэсгийг бич.</div>'));
     return;
   }
-  const table = el('<table class="table"><thead><tr><th>Зочин</th><th>Утас</th><th>Бүртгүүлсэн</th><th>Төлөв</th></tr></thead><tbody></tbody></table>');
+  const table = el('<table class="table"><thead><tr><th>Зочин</th><th>Холбоо барих</th><th>Бүртгүүлсэн</th><th>Төлөв</th></tr></thead><tbody></tbody></table>');
   const body = table.querySelector('tbody');
   for (const g of data.guests) {
     const tr = el(`
       <tr data-link data-guest="${g.id}">
         <td><b>${esc(g.name ?? (g.closed_at ? 'Хаагдсан бүртгэл' : 'Нэргүй зочин'))}</b></td>
-        <td><span class="mono">${esc(g.phone ?? '—')}</span></td>
+        <td><span class="mono">${esc(g.phone ?? '')}</span>${g.email ? `<span class="sub">${esc(g.email)}</span>` : ''}${!g.phone && !g.email ? '—' : ''}</td>
         <td><span class="mono">${when(g.joined_at)}</span></td>
         <td>${g.closed_at ? `<span class="pill" data-s="off">хаагдсан ${when(g.closed_at)}</span>` : '<span class="pill" data-s="contracted">идэвхтэй</span>'}</td>
       </tr>`);
@@ -578,6 +578,7 @@ async function loadGuests() {
   box.replaceChildren(table);
 }
 
+const WAY_WORD = { phone: 'утас', email: 'имэйл', google: 'Google', apple: 'Apple' };
 async function openGuest(id) {
   const view = document.getElementById('view');
   let f;
@@ -595,7 +596,7 @@ async function openGuest(id) {
   view.append(back);
   view.append(head(
     `${esc(g.name ?? (closed ? 'Хаагдсан бүртгэл' : 'Нэргүй зочин'))}${closed ? ' <span class="pill" data-s="off">хаагдсан</span>' : ''}`,
-    `${g.phone ? `${tel(g.phone)} · ` : ''}бүртгүүлсэн ${when(g.joined_at)}`,
+    `${g.phone ? `${tel(g.phone)} · ` : ''}${g.email ? `${esc(g.email)} · ` : ''}бүртгүүлсэн ${when(g.joined_at)}${g.ways?.length ? ` · нэвтэрдэг: ${g.ways.map((w) => WAY_WORD[w] ?? w).join(', ')}` : ''}`,
   ));
   const page = el(`
     <div class="detail">
@@ -658,7 +659,7 @@ async function openGuest(id) {
       } else if (b.dataset.a === 'close') {
         const note = page.querySelector('#why').value.trim();
         if (!note) return toast('Шалтгаан бичнэ үү.', 'bad');
-        if (!confirm(`${g.phone ?? 'Энэ'} бүртгэлийг хаах уу? Буцаах боломжгүй.`)) return;
+        if (!confirm(`${g.phone ?? g.email ?? 'Энэ'} бүртгэлийг хаах уу? Буцаах боломжгүй.`)) return;
         await ops(`/v1/ops/guests/${id}/close`, { method: 'POST', body: { note } });
         toast('Бүртгэл хаагдлаа.', 'good');
       }

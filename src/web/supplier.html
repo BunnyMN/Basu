@@ -170,7 +170,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mnt, money, KIND, dayLabel } from '/api.js';
+import { api, store, toast, mnt, money, KIND, dayLabel, signInDoors } from '/api.js';
 
 const root = document.getElementById('root');
 const el = (html) => {
@@ -245,12 +245,10 @@ const DOOR_FOOT = '<div class="door-foot"><a href="/terms">Үйлчилгээн�
 /* ── the doors ─────────────────────────────────────────────────────── */
 
 /**
- * Phone and a password — the same door the app uses.
- *
- * It was a one-time code, which needs an SMS gateway the server may not
- * have; a password is a door the person carries. The same card registers
- * and signs in: a number nobody has claimed makes an account, and one that
- * is claimed asks for its password.
+ * The ways in — Google, a code by email, or the phone and password a
+ * contract was signed with — the same block the guests' pages use. Whoever
+ * is new becomes an account by any of them, and the application form is the
+ * next card.
  */
 function signInCard() {
   const card = el(`
@@ -258,60 +256,17 @@ function signInCard() {
       <div class="card" id="signin">
         <div class="brand wordmark" data-size="sm">Basu</div>
         <h2>Нийлүүлэгчийн хэсэг</h2>
-        <p>Гэрээний утасны дугаар, нууц үгээрээ нэвтэрнэ үү.</p>
-        <label class="field"><span>Утасны дугаар</span><input name="phone" type="tel" inputmode="tel" placeholder="+976 XXXX XXXX" autocomplete="tel"></label>
-        <label class="field"><span>Нууц үг</span><input name="password" type="password" placeholder="Дор хаяж 8 тэмдэгт" autocomplete="current-password"></label>
-        <div class="otp" hidden><label class="field"><span>Нууц үгээ давтах</span><input name="again" type="password" placeholder="Дахин бичнэ үү" autocomplete="new-password"></label></div>
-        <div class="foot">
-          <button class="btn" data-v="primary" data-size="lg" type="button" id="send">Нэвтрэх</button>
-        </div>
+        <p>Нэвтэрч ороод нийлүүлэгч болох хүсэлтээ илгээнэ үү. Гэрээт нийлүүлэгч бол гэрээний утас, нууц үгээрээ нэвтэрнэ.</p>
+        <div data-doors></div>
         <div class="links">
-          <p class="cap">Анх удаа бол дугаар, нууц үгээ бичихэд бүртгэл үүснэ.</p>
           <button class="link" type="button" id="back">Таблет дээр кодоор холбох${ICON.right}</button>
         </div>
       </div>
       ${DOOR_FOOT}
     </div>`);
-  const phone = card.querySelector('[name="phone"]');
-  const password = card.querySelector('[name="password"]');
-  const again = card.querySelector('[name="again"]');
-  const send = card.querySelector('#send');
-  let registering = false;
-  send.addEventListener('click', async () => {
-    const number = phone.value.replace(/\s+/g, '');
-    try {
-      if (registering) {
-        if (again.value !== password.value) return toast('Хоёр нууц үг таарахгүй байна.', 'bad');
-        const { token } = await api('/v1/auth/register', {
-          method: 'POST',
-          body: { phone: number, password: password.value, device: 'Нийлүүлэгчийн дэлгэц' },
-        });
-        store.guestToken = token;
-        return boot();
-      }
-      const { token } = await api('/v1/auth/login', {
-        method: 'POST',
-        body: { phone: number, password: password.value, device: 'Нийлүүлэгчийн дэлгэц' },
-      });
-      store.guestToken = token;
-      boot();
-    } catch (error) {
-      // Nobody has this number yet: the same card becomes the sign-up.
-      if (error.code === 'BAD_CREDENTIALS' && !registering && password.value.length >= 8) {
-        registering = true;
-        card.querySelector('.otp').hidden = false;
-        send.textContent = 'Бүртгүүлэх';
-        again.focus();
-        toast('Шинэ дугаар. Нууц үгээ давтаад бүртгүүлнэ үү.');
-        return;
-      }
-      toast(error.message, 'bad');
-    }
-  });
-  password.addEventListener('keydown', (e) => e.key === 'Enter' && send.click());
-  again.addEventListener('keydown', (e) => e.key === 'Enter' && send.click());
-  phone.addEventListener('keydown', (e) => e.key === 'Enter' && send.click());
-  // The demo has no SMS to read a code from; a walkthrough skips straight in.
+  const doors = signInDoors({ device: 'Нийлүүлэгчийн дэлгэц', returnTo: '/supplier', onToken: () => boot() });
+  card.querySelector('[data-doors]').replaceWith(doors);
+  // The demo has no inbox to read a code from; a walkthrough skips straight in.
   api('/dev/clock')
     .then(() => {
       const demo = el('<button class="btn" type="button" id="demo">Демо: кодгүй нэвтрэх</button>');
@@ -321,10 +276,11 @@ function signInCard() {
         // A number typed is the person who typed it; none typed is somebody
         // new, so a walkthrough reaches the form rather than the seed's own
         // waiting application.
+        const typed = doors.querySelector('[name="phone"]').value.replace(/\s+/g, '');
         const fresh = `+97688${String(Date.now() % 1_000_000).padStart(6, '0')}`;
         const { token } = await api('/dev/login', {
           method: 'POST',
-          body: { phone: phone.value.replace(/\s+/g, '') || fresh, device: 'Нийлүүлэгчийн дэлгэц' },
+          body: { phone: typed || fresh, device: 'Нийлүүлэгчийн дэлгэц' },
         });
         store.guestToken = token;
         boot();
@@ -336,7 +292,7 @@ function signInCard() {
   return card;
 }
 
-/** The front door: a phone first, a pairing code for a tablet behind it. */
+/** The front door: a person first, a pairing code for a tablet behind it. */
 function showLanding() {
   root.replaceChildren(signInCard());
 }
@@ -357,7 +313,7 @@ async function showPairing() {
         <p>Basu-гаас авсан 8 оронтой кодоо оруулна уу. Нэг удаа холбоход хангалттай.</p>
         <input class="code" inputmode="numeric" maxlength="8" placeholder="········" aria-label="Холбох код">
         <button class="btn" data-v="primary" data-size="lg" type="button">Холбох</button>
-        <div class="links"><a id="become" class="link" role="button" tabindex="0">${ICON.left}Утсаараа нэвтрэх</a></div>
+        <div class="links"><a id="become" class="link" role="button" tabindex="0">${ICON.left}Нэвтрэх</a></div>
       </div>
       ${DOOR_FOOT}
     </div>`);
@@ -430,12 +386,13 @@ async function showPairing() {
 /* ── becoming a supplier ─────────────────────────────────────────── */
 
 /**
- * The form a would-be supplier fills in, behind a phone they have proved.
+ * The form a would-be supplier fills in, once signed in.
  *
- * The phone is not a field: it is the number they sign in with, by OTP, and
- * that is the only proof anybody has that it is theirs. What they type is who
- * they are and where a guest collects. Ops answers from the ops page and the
- * answer arrives here — and by SMS, with the code, when it is yes.
+ * The phone guests will ring is the account's own when it was made with one.
+ * An account made by email, Google or Apple has none, so the form asks for
+ * it — and ops rings it before saying yes, which is the proof it is theirs.
+ * Ops answers from the desk and the answer arrives here, and by email or
+ * message, with the code, when it is yes.
  */
 async function showApply() {
   root.replaceChildren();
@@ -444,8 +401,12 @@ async function showApply() {
     return;
   }
   let application;
+  let me;
   try {
-    ({ application } = await api('/v1/supplier/application', { token: store.guestToken }));
+    [{ application }, me] = await Promise.all([
+      api('/v1/supplier/application', { token: store.guestToken }),
+      api('/v1/me', { token: store.guestToken }),
+    ]);
   } catch (error) {
     if (error.status === 401) {
       store.guestToken = null;
@@ -455,22 +416,24 @@ async function showApply() {
     toast(error.message, 'bad');
     return;
   }
-  root.append(application ? statusCard(application) : applyForm());
+  const needsPhone = !me.phone;
+  root.append(application ? statusCard(application, needsPhone) : applyForm(needsPhone));
 }
 
 /** The banks a person in Ulaanbaatar has an account at, most common first. */
 const BANKS = ['Хаан банк', 'Голомт банк', 'Худалдаа хөгжлийн банк', 'Хас банк', 'Төрийн банк', 'Капитрон банк', 'Ариг банк', 'Богд банк', 'М банк'];
 
-function applyForm() {
+function applyForm(needsPhone = false) {
   const card = el(`
     <div class="door">
       <div class="card" id="apply">
         <div class="brand wordmark" data-size="sm">Basu</div>
         <h2>Нийлүүлэгч болох</h2>
-        <p>Basu хүсэлтийг тань үзээд гэрээ байгуулна. Батлагдвал энэ утсаараа нэвтэрч ажиллана.</p>
+        <p>Basu хүсэлтийг тань үзээд гэрээ байгуулна. Батлагдвал энэ бүртгэлээрээ нэвтэрч ажиллана.</p>
         <div class="form-group">
           <div class="section-label">Таны тухай</div>
           <label class="field"><span>Нэр (малчин, хоршоо, махны газар)</span><input name="name" placeholder="Архангай · Доржийн хот айл"></label>
+          ${needsPhone ? '<label class="field"><span>Холбогдох утас</span><input name="phone" type="tel" inputmode="tel" placeholder="+976 XXXX XXXX" autocomplete="tel"><small>Худалдан авагч, Basu энэ дугаараар холбогдоно. Батлахаас өмнө Basu залгаж шалгана.</small></label>' : ''}
           <label class="field"><span>ТТД (е-баримтад, байвал)</span><input name="tin" inputmode="numeric" placeholder="7–10 орон"></label>
           <label class="field"><span>Хотод мах авах цэг</span><input name="address" placeholder="Дүүрэг, зах, хаалга"></label>
           <label class="field"><span>Юу зарах вэ, хаанаас</span><textarea name="about" placeholder="Архангайн хонь, 10-р сараас, 20 толгой…"></textarea></label>
@@ -496,6 +459,7 @@ function applyForm() {
         token: store.guestToken,
         body: {
           name: v('name'),
+          ...(needsPhone ? { phone: v('phone') } : {}),
           tin: v('tin'),
           address: v('address'),
           about: v('about'),
@@ -515,12 +479,12 @@ function applyForm() {
 }
 
 const APPLICATION = {
-  applied: ['Хүлээгдэж байна', 'Basu хүсэлтийг тань үзэж байна. Батлагдвал энд болон SMS-ээр мэдэгдэнэ.'],
+  applied: ['Хүлээгдэж байна', 'Basu хүсэлтийг тань үзэж байна. Хариуг энд, мөн имэйл эсвэл мессежээр мэдэгдэнэ.'],
   contracted: ['Батлагдлаа', 'Та гэрээт нийлүүлэгч боллоо.'],
   declined: ['Татгалзсан', ''],
 };
 
-function statusCard(a) {
+function statusCard(a, needsPhone = false) {
   const [word, cap] = APPLICATION[a.state] ?? [a.state, ''];
   const card = el(`
     <div class="door">
@@ -552,7 +516,7 @@ function statusCard(a) {
     inner.append(el('<p>Дэлгэц аль хэдийн холбогдсон. Код шинээр хэрэгтэй бол Basu-д хэлнэ үү.</p>'));
   } else if (a.state === 'declined') {
     const again = el('<button class="btn" data-size="lg" type="button" id="again">Дахин хүсэлт гаргах</button>');
-    again.addEventListener('click', () => root.replaceChildren(applyForm()));
+    again.addEventListener('click', () => root.replaceChildren(applyForm(needsPhone)));
     inner.append(again);
   }
   inner.append(el(`<div class="links"><button class="link" type="button" id="back">Таблет дээр кодоор холбох${ICON.right}</button></div>`));
