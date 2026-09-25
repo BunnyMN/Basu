@@ -21,25 +21,18 @@ p{margin:0}
 .pair p{color:var(--ink-2);margin-bottom:20px}
 .pair .input{margin-bottom:10px}
 
-/* the frame */
-.app{display:grid;grid-template-columns:var(--side) minmax(0,1fr);min-height:100dvh}
+/* the frame: the grid, the sidebar and the drawer are /app.css's .desk-frame */
 .main{min-width:0}
 .page{max-width:var(--col-desk);margin:0 auto;padding:var(--s-7) var(--gutter) 64px}
 .page > .back{margin-bottom:4px}
 .page-head + .section{margin-top:0}
-/* the front room: a person's own page, before and beside the desk */
-.front{max-width:760px;margin:0 auto;padding:28px var(--gutter) 56px}
-.front-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:8px}
-.front-head .who{font-size:var(--t-cap);color:var(--ink-2);margin-top:4px}
-.front .section{margin-top:28px}
+.page-head + .kpi-band{margin-bottom:8px}
 .org-row{cursor:pointer}
-.org-row .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
 .org-form .checks{display:flex;gap:20px;margin:0 0 16px}
 .org-form .checks label{display:flex;align-items:center;gap:8px;font-size:var(--t-body-lg)}
 .add-member{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .add-member .input{width:auto;flex:1 1 220px}
 .add-member [data-found]{flex-basis:100%;font-size:var(--t-body)}
-.back-link{margin-bottom:12px}
 /* an ask for a seat: who, why, and the answer on one line under it */
 .request .main{flex:1;min-width:0}
 .request .who-contact{font-weight:400;font-size:var(--t-cap);color:var(--ink-2);margin-left:6px}
@@ -51,17 +44,35 @@ p{margin:0}
 .req-actions .btn{min-height:var(--h-sm);font-size:var(--t-cap)}
 .req-actions .gap{width:12px}
 .pair-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:0 16px;align-items:start}
+/* a business's people: on a phone the address folds under the name, and the table fits */
+.table.team td .sub{display:none}
+@media (max-width:720px){
+  .table.team{min-width:0}
+  .table.team th:nth-child(2),.table.team td:nth-child(2){display:none}
+  .table.team td .sub{display:block}
+}
+/* a business's front page: a door to each of its parts */
+.org-doors{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.org-door h3{font-size:var(--t-row);margin:0 0 10px}
+.org-door .links{display:flex;flex-direction:column;gap:2px;margin:0 -8px}
+.door-link{display:flex;align-items:center;gap:10px;min-height:36px;padding:0 8px;border-radius:var(--r-sm);font-size:var(--t-body);font-weight:500;color:var(--ink-2)}
+.door-link svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3)}
+@media (hover:hover){.door-link:hover{background:var(--surface-2);color:var(--ink)}}
+/* who may do what: permissions down, roles across, the reader's own column marked */
+.table.roles th.role-col,.table.roles td.role-col{width:96px;text-align:center}
+.table.roles th.yours{color:var(--ink)}
+.table.roles th.role-col small{display:block;font-family:var(--mono);font-size:var(--t-meta);font-weight:500;color:var(--accent-ink);text-transform:none;letter-spacing:0}
+.table.roles td.yours{background:var(--surface-2)}
+.table.roles .yes svg{width:18px;height:18px;fill:none;stroke:var(--ready);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
+.table.roles .no{color:var(--ink-3)}
+.table.roles tr.role-sec td{padding-top:18px;font-family:var(--mono);font-size:var(--t-eyebrow);font-weight:500;letter-spacing:var(--track-eyebrow);text-transform:uppercase;color:var(--ink-3);background:none}
+/* a page whose part of Basu is not joined up yet */
+.soon{display:flex;flex-direction:column;align-items:center;text-align:center;padding:40px 24px}
+.soon-mark{display:inline-grid;place-items:center;width:48px;height:48px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);margin-bottom:12px}
+.soon-mark svg{width:22px;height:22px;fill:none;stroke:var(--ink-3);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.soon h3{margin:0 0 6px}
+.soon .cap{max-width:52ch;margin:0}
 @media (max-width:900px){
-  .app{grid-template-columns:minmax(0,1fr)}
-  .sidebar{position:sticky;top:0;z-index:var(--z-bar);height:auto;width:auto;min-width:0;max-width:100%;flex-direction:row;align-items:center;gap:8px;padding:8px 12px;border-right:0;border-bottom:1px solid var(--line)}
-  .sidebar .brand{padding:0 8px 0 4px;flex:none}
-  .sidebar .brand span{display:none}
-  .sidebar > nav.tabs{flex-direction:row;flex:1;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;gap:2px}
-  .sidebar > nav.tabs::-webkit-scrollbar{display:none}
-  .sidebar .grp{display:none}
-  .sidebar .tabs button[data-tab]{width:auto;flex:none;padding:0 10px}
-  .sidebar .me{display:none}
-  .sidebar .out{margin:0;width:auto;flex:none}
   .page{padding:var(--s-5) var(--s-5) var(--s-8)}
 }
 
@@ -159,6 +170,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 
 <script type="module">
 import { api, store, toast, mnt, money, KIND, HEADLINE, dayLabel, signInDoors, accountWays, authReturn } from '/api.js';
+import { NAV_ICON, deskFrame } from '/sidenav.js';
 
 const root = document.getElementById('root');
 const el = (html) => {
@@ -215,23 +227,6 @@ const REASON = {
 };
 const actorWord = (a) =>
   a.startsWith('guest:') ? 'зочин' : a.startsWith('supplier:owner:') ? 'нийлүүлэгч (утас)' : a.startsWith('supplier:') ? 'нийлүүлэгчийн дэлгэц' : a.startsWith('ops') ? a.replace('ops:', 'ops · ') : 'систем';
-const ICON = {
-  notify: '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>',
-  system: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4M7 10l2 2 2-2 2 2 2-2"/></svg>',
-  money: '<svg viewBox="0 0 24 24"><path d="M4 7h16v11H4z"/><path d="M4 11h16M8 7V5h8v2"/><circle cx="12" cy="14.5" r="1.6"/></svg>',
-  venues: '<svg viewBox="0 0 24 24"><path d="M4 10l1.5-5h13L20 10"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>',
-  lunches: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/></svg>',
-  reviews: '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>',
-  guests: '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.8 3.5-5.6 7-5.6s6.1 1.8 7 5.6"/></svg>',
-  overview: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></svg>',
-  stats: '<svg viewBox="0 0 24 24"><path d="M4 19h16M7 16V9M12 16V5M17 16v-6"/></svg>',
-  orders: '<svg viewBox="0 0 24 24"><path d="M6 4h12v16l-3-2-3 2-3-2-3 2z"/><path d="M9 9h6M9 13h4"/></svg>',
-  suppliers: '<svg viewBox="0 0 24 24"><path d="M4 9l1.5-4h13L20 9"/><path d="M4 9c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3"/><path d="M6 12v8h12v-8"/></svg>',
-  pay: '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M15.5 15h2"/></svg>',
-  audit: '<svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>',
-  members: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c.8-3.2 3-4.8 6-4.8s5.2 1.6 6 4.8"/><circle cx="17" cy="9.5" r="2.4"/><path d="M15.5 15.2c2.6.2 4.4 1.6 5 4.8"/></svg>',
-};
-
 /* ── the door ─────────────────────────────────────────────────────── */
 
 async function showToken() {
@@ -343,7 +338,7 @@ function enterDesk(t) {
   boot();
 }
 
-/* ── the front room: signed in, not seated ─────────────────────────── */
+/* ── a person's own corner ─────────────────────────────────────────── */
 
 const ROLE_ASK = [
   ['ops', 'ops — захиалга, нийлүүлэгч'],
@@ -352,35 +347,86 @@ const ROLE_ASK = [
   ['admin', 'админ — бүгд, гишүүд'],
 ];
 let frontPoll;
+/** What the switcher asked the corner to open when it gets there: the business form, or the ask for a seat. */
+let wanted = null;
+
+const ORG_ROLE_WORD = { owner: 'эзэн', manager: 'менежер', staff: 'ажилтан', accountant: 'нягтлан' };
+const ORG_STATE = { applied: ['applied', 'хүлээгдэж байна'], active: ['contracted', 'идэвхтэй'], declined: ['off', 'татгалзсан'], suspended: ['off', 'түр хаасан'] };
+const kinds = (o) => [o.restaurant && 'Ресторан', o.supplier && 'Нийлүүлэгч'].filter(Boolean);
 
 /**
- * Who you are, and your seat at the desk: asked for, waiting, or said no
- * to. While a request waits the page keeps asking, so the yes opens the
- * desk without anybody reloading anything.
+ * The corner's front page: the businesses this person is part of, the way
+ * to register one, and their seat at Basu's desk — asked for, waiting, said
+ * no to, or held. While an ask waits the page keeps asking, so the yes opens
+ * the desk without anybody reloading anything.
  */
-function showFrontRoom({ account, request }) {
-  clearInterval(frontPoll);
-  const name = account.name ?? request?.name ?? '';
-  const contact = account.email ?? account.phone ?? '';
-  const page = el(`
-    <div class="front">
-      <div class="front-head">
-        <div><div class="brand wordmark">Basu</div><div class="who"><span data-name>${name ? `${esc(name)} · ` : ''}</span>${esc(contact)} <button class="btn" data-v="link" type="button" data-rename>${name ? 'Нэр засах' : 'Нэрээ бичих'}</button></div></div>
-        <button class="btn" data-v="quiet" type="button" id="front-out">Гарах</button>
-      </div>
-      <div id="front-orgs"></div>
-      <section class="section"><h2 class="section-label">Basu-гийн ops эрх</h2>
-        <div class="card"><div class="card-body" id="front">
-          <p class="cap" style="margin:0 0 14px">Basu-гийн ажилтан бол ops-ийн хэсэгт орох эрх хүснэ үү — админ зөвшөөрөхөд шууд нээгдэнэ.</p>
-          <div data-state></div>
-          <div data-form></div>
-        </div></div>
-      </section>
-    </div>`);
-  const card = page;
-  const state = card.querySelector('[data-state]');
-  const slot = card.querySelector('[data-form]');
+function renderMeHome(view) {
+  const account = access.account ?? {};
+  view.append(head(account.name ? `Сайн байна уу, ${esc(account.name)}` : 'Тавтай морил', 'Таны байгууллагууд, Basu-гийн ops эрх нэг дор.'));
 
+  const orgs = access.workspaces.filter((w) => w.kind === 'org');
+  const section = el(`
+    <section class="section"><h2 class="section-label">Миний байгууллагууд</h2>
+      <div class="card" data-rows id="org-list"></div>
+      <div class="form-foot" style="justify-content:flex-start;margin-top:12px"><button class="btn" data-v="primary" type="button" id="org-new">Байгууллага бүртгүүлэх</button></div>
+    </section>`);
+  const list = section.querySelector('#org-list');
+  if (!orgs.length) {
+    list.append(el('<div class="empty">Та одоогоор ямар ч байгууллагад байхгүй. Ресторан эсвэл нийлүүлэгчээ бүртгүүлбэл та эзэн нь болно; эсвэл менежер тань таныг утас, имэйлээр чинь нэмнэ.</div>'));
+  }
+  for (const w of orgs) {
+    const [tone, word] = ORG_STATE[w.state] ?? ['off', w.state];
+    const row = el(`
+      <div class="row org-row" data-chev tabindex="0" data-org="${esc(w.id)}">
+        <div class="main">
+          <div class="title">${esc(w.name)}</div>
+          <p class="cap" style="margin:2px 0 0">${esc(w.sub)}</p>
+          ${w.state === 'declined' && w.decline_reason ? `<p class="cap" style="margin:4px 0 0">Шалтгаан: ${esc(w.decline_reason)}</p>` : ''}
+        </div>
+        <div class="end"><span class="pill" data-s="${tone}">${word}</span></div>
+      </div>`);
+    const go = () => open(w);
+    row.addEventListener('click', go);
+    row.addEventListener('keydown', (e) => e.key === 'Enter' && go());
+    list.append(row);
+  }
+  const newOrg = section.querySelector('#org-new');
+  newOrg.addEventListener('click', () => {
+    newOrg.remove();
+    section.append(orgForm(async (id) => {
+      await reload(id);
+    }));
+  });
+  view.append(section);
+  view.append(deskSection());
+
+  if (wanted === 'new-org') newOrg.click();
+  if (wanted) view.querySelector(wanted === 'new-org' ? '.org-form' : '#front')?.scrollIntoView({ block: 'start' });
+  if (wanted === 'ask-desk') view.querySelector('#ask-open')?.click();
+  wanted = null;
+}
+
+/** Basu's own desk, from the corner: the seat held, or the ask for one. */
+function deskSection() {
+  const seat = deskSeat();
+  const request = access.desk_request;
+  const box = el(`
+    <section class="section"><h2 class="section-label">Basu-гийн ops эрх</h2>
+      <div class="card"><div class="card-body" id="front">
+        <p class="cap" style="margin:0 0 14px">Basu-гийн ажилтан бол ops-ийн хэсэгт орох эрх хүснэ үү — админ зөвшөөрөхөд шууд нээгдэнэ.</p>
+        <div data-state></div>
+        <div data-form></div>
+      </div></div>
+    </section>`);
+  const state = box.querySelector('[data-state]');
+  const slot = box.querySelector('[data-form]');
+  if (seat) {
+    box.querySelector('.cap').textContent = `Та Basu ops-ийн гишүүн — ${seat.role_label}.`;
+    const go = el('<button class="btn" type="button">Ops ширээ нээх</button>');
+    go.addEventListener('click', () => open(seat));
+    slot.append(go);
+    return box;
+  }
   const form = (asked) => {
     const f = el(`
       <div>
@@ -389,7 +435,7 @@ function showFrontRoom({ account, request }) {
         <textarea class="input" name="note" rows="3" placeholder="Та хэн бэ, юунд хэрэгтэй вэ (заавал биш)" aria-label="Тайлбар"></textarea>
         <button class="btn" data-size="lg" type="button" id="ask" style="width:100%">${asked ? 'Хүсэлтээ шинэчлэх' : 'Эрх хүсэх'}</button>
       </div>`);
-    f.querySelector('[name="name"]').value = asked?.name ?? name;
+    f.querySelector('[name="name"]').value = asked?.name ?? access.account?.name ?? '';
     f.querySelector('[name="role"]').value = asked?.role ?? 'ops';
     f.querySelector('[name="note"]').value = asked?.note ?? '';
     f.querySelector('#ask').addEventListener('click', async (e) => {
@@ -398,7 +444,7 @@ function showFrontRoom({ account, request }) {
       try {
         await ops('/v1/ops/requests', { method: 'POST', body: { name: v('name'), role: v('role'), note: v('note') } });
         toast('Хүсэлт илгээгдлээ.');
-        boot();
+        await reload('me');
       } catch (error) {
         toast(error.message, 'bad');
       } finally {
@@ -425,121 +471,94 @@ function showFrontRoom({ account, request }) {
     frontPoll = setInterval(async () => {
       if (document.hidden) return;
       try {
-        const now = await ops('/v1/ops/whoami');
-        if (now.member || now.request?.state !== 'pending') {
+        const now = await ops('/v1/access');
+        if (now.workspaces.some((w) => w.kind === 'desk') || now.desk_request?.state !== 'pending') {
           clearInterval(frontPoll);
-          boot();
+          access = now;
+          const seated = now.workspaces.find((w) => w.kind === 'desk');
+          if (seated) open(seated);
+          else show(tab);
         }
       } catch {
         clearInterval(frontPoll);
       }
     }, 10_000);
-  } else {
-    if (request?.state !== 'declined') {
-      // Most people here run a business; asking for Basu's own desk is the rarer thing, one tap away.
-      const open = el('<button class="btn" type="button">Ops эрх хүсэх</button>');
-      open.addEventListener('click', () => {
-        open.remove();
-        slot.append(form(null));
-      });
-      slot.append(open);
-    }
-    if (request?.state === 'declined') {
-      state.append(el(`
-        <div class="callout" data-k="warn" style="margin-bottom:16px">
-          <b>Хүсэлтийг татгалзсан</b>
-          <span>${request.decline_reason ? `Шалтгаан: ${esc(request.decline_reason)}. ` : ''}Дахин хүсэж болно.</span>
-        </div>`));
-      slot.append(form(null));
-    }
+    return box;
   }
-  card.querySelector('#front-out').addEventListener('click', () => {
-    clearInterval(frontPoll);
-    store.opsToken = null;
-    me = null;
-    showToken();
+  if (request?.state === 'declined') {
+    state.append(el(`
+      <div class="callout" data-k="warn" style="margin-bottom:16px">
+        <b>Хүсэлтийг татгалзсан</b>
+        <span>${request.decline_reason ? `Шалтгаан: ${esc(request.decline_reason)}. ` : ''}Дахин хүсэж болно.</span>
+      </div>`));
+    slot.append(form(null));
+    return box;
+  }
+  // Most people here run a business; asking for Basu's own desk is the rarer thing, one tap away.
+  const ask = el('<button class="btn" type="button" id="ask-open">Ops эрх хүсэх</button>');
+  ask.addEventListener('click', () => {
+    ask.remove();
+    slot.append(form(null));
   });
-  card.querySelector('[data-rename]').addEventListener('click', (e) => {
-    const box = el(`<span class="add-member" style="display:inline-flex;margin-top:6px"><input class="input" name="display_name" placeholder="Таны нэр" style="width:220px"><button class="btn" data-v="primary" data-size="sm" type="button">Хадгалах</button></span>`);
-    box.querySelector('input').value = name;
-    const save = async () => {
-      try {
-        await ops('/v1/me', { method: 'PATCH', body: { display_name: box.querySelector('input').value.trim() } });
-        toast('Нэр хадгалагдлаа.', 'good');
-        boot();
-      } catch (error) {
-        toast(error.message, 'bad');
-      }
-    };
-    box.querySelector('button').addEventListener('click', save);
-    box.querySelector('input').addEventListener('keydown', (ev) => ev.key === 'Enter' && save());
-    e.target.replaceWith(box);
-    box.querySelector('input').focus();
-  });
-  card.querySelector('#front-orgs').after(accountWays({ token: store.opsToken }));
-  root.replaceChildren(card);
-  void renderMyOrgs(card.querySelector('#front-orgs'));
+  slot.append(ask);
+  return box;
 }
 
-/** «Би» at the desk: a member's own businesses, and the ways back into their account. */
-function renderMine(view) {
-  const orgs = el('<div></div>');
-  view.append(orgs, accountWays({ token: store.opsToken }));
-  void renderMyOrgs(orgs);
-}
-
-/* ── a person's businesses ─────────────────────────────────────────── */
-
-const ORG_ROLE_WORD = { owner: 'эзэн', manager: 'менежер', staff: 'ажилтан', accountant: 'нягтлан' };
-const ORG_STATE = { applied: ['applied', 'хүлээгдэж байна'], active: ['contracted', 'идэвхтэй'], declined: ['off', 'татгалзсан'], suspended: ['off', 'түр хаасан'] };
-const kinds = (o) => [o.restaurant && 'Ресторан', o.supplier && 'Нийлүүлэгч'].filter(Boolean);
-
-/**
- * The businesses this person is part of, and the way to register one. Used
- * in the front room and, for somebody at the desk, under «Миний байгууллага».
- */
-async function renderMyOrgs(box) {
-  box.replaceChildren();
-  let orgs;
-  try {
-    ({ orgs } = await ops('/v1/orgs/mine'));
-  } catch (error) {
-    box.append(el(`<p class="empty">${esc(error.message)}</p>`));
-    return;
-  }
-  const section = el(`
-    <section class="section"><h2 class="section-label">Миний байгууллага</h2>
-      <div class="card" data-rows id="org-list"></div>
-      <div class="form-foot" style="justify-content:flex-start;margin-top:12px"><button class="btn" data-v="primary" type="button" id="org-new">Байгууллага бүртгүүлэх</button></div>
-    </section>`);
-  const list = section.querySelector('#org-list');
-  if (!orgs.length) {
-    list.append(el('<div class="empty">Та одоогоор ямар ч байгууллагад байхгүй. Ресторан эсвэл нийлүүлэгчээ бүртгүүлбэл та эзэн нь болно; эсвэл менежер тань таныг утас, имэйлээр чинь нэмнэ.</div>'));
-  }
-  for (const o of orgs) {
-    const [tone, word] = ORG_STATE[o.state] ?? ['off', o.state];
-    const row = el(`
-      <div class="row org-row" data-chev tabindex="0">
-        <div class="main">
-          <div class="title">${esc(o.name)}</div>
-          <div class="tags">${kinds(o).map((k) => `<span class="pill" data-size="sm">${k}</span>`).join('')}<span class="pill" data-size="sm">${ORG_ROLE_WORD[o.role] ?? o.role}</span></div>
-          ${o.state === 'declined' && o.decline_reason ? `<p class="cap" style="margin:4px 0 0">Шалтгаан: ${esc(o.decline_reason)}</p>` : ''}
+/** The person: their name, how they sign in, and every device that is signed in as them. */
+async function renderMeProfile(view) {
+  const account = access.account ?? {};
+  view.append(head('Профайл', 'Таны нэр, нэвтэрдэг хаяг, нэвтэрсэн төхөөрөмжүүд.'));
+  const card = el(`
+    <section class="section"><h2 class="section-label">Та</h2>
+      <div class="card"><div class="card-body">
+        <label class="field"><span>Нэр</span><input name="display_name" placeholder="Таны нэр" autocomplete="name"></label>
+        <div class="facts" style="padding:0 0 16px">
+          <div><span class="lab">Имэйл</span><b>${account.email ? esc(account.email) : '—'}</b></div>
+          <div><span class="lab">Утас</span><b class="mono">${account.phone ? esc(account.phone) : '—'}</b></div>
         </div>
-        <div class="end"><span class="pill" data-s="${tone}">${word}</span></div>
-      </div>`);
-    const open = () => {
-      if (o.state === 'active') renderOrg(box, o.id);
-      else toast(o.state === 'applied' ? 'Basu хүсэлтийг тань үзэж байна. Батлагдмагц ажилтнуудаа нэмж болно.' : 'Энэ байгууллага идэвхгүй байна.');
-    };
-    row.addEventListener('click', open);
-    row.addEventListener('keydown', (e) => e.key === 'Enter' && open());
-    list.append(row);
+        <div class="form-foot" style="justify-content:flex-start"><button class="btn" data-v="primary" type="button" id="save-name">Хадгалах</button></div>
+      </div></div>
+    </section>`);
+  const input = card.querySelector('[name="display_name"]');
+  input.value = account.name ?? '';
+  const save = async () => {
+    try {
+      await ops('/v1/me', { method: 'PATCH', body: { display_name: input.value.trim() } });
+      toast('Нэр хадгалагдлаа.', 'good');
+      await reload('me');
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  };
+  card.querySelector('#save-name').addEventListener('click', save);
+  input.addEventListener('keydown', (e) => e.key === 'Enter' && save());
+  view.append(card);
+  // The ways back into the account: an address to reset a forgotten password by, and the password itself.
+  view.append(accountWays({ token: store.opsToken }));
+
+  const sessions = el(`
+    <section class="section"><h2 class="section-label">Нэвтэрсэн төхөөрөмжүүд</h2>
+      <div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Төхөөрөмж</th><th>Нэвтэрсэн</th><th>Сүүлд</th></tr></thead><tbody id="sessions"><tr><td colspan="3" class="empty">…</td></tr></tbody></table></div>
+      <div class="card-foot"><button class="btn" data-v="quiet" data-size="sm" type="button" id="revoke-others">Бусад бүх төхөөрөмжөөс гарах</button></div></div>
+    </section>`);
+  view.append(sessions);
+  try {
+    const { sessions: list } = await ops('/v1/me/sessions');
+    const body = sessions.querySelector('#sessions');
+    body.replaceChildren(...list.map((s) => el(`<tr><td><b>${esc(s.label ?? 'Төхөөрөмж')}</b>${s.current ? ' <span class="pill" data-size="sm" data-s="contracted">энэ</span>' : ''}</td><td>${stamp(s.created_at)}</td><td>${s.last_seen_at ? stamp(s.last_seen_at) : '—'}</td></tr>`)));
+  } catch (error) {
+    sessions.querySelector('#sessions').replaceChildren(el(`<tr><td colspan="3" class="empty">${esc(error.message)}</td></tr>`));
   }
-  section.querySelector('#org-new').addEventListener('click', () => {
-    section.querySelector('#org-new').remove();
-    section.append(orgForm(() => renderMyOrgs(box)));
+  sessions.querySelector('#revoke-others').addEventListener('click', async () => {
+    if (!confirm('Энэ төхөөрөмжөөс бусад бүх газраас гарах уу?')) return;
+    try {
+      const { revoked } = await ops('/v1/me/sessions/revoke', { method: 'POST' });
+      toast(revoked ? `${revoked} төхөөрөмжөөс гарлаа.` : 'Өөр төхөөрөмж алга.', 'good');
+      show('profile');
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
   });
-  box.append(section);
 }
 
 /** Registering a business: its owner is whoever sends this; Basu approves it. */
@@ -565,12 +584,12 @@ function orgForm(done) {
     const on = (n) => f.querySelector(`[name="${n}"]`).checked;
     e.target.setAttribute('data-busy', '');
     try {
-      await ops('/v1/orgs', {
+      const made = await ops('/v1/orgs', {
         method: 'POST',
         body: { name: v('name'), restaurant: on('restaurant'), supplier: on('supplier'), phone: v('phone'), tin: v('tin'), address: v('address'), about: v('about') },
       });
       toast('Бүртгэл илгээгдлээ. Basu батлахад мэдэгдэнэ.', 'good');
-      done();
+      await done(made.id);
     } catch (error) {
       toast(error.message, 'bad');
     } finally {
@@ -580,52 +599,120 @@ function orgForm(done) {
   return f;
 }
 
+/* ── a business ────────────────────────────────────────────────────── */
+
+/** The business open now, with who works there — asked afresh by each of its pages. */
+const orgFile = () => ops(`/v1/orgs/${ws.id}`);
+/** The supplier's own routes, for the business open now. */
+const atOrg = (path) => api(path, { token: token(), headers: { 'x-basu-org': ws.id } });
+const orgLink = (key) => pagesOf(ws).find((i) => i.key === key);
+
 /**
- * One business: who works there, and — for its owner and managers — bringing
- * somebody in by the phone or address they sign in with, changing a role,
- * taking somebody out.
+ * A business's front page: what it is and what the person is in it, the
+ * day's numbers where it sells идэш, and a door to every page the role opens.
+ * One still waiting for the desk, or turned down, says so and nothing else.
  */
-async function renderOrg(box, id) {
-  box.replaceChildren();
+async function renderOrgHome(view) {
+  const w = ws;
+  view.append(head(esc(w.name), esc(w.sub)));
+  if (w.state !== 'active') {
+    const word = {
+      applied: ['ok', 'Basu шалгаж байна', 'Бүртгэлийг тань Basu-гийн баг шалгаж байна. Батлагдмагц энд ажилтнуудаа нэмж, хэсгүүдээ нээнэ — мэдэгдэл ирнэ.'],
+      declined: ['warn', 'Бүртгэлийг татгалзсан', w.decline_reason ? `Шалтгаан: ${esc(w.decline_reason)}. Засаад дахин бүртгүүлж болно.` : 'Засаад дахин бүртгүүлж болно.'],
+      suspended: ['warn', 'Түр хаасан', 'Энэ байгууллагыг Basu түр хаасан байна. Дэлгэрэнгүйг Basu-гаас асууна уу.'],
+    }[w.state] ?? ['warn', w.state, ''];
+    view.append(el(`<div class="callout" data-k="${word[0]}"><b>${word[1]}</b><span>${word[2]}</span></div>`));
+    if (w.state === 'declined') {
+      const again = el('<div class="form-foot" style="justify-content:flex-start;margin-top:16px"><button class="btn" type="button">Дахин бүртгүүлэх</button></div>');
+      again.querySelector('button').addEventListener('click', () => {
+        wanted = 'new-org';
+        open(access.workspaces.find((x) => x.kind === 'me'), 'home');
+      });
+      view.append(again);
+    }
+    return;
+  }
+
+  if (w.modules.includes('idesh') && can('idesh.orders.view')) {
+    const band = el('<div class="kpis kpi-band" id="org-kpis" hidden></div>');
+    view.append(band);
+    atOrg('/v1/supplier/home')
+      .then((h) => {
+        if (!band.isConnected) return;
+        const todo = h.lanes.paid + h.lanes.preparing + h.lanes.ready + h.lanes.dispatched;
+        const cells = [
+          `<div class="card kpi"><div class="lab">Хийх ажил</div><b>${todo}</b><span>${[h.due_today ? `${h.due_today} өнөөдөр авна` : '', h.overdue ? `${h.overdue} ирээгүй` : ''].filter(Boolean).join(' · ') || 'идэвхтэй захиалга'}</span></div>`,
+          `<div class="card kpi"><div class="lab">Шинэ</div><b>${h.lanes.paid}</b><span>төлсөн, бэлтгэж эхлээгүй</span></div>`,
+          `<div class="card kpi"><div class="lab">Улирал</div><b>${h.season.handed}</b><span>хүлээлгэн өгсөн</span></div>`,
+        ];
+        if (h.season.payout_mnt !== null) cells.push(`<div class="card kpi"><div class="lab">Танд очих</div><b>${money(h.season.payout_mnt)}</b><span>энэ улирлын орлого</span></div>`);
+        band.innerHTML = cells.join('');
+        band.hidden = false;
+      })
+      .catch(() => band.remove());
+  }
+
+  const doors = w.menu.filter((g) => g.label);
+  const grid = el('<section class="section"><h2 class="section-label">Таны хэсгүүд</h2><div class="org-doors"></div></section>');
+  for (const g of doors) {
+    const card = el(`<div class="card org-door"><div class="card-body"><h3>${esc(g.label)}</h3><div class="links"></div></div></div>`);
+    for (const it of g.items) {
+      const link = el(`<a class="door-link" href="${it.href ? esc(it.href) : `#${esc(w.id)}/${esc(it.key)}`}">${NAV_ICON[it.icon] ?? ''}<span>${esc(it.label)}</span></a>`);
+      if (!it.href) {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          show(it.key);
+        });
+      }
+      card.querySelector('.links').append(link);
+    }
+    grid.querySelector('.org-doors').append(card);
+  }
+  view.append(grid);
+  view.append(el(`<p class="cap" style="margin-top:20px">Та энэ байгууллагад <b>${esc(w.role_label)}</b>. ${orgLink('roles') ? '<a class="link" href="#" data-roles>Хэн юу хийж болохыг харах →</a>' : ''}</p>`));
+  view.querySelector('[data-roles]')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    show('roles');
+  });
+}
+
+/**
+ * Who works at the business, and — for its owner and managers — bringing
+ * somebody in by the phone or address they sign in with, changing a role,
+ * taking somebody out. Anybody may leave.
+ */
+async function renderOrgTeam(view) {
+  view.append(head('Ажилтнууд', 'Хэн энэ байгууллагад ажилладаг, ямар эрхтэй.'));
   let data;
   try {
-    data = await ops(`/v1/orgs/${id}`);
+    data = await orgFile();
   } catch (error) {
-    toast(error.message, 'bad');
-    return renderMyOrgs(box);
+    view.append(el(`<p class="empty">${esc(error.message)}</p>`));
+    return;
   }
-  const { org, role, may, members } = data;
+  const { org, may, members } = data;
   // Which roles this person may give: an owner any, a manager staff and accountants.
   const giving = may.managers ? ['manager', 'staff', 'accountant', 'owner'] : may.members ? ['staff', 'accountant'] : [];
-  const back = el('<button class="btn" data-v="link" type="button">← Миний байгууллага</button>');
-  back.addEventListener('click', () => renderMyOrgs(box));
   const section = el(`
     <section class="section">
-      <div class="back-link"></div>
-      <h2 style="margin:0 0 4px">${esc(org.name)}</h2>
-      <p class="cap" style="margin:0 0 16px">${kinds(org).join(' · ')} · Та: ${ORG_ROLE_WORD[role]}${org.phone ? ` · <span class="mono">${esc(org.phone)}</span>` : ''}${org.address ? ` · ${esc(org.address)}` : ''}</p>
-      ${org.supplier ? '<p style="margin:0 0 16px"><a class="link" href="/supplier">Нийлүүлэгчийн хэсэг нээх →</a></p>' : ''}
-      ${org.restaurant ? '<p class="cap" style="margin:0 0 16px">Рестораны цэс, захиалгын хэсэг удахгүй нэмэгдэнэ.</p>' : ''}
-      <h3 class="section-label">Ажилтнууд · ${members.length}</h3>
-      <div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Нэр</th><th>Утас, имэйл</th><th>Эрх</th><th></th></tr></thead><tbody data-members></tbody></table></div></div>
+      <div class="card"><div class="table-wrap"><table class="table team"><thead><tr><th>Нэр</th><th>Утас, имэйл</th><th>Эрх</th><th></th></tr></thead><tbody data-members></tbody></table></div></div>
       <div data-add></div>
     </section>`);
-  section.querySelector('.back-link').append(back);
   const body = section.querySelector('[data-members]');
   for (const m of members) {
     const mine = giving.includes(m.role) && !m.you;
     const tr = el(`
-      <tr>
-        <td><b>${esc(m.name ?? '—')}</b>${m.you ? ' <span class="meta">(та)</span>' : ''}</td>
-        <td>${m.contact ? esc(m.contact) : '—'}</td>
-        <td>${mine ? `<select class="input" data-size="sm" style="width:auto">${giving.map((r) => `<option value="${r}"${r === m.role ? ' selected' : ''}>${ORG_ROLE_WORD[r]}</option>`).join('')}</select>` : ORG_ROLE_WORD[m.role]}</td>
+      <tr data-member="${esc(m.guest_id)}">
+        <td><b>${esc(m.name ?? '—')}</b>${m.you ? ' <span class="meta">(та)</span>' : ''}${m.contact ? `<span class="sub mono">${esc(m.contact)}</span>` : ''}</td>
+        <td class="mono">${m.contact ? esc(m.contact) : '—'}</td>
+        <td>${mine ? `<select class="input" data-size="sm" style="width:auto" aria-label="Эрх">${giving.map((r) => `<option value="${r}"${r === m.role ? ' selected' : ''}>${ORG_ROLE_WORD[r]}</option>`).join('')}</select>` : ORG_ROLE_WORD[m.role]}</td>
         <td class="num"></td>
       </tr>`);
     const cell = tr.lastElementChild;
     if (mine) {
       tr.querySelector('select').addEventListener('change', async (e) => {
         try {
-          await ops(`/v1/orgs/${id}/members/${m.guest_id}`, { method: 'PATCH', body: { role: e.target.value } });
+          await ops(`/v1/orgs/${org.id}/members/${m.guest_id}`, { method: 'PATCH', body: { role: e.target.value } });
           toast(`${m.name ?? ''}: ${ORG_ROLE_WORD[e.target.value]}`, 'good');
         } catch (error) {
           toast(error.message, 'bad');
@@ -638,9 +725,9 @@ async function renderOrg(box, id) {
       out.addEventListener('click', async () => {
         if (!confirm(m.you ? `«${org.name}»-оос гарах уу?` : `${m.name ?? 'Энэ хүн'}-ийг хасах уу?`)) return;
         try {
-          await ops(`/v1/orgs/${id}/members/${m.guest_id}`, { method: 'DELETE' });
-          if (m.you) return renderMyOrgs(box);
-          renderOrg(box, id);
+          await ops(`/v1/orgs/${org.id}/members/${m.guest_id}`, { method: 'DELETE' });
+          if (m.you) return reload('me');
+          show('team');
         } catch (error) {
           toast(error.message, 'bad');
         }
@@ -665,19 +752,19 @@ async function renderOrg(box, id) {
       const contact = add.querySelector('[name="contact"]').value.trim();
       if (!contact) return;
       try {
-        const who = await ops(`/v1/orgs/${id}/lookup?contact=${encodeURIComponent(contact)}`);
+        const who = await ops(`/v1/orgs/${org.id}/lookup?contact=${encodeURIComponent(contact)}`);
         found.hidden = false;
         found.replaceChildren(el(`
           <div class="add-member" style="margin-top:8px">
             <span><b>${esc(who.name ?? 'Нэргүй')}</b> · ${esc(who.contact ?? '')}</span>
-            <select class="input" style="width:auto;flex:0 0 auto">${giving.filter((r) => r !== 'owner').map((r) => `<option value="${r}">${ORG_ROLE_WORD[r]}</option>`).join('')}</select>
+            <select class="input" style="width:auto;flex:0 0 auto" aria-label="Эрх">${giving.filter((r) => r !== 'owner').map((r) => `<option value="${r}">${ORG_ROLE_WORD[r]}</option>`).join('')}</select>
             <button class="btn" data-v="primary" type="button" data-add-go>Нэмэх</button>
           </div>`));
         found.querySelector('[data-add-go]').addEventListener('click', async () => {
           try {
-            await ops(`/v1/orgs/${id}/members`, { method: 'POST', body: { guest_id: who.guest_id, role: found.querySelector('select').value } });
+            await ops(`/v1/orgs/${org.id}/members`, { method: 'POST', body: { guest_id: who.guest_id, role: found.querySelector('select').value } });
             toast(`${who.name ?? 'Хүн'} нэмэгдлээ.`, 'good');
-            renderOrg(box, id);
+            show('team');
           } catch (error) {
             toast(error.message, 'bad');
           }
@@ -690,8 +777,132 @@ async function renderOrg(box, id) {
     add.querySelector('[data-find]').addEventListener('click', find);
     add.querySelector('[name="contact"]').addEventListener('keydown', (e) => e.key === 'Enter' && find());
     section.querySelector('[data-add]').append(add);
+  } else {
+    section.append(el('<p class="cap" style="margin-top:12px">Хүн нэмэх, эрх өөрчлөх нь эзэн, менежерийн ажил.</p>'));
   }
-  box.append(section);
+  view.append(section);
+}
+
+/** The business's own details — what Basu knows it by — changed by its owner or a manager, read by everybody else. */
+async function renderOrgProfile(view) {
+  view.append(head('Мэдээлэл', 'Basu-д бүртгэлтэй байгууллагын мэдээлэл.'));
+  let data;
+  try {
+    data = await orgFile();
+  } catch (error) {
+    view.append(el(`<p class="empty">${esc(error.message)}</p>`));
+    return;
+  }
+  const { org } = data;
+  const editable = can('org.profile.edit');
+  const card = el(`
+    <section class="section"><div class="card"><div class="card-body">
+      <label class="field"><span>Байгууллагын нэр</span><input name="name"></label>
+      <div class="fields">
+        <label class="field"><span>Холбогдох утас</span><input name="phone" type="tel"></label>
+        <label class="field"><span>ТТД</span><input name="tin" inputmode="numeric" placeholder="7–10 орон"></label>
+      </div>
+      <label class="field"><span>Хаяг</span><input name="address"></label>
+      <label class="field"><span>Товч тайлбар</span><textarea name="about"></textarea></label>
+      <p class="cap">${kinds(org).join(' · ')} · бүртгүүлсэн ${when(org.created_at)}${org.decided_at ? ` · батлагдсан ${when(org.decided_at)}` : ''}</p>
+      ${editable ? '<div class="form-foot"><button class="btn" data-v="primary" type="button" id="save-org">Хадгалах</button></div>' : '<p class="cap">Мэдээллийг эзэн эсвэл менежер засна.</p>'}
+    </div></div></section>`);
+  for (const [name, value] of Object.entries({ name: org.name, phone: org.phone, tin: org.tin, address: org.address, about: org.about })) {
+    const input = card.querySelector(`[name="${name}"]`);
+    input.value = value ?? '';
+    input.disabled = !editable;
+  }
+  card.querySelector('#save-org')?.addEventListener('click', async (e) => {
+    const v = (n) => card.querySelector(`[name="${n}"]`).value.trim();
+    e.target.setAttribute('data-busy', '');
+    try {
+      await ops(`/v1/orgs/${org.id}`, { method: 'PATCH', body: { name: v('name'), phone: v('phone'), tin: v('tin'), address: v('address'), about: v('about') } });
+      toast('Хадгалагдлаа.', 'good');
+      await reload(org.id);
+    } catch (error) {
+      toast(error.message, 'bad');
+    } finally {
+      e.target.removeAttribute('data-busy');
+    }
+  });
+  view.append(card);
+  if (org.supplier && orgLink('idesh.profile')) {
+    view.append(el(`<div class="callout" style="margin-top:16px"><b>Зочдод харагдах профайл, олголтын данс</b><span>Нийлүүлэгчийн нэр, мах авах цэг, данс нь <a class="link" href="${esc(orgLink('idesh.profile').href)}">нийлүүлэгчийн профайл</a> дээр.</span></div>`));
+  }
+}
+
+/**
+ * Who may do what here, as one table: every thing a person can do in this
+ * business, and the roles that may. Read before handing somebody a role;
+ * the person's own column is marked.
+ */
+async function renderOrgRoles(view) {
+  view.append(head('Эрхүүд', 'Үүрэг бүр энэ байгууллагад юу хийж болох вэ. Таны үүргийг тодруулсан.'));
+  let table;
+  try {
+    table = await ops(`/v1/access/roles?org=${encodeURIComponent(ws.id)}`);
+  } catch (error) {
+    view.append(el(`<p class="empty">${esc(error.message)}</p>`));
+    return;
+  }
+  view.append(roleTable(table));
+}
+
+/** A table of permissions against roles — a business's, or the desk's. */
+function roleTable(table) {
+  const SECTION = { null: table.scope === 'desk' ? 'Basu ops' : 'Байгууллага', idesh: 'Идэш', dine: 'Хоол' };
+  const groups = [...new Set(table.permissions.map((p) => String(p.module)))];
+  const thead = `<tr><th>Юу хийх</th>${table.roles.map((r) => `<th class="role-col${r.key === table.yours ? ' yours' : ''}">${esc(r.label)}${r.key === table.yours ? '<small>та</small>' : ''}</th>`).join('')}</tr>`;
+  const rows = groups
+    .map((g) => {
+      const list = table.permissions.filter((p) => String(p.module) === g);
+      return `<tr class="role-sec"><td colspan="${table.roles.length + 1}">${SECTION[g] ?? g}</td></tr>${list
+        .map((p) => `<tr><td>${esc(p.mn)}</td>${table.roles.map((r) => `<td class="role-col${r.key === table.yours ? ' yours' : ''}">${p.roles.includes(r.key) ? `<span class="yes" aria-label="тийм">${NAV_ICON.check}</span>` : '<span class="no" aria-label="үгүй">—</span>'}</td>`).join('')}</tr>`)
+        .join('')}`;
+    })
+    .join('');
+  return el(`<section class="section"><div class="card"><div class="table-wrap"><table class="table roles"><thead>${thead}</thead><tbody>${rows}</tbody></table></div></div></section>`);
+}
+
+/** One change to who holds what, said without bending anybody's name. */
+const LOG_WORD = {
+  registered: (e) => `<b>${esc(e.who ?? '')}</b> бүртгүүлсэн · эзэн`,
+  approved: () => 'Basu баталсан',
+  declined: () => 'Basu татгалзсан',
+  added: (e) => `<b>${esc(e.who ?? 'Нэгэн хүн')}</b> нэмэгдсэн · ${ORG_ROLE_WORD[e.role] ?? e.role}`,
+  role: (e) => `<b>${esc(e.who ?? 'Нэгэн хүн')}</b>: ${ORG_ROLE_WORD[e.was] ?? e.was} → ${ORG_ROLE_WORD[e.role] ?? e.role}`,
+  removed: (e) => `<b>${esc(e.who ?? 'Нэгэн хүн')}</b> хасагдсан · ${ORG_ROLE_WORD[e.was] ?? e.was}`,
+  left: (e) => `<b>${esc(e.who ?? 'Нэгэн хүн')}</b> өөрөө гарсан · ${ORG_ROLE_WORD[e.was] ?? e.was}`,
+};
+
+/** Who gave whom which role, newest first: the owner's and the managers' record. */
+async function renderOrgLog(view) {
+  view.append(head('Түүх', 'Хэн хэнийг ямар эрхээр нэмж, өөрчилж, хассан.'));
+  let log;
+  try {
+    ({ log } = await ops(`/v1/orgs/${ws.id}/log`));
+  } catch (error) {
+    view.append(el(`<p class="empty">${esc(error.message)}</p>`));
+    return;
+  }
+  const list = el('<div class="card"><ul class="log rows" data-rows id="org-log"></ul></div>');
+  if (!log.length) list.firstElementChild.append(el('<li class="empty">Бүртгэл алга.</li>'));
+  for (const e of log) {
+    list.firstElementChild.append(el(`<li><span class="who">${esc(e.by ?? 'систем')}</span><span>${(LOG_WORD[e.action] ?? (() => e.action))(e)}</span><span class="when meta">${when(e.at)} ${clockOf(e.at)}</span></li>`));
+  }
+  view.append(list);
+}
+
+/** A restaurant's pages, until the restaurant side is joined up: what will be here, and why it is not yet. */
+function renderDineSoon(view) {
+  const item = orgLink(tab);
+  view.append(head(esc(item?.label ?? 'Ресторан'), 'Рестораны хэсэг'));
+  view.append(el(`
+    <div class="card"><div class="card-body soon">
+      <span class="soon-mark" aria-hidden="true">${NAV_ICON[item?.icon] ?? NAV_ICON.venues}</span>
+      <h3>Тун удахгүй</h3>
+      <p class="cap">Таны рестораныг Basu-гийн хоолны апп-тай холбох ажил явагдаж байна. Холбогдмогц цэс, захиалга, гал тогооны дэлгэц энд нээгдэнэ — эрх нь яг одоо харагдаж буйгаар: цэсийг эзэн, менежер засна, ажилтан хардаг.</p>
+    </div></div>`));
 }
 
 /* ── the desk: businesses waiting for a yes ────────────────────────── */
@@ -717,7 +928,7 @@ async function renderOrgsDesk(view) {
           <div class="title">${esc(o.name)} <span class="who-contact">${kinds(o).join(' · ')}</span></div>
           <p class="cap">${[o.applicant && `Бүртгүүлсэн: ${esc(o.applicant)}`, o.phone && `<span class="mono">${esc(o.phone)}</span>`, o.address && esc(o.address), o.tin && `ТТД ${esc(o.tin)}`, `${o.members} хүн`].filter(Boolean).join(' · ')}</p>
           ${o.about ? `<p class="cap">${esc(o.about)}</p>` : ''}
-          ${o.state === 'applied' ? `<div class="req-actions">
+          ${o.state === 'applied' && can('desk.orgs.decide') ? `<div class="req-actions">
             <button class="btn" data-v="primary" type="button" data-a="approve">Батлах</button>
             <span class="gap" aria-hidden="true"></span>
             <input class="input" name="reason" placeholder="Татгалзах шалтгаан" aria-label="Татгалзах шалтгаан">
@@ -749,119 +960,170 @@ async function renderOrgsDesk(view) {
   view.append(list);
 }
 
-/* ── the desk ─────────────────────────────────────────────────────── */
+/* ── the frame: one sidebar for every place a person works ─────────── */
 
 /**
- * The desk's own session: the demo's secret, or a member's sign-in — kept
+ * The desk's own session: the demo's secret, or a person's sign-in — kept
  * under its own key, never the guest's, so a person who is both a guest
  * and a member keeps both, and a browser that is only a guest is simply
  * shown the door here.
  */
 const token = () => store.opsToken;
 const ops = (path, options = {}) => api(path, { ...options, token: token() });
-let me = null;
 
-const TABS = [
-  { key: 'overview', label: 'Самбар', icon: ICON.overview, group: 'Basu' },
-  { key: 'guests', label: 'Зочид', icon: ICON.guests, group: 'Basu' },
-  { key: 'money', label: 'Мөнгө', icon: ICON.money, group: 'Basu' },
-  { key: 'notify', label: 'Мэдэгдэл', icon: ICON.notify, group: 'Basu' },
-  { key: 'system', label: 'Систем', icon: ICON.system, group: 'Basu' },
-  { key: 'venues', label: 'Ресторан', icon: ICON.venues, group: 'Хоол' },
-  { key: 'lunches', label: 'Захиалга', icon: ICON.lunches, group: 'Хоол' },
-  { key: 'reviews', label: 'Үнэлгээ', icon: ICON.reviews, group: 'Хоол' },
-  { key: 'stats', label: 'Тоон үзүүлэлт', icon: ICON.stats, group: 'Идэш' },
-  { key: 'orders', label: 'Захиалгууд', icon: ICON.orders, group: 'Идэш' },
-  { key: 'suppliers', label: 'Нийлүүлэгчид', icon: ICON.suppliers, group: 'Идэш' },
-  { key: 'pay', label: 'Олголт, буцаалт', icon: ICON.pay, group: 'Идэш' },
-  { key: 'audit', label: 'Бүртгэл', icon: ICON.audit, group: 'Ширээ' },
-  { key: 'orgs', label: 'Байгууллагууд', icon: ICON.venues, group: 'Ширээ', run: true },
-  { key: 'members', label: 'Гишүүд', icon: ICON.members, group: 'Ширээ', admin: true },
-  { key: 'myorgs', label: 'Миний байгууллага', icon: ICON.suppliers, group: 'Би' },
-];
-let tab = localStorage.getItem('basu.ops.tab') ?? 'overview';
+/** What /v1/access said: the person, and every place they work, each with its menu. */
+let access = null;
+/** The place open now. */
+let ws = null;
+/** The frame's handles. */
+let nav = null;
+/** The page open now. */
+let tab = null;
+/** The desk seat, when the place open is the desk. */
+let me = null;
 let cache = { suppliers: [], settlements: [], requests: [], orgs: [] };
 
-async function refresh() {
+/** Whether the place open now lets this person do that. The server asks again; this only decides what to draw. */
+const can = (permission) => Boolean(ws?.permissions?.includes(permission));
+const deskSeat = () => access?.workspaces.find((w) => w.kind === 'desk') ?? null;
+const pagesOf = (w) => w.menu.flatMap((g) => g.items);
+/** Whether the place open now has that page — what a link inside a page asks before it is drawn. */
+const hasPage = (key) => Boolean(ws && pagesOf(ws).some((i) => i.key === key && !i.href));
+const lastPageKey = (w) => (w.kind === 'desk' ? 'basu.ops.tab' : `basu.dash.page.${w.id}`);
+const firstPage = (w) => pagesOf(w).find((i) => !i.href)?.key ?? 'home';
+const remembered = (w) => {
+  const saved = localStorage.getItem(lastPageKey(w));
+  return saved && pagesOf(w).some((i) => i.key === saved && !i.href) ? saved : firstPage(w);
+};
+
+const DESK_PAGES = {
+  overview: renderOverview, guests: renderGuests, money: renderMoney, notify: renderNotify, system: renderSystem,
+  venues: renderVenues, lunches: renderLunches, reviews: renderReviews,
+  stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay,
+  orgs: renderOrgsDesk, members: renderMembers, audit: renderAudit,
+};
+const ORG_PAGES = { home: renderOrgHome, team: renderOrgTeam, profile: renderOrgProfile, roles: renderOrgRoles, log: renderOrgLog };
+const ME_PAGES = { home: renderMeHome, profile: renderMeProfile };
+
+/**
+ * The place to open: the one the address names, else the last one used,
+ * else the desk, else the first business that is running, else the
+ * person's own corner.
+ */
+function choose(hash) {
+  const [id, page] = decodeURIComponent((hash ?? '').replace(/^#/, '')).split('/');
+  const all = access.workspaces;
+  const named = all.find((w) => w.id === id);
+  if (named) return { w: named, page };
+  const last = all.find((w) => w.id === localStorage.getItem('basu.dash.ws'));
+  return { w: last ?? all.find((w) => w.kind === 'desk') ?? all.find((w) => w.kind === 'org' && w.state === 'active') ?? all[0], page: null };
+}
+
+/** Open a place — the frame is built afresh for it — on the page asked for, or the one last open there. */
+function open(w, page) {
+  if (!w) return;
+  clearInterval(frontPoll);
+  ws = w;
+  localStorage.setItem('basu.dash.ws', w.id);
+  me = w.kind === 'desk' ? { id: w.seat?.id, name: w.seat?.name, role: w.role } : null;
+  frame();
+  tab = hasPage(page) ? page : remembered(w);
+  nav.select(tab);
+  if (w.kind === 'desk') refresh();
+  else show(tab);
+}
+
+function frame() {
+  const actions = [];
+  if (access.account) {
+    actions.push({ key: 'new-org', label: 'Байгууллага бүртгүүлэх', icon: 'plus' });
+    if (!deskSeat()) actions.push({ key: 'ask-desk', label: 'Basu ops эрх хүсэх', icon: 'key' });
+  }
+  nav = deskFrame({
+    workspaces: access.workspaces,
+    current: ws,
+    account: access.account,
+    onPage: (item) => (item.href ? false : show(item.key)),
+    onWorkspace: (w) => open(w),
+    onSignOut: signOut,
+    actions,
+    onAction: (key) => {
+      wanted = key;
+      open(access.workspaces.find((w) => w.kind === 'me'), 'home');
+    },
+  });
+  root.replaceChildren(nav.root);
+}
+
+/** Ask again who the person is and where they work — after they changed it — and open `id` (or stay). */
+async function reload(id) {
   try {
-    const [{ suppliers }, { settlements }, whoami] = await Promise.all([ops('/v1/ops/suppliers'), ops('/v1/ops/settlements'), ops('/v1/ops/me')]);
-    me = whoami.member;
-    const requests = me?.role === 'admin' ? (await ops('/v1/ops/requests')).requests : [];
-    const orgs = ['admin', 'ops'].includes(me?.role) ? (await ops('/v1/ops/orgs')).orgs : [];
-    cache = { suppliers, settlements, requests, orgs };
+    access = await ops('/v1/access');
   } catch (error) {
-    if (error.status === 401 || error.status === 503) {
-      store.opsToken = null;
-      me = null;
-      showToken();
-      return;
-    }
+    if (error.status === 401) return signOut();
     toast(error.message, 'bad');
     return;
   }
-  if (!document.querySelector('.app')) frame();
+  const w = access.workspaces.find((x) => x.id === (id ?? ws?.id)) ?? access.workspaces.find((x) => x.id === ws?.id);
+  open(w ?? choose('').w, w?.id === ws?.id ? tab : null);
+}
+
+function signOut() {
+  clearInterval(frontPoll);
+  store.opsToken = null;
+  access = ws = nav = me = null;
+  showToken();
+}
+
+/** The desk's lists the badges and three pages read, then the page again. A business or the corner has none. */
+async function refresh() {
+  if (ws?.kind === 'desk') {
+    try {
+      const [suppliers, settlements, requests, orgs] = await Promise.all([
+        can('desk.idesh.view') ? ops('/v1/ops/suppliers').then((r) => r.suppliers) : [],
+        can('desk.payouts.view') ? ops('/v1/ops/settlements').then((r) => r.settlements) : [],
+        can('desk.members.manage') ? ops('/v1/ops/requests').then((r) => r.requests) : [],
+        can('desk.orgs.view') ? ops('/v1/ops/orgs').then((r) => r.orgs) : [],
+      ]);
+      cache = { suppliers, settlements, requests, orgs };
+    } catch (error) {
+      // The seat went while the page was open: ask again where this person works rather than throw them out.
+      if (error.status === 401) return reload();
+      if (error.status === 503) return signOut();
+      toast(error.message, 'bad');
+      return;
+    }
+  }
   badges();
   show(tab);
 }
 
-function frame() {
-  const f = el(`
-    <div class="app">
-      <aside class="side sidebar">
-        <div class="brand"><b>Basu</b><span>Ops</span></div>
-        <nav class="tabs" aria-label="Хэсгүүд">
-          ${TABS.filter((t) => (!t.admin || me?.role === 'admin') && (!t.run || ['admin', 'ops'].includes(me?.role)))
-            .map((t, i, all) => `${t.group !== all[i - 1]?.group ? `<div class="grp">${t.group}</div>` : ''}<button type="button" data-tab="${t.key}">${t.icon}<span class="t">${t.label}</span><span class="n" data-badge="${t.key}" hidden></span></button>`)
-            .join('')}
-        </nav>
-        <div class="me"><b id="me-name">${esc(me?.name ?? '')}</b><span>${me ? ROLE_WORD[me.role] ?? me.role : ''}${me?.phone ? ` · ${esc(me.phone)}` : ''}</span></div>
-        <button class="out" type="button" id="out">Гарах</button>
-      </aside>
-      <main class="main"><div class="page" id="view"></div></main>
-    </div>`);
-  f.querySelector('#out').addEventListener('click', () => {
-    store.opsToken = null;
-    me = null;
-    showToken();
-  });
-  f.querySelector('.tabs').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-tab]');
-    if (b) show(b.dataset.tab);
-  });
-  root.replaceChildren(f);
-}
-
-/** What waits, in the sidebar: applications to answer, money to send. */
+/** What waits, in the sidebar: applications to answer, money to send, people and businesses asking in. */
 function badges() {
+  if (ws?.kind !== 'desk' || !nav) return;
   const applied = cache.suppliers.filter((s) => s.state === 'applied').length;
   const due = cache.settlements.filter((t) => t.state === 'due').length;
-  const set = (key, n, hot) => {
-    const b = document.querySelector(`[data-badge="${key}"]`);
-    if (!b) return;
-    b.hidden = !n;
-    b.textContent = String(n);
-    b.toggleAttribute('data-hot', Boolean(hot));
-  };
-  set('suppliers', applied, applied > 0);
-  set('pay', due, due > 0);
-  set('members', cache.requests.length, cache.requests.length > 0);
   const waitingOrgs = cache.orgs.filter((o) => o.state === 'applied').length;
-  set('orgs', waitingOrgs, waitingOrgs > 0);
+  nav.badge('suppliers', applied, applied > 0);
+  nav.badge('pay', due, due > 0);
+  nav.badge('members', cache.requests.length, cache.requests.length > 0);
+  nav.badge('orgs', waitingOrgs, waitingOrgs > 0);
 }
 
 function show(key) {
+  if (!ws || !nav) return;
   tab = key;
-  localStorage.setItem('basu.ops.tab', key);
-  for (const b of document.querySelectorAll('.tabs button')) {
-    const on = b.dataset.tab === key;
-    b.toggleAttribute('data-on', on);
-    if (on) b.setAttribute('aria-current', 'page');
-    else b.removeAttribute('aria-current');
-  }
-  const view = document.getElementById('view');
+  localStorage.setItem(lastPageKey(ws), key);
+  history.replaceState(null, '', `#${ws.id}/${key}`);
+  nav.select(key);
+  clearInterval(frontPoll);
+  const view = nav.view;
   view.replaceChildren();
   window.scrollTo(0, 0);
-  ({ overview: renderOverview, guests: renderGuests, money: renderMoney, notify: renderNotify, system: renderSystem, venues: renderVenues, lunches: renderLunches, reviews: renderReviews, stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers, orgs: renderOrgsDesk, myorgs: renderMine })[key]?.(view);
+  const pages = ws.kind === 'desk' ? DESK_PAGES : ws.kind === 'org' ? ORG_PAGES : ME_PAGES;
+  const draw = hasPage(key) ? pages[key] ?? (key.startsWith('dine.') ? renderDineSoon : null) : null;
+  if (draw) draw(view);
+  else view.append(head('Олдсонгүй', 'Энэ хуудас танд нээлттэй биш байна.'));
 }
 
 const head = (title, sub, right = '') =>
@@ -906,7 +1168,7 @@ async function renderOverview(view) {
   if (v.banner) list.append(el(`<div class="card alert" data-level="info" id="banner"><span><b>Зарлал.</b> ${esc(v.banner)}</span></div>`));
   if (v.alerts.length) {
     for (const a of v.alerts) {
-      list.append(el(`<div class="card alert" data-level="${a.level}"><span>${esc(a.text)}</span>${a.tab ? `<button type="button" class="btn" data-v="quiet" data-size="sm" data-go="${a.tab}">Очих</button>` : ''}</div>`));
+      list.append(el(`<div class="card alert" data-level="${a.level}"><span>${esc(a.text)}</span>${a.tab && hasPage(a.tab) ? `<button type="button" class="btn" data-v="quiet" data-size="sm" data-go="${a.tab}">Очих</button>` : ''}</div>`));
     }
     list.addEventListener('click', (e) => {
       const b = e.target.closest('button[data-go]');
@@ -1081,11 +1343,11 @@ async function openGuest(id) {
         <div class="card-body acts">
           ${f.sessions.length ? f.sessions.map((s) => `
             <div class="sess"><span>${esc(s.label ?? 'Утас')}<small>сүүлд ${when(s.last_seen_at ?? s.created_at)} ${clockOf(s.last_seen_at ?? s.created_at)}</small></span>
-            <button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-sid="${s.id}">Гаргах</button></div>`).join('') : '<div class="hint">Нээлттэй сесс алга.</div>'}
+            ${can('desk.guests.sessions') ? `<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-sid="${s.id}">Гаргах</button>` : ''}</div>`).join('') : '<div class="hint">Нээлттэй сесс алга.</div>'}
           ${f.devices.length ? `<div class="hint">Push: ${f.devices.map((d) => `${PLATFORM_WORD[d.platform] ?? d.platform}${d.label ? ` · ${esc(d.label)}` : ''}`).join(', ')}</div>` : ''}
           ${closed ? '' : `
           <div class="sep"></div>
-          ${me?.role === 'admin' ? `
+          ${can('desk.guests.close') ? `
           <label class="field"><span>Бүртгэл хаах шалтгаан</span><input id="why" placeholder="Зочин бичгээр хүссэн…"></label>
           <button class="btn" data-v="danger" type="button" data-a="close">Бүртгэл хаах</button>
           <div class="hint">Түрийвчид мөнгөтэй эсвэл идэвхтэй захиалгатай бол хаагдахгүй. Нэр, утас арилна; захиалга, гүйлгээ бүртгэлд үлдэнэ.</div>` : '<div class="hint">Бүртгэл хаахыг зөвхөн админ хийнэ.</div>'}`}
@@ -1168,15 +1430,15 @@ function renderVenue(r) {
       </div>
       <div class="right"><div class="btns">
         <button class="btn" data-size="sm" type="button" data-a="menu">Цэс</button>
-        <details class="more"><summary class="btn" data-size="sm" data-icon aria-label="Бусад үйлдэл"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></summary><div class="menu">
+        ${can('desk.dine.manage') ? `<details class="more"><summary class="btn" data-size="sm" data-icon aria-label="Бусад үйлдэл"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></summary><div class="menu">
           <button class="btn" data-size="sm" data-v="quiet" type="button" data-a="tablet">Шинэ таблет</button>
           <button class="btn${r.active ? ' ink-stop' : ''}" data-size="sm" data-v="quiet" type="button" data-a="active">${r.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>
-        </div></details>
+        </div></details>` : ''}
       </div></div>
       <div class="about">Өнөөдөр <b>${r.today.placed}</b> захиалга · <b>${r.today.live}</b> идэвхтэй${r.today.held ? ` · <b class="ink-hold">${r.today.held} түр зогсоосон</b>` : ''} · <b>${money(r.today.sales_mnt)}</b> · цэс ${r.menu.active}/${r.menu.total}${r.menu.sold_out ? ` (${r.menu.sold_out} дууссан)` : ''}
         <div class="sess-list">${r.devices.length ? r.devices.map((d) => `
           <div class="sess"><span>${d.pairing_code ? `Код <b class="mono">${d.pairing_code}</b> · ${esc(d.label ?? '')} · ${clockOf(d.pairing_expires_at)} хүртэл` : `${esc(d.label ?? 'Таблет')} · ${d.online ? '<span class="pill" data-s="contracted">онлайн</span>' : `сүүлд ${d.last_seen_at ? `${when(d.last_seen_at)} ${clockOf(d.last_seen_at)}` : 'хэзээ ч үгүй'}`}`}</span>
-          <button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-device="${d.id}">Салгах</button></div>`).join('') : '<span class="muted">Таблет холбогдоогүй.</span>'}</div>
+          ${can('desk.dine.manage') ? `<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-device="${d.id}">Салгах</button>` : ''}</div>`).join('') : '<span class="muted">Таблет холбогдоогүй.</span>'}</div>
       </div>
     </div>`);
   card.addEventListener('click', async (e) => {
@@ -1211,7 +1473,7 @@ function renderVenue(r) {
 async function menuDrawer(r) {
   const { items } = await ops(`/v1/ops/dine/restaurants/${r.id}/menu`);
   const d = el(`<div class="drawer table-wrap"><table class="table"${items.length ? '' : ' data-empty'}><thead><tr><th>Хоол</th><th>Цех</th><th class="num">Үнэ</th><th class="num">Бэлтгэх, мин</th><th>Төлөв</th><th></th></tr></thead><tbody>${items
-    .map((m) => `<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td>${esc(m.station)}</td><td class="num">${money(m.price_mnt)}</td><td class="num">${m.prep_minutes}</td><td>${m.active ? (m.sold_out_until ? '<span class="pill" data-s="off">дууссан</span>' : '<span class="pill" data-s="contracted">цэсэнд</span>') : '<span class="pill" data-s="declined">нуусан</span>'}</td><td class="num"><button class="btn" data-size="sm" data-v="quiet" type="button" data-item="${m.id}" data-on="${m.active}">${m.active ? 'Нуух' : 'Харуулах'}</button></td></tr>`)
+    .map((m) => `<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td>${esc(m.station)}</td><td class="num">${money(m.price_mnt)}</td><td class="num">${m.prep_minutes}</td><td>${m.active ? (m.sold_out_until ? '<span class="pill" data-s="off">дууссан</span>' : '<span class="pill" data-s="contracted">цэсэнд</span>') : '<span class="pill" data-s="declined">нуусан</span>'}</td><td class="num">${can('desk.dine.manage') ? `<button class="btn" data-size="sm" data-v="quiet" type="button" data-item="${m.id}" data-on="${m.active}">${m.active ? 'Нуух' : 'Харуулах'}</button>` : ''}</td></tr>`)
     .join('') || '<tr><td colspan="6" class="empty">Цэс хоосон.</td></tr>'}</tbody></table></div>`);
   d.addEventListener('click', async (e) => {
     const b = e.target.closest('button[data-item]');
@@ -1346,7 +1608,7 @@ async function openLunch(id) {
       <div class="card" id="acts">
         <div class="card-head"><h3>Ops-ийн үйлдэл</h3></div>
         <div class="card-body acts">
-          ${DINE_FREE.includes(o.state) || ['ARMED', 'HELD', 'FIRED', 'COOKING', 'READY'].includes(o.state) ? `
+          ${!can('desk.dine.manage') ? '<div class="hint">Үйлдлийг ops, админ хийнэ.</div>' : DINE_FREE.includes(o.state) || ['ARMED', 'HELD', 'FIRED', 'COOKING', 'READY'].includes(o.state) ? `
           <label class="field"><span>Тэмдэглэл</span><input id="note" placeholder="Бүртгэлд үлдэнэ"></label>
           ${DINE_FREE.includes(o.state) ? '<button class="btn" data-v="danger" type="button" data-a="cancel">Зочны өмнөөс цуцлах</button><div class="hint">Гал дээр гараагүй тул мөнгө бүтэн түрийвч рүү буцна.</div>' : '<div class="hint">Гал дээр гарсан: цуцлах боломжгүй.</div>'}
           ${['ARMED', 'HELD', 'FIRED', 'COOKING', 'READY'].includes(o.state) ? '<div class="sep"></div><button class="btn" type="button" data-a="no-show">Зочин ирээгүй гэж тэмдэглэх</button><div class="hint">Ширээ суллагдана; мөнгө буцахгүй.</div>' : ''}
@@ -1423,7 +1685,7 @@ const TOPUP_PILL = { pending: 'PAID', settled: 'contracted', failed: 'declined',
 const RECEIPT_PILL = { queued: 'PAID', issued: 'contracted', failed: 'declined' };
 let moneyView = localStorage.getItem('basu.ops.money') ?? 'checks';
 let moneyFilter = { kind: '', from: '', to: '', topupState: '', receiptState: '' };
-const canMoney = () => ['admin', 'finance'].includes(me?.role);
+const canMoney = () => can('desk.money.manage');
 
 /** A CSV the browser saves, fetched with the desk's token because a plain link cannot carry one. */
 async function download(path, name) {
@@ -1662,7 +1924,7 @@ async function loadMessages() {
   for (const m of data.messages) {
     list.append(el(`<li data-message="${m.id}"><span class="who">${m.channel === 'sms' ? 'SMS' : 'Push'}<small>${esc(m.guest ?? 'зочин')}<br><span class="mono">${esc(m.guest_phone ?? '')}</span></small></span>
       <div>${esc(TEMPLATE_WORD[m.template] ?? m.title ?? m.template)}<small>${esc(m.body)}</small></div>
-      <span class="when meta">${when(m.created_at)} ${clockOf(m.created_at)}<br><span class="pill" data-s="${MSG_PILL[m.state] ?? 'off'}">${MSG_WORD[m.state] ?? m.state}</span>${m.read_at ? ' <span class="cap">уншсан</span>' : ''}${m.state === 'failed' ? ` <button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${m.id}">Дахин</button>` : ''}</span></li>`));
+      <span class="when meta">${when(m.created_at)} ${clockOf(m.created_at)}<br><span class="pill" data-s="${MSG_PILL[m.state] ?? 'off'}">${MSG_WORD[m.state] ?? m.state}</span>${m.read_at ? ' <span class="cap">уншсан</span>' : ''}${m.state === 'failed' && can('desk.notify.retry') ? ` <button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${m.id}">Дахин</button>` : ''}</span></li>`));
   }
   list.addEventListener('click', async (e) => {
     const b = e.target.closest('button[data-retry]');
@@ -1740,8 +2002,8 @@ async function drawSystem() {
         <tr><td>Идэшний дүрэм</td><td class="end">шимтгэл ${s.rules.commission_pct}% · суутгал ${s.rules.forfeit_pct}% · ирээгүй ${s.rules.no_show_days} хоног</td></tr>
       </tbody></table></div></div></section>
       <section class="section"><h2 class="section-label">Тохиргоо</h2><div class="card card-body" id="settings">${s.settings
-        .map((k) => `<label class="field"><span>${esc(k.label)}</span><input data-key="${k.key}" ${k.kind === 'number' ? 'type="number" min="0" step="1"' : 'type="text" maxlength="500"'} value="${esc(String(k.value))}"${me?.role === 'admin' ? '' : ' disabled'}><small>${esc(k.hint)}${k.updated_by ? ` · ${esc(k.updated_by.replace('ops:', ''))}, ${when(k.updated_at)}` : ''}</small></label>`)
-        .join('')}${me?.role === 'admin' ? '<div class="form-foot"><button class="btn" data-v="primary" type="button" id="save-settings">Хадгалах</button></div>' : '<div class="hint">Тохиргоог зөвхөн админ өөрчилнө.</div>'}</div></section>
+        .map((k) => `<label class="field"><span>${esc(k.label)}</span><input data-key="${k.key}" ${k.kind === 'number' ? 'type="number" min="0" step="1"' : 'type="text" maxlength="500"'} value="${esc(String(k.value))}"${can('desk.system.manage') ? '' : ' disabled'}><small>${esc(k.hint)}${k.updated_by ? ` · ${esc(k.updated_by.replace('ops:', ''))}, ${when(k.updated_at)}` : ''}</small></label>`)
+        .join('')}${can('desk.system.manage') ? '<div class="form-foot"><button class="btn" data-v="primary" type="button" id="save-settings">Хадгалах</button></div>' : '<div class="hint">Тохиргоог зөвхөн админ өөрчилнө.</div>'}</div></section>
     </div>
   </div>`);
   page.querySelector('#save-settings')?.addEventListener('click', async (e) => {
@@ -1914,7 +2176,7 @@ async function openOrder(id) {
       <div class="card" id="acts">
         <div class="card-head"><h3>Ops-ийн үйлдэл</h3></div>
         <div class="card-body acts">
-          ${live ? `
+          ${live && !can('desk.idesh.manage') ? '<div class="hint">Үйлдлийг ops, админ хийнэ.</div>' : live ? `
           <label class="field"><span>Тэмдэглэл</span><input id="note" placeholder="Бүртгэлд үлдэнэ"></label>
           <button class="btn" type="button" data-a="resend">Мэдэгдэл дахин илгээх</button>
           ${['READY', 'DISPATCHED'].includes(o.state) ? '<button class="btn" data-v="primary" type="button" data-a="hand">Хүлээлгэн өгсөн гэж тэмдэглэх</button>' : ''}
@@ -1968,7 +2230,8 @@ function renderSuppliers(view) {
   const list = view.querySelector('#all .rows');
   if (!rest.length) list.append(el('<div class="card empty">Нийлүүлэгч алга.</div>'));
   for (const s of rest) list.append(renderRow(s));
-  view.querySelector('#new').append(newForm());
+  if (can('desk.idesh.manage')) view.querySelector('#new').append(newForm());
+  else view.querySelector('#new').remove();
 }
 
 function renderRow(s) {
@@ -2019,7 +2282,10 @@ function renderRow(s) {
     menu.append(button);
   };
 
-  if (s.state === 'applied') {
+  // Each button only for a seat that may press it: ops runs the suppliers, finance the contract's money.
+  const runs = can('desk.idesh.manage');
+  const signs = can('desk.idesh.terms');
+  if (s.state === 'applied' && runs) {
     const ok = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
     ok.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/approve`, null, showCode));
     const no = el('<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="decline">Татгалзах</button>');
@@ -2030,7 +2296,7 @@ function renderRow(s) {
     });
     buttons.append(ok, no);
   }
-  if (s.state === 'contracted' && s.bank_account && !s.bank_verified) {
+  if (s.state === 'contracted' && s.bank_account && !s.bank_verified && signs) {
     // A changed account pays out nothing until somebody holds it up against the contract.
     const check = el('<button class="btn" data-size="sm" type="button" data-a="bank-verify">Данс баталгаажуулах</button>');
     check.addEventListener('click', () => {
@@ -2040,9 +2306,11 @@ function renderRow(s) {
     buttons.append(check);
   }
   if (s.state === 'contracted') {
-    const code = small('Шинэ код', 'data-a="code"');
-    code.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/code`, null, showCode));
-    fold(code);
+    if (runs) {
+      const code = small('Шинэ код', 'data-a="code"');
+      code.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/code`, null, showCode));
+      fold(code);
+    }
     // Their listings, to look at and, if need be, hide.
     const stall = small('Зарууд', 'data-a="listings"');
     stall.addEventListener('click', async () => {
@@ -2052,7 +2320,7 @@ function renderRow(s) {
       if (!listings.length) box.append(el('<span class="muted">Зар алга.</span>'));
       for (const l of listings) {
         const line = el(`<div class="stall-line"${l.active ? '' : ' data-off'}><span>${esc(l.title)} · ${money(l.price_mnt)}/${l.unit === 'kg' ? 'кг' : 'толгой'} · <span class="mono">${l.sold}/${l.quantity}</span>${l.active ? '' : ' · нуусан'}</span></div>`);
-        if (l.active) {
+        if (l.active && runs) {
           const hide = el('<button class="btn" data-v="quiet" data-size="sm" type="button">Нуух</button>');
           hide.addEventListener('click', () => {
             const note = prompt('Нуух шалтгаан (бүртгэлд үлдэнэ):', '');
@@ -2073,9 +2341,9 @@ function renderRow(s) {
       if (note === null) return;
       act(`/v1/ops/suppliers/${s.id}/active`, { active: !s.active, note });
     });
-    fold(toggle);
+    if (runs) fold(toggle);
   }
-  if (s.state !== 'declined') {
+  if (s.state !== 'declined' && signs) {
     // The contract's terms: written in once it is signed, corrected here.
     const terms = small('Нөхцөл', 'data-a="terms"');
     terms.addEventListener('click', () => {
@@ -2207,7 +2475,7 @@ function renderSettlement(t) {
       }</small></div>
       <div class="right"><span class="amount">${money(t.amount_mnt)}</span><span class="pill" data-s="${status[0]}">${status[1]}</span><div class="btns"></div></div>
     </div>`);
-  if (t.state === 'due' && t.bank_verified && !t.approved_at) {
+  if (t.state === 'due' && t.bank_verified && !t.approved_at && can('desk.payouts.approve')) {
     // Two people, not one: releasing the money and sending it are different
     // hands, so the row only ever offers the half that is this member's.
     const approve = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
@@ -2225,7 +2493,7 @@ function renderSettlement(t) {
     });
     row.querySelector('.btns').append(approve);
   }
-  if (t.state === 'due' && t.bank_verified && t.approved_at) {
+  if (t.state === 'due' && t.bank_verified && t.approved_at && can('desk.payouts.approve')) {
     const paid = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="paid">Шилжүүлсэн</button>');
     paid.addEventListener('click', async () => {
       const reference = prompt(`${mnt(t.amount_mnt)} → ${bank}\nБанкны гүйлгээний дугаар (заавал биш):`, '');
@@ -2401,10 +2669,26 @@ async function renderMembers(view) {
     }
   });
   view.append(form);
+  // What each role opens, before a role is handed to anybody: the same table the server keeps.
+  try {
+    const table = await ops('/v1/access/roles?scope=desk');
+    if (tab !== 'members') return;
+    const roles = roleTable(table);
+    roles.prepend(el('<h2 class="section-label">Эрх бүр юу хийдэг</h2>'));
+    roles.id = 'desk-roles';
+    view.append(roles);
+  } catch {
+    /* the page stands without the table */
+  }
 }
 
 /* ── boot ─────────────────────────────────────────────────────────── */
 
+/**
+ * Signed in or not; and if so, where this person works. The server says
+ * which places and which pages; the page opens the one the address names,
+ * or the one used last.
+ */
 async function boot() {
   root.replaceChildren();
   clearInterval(frontPoll);
@@ -2419,25 +2703,27 @@ async function boot() {
     showToken();
     return;
   }
-  // A member sits at the desk; anybody else signed in stands in the front room.
   try {
-    ({ member: me } = await ops('/v1/ops/me'));
+    access = await ops('/v1/access');
   } catch (error) {
-    if (error.status !== 401) {
-      toast(error.message, 'bad');
+    if (error.status === 401 || error.status === 503) {
+      store.opsToken = null;
+      showToken();
       return;
     }
-    try {
-      showFrontRoom(await ops('/v1/ops/whoami'));
-    } catch {
-      store.opsToken = null;
-      me = null;
-      showToken();
-    }
+    toast(error.message, 'bad');
     return;
   }
-  refresh();
+  const { w, page } = choose(location.hash);
+  open(w, page);
 }
+
+// A link from the supplier's screen, or the back button: the address names another place or page.
+addEventListener('hashchange', () => {
+  if (!access) return;
+  const { w, page } = choose(location.hash);
+  if (w && (w.id !== ws?.id || (page && page !== tab))) open(w, page);
+});
 
 boot();
 </script>

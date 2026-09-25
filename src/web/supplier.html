@@ -61,11 +61,8 @@
 .topbar .out[data-confirm]{width:auto;padding:0 12px;border-color:var(--stop-line);color:var(--stop)}
 .topbar .out[data-confirm] svg{display:none}
 .sidebar .out[data-confirm]{background:var(--stop-soft);color:var(--stop)}
-@media (min-width:900px){
-  .shell{display:grid;grid-template-columns:var(--side) minmax(0,1fr);align-items:start}
-  .bar{display:none}
-  .view{padding:28px var(--gutter) 48px}
-}
+/* at a desk the pages sit in the dashboard's frame (/app.css .desk-frame) */
+.desk-frame .page{width:100%;max-width:var(--col-desk);margin:0 auto;padding:28px var(--gutter) 48px}
 
 /* ── today ── */
 .stats{margin-bottom:24px}
@@ -149,8 +146,8 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;
 /* .field > span is the label rule; the affix wrapper is a span too (requested for app.css) */
 .field > .affix{font-weight:400;margin-bottom:0}
 /* digits a person reads back to a bank — ТТД, данс, утас, үнэ — are mono tabular; the placeholder is a sentence and stays sans (requested for app.css) */
-:is(.door,.view) .field input:is([type="tel"],[inputmode="numeric"],[inputmode="decimal"]){font-family:var(--mono);font-variant-numeric:tabular-nums}
-:is(.door,.view) .field input:is([type="tel"],[inputmode="numeric"],[inputmode="decimal"])::placeholder{font-family:var(--sans)}
+:is(.door,.view,.page) .field input:is([type="tel"],[inputmode="numeric"],[inputmode="decimal"]){font-family:var(--mono);font-variant-numeric:tabular-nums}
+:is(.door,.view,.page) .field input:is([type="tel"],[inputmode="numeric"],[inputmode="decimal"])::placeholder{font-family:var(--sans)}
 .new .form-group:first-child{border-top:0;padding-top:0;margin-top:0}
 .new .foot{margin-top:4px}
 
@@ -170,7 +167,8 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mnt, money, KIND, dayLabel, signInDoors, accountWays } from '/api.js';
+import { api, store, shell, toast, mnt, money, KIND, dayLabel, signInDoors, accountWays } from '/api.js';
+import { NAV_ICON, deskFrame } from '/sidenav.js';
 
 const root = document.getElementById('root');
 const el = (html) => {
@@ -192,11 +190,28 @@ const esc = (value) => {
  * the demo can watch every one at once, read-only on the stall.
  */
 const ALL = 'all-suppliers';
-const watchingAll = () => store.supplierToken === ALL;
-/** A paired screen's token, or the owner's own sign-in: the API takes either. */
-const token = () => store.supplierToken || store.guestToken;
-/** Which way we came in: a screen paired by code, or a person by phone. */
-const mode = () => (store.supplierToken ? 'device' : 'owner');
+/**
+ * The business the dashboard opened this page for — `/supplier?org=…` — so
+ * a person who works at two suppliers works at the one they chose there.
+ */
+const ORG = new URLSearchParams(location.search).get('org');
+const watchingAll = () => !ORG && store.supplierToken === ALL;
+/**
+ * A paired screen's token, or a person's own sign-in — made on this page, by
+ * the app, or on the dashboard. Opened from the dashboard, the dashboard's
+ * session is the person; otherwise a screen paired here comes first.
+ */
+const token = () => (ORG ? store.opsToken || store.guestToken : store.supplierToken || store.guestToken || store.opsToken);
+/** The supplier's own routes: the token, and which business when the dashboard said. */
+const sup = (path, options = {}) => api(path, { ...options, token: token(), headers: ORG ? { 'x-basu-org': ORG } : {} });
+
+/**
+ * Who this seat is here and what it may do — `/v1/supplier/seat`, asked on
+ * opening. A tab or a button this seat may not use is not drawn; the server
+ * refuses it anyway.
+ */
+let seat = null;
+const may = (permission) => Boolean(seat?.permissions?.includes(permission));
 
 /**
  * Phone chrome below 900px, a desk above it: the same nav is a tab bar or a
@@ -208,18 +223,25 @@ const desk = typeof matchMedia === 'function' ? matchMedia('(min-width:900px)') 
 const isDesk = () => Boolean(desk?.matches);
 function applyDesk() {
   document.documentElement.toggleAttribute('data-desk', isDesk());
-  const nav = document.querySelector('.shell > .tabs');
-  if (nav) {
-    nav.classList.toggle('sidebar', isDesk());
-    nav.classList.toggle('tabbar', !isDesk());
-  }
-  document.body.classList.toggle('has-tabbar', Boolean(nav) && !isDesk());
+  document.body.classList.toggle('has-tabbar', Boolean(document.querySelector('.shell > .tabbar')) && !isDesk());
 }
-desk?.addEventListener?.('change', applyDesk);
+// Phone and desk are two frames, not one restyled: crossing the line redraws the module on the tab it was on.
+desk?.addEventListener?.('change', () => {
+  applyDesk();
+  if (document.getElementById('view')) openModule();
+});
 
+/** Sign out of the session this page is using — and, having come from the dashboard, go back there. */
 function signOut() {
-  store.supplierToken = null;
-  if (mode() === 'owner') store.guestToken = null;
+  const used = token();
+  if (store.supplierToken === used || watchingAll()) store.supplierToken = null;
+  if (store.guestToken === used) store.guestToken = null;
+  if (store.opsToken === used) store.opsToken = null;
+  seat = null;
+  if (ORG) {
+    location.href = '/dashboard';
+    return;
+  }
   boot();
 }
 
@@ -396,7 +418,8 @@ async function showPairing() {
  */
 async function showApply() {
   root.replaceChildren();
-  if (!store.guestToken) {
+  const person = ORG || !store.supplierToken ? token() : store.guestToken || store.opsToken;
+  if (!person) {
     root.append(signInCard());
     return;
   }
@@ -404,12 +427,13 @@ async function showApply() {
   let me;
   try {
     [{ application }, me] = await Promise.all([
-      api('/v1/supplier/application', { token: store.guestToken }),
-      api('/v1/me', { token: store.guestToken }),
+      api('/v1/supplier/application', { token: person }),
+      api('/v1/me', { token: person }),
     ]);
   } catch (error) {
     if (error.status === 401) {
-      store.guestToken = null;
+      if (store.guestToken === person) store.guestToken = null;
+      if (store.opsToken === person) store.opsToken = null;
       root.append(signInCard());
       return;
     }
@@ -456,7 +480,7 @@ function applyForm(needsPhone = false) {
     try {
       await api('/v1/supplier/apply', {
         method: 'POST',
-        token: store.guestToken,
+        token: token(),
         body: {
           name: v('name'),
           ...(needsPhone ? { phone: v('phone') } : {}),
@@ -624,12 +648,9 @@ function renderTicket(ticket, lane) {
   const send = async (action, body, button) => {
     if (button) button.disabled = true;
     try {
-      await api(
-        watchingAll()
-          ? `/dev/supplier/orders/${ticket.id}/${action}`
-          : `/v1/supplier/orders/${ticket.id}/${action}`,
-        { method: 'POST', token: watchingAll() ? undefined : token(), body },
-      );
+      await (watchingAll()
+        ? api(`/dev/supplier/orders/${ticket.id}/${action}`, { method: 'POST', body })
+        : sup(`/v1/supplier/orders/${ticket.id}/${action}`, { method: 'POST', body }));
       await refreshBoard();
       await onActed?.();
     } catch (error) {
@@ -702,6 +723,8 @@ function renderTicket(ticket, lane) {
     buttons.append(button);
   };
 
+  // An accountant reads the order; the buttons are for whoever does the work.
+  if (!watchingAll() && !may('idesh.orders.act')) return node;
   if (lane === 'paid') {
     add('Бэлтгэж эхлэх', 'prepare', 'primary');
     cancelWith(['guest_asked', 'cannot_fulfil', 'vet']);
@@ -734,7 +757,7 @@ async function refreshBoard() {
   try {
     const data = watchingAll()
       ? await api('/dev/supplier/board')
-      : await api('/v1/supplier/board', { token: token() });
+      : await sup('/v1/supplier/board');
     renderBoard(data);
   } catch (error) {
     if (error.status === 401 && !watchingAll()) {
@@ -763,7 +786,7 @@ function renderStall(listings) {
   if (!listings.length) rows.append(el('<div class="card empty"><b>Зар алга</b>Доор эхний зараа нэмнэ үү.</div>'));
   for (const l of listings) rows.append(renderRow(l));
   stall.append(rows);
-  stall.append(newForm());
+  if (may('idesh.listings.edit')) stall.append(newForm());
 }
 
 function renderRow(l) {
@@ -777,15 +800,16 @@ function renderRow(l) {
         <span class="num">${money(l.price_mnt)}<small>үнэ</small></span>
         <span class="num">${l.sold} / ${l.quantity}<small>зарагдсан</small></span>
       </span>
-      <span class="btns">
+      ${may('idesh.listings.edit') ? `<span class="btns">
         <button class="btn" type="button" data-a="edit">Засах</button>
         <button class="btn quiet" type="button" data-a="toggle">${l.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>
-      </span>
+      </span>` : ''}
     </div>`);
+  if (!may('idesh.listings.edit')) return row;
 
   const patch = async (body) => {
     try {
-      const { listing } = await api(`/v1/supplier/listings/${l.id}`, { method: 'PATCH', token: token(), body });
+      const { listing } = await sup(`/v1/supplier/listings/${l.id}`, { method: 'PATCH', body });
       row.replaceWith(renderRow(listing));
     } catch (error) {
       toast(error.message, 'bad');
@@ -815,7 +839,7 @@ function renderRow(l) {
         ready_from: form.querySelector('[name="ready"]').value,
       };
       try {
-        const { listing } = await api(`/v1/supplier/listings/${l.id}`, { method: 'PATCH', token: token(), body });
+        const { listing } = await sup(`/v1/supplier/listings/${l.id}`, { method: 'PATCH', body });
         form.replaceWith(renderRow(listing));
         toast('Хадгалагдлаа');
       } catch (error) {
@@ -905,9 +929,9 @@ function newForm() {
     if (body.unit === 'whole') body.approx_kg = Number(v('approx_kg'));
     else body.min_qty = Number(v('min_qty') || 1);
     try {
-      await api('/v1/supplier/listings', { method: 'POST', token: token(), body });
+      await sup('/v1/supplier/listings', { method: 'POST', body });
       toast('Зар нэмэгдлээ');
-      const { listings } = await api('/v1/supplier/listings', { token: token() });
+      const { listings } = await sup('/v1/supplier/listings');
       renderStall(listings);
     } catch (error) {
       toast(error.message, 'bad');
@@ -928,7 +952,7 @@ async function renderMoney() {
   if (!box) return;
   let data;
   try {
-    data = await api('/v1/supplier/money', { token: token() });
+    data = await sup('/v1/supplier/money');
   } catch {
     box.replaceChildren(el('<div class="card empty">Тооцоо ачаалж чадсангүй.</div>'));
     return;
@@ -984,13 +1008,24 @@ function when(iso) {
 /* ── the module ──────────────────────────────────────────────────── */
 
 const TABS = [
-  { key: 'today', label: 'Өнөөдөр', icon: ICON.today },
-  { key: 'orders', label: 'Захиалга', icon: ICON.orders },
-  { key: 'stall', label: 'Зар', icon: ICON.stall },
-  { key: 'money', label: 'Мөнгө', icon: ICON.money },
-  { key: 'profile', label: 'Профайл', icon: ICON.profile },
+  { key: 'today', label: 'Өнөөдөр', icon: ICON.today, nav: 'today', needs: 'idesh.board' },
+  { key: 'orders', label: 'Захиалга', icon: ICON.orders, nav: 'orders', needs: 'idesh.orders.view' },
+  { key: 'stall', label: 'Зар', icon: ICON.stall, nav: 'stall', needs: 'idesh.listings.view' },
+  { key: 'money', label: 'Мөнгө', icon: ICON.money, nav: 'pay', needs: 'idesh.money.view' },
+  { key: 'profile', label: 'Профайл', icon: ICON.profile, nav: 'person', needs: 'org.view' },
 ];
-let tab = 'today';
+/** The tab to open: the one the address names — the dashboard links straight to one — else today. */
+let tab = location.hash.slice(1) || 'today';
+/** The desk frame's handles, when the page is at a desk. */
+let deskNav = null;
+
+/**
+ * The tabs this seat opens: all five for an owner, a manager or a screen on
+ * the counter; the day, the orders and the stall for staff; the orders and
+ * the money for an accountant. A demo watching every supplier at once gets
+ * only today's work — the rest is one supplier's own.
+ */
+const tabsFor = () => (watchingAll() ? TABS.slice(0, 1) : TABS.filter((t) => may(t.needs)));
 
 /** The page's one h1: large on a phone, beside its lead on a desk. */
 function pageHead(title, sub, subId) {
@@ -1000,78 +1035,156 @@ function pageHead(title, sub, subId) {
 }
 
 /**
- * The supplier's own app: five tabs along the bottom of a phone, a sidebar
- * on a computer, the same page in both. A demo watching every supplier at
- * once gets only today's work — the rest is one supplier's own.
+ * Signing out is two taps: the first turns the button into the question for
+ * four seconds, the second answers it — a stray tap on a counter tablet must
+ * not drop the pairing. `buttons` are every way out on the frame.
+ */
+function twoTaps(buttons, word, leave, now = false) {
+  let armed = null;
+  const say = (asking) => {
+    for (const b of buttons) {
+      b.toggleAttribute('data-confirm', asking);
+      const label = b.querySelector('.t');
+      if (label) {
+        label.textContent = asking ? 'Гарах уу?' : word;
+        label.classList.toggle('sr-only', !asking);
+      } else if (b.closest('.acct')) b.innerHTML = asking ? 'Гарах уу?' : NAV_ICON.out;
+      else b.textContent = asking ? 'Гарах уу?' : word;
+      b.setAttribute('aria-label', asking ? 'Гарах уу?' : word);
+    }
+  };
+  return () => {
+    if (now) return leave();
+    if (armed) {
+      clearTimeout(armed);
+      armed = null;
+      say(false);
+      return leave();
+    }
+    say(true);
+    armed = setTimeout(() => {
+      armed = null;
+      say(false);
+    }, 4000);
+  };
+}
+
+/**
+ * The supplier's own app: the tabs this seat opens along the bottom of a
+ * phone; at a desk, the dashboard's frame with this business as the place.
  */
 function openModule() {
+  const tabs = tabsFor();
+  if (!tabs.some((t) => t.key === tab)) tab = tabs[0]?.key ?? 'today';
+  if (isDesk()) {
+    void openDesk(tabs);
+    return;
+  }
+  deskNav = null;
+  // On a phone the page follows the phone's light or dark, as every guest page does.
+  document.documentElement.removeAttribute('data-theme');
   const all = watchingAll();
-  const tabs = all ? TABS.slice(0, 1) : TABS;
-  const name = all ? 'Бүх нийлүүлэгч' : '…';
+  const name = all ? 'Бүх нийлүүлэгч' : seat?.supplier?.name ?? '…';
   const out = all ? 'Солих' : 'Гарах';
   const frame = el(`
     <div class="shell">
       <header class="bar topbar">
         <span class="conn" id="conn">Холбогдсон</span>
-        <div class="title"><b class="supplier-name" id="supplier">${name}</b></div>
+        <div class="title"><b class="supplier-name" id="supplier">${esc(name)}</b></div>
         <div class="act"><button class="btn out" type="button" data-v="quiet" data-icon id="out" aria-label="${out}">${all ? ICON.swap : ICON.out}<span class="t sr-only">${out}</span></button></div>
       </header>
-      <nav class="tabs ${isDesk() ? 'sidebar' : 'tabbar'}" aria-label="Хэсгүүд">
-        <div class="brand"><b>Basu</b><span>Нийлүүлэгч</span></div>
+      <nav class="tabs tabbar" aria-label="Хэсгүүд">
         ${tabs.map((t) => `<button type="button" data-tab="${t.key}">${t.icon}<span class="t">${t.label}</span></button>`).join('')}
-        <div class="me"><b class="supplier-name">${name}</b></div>
-        <button class="out side" type="button" id="out-side">${out}</button>
       </nav>
       <main class="view" id="view"></main>
     </div>`);
   const leave = () => (all ? ((store.supplierToken = null), boot()) : signOut());
-  // A stray tap on a counter tablet must not drop the pairing: the first tap
-  // turns the button into the question for four seconds, the second answers it.
-  const outButton = frame.querySelector('#out');
-  const outSide = frame.querySelector('#out-side');
-  const outWord = outButton.querySelector('.t');
-  let armed = null;
-  const say = (word, asking) => {
-    outWord.textContent = word;
-    outWord.classList.toggle('sr-only', !asking);
-    outButton.setAttribute('aria-label', word);
-    outSide.textContent = word;
-    for (const b of [outButton, outSide]) b.toggleAttribute('data-confirm', asking);
-  };
-  const disarm = () => {
-    clearTimeout(armed);
-    armed = null;
-    say(out, false);
-  };
-  const ask = () => {
-    if (all) return leave();
-    if (armed) {
-      disarm();
-      return leave();
-    }
-    say('Гарах уу?', true);
-    armed = setTimeout(disarm, 4000);
-  };
-  outButton.addEventListener('click', ask);
-  outSide.addEventListener('click', ask);
+  frame.querySelector('#out').addEventListener('click', twoTaps([frame.querySelector('#out')], out, leave, all));
   frame.querySelector('.tabs').addEventListener('click', (e) => {
     const button = e.target.closest('button[data-tab]');
     if (button) show(button.dataset.tab);
   });
   root.replaceChildren(frame);
   applyDesk();
-  show(all ? 'today' : tab);
+  show(tab);
+}
+
+/**
+ * At a desk the supplier's pages sit in the dashboard's own frame: the
+ * business as the place, and beside its supplier tabs the dashboard's pages
+ * for it — its people, its details, who may do what — one click away. A
+ * screen on the counter, or a demo watching everybody, has its tabs alone.
+ */
+async function openDesk(tabs) {
+  const all = watchingAll();
+  const name = all ? 'Бүх нийлүүлэгч' : seat?.supplier?.name ?? 'Нийлүүлэгч';
+  let workspaces = null;
+  let current = null;
+  let account = null;
+  // Inside the Basu app — an iPad on its side is a desk too — the dashboard is not one of its pages.
+  if (!all && seat && !seat.screen && !shell.present) {
+    try {
+      const access = await api('/v1/access', { token: token() });
+      account = access.account;
+      workspaces = access.workspaces;
+      current = workspaces.find((w) => w.id === seat.org_id) ?? null;
+    } catch {
+      /* the page works without the dashboard's pages beside it */
+    }
+  }
+  if (!current) {
+    current = {
+      id: 'screen',
+      kind: 'org',
+      name,
+      sub: all ? 'Демо · бүх нийлүүлэгч' : seat?.screen ? 'Нийлүүлэгчийн дэлгэц' : 'Нийлүүлэгч',
+      menu: [{ key: 'main', label: null, items: tabs.map((t) => ({ key: `idesh.${t.key}`, label: t.label, icon: t.nav })) }],
+    };
+    workspaces = [current];
+    if (!account) account = { name: all ? 'Демо' : seat?.screen ? 'Холбосон дэлгэц' : name, email: all ? 'Бүх нийлүүлэгч' : name };
+  }
+  const leave = () => (all ? ((store.supplierToken = null), boot()) : signOut());
+  const frame = deskFrame({
+    workspaces,
+    current,
+    account,
+    brand: 'Нийлүүлэгч',
+    onPage: (item) => {
+      if (item.key.startsWith('idesh.')) return void show(item.key.slice(6));
+      toDashboard(`#${current.id}/${item.key}`);
+    },
+    onWorkspace: (w) => toDashboard(`#${w.id}`),
+    onSignOut: () => ask(),
+  });
+  const ask = twoTaps([frame.root.querySelector('#out')], all ? 'Солих' : 'Гарах', leave, all);
+  deskNav = frame;
+  // At a desk it is the dashboard's frame, and the dashboard is light: one look from page to page.
+  document.documentElement.setAttribute('data-theme', 'light');
+  root.replaceChildren(frame.root);
+  applyDesk();
+  show(tab);
+}
+
+/**
+ * To the dashboard, as the same person: a session made on this page is the
+ * dashboard's too, rather than a second sign-in for the one person.
+ */
+function toDashboard(hash) {
+  if (!store.opsToken && token() && !seat?.screen) store.opsToken = token();
+  location.href = `/dashboard${hash}`;
 }
 
 function show(key) {
   tab = key;
   onActed = null;
-  for (const b of document.querySelectorAll('.tabs button[data-tab]')) {
+  history.replaceState(null, '', `${location.pathname}${location.search}#${key}`);
+  for (const b of document.querySelectorAll('.tabbar button[data-tab]')) {
     const on = b.dataset.tab === key;
     b.toggleAttribute('data-on', on);
     if (on) b.setAttribute('aria-current', 'page');
     else b.removeAttribute('aria-current');
   }
+  deskNav?.select(`idesh.${key}`);
   const view = document.getElementById('view');
   view.replaceChildren();
   window.scrollTo(0, 0);
@@ -1106,7 +1219,7 @@ async function renderHome() {
   if (!box) return;
   let h;
   try {
-    h = await api('/v1/supplier/home', { token: token() });
+    h = await sup('/v1/supplier/home');
   } catch {
     box.remove();
     return;
@@ -1126,7 +1239,9 @@ async function renderHome() {
         : 'хийх ажил алга'
     }</span></div>`),
     el(`<div class="card stat kpi"><b>${h.season.handed}</b><span>${h.season.by_kind.map((b) => `${KIND[b.kind] ?? b.kind} ${k(b.qty, b.unit)}`).join(', ') || 'энэ улирал хүлээлгэн өгсөн'}</span></div>`),
-    el(`<div class="card stat kpi"><b>${money(h.season.payout_mnt)}</b><span>танд очих орлого${h.season.forfeit_mnt ? `, суутгал ${mnt(h.season.forfeit_mnt)}` : ''}</span></div>`),
+    ...(h.season.payout_mnt === null
+      ? []
+      : [el(`<div class="card stat kpi"><b>${money(h.season.payout_mnt)}</b><span>танд очих орлого${h.season.forfeit_mnt ? `, суутгал ${mnt(h.season.forfeit_mnt)}` : ''}</span></div>`)]),
   );
   box.hidden = false;
 }
@@ -1170,7 +1285,7 @@ async function loadOrders() {
   if (!box) return;
   let data;
   try {
-    data = await api(`/v1/supplier/orders?scope=${orderQuery.scope}&q=${encodeURIComponent(orderQuery.q)}`, { token: token() });
+    data = await sup(`/v1/supplier/orders?scope=${orderQuery.scope}&q=${encodeURIComponent(orderQuery.q)}`);
   } catch (error) {
     if (error.status === 401) return signOut();
     box.replaceChildren(el('<div class="card empty">Ачаалж чадсангүй.</div>'));
@@ -1180,7 +1295,10 @@ async function loadOrders() {
   const none = orderQuery.q ? 'Хайлтад тохирох захиалга олдсонгүй.' : 'Энэ хэсэгт захиалга байхгүй.';
   const ended = (o) => o.state === 'CANCELLED' || o.state === 'REFUNDED';
   const what = (o) => `${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}`;
-  const amount = (o) => money(ended(o) ? o.forfeit_mnt ?? 0 : o.payout_mnt);
+  // What the supplier keeps of an order is the money's; a seat without it reads what the guest paid.
+  const mine = (o) => o.payout_mnt !== null && o.payout_mnt !== undefined;
+  const amount = (o) => money(ended(o) ? o.forfeit_mnt ?? 0 : mine(o) ? o.payout_mnt : o.total_mnt);
+  const amountWord = (o) => (ended(o) ? 'суутгал' : mine(o) ? 'танд' : 'нийт');
   if (isDesk()) {
     // A desk reads orders as a table: one line each, the code and the money in their columns.
     const rows = data.orders.map((o) => `
@@ -1196,7 +1314,7 @@ async function loadOrders() {
     box.replaceChildren(el(`
       <div class="table-wrap">
         <table class="table"${rows.length ? '' : ' data-empty'}>
-          <thead><tr><th>№</th><th>Мах</th><th>Зочин</th><th>Авах</th><th>Өдөр</th><th>Төлөв</th><th class="num">Танд</th></tr></thead>
+          <thead><tr><th>№</th><th>Мах</th><th>Зочин</th><th>Авах</th><th>Өдөр</th><th>Төлөв</th><th class="num">${may('idesh.money.view') ? 'Танд' : 'Нийт'}</th></tr></thead>
           <tbody>${rows.join('') || `<tr><td colspan="7" class="empty"><b>Захиалга алга</b>${none}</td></tr>`}</tbody>
         </table>
       </div>`));
@@ -1230,7 +1348,7 @@ async function loadOrders() {
         </span>
         <span class="end right">
           <span class="chip" data-s="${o.state}" data-size="sm">${STATE_WORD[o.state] ?? o.state}</span>
-          <span class="amt val">${amount(o)}<small>${ended(o) ? 'суутгал' : 'танд'}</small></span>
+          <span class="amt val">${amount(o)}<small>${amountWord(o)}</small></span>
         </span>
       </button>`);
     row.addEventListener('click', () => openOrder(o.id));
@@ -1260,7 +1378,7 @@ async function openOrder(id) {
   const view = document.getElementById('view');
   let data;
   try {
-    data = await api(`/v1/supplier/orders/${id}`, { token: token() });
+    data = await sup(`/v1/supplier/orders/${id}`);
   } catch (error) {
     toast(error.message, 'bad');
     return;
@@ -1293,7 +1411,7 @@ async function openOrder(id) {
 async function renderStallTab(view) {
   view.append(el(`<div class="stall" id="stall">${pageHead('Миний зар')}</div>`));
   try {
-    const { listings } = await api('/v1/supplier/listings', { token: token() });
+    const { listings } = await sup('/v1/supplier/listings');
     if (document.getElementById('stall')) renderStall(listings);
   } catch (error) {
     if (error.status === 401) signOut();
@@ -1307,63 +1425,79 @@ function renderMoneyTab(view) {
 
 /* the profile: how they are found, where the money goes */
 
+/**
+ * How guests find the supplier, and where its money goes. An owner or a
+ * manager changes the first; only an owner the second, with their own
+ * password, and only a seat that holds the money sees it at all. Staff read
+ * the details and nothing more.
+ */
 async function renderProfile(view) {
   let p;
   try {
-    p = await api('/v1/supplier/profile', { token: token() });
+    p = await sup('/v1/supplier/profile');
   } catch (error) {
     if (error.status === 401) return signOut();
     view.append(el('<div class="card empty">Ачаалж чадсангүй.</div>'));
     return;
   }
+  const edits = may('org.profile.edit');
+  const seesBank = may('idesh.money.view');
+  const movesBank = may('org.bank.manage');
+  const terms = [
+    `Утас <b class="mn">${esc(p.phone)}</b>`,
+    p.merchant_tin ? `ТТД <b class="mn">${esc(p.merchant_tin)}</b>` : 'ТТД алга',
+    p.commission_pct !== null && p.commission_pct !== undefined ? `шимтгэл ${p.commission_pct}%` : '',
+  ].filter(Boolean).join(' · ');
   const form = el(`
     <section>
       ${pageHead('Профайл', 'Зочид таныг ингэж харна.')}
       <div class="card profile">
-        <div class="hint">Утас <b class="mn">${esc(p.phone)}</b> · ${p.merchant_tin ? `ТТД <b class="mn">${esc(p.merchant_tin)}</b>` : 'ТТД алга'} · шимтгэл ${p.commission_pct}%. Эдгээр нь гэрээний нөхцөл — өөрчлөх бол Basu-д хэлнэ.</div>
+        <div class="hint">${terms}. Эдгээр нь гэрээний нөхцөл — өөрчлөх бол Basu-д хэлнэ.</div>
         <div class="card-body">
           <label class="field"><span>Нэр</span><input name="name" value="${esc(p.name)}"></label>
           <label class="field"><span>Хотод мах авах цэг</span><input name="address" value="${esc(p.pickup_address)}"><small>Зочин өөрөө ирж авахдаа энд ирнэ.</small></label>
           <label class="field"><span>Юу зарах вэ, хаанаас</span><textarea name="about">${esc(p.about ?? '')}</textarea></label>
-          <div class="form-group">
+          ${seesBank ? `<div class="form-group">
             <div class="sec section-label">Олголт очих данс</div>
             <label class="field"><span>Банк</span><input name="bank_name" list="banks" value="${esc(p.bank_name ?? '')}"></label>
             <datalist id="banks">${BANKS.map((b) => `<option value="${b}">`).join('')}</datalist>
             <label class="field"><span>Дансны дугаар</span><input name="bank_account" inputmode="numeric" value="${esc(p.bank_account ?? '')}"></label>
             <label class="field"><span>Данс эзэмшигчийн нэр</span><input name="bank_holder" value="${esc(p.bank_holder ?? '')}"></label>
             ${p.bank_account && !p.bank_verified ? '<div class="callout" data-k="warn"><span>Шинэ дансыг Basu санхүү гэрээтэй тулгаж баталгаажуулах хүртэл олголт хийгдэхгүй.</span></div>' : ''}
-            <div id="otp-step" hidden><label class="field"><span>Утсанд тань ирсэн код</span><input name="otp_code" inputmode="numeric" maxlength="6" placeholder="6 оронтой код" autocomplete="one-time-code"><small>Данс солиход өөрийн утсаар баталгаажуулна.</small></label></div>
-          </div>
-          <button class="btn" data-v="primary" data-size="lg" type="button" id="save">Хадгалах</button>
+            ${movesBank ? '' : '<p class="cap">Данс солих нь зөвхөн эзний эрх.</p>'}
+            <div id="password-step" hidden><label class="field"><span>Таны нууц үг</span><input name="password" type="password" autocomplete="current-password"><small>Мөнгө очих газар солигдож байгаа тул өөрийн нууц үгээр баталгаажуулна.</small></label></div>
+          </div>` : ''}
+          ${edits ? '<button class="btn" data-v="primary" data-size="lg" type="button" id="save">Хадгалах</button>' : '<p class="cap">Мэдээллийг эзэн эсвэл менежер засна.</p>'}
         </div>
       </div>
     </section>`);
-  form.querySelector('#save').addEventListener('click', async () => {
-    const v = (name) => form.querySelector(`[name="${name}"]`).value.trim();
+  for (const input of form.querySelectorAll('input, textarea')) {
+    const bank = ['bank_name', 'bank_account', 'bank_holder'].includes(input.name);
+    if (input.name === 'password') continue;
+    input.disabled = bank ? !movesBank : !edits;
+  }
+  form.querySelector('#save')?.addEventListener('click', async () => {
+    const v = (name) => form.querySelector(`[name="${name}"]`)?.value.trim();
+    const body = { name: v('name'), address: v('address'), about: v('about') };
+    if (movesBank) Object.assign(body, { bank_name: v('bank_name'), bank_account: v('bank_account'), bank_holder: v('bank_holder'), password: v('password') || undefined });
     try {
-      await api('/v1/supplier/profile', {
-        method: 'PATCH',
-        token: token(),
-        body: { name: v('name'), address: v('address'), about: v('about'), bank_name: v('bank_name'), bank_account: v('bank_account'), bank_holder: v('bank_holder'), otp_code: v('otp_code') || undefined },
-      });
+      await sup('/v1/supplier/profile', { method: 'PATCH', body });
       toast('Хадгалагдлаа.');
       for (const n of document.querySelectorAll('.supplier-name')) n.textContent = v('name');
       show('profile');
     } catch (error) {
-      if (error.code === 'OTP_REQUIRED') {
-        // The money is moving somewhere new: a code went to the phone.
-        form.querySelector('#otp-step').hidden = false;
-        form.querySelector('[name="otp_code"]').focus();
-        toast(error.message);
-        return;
+      if (error.code === 'PASSWORD_REQUIRED' || error.code === 'BAD_PASSWORD') {
+        // The money is moving somewhere new: the owner says it is them.
+        form.querySelector('#password-step').hidden = false;
+        form.querySelector('[name="password"]').focus();
       }
       toast(error.message, 'bad');
     }
   });
   view.append(form);
-  // The owner's own account — a paired screen has none. Most owners came in
+  // The person's own account — a paired screen has none. Most owners came in
   // by phone, and an address is their only way back from a forgotten password.
-  if (mode() === 'owner') view.append(accountWays({ token: store.guestToken }));
+  if (seat && !seat.screen) view.append(accountWays({ token: token() }));
 }
 
 /* ── boot ────────────────────────────────────────────────────────── */
@@ -1376,28 +1510,52 @@ async function renderProfile(view) {
 async function boot() {
   root.replaceChildren();
   applyDesk();
-  if (store.supplierToken) {
+  seat = null;
+  if (watchingAll()) {
     openModule();
     return;
   }
-  if (store.guestToken) {
-    try {
-      const { supplier } = await api('/v1/supplier/me', { token: store.guestToken });
-      if (supplier?.state === 'contracted') {
-        openModule();
-        return;
-      }
-      showApply();
+  if (!token()) {
+    showLanding();
+    return;
+  }
+  try {
+    seat = await sup('/v1/supplier/seat');
+    openModule();
+    return;
+  } catch (error) {
+    if (error.status === 403) {
+      root.append(notHere(error.message));
       return;
-    } catch (error) {
-      if (error.status === 401) store.guestToken = null;
-      else {
-        toast(error.message, 'bad');
-        return;
-      }
+    }
+    if (error.status !== 401) {
+      toast(error.message, 'bad');
+      return;
     }
   }
-  showLanding();
+  // Not a seat at a contracted supplier. A screen whose pairing was taken back
+  // starts again; a person is either still applying or not signed in at all.
+  if (!ORG && store.supplierToken) {
+    store.supplierToken = null;
+    boot();
+    return;
+  }
+  showApply();
+}
+
+/** Opened from the dashboard for a business this person does not work at as a supplier. */
+function notHere(message) {
+  const card = el(`
+    <div class="door">
+      <div class="card">
+        <div class="brand wordmark" data-size="sm">Basu</div>
+        <h2>Нээх эрхгүй байна</h2>
+        <p>${esc(message)} Энэ байгууллагын нийлүүлэгчийн хэсэгт та ажилладаггүй байна.</p>
+        <a class="btn" data-v="primary" data-size="lg" href="/dashboard">Dashboard руу буцах</a>
+      </div>
+      ${DOOR_FOOT}
+    </div>`);
+  return card;
 }
 
 boot();

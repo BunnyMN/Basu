@@ -156,43 +156,60 @@ export async function supplierForOrg(input: {
   return rows[0]!.id;
 }
 
-/** Who a person is at a supplier: its owner, or a member of its organisation with a role. */
+/** Who a person is at a supplier: their role in the organisation it belongs to. */
 export type SupplierRole = OrgRole;
+
+const ROLE_RANK: Record<OrgRole, number> = { owner: 0, manager: 1, accountant: 2, staff: 3 };
 
 /**
  * The supplier this guest works at, if any that is not declined, and their
- * role there. Their own first; then one whose organisation they belong to.
- * A supplier written in before there were owners is claimed here, by the
- * phone on its row matching the phone the guest signed in with.
+ * role there.
+ *
+ * The organisation is the only thing that grants a role: a member of an
+ * active supplier organisation is whatever the organisation says, and an
+ * owner who handed the business on, or was taken out of it, is nothing
+ * here any more — whatever `owner_guest_id` still remembers. With `orgId`
+ * the answer is about that business alone, for a person in several; without
+ * it, the one where they hold the most, contracted first.
+ *
+ * Only a supplier with no organisation yet — an application still waiting,
+ * or a row ops wrote in before there were organisations — is its owner's by
+ * `owner_guest_id`, and one written in before there were owners at all is
+ * claimed here by the phone on its row matching the one the guest proved.
  */
 export async function supplierOf(
   guestId: string,
+  opts: { orgId?: string | null } = {},
   db: Db = getPool(),
-): Promise<{ id: string; name: string; state: SupplierState; role: SupplierRole } | null> {
+): Promise<{ id: string; name: string; state: SupplierState; role: SupplierRole; orgId: string | null } | null> {
+  const memberships = (await orgsOf(guestId, db)).filter(
+    (m) => m.org.state === 'active' && m.org.supplier && (!opts.orgId || m.org.id === opts.orgId),
+  );
+  if (memberships.length) {
+    const { rows } = await db.query<{ id: string; name: string; state: SupplierState; org_id: string; contracted_at: Date | null }>(
+      `SELECT id, name, state, org_id, contracted_at FROM idesh.supplier
+        WHERE org_id = ANY($1::uuid[]) AND state <> 'declined' AND active`,
+      [memberships.map((m) => m.org.id)],
+    );
+    const roleOf = (orgId: string) => memberships.find((m) => m.org.id === orgId)!.role;
+    const best = rows.sort(
+      (a, b) =>
+        ROLE_RANK[roleOf(a.org_id)] - ROLE_RANK[roleOf(b.org_id)] ||
+        Number(b.state === 'contracted') - Number(a.state === 'contracted') ||
+        (b.contracted_at?.getTime() ?? 0) - (a.contracted_at?.getTime() ?? 0),
+    )[0];
+    if (best) return { id: best.id, name: best.name, state: best.state, role: roleOf(best.org_id), orgId: best.org_id };
+  }
+  if (opts.orgId) return null;
+
   const owned = await db.query<{ id: string; name: string; state: SupplierState }>(
     `SELECT id, name, state FROM idesh.supplier
-      WHERE owner_guest_id = $1 AND state <> 'declined' AND active
+      WHERE owner_guest_id = $1 AND org_id IS NULL AND state <> 'declined' AND active
       ORDER BY (state = 'contracted') DESC, contracted_at DESC NULLS LAST
       LIMIT 1`,
     [guestId],
   );
-  if (owned.rows[0]) return { ...owned.rows[0], role: 'owner' };
-
-  const memberships = (await orgsOf(guestId, db)).filter((m) => m.org.state === 'active' && m.org.supplier);
-  if (memberships.length) {
-    const { rows } = await db.query<{ id: string; name: string; state: SupplierState; org_id: string }>(
-      `SELECT id, name, state, org_id FROM idesh.supplier
-        WHERE org_id = ANY($1::uuid[]) AND state <> 'declined' AND active
-        ORDER BY (state = 'contracted') DESC, contracted_at DESC NULLS LAST
-        LIMIT 1`,
-      [memberships.map((m) => m.org.id)],
-    );
-    const found = rows[0];
-    if (found) {
-      const role = memberships.find((m) => m.org.id === found.org_id)!.role;
-      return { id: found.id, name: found.name, state: found.state, role };
-    }
-  }
+  if (owned.rows[0]) return { ...owned.rows[0], role: 'owner', orgId: null };
 
   const phone = (await contactsFor([guestId])).get(guestId)?.phone;
   if (!phone) return null;
@@ -207,7 +224,21 @@ export async function supplierOf(
   );
   if (!claimed.rows[0]) return null;
   await giveOrganisation(claimed.rows[0].id, db);
-  return { ...claimed.rows[0], role: 'owner' };
+  const org = await db.query<{ org_id: string | null }>('SELECT org_id FROM idesh.supplier WHERE id = $1', [claimed.rows[0].id]);
+  return { ...claimed.rows[0], role: 'owner', orgId: org.rows[0]?.org_id ?? null };
+}
+
+/** The supplier a business runs, if it is one — what the business's dashboard asks before opening its supplier pages. */
+export async function supplierOfOrg(
+  orgId: string,
+  db: Db = getPool(),
+): Promise<{ id: string; name: string; state: SupplierState; active: boolean } | null> {
+  const { rows } = await db.query<{ id: string; name: string; state: SupplierState; active: boolean }>(
+    `SELECT id, name, state, active FROM idesh.supplier WHERE org_id = $1
+      ORDER BY (state = 'contracted') DESC, contracted_at DESC NULLS LAST LIMIT 1`,
+    [orgId],
+  );
+  return rows[0] ?? null;
 }
 
 /* ── applying ──────────────────────────────────────────────────────── */

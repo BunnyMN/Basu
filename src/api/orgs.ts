@@ -5,7 +5,7 @@ import {
   ORG_ROLES,
   OrgError,
   addMember,
-  can,
+  logOf,
   membersOf,
   orgById,
   orgsOf,
@@ -17,6 +17,7 @@ import {
   type OrgRole,
   type Organization,
 } from '../platform/org/index.js';
+import { modulesOf, orgGrants, type Grants } from '../platform/access/index.js';
 import type { Ctx } from '../ports.js';
 import { badRequest, sendError } from './errors.js';
 import type { Guard } from './hardening.js';
@@ -82,6 +83,12 @@ const masked = (contact: string | null): string | null => {
 export async function registerOrgRoutes(app: FastifyInstance, ctx: Ctx, requireGuest: Guard): Promise<void> {
   const guarded = { preHandler: requireGuest };
 
+  /** What this person may do in that organisation — nothing unless it is active and they are in it. */
+  const grantsIn = async (orgId: string, guestId: string): Promise<{ org: Organization | null; role: OrgRole | null; grants: Grants }> => {
+    const [org, role] = await Promise.all([orgById(orgId), roleIn(orgId, guestId)]);
+    return { org, role, grants: orgGrants(role, org ? modulesOf(org) : []) };
+  };
+
   /** Register a business. The owner is whoever registers it; the desk says yes. */
   app.post<{
     Body: {
@@ -137,14 +144,17 @@ export async function registerOrgRoutes(app: FastifyInstance, ctx: Ctx, requireG
     const members = await membersOf(org.id);
     const ids = members.map((m) => m.guestId);
     const [names, contacts] = await Promise.all([displayNamesFor(ids), contactsFor(ids)]);
-    const seesContacts = can(mine.role, 'members');
+    // A business still waiting grants nothing yet; its registrant sees who is in it.
+    const grants = org.state === 'active' ? orgGrants(mine.role, modulesOf(org)) : orgGrants(null, []);
+    const seesContacts = grants.has('org.team.manage');
     return reply.send({
       org: shapeOrg(org),
       role: mine.role,
+      permissions: grants.list(),
       may: {
-        members: can(mine.role, 'members'),
-        managers: can(mine.role, 'managers'),
-        profile: can(mine.role, 'profile'),
+        members: grants.has('org.team.manage'),
+        managers: grants.has('org.managers.manage'),
+        profile: grants.has('org.profile.edit'),
       },
       members: members.map((m) => {
         const c = contacts.get(m.guestId);
@@ -193,8 +203,8 @@ export async function registerOrgRoutes(app: FastifyInstance, ctx: Ctx, requireG
     '/v1/orgs/:id/lookup',
     guarded,
     async (request, reply) => {
-      const role = await roleIn(request.params.id, request.guestId!);
-      if (!can(role, 'members')) return orgRefusal(reply, new OrgError('FORBIDDEN', 'cannot add people here'));
+      const { grants } = await grantsIn(request.params.id, request.guestId!);
+      if (!grants.has('org.team.manage')) return orgRefusal(reply, new OrgError('FORBIDDEN', 'cannot add people here'));
       const found = await accountByContact(request.query.contact ?? '').catch(() => null);
       if (!found) {
         return reply.status(404).send({
@@ -250,7 +260,7 @@ export async function registerOrgRoutes(app: FastifyInstance, ctx: Ctx, requireG
       const role = request.body?.role as OrgRole;
       if (!ORG_ROLES.includes(role)) return badRequest(reply, 'Эрхээ сонгоно уу.', 'role is required');
       try {
-        await setRole({ orgId: request.params.id, guestId: request.params.guestId, role, by: request.guestId! });
+        await setRole({ orgId: request.params.id, guestId: request.params.guestId, role, by: request.guestId!, now: ctx.clock.now() });
         return reply.send({ guest_id: request.params.guestId, role });
       } catch (error) {
         return orgRefusal(reply, error);
@@ -258,9 +268,32 @@ export async function registerOrgRoutes(app: FastifyInstance, ctx: Ctx, requireG
     },
   );
 
+  /**
+   * Who gave whom which role, newest first — for the owner and the managers,
+   * who answer for who can see the money.
+   */
+  app.get<{ Params: { id: string } }>('/v1/orgs/:id/log', guarded, async (request, reply) => {
+    const { grants } = await grantsIn(request.params.id, request.guestId!);
+    if (!grants.has('org.log.view')) return orgRefusal(reply, new OrgError('FORBIDDEN', 'the record is the owner’s and the managers’'));
+    const entries = await logOf(request.params.id, 100);
+    const ids = [...new Set(entries.flatMap((e) => [e.byGuest, e.guestId]).filter((x): x is string => Boolean(x)))];
+    const names = await displayNamesFor(ids);
+    return reply.send({
+      log: entries.map((e) => ({
+        id: e.id,
+        action: e.action,
+        by: e.byDesk ? `Basu · ${e.byDesk.replace(/^ops:/, '')}` : e.byGuest ? names.get(e.byGuest) ?? null : null,
+        who: e.guestId ? names.get(e.guestId) ?? null : null,
+        role: e.role,
+        was: e.was,
+        at: e.at.toISOString(),
+      })),
+    });
+  });
+
   app.delete<{ Params: { id: string; guestId: string } }>('/v1/orgs/:id/members/:guestId', guarded, async (request, reply) => {
     try {
-      await removeMember({ orgId: request.params.id, guestId: request.params.guestId, by: request.guestId! });
+      await removeMember({ orgId: request.params.id, guestId: request.params.guestId, by: request.guestId!, now: ctx.clock.now() });
       return reply.status(204).send();
     } catch (error) {
       return orgRefusal(reply, error);

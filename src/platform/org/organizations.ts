@@ -1,4 +1,5 @@
 import { getPool, tx, type Db } from '../../db/pool.js';
+import { ORG_ROLES, mayAssign, modulesOf, orgGrants, type OrgRole } from '../access/index.js';
 
 /**
  * Businesses on Basu, and the people who run them.
@@ -10,33 +11,12 @@ import { getPool, tx, type Db } from '../../db/pool.js';
  * money goes, and an accountant can read the money without being able to
  * cancel anybody's sheep.
  *
- * The verticals ask here who may do what; they keep their own tables.
+ * What each role may do is access's to say (`platform/access`); this module
+ * keeps who holds which role, and the record of every change to that.
  */
 
-export type OrgRole = 'owner' | 'manager' | 'staff' | 'accountant';
-export const ORG_ROLES: readonly OrgRole[] = ['owner', 'manager', 'staff', 'accountant'];
+export { ORG_ROLES, type OrgRole };
 export type OrgState = 'applied' | 'active' | 'declined' | 'suspended';
-
-/**
- * What a role may do. `members` is bringing in staff and accountants;
- * `managers` is appointing managers and owners. `catalog` is listings and
- * menus, `profile` the organisation's details, `bank` where its money goes.
- */
-export type OrgAction = 'members' | 'managers' | 'profile' | 'bank' | 'money' | 'orders' | 'catalog' | 'screens';
-
-const MAY: Record<OrgAction, readonly OrgRole[]> = {
-  managers: ['owner'],
-  bank: ['owner'],
-  members: ['owner', 'manager'],
-  profile: ['owner', 'manager'],
-  screens: ['owner', 'manager'],
-  catalog: ['owner', 'manager', 'staff'],
-  orders: ['owner', 'manager', 'staff'],
-  money: ['owner', 'manager', 'accountant'],
-};
-
-export const can = (role: OrgRole | null | undefined, action: OrgAction): boolean =>
-  Boolean(role && MAY[action].includes(role));
 
 export class OrgError extends Error {
   constructor(
@@ -156,6 +136,7 @@ export async function registerOrg(input: OrgInput & { guestId: string; now: Date
       `INSERT INTO org.membership (org_id, guest_id, role, added_by, added_at) VALUES ($1, $2, 'owner', $2, $3)`,
       [id, input.guestId, input.now],
     );
+    await note(client, { orgId: id, by: input.guestId, action: 'registered', guestId: input.guestId, role: 'owner', at: input.now });
     return (await orgById(id, client))!;
   });
 }
@@ -194,16 +175,6 @@ export async function membersOf(orgId: string, db: Db = getPool()): Promise<Memb
   return rows.map((r) => ({ guestId: r.guest_id, role: r.role, addedAt: r.added_at }));
 }
 
-/**
- * Who may give which role: an owner any, a manager only staff and
- * accountants. The same rule changes and removes people.
- */
-function mayHandle(actor: OrgRole | null, role: OrgRole): boolean {
-  if (actor === 'owner') return true;
-  if (actor === 'manager') return role === 'staff' || role === 'accountant';
-  return false;
-}
-
 async function actorRole(orgId: string, actorId: string, db: Db): Promise<OrgRole> {
   const org = await orgById(orgId, db);
   if (!org) throw new OrgError('NOT_FOUND', 'no such organisation');
@@ -215,19 +186,21 @@ async function actorRole(orgId: string, actorId: string, db: Db): Promise<OrgRol
 /** Bring somebody in. They must already have signed in to Basu once — that is who they are. */
 export async function addMember(input: { orgId: string; guestId: string; role: OrgRole; by: string; now: Date }): Promise<void> {
   if (!ORG_ROLES.includes(input.role)) throw new OrgError('BAD_INPUT', `no such role: ${input.role}`);
-  const db = getPool();
-  const actor = await actorRole(input.orgId, input.by, db);
-  if (!mayHandle(actor, input.role)) throw new OrgError('FORBIDDEN', `a ${actor} cannot give the role ${input.role}`);
-  const { rowCount } = await db.query(
-    `INSERT INTO org.membership (org_id, guest_id, role, added_by, added_at) VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (org_id, guest_id) DO NOTHING`,
-    [input.orgId, input.guestId, input.role, input.by, input.now],
-  );
-  if (!rowCount) throw new OrgError('ALREADY_MEMBER', 'already a member here');
+  await tx(async (client) => {
+    const actor = await actorRole(input.orgId, input.by, client);
+    if (!mayAssign(actor, input.role)) throw new OrgError('FORBIDDEN', `a ${actor} cannot give the role ${input.role}`);
+    const { rowCount } = await client.query(
+      `INSERT INTO org.membership (org_id, guest_id, role, added_by, added_at) VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (org_id, guest_id) DO NOTHING`,
+      [input.orgId, input.guestId, input.role, input.by, input.now],
+    );
+    if (!rowCount) throw new OrgError('ALREADY_MEMBER', 'already a member here');
+    await note(client, { orgId: input.orgId, by: input.by, action: 'added', guestId: input.guestId, role: input.role, at: input.now });
+  });
 }
 
 /** Change a member's role. Both the old role and the new must be the actor's to give. */
-export async function setRole(input: { orgId: string; guestId: string; role: OrgRole; by: string }): Promise<void> {
+export async function setRole(input: { orgId: string; guestId: string; role: OrgRole; by: string; now: Date }): Promise<void> {
   if (!ORG_ROLES.includes(input.role)) throw new OrgError('BAD_INPUT', `no such role: ${input.role}`);
   await tx(async (client) => {
     const actor = await actorRole(input.orgId, input.by, client);
@@ -237,20 +210,22 @@ export async function setRole(input: { orgId: string; guestId: string; role: Org
     );
     const was = current.rows[0]?.role;
     if (!was) throw new OrgError('NOT_FOUND', 'not a member here');
-    if (!mayHandle(actor, was) || !mayHandle(actor, input.role)) {
+    if (!mayAssign(actor, was) || !mayAssign(actor, input.role)) {
       throw new OrgError('FORBIDDEN', `a ${actor} cannot change a ${was} into a ${input.role}`);
     }
-    if (was === 'owner' && input.role !== 'owner') await keepAnOwner(client, input.orgId);
+    if (was === input.role) return;
+    if (was === 'owner') await keepAnOwner(client, input.orgId);
     await client.query('UPDATE org.membership SET role = $3 WHERE org_id = $1 AND guest_id = $2', [
       input.orgId,
       input.guestId,
       input.role,
     ]);
+    await note(client, { orgId: input.orgId, by: input.by, action: 'role', guestId: input.guestId, role: input.role, was, at: input.now });
   });
 }
 
 /** Take somebody out. Anybody may leave; an organisation never loses its last owner. */
-export async function removeMember(input: { orgId: string; guestId: string; by: string }): Promise<void> {
+export async function removeMember(input: { orgId: string; guestId: string; by: string; now: Date }): Promise<void> {
   await tx(async (client) => {
     const current = await client.query<{ role: OrgRole }>(
       'SELECT role FROM org.membership WHERE org_id = $1 AND guest_id = $2 FOR UPDATE',
@@ -258,12 +233,14 @@ export async function removeMember(input: { orgId: string; guestId: string; by: 
     );
     const was = current.rows[0]?.role;
     if (!was) throw new OrgError('NOT_FOUND', 'not a member here');
-    if (input.guestId !== input.by) {
+    const leaving = input.guestId === input.by;
+    if (!leaving) {
       const actor = await actorRole(input.orgId, input.by, client);
-      if (!mayHandle(actor, was)) throw new OrgError('FORBIDDEN', `a ${actor} cannot remove a ${was}`);
+      if (!mayAssign(actor, was)) throw new OrgError('FORBIDDEN', `a ${actor} cannot remove a ${was}`);
     }
     if (was === 'owner') await keepAnOwner(client, input.orgId);
     await client.query('DELETE FROM org.membership WHERE org_id = $1 AND guest_id = $2', [input.orgId, input.guestId]);
+    await note(client, { orgId: input.orgId, by: input.by, action: leaving ? 'left' : 'removed', guestId: input.guestId, was, at: input.now });
   });
 }
 
@@ -279,8 +256,10 @@ async function keepAnOwner(client: Db, orgId: string): Promise<void> {
 export async function updateOrg(input: Partial<OrgInput> & { orgId: string; by: string }): Promise<Organization> {
   const db = getPool();
   const actor = await actorRole(input.orgId, input.by, db);
-  if (!can(actor, 'profile')) throw new OrgError('FORBIDDEN', 'only an owner or a manager changes the details');
   const current = (await orgById(input.orgId, db))!;
+  if (!orgGrants(actor, modulesOf(current)).has('org.profile.edit')) {
+    throw new OrgError('FORBIDDEN', 'only an owner or a manager changes the details');
+  }
   const v = checked({
     name: input.name ?? current.name,
     restaurant: current.restaurant,
@@ -311,24 +290,31 @@ export async function listOrgs(opts: { state?: OrgState } = {}, db: Db = getPool
   return rows.map(shape);
 }
 
-export async function approveOrg(input: { id: string; by: string; now: Date }, db: Db = getPool()): Promise<Organization> {
-  const { rows } = await db.query<Row>(
-    `UPDATE org.organization o SET state = 'active', decided_at = $2, decided_by = $3, decline_reason = NULL
-      WHERE o.id = $1 AND o.state = 'applied' RETURNING ${COLUMNS}`,
-    [input.id, input.now, input.by],
-  );
-  if (!rows[0]) throw new OrgError('NOT_PENDING', 'nothing is waiting under that id');
-  return shape(rows[0]);
+/** Yes, from the desk. `by` is the desk member's name, as the desk's own record writes it. */
+export async function approveOrg(input: { id: string; by: string; now: Date }): Promise<Organization> {
+  return tx(async (client) => {
+    const { rows } = await client.query<Row>(
+      `UPDATE org.organization o SET state = 'active', decided_at = $2, decided_by = $3, decline_reason = NULL
+        WHERE o.id = $1 AND o.state = 'applied' RETURNING ${COLUMNS}`,
+      [input.id, input.now, input.by],
+    );
+    if (!rows[0]) throw new OrgError('NOT_PENDING', 'nothing is waiting under that id');
+    await note(client, { orgId: input.id, desk: input.by, action: 'approved', at: input.now });
+    return shape(rows[0]);
+  });
 }
 
-export async function declineOrg(input: { id: string; reason?: string | null; by: string; now: Date }, db: Db = getPool()): Promise<Organization> {
-  const { rows } = await db.query<Row>(
-    `UPDATE org.organization o SET state = 'declined', decided_at = $2, decided_by = $3, decline_reason = $4
-      WHERE o.id = $1 AND o.state = 'applied' RETURNING ${COLUMNS}`,
-    [input.id, input.now, input.by, input.reason?.trim().slice(0, 300) || null],
-  );
-  if (!rows[0]) throw new OrgError('NOT_PENDING', 'nothing is waiting under that id');
-  return shape(rows[0]);
+export async function declineOrg(input: { id: string; reason?: string | null; by: string; now: Date }): Promise<Organization> {
+  return tx(async (client) => {
+    const { rows } = await client.query<Row>(
+      `UPDATE org.organization o SET state = 'declined', decided_at = $2, decided_by = $3, decline_reason = $4
+        WHERE o.id = $1 AND o.state = 'applied' RETURNING ${COLUMNS}`,
+      [input.id, input.now, input.by, input.reason?.trim().slice(0, 300) || null],
+    );
+    if (!rows[0]) throw new OrgError('NOT_PENDING', 'nothing is waiting under that id');
+    await note(client, { orgId: input.id, desk: input.by, action: 'declined', at: input.now });
+    return shape(rows[0]);
+  });
 }
 
 /**
@@ -361,6 +347,63 @@ export async function orgForExisting(input: OrgInput & { ownerId: string; now: D
       `INSERT INTO org.membership (org_id, guest_id, role, added_by, added_at) VALUES ($1, $2, 'owner', $2, $3)`,
       [rows[0]!.id, input.ownerId, input.now],
     );
+    await note(client, { orgId: rows[0]!.id, by: input.ownerId, action: 'registered', guestId: input.ownerId, role: 'owner', at: input.now });
     return (await orgById(rows[0]!.id, client))!;
   });
+}
+
+/* ── the record of who holds what ────────────────────────────────── */
+
+export type LogAction = 'registered' | 'approved' | 'declined' | 'added' | 'role' | 'removed' | 'left';
+
+export interface LogEntry {
+  id: string;
+  /** The account that did it; null when the desk did. */
+  byGuest: string | null;
+  /** The desk member's name, when the desk did it. */
+  byDesk: string | null;
+  action: LogAction;
+  guestId: string | null;
+  role: OrgRole | null;
+  was: OrgRole | null;
+  at: Date;
+}
+
+async function note(
+  client: Db,
+  entry: { orgId: string; by?: string; desk?: string; action: LogAction; guestId?: string; role?: OrgRole; was?: OrgRole; at: Date },
+): Promise<void> {
+  await client.query(
+    `INSERT INTO org.membership_log (org_id, actor_guest, actor_desk, action, guest_id, role, was, at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [entry.orgId, entry.by ?? null, entry.desk ?? null, entry.action, entry.guestId ?? null, entry.role ?? null, entry.was ?? null, entry.at],
+  );
+}
+
+/** The latest changes to who holds what in one organisation, newest first. */
+export async function logOf(orgId: string, limit = 50, db: Db = getPool()): Promise<LogEntry[]> {
+  const { rows } = await db.query<{
+    id: string;
+    actor_guest: string | null;
+    actor_desk: string | null;
+    action: LogAction;
+    guest_id: string | null;
+    role: OrgRole | null;
+    was: OrgRole | null;
+    at: Date;
+  }>(
+    `SELECT id::text, actor_guest, actor_desk, action, guest_id, role, was, at
+       FROM org.membership_log WHERE org_id = $1 ORDER BY at DESC, id DESC LIMIT $2`,
+    [orgId, Math.min(Math.max(limit, 1), 200)],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    byGuest: r.actor_guest,
+    byDesk: r.actor_desk,
+    action: r.action,
+    guestId: r.guest_id,
+    role: r.role,
+    was: r.was,
+    at: r.at,
+  }));
 }

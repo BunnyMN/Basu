@@ -89,10 +89,12 @@ src/api/        Fastify HTTP давхарга (/v1) + монгол хэлтэй 
 src/services/   Хоолны vertical: захиалга, төлөвлөлт, үнэлгээ, таблетууд
 src/idesh/      Өвлийн идэшний vertical: нийлүүлэгч, зар, идэш, төлвүүд. Хаалга нь index.ts
 src/scheduler/  fire_job дараалал + минут тутмын гүйлт (arm → replan → fire → relay → идэшний цэвэрлэгээ)
-src/platform/   Аль ч vertical-д хамаарахгүй, бүгдэд нь хэрэгтэй гурав
+src/platform/   Аль ч vertical-д хамаарахгүй, бүгдэд нь хэрэгтэй хэсгүүд
   identity/     Хэн вэ: утас, OTP, сесс, профайл
   ledger/       Мөнгө: түрийвч, давхар бичилт, цэнэглэлт, е-баримт
   notify/       Мэдэгдэл: дараалал, суваг, төхөөрөмж, inbox
+  org/          Байгууллага (ресторан, нийлүүлэгч) ба хүмүүс нь, үүрэг, эрхийн түүх
+  access/       Хэн юу хийж болох вэ: эрх, үүрэг, модуль, dashboard-ын цэс — нэг хүснэгт (ADR 0003)
 src/db/         Pool, гүйлгээ, миграц, станцын дэвтэр
 src/ports.ts    Гадаад системүүдийн интерфейс + тестийн хуурамч хувилбарууд
 src/sim/        Өдрийн симуляц
@@ -132,6 +134,8 @@ grid бол grid биш. Сүүлийн үеийн зүйл ИДЭВХТЭЙ х�
 | identity | `identity.*` | `src/platform/identity/index.ts` |
 | ledger | `ledger.*` | `src/platform/ledger/index.ts` |
 | notify | `notify.*` | `src/platform/notify/index.ts` |
+| org | `org.*` | `src/platform/org/index.ts` |
+| access | — (хүснэгтгүй, дүрэм л) | `src/platform/access/index.ts` |
 | хоол (vertical) | `dine.*` | — |
 | идэш (vertical) | `idesh.*` | `src/idesh/index.ts` |
 

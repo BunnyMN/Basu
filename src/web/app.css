@@ -65,7 +65,7 @@
 
   /* space, 4-pt */
   --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:20px; --s-6:24px; --s-7:32px; --s-8:48px;
-  --gutter:20px; --col:560px; --col-desk:1180px; --side:240px;
+  --gutter:20px; --col:560px; --col-desk:1180px; --side:256px;
   --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
 
   /* controls + chrome. 16px in a control keeps iOS from zooming on focus. */
@@ -665,45 +665,103 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .tabbar button .count{position:absolute;top:4px;left:calc(50% + 6px)}
 
 /* ── sidebar (desk) ───────────────────────────────────────────────── */
-/* aside.sidebar (ops) or nav.tabs.sidebar (supplier ≥900px): brand, a
-   scrolling nav, the account pinned at the foot so sign-out never clips. */
+/* The desk frame (sidenav.js), on the dashboard and on the supplier's screen
+   at a desk: the brand; the place a person is working in, as a switcher; the
+   place's menu, one folding group per module; the person pinned at the foot
+   so the way out never scrolls away. ≤900px the sidebar is a drawer behind
+   the deskbar's menu button. Only the open item carries the accent. */
+.desk-frame{display:grid;grid-template-columns:var(--side) minmax(0,1fr);min-height:100dvh}
+.desk-frame > .main{min-width:0}
+.deskbar,.nav-scrim{display:none}
 .sidebar{
   position:sticky;top:0;height:100dvh;width:var(--side);flex:none;display:flex;flex-direction:column;
-  background:var(--surface);border-right:1px solid var(--line);padding:20px 12px 16px;
+  background:var(--surface);border-right:1px solid var(--line);padding:18px 12px 12px;
 }
-.sidebar .brand{display:flex;align-items:baseline;gap:8px;padding:0 10px 20px;margin:0;font-size:1.125rem;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
+.sidebar .brand{display:flex;align-items:baseline;gap:8px;padding:0 8px 14px;margin:0;font-size:1.125rem;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
 .sidebar .brand b{font-size:1.125rem;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
-.sidebar .brand span,.sidebar .brand small{font-size:var(--t-cap);font-weight:500;letter-spacing:0;text-transform:none;color:var(--ink-3)}
-.sidebar .side{display:block;padding:0 10px 12px}
-.sidebar .side h1{font-size:var(--t-cap);font-weight:500;color:var(--ink-2);line-height:1.35;overflow-wrap:anywhere}
-.sidebar .tabs,.sidebar > nav{display:flex;flex-direction:column;gap:2px;flex:1;min-height:0;overflow-y:auto;padding:0;position:static;height:auto;border:0;background:none}
-.sidebar .grp{font-family:var(--mono);font-size:var(--t-eyebrow);font-weight:500;letter-spacing:var(--track-eyebrow);text-transform:uppercase;color:var(--ink-3);padding:16px 10px 6px}
-.sidebar .grp:first-child{padding-top:0}
-.sidebar .tabs button,.sidebar > nav button,.sidebar button[data-tab]{
-  display:flex;flex-direction:row;align-items:center;gap:10px;width:100%;flex:none;min-height:36px;padding:0 10px;
-  border:0;border-radius:var(--r-sm);background:none;font-family:var(--sans);font-size:var(--t-body);font-weight:500;color:var(--ink-2);text-align:left;
+.sidebar .brand span{font-size:var(--t-cap);font-weight:500;letter-spacing:0;color:var(--ink-3)}
+.sidebar .nav-close{display:none}
+
+/* the place: who the person is working as here, and the way to the others */
+.ws{position:relative;margin:0 0 12px}
+.ws-btn{display:flex;align-items:center;gap:10px;width:100%;min-height:54px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--r-ctl);background:var(--surface-2);color:var(--ink);text-align:left}
+.ws-btn:disabled{cursor:default}
+.ws-btn > svg{width:16px;height:16px;flex:none;margin-left:auto;fill:none;stroke:var(--ink-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+@media (hover:hover){.ws-btn:not(:disabled):hover{border-color:var(--line-2);background:var(--surface)}}
+.ws-btn[aria-expanded="true"]{border-color:var(--line-2);background:var(--surface)}
+.ws-mark{flex:none;display:inline-grid;place-items:center;width:32px;height:32px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--line-2);font-size:var(--t-cap);font-weight:600;letter-spacing:.02em;line-height:1;color:var(--ink-2)}
+.ws-mark[data-kind="desk"]{background:var(--ink);border-color:var(--ink);color:var(--ink-inverse)}
+.ws-mark[data-kind="me"]{border-radius:50%}
+.ws-text{display:flex;flex-direction:column;flex:1;min-width:0}
+.ws-text b{font-size:var(--t-body);font-weight:600;line-height:1.3;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-text small{margin-top:1px;font-size:var(--t-meta);line-height:1.35;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-menu{position:absolute;left:0;width:max(100%,296px);top:calc(100% + 6px);z-index:var(--z-bar);display:flex;flex-direction:column;gap:2px;max-height:min(64vh,460px);overflow-y:auto;padding:6px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-ctl);box-shadow:var(--shadow-float)}
+.ws-lab{padding:6px 8px 4px;font-family:var(--mono);font-size:var(--t-eyebrow);font-weight:500;letter-spacing:var(--track-eyebrow);text-transform:uppercase;color:var(--ink-3)}
+.ws-opt,.ws-act{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;padding:6px 8px;border:0;border-radius:var(--r-sm);background:none;color:var(--ink);text-align:left}
+.ws-opt .ws-mark{width:28px;height:28px}
+.ws-opt > svg,.ws-act > svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ws-opt > svg{margin-left:auto;color:var(--accent)}
+.ws-act{min-height:40px;font-size:var(--t-body);font-weight:500;color:var(--ink-2)}
+.ws-act > svg{color:var(--ink-3)}
+@media (hover:hover){.ws-opt:hover,.ws-act:hover{background:var(--surface-2)}}
+.ws-opt:focus-visible,.ws-act:focus-visible{outline-offset:-2px}
+.ws-sep{height:1px;margin:4px 2px;background:var(--line)}
+
+/* the place's menu: the top items bare, then one folding group per module */
+.sidebar .tabs{display:flex;flex-direction:column;gap:2px;flex:1;min-height:0;overflow-y:auto;margin:0 -4px;padding:0 4px 8px;position:static;height:auto;border:0;background:none}
+.nav-top,.grp-items{display:flex;flex-direction:column;gap:2px}
+.nav-group{margin-top:10px}
+.sidebar .grp{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:28px;padding:0 10px;border:0;border-radius:var(--r-sm);background:none;font-family:var(--mono);font-size:var(--t-eyebrow);font-weight:500;letter-spacing:var(--track-eyebrow);text-transform:uppercase;color:var(--ink-3);text-align:left}
+.sidebar .grp svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform var(--dur) var(--ease)}
+@media (hover:hover){.sidebar .grp:hover{background:var(--surface-2);color:var(--ink-2)}}
+.nav-group[data-shut] .grp svg{transform:rotate(-90deg)}
+.nav-group[data-shut] .grp-items{display:none}
+.grp-items{margin-top:2px}
+.sidebar [data-tab]{
+  display:flex;flex-direction:row;align-items:center;gap:10px;width:100%;flex:none;min-height:34px;padding:0 10px;
+  border:0;border-radius:var(--r-sm);background:none;font-family:var(--sans);font-size:var(--t-body);font-weight:500;color:var(--ink-2);text-align:left;text-decoration:none;
 }
-.sidebar button[data-tab] svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3);opacity:1}
-.sidebar button[data-tab] span.t{display:inline}
-.sidebar button[data-tab][data-on]{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
-.sidebar button[data-tab][data-on] svg{color:var(--accent)}
-@media (hover:hover){.sidebar button[data-tab]:hover{background:var(--surface-2);color:var(--ink)}.sidebar button[data-tab][data-on]:hover{background:var(--accent-soft);color:var(--accent-ink)}}
-.sidebar button[data-tab] .n,.sidebar .count{
+.sidebar [data-tab] svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3)}
+.sidebar [data-tab] span.t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sidebar [data-tab][data-on]{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+.sidebar [data-tab][data-on] svg{color:var(--accent)}
+@media (hover:hover){.sidebar [data-tab]:hover{background:var(--surface-2);color:var(--ink)}.sidebar [data-tab][data-on]:hover{background:var(--accent-soft);color:var(--accent-ink)}}
+.sidebar [data-tab] .n,.sidebar .count{
   margin-left:auto;display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:var(--r-sm);
   background:var(--surface-2);color:var(--ink-2);font-family:var(--mono);font-size:.6875rem;font-weight:600;font-variant-numeric:tabular-nums;
 }
-.sidebar button[data-tab] .n[data-hot]{background:var(--accent);color:var(--on-accent)}
-.sidebar .conn{display:flex;align-items:center;gap:6px;padding:8px 10px;font-size:var(--t-cap);font-weight:500;color:var(--ready)}
-.sidebar .conn::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
-.sidebar .conn[data-stale]{color:var(--stop)}
-.sidebar .me{margin-top:auto;padding:12px 10px 4px;border-top:1px solid var(--line)}
-.sidebar .me b{display:block;font-size:var(--t-cap);font-weight:500;color:var(--ink)}
-.sidebar .me span{display:block;font-family:var(--mono);font-size:var(--t-meta);color:var(--ink-3);margin-top:2px}
-.sidebar .out{
-  display:flex;align-items:center;gap:8px;width:100%;min-height:36px;margin-top:6px;padding:0 10px;border:0;border-radius:var(--r-sm);
-  background:none;font-size:var(--t-cap);font-weight:500;color:var(--ink-2);text-align:left;
+.sidebar [data-tab] .n[data-hot]{background:var(--accent);color:var(--on-accent)}
+
+/* the person, and the way out */
+.acct{display:flex;align-items:center;gap:10px;margin-top:8px;padding:12px 2px 0 6px;border-top:1px solid var(--line)}
+.acct .av{flex:none;display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);font-size:var(--t-cap);font-weight:600;line-height:1;color:var(--ink-2)}
+.acct .who{display:flex;flex-direction:column;flex:1;min-width:0}
+.acct .who b{font-size:var(--t-cap);font-weight:600;line-height:1.35;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acct .who small{font-family:var(--mono);font-size:var(--t-meta);line-height:1.4;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acct .out{flex:none;display:inline-grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:var(--r-sm);background:none;color:var(--ink-3)}
+.acct .out svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+@media (hover:hover){.acct .out:hover{background:var(--stop-soft);color:var(--stop)}}
+.acct .out[data-confirm]{display:inline-flex;width:auto;padding:0 10px;background:var(--stop-soft);color:var(--stop);font-size:var(--t-cap);font-weight:500}
+.acct .out[data-confirm] svg{display:none}
+
+/* ≤900px: the sidebar is a drawer behind the deskbar's menu button */
+@media (max-width:900px){
+  .desk-frame{grid-template-columns:minmax(0,1fr);align-content:start}
+  .deskbar{position:sticky;top:0;z-index:var(--z-bar);display:flex;align-items:center;gap:6px;min-height:calc(var(--bar-h) + var(--safe-t));padding:var(--safe-t) 12px 0 4px;background:var(--surface);border-bottom:1px solid var(--line)}
+  .nav-open{display:inline-grid;place-items:center;flex:none;width:var(--target);height:var(--target);padding:0;border:0;border-radius:var(--r-ctl);background:none;color:var(--ink)}
+  .nav-open svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+  .deskbar-t{display:flex;flex-direction:column;min-width:0}
+  .deskbar-t b{font-size:var(--t-row);font-weight:600;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .deskbar-t span{font-size:var(--t-meta);line-height:1.35;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sidebar{position:fixed;inset:0 auto 0 0;z-index:var(--z-sheet);width:min(86vw,304px);height:100dvh;padding:calc(16px + var(--safe-t)) 12px calc(12px + var(--safe-b));transform:translateX(-104%);transition:transform var(--dur-sheet) var(--ease)}
+  .sidebar[data-open]{transform:none;box-shadow:var(--shadow-float)}
+  .sidebar .brand{align-items:center;padding-bottom:12px}
+  .sidebar .nav-close{display:inline-grid;place-items:center;width:36px;height:36px;margin-left:auto;padding:0;border:0;border-radius:var(--r-sm);background:none;color:var(--ink-3)}
+  .sidebar .nav-close svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+  .nav-scrim:not([hidden]){display:block;position:fixed;inset:0;z-index:var(--z-scrim);background:var(--scrim)}
+  :root[data-nav-open]{overflow:hidden}
 }
-@media (hover:hover){.sidebar .out:hover{background:var(--stop-soft);color:var(--stop)}}
+@media (prefers-reduced-motion:reduce){.sidebar,.sidebar .grp svg{transition:none}}
 
 /* ── segmented control ────────────────────────────────────────────── */
 .seg{display:inline-flex;gap:2px;padding:3px;border-radius:var(--r-ctl);background:var(--surface-2);border:1px solid var(--line)}

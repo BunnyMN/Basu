@@ -57,6 +57,7 @@ import { registerOpsRoutes } from './ops.js';
 import { registerPaymentRoutes } from './payments.js';
 import { registerAuthRoutes } from './auth.js';
 import { registerOrgRoutes } from './orgs.js';
+import { registerAccessRoutes } from './access.js';
 import { FakeMailer, type Ctx } from '../ports.js';
 
 /**
@@ -155,6 +156,8 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
   // The ways in that need no phone: email codes, Google, Apple.
   await registerAuthRoutes(app, ctx);
   await registerOrgRoutes(app, ctx, requireGuest);
+  // What each signed-in person sits in, and the menu it draws. See src/api/access.ts.
+  await registerAccessRoutes(app, ctx);
 
   /** A guest may only ever touch their own order. */
   const ownedByGuest = async (orderId: string, guestId: string): Promise<boolean> => {

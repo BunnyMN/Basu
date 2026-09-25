@@ -1,4 +1,5 @@
 import { getPool, tx, type Db } from '../db/pool.js';
+import { DESK_ROLES, type DeskRole } from '../platform/access/index.js';
 
 /**
  * The people at the desk.
@@ -15,11 +16,12 @@ import { getPool, tx, type Db } from '../db/pool.js';
  * with, the Google account they use at work — and each is the same seat.
  *
  * Roles are few and flat: admin does everything, finance moves money, ops
- * runs orders and suppliers, viewer looks.
+ * runs orders and suppliers, viewer looks. What each may open and press is
+ * `platform/access`'s table; this module keeps who sits in which.
  */
 
-export type Role = 'admin' | 'finance' | 'ops' | 'viewer';
-export const ROLES: readonly Role[] = ['admin', 'finance', 'ops', 'viewer'];
+export type Role = DeskRole;
+export const ROLES: readonly Role[] = DESK_ROLES;
 
 export interface Member {
   id: string;

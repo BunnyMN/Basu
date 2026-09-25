@@ -80,6 +80,7 @@ export {
   updateSupplier,
   ownerOf,
   supplierOf,
+  supplierOfOrg,
   supplierById,
   updateSupplierProfile,
   setSupplierActive,

@@ -32,6 +32,8 @@ import {
   supplierForOrg,
 } from '../idesh/index.js';
 import { limits } from './hardening.js';
+import { need } from './guards.js';
+import { deskGrants, type Permission } from '../platform/access/index.js';
 import { shapeOrder, shapeSettlement } from './shapes.js';
 import { overviewAt } from './overview.js';
 import { closeGuest, guestFile, guestSearch } from './guests.js';
@@ -40,7 +42,7 @@ import { registerMoneyDesk } from './moneyDesk.js';
 import { registerSystemDesk } from './systemDesk.js';
 import { revokeSession } from '../platform/identity/index.js';
 import { mode } from '../mode.js';
-import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
+import { badRequest, sendError, unauthorized } from './errors.js';
 import {
   ROLES,
   RequestError,
@@ -106,13 +108,48 @@ function same(a: string, b: string): boolean {
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
-/** What each role may do. Admin may do all of it. */
-const MAY: Record<string, readonly Role[]> = {
-  look: ['admin', 'finance', 'ops', 'viewer'],
-  run: ['admin', 'ops'],
-  money: ['admin', 'finance'],
-  members: ['admin'],
-};
+/**
+ * The seat this account sits in, if any. First time at the desk, a seat is
+ * taken only with an address the account has proved — an email somebody
+ * vouched for, or a number an SMS code reached, that a member is named by.
+ * A number merely typed at sign-up is not one.
+ */
+export async function seatOf(guestId: string): Promise<Member | null> {
+  const member = await memberForAccount(guestId);
+  if (member) return member;
+  const contact = (await contactsFor([guestId])).get(guestId);
+  return linkByProof({
+    guestId,
+    email: contact?.email ?? null,
+    phone: contact?.phoneVerified ? contact.phone : null,
+  });
+}
+
+export interface DeskSeat {
+  id: string;
+  name: string;
+  role: Role;
+  phone: string | null;
+  email: string | null;
+}
+
+/**
+ * Who a bearer token is at the desk: the demo's shared secret is one admin
+ * with no account behind it; anybody else is the active member their
+ * account sits as, or nobody. `guestId` is the account, when there is one.
+ */
+export async function deskSeatFor(ctx: Ctx, token: string | undefined): Promise<{ guestId: string | null; seat: DeskSeat | null }> {
+  if (!token) return { guestId: null, seat: null };
+  const shared = opsToken();
+  if (shared && same(token, shared)) return { guestId: null, seat: { id: 'demo', name: 'Демо', role: 'admin', phone: null, email: null } };
+  const guestId = await resolveGuest(ctx, token);
+  if (!guestId) return { guestId: null, seat: null };
+  const member = await seatOf(guestId);
+  return {
+    guestId,
+    seat: member?.active ? { id: member.id, name: member.name, role: member.role, phone: member.phone, email: member.email } : null,
+  };
+}
 
 const shape = (s: SupplierRow) => ({
   id: s.id,
@@ -144,36 +181,11 @@ export async function registerOpsRoutes(
   ctx: Ctx,
   opts: { dev: boolean },
 ): Promise<void> {
-  /**
-   * The seat this account sits in, if any. First time at the desk, a seat
-   * is taken only with an address the account has proved — an email somebody
-   * vouched for, or a number an SMS code reached, that a member is named by.
-   * A number merely typed at sign-up is not one.
-   */
-  async function seatOf(guestId: string): Promise<Member | null> {
-    const member = await memberForAccount(guestId);
-    if (member) return member;
-    const contact = (await contactsFor([guestId])).get(guestId);
-    return linkByProof({
-      guestId,
-      email: contact?.email ?? null,
-      phone: contact?.phoneVerified ? contact.phone : null,
-    });
-  }
-
   const requireOps: Guard = async (request, reply) => {
-    const sent = bearer(request);
-    if (!sent) return unauthorized(reply);
-    const shared = opsToken();
-    if (shared && same(sent, shared)) {
-      request.ops = { id: 'demo', name: 'Демо', role: 'admin', phone: null, email: null };
-      return undefined;
-    }
-    const guestId = await resolveGuest(ctx, sent);
-    if (!guestId) return unauthorized(reply);
-    const member = await seatOf(guestId);
-    if (!member?.active) return unauthorized(reply);
-    request.ops = { id: member.id, name: member.name, role: member.role, phone: member.phone, email: member.email };
+    const { seat } = await deskSeatFor(ctx, bearer(request));
+    if (!seat) return unauthorized(reply);
+    request.ops = seat;
+    request.grants = deskGrants(seat.role);
     return undefined;
   };
 
@@ -185,16 +197,15 @@ export async function registerOpsRoutes(
     request.guestId = guestId;
     return undefined;
   };
-  /** A route that needs more than a seat at the desk. */
-  const may = (what: keyof typeof MAY): Guard => async (request, reply) => {
-    if (!request.ops || !MAY[what]!.includes(request.ops.role)) return forbidden(reply, `this needs one of ${MAY[what]!.join(', ')}`);
-    return undefined;
-  };
   const limit = { rateLimit: limits().ops };
+  /** Any seat at the desk — who am I. */
   const asOps = { preHandler: requireOps, config: limit };
-  const asRunner = { preHandler: [requireOps, may('run')], config: limit };
-  const asFinance = { preHandler: [requireOps, may('money')], config: limit };
-  const asAdmin = { preHandler: [requireOps, may('members')], config: limit };
+  /**
+   * A desk route: a seat that holds the permission the route names. Which
+   * role holds what is `platform/access`'s table, the same one the menu is
+   * drawn from.
+   */
+  const desk = (permission: Permission) => ({ preHandler: [requireOps, need(permission)], config: limit });
 
   /** Who is acting, for the record: the member the session belongs to. */
   const who = (request: FastifyRequest) => `ops:${request.ops?.name ?? '?'}`;
@@ -278,7 +289,7 @@ export async function registerOpsRoutes(
   /* ── businesses: the desk says yes or no ── */
 
   /** Every organisation, what waits first, with who registered it. */
-  app.get('/v1/ops/orgs', asOps, async () => {
+  app.get('/v1/ops/orgs', desk('desk.orgs.view'), async () => {
     const orgs = await listOrgs();
     const owners = await contactsFor(orgs.map((o) => o.appliedBy));
     const counts = await Promise.all(orgs.map((o) => membersOf(o.id).then((m) => m.length)));
@@ -297,7 +308,7 @@ export async function registerOpsRoutes(
    * Yes. The organisation is active; a supplier organisation gets its
    * supplier at once, contracted, owned by whoever registered it.
    */
-  app.post<{ Params: { id: string } }>('/v1/ops/orgs/:id/approve', asRunner, async (request, reply) => {
+  app.post<{ Params: { id: string } }>('/v1/ops/orgs/:id/approve', desk('desk.orgs.decide'), async (request, reply) => {
     try {
       const pending = await orgById(request.params.id);
       if (pending?.supplier && pending.state === 'applied' && (!pending.phone || !pending.address)) {
@@ -325,7 +336,7 @@ export async function registerOpsRoutes(
     }
   });
 
-  app.post<{ Params: { id: string }; Body: { reason?: string } }>('/v1/ops/orgs/:id/decline', asRunner, async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { reason?: string } }>('/v1/ops/orgs/:id/decline', desk('desk.orgs.decide'), async (request, reply) => {
     try {
       const org = await declineOrg({ id: request.params.id, reason: request.body?.reason ?? null, by: who(request), now: ctx.clock.now() });
       await recordAudit({ who: who(request), action: 'org.decline', targetKind: 'org', targetId: org.id, note: `${org.name}${org.declineReason ? ` · ${org.declineReason}` : ''}` });
@@ -338,13 +349,13 @@ export async function registerOpsRoutes(
 
   /* ── the members, admin only ── */
 
-  app.get('/v1/ops/requests', asAdmin, async () => ({ requests: (await pendingRequests()).map(shapeRequest) }));
+  app.get('/v1/ops/requests', desk('desk.members.manage'), async () => ({ requests: (await pendingRequests()).map(shapeRequest) }));
 
   /** Tell the person how it went — in the app, and by email where they have one. */
   const tellRequester = (guestId: string, id: string, title: string, body: string) =>
     enqueue(ctx, { guestId, template: 'ops.request', title, body, channel: 'push', subject: 'ops_request', subjectId: id, dedupeKey: `ops_request:${id}` });
 
-  app.post<{ Params: { id: string }; Body: { role?: string } }>('/v1/ops/requests/:id/approve', asAdmin, async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { role?: string } }>('/v1/ops/requests/:id/approve', desk('desk.members.manage'), async (request, reply) => {
     const role = request.body?.role ? (request.body.role as Role) : null;
     try {
       const waiting = (await pendingRequests()).find((r) => r.id === request.params.id);
@@ -365,7 +376,7 @@ export async function registerOpsRoutes(
     }
   });
 
-  app.post<{ Params: { id: string }; Body: { reason?: string } }>('/v1/ops/requests/:id/decline', asAdmin, async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { reason?: string } }>('/v1/ops/requests/:id/decline', desk('desk.members.manage'), async (request, reply) => {
     try {
       const decided = await declineRequest({ id: request.params.id, reason: request.body?.reason ?? null, by: who(request), now: ctx.clock.now() });
       await recordAudit({ who: who(request), action: 'member.decline', targetKind: 'member', targetId: decided.id, note: `${decided.name}${decided.declineReason ? ` · ${decided.declineReason}` : ''}` });
@@ -389,9 +400,9 @@ export async function registerOpsRoutes(
     created_at: m.createdAt.toISOString(),
   });
 
-  app.get('/v1/ops/members', asAdmin, async () => ({ members: (await listMembers()).map(shapeMember) }));
+  app.get('/v1/ops/members', desk('desk.members.manage'), async () => ({ members: (await listMembers()).map(shapeMember) }));
 
-  app.post<{ Body: { phone?: string; email?: string; name?: string; role?: string } }>('/v1/ops/members', asAdmin, async (request, reply) => {
+  app.post<{ Body: { phone?: string; email?: string; name?: string; role?: string } }>('/v1/ops/members', desk('desk.members.manage'), async (request, reply) => {
     const body = request.body ?? {};
     try {
       const member = await upsertMember({
@@ -419,7 +430,7 @@ export async function registerOpsRoutes(
     }
   });
 
-  app.post<{ Body: { phone?: string; role?: string; name?: string } }>('/v1/ops/invites', asAdmin, async (request, reply) => {
+  app.post<{ Body: { phone?: string; role?: string; name?: string } }>('/v1/ops/invites', desk('desk.members.manage'), async (request, reply) => {
     const body = request.body ?? {};
     const role = body.role ? (body.role as Role) : null;
     if (role && !ROLES.includes(role)) return badRequest(reply, 'Эрх буруу байна.', `no such role: ${body.role}`);
@@ -438,7 +449,7 @@ export async function registerOpsRoutes(
     }
   });
 
-  app.post<{ Params: { id: string }; Body: { active?: boolean } }>('/v1/ops/members/:id/active', asAdmin, async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { active?: boolean } }>('/v1/ops/members/:id/active', desk('desk.members.manage'), async (request, reply) => {
     if (typeof request.body?.active !== 'boolean') return badRequest(reply, 'active: true эсвэл false.', 'active must be a boolean');
     if (request.params.id === request.ops!.id && !request.body.active) return badRequest(reply, 'Өөрийгөө хаах боломжгүй.', 'cannot deactivate yourself');
     try {
@@ -451,7 +462,7 @@ export async function registerOpsRoutes(
   });
 
   /** Everybody who is, or asked to be, a supplier. Applications first. */
-  app.get('/v1/ops/suppliers', asOps, async () => ({
+  app.get('/v1/ops/suppliers', desk('desk.idesh.view'), async () => ({
     suppliers: (await listSuppliers()).map(shape),
   }));
 
@@ -468,7 +479,7 @@ export async function registerOpsRoutes(
       bank_account?: string;
       bank_holder?: string;
     };
-  }>('/v1/ops/suppliers', asRunner, async (request, reply) => {
+  }>('/v1/ops/suppliers', desk('desk.idesh.manage'), async (request, reply) => {
     const body = request.body ?? {};
     if (!body.name?.trim() || !body.phone || !body.address?.trim()) {
       return badRequest(reply, 'Нэр, утас, авах цэгээ оруулна уу.', 'name, phone and address are required');
@@ -495,7 +506,7 @@ export async function registerOpsRoutes(
     }
   });
 
-  app.post<{ Params: { id: string } }>('/v1/ops/suppliers/:id/approve', asRunner, async (request, reply) => {
+  app.post<{ Params: { id: string } }>('/v1/ops/suppliers/:id/approve', desk('desk.idesh.manage'), async (request, reply) => {
     try {
       const { pairingCode } = await approveSupplier(ctx, request.params.id);
       return reply.send({ state: 'contracted', pairing_code: pairingCode });
@@ -506,7 +517,7 @@ export async function registerOpsRoutes(
 
   app.post<{ Params: { id: string }; Body: { reason?: string } }>(
     '/v1/ops/suppliers/:id/decline',
-    asRunner,
+    desk('desk.idesh.manage'),
     async (request, reply) => {
       try {
         await declineSupplier(ctx, request.params.id, request.body?.reason ?? '');
@@ -521,7 +532,7 @@ export async function registerOpsRoutes(
   app.patch<{
     Params: { id: string };
     Body: { commission_pct?: number; tin?: string; bank_name?: string; bank_account?: string; bank_holder?: string };
-  }>('/v1/ops/suppliers/:id', asFinance, async (request, reply) => {
+  }>('/v1/ops/suppliers/:id', desk('desk.idesh.terms'), async (request, reply) => {
     const body = request.body ?? {};
     if (body.commission_pct !== undefined && typeof body.commission_pct !== 'number') {
       return badRequest(reply, 'Шимтгэл тоо байх ёстой.', 'commission_pct must be a number');
@@ -546,7 +557,7 @@ export async function registerOpsRoutes(
 
   app.get<{ Querystring: { scope?: string; state?: string; supplier?: string; day?: string; q?: string } }>(
     '/v1/ops/orders',
-    asOps,
+    desk('desk.idesh.view'),
     async (request) => {
       const raw = request.query.scope;
       const scope: OrderScope = raw === 'live' || raw === 'done' ? raw : 'all';
@@ -562,7 +573,7 @@ export async function registerOpsRoutes(
     },
   );
 
-  app.get<{ Params: { id: string } }>('/v1/ops/orders/:id', asOps, async (request, reply) => {
+  app.get<{ Params: { id: string } }>('/v1/ops/orders/:id', desk('desk.idesh.view'), async (request, reply) => {
     const found = await orderForOps(request.params.id);
     if (!found) return sendError(reply, new IdeshError('NOT_FOUND', 'no such order'));
     return reply.send({
@@ -579,7 +590,7 @@ export async function registerOpsRoutes(
    */
   app.post<{ Params: { id: string; action: string }; Body: { reason?: string; note?: string } }>(
     '/v1/ops/orders/:id/:action',
-    asRunner,
+    desk('desk.idesh.manage'),
     async (request, reply) => {
       const { id, action } = request.params;
       const body = request.body ?? {};
@@ -614,15 +625,15 @@ export async function registerOpsRoutes(
     },
   );
 
-  registerDineDesk(app, ctx, { asOps, asRunner, who });
-  registerMoneyDesk(app, ctx, { asOps, asFinance, who });
-  registerSystemDesk(app, ctx, { asOps, asRunner, asAdmin, who });
+  registerDineDesk(app, ctx, { desk, who });
+  registerMoneyDesk(app, ctx, { desk, who });
+  registerSystemDesk(app, ctx, { desk, who });
 
   /* ── the guests ── */
 
-  app.get<{ Querystring: { q?: string } }>('/v1/ops/guests', asOps, async (request) => guestSearch(request.query.q ?? ''));
+  app.get<{ Querystring: { q?: string } }>('/v1/ops/guests', desk('desk.guests.view'), async (request) => guestSearch(request.query.q ?? ''));
 
-  app.get<{ Params: { id: string } }>('/v1/ops/guests/:id', asOps, async (request, reply) => {
+  app.get<{ Params: { id: string } }>('/v1/ops/guests/:id', desk('desk.guests.view'), async (request, reply) => {
     const file = await guestFile(request.params.id);
     if (!file) return sendError(reply, new IdeshError('NOT_FOUND', 'no such guest'));
     return reply.send(file);
@@ -631,7 +642,7 @@ export async function registerOpsRoutes(
   /** A phone is gone: sign that one out. */
   app.post<{ Params: { id: string; sid: string }; Body: { note?: string } }>(
     '/v1/ops/guests/:id/sessions/:sid/revoke',
-    asRunner,
+    desk('desk.guests.sessions'),
     async (request, reply) => {
       const gone = await revokeSession(request.params.id, request.params.sid, ctx.clock.now());
       if (!gone) return sendError(reply, new IdeshError('NOT_FOUND', 'no such open session'));
@@ -641,7 +652,7 @@ export async function registerOpsRoutes(
   );
 
   /** Closing on somebody's behalf: admin only, a reason required, the same two refusals the app has. */
-  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/guests/:id/close', asAdmin, async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/guests/:id/close', desk('desk.guests.close'), async (request, reply) => {
     const note = request.body?.note?.trim();
     if (!note) return badRequest(reply, 'Шалтгаан бичнэ үү.', 'note required');
     try {
@@ -668,9 +679,9 @@ export async function registerOpsRoutes(
   });
 
   /** The whole house, cut three ways, and what needs somebody today. */
-  app.get('/v1/ops/overview', asOps, async () => overviewAt(ctx.clock.now()));
+  app.get('/v1/ops/overview', desk('desk.overview'), async () => overviewAt(ctx.clock.now()));
 
-  app.get('/v1/ops/stats', asOps, async () => {
+  app.get('/v1/ops/stats', desk('desk.idesh.view'), async () => {
     const stats = await statsFor(ctx.clock.now());
     return {
       today: shapeTally(stats.today),
@@ -694,7 +705,7 @@ export async function registerOpsRoutes(
   });
 
   /** One supplier's listings, for the desk to look at and, if need be, hide. */
-  app.get<{ Params: { id: string } }>('/v1/ops/suppliers/:id/listings', asOps, async (request) => ({
+  app.get<{ Params: { id: string } }>('/v1/ops/suppliers/:id/listings', desk('desk.idesh.view'), async (request) => ({
     listings: (await listingsOf(request.params.id)).map((l) => ({
       id: l.id,
       kind: l.kind,
@@ -712,7 +723,7 @@ export async function registerOpsRoutes(
 
   app.post<{ Params: { id: string }; Body: { active?: boolean; note?: string } }>(
     '/v1/ops/suppliers/:id/active',
-    asRunner,
+    desk('desk.idesh.manage'),
     async (request, reply) => {
       const active = request.body?.active;
       if (typeof active !== 'boolean') return badRequest(reply, 'active: true эсвэл false.', 'active must be a boolean');
@@ -728,7 +739,7 @@ export async function registerOpsRoutes(
   );
 
   /** Finance has held the account up against the contract: money may go there now. */
-  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/suppliers/:id/bank-verify', asFinance, async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/suppliers/:id/bank-verify', desk('desk.idesh.terms'), async (request, reply) => {
     try {
       await verifySupplierBank(request.params.id);
       await recordAudit({ who: who(request), action: 'supplier.bank_verify', targetKind: 'supplier', targetId: request.params.id, note: request.body?.note ?? null });
@@ -739,7 +750,7 @@ export async function registerOpsRoutes(
     }
   });
 
-  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/listings/:id/hide', asRunner, async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/listings/:id/hide', desk('desk.idesh.manage'), async (request, reply) => {
     try {
       await hideListing(request.params.id, ctx.clock.now());
       await recordAudit({ who: who(request), action: 'listing.hide', targetKind: 'listing', targetId: request.params.id, note: request.body?.note ?? null });
@@ -749,7 +760,7 @@ export async function registerOpsRoutes(
     }
   });
 
-  app.get<{ Querystring: { limit?: string } }>('/v1/ops/audit', asOps, async (request) => ({
+  app.get<{ Querystring: { limit?: string } }>('/v1/ops/audit', desk('desk.audit.view'), async (request) => ({
     audit: (await listAudit({ limit: Math.min(Number(request.query.limit) || 100, 500) })).map((a) => ({
       id: a.id,
       who: a.who,
@@ -764,14 +775,14 @@ export async function registerOpsRoutes(
   /* ── the list to pay ── */
 
   /** Everything owed outside, unpaid first. */
-  app.get('/v1/ops/settlements', asOps, async () => ({
+  app.get('/v1/ops/settlements', desk('desk.payouts.view'), async () => ({
     settlements: (await listSettlements()).map(shapeSettlement),
   }));
 
   /** «Батлах»: this one should be paid. The person who presses it may not be the one who pays. */
   app.post<{ Params: { id: string }; Body: { note?: string } }>(
     '/v1/ops/settlements/:id/approve',
-    asFinance,
+    desk('desk.payouts.approve'),
     async (request, reply) => {
       try {
         const released = await approveSettlement(request.params.id, who(request), ctx.clock.now());
@@ -792,7 +803,7 @@ export async function registerOpsRoutes(
   /** «Шилжүүлсэн»: the bank transfer was made by hand; the ledger and the person owed hear of it. */
   app.post<{ Params: { id: string }; Body: { reference?: string } }>(
     '/v1/ops/settlements/:id/paid',
-    asFinance,
+    desk('desk.payouts.approve'),
     async (request, reply) => {
       try {
         const paid = await markSettled(ctx, request.params.id, who(request), request.body?.reference ?? '');
@@ -811,7 +822,7 @@ export async function registerOpsRoutes(
   );
 
   /** A fresh code — a lost phone, a code that expired unread. */
-  app.post<{ Params: { id: string } }>('/v1/ops/suppliers/:id/code', asRunner, async (request, reply) => {
+  app.post<{ Params: { id: string } }>('/v1/ops/suppliers/:id/code', desk('desk.idesh.manage'), async (request, reply) => {
     const known = (await listSuppliers()).find((s) => s.id === request.params.id);
     if (!known || known.state !== 'contracted') {
       return sendError(reply, new IdeshError('NOT_FOUND', 'no contracted supplier under that id'));

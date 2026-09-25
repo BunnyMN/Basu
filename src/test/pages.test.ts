@@ -76,12 +76,13 @@ async function openPage(file: string, search = ''): Promise<JSDOM> {
   const strip = (source: string) => source.replace(/\bexport\s+/g, '');
   const shared = strip(await readFile(join(WEB, 'api.js'), 'utf8'));
   const mapLib = strip(await readFile(join(WEB, 'mapStyle.js'), 'utf8'));
+  const sideNav = strip(await readFile(join(WEB, 'sidenav.js'), 'utf8'));
   const inline = /<script type="module">([\s\S]*?)<\/script>/.exec(html)?.[1] ?? '';
   const page = inline.replace(/^\s*import[\s\S]*?from\s*'\/[\w.]+';?$/gm, '');
 
   stubMapLibre(window);
   window.eval(
-    `(async () => { ${shared}\n${mapLib}\n${page} })().catch(e => { window.__err = e; });`,
+    `(async () => { ${shared}\n${mapLib}\n${sideNav}\n${page} })().catch(e => { window.__err = e; });`,
   );
   open.push(dom);
   return dom;
@@ -208,7 +209,7 @@ async function until(
   throw new Error(
     `timed out waiting for ${label}` +
       (toast ? `\n--- toast --- ${toast}` : '') +
-      `\n--- body ---\n${dom.window.document.body.textContent?.slice(0, 900)}`,
+      `\n--- body ---\n${dom.window.document.body.textContent?.replace(/\s+/g, " ").slice(0, 2400)}`,
   );
 }
 
@@ -1100,7 +1101,7 @@ describe('нийлүүлэгч болох', () => {
     await until(desk, 'the front page', (d) => d.querySelectorAll('#now .kpi').length === 6);
     const doc = desk.window.document;
     expect(doc.querySelector('.tabs button[data-tab="overview"]')?.hasAttribute('data-on')).toBe(true);
-    expect(doc.querySelector('.tabs .grp')?.textContent).toBe('Basu');
+    expect(doc.querySelector('.tabs .grp')?.textContent).toBe('Платформ');
     // The seeded application is waiting, and the page says so before anything else.
     expect([...doc.querySelectorAll('#alerts .alert')].map((a) => a.textContent)).toEqual(
       expect.arrayContaining([expect.stringContaining('нийлүүлэгчийн өргөдөл')]),
@@ -1212,6 +1213,118 @@ describe('нийлүүлэгч болох', () => {
     await opsTab(desk, 'overview');
     await until(desk, 'the banner', (d) => Boolean(d.querySelector('#banner')));
     expect(doc.querySelector('#banner')?.textContent).toContain('Маргааш ажиллахгүй');
+  });
+});
+
+describe('who sees what', () => {
+  /** A person of this test's own, signed up the way anybody is; their session, not stored anywhere yet. */
+  async function account(phone: string, name: string): Promise<string> {
+    const made = await fetch(`${base}/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ phone, password: GUEST_PASSWORD, name }),
+    });
+    return ((await made.json()) as { token: string }).token;
+  }
+  const as = (token: string) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
+  const deskToken = async () => ((await (await fetch(`${base}/dev/ops-token`)).json()) as { token: string }).token;
+
+  /** A business its owner registered and the desk approved, with the people given, each in a role. */
+  async function business(owner: string, name: string, kinds: Record<string, boolean>, people: Array<[string, string]> = []): Promise<string> {
+    const made = (await (await fetch(`${base}/v1/orgs`, {
+      method: 'POST',
+      headers: as(owner),
+      body: JSON.stringify({ name, ...kinds, phone: '8811 0001', address: 'Нарантуул, 3-р хаалга' }),
+    })).json()) as { id: string };
+    await fetch(`${base}/v1/ops/orgs/${made.id}/approve`, { method: 'POST', headers: { authorization: `Bearer ${await deskToken()}` } });
+    for (const [phone, role] of people) {
+      const found = (await (await fetch(`${base}/v1/orgs/${made.id}/lookup?contact=${encodeURIComponent(phone)}`, { headers: as(owner) })).json()) as { guest_id: string };
+      await fetch(`${base}/v1/orgs/${made.id}/members`, { method: 'POST', headers: as(owner), body: JSON.stringify({ guest_id: found.guest_id, role }) });
+    }
+    return made.id;
+  }
+  const tabs = (dom: JSDOM) => [...dom.window.document.querySelectorAll('.tabs [data-tab]')].map((b) => (b as HTMLElement).dataset['tab']);
+
+  it('opens the dashboard on a butcher’s staff member’s own business: the day and the stall, no money, no menu, no desk', async () => {
+    const owner = await account('+97688030001', 'Дорж');
+    const staff = await account('+97688030003', 'Бат');
+    const orgId = await business(owner, 'Хэрлэн мах · тест', { supplier: true }, [['+97688030003', 'staff']]);
+    storage.setItem('basu.ops', staff);
+    storage.removeItem('basu.dash.ws');
+    const dash = await openPage('ops.html');
+    await until(dash, 'the business', (d) => Boolean(d.querySelector('.tabs [data-tab="idesh.today"]')));
+    const doc = dash.window.document;
+    expect(doc.querySelector('.ws-btn')?.textContent).toContain('Хэрлэн мах · тест');
+    expect(doc.querySelector('.ws-btn')?.textContent).toContain('Нийлүүлэгч · Ажилтан');
+    expect(tabs(dash)).toEqual(['home', 'idesh.today', 'idesh.orders', 'idesh.stall', 'idesh.profile', 'team', 'profile', 'roles']);
+    expect(doc.querySelector('.nav-group[data-group="dine"]')).toBeNull();
+    // The supplier's pages are the supplier's own screen, opened for this business.
+    expect(doc.querySelector('.tabs a[data-tab="idesh.orders"]')?.getAttribute('href')).toBe(`/supplier?org=${orgId}#orders`);
+    // The table of roles marks the staff's own column.
+    (doc.querySelector('.tabs [data-tab="roles"]') as HTMLElement).click();
+    await until(dash, 'the roles', (d) => Boolean(d.querySelector('.table.roles th.yours')));
+    expect(doc.querySelector('.table.roles th.yours')?.textContent).toContain('Ажилтан');
+    expect(doc.querySelector('.table.roles')?.textContent).not.toContain('Цэс');
+  });
+
+  it('lets an owner bring somebody in from the dashboard, and keeps the record of it', async () => {
+    const owner = await account('+97688030011', 'Сараа');
+    await account('+97688030013', 'Туяа');
+    const orgId = await business(owner, 'Алтан тогоо · тест', { restaurant: true });
+    storage.setItem('basu.ops', owner);
+    const dash = await openPage('ops.html', `#${orgId}/team`);
+    await until(dash, 'the team', (d) => d.querySelectorAll('tr[data-member]').length === 1);
+    const doc = dash.window.document;
+    // A restaurant: a menu, and no stall.
+    expect(tabs(dash)).toEqual(expect.arrayContaining(['dine.orders', 'dine.menu', 'dine.kitchen', 'team', 'log']));
+    expect(tabs(dash).some((t) => t?.startsWith('idesh.'))).toBe(false);
+    (doc.querySelector('[name="contact"]') as HTMLInputElement).value = '88030013';
+    (doc.querySelector('[data-find]') as HTMLElement).click();
+    await until(dash, 'the person found', (d) => Boolean(d.querySelector('[data-add-go]')));
+    (doc.querySelector('[data-found] select') as HTMLSelectElement).value = 'accountant';
+    (doc.querySelector('[data-add-go]') as HTMLElement).click();
+    await until(dash, 'the new member', (d) => d.querySelectorAll('tr[data-member]').length === 2);
+    expect(doc.querySelector('[data-members]')?.textContent).toContain('Туяа');
+
+    (doc.querySelector('.tabs [data-tab="log"]') as HTMLElement).click();
+    await until(dash, 'the record', (d) => d.querySelectorAll('#org-log li').length >= 3);
+    expect(doc.querySelector('#org-log li')?.textContent).toContain('Туяа нэмэгдсэн · нягтлан');
+  });
+
+  it('gives an accountant the orders and the money on the supplier’s screen, and no counter or stall', async () => {
+    const owner = await account('+97688030021', 'Болд');
+    const accountant = await account('+97688030024', 'Номин');
+    const orgId = await business(owner, 'Туул мах · тест', { supplier: true }, [['+97688030024', 'accountant']]);
+    storage.removeItem('basu.supplier');
+    storage.setItem('basu.ops', accountant);
+    const screen = await openPage('supplier.html', `?org=${orgId}`);
+    await until(screen, 'the module', (d) => d.querySelectorAll('.tabbar button[data-tab]').length > 0);
+    expect([...screen.window.document.querySelectorAll('.tabbar button[data-tab]')].map((b) => (b as HTMLElement).dataset['tab'])).toEqual(['orders', 'money', 'profile']);
+    expect(screen.window.document.querySelector('#supplier')?.textContent).toBe('Туул мах · тест');
+    storage.removeItem('basu.ops');
+  });
+
+  it('keeps the desk’s own pages to the roles that hold them', async () => {
+    const desk = await deskToken();
+    const invited = (await (await fetch(`${base}/v1/ops/members`, {
+      method: 'POST',
+      headers: as(desk),
+      body: JSON.stringify({ phone: '+97688030031', name: 'Санхүү', role: 'finance' }),
+    })).json()) as { invite_code: string };
+    const claimed = (await (await fetch(`${base}/v1/auth/claim`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code: invited.invite_code, phone: '+97688030031', password: GUEST_PASSWORD, name: 'Санхүү' }),
+    })).json()) as { token: string };
+    storage.setItem('basu.ops', claimed.token);
+    storage.removeItem('basu.dash.ws');
+    storage.removeItem('basu.ops.tab');
+    const dash = await openPage('ops.html');
+    await until(dash, 'the desk', (d) => Boolean(d.querySelector('.tabs [data-tab="money"]')));
+    const seen = tabs(dash);
+    expect(seen).toEqual(expect.arrayContaining(['overview', 'money', 'pay', 'audit']));
+    for (const hidden of ['venues', 'lunches', 'notify', 'system', 'members']) expect(seen).not.toContain(hidden);
+    storage.removeItem('basu.ops');
   });
 });
 
