@@ -100,9 +100,9 @@ final class SignInFlowTests: XCTestCase {
 
     // ── sign up, in Cyrillic, with the field shown ────────────────────
     try openThePasswordDoor(app)
-    let doors = app.segmentedControls["signin.door"]
-    try check(doors.waitForExistence(timeout: 5), "the sheet should open on its two doors")
-    doors.buttons["Бүртгүүлэх"].tap()
+    let signUp = app.buttons["signin.door.signUp"]
+    try check(signUp.waitForExistence(timeout: 5), "the password face should open on its two doors")
+    signUp.tap()
     app.buttons["signin.reveal"].tap()
     if app.textFields["signin.name"].waitForExistence(timeout: 3) {
       // By email: a name, the address, the password twice — then the code.
@@ -166,9 +166,9 @@ final class SignInFlowTests: XCTestCase {
   /// under the email door, perhaps below the fold.
   private func openThePasswordDoor(_ app: XCUIApplication) throws {
     let way = app.buttons["signin.passwordWay"]
-    if !way.waitForExistence(timeout: 3), !app.segmentedControls["signin.door"].exists { app.swipeUp() }
+    if !way.waitForExistence(timeout: 3), !app.buttons["signin.door.signIn"].exists { app.swipeUp() }
     if way.waitForExistence(timeout: 5) { way.tap() }
-    try check(app.segmentedControls["signin.door"].waitForExistence(timeout: 5), "the password door should be open")
+    try check(app.buttons["signin.door.signIn"].waitForExistence(timeout: 5), "the password door should be open")
   }
 
   private func type(_ element: XCUIElement, _ text: String) throws {

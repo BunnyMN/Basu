@@ -122,15 +122,6 @@ final class Session {
     keep(token: token, phone: number, email: nil)
   }
 
-  /// A code from Basu: the way into an account somebody else made for this
-  /// number — a supplier's owner, registered by the desk — which has no
-  /// password until its owner chooses one here.
-  func claim(code: String, phone: String, password: String) async throws {
-    let number = PhoneNumber.e164(phone)
-    let token = try await api.claim(code: code, phone: number, password: password, device: Self.deviceName)
-    keep(token: token, phone: number, email: nil)
-  }
-
   /// What this phone calls itself — «Батаагийн iPhone». It goes to identity so
   /// somebody looking at their sessions can tell which row to revoke.
   @MainActor static var deviceName: String { UIDevice.current.name }

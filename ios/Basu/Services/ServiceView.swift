@@ -187,8 +187,10 @@ final class ServicePage: NSObject {
   }
 
   /// Whether a navigation is going somewhere the shell owns.
+  /// The web launcher, which is where a page's «‹ Basu» goes in a browser:
+  /// `/` until the front page took that address, `/app` since.
   private func isHome(_ url: URL) -> Bool {
-    url.host == base.host && url.port == base.port && (url.path.isEmpty || url.path == "/")
+    url.host == base.host && url.port == base.port && ["", "/", "/app", "/app/"].contains(url.path)
   }
 
   private func isOurs(_ url: URL) -> Bool {

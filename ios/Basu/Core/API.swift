@@ -186,17 +186,6 @@ struct API: Sendable {
     ).token
   }
 
-  func claim(code: String, phone: String, password: String, device: String) async throws -> String {
-    try await send(
-      .init(
-        path: "/v1/auth/claim",
-        method: "POST",
-        body: ["code": code, "phone": phone, "password": password, "device": device],
-      ),
-      as: Token.self,
-    ).token
-  }
-
   // MARK: signing in without a phone
   //
   // A code by email, Google through the system's sign-in sheet, and Apple.

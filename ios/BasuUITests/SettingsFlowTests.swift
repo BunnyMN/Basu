@@ -62,8 +62,11 @@ final class SettingsFlowTests: XCTestCase {
     XCTAssertTrue(app.buttons["settings.appearance.system"].isSelected, "«Систем» is the one chosen")
 
     // ── the kept pages ────────────────────────────────────────────────
+    // Clear of the tab bar, which lies over the bottom of the scroll: a
+    // row under it is «hittable» and the tap lands on the bar.
     let cache = app.buttons["settings.cache"]
-    for _ in 0..<4 where !cache.isHittable { app.swipeUp() }
+    let bar = app.buttons["tab.home"].frame.minY
+    for _ in 0..<8 where !(cache.exists && cache.frame.maxY < bar - 8) { app.swipeUp(velocity: .slow) }
     cache.tap()
     XCTAssertTrue(
       app.staticTexts["Цэвэрлэлээ"].waitForExistence(timeout: 5),

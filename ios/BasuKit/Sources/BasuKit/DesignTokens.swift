@@ -194,6 +194,11 @@ public enum BasuMetric {
     public static let avatarLauncher: CGFloat = 30
     public static let avatarProfile: CGFloat  = 54
     public static let switchSize            = CGSize(width: 51, height: 31)
+    // The way in: fields and buttons one height and one corner, on one card.
+    public static let control: CGFloat       = 14
+    public static let controlHeight: CGFloat = 52
+    public static let authCard: CGFloat      = 24
+    public static let mascot: CGFloat        = 150
     public static let swipeAction: CGFloat   = 88
     public static let searchThreshold        = 7   // services before the filter field appears
 

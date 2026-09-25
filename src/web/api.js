@@ -111,6 +111,16 @@ export const shell = {
 // developer needs is drawn.
 if (shell.present && typeof document !== 'undefined') {
   document.documentElement.classList.add('in-shell');
+  // «‹ Basu» is the web launcher (/app) in a browser and the shell's own
+  // launcher in the app. Said to the shell as a message rather than left for
+  // it to recognise the address: the builds already on phones knew only /,
+  // and loaded the web launcher inside themselves once it moved to /app.
+  document.addEventListener('click', (event) => {
+    const home = event.target instanceof Element ? event.target.closest('a#home') : null;
+    if (!home) return;
+    event.preventDefault();
+    shell.post({ type: 'home' });
+  });
 }
 
 /* ── signing in on the web ─────────────────────────────────────────── */
