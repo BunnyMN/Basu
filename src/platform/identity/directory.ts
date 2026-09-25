@@ -1,4 +1,5 @@
 import { getPool } from '../../db/pool.js';
+import { phoneE164 } from './register.js';
 
 /**
  * Finding a person, for the desk.
@@ -71,4 +72,28 @@ export async function guestCard(guestId: string): Promise<GuestCard | null> {
     [guestId],
   );
   return rows[0] ? card(rows[0]) : null;
+}
+
+/**
+ * The account behind a phone number or an email address, exactly — for a
+ * manager adding somebody they work with, who says «I signed in with this».
+ * Only open accounts; nothing for a partial match, so it cannot be used to
+ * browse who is on Basu.
+ */
+export async function accountByContact(
+  raw: string,
+): Promise<{ guestId: string; name: string | null; phone: string | null; email: string | null } | null> {
+  const typed = raw.trim();
+  if (!typed) return null;
+  const byEmail = typed.includes('@');
+  const value = byEmail ? typed.toLowerCase() : phoneE164(typed);
+  const { rows } = await getPool().query<{ id: string; name: string | null; phone_e164: string | null; email: string | null }>(
+    `SELECT g.id, COALESCE(p.display_name, g.name) AS name, g.phone_e164, g.email
+       FROM identity.guest g
+       LEFT JOIN identity.profile p ON p.guest_id = g.id
+      WHERE g.closed_at IS NULL AND ${byEmail ? 'lower(g.email) = $1' : 'g.phone_e164 = $1'}`,
+    [value],
+  );
+  const r = rows[0];
+  return r ? { guestId: r.id, name: r.name, phone: r.phone_e164, email: r.email } : null;
 }

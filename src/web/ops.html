@@ -27,6 +27,19 @@ p{margin:0}
 .page{max-width:var(--col-desk);margin:0 auto;padding:var(--s-7) var(--gutter) 64px}
 .page > .back{margin-bottom:4px}
 .page-head + .section{margin-top:0}
+/* the front room: a person's own page, before and beside the desk */
+.front{max-width:760px;margin:0 auto;padding:28px var(--gutter) 56px}
+.front-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:8px}
+.front-head .who{font-size:var(--t-cap);color:var(--ink-2);margin-top:4px}
+.front .section{margin-top:28px}
+.org-row{cursor:pointer}
+.org-row .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.org-form .checks{display:flex;gap:20px;margin:0 0 16px}
+.org-form .checks label{display:flex;align-items:center;gap:8px;font-size:var(--t-body-lg)}
+.add-member{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.add-member .input{width:auto;flex:1 1 220px}
+.add-member [data-found]{flex-basis:100%;font-size:var(--t-body)}
+.back-link{margin-bottom:12px}
 /* an ask for a seat: who, why, and the answer on one line under it */
 .request .main{flex:1;min-width:0}
 .request .who-contact{font-weight:400;font-size:var(--t-cap);color:var(--ink-2);margin-left:6px}
@@ -363,15 +376,22 @@ function showFrontRoom({ account, request }) {
   clearInterval(frontPoll);
   const name = account.name ?? request?.name ?? '';
   const contact = account.email ?? account.phone ?? '';
-  const card = el(`
-    <div class="door"><div class="card pair" id="front">
-      <div class="brand wordmark">Basu<small>Ops</small></div>
-      <h2>${name ? `Сайн байна уу, ${esc(name)}` : 'Сайн байна уу'}</h2>
-      <p>${contact ? `${esc(contact)} хаягаар нэвтэрсэн байна. ` : ''}Ops-ийн хэсэгт орохын тулд эрх хүснэ үү — админ зөвшөөрөхөд шууд нээгдэнэ.</p>
-      <div data-state></div>
-      <div data-form></div>
-      <button class="btn" data-v="link" type="button" id="front-out">Гарах</button>
-    </div></div>`);
+  const page = el(`
+    <div class="front">
+      <div class="front-head">
+        <div><div class="brand wordmark">Basu</div><div class="who"><span data-name>${name ? `${esc(name)} · ` : ''}</span>${esc(contact)} <button class="btn" data-v="link" type="button" data-rename>${name ? 'Нэр засах' : 'Нэрээ бичих'}</button></div></div>
+        <button class="btn" data-v="quiet" type="button" id="front-out">Гарах</button>
+      </div>
+      <div id="front-orgs"></div>
+      <section class="section"><h2 class="section-label">Basu-гийн ops эрх</h2>
+        <div class="card"><div class="card-body" id="front">
+          <p class="cap" style="margin:0 0 14px">Basu-гийн ажилтан бол ops-ийн хэсэгт орох эрх хүснэ үү — админ зөвшөөрөхөд шууд нээгдэнэ.</p>
+          <div data-state></div>
+          <div data-form></div>
+        </div></div>
+      </section>
+    </div>`);
+  const card = page;
   const state = card.querySelector('[data-state]');
   const slot = card.querySelector('[data-form]');
 
@@ -381,7 +401,7 @@ function showFrontRoom({ account, request }) {
         <input class="input" name="name" placeholder="Таны нэр" aria-label="Нэр" autocomplete="name">
         <select class="input" name="role" aria-label="Хүсэх эрх">${ROLE_ASK.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
         <textarea class="input" name="note" rows="3" placeholder="Та хэн бэ, юунд хэрэгтэй вэ (заавал биш)" aria-label="Тайлбар"></textarea>
-        <button class="btn" data-v="primary" data-size="lg" type="button" id="ask">${asked ? 'Хүсэлтээ шинэчлэх' : 'Эрх хүсэх'}</button>
+        <button class="btn" data-size="lg" type="button" id="ask" style="width:100%">${asked ? 'Хүсэлтээ шинэчлэх' : 'Эрх хүсэх'}</button>
       </div>`);
     f.querySelector('[name="name"]').value = asked?.name ?? name;
     f.querySelector('[name="role"]').value = asked?.role ?? 'ops';
@@ -429,14 +449,23 @@ function showFrontRoom({ account, request }) {
       }
     }, 10_000);
   } else {
+    if (request?.state !== 'declined') {
+      // Most people here run a business; asking for Basu's own desk is the rarer thing, one tap away.
+      const open = el('<button class="btn" type="button">Ops эрх хүсэх</button>');
+      open.addEventListener('click', () => {
+        open.remove();
+        slot.append(form(null));
+      });
+      slot.append(open);
+    }
     if (request?.state === 'declined') {
       state.append(el(`
         <div class="callout" data-k="warn" style="margin-bottom:16px">
           <b>Хүсэлтийг татгалзсан</b>
           <span>${request.decline_reason ? `Шалтгаан: ${esc(request.decline_reason)}. ` : ''}Дахин хүсэж болно.</span>
         </div>`));
+      slot.append(form(null));
     }
-    slot.append(form(null));
   }
   card.querySelector('#front-out').addEventListener('click', () => {
     clearInterval(frontPoll);
@@ -444,7 +473,286 @@ function showFrontRoom({ account, request }) {
     me = null;
     showToken();
   });
+  card.querySelector('[data-rename]').addEventListener('click', (e) => {
+    const box = el(`<span class="add-member" style="display:inline-flex;margin-top:6px"><input class="input" name="display_name" placeholder="Таны нэр" style="width:220px"><button class="btn" data-v="primary" data-size="sm" type="button">Хадгалах</button></span>`);
+    box.querySelector('input').value = name;
+    const save = async () => {
+      try {
+        await ops('/v1/me', { method: 'PATCH', body: { display_name: box.querySelector('input').value.trim() } });
+        toast('Нэр хадгалагдлаа.', 'good');
+        boot();
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+    };
+    box.querySelector('button').addEventListener('click', save);
+    box.querySelector('input').addEventListener('keydown', (ev) => ev.key === 'Enter' && save());
+    e.target.replaceWith(box);
+    box.querySelector('input').focus();
+  });
   root.replaceChildren(card);
+  void renderMyOrgs(card.querySelector('#front-orgs'));
+}
+
+/* ── a person's businesses ─────────────────────────────────────────── */
+
+const ORG_ROLE_WORD = { owner: 'эзэн', manager: 'менежер', staff: 'ажилтан', accountant: 'нягтлан' };
+const ORG_STATE = { applied: ['applied', 'хүлээгдэж байна'], active: ['contracted', 'идэвхтэй'], declined: ['off', 'татгалзсан'], suspended: ['off', 'түр хаасан'] };
+const kinds = (o) => [o.restaurant && 'Ресторан', o.supplier && 'Нийлүүлэгч'].filter(Boolean);
+
+/**
+ * The businesses this person is part of, and the way to register one. Used
+ * in the front room and, for somebody at the desk, under «Миний байгууллага».
+ */
+async function renderMyOrgs(box) {
+  box.replaceChildren();
+  let orgs;
+  try {
+    ({ orgs } = await ops('/v1/orgs/mine'));
+  } catch (error) {
+    box.append(el(`<p class="empty">${esc(error.message)}</p>`));
+    return;
+  }
+  const section = el(`
+    <section class="section"><h2 class="section-label">Миний байгууллага</h2>
+      <div class="card" data-rows id="org-list"></div>
+      <div class="form-foot" style="justify-content:flex-start;margin-top:12px"><button class="btn" data-v="primary" type="button" id="org-new">Байгууллага бүртгүүлэх</button></div>
+    </section>`);
+  const list = section.querySelector('#org-list');
+  if (!orgs.length) {
+    list.append(el('<div class="empty">Та одоогоор ямар ч байгууллагад байхгүй. Ресторан эсвэл нийлүүлэгчээ бүртгүүлбэл та эзэн нь болно; эсвэл менежер тань таныг утас, имэйлээр чинь нэмнэ.</div>'));
+  }
+  for (const o of orgs) {
+    const [tone, word] = ORG_STATE[o.state] ?? ['off', o.state];
+    const row = el(`
+      <div class="row org-row" data-chev tabindex="0">
+        <div class="main">
+          <div class="title">${esc(o.name)}</div>
+          <div class="tags">${kinds(o).map((k) => `<span class="pill" data-size="sm">${k}</span>`).join('')}<span class="pill" data-size="sm">${ORG_ROLE_WORD[o.role] ?? o.role}</span></div>
+          ${o.state === 'declined' && o.decline_reason ? `<p class="cap" style="margin:4px 0 0">Шалтгаан: ${esc(o.decline_reason)}</p>` : ''}
+        </div>
+        <div class="end"><span class="pill" data-s="${tone}">${word}</span></div>
+      </div>`);
+    const open = () => {
+      if (o.state === 'active') renderOrg(box, o.id);
+      else toast(o.state === 'applied' ? 'Basu хүсэлтийг тань үзэж байна. Батлагдмагц ажилтнуудаа нэмж болно.' : 'Энэ байгууллага идэвхгүй байна.');
+    };
+    row.addEventListener('click', open);
+    row.addEventListener('keydown', (e) => e.key === 'Enter' && open());
+    list.append(row);
+  }
+  section.querySelector('#org-new').addEventListener('click', () => {
+    section.querySelector('#org-new').remove();
+    section.append(orgForm(() => renderMyOrgs(box)));
+  });
+  box.append(section);
+}
+
+/** Registering a business: its owner is whoever sends this; Basu approves it. */
+function orgForm(done) {
+  const f = el(`
+    <div class="card org-form" style="margin-top:12px"><div class="card-body">
+      <label class="field"><span>Байгууллагын нэр</span><input name="name" placeholder="Хэрлэн мах, Алтан тогоо ресторан…"></label>
+      <div class="checks">
+        <label><input type="checkbox" name="restaurant"> Ресторан</label>
+        <label><input type="checkbox" name="supplier"> Идэшний нийлүүлэгч</label>
+      </div>
+      <div class="fields">
+        <label class="field"><span>Холбогдох утас</span><input name="phone" type="tel" placeholder="+976 XXXX XXXX"></label>
+        <label class="field"><span>ТТД (байвал)</span><input name="tin" inputmode="numeric" placeholder="7–10 орон"></label>
+      </div>
+      <label class="field"><span>Хаяг</span><input name="address" placeholder="Дүүрэг, хороо, байр / зах, хаалга"></label>
+      <label class="field"><span>Товч тайлбар</span><textarea name="about" placeholder="Юу хийдэг, хэдэн хүнтэй…"></textarea></label>
+      <p class="cap">Бүртгүүлсэн хүн байгууллагын эзэн болно. Basu шалгаж баталсны дараа ажилтнуудаа нэмнэ.</p>
+      <div class="form-foot"><button class="btn" data-v="primary" type="button" data-send>Бүртгүүлэх</button></div>
+    </div></div>`);
+  f.querySelector('[data-send]').addEventListener('click', async (e) => {
+    const v = (n) => f.querySelector(`[name="${n}"]`).value.trim();
+    const on = (n) => f.querySelector(`[name="${n}"]`).checked;
+    e.target.setAttribute('data-busy', '');
+    try {
+      await ops('/v1/orgs', {
+        method: 'POST',
+        body: { name: v('name'), restaurant: on('restaurant'), supplier: on('supplier'), phone: v('phone'), tin: v('tin'), address: v('address'), about: v('about') },
+      });
+      toast('Бүртгэл илгээгдлээ. Basu батлахад мэдэгдэнэ.', 'good');
+      done();
+    } catch (error) {
+      toast(error.message, 'bad');
+    } finally {
+      e.target.removeAttribute('data-busy');
+    }
+  });
+  return f;
+}
+
+/**
+ * One business: who works there, and — for its owner and managers — bringing
+ * somebody in by the phone or address they sign in with, changing a role,
+ * taking somebody out.
+ */
+async function renderOrg(box, id) {
+  box.replaceChildren();
+  let data;
+  try {
+    data = await ops(`/v1/orgs/${id}`);
+  } catch (error) {
+    toast(error.message, 'bad');
+    return renderMyOrgs(box);
+  }
+  const { org, role, may, members } = data;
+  // Which roles this person may give: an owner any, a manager staff and accountants.
+  const giving = may.managers ? ['manager', 'staff', 'accountant', 'owner'] : may.members ? ['staff', 'accountant'] : [];
+  const back = el('<button class="btn" data-v="link" type="button">← Миний байгууллага</button>');
+  back.addEventListener('click', () => renderMyOrgs(box));
+  const section = el(`
+    <section class="section">
+      <div class="back-link"></div>
+      <h2 style="margin:0 0 4px">${esc(org.name)}</h2>
+      <p class="cap" style="margin:0 0 16px">${kinds(org).join(' · ')} · Та: ${ORG_ROLE_WORD[role]}${org.phone ? ` · <span class="mono">${esc(org.phone)}</span>` : ''}${org.address ? ` · ${esc(org.address)}` : ''}</p>
+      ${org.supplier ? '<p style="margin:0 0 16px"><a class="link" href="/supplier">Нийлүүлэгчийн хэсэг нээх →</a></p>' : ''}
+      ${org.restaurant ? '<p class="cap" style="margin:0 0 16px">Рестораны цэс, захиалгын хэсэг удахгүй нэмэгдэнэ.</p>' : ''}
+      <h3 class="section-label">Ажилтнууд · ${members.length}</h3>
+      <div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Нэр</th><th>Утас, имэйл</th><th>Эрх</th><th></th></tr></thead><tbody data-members></tbody></table></div></div>
+      <div data-add></div>
+    </section>`);
+  section.querySelector('.back-link').append(back);
+  const body = section.querySelector('[data-members]');
+  for (const m of members) {
+    const mine = giving.includes(m.role) && !m.you;
+    const tr = el(`
+      <tr>
+        <td><b>${esc(m.name ?? '—')}</b>${m.you ? ' <span class="meta">(та)</span>' : ''}</td>
+        <td>${m.contact ? esc(m.contact) : '—'}</td>
+        <td>${mine ? `<select class="input" data-size="sm" style="width:auto">${giving.map((r) => `<option value="${r}"${r === m.role ? ' selected' : ''}>${ORG_ROLE_WORD[r]}</option>`).join('')}</select>` : ORG_ROLE_WORD[m.role]}</td>
+        <td class="num"></td>
+      </tr>`);
+    const cell = tr.lastElementChild;
+    if (mine) {
+      tr.querySelector('select').addEventListener('change', async (e) => {
+        try {
+          await ops(`/v1/orgs/${id}/members/${m.guest_id}`, { method: 'PATCH', body: { role: e.target.value } });
+          toast(`${m.name ?? ''}: ${ORG_ROLE_WORD[e.target.value]}`, 'good');
+        } catch (error) {
+          toast(error.message, 'bad');
+          e.target.value = m.role;
+        }
+      });
+    }
+    if (mine || m.you) {
+      const out = el(`<button class="btn" data-v="quiet" data-size="sm" type="button">${m.you ? 'Гарах' : 'Хасах'}</button>`);
+      out.addEventListener('click', async () => {
+        if (!confirm(m.you ? `«${org.name}»-оос гарах уу?` : `${m.name ?? 'Энэ хүн'}-ийг хасах уу?`)) return;
+        try {
+          await ops(`/v1/orgs/${id}/members/${m.guest_id}`, { method: 'DELETE' });
+          if (m.you) return renderMyOrgs(box);
+          renderOrg(box, id);
+        } catch (error) {
+          toast(error.message, 'bad');
+        }
+      });
+      cell.append(out);
+    }
+    body.append(tr);
+  }
+  if (giving.length) {
+    const add = el(`
+      <div class="card" style="margin-top:12px"><div class="card-body">
+        <h3 class="section-label" style="margin-top:0">Хүн нэмэх</h3>
+        <p class="cap" style="margin:0 0 12px">Тэр хүний Basu-д нэвтэрдэг утас эсвэл имэйлээр хайна. Урьд нь нэг удаа нэвтэрсэн байх ёстой.</p>
+        <div class="add-member">
+          <input class="input" name="contact" placeholder="Утас эсвэл имэйл" aria-label="Утас эсвэл имэйл" autocapitalize="none">
+          <button class="btn" type="button" data-find>Хайх</button>
+          <div data-found hidden></div>
+        </div>
+      </div></div>`);
+    const found = add.querySelector('[data-found]');
+    const find = async () => {
+      const contact = add.querySelector('[name="contact"]').value.trim();
+      if (!contact) return;
+      try {
+        const who = await ops(`/v1/orgs/${id}/lookup?contact=${encodeURIComponent(contact)}`);
+        found.hidden = false;
+        found.replaceChildren(el(`
+          <div class="add-member" style="margin-top:8px">
+            <span><b>${esc(who.name ?? 'Нэргүй')}</b> · ${esc(who.contact ?? '')}</span>
+            <select class="input" style="width:auto;flex:0 0 auto">${giving.filter((r) => r !== 'owner').map((r) => `<option value="${r}">${ORG_ROLE_WORD[r]}</option>`).join('')}</select>
+            <button class="btn" data-v="primary" type="button" data-add-go>Нэмэх</button>
+          </div>`));
+        found.querySelector('[data-add-go]').addEventListener('click', async () => {
+          try {
+            await ops(`/v1/orgs/${id}/members`, { method: 'POST', body: { guest_id: who.guest_id, role: found.querySelector('select').value } });
+            toast(`${who.name ?? 'Хүн'} нэмэгдлээ.`, 'good');
+            renderOrg(box, id);
+          } catch (error) {
+            toast(error.message, 'bad');
+          }
+        });
+      } catch (error) {
+        found.hidden = false;
+        found.replaceChildren(el(`<p class="cap" style="margin:8px 0 0">${esc(error.message)}</p>`));
+      }
+    };
+    add.querySelector('[data-find]').addEventListener('click', find);
+    add.querySelector('[name="contact"]').addEventListener('keydown', (e) => e.key === 'Enter' && find());
+    section.querySelector('[data-add]').append(add);
+  }
+  box.append(section);
+}
+
+/* ── the desk: businesses waiting for a yes ────────────────────────── */
+
+async function renderOrgsDesk(view) {
+  view.append(head('Байгууллагууд', 'Ресторан, нийлүүлэгчийн бүртгэл. Батлахад бүртгүүлсэн хүн нь эзэн болж, ажилтнуудаа өөрөө нэмнэ.'));
+  let orgs;
+  try {
+    ({ orgs } = await ops('/v1/ops/orgs'));
+  } catch (error) {
+    view.append(el(`<p class="empty">${esc(error.message)}</p>`));
+    return;
+  }
+  cache.orgs = orgs;
+  badges();
+  const list = el('<div class="card" data-rows></div>');
+  if (!orgs.length) list.append(el('<div class="empty">Бүртгэл алга.</div>'));
+  for (const o of orgs) {
+    const [tone, word] = ORG_STATE[o.state] ?? ['off', o.state];
+    const row = el(`
+      <div class="row request">
+        <div class="main">
+          <div class="title">${esc(o.name)} <span class="who-contact">${kinds(o).join(' · ')}</span></div>
+          <p class="cap">${[o.applicant && `Бүртгүүлсэн: ${esc(o.applicant)}`, o.phone && `<span class="mono">${esc(o.phone)}</span>`, o.address && esc(o.address), o.tin && `ТТД ${esc(o.tin)}`, `${o.members} хүн`].filter(Boolean).join(' · ')}</p>
+          ${o.about ? `<p class="cap">${esc(o.about)}</p>` : ''}
+          ${o.state === 'applied' ? `<div class="req-actions">
+            <button class="btn" data-v="primary" type="button" data-a="approve">Батлах</button>
+            <span class="gap" aria-hidden="true"></span>
+            <input class="input" name="reason" placeholder="Татгалзах шалтгаан" aria-label="Татгалзах шалтгаан">
+            <button class="btn" data-v="quiet" type="button" data-a="decline">Татгалзах</button>
+          </div>` : ''}
+        </div>
+        <div class="end"><span class="pill" data-s="${tone}">${word}</span><span class="meta" style="display:block;margin-top:6px">${when(o.created_at)}</span></div>
+      </div>`);
+    row.querySelector('[data-a="approve"]')?.addEventListener('click', async () => {
+      try {
+        await ops(`/v1/ops/orgs/${o.id}/approve`, { method: 'POST' });
+        toast(`«${o.name}» батлагдлаа.`, 'good');
+        show('orgs');
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+    });
+    row.querySelector('[data-a="decline"]')?.addEventListener('click', async () => {
+      try {
+        await ops(`/v1/ops/orgs/${o.id}/decline`, { method: 'POST', body: { reason: row.querySelector('[name="reason"]').value.trim() } });
+        toast('Татгалзлаа.');
+        show('orgs');
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+    });
+    list.append(row);
+  }
+  view.append(list);
 }
 
 /* ── the desk ─────────────────────────────────────────────────────── */
@@ -473,17 +781,20 @@ const TABS = [
   { key: 'suppliers', label: 'Нийлүүлэгчид', icon: ICON.suppliers, group: 'Идэш' },
   { key: 'pay', label: 'Олголт, буцаалт', icon: ICON.pay, group: 'Идэш' },
   { key: 'audit', label: 'Бүртгэл', icon: ICON.audit, group: 'Ширээ' },
+  { key: 'orgs', label: 'Байгууллагууд', icon: ICON.venues, group: 'Ширээ', run: true },
   { key: 'members', label: 'Гишүүд', icon: ICON.members, group: 'Ширээ', admin: true },
+  { key: 'myorgs', label: 'Миний байгууллага', icon: ICON.suppliers, group: 'Би' },
 ];
 let tab = localStorage.getItem('basu.ops.tab') ?? 'overview';
-let cache = { suppliers: [], settlements: [], requests: [] };
+let cache = { suppliers: [], settlements: [], requests: [], orgs: [] };
 
 async function refresh() {
   try {
     const [{ suppliers }, { settlements }, whoami] = await Promise.all([ops('/v1/ops/suppliers'), ops('/v1/ops/settlements'), ops('/v1/ops/me')]);
     me = whoami.member;
     const requests = me?.role === 'admin' ? (await ops('/v1/ops/requests')).requests : [];
-    cache = { suppliers, settlements, requests };
+    const orgs = ['admin', 'ops'].includes(me?.role) ? (await ops('/v1/ops/orgs')).orgs : [];
+    cache = { suppliers, settlements, requests, orgs };
   } catch (error) {
     if (error.status === 401 || error.status === 503) {
       store.opsToken = null;
@@ -505,7 +816,7 @@ function frame() {
       <aside class="side sidebar">
         <div class="brand"><b>Basu</b><span>Ops</span></div>
         <nav class="tabs" aria-label="Хэсгүүд">
-          ${TABS.filter((t) => !t.admin || me?.role === 'admin')
+          ${TABS.filter((t) => (!t.admin || me?.role === 'admin') && (!t.run || ['admin', 'ops'].includes(me?.role)))
             .map((t, i, all) => `${t.group !== all[i - 1]?.group ? `<div class="grp">${t.group}</div>` : ''}<button type="button" data-tab="${t.key}">${t.icon}<span class="t">${t.label}</span><span class="n" data-badge="${t.key}" hidden></span></button>`)
             .join('')}
         </nav>
@@ -540,6 +851,8 @@ function badges() {
   set('suppliers', applied, applied > 0);
   set('pay', due, due > 0);
   set('members', cache.requests.length, cache.requests.length > 0);
+  const waitingOrgs = cache.orgs.filter((o) => o.state === 'applied').length;
+  set('orgs', waitingOrgs, waitingOrgs > 0);
 }
 
 function show(key) {
@@ -554,7 +867,7 @@ function show(key) {
   const view = document.getElementById('view');
   view.replaceChildren();
   window.scrollTo(0, 0);
-  ({ overview: renderOverview, guests: renderGuests, money: renderMoney, notify: renderNotify, system: renderSystem, venues: renderVenues, lunches: renderLunches, reviews: renderReviews, stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers })[key]?.(view);
+  ({ overview: renderOverview, guests: renderGuests, money: renderMoney, notify: renderNotify, system: renderSystem, venues: renderVenues, lunches: renderLunches, reviews: renderReviews, stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers, orgs: renderOrgsDesk, myorgs: (v) => renderMyOrgs(v) })[key]?.(view);
 }
 
 const head = (title, sub, right = '') =>
@@ -1943,7 +2256,7 @@ function renderSettlement(t) {
 const ACTION = {
   'order.cancel': 'Захиалга цуцалсан', 'order.hand': 'Хүлээлгэн өгсөн гэж тэмдэглэсэн', 'order.resend': 'Мэдэгдэл дахин илгээсэн',
   'supplier.suspend': 'Нийлүүлэгчийг түр зогсоосон', 'supplier.activate': 'Нийлүүлэгчийг идэвхжүүлсэн', 'supplier.terms': 'Гэрээний нөхцөл өөрчилсөн',
-  'supplier.bank_verify': 'Данс баталгаажуулсан', 'listing.hide': 'Зар нуусан', 'member.upsert': 'Гишүүн нэмсэн', 'member.approve': 'Ops эрх олгосон', 'member.decline': 'Эрхийн хүсэлт татгалзсан', 'member.activate': 'Гишүүн нээсэн', 'member.deactivate': 'Гишүүн хаасан',
+  'supplier.bank_verify': 'Данс баталгаажуулсан', 'listing.hide': 'Зар нуусан', 'member.upsert': 'Гишүүн нэмсэн', 'member.approve': 'Ops эрх олгосон', 'org.approve': 'Байгууллага баталсан', 'org.decline': 'Байгууллага татгалзсан', 'member.decline': 'Эрхийн хүсэлт татгалзсан', 'member.activate': 'Гишүүн нээсэн', 'member.deactivate': 'Гишүүн хаасан',
 };
 
 async function renderAudit(view) {

@@ -70,6 +70,8 @@ export {
 
 export {
   registerSupplier,
+  supplierForOrg,
+  type SupplierRole,
   applySupplier,
   applicationOf,
   approveSupplier,

@@ -29,6 +29,7 @@ import {
   type OrderScope,
   type SupplierRow,
   type Tally,
+  supplierForOrg,
 } from '../idesh/index.js';
 import { limits } from './hardening.js';
 import { shapeOrder, shapeSettlement } from './shapes.js';
@@ -60,6 +61,8 @@ import {
 } from '../ops/index.js';
 import { contactsFor, phoneE164, profileOf, resolveGuest } from '../platform/identity/index.js';
 import { enqueue } from '../platform/notify/index.js';
+import { approveOrg, declineOrg, listOrgs, membersOf, orgById } from '../platform/org/index.js';
+import { orgRefusal, shapeOrg } from './orgs.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -271,6 +274,67 @@ export async function registerOpsRoutes(
       }
     },
   );
+
+  /* ── businesses: the desk says yes or no ── */
+
+  /** Every organisation, what waits first, with who registered it. */
+  app.get('/v1/ops/orgs', asOps, async () => {
+    const orgs = await listOrgs();
+    const owners = await contactsFor(orgs.map((o) => o.appliedBy));
+    const counts = await Promise.all(orgs.map((o) => membersOf(o.id).then((m) => m.length)));
+    return {
+      orgs: orgs.map((o, i) => {
+        const c = owners.get(o.appliedBy);
+        return { ...shapeOrg(o), applicant: c?.email ?? c?.phone ?? null, members: counts[i] };
+      }),
+    };
+  });
+
+  const tellOwner = (guestId: string, id: string, title: string, body: string) =>
+    enqueue(ctx, { guestId, template: 'org.decision', title, body, channel: 'push', subject: 'org', subjectId: id, dedupeKey: `org:${id}:decision` });
+
+  /**
+   * Yes. The organisation is active; a supplier organisation gets its
+   * supplier at once, contracted, owned by whoever registered it.
+   */
+  app.post<{ Params: { id: string } }>('/v1/ops/orgs/:id/approve', asRunner, async (request, reply) => {
+    try {
+      const pending = await orgById(request.params.id);
+      if (pending?.supplier && pending.state === 'applied' && (!pending.phone || !pending.address)) {
+        return badRequest(reply, 'Нийлүүлэгчид утас, хаяг заавал хэрэгтэй.', 'a supplier needs a phone and an address');
+      }
+      const org = await approveOrg({ id: request.params.id, by: who(request), now: ctx.clock.now() });
+      if (org.supplier) {
+        await supplierForOrg({
+          orgId: org.id,
+          ownerId: org.appliedBy,
+          name: org.name,
+          phone: org.phone!,
+          address: org.address!,
+          lat: org.lat,
+          lon: org.lon,
+          tin: org.tin,
+          about: org.about,
+        });
+      }
+      await recordAudit({ who: who(request), action: 'org.approve', targetKind: 'org', targetId: org.id, note: org.name });
+      await tellOwner(org.appliedBy, org.id, 'Байгууллага батлагдлаа', `«${org.name}» Basu дээр батлагдлаа. basu.burzai.cloud/dashboard-д ажилтнуудаа нэмж болно.`);
+      return reply.send(shapeOrg(org));
+    } catch (error) {
+      return orgRefusal(reply, error);
+    }
+  });
+
+  app.post<{ Params: { id: string }; Body: { reason?: string } }>('/v1/ops/orgs/:id/decline', asRunner, async (request, reply) => {
+    try {
+      const org = await declineOrg({ id: request.params.id, reason: request.body?.reason ?? null, by: who(request), now: ctx.clock.now() });
+      await recordAudit({ who: who(request), action: 'org.decline', targetKind: 'org', targetId: org.id, note: `${org.name}${org.declineReason ? ` · ${org.declineReason}` : ''}` });
+      await tellOwner(org.appliedBy, org.id, 'Байгууллагын бүртгэл', `«${org.name}»-ийг батлах боломжгүй байлаа.${org.declineReason ? ` Шалтгаан: ${org.declineReason}.` : ''}`);
+      return reply.send(shapeOrg(org));
+    } catch (error) {
+      return orgRefusal(reply, error);
+    }
+  });
 
   /* ── the members, admin only ── */
 

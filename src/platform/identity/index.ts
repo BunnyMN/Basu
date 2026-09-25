@@ -48,7 +48,7 @@ export {
 } from './sessions.js';
 
 export { guestCensus, type GuestCensus } from './census.js';
-export { findGuests, guestCard, type GuestCard } from './directory.js';
+export { accountByContact, findGuests, guestCard, type GuestCard } from './directory.js';
 
 export { MIN_PASSWORD, PasswordError, checkPassword, hashPassword, verifyPassword } from './password.js';
 export { registerGuest, signInWithPassword, claimAccount, changePassword, confirmPassword, hasPassword, phoneE164, requirePhone } from './register.js';

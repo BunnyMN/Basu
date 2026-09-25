@@ -3,6 +3,7 @@ import { getPool, tx, type Db } from '../db/pool.js';
 import { addMinutes } from '../domain/time.js';
 import { AuthError, contactsFor, guestForPhone, requirePhone } from '../platform/identity/index.js';
 import { enqueue } from '../platform/notify/index.js';
+import { orgForExisting, orgsOf, type OrgRole } from '../platform/org/index.js';
 import type { Ctx } from '../ports.js';
 import { IdeshError } from './errors.js';
 import { seal, unseal } from '../secret.js';
@@ -46,6 +47,12 @@ export interface SupplierInput extends BankDetails {
 
 /** Ops writes a contracted supplier straight in — the script, or the ops page. */
 export async function registerSupplier(input: SupplierInput, db: Db = getPool()): Promise<string> {
+  const id = await insertContracted(input, db);
+  await giveOrganisation(id, db);
+  return id;
+}
+
+async function insertContracted(input: SupplierInput, db: Db): Promise<string> {
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO idesh.supplier
        (name, phone, ebarimt_merchant_tin, pickup_address, lat, lon, state, contracted_at,
@@ -88,14 +95,80 @@ export async function ownerOf(supplierId: string, db: Db = getPool()): Promise<s
 }
 
 /**
- * The supplier this guest owns, if they own one that is not declined. A
- * supplier written in before there were owners is claimed here, by the
+ * A supplier that has no organisation yet gets one, its owner the
+ * organisation's owner — so the people who work there can be brought in.
+ */
+async function giveOrganisation(supplierId: string, db: Db = getPool()): Promise<void> {
+  const { rows } = await db.query<{
+    name: string;
+    phone: string;
+    pickup_address: string;
+    lat: string | null;
+    lon: string | null;
+    ebarimt_merchant_tin: string | null;
+    about: string | null;
+    owner_guest_id: string | null;
+    org_id: string | null;
+  }>(
+    `SELECT name, phone, pickup_address, lat, lon, ebarimt_merchant_tin, about, owner_guest_id, org_id
+       FROM idesh.supplier WHERE id = $1`,
+    [supplierId],
+  );
+  const s = rows[0];
+  if (!s || s.org_id || !s.owner_guest_id) return;
+  const org = await orgForExisting({
+    name: s.name,
+    restaurant: false,
+    supplier: true,
+    phone: s.phone,
+    address: s.pickup_address,
+    lat: s.lat === null ? null : Number(s.lat),
+    lon: s.lon === null ? null : Number(s.lon),
+    tin: s.ebarimt_merchant_tin,
+    about: s.about,
+    ownerId: s.owner_guest_id,
+    now: new Date(),
+  });
+  await db.query('UPDATE idesh.supplier SET org_id = $2 WHERE id = $1 AND org_id IS NULL', [supplierId, org.id]);
+}
+
+/**
+ * The supplier of an organisation the desk has just approved: contracted at
+ * once, its owner the organisation's owner.
+ */
+export async function supplierForOrg(input: {
+  orgId: string;
+  ownerId: string;
+  name: string;
+  phone: string;
+  address: string;
+  lat?: number | null;
+  lon?: number | null;
+  tin?: string | null;
+  about?: string | null;
+}): Promise<string> {
+  const { rows } = await getPool().query<{ id: string }>(
+    `INSERT INTO idesh.supplier
+       (name, phone, ebarimt_merchant_tin, pickup_address, lat, lon, about, state, contracted_at, owner_guest_id, org_id, decided_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'contracted', now(), $8, $9, now()) RETURNING id`,
+    [input.name, input.phone, input.tin ?? null, input.address, input.lat ?? null, input.lon ?? null, input.about ?? null, input.ownerId, input.orgId],
+  );
+  return rows[0]!.id;
+}
+
+/** Who a person is at a supplier: its owner, or a member of its organisation with a role. */
+export type SupplierRole = OrgRole;
+
+/**
+ * The supplier this guest works at, if any that is not declined, and their
+ * role there. Their own first; then one whose organisation they belong to.
+ * A supplier written in before there were owners is claimed here, by the
  * phone on its row matching the phone the guest signed in with.
  */
 export async function supplierOf(
   guestId: string,
   db: Db = getPool(),
-): Promise<{ id: string; name: string; state: SupplierState } | null> {
+): Promise<{ id: string; name: string; state: SupplierState; role: SupplierRole } | null> {
   const owned = await db.query<{ id: string; name: string; state: SupplierState }>(
     `SELECT id, name, state FROM idesh.supplier
       WHERE owner_guest_id = $1 AND state <> 'declined' AND active
@@ -103,7 +176,23 @@ export async function supplierOf(
       LIMIT 1`,
     [guestId],
   );
-  if (owned.rows[0]) return owned.rows[0];
+  if (owned.rows[0]) return { ...owned.rows[0], role: 'owner' };
+
+  const memberships = (await orgsOf(guestId, db)).filter((m) => m.org.state === 'active' && m.org.supplier);
+  if (memberships.length) {
+    const { rows } = await db.query<{ id: string; name: string; state: SupplierState; org_id: string }>(
+      `SELECT id, name, state, org_id FROM idesh.supplier
+        WHERE org_id = ANY($1::uuid[]) AND state <> 'declined' AND active
+        ORDER BY (state = 'contracted') DESC, contracted_at DESC NULLS LAST
+        LIMIT 1`,
+      [memberships.map((m) => m.org.id)],
+    );
+    const found = rows[0];
+    if (found) {
+      const role = memberships.find((m) => m.org.id === found.org_id)!.role;
+      return { id: found.id, name: found.name, state: found.state, role };
+    }
+  }
 
   const phone = (await contactsFor([guestId])).get(guestId)?.phone;
   if (!phone) return null;
@@ -116,7 +205,9 @@ export async function supplierOf(
       RETURNING id, name, state`,
     [guestId, phone],
   );
-  return claimed.rows[0] ?? null;
+  if (!claimed.rows[0]) return null;
+  await giveOrganisation(claimed.rows[0].id, db);
+  return { ...claimed.rows[0], role: 'owner' };
 }
 
 /* ── applying ──────────────────────────────────────────────────────── */
@@ -264,6 +355,7 @@ export async function approveSupplier(ctx: Ctx, supplierId: string): Promise<{ p
     return rows[0] ?? null;
   });
   if (!approved) throw new IdeshError('NOT_PENDING', 'no application is waiting under that id');
+  await giveOrganisation(supplierId);
 
   const pairingCode = await createSupplierCode(
     ctx,

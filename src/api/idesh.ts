@@ -41,6 +41,7 @@ import {
   settlementsOf,
   type CancelReason,
   supplierOf,
+  type SupplierRole,
   homeOf,
   ordersOf,
   orderForSupplier,
@@ -54,6 +55,7 @@ import {
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import { confirmPassword, contactsFor, resolveGuest } from '../platform/identity/index.js';
 import { enqueue } from '../platform/notify/index.js';
+import { can, type OrgAction } from '../platform/org/index.js';
 import type { Ctx } from '../ports.js';
 import { limits } from './hardening.js';
 import { shapeOrder, shapeSettlement, shapeSummary } from './shapes.js';
@@ -72,7 +74,8 @@ import { shapeOrder, shapeSettlement, shapeSummary } from './shapes.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
-    supplierDevice?: { deviceId: string; supplierId: string };
+    /** Who is acting at a supplier, and with which role — a paired screen acts as a manager. */
+    supplierDevice?: { deviceId: string; supplierId: string; role: SupplierRole };
   }
 }
 
@@ -202,16 +205,35 @@ export async function registerIdeshRoutes(
     if (!token) return unauthorized(reply);
     const device = await resolveSupplierDevice(ctx, token);
     if (device) {
-      request.supplierDevice = device;
+      // A screen on the counter does the day's work — never the bank, which
+      // takes a person's password.
+      request.supplierDevice = { ...device, role: 'manager' };
       return undefined;
     }
     const guestId = await resolveGuest(ctx, token);
     const mine = guestId ? await supplierOf(guestId) : null;
     if (!mine || mine.state !== 'contracted') return unauthorized(reply);
-    request.supplierDevice = { deviceId: `owner:${guestId}`, supplierId: mine.id };
+    const actor = mine.role === 'owner' ? `owner:${guestId}` : `${mine.role}:${guestId}`;
+    request.supplierDevice = { deviceId: actor, supplierId: mine.id, role: mine.role };
     return undefined;
   };
   const asSupplier = { preHandler: requireSupplier };
+  /**
+   * A supplier route that needs more than working there: the organisation's
+   * roles decide — staff take orders and write listings, an accountant reads
+   * the money, only an owner or a manager changes the details.
+   */
+  const asSupplierMay = (action: OrgAction) => ({
+    preHandler: [
+      requireSupplier,
+      async (request: FastifyRequest, reply: FastifyReply) => {
+        if (!can(request.supplierDevice?.role, action)) {
+          return forbidden(reply, `this needs a role that may ${action}`);
+        }
+        return undefined;
+      },
+    ],
+  });
 
   /* ── browsing — no sign-in, the way the restaurant list works ─────── */
 
@@ -540,13 +562,17 @@ export async function registerIdeshRoutes(
    */
   app.patch<{
     Body: { name?: string; address?: string; about?: string | null; lat?: number | null; lon?: number | null; bank_name?: string; bank_account?: string; bank_holder?: string; password?: string };
-  }>('/v1/supplier/profile', asSupplier, async (request, reply) => {
+  }>('/v1/supplier/profile', asSupplierMay('profile'), async (request, reply) => {
     const body = request.body ?? {};
     const supplierId = request.supplierDevice!.supplierId;
     try {
       const bank = { bankName: body.bank_name, bankAccount: body.bank_account, bankHolder: body.bank_holder };
       const changing = (bank.bankName !== undefined || bank.bankAccount !== undefined || bank.bankHolder !== undefined) && (await bankWouldChange(supplierId, bank));
       if (changing) {
+        // Where the money goes is the owner's alone to change.
+        if (!can(request.supplierDevice!.role, 'bank')) {
+          return forbidden(reply, 'only the owner changes where the money goes');
+        }
         const me = await supplierById(supplierId);
         if (!me) return sendError(reply, new IdeshError('NOT_FOUND', 'no such supplier'));
         const owner = await ownerOf(supplierId);
@@ -590,7 +616,7 @@ export async function registerIdeshRoutes(
   });
 
   /** The supplier's money: their rate, what they are owed, what was sent. */
-  app.get('/v1/supplier/money', asSupplier, async (request) => {
+  app.get('/v1/supplier/money', asSupplierMay('money'), async (request) => {
     const supplierId = request.supplierDevice!.supplierId;
     const me = (await listSuppliers()).find((s) => s.id === supplierId);
     return {
@@ -642,7 +668,7 @@ export async function registerIdeshRoutes(
 
   app.post<{ Params: { id: string; action: string }; Body: { reason?: string } }>(
     '/v1/supplier/orders/:id/:action',
-    asSupplier,
+    asSupplierMay('orders'),
     async (request, reply) => {
       const device = request.supplierDevice!;
       if (!(await ownedBySupplier(request.params.id, device.supplierId))) {
@@ -669,7 +695,7 @@ export async function registerIdeshRoutes(
 
   app.post<{ Body: Record<string, unknown> }>(
     '/v1/supplier/listings',
-    asSupplier,
+    asSupplierMay('catalog'),
     async (request, reply) => {
       const input = readListing(request.body ?? {});
       if (typeof input === 'string') return badRequest(reply, 'Зарын мэдээлэл дутуу байна.', input);
@@ -688,7 +714,7 @@ export async function registerIdeshRoutes(
 
   app.patch<{ Params: { id: string }; Body: Record<string, unknown> }>(
     '/v1/supplier/listings/:id',
-    asSupplier,
+    asSupplierMay('catalog'),
     async (request, reply) => {
       try {
         const listing = await updateListing(
