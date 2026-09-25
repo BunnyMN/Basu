@@ -2,8 +2,8 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
 import { accountByContact, contactsFor, displayNamesFor, requirePhone } from '../platform/identity/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import {
-  ORG_ROLES,
   OrgError,
+  accessIn,
   addMember,
   logOf,
   membersOf,
@@ -11,13 +11,11 @@ import {
   orgsOf,
   registerOrg,
   removeMember,
-  roleIn,
   setRole,
   updateOrg,
-  type OrgRole,
   type Organization,
 } from '../platform/org/index.js';
-import { modulesOf, orgGrants, type Grants } from '../platform/access/index.js';
+import { NO_GRANTS, linksOf, mayHandOut, rolesForOrg, rolesOf, type Grants, type Role } from '../platform/access/index.js';
 import type { Ctx } from '../ports.js';
 import { badRequest, sendError } from './errors.js';
 import type { Guard } from './hardening.js';
@@ -31,12 +29,11 @@ import type { Guard } from './hardening.js';
  * that person signs in to Basu with — each with a role.
  */
 
-export const ROLE_WORD: Record<OrgRole, string> = {
-  owner: 'эзэн',
-  manager: 'менежер',
-  staff: 'ажилтан',
-  accountant: 'нягтлан',
-};
+/** A role's name, as a person reads it in a sentence: «менежер», or whatever Basu called one it made. */
+export async function roleWord(key: string): Promise<string> {
+  const role = (await rolesOf('org')).find((r) => r.key === key);
+  return role ? role.name.toLowerCase() : key;
+}
 
 export const shapeOrg = (o: Organization) => ({
   id: o.id,
@@ -65,6 +62,7 @@ export function orgRefusal(reply: FastifyReply, error: unknown): FastifyReply {
     LAST_OWNER: [409, 'Байгууллага дор хаяж нэг эзэнтэй байх ёстой.'],
     NOT_PENDING: [409, 'Энэ хүсэлтэд аль хэдийн хариулсан байна.'],
     BAD_INPUT: [400, 'Мэдээллээ шалгана уу.'],
+    NO_SUCH_ROLE: [400, 'Энэ байгууллагад ийм үүрэг алга.'],
   };
   const [status, mn] = words[error.code];
   return reply.status(status).send({ error: { code: error.code, message_mn: mn, message_en: error.message } });
@@ -84,10 +82,19 @@ export async function registerOrgRoutes(app: FastifyInstance, ctx: Ctx, requireG
   const guarded = { preHandler: requireGuest };
 
   /** What this person may do in that organisation — nothing unless it is active and they are in it. */
-  const grantsIn = async (orgId: string, guestId: string): Promise<{ org: Organization | null; role: OrgRole | null; grants: Grants }> => {
-    const [org, role] = await Promise.all([orgById(orgId), roleIn(orgId, guestId)]);
-    return { org, role, grants: orgGrants(role, org ? modulesOf(org) : []) };
+  const grantsIn = async (orgId: string, guestId: string): Promise<{ org: Organization | null; role: Role | null; grants: Grants }> => {
+    const seat = await accessIn(orgId, guestId);
+    return seat ? { org: seat.org, role: seat.role, grants: seat.grants } : { org: await orgById(orgId), role: null, grants: NO_GRANTS };
   };
+
+  /** A role as the business's own pages read it, with whether this person may hand it out. */
+  const shapeRole = (r: Role, assignable: boolean) => ({
+    key: r.key,
+    name: r.name,
+    description: r.description,
+    head: r.head,
+    assignable,
+  });
 
   /** Register a business. The owner is whoever registers it; the desk says yes. */
   app.post<{
@@ -143,27 +150,41 @@ export async function registerOrgRoutes(app: FastifyInstance, ctx: Ctx, requireG
     if (!org || !mine) return orgRefusal(reply, new OrgError('NOT_FOUND', 'no such organisation of yours'));
     const members = await membersOf(org.id);
     const ids = members.map((m) => m.guestId);
-    const [names, contacts] = await Promise.all([displayNamesFor(ids), contactsFor(ids)]);
+    const [names, contacts, open, links, seat] = await Promise.all([
+      displayNamesFor(ids),
+      contactsFor(ids),
+      rolesForOrg(org.id),
+      linksOf('org'),
+      accessIn(org.id, me),
+    ]);
     // A business still waiting grants nothing yet; its registrant sees who is in it.
-    const grants = org.state === 'active' ? orgGrants(mine.role, modulesOf(org)) : orgGrants(null, []);
-    const seesContacts = grants.has('org.team.manage');
+    const grants = seat?.grants ?? NO_GRANTS;
+    const seesContacts = grants.has('org.team:manage');
+    const named = new Map((await rolesOf('org')).map((r) => [r.key, r.name]));
     return reply.send({
       org: shapeOrg(org),
       role: mine.role,
+      role_name: named.get(mine.role) ?? mine.role,
       permissions: grants.list(),
       may: {
-        members: grants.has('org.team.manage'),
-        managers: grants.has('org.managers.manage'),
-        profile: grants.has('org.profile.edit'),
+        members: grants.has('org.team:manage'),
+        managers: grants.has('org.team:heads'),
+        profile: grants.has('org.profile:edit'),
       },
+      // The roles this business may hand out, and which of them this person may give.
+      roles: open.map((r) => shapeRole(r, org.state === 'active' && mayHandOut(grants, r, org, links))),
       members: members.map((m) => {
         const c = contacts.get(m.guestId);
         const contact = c?.email ?? c?.phone ?? null;
+        const role = open.find((r) => r.key === m.role);
         return {
           guest_id: m.guestId,
           name: names.get(m.guestId) ?? null,
           contact: seesContacts || m.guestId === me ? contact : masked(contact),
           role: m.role,
+          role_name: named.get(m.role) ?? m.role,
+          // Whether this person may change or take out this member: they may hand out the member's role.
+          manageable: m.guestId !== me && org.state === 'active' && Boolean(role ? mayHandOut(grants, role, org, links) : grants.has('org.team:heads')),
           added_at: m.addedAt.toISOString(),
           you: m.guestId === me,
         };
@@ -204,7 +225,7 @@ export async function registerOrgRoutes(app: FastifyInstance, ctx: Ctx, requireG
     guarded,
     async (request, reply) => {
       const { grants } = await grantsIn(request.params.id, request.guestId!);
-      if (!grants.has('org.team.manage')) return orgRefusal(reply, new OrgError('FORBIDDEN', 'cannot add people here'));
+      if (!grants.has('org.team:manage')) return orgRefusal(reply, new OrgError('FORBIDDEN', 'cannot add people here'));
       const found = await accountByContact(request.query.contact ?? '').catch(() => null);
       if (!found) {
         return reply.status(404).send({
@@ -224,14 +245,14 @@ export async function registerOrgRoutes(app: FastifyInstance, ctx: Ctx, requireG
     guarded,
     async (request, reply) => {
       const body = request.body ?? {};
-      if (!body.guest_id || !ORG_ROLES.includes(body.role as OrgRole)) {
+      if (!body.guest_id || typeof body.role !== 'string' || !body.role) {
         return badRequest(reply, 'Хүн, эрхээ сонгоно уу.', 'guest_id and role are required');
       }
       try {
         await addMember({
           orgId: request.params.id,
           guestId: body.guest_id,
-          role: body.role as OrgRole,
+          role: body.role,
           by: request.guestId!,
           now: ctx.clock.now(),
         });
@@ -240,7 +261,7 @@ export async function registerOrgRoutes(app: FastifyInstance, ctx: Ctx, requireG
           guestId: body.guest_id,
           template: 'org.member',
           title: org?.name ?? 'Байгууллага',
-          body: `Таныг «${org?.name ?? ''}» байгууллагад ${ROLE_WORD[body.role as OrgRole]}-аар нэмлээ.`,
+          body: `Таныг «${org?.name ?? ''}» байгууллагад нэмлээ — үүрэг: ${await roleWord(body.role)}.`,
           channel: 'push',
           subject: 'org',
           subjectId: request.params.id,
@@ -257,8 +278,8 @@ export async function registerOrgRoutes(app: FastifyInstance, ctx: Ctx, requireG
     '/v1/orgs/:id/members/:guestId',
     guarded,
     async (request, reply) => {
-      const role = request.body?.role as OrgRole;
-      if (!ORG_ROLES.includes(role)) return badRequest(reply, 'Эрхээ сонгоно уу.', 'role is required');
+      const role = request.body?.role;
+      if (typeof role !== 'string' || !role) return badRequest(reply, 'Эрхээ сонгоно уу.', 'role is required');
       try {
         await setRole({ orgId: request.params.id, guestId: request.params.guestId, role, by: request.guestId!, now: ctx.clock.now() });
         return reply.send({ guest_id: request.params.guestId, role });
@@ -274,10 +295,11 @@ export async function registerOrgRoutes(app: FastifyInstance, ctx: Ctx, requireG
    */
   app.get<{ Params: { id: string } }>('/v1/orgs/:id/log', guarded, async (request, reply) => {
     const { grants } = await grantsIn(request.params.id, request.guestId!);
-    if (!grants.has('org.log.view')) return orgRefusal(reply, new OrgError('FORBIDDEN', 'the record is the owner’s and the managers’'));
+    if (!grants.has('org.log')) return orgRefusal(reply, new OrgError('FORBIDDEN', 'the record is the owner’s and the managers’'));
     const entries = await logOf(request.params.id, 100);
     const ids = [...new Set(entries.flatMap((e) => [e.byGuest, e.guestId]).filter((x): x is string => Boolean(x)))];
     const names = await displayNamesFor(ids);
+    const named = new Map((await rolesOf('org')).map((r) => [r.key, r.name]));
     return reply.send({
       log: entries.map((e) => ({
         id: e.id,
@@ -286,6 +308,8 @@ export async function registerOrgRoutes(app: FastifyInstance, ctx: Ctx, requireG
         who: e.guestId ? names.get(e.guestId) ?? null : null,
         role: e.role,
         was: e.was,
+        role_name: e.roleName ?? named.get(e.role ?? '') ?? e.role,
+        was_name: e.wasName ?? named.get(e.was ?? '') ?? e.was,
         at: e.at.toISOString(),
       })),
     });

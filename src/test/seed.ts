@@ -27,7 +27,7 @@ export async function truncateAll(db: Db = getPool()): Promise<void> {
              dine.order_line, dine.station_reservation, dine.dish_review, dine.order_review,
              dine.dining_order, dine.slot, dine.dining_table, dine.menu_item, dine.station,
              dine.trust_profile, dine.kds_device, dine.restaurant,
-             ops.member, ops.member_account, ops.access_request, org.membership, org.organization, ops.tick, ops.setting, idesh.audit, idesh.settlement, idesh.order_event, idesh.idesh_order, idesh.listing, idesh.supplier_device,
+             ops.member, ops.member_account, ops.access_request, org.membership_log, org.membership, org.organization, access.role, access.org_role, access.module, access.page, ops.tick, ops.setting, idesh.audit, idesh.settlement, idesh.order_event, idesh.idesh_order, idesh.listing, idesh.supplier_device,
              idesh.supplier,
              identity.profile, identity.guest_session, identity.guest, identity.otp_challenge, identity.oauth_state
     RESTART IDENTITY CASCADE
@@ -172,4 +172,9 @@ export async function storedBankOf(
   );
   const r = rows[0];
   return { bankName: r?.bank_name ?? null, bankAccount: r?.bank_account ?? null, bankHolder: r?.bank_holder ?? null };
+}
+
+/** A server that has not written its roles yet — what production is for a moment at boot. */
+export async function forgetRoles(): Promise<void> {
+  await getPool().query('TRUNCATE access.role, access.org_role');
 }

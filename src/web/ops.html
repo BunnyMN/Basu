@@ -66,6 +66,62 @@ p{margin:0}
 .table.roles .yes svg{width:18px;height:18px;fill:none;stroke:var(--ready);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
 .table.roles .no{color:var(--ink-3)}
 .table.roles tr.role-sec td{padding-top:18px;font-family:var(--mono);font-size:var(--t-eyebrow);font-weight:500;letter-spacing:var(--track-eyebrow);text-transform:uppercase;color:var(--ink-3);background:none}
+/* the roles page: every role on the left, the one chosen on the right as a tree to tick */
+.roles-grid{display:grid;grid-template-columns:minmax(240px,320px) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:1000px){.roles-grid{grid-template-columns:1fr}}
+.roles-list{overflow:hidden}
+.role-row{display:flex;align-items:flex-start;gap:12px;width:100%;padding:12px 16px;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;color:var(--ink)}
+.role-row:last-child{border-bottom:0}
+.role-row .main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.role-row .title{font-size:var(--t-row);font-weight:600}
+.role-row .sub{font-size:var(--t-cap);color:var(--ink-2);line-height:1.4}
+.role-row .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.role-row .end{flex:none;padding-top:2px}
+.role-row[data-on]{background:var(--accent-soft)}
+.role-row[data-on] .title{color:var(--accent-ink)}
+@media (hover:hover){.role-row:not([data-on]):hover{background:var(--surface-2)}}
+.role-add .title{color:var(--accent-ink)}
+.role-flags{margin:0 0 16px}
+.perm-tree{display:flex;flex-direction:column;gap:12px;margin-bottom:16px}
+.perm-mod{border:1px solid var(--line);border-radius:var(--r-ctl);overflow:hidden}
+.perm-mod-head{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--line);font-weight:600;cursor:pointer}
+.sec-mod{display:inline-flex;align-items:center;gap:8px}
+.sec-mod svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3)}
+.perm-pages{display:flex;flex-direction:column}
+.perm-page{padding:10px 14px}
+.perm-page + .perm-page{border-top:1px solid var(--line)}
+.perm-view{display:flex;align-items:center;gap:10px;cursor:pointer}
+.perm-view small{font-size:var(--t-meta);color:var(--ink-3);font-weight:400}
+.perm-acts{display:flex;flex-wrap:wrap;gap:6px 18px;margin:8px 0 0 28px}
+.perm-acts label{display:flex;align-items:center;gap:8px;font-size:var(--t-cap);color:var(--ink-2);cursor:pointer}
+.table.roles tr.perm-act td:first-child{padding-left:28px;font-size:var(--t-cap);color:var(--ink-2)}
+.table.roles tr.perm-page td:first-child{font-weight:500}
+/* the menu page: each module a card, its pages rows to rename, move, reorder and hide */
+.menu-tools{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;padding:10px 0;margin-bottom:8px;background:var(--bg)}
+.menu-tools .gap{flex:1}
+.menu-board{display:flex;flex-direction:column;gap:12px}
+.menu-mod-head{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surface-2);border-bottom:1px solid var(--line);border-radius:var(--r-md) var(--r-md) 0 0}
+.menu-mod-head [name="name"]{flex:1;min-width:0;font-weight:600}
+.menu-page{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 16px;border-top:1px solid var(--line)}
+.menu-page:first-child{border-top:0}
+.menu-board .input{width:auto;min-width:0;height:var(--h-sm);min-height:var(--h-sm);font-size:var(--t-body)}
+.menu-page [name="name"]{flex:1 1 220px}
+.menu-page [name="module"]{flex:0 0 190px}
+.icon-pick select{flex:0 0 120px}
+.menu-page[data-off] [name="name"]{color:var(--ink-3);text-decoration:line-through}
+.menu-page .menu-href{flex-basis:100%;font-size:var(--t-meta);color:var(--ink-3);padding-left:170px;overflow-wrap:anywhere}
+@media (max-width:720px){.menu-page [name="module"]{flex:1 1 100%}.menu-page .menu-href{padding-left:0}}
+.menu-pages > .empty{padding:12px 16px}
+.menu-moves{display:flex;align-items:center;gap:4px}
+.menu-shown{display:flex;align-items:center;gap:6px;margin-left:6px;font-size:var(--t-cap);color:var(--ink-2)}
+.icon-pick{display:flex;align-items:center;gap:6px}
+.icon-pick [data-preview]{display:inline-grid;place-items:center;width:32px;height:32px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface)}
+.icon-pick [data-preview] svg{width:18px;height:18px;fill:none;stroke:var(--ink-2);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+
+/* a business's roles, from the desk */
+.org-roles{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.org-role{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-ctl)}
+.org-role small{flex-basis:100%;padding-left:26px;font-size:var(--t-cap);color:var(--ink-2)}
 /* a page whose part of Basu is not joined up yet */
 .soon{display:flex;flex-direction:column;align-items:center;text-align:center;padding:40px 24px}
 .soon-mark{display:inline-grid;place-items:center;width:48px;height:48px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);margin-bottom:12px}
@@ -212,7 +268,6 @@ const STORY_K = {
 const step = (type, title, sub, at) =>
   `<li data-done${STORY_K[type] ? ` data-k="${STORY_K[type]}"` : ''}><span class="w">${title}<span class="s">${sub}</span></span><span class="t">${when(at)} ${clockOf(at)}</span></li>`;
 const STATE = { applied: 'хүлээгдэж байна', contracted: 'гэрээт', declined: 'татгалзсан' };
-const ROLE_WORD = { admin: 'админ', finance: 'санхүү', ops: 'ops', viewer: 'зөвхөн харах' };
 const STATE_WORD = {
   PAID: 'Төлсөн', PREPARING: 'Бэлтгэж байна', READY: 'Бэлэн', DISPATCHED: 'Замд',
   HANDED: 'Өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан', REFUNDED: 'Буцаасан',
@@ -226,7 +281,11 @@ const REASON = {
   no_show: 'Зочин ирээгүй', unreachable: 'Хаяг дээр холбогдоогүй', draft_expired: 'Төлөгдөөгүй',
 };
 const actorWord = (a) =>
-  a.startsWith('guest:') ? 'зочин' : a.startsWith('supplier:owner:') ? 'нийлүүлэгч (утас)' : a.startsWith('supplier:') ? 'нийлүүлэгчийн дэлгэц' : a.startsWith('ops') ? a.replace('ops:', 'ops · ') : 'систем';
+  a.startsWith('guest:') ? 'зочин'
+    : a.startsWith('supplier:owner:') ? 'нийлүүлэгчийн эзэн'
+      : /^supplier:[a-z0-9-]+:[0-9a-f-]{36}$/.test(a) ? 'нийлүүлэгчийн ажилтан'
+        : a.startsWith('supplier:') ? 'нийлүүлэгчийн дэлгэц'
+          : a.startsWith('ops') ? a.replace('ops:', 'ops · ') : 'систем';
 /* ── the door ─────────────────────────────────────────────────────── */
 
 async function showToken() {
@@ -296,17 +355,10 @@ function enterDesk(t) {
 
 /* ── a person's own corner ─────────────────────────────────────────── */
 
-const ROLE_ASK = [
-  ['ops', 'ops — захиалга, нийлүүлэгч'],
-  ['finance', 'санхүү — олголт, буцаалт, данс'],
-  ['viewer', 'зөвхөн харах'],
-  ['admin', 'админ — бүгд, гишүүд'],
-];
 let frontPoll;
 /** What the switcher asked the corner to open when it gets there: the business form, or the ask for a seat. */
 let wanted = null;
 
-const ORG_ROLE_WORD = { owner: 'эзэн', manager: 'менежер', staff: 'ажилтан', accountant: 'нягтлан' };
 const ORG_STATE = { applied: ['applied', 'хүлээгдэж байна'], active: ['contracted', 'идэвхтэй'], declined: ['off', 'татгалзсан'], suspended: ['off', 'түр хаасан'] };
 const kinds = (o) => [o.restaurant && 'Ресторан', o.supplier && 'Нийлүүлэгч'].filter(Boolean);
 
@@ -387,12 +439,15 @@ function deskSection() {
     const f = el(`
       <div>
         <input class="input" name="name" placeholder="Таны нэр" aria-label="Нэр" autocomplete="name">
-        <select class="input" name="role" aria-label="Хүсэх эрх">${ROLE_ASK.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
+        <select class="input" name="role" aria-label="Хүсэх эрх"></select>
         <textarea class="input" name="note" rows="3" placeholder="Та хэн бэ, юунд хэрэгтэй вэ (заавал биш)" aria-label="Тайлбар"></textarea>
         <button class="btn" data-size="lg" type="button" id="ask" style="width:100%">${asked ? 'Хүсэлтээ шинэчлэх' : 'Эрх хүсэх'}</button>
       </div>`);
     f.querySelector('[name="name"]').value = asked?.name ?? access.account?.name ?? '';
-    f.querySelector('[name="role"]').value = asked?.role ?? 'ops';
+    // The desk's roles as Basu has them now, each with what it is for.
+    void deskRoleList().then((roles) => {
+      f.querySelector('[name="role"]').innerHTML = roles.map((r) => roleOption(r, asked?.role ?? 'ops')).join('');
+    });
     f.querySelector('[name="note"]').value = asked?.note ?? '';
     f.querySelector('#ask').addEventListener('click', async (e) => {
       const v = (n) => f.querySelector(`[name="${n}"]`).value.trim();
@@ -411,12 +466,15 @@ function deskSection() {
   };
 
   if (request?.state === 'pending') {
-    const role = ROLE_ASK.find(([k]) => k === request.role)?.[1] ?? request.role;
-    state.append(el(`
+    const waiting = el(`
       <div class="callout" data-k="ok" style="margin-bottom:16px">
         <b>Хүсэлт хүлээгдэж байна</b>
-        <span>Хүссэн эрх: ${esc(role)} · ${when(request.created_at)} ${clockOf(request.created_at)}. Админ зөвшөөрмөгц энэ хуудас өөрөө нээгдэнэ.</span>
-      </div>`));
+        <span>Хүссэн эрх: <span data-asked>${esc(request.role)}</span> · ${when(request.created_at)} ${clockOf(request.created_at)}. Админ зөвшөөрмөгц энэ хуудас өөрөө нээгдэнэ.</span>
+      </div>`);
+    void deskRoleList().then((roles) => {
+      waiting.querySelector('[data-asked]').textContent = roles.find((r) => r.key === request.role)?.name ?? request.role;
+    });
+    state.append(waiting);
     const change = el('<button class="btn" type="button" data-size="lg" style="width:100%">Хүсэлтээ өөрчлөх</button>');
     change.addEventListener('click', () => {
       change.remove();
@@ -589,7 +647,7 @@ async function renderOrgHome(view) {
     return;
   }
 
-  if (w.modules.includes('idesh') && can('idesh.orders.view')) {
+  if (w.kinds?.supplier && (can('org.idesh.today') || can('org.idesh.orders'))) {
     const band = el('<div class="kpis kpi-band" id="org-kpis" hidden></div>');
     view.append(band);
     atOrg('/v1/supplier/home')
@@ -646,9 +704,10 @@ async function renderOrgTeam(view) {
     view.append(el(`<p class="empty">${esc(error.message)}</p>`));
     return;
   }
-  const { org, may, members } = data;
-  // Which roles this person may give: an owner any, a manager staff and accountants.
-  const giving = may.managers ? ['manager', 'staff', 'accountant', 'owner'] : may.members ? ['staff', 'accountant'] : [];
+  const { org, members } = data;
+  // The roles this business may hand out that this person may give — never more than they hold themselves.
+  const giving = data.roles.filter((r) => r.assignable);
+  const options = (chosen) => giving.map((r) => `<option value="${esc(r.key)}"${r.key === chosen ? ' selected' : ''}>${esc(r.name)}</option>`).join('');
   const section = el(`
     <section class="section">
       <div class="card"><div class="table-wrap"><table class="table team"><thead><tr><th>Нэр</th><th>Утас, имэйл</th><th>Эрх</th><th></th></tr></thead><tbody data-members></tbody></table></div></div>
@@ -656,12 +715,12 @@ async function renderOrgTeam(view) {
     </section>`);
   const body = section.querySelector('[data-members]');
   for (const m of members) {
-    const mine = giving.includes(m.role) && !m.you;
+    const mine = m.manageable;
     const tr = el(`
       <tr data-member="${esc(m.guest_id)}">
         <td><b>${esc(m.name ?? '—')}</b>${m.you ? ' <span class="meta">(та)</span>' : ''}${m.contact ? `<span class="sub mono">${esc(m.contact)}</span>` : ''}</td>
         <td class="mono">${m.contact ? esc(m.contact) : '—'}</td>
-        <td>${mine ? `<select class="input" data-size="sm" style="width:auto" aria-label="Эрх">${giving.map((r) => `<option value="${r}"${r === m.role ? ' selected' : ''}>${ORG_ROLE_WORD[r]}</option>`).join('')}</select>` : ORG_ROLE_WORD[m.role]}</td>
+        <td>${mine ? `<select class="input" data-size="sm" style="width:auto" aria-label="Эрх">${options(m.role)}</select>` : esc(m.role_name)}</td>
         <td class="num"></td>
       </tr>`);
     const cell = tr.lastElementChild;
@@ -669,7 +728,7 @@ async function renderOrgTeam(view) {
       tr.querySelector('select').addEventListener('change', async (e) => {
         try {
           await ops(`/v1/orgs/${org.id}/members/${m.guest_id}`, { method: 'PATCH', body: { role: e.target.value } });
-          toast(`${m.name ?? ''}: ${ORG_ROLE_WORD[e.target.value]}`, 'good');
+          toast(`${m.name ?? ''}: ${e.target.selectedOptions[0]?.textContent ?? ''}`, 'good');
         } catch (error) {
           toast(error.message, 'bad');
           e.target.value = m.role;
@@ -713,7 +772,7 @@ async function renderOrgTeam(view) {
         found.replaceChildren(el(`
           <div class="add-member" style="margin-top:8px">
             <span><b>${esc(who.name ?? 'Нэргүй')}</b> · ${esc(who.contact ?? '')}</span>
-            <select class="input" style="width:auto;flex:0 0 auto" aria-label="Эрх">${giving.filter((r) => r !== 'owner').map((r) => `<option value="${r}">${ORG_ROLE_WORD[r]}</option>`).join('')}</select>
+            <select class="input" style="width:auto;flex:0 0 auto" aria-label="Эрх">${options(giving.find((r) => !r.head)?.key)}</select>
             <button class="btn" data-v="primary" type="button" data-add-go>Нэмэх</button>
           </div>`));
         found.querySelector('[data-add-go]').addEventListener('click', async () => {
@@ -750,7 +809,7 @@ async function renderOrgProfile(view) {
     return;
   }
   const { org } = data;
-  const editable = can('org.profile.edit');
+  const editable = can('org.profile:edit');
   const card = el(`
     <section class="section"><div class="card"><div class="card-body">
       <label class="field"><span>Байгууллагын нэр</span><input name="name"></label>
@@ -801,34 +860,19 @@ async function renderOrgRoles(view) {
     view.append(el(`<p class="empty">${esc(error.message)}</p>`));
     return;
   }
-  view.append(roleTable(table));
-}
-
-/** A table of permissions against roles — a business's, or the desk's. */
-function roleTable(table) {
-  const SECTION = { null: table.scope === 'desk' ? 'Basu ops' : 'Байгууллага', idesh: 'Идэш', dine: 'Хоол' };
-  const groups = [...new Set(table.permissions.map((p) => String(p.module)))];
-  const thead = `<tr><th>Юу хийх</th>${table.roles.map((r) => `<th class="role-col${r.key === table.yours ? ' yours' : ''}">${esc(r.label)}${r.key === table.yours ? '<small>та</small>' : ''}</th>`).join('')}</tr>`;
-  const rows = groups
-    .map((g) => {
-      const list = table.permissions.filter((p) => String(p.module) === g);
-      return `<tr class="role-sec"><td colspan="${table.roles.length + 1}">${SECTION[g] ?? g}</td></tr>${list
-        .map((p) => `<tr><td>${esc(p.mn)}</td>${table.roles.map((r) => `<td class="role-col${r.key === table.yours ? ' yours' : ''}">${p.roles.includes(r.key) ? `<span class="yes" aria-label="тийм">${NAV_ICON.check}</span>` : '<span class="no" aria-label="үгүй">—</span>'}</td>`).join('')}</tr>`)
-        .join('')}`;
-    })
-    .join('');
-  return el(`<section class="section"><div class="card"><div class="table-wrap"><table class="table roles"><thead>${thead}</thead><tbody>${rows}</tbody></table></div></div></section>`);
+  view.append(matrixTable(table));
 }
 
 /** One change to who holds what, said without bending anybody's name. */
 const LOG_WORD = {
-  registered: (e) => `<b>${esc(e.who ?? '')}</b> бүртгүүлсэн · эзэн`,
+  registered: (e) => `<b>${esc(e.who ?? '')}</b> бүртгүүлсэн · ${esc(e.role_name ?? 'эзэн')}`,
   approved: () => 'Basu баталсан',
   declined: () => 'Basu татгалзсан',
-  added: (e) => `<b>${esc(e.who ?? 'Нэгэн хүн')}</b> нэмэгдсэн · ${ORG_ROLE_WORD[e.role] ?? e.role}`,
-  role: (e) => `<b>${esc(e.who ?? 'Нэгэн хүн')}</b>: ${ORG_ROLE_WORD[e.was] ?? e.was} → ${ORG_ROLE_WORD[e.role] ?? e.role}`,
-  removed: (e) => `<b>${esc(e.who ?? 'Нэгэн хүн')}</b> хасагдсан · ${ORG_ROLE_WORD[e.was] ?? e.was}`,
-  left: (e) => `<b>${esc(e.who ?? 'Нэгэн хүн')}</b> өөрөө гарсан · ${ORG_ROLE_WORD[e.was] ?? e.was}`,
+  added: (e) => `<b>${esc(e.who ?? 'Нэгэн хүн')}</b> нэмэгдсэн · ${esc(e.role_name ?? e.role)}`,
+  role: (e) => `<b>${esc(e.who ?? 'Нэгэн хүн')}</b>: ${esc(e.was_name ?? e.was)} → ${esc(e.role_name ?? e.role)}`,
+  removed: (e) => `<b>${esc(e.who ?? 'Нэгэн хүн')}</b> хасагдсан · ${esc(e.was_name ?? e.was)}`,
+  left: (e) => `<b>${esc(e.who ?? 'Нэгэн хүн')}</b> өөрөө гарсан · ${esc(e.was_name ?? e.was)}`,
+  roles: () => 'Basu энэ байгууллагад нээх үүргийг өөрчилсөн',
 };
 
 /** Who gave whom which role, newest first: the owner's and the managers' record. */
@@ -884,15 +928,17 @@ async function renderOrgsDesk(view) {
           <div class="title">${esc(o.name)} <span class="who-contact">${kinds(o).join(' · ')}</span></div>
           <p class="cap">${[o.applicant && `Бүртгүүлсэн: ${esc(o.applicant)}`, o.phone && `<span class="mono">${esc(o.phone)}</span>`, o.address && esc(o.address), o.tin && `ТТД ${esc(o.tin)}`, `${o.members} хүн`].filter(Boolean).join(' · ')}</p>
           ${o.about ? `<p class="cap">${esc(o.about)}</p>` : ''}
-          ${o.state === 'applied' && can('desk.orgs.decide') ? `<div class="req-actions">
+          ${o.state === 'applied' && can('desk.orgs:decide') ? `<div class="req-actions">
             <button class="btn" data-v="primary" type="button" data-a="approve">Батлах</button>
             <span class="gap" aria-hidden="true"></span>
             <input class="input" name="reason" placeholder="Татгалзах шалтгаан" aria-label="Татгалзах шалтгаан">
             <button class="btn" data-v="quiet" type="button" data-a="decline">Татгалзах</button>
           </div>` : ''}
         </div>
-        <div class="end"><span class="pill" data-s="${tone}">${word}</span><span class="meta" style="display:block;margin-top:6px">${when(o.created_at)}</span></div>
+        <div class="end"><span class="pill" data-s="${tone}">${word}</span><span class="meta" style="display:block;margin-top:6px">${when(o.created_at)}</span>
+          ${o.state === 'active' ? '<button class="btn" data-size="sm" type="button" data-a="access" style="margin-top:8px">Үүрэг, эрх</button>' : ''}</div>
       </div>`);
+    row.querySelector('[data-a="access"]')?.addEventListener('click', () => openOrgAccess(o.id));
     row.querySelector('[data-a="approve"]')?.addEventListener('click', async () => {
       try {
         await ops(`/v1/ops/orgs/${o.id}/approve`, { method: 'POST' });
@@ -914,6 +960,460 @@ async function renderOrgsDesk(view) {
     list.append(row);
   }
   view.append(list);
+}
+
+/* ── who may do what: the desk's roles and menu ────────────────────── */
+
+/** The icons a module or page may wear, with the word the pickers say. */
+const ICON_WORD = {
+  overview: 'Самбар', home: 'Гэр', layers: 'Давхарга', bowl: 'Аяга', stall: 'Лангуу', org: 'Байгууллага', settings: 'Тохиргоо',
+  layout: 'Бүтэц', link: 'Холбоос', guests: 'Хүн', members: 'Хүмүүс', person: 'Хувь хүн', money: 'Мөнгө', pay: 'Карт',
+  notify: 'Хонх', system: 'Дэлгэц', venues: 'Ресторан', lunches: 'Таваг', reviews: 'Од', stats: 'График', orders: 'Баримт',
+  suppliers: 'Дэлгүүр', audit: 'Цаг', shield: 'Бамбай', today: 'Хуанли', menu: 'Цэс', kitchen: 'Гал тогоо', truck: 'Машин',
+  tag: 'Шошго', file: 'Файл',
+};
+const SCOPE_WORD = { desk: 'Basu ops', org: 'Байгууллага' };
+let accessScope = localStorage.getItem('basu.ops.access') === 'org' ? 'org' : 'desk';
+/** The role the roles page opens on next: the one just made or saved. */
+let rolePick = null;
+
+/** The desk's roles, for the pickers that seat somebody or ask for a seat: asked once a page, and again after the roles change. */
+let deskRoles = null;
+async function deskRoleList() {
+  deskRoles ??= ops('/v1/access/roles?scope=desk').then((t) => t.roles).catch(() => []);
+  return deskRoles;
+}
+const roleOption = (r, chosen) => `<option value="${esc(r.key)}"${r.key === chosen ? ' selected' : ''}>${esc(r.name)}${r.description ? ` — ${esc(r.description)}` : ''}</option>`;
+
+/** Desk or business: the switch the roles and menu pages share. */
+function scopeSeg(onChange) {
+  const seg = el(`<div class="seg">${['desk', 'org'].map((k) => `<button type="button" data-scope="${k}"${accessScope === k ? ' data-on' : ''}>${SCOPE_WORD[k]}</button>`).join('')}</div>`);
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-scope]');
+    if (!b || b.dataset.scope === accessScope) return;
+    accessScope = b.dataset.scope;
+    localStorage.setItem('basu.ops.access', accessScope);
+    onChange();
+  });
+  return seg;
+}
+
+/**
+ * Who may do what, read-only: each module's pages and what can be done on
+ * each, a mark under every role that may, the reader's own column lit.
+ */
+function matrixTable(table) {
+  const roles = table.roles;
+  const opens = (r, p) => r.locked || (r.permissions ?? []).includes(p);
+  const lit = (r) => (r.key === table.yours ? ' yours' : '');
+  const cols = (p) => roles.map((r) => `<td class="role-col${lit(r)}">${opens(r, p) ? `<span class="yes" aria-label="тийм">${NAV_ICON.check}</span>` : '<span class="no" aria-label="үгүй">—</span>'}</td>`).join('');
+  const thead = `<tr><th>Хуудас, үйлдэл</th>${roles.map((r) => `<th class="role-col${lit(r)}">${esc(r.name)}${r.key === table.yours ? '<small>та</small>' : ''}</th>`).join('')}</tr>`;
+  const body = table.modules
+    .map((m) => {
+      const pages = table.pages.filter((p) => p.module === m.key && !p.hidden);
+      if (!pages.length) return '';
+      return `<tr class="role-sec"><td colspan="${roles.length + 1}"><span class="sec-mod">${NAV_ICON[m.icon] ?? ''}${esc(m.name)}</span></td></tr>${pages
+        .map((p) => `<tr class="perm-page"><td>${esc(p.name)}</td>${cols(p.permission)}</tr>${p.actions.map((a) => `<tr class="perm-act"><td>${esc(a.label)}</td>${cols(a.permission)}</tr>`).join('')}`)
+        .join('')}`;
+    })
+    .join('');
+  return el(`<section class="section"><div class="card"><div class="table-wrap"><table class="table roles"><thead>${thead}</thead><tbody>${body}</tbody></table></div></div></section>`);
+}
+
+/**
+ * The roles page. On the left every role of the desk or of businesses, with
+ * who holds it; on the right the one chosen, as a tree of modules, their
+ * pages and what can be done on each, ticked for what the role opens. A new
+ * role starts empty. The admin role opens everything and stays as it is.
+ */
+async function renderRoles(view) {
+  const pick = rolePick;
+  rolePick = null;
+  const manage = can('desk.roles:manage');
+  view.append(head('Үүрэг, эрх', 'Үүрэг үүсгээд, ямар хуудас, ямар үйлдэл нээхийг нь чагтаар сонгоно. Хүн бүрийн цэс, эрх үүнээс шууд гарна.', '<div data-seg></div>'));
+  view.querySelector('[data-seg]').replaceWith(scopeSeg(() => show('roles')));
+  const box = el('<div class="roles-grid"><div class="card roles-list" data-rows id="roles-list"></div><div class="card role-edit" id="role-edit"></div></div>');
+  view.append(box);
+  let data;
+  try {
+    data = await ops(`/v1/ops/access/${accessScope}`);
+  } catch (error) {
+    box.replaceWith(el(`<p class="empty">${esc(error.message)}</p>`));
+    return;
+  }
+  if (tab !== 'roles') return;
+  const list = box.querySelector('#roles-list');
+  const edit = box.querySelector('#role-edit');
+  const draw = (key) => {
+    for (const r of list.querySelectorAll('[data-role]')) r.toggleAttribute('data-on', r.dataset.role === key);
+    const role = key === '+' ? { key: null, name: '', description: '', permissions: [], locked: false, head: false, everyone: true, builtin: false } : data.roles.find((r) => r.key === key);
+    edit.replaceChildren(roleEditor(data, role, manage));
+  };
+  for (const r of data.roles) {
+    const flags = [
+      r.locked && '<span class="pill" data-size="sm">бүгдийг нээнэ</span>',
+      r.head && '<span class="pill" data-size="sm">эзэн</span>',
+      accessScope === 'org' && !r.everyone && '<span class="pill" data-size="sm" data-s="applied">сонгосон байгууллагад</span>',
+    ].filter(Boolean).join('');
+    const count = data.usage[r.key] ?? 0;
+    const row = el(`
+      <button class="row role-row" type="button" data-role="${esc(r.key)}">
+        <span class="main"><span class="title">${esc(r.name)}</span><span class="sub">${esc(r.description ?? '')}</span>${flags ? `<span class="tags">${flags}</span>` : ''}</span>
+        <span class="end"><span class="meta">${count} хүн</span></span>
+      </button>`);
+    row.addEventListener('click', () => draw(r.key));
+    list.append(row);
+  }
+  if (manage) {
+    const add = el('<button class="row role-row role-add" type="button" data-role="+"><span class="main"><span class="title">+ Шинэ үүрэг</span><span class="sub">Нэр өгөөд хуудсуудаа сонгоно</span></span></button>');
+    add.addEventListener('click', () => draw('+'));
+    list.append(add);
+  }
+  draw(pick && (pick === '+' || data.roles.some((r) => r.key === pick)) ? pick : data.roles[0]?.key ?? '+');
+}
+
+/** One role, as a tree to tick: modules, their pages, and what can be done on each. */
+function roleEditor(data, role, manage) {
+  const fixed = role.locked || !manage;
+  const held = new Set(role.locked ? data.pages.flatMap((p) => [p.permission, ...p.actions.map((a) => a.permission)]) : role.permissions ?? []);
+  const kindWord = { supplier: 'нийлүүлэгчид', restaurant: 'ресторанд' };
+  const f = el(`
+    <div class="card-body">
+      <div class="fields">
+        <label class="field"><span>Үүргийн нэр</span><input name="name" maxlength="40" placeholder="Кассир, Тогооч, Нягтлан…"></label>
+        <label class="field"><span>Тайлбар</span><input name="description" maxlength="200" placeholder="Юу хийдэг вэ, нэг өгүүлбэр"></label>
+      </div>
+      ${data.scope === 'org' ? `<div class="checks role-flags">
+        <label><input type="checkbox" name="everyone"> Бүх байгууллагад нээлттэй</label>
+        <label><input type="checkbox" name="head"> Эзэн — байгууллагын тэргүүн</label>
+      </div>` : ''}
+      ${role.locked ? '<div class="callout" style="margin-bottom:16px"><b>Бүх хуудас, бүх үйлдэл</b><span>Админ үүрэг бүгдийг нээдэг, засагдахгүй — ингэснээр Basu өөрийгөө хэзээ ч түгжихгүй.</span></div>' : ''}
+      <div class="perm-tree" data-tree></div>
+      ${fixed ? '' : `<div class="form-foot">
+        ${role.key && !role.builtin ? '<button class="btn" data-v="quiet" type="button" data-drop>Устгах</button>' : ''}
+        <button class="btn" data-v="primary" type="button" data-save>${role.key ? 'Хадгалах' : 'Үүрэг үүсгэх'}</button>
+      </div>`}
+    </div>`);
+  f.querySelector('[name="name"]').value = role.name ?? '';
+  f.querySelector('[name="description"]').value = role.description ?? '';
+  if (data.scope === 'org') {
+    f.querySelector('[name="everyone"]').checked = role.everyone !== false;
+    f.querySelector('[name="head"]').checked = Boolean(role.head);
+  }
+  const tree = f.querySelector('[data-tree]');
+  for (const m of data.modules) {
+    const pages = data.pages.filter((p) => p.module === m.key);
+    if (!pages.length) continue;
+    const mod = el(`
+      <div class="perm-mod">
+        <label class="perm-mod-head"><input type="checkbox" data-all> <span class="sec-mod">${NAV_ICON[m.icon] ?? ''}${esc(m.name)}</span></label>
+        <div class="perm-pages"></div>
+      </div>`);
+    for (const p of pages) {
+      const note = [p.hidden && 'цэснээс нуусан', p.kind && `зөвхөн ${kindWord[p.kind]}`, p.link && 'холбоос'].filter(Boolean).join(' · ');
+      const page = el(`
+        <div class="perm-page" data-page="${esc(p.key)}">
+          <label class="perm-view"><input type="checkbox" value="${esc(p.permission)}" data-view> <b>${esc(p.name)}</b>${note ? ` <small>${esc(note)}</small>` : ''}</label>
+          ${p.actions.length ? `<div class="perm-acts">${p.actions.map((a) => `<label><input type="checkbox" value="${esc(a.permission)}" data-act> ${esc(a.label)}</label>`).join('')}</div>` : ''}
+        </div>`);
+      page.querySelectorAll('input').forEach((i) => (i.checked = held.has(i.value)));
+      mod.querySelector('.perm-pages').append(page);
+    }
+    tree.append(mod);
+  }
+  // A module's box says whether all, some or none of it is ticked; a page's actions need the page.
+  const sync = () => {
+    for (const mod of tree.querySelectorAll('.perm-mod')) {
+      const boxes = [...mod.querySelectorAll('.perm-pages input')];
+      const on = boxes.filter((b) => b.checked).length;
+      const all = mod.querySelector('[data-all]');
+      all.checked = on === boxes.length && on > 0;
+      all.indeterminate = on > 0 && on < boxes.length;
+    }
+  };
+  tree.addEventListener('change', (e) => {
+    const input = e.target;
+    if (input.matches('[data-all]')) {
+      for (const b of input.closest('.perm-mod').querySelectorAll('.perm-pages input')) b.checked = input.checked;
+    } else if (input.matches('[data-act]') && input.checked) {
+      input.closest('.perm-page').querySelector('[data-view]').checked = true;
+    } else if (input.matches('[data-view]') && !input.checked) {
+      for (const b of input.closest('.perm-page').querySelectorAll('[data-act]')) b.checked = false;
+    }
+    sync();
+  });
+  sync();
+  if (fixed) f.querySelectorAll('input').forEach((i) => (i.disabled = true));
+
+  f.querySelector('[data-save]')?.addEventListener('click', async (e) => {
+    const body = {
+      name: f.querySelector('[name="name"]').value.trim(),
+      description: f.querySelector('[name="description"]').value.trim(),
+      permissions: [...tree.querySelectorAll('.perm-pages input:checked')].map((i) => i.value),
+      ...(data.scope === 'org' ? { everyone: f.querySelector('[name="everyone"]').checked, head: f.querySelector('[name="head"]').checked } : {}),
+    };
+    e.target.setAttribute('data-busy', '');
+    try {
+      const saved = role.key
+        ? await ops(`/v1/ops/roles/${data.scope}/${role.key}`, { method: 'PATCH', body })
+        : await ops(`/v1/ops/roles/${data.scope}`, { method: 'POST', body });
+      toast(role.key ? 'Хадгалагдлаа.' : 'Үүрэг үүслээ.', 'good');
+      deskRoles = null;
+      rolePick = saved.key;
+      await reload();
+    } catch (error) {
+      toast(error.message, 'bad');
+    } finally {
+      e.target.removeAttribute('data-busy');
+    }
+  });
+  f.querySelector('[data-drop]')?.addEventListener('click', async () => {
+    if (!confirm(`«${role.name}» үүргийг устгах уу?`)) return;
+    try {
+      await ops(`/v1/ops/roles/${data.scope}/${role.key}`, { method: 'DELETE' });
+      toast('Устгалаа.');
+      deskRoles = null;
+      await reload();
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  return f;
+}
+
+/**
+ * The menu page: every module of the desk or of businesses, in order, with
+ * its pages under it — each renamed, reordered, moved to another module,
+ * given another icon or hidden, right here; a module or a link added; and
+ * all of it saved at once, the sidebar following the moment it is.
+ */
+async function renderMenus(view) {
+  const manage = can('desk.menus:manage');
+  view.append(head('Цэс', 'Зүүн цэсний модуль, хуудсыг нэрлэж, эрэмбэлж, зөөж, нууна. Хэн юу харах нь «Үүрэг, эрх»-ээр.', '<div data-seg></div>'));
+  view.querySelector('[data-seg]').replaceWith(scopeSeg(() => show('menus')));
+  let data;
+  try {
+    data = await ops(`/v1/ops/access/${accessScope}`);
+  } catch (error) {
+    view.append(el(`<p class="empty">${esc(error.message)}</p>`));
+    return;
+  }
+  if (tab !== 'menus') return;
+  const icons = (chosen) => data.icons.map((k) => `<option value="${k}"${k === chosen ? ' selected' : ''}>${ICON_WORD[k] ?? k}</option>`).join('');
+  const moduleOptions = (chosen) => data.all_modules.map((m) => `<option value="${esc(m.key)}"${m.key === chosen ? ' selected' : ''}>${esc(m.key === 'main' ? 'Дээд хэсэг' : m.name)}</option>`).join('');
+  const board = el('<div class="menu-board" id="menu-board"></div>');
+  const mods = new Map();
+  for (const m of data.all_modules) {
+    const top = m.key === 'main';
+    const card = el(`
+      <section class="card menu-mod" data-module="${esc(m.key)}">
+        <div class="menu-mod-head">
+          <span class="icon-pick"><span data-preview>${NAV_ICON[m.icon] ?? ''}</span><select class="input" data-size="sm" name="icon" aria-label="Дүрс"${top ? ' disabled' : ''}>${icons(m.icon)}</select></span>
+          <input class="input" name="name" maxlength="40" aria-label="Модулийн нэр"${top ? ' disabled' : ''}>
+          <span class="menu-moves">
+            <button class="btn" data-size="sm" data-v="quiet" data-icon type="button" data-up aria-label="Дээш"${top ? ' disabled' : ''}>↑</button>
+            <button class="btn" data-size="sm" data-v="quiet" data-icon type="button" data-down aria-label="Доош"${top ? ' disabled' : ''}>↓</button>
+            ${m.key.startsWith('m-') ? '<button class="btn" data-size="sm" data-v="quiet" type="button" data-drop-mod>Устгах</button>' : ''}
+          </span>
+        </div>
+        <div class="menu-pages" data-rows></div>
+      </section>`);
+    card.querySelector('[name="name"]').value = top ? 'Дээд хэсэг — модульгүй хуудсууд' : m.name ?? '';
+    mods.set(m.key, card);
+    board.append(card);
+  }
+  const pageRow = (p) => {
+    const row = el(`
+      <div class="menu-page" data-page="${esc(p.key)}"${p.hidden ? ' data-off' : ''}>
+        <span class="icon-pick"><span data-preview>${NAV_ICON[p.icon] ?? ''}</span><select class="input" data-size="sm" name="icon" aria-label="Дүрс">${icons(p.icon)}</select></span>
+        <input class="input" name="name" maxlength="40" aria-label="Хуудасны нэр">
+        <select class="input" data-size="sm" name="module" aria-label="Модуль">${moduleOptions(p.module)}</select>
+        <span class="menu-moves">
+          <button class="btn" data-size="sm" data-v="quiet" data-icon type="button" data-up aria-label="Дээш">↑</button>
+          <button class="btn" data-size="sm" data-v="quiet" data-icon type="button" data-down aria-label="Доош">↓</button>
+          <label class="menu-shown"><input type="checkbox" name="shown"${p.hidden ? '' : ' checked'}> харагдана</label>
+          ${p.link ? `<button class="btn" data-size="sm" data-v="quiet" type="button" data-drop-link title="${esc(p.link)}">Холбоос устгах</button>` : ''}
+        </span>
+        ${p.link ? `<span class="menu-href mono">${esc(p.link)}</span>` : ''}
+      </div>`);
+    row.querySelector('[name="name"]').value = p.name;
+    return row;
+  };
+  for (const p of data.pages) mods.get(p.module)?.querySelector('.menu-pages').append(pageRow(p));
+  for (const card of mods.values()) {
+    if (!card.querySelector('.menu-page')) card.querySelector('.menu-pages').append(el('<div class="empty">Хоосон — хуудсыг энд зөөвөл харагдана.</div>'));
+  }
+
+  board.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.name === 'icon') t.closest('.icon-pick').querySelector('[data-preview]').innerHTML = NAV_ICON[t.value] ?? '';
+    if (t.name === 'module') {
+      const row = t.closest('.menu-page');
+      const target = mods.get(t.value).querySelector('.menu-pages');
+      target.querySelector('.empty')?.remove();
+      target.append(row);
+    }
+    if (t.name === 'shown') t.closest('.menu-page').toggleAttribute('data-off', !t.checked);
+  });
+  board.addEventListener('click', async (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const unit = b.closest('.menu-page') ?? b.closest('.menu-mod');
+    if (b.matches('[data-up]')) {
+      const prev = unit.previousElementSibling;
+      if (prev && !prev.matches('[data-module="main"]') && !prev.matches('.empty')) prev.before(unit);
+    } else if (b.matches('[data-down]')) {
+      unit.nextElementSibling?.after(unit);
+    } else if (b.matches('[data-drop-mod]')) {
+      try {
+        await ops(`/v1/ops/menus/${accessScope}/modules/${unit.dataset.module}`, { method: 'DELETE' });
+        await reload();
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+    } else if (b.matches('[data-drop-link]')) {
+      if (!confirm('Энэ холбоосыг цэснээс устгах уу?')) return;
+      try {
+        await ops(`/v1/ops/menus/${accessScope}/links/${unit.dataset.page}`, { method: 'DELETE' });
+        await reload();
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+    }
+  });
+
+  const tools = el(`
+    <div class="menu-tools">
+      <button class="btn" type="button" data-add-mod>+ Модуль</button>
+      <button class="btn" type="button" data-add-link>+ Холбоос</button>
+      <span class="gap"></span>
+      <button class="btn" data-v="primary" type="button" data-save-menu id="save-menu">Хадгалах</button>
+    </div>`);
+  tools.querySelector('[data-add-mod]').addEventListener('click', async () => {
+    const name = prompt('Модулийн нэр:', '');
+    if (!name?.trim()) return;
+    try {
+      await ops(`/v1/ops/menus/${accessScope}/modules`, { method: 'POST', body: { name: name.trim() } });
+      await reload();
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  tools.querySelector('[data-add-link]').addEventListener('click', async () => {
+    const name = prompt('Холбоосын нэр (цэсэнд харагдах):', '');
+    if (!name?.trim()) return;
+    const href = prompt('Хаяг — /kds гэх мэт Basu-гийн зам, эсвэл https://…', 'https://');
+    if (!href?.trim()) return;
+    try {
+      await ops(`/v1/ops/menus/${accessScope}/links`, { method: 'POST', body: { name: name.trim(), href: href.trim() } });
+      toast('Холбоос нэмэгдлээ. Хэн харахыг «Үүрэг, эрх»-ээс сонгоно.', 'good');
+      await reload();
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  tools.querySelector('[data-save-menu]').addEventListener('click', async (e) => {
+    const modules = [...board.querySelectorAll('.menu-mod')].map((card, i) => ({
+      key: card.dataset.module,
+      name: card.querySelector('[name="name"]').value.trim(),
+      icon: card.querySelector('[name="icon"]').value,
+      sort: i * 10,
+    }));
+    const pages = [...board.querySelectorAll('.menu-mod')].flatMap((card) =>
+      [...card.querySelectorAll('.menu-page')].map((row, i) => ({
+        key: row.dataset.page,
+        module: card.dataset.module,
+        name: row.querySelector('[name="name"]').value.trim(),
+        icon: row.querySelector('[name="icon"]').value,
+        sort: (i + 1) * 10,
+        hidden: !row.querySelector('[name="shown"]').checked,
+      })),
+    );
+    e.target.setAttribute('data-busy', '');
+    try {
+      await ops(`/v1/ops/menus/${accessScope}`, { method: 'PUT', body: { modules: modules.filter((m) => m.key !== 'main'), pages } });
+      toast('Цэс хадгалагдлаа.', 'good');
+      await reload();
+    } catch (error) {
+      toast(error.message, 'bad');
+    } finally {
+      e.target.removeAttribute('data-busy');
+    }
+  });
+  if (manage) view.append(tools);
+  view.append(board);
+  if (!manage) board.querySelectorAll('input, select, button').forEach((i) => (i.disabled = true));
+}
+
+/**
+ * One business, from the desk: the people in it and their roles — any of
+ * them the desk may change, its head too — and which roles, beyond those
+ * open to every business, it may hand out.
+ */
+async function openOrgAccess(orgId) {
+  const view = nav.view;
+  view.replaceChildren();
+  window.scrollTo(0, 0);
+  let data;
+  try {
+    data = await ops(`/v1/ops/orgs/${orgId}/access`);
+  } catch (error) {
+    toast(error.message, 'bad');
+    return show('orgs');
+  }
+  const deciding = can('desk.orgs:access');
+  const back = el('<button class="back link" type="button">← Байгууллагууд</button>');
+  back.addEventListener('click', () => show('orgs'));
+  view.append(back, head(esc(data.org.name), `${kinds(data.org).join(' · ')} · ${ORG_STATE[data.org.state]?.[1] ?? data.org.state}`));
+  const open = data.roles.filter((r) => r.open);
+  const people = el(`
+    <section class="section"><h2 class="section-label">Хүмүүс, үүрэг</h2>
+      <div class="card"><div class="table-wrap"><table class="table team"><thead><tr><th>Нэр</th><th>Утас, имэйл</th><th>Үүрэг</th></tr></thead><tbody data-people></tbody></table></div></div>
+    </section>`);
+  for (const m of data.members) {
+    const tr = el(`<tr data-member="${esc(m.guest_id)}"><td><b>${esc(m.name ?? '—')}</b><span class="sub mono">${esc(m.contact ?? '')}</span></td><td class="mono">${esc(m.contact ?? '—')}</td><td></td></tr>`);
+    const cell = tr.lastElementChild;
+    if (deciding) {
+      const select = el(`<select class="input" data-size="sm" style="width:auto" aria-label="Үүрэг">${open.map((r) => `<option value="${esc(r.key)}"${r.key === m.role ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select>`);
+      select.addEventListener('change', async () => {
+        try {
+          await ops(`/v1/ops/orgs/${orgId}/members/${m.guest_id}`, { method: 'PATCH', body: { role: select.value } });
+          toast(`${m.name ?? 'Хүн'}: ${select.selectedOptions[0].textContent}`, 'good');
+          m.role = select.value;
+        } catch (error) {
+          toast(error.message, 'bad');
+          select.value = m.role;
+        }
+      });
+      cell.append(select);
+    } else cell.textContent = m.role_name;
+    people.querySelector('[data-people]').append(tr);
+  }
+  view.append(people);
+
+  const roles = el(`
+    <section class="section"><h2 class="section-label">Энэ байгууллагад нээлттэй үүрэг</h2>
+      <div class="card"><div class="card-body">
+        <p class="cap" style="margin:0 0 12px">«Бүх байгууллагад» үүргийг хүн бүр ашиглана. Бусдыг нь зөвхөн чагталсан байгууллага ажилтандаа өгнө. Үүрэг бүр юу нээхийг «Үүрэг, эрх»-ээр засна.</p>
+        <div class="org-roles" data-org-roles></div>
+        ${deciding ? '<div class="form-foot"><button class="btn" data-v="primary" type="button" data-save-roles>Хадгалах</button></div>' : ''}
+      </div></div>
+    </section>`);
+  const holder = roles.querySelector('[data-org-roles]');
+  for (const r of data.roles) {
+    holder.append(el(`<label class="org-role"><input type="checkbox" value="${esc(r.key)}"${r.open ? ' checked' : ''}${r.everyone || !deciding ? ' disabled' : ''}> <b>${esc(r.name)}</b>${r.head ? ' <span class="pill" data-size="sm">эзэн</span>' : ''}${r.everyone ? ' <span class="meta">бүх байгууллагад</span>' : ''}${r.description ? `<small>${esc(r.description)}</small>` : ''}</label>`));
+  }
+  roles.querySelector('[data-save-roles]')?.addEventListener('click', async () => {
+    const keys = [...holder.querySelectorAll('input:checked:not(:disabled)')].map((i) => i.value);
+    try {
+      await ops(`/v1/ops/orgs/${orgId}/roles`, { method: 'PUT', body: { keys } });
+      toast('Хадгалагдлаа.', 'good');
+      openOrgAccess(orgId);
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  });
+  view.append(roles);
 }
 
 /* ── the frame: one sidebar for every place a person works ─────────── */
@@ -956,7 +1456,7 @@ const DESK_PAGES = {
   overview: renderOverview, guests: renderGuests, money: renderMoney, notify: renderNotify, system: renderSystem,
   venues: renderVenues, lunches: renderLunches, reviews: renderReviews,
   stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay,
-  orgs: renderOrgsDesk, members: renderMembers, audit: renderAudit,
+  orgs: renderOrgsDesk, members: renderMembers, roles: renderRoles, menus: renderMenus, audit: renderAudit,
 };
 const ORG_PAGES = { home: renderOrgHome, team: renderOrgTeam, profile: renderOrgProfile, roles: renderOrgRoles, log: renderOrgLog };
 const ME_PAGES = { home: renderMeHome, profile: renderMeProfile };
@@ -1036,10 +1536,10 @@ async function refresh() {
   if (ws?.kind === 'desk') {
     try {
       const [suppliers, settlements, requests, orgs] = await Promise.all([
-        can('desk.idesh.view') ? ops('/v1/ops/suppliers').then((r) => r.suppliers) : [],
-        can('desk.payouts.view') ? ops('/v1/ops/settlements').then((r) => r.settlements) : [],
-        can('desk.members.manage') ? ops('/v1/ops/requests').then((r) => r.requests) : [],
-        can('desk.orgs.view') ? ops('/v1/ops/orgs').then((r) => r.orgs) : [],
+        (can('desk.suppliers') || can('desk.orders')) ? ops('/v1/ops/suppliers').then((r) => r.suppliers) : [],
+        can('desk.pay') ? ops('/v1/ops/settlements').then((r) => r.settlements) : [],
+        can('desk.members') ? ops('/v1/ops/requests').then((r) => r.requests) : [],
+        can('desk.orgs') ? ops('/v1/ops/orgs').then((r) => r.orgs) : [],
       ]);
       cache = { suppliers, settlements, requests, orgs };
     } catch (error) {
@@ -1299,11 +1799,11 @@ async function openGuest(id) {
         <div class="card-body acts">
           ${f.sessions.length ? f.sessions.map((s) => `
             <div class="sess"><span>${esc(s.label ?? 'Утас')}<small>сүүлд ${when(s.last_seen_at ?? s.created_at)} ${clockOf(s.last_seen_at ?? s.created_at)}</small></span>
-            ${can('desk.guests.sessions') ? `<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-sid="${s.id}">Гаргах</button>` : ''}</div>`).join('') : '<div class="hint">Нээлттэй сесс алга.</div>'}
+            ${can('desk.guests:sessions') ? `<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-sid="${s.id}">Гаргах</button>` : ''}</div>`).join('') : '<div class="hint">Нээлттэй сесс алга.</div>'}
           ${f.devices.length ? `<div class="hint">Push: ${f.devices.map((d) => `${PLATFORM_WORD[d.platform] ?? d.platform}${d.label ? ` · ${esc(d.label)}` : ''}`).join(', ')}</div>` : ''}
           ${closed ? '' : `
           <div class="sep"></div>
-          ${can('desk.guests.close') ? `
+          ${can('desk.guests:close') ? `
           <label class="field"><span>Бүртгэл хаах шалтгаан</span><input id="why" placeholder="Зочин бичгээр хүссэн…"></label>
           <button class="btn" data-v="danger" type="button" data-a="close">Бүртгэл хаах</button>
           <div class="hint">Түрийвчид мөнгөтэй эсвэл идэвхтэй захиалгатай бол хаагдахгүй. Нэр, утас арилна; захиалга, гүйлгээ бүртгэлд үлдэнэ.</div>` : '<div class="hint">Бүртгэл хаахыг зөвхөн админ хийнэ.</div>'}`}
@@ -1386,7 +1886,7 @@ function renderVenue(r) {
       </div>
       <div class="right"><div class="btns">
         <button class="btn" data-size="sm" type="button" data-a="menu">Цэс</button>
-        ${can('desk.dine.manage') ? `<details class="more"><summary class="btn" data-size="sm" data-icon aria-label="Бусад үйлдэл"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></summary><div class="menu">
+        ${can('desk.venues:manage') ? `<details class="more"><summary class="btn" data-size="sm" data-icon aria-label="Бусад үйлдэл"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></summary><div class="menu">
           <button class="btn" data-size="sm" data-v="quiet" type="button" data-a="tablet">Шинэ таблет</button>
           <button class="btn${r.active ? ' ink-stop' : ''}" data-size="sm" data-v="quiet" type="button" data-a="active">${r.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>
         </div></details>` : ''}
@@ -1394,7 +1894,7 @@ function renderVenue(r) {
       <div class="about">Өнөөдөр <b>${r.today.placed}</b> захиалга · <b>${r.today.live}</b> идэвхтэй${r.today.held ? ` · <b class="ink-hold">${r.today.held} түр зогсоосон</b>` : ''} · <b>${money(r.today.sales_mnt)}</b> · цэс ${r.menu.active}/${r.menu.total}${r.menu.sold_out ? ` (${r.menu.sold_out} дууссан)` : ''}
         <div class="sess-list">${r.devices.length ? r.devices.map((d) => `
           <div class="sess"><span>${d.pairing_code ? `Код <b class="mono">${d.pairing_code}</b> · ${esc(d.label ?? '')} · ${clockOf(d.pairing_expires_at)} хүртэл` : `${esc(d.label ?? 'Таблет')} · ${d.online ? '<span class="pill" data-s="contracted">онлайн</span>' : `сүүлд ${d.last_seen_at ? `${when(d.last_seen_at)} ${clockOf(d.last_seen_at)}` : 'хэзээ ч үгүй'}`}`}</span>
-          ${can('desk.dine.manage') ? `<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-device="${d.id}">Салгах</button>` : ''}</div>`).join('') : '<span class="muted">Таблет холбогдоогүй.</span>'}</div>
+          ${can('desk.venues:manage') ? `<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-device="${d.id}">Салгах</button>` : ''}</div>`).join('') : '<span class="muted">Таблет холбогдоогүй.</span>'}</div>
       </div>
     </div>`);
   card.addEventListener('click', async (e) => {
@@ -1429,7 +1929,7 @@ function renderVenue(r) {
 async function menuDrawer(r) {
   const { items } = await ops(`/v1/ops/dine/restaurants/${r.id}/menu`);
   const d = el(`<div class="drawer table-wrap"><table class="table"${items.length ? '' : ' data-empty'}><thead><tr><th>Хоол</th><th>Цех</th><th class="num">Үнэ</th><th class="num">Бэлтгэх, мин</th><th>Төлөв</th><th></th></tr></thead><tbody>${items
-    .map((m) => `<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td>${esc(m.station)}</td><td class="num">${money(m.price_mnt)}</td><td class="num">${m.prep_minutes}</td><td>${m.active ? (m.sold_out_until ? '<span class="pill" data-s="off">дууссан</span>' : '<span class="pill" data-s="contracted">цэсэнд</span>') : '<span class="pill" data-s="declined">нуусан</span>'}</td><td class="num">${can('desk.dine.manage') ? `<button class="btn" data-size="sm" data-v="quiet" type="button" data-item="${m.id}" data-on="${m.active}">${m.active ? 'Нуух' : 'Харуулах'}</button>` : ''}</td></tr>`)
+    .map((m) => `<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td>${esc(m.station)}</td><td class="num">${money(m.price_mnt)}</td><td class="num">${m.prep_minutes}</td><td>${m.active ? (m.sold_out_until ? '<span class="pill" data-s="off">дууссан</span>' : '<span class="pill" data-s="contracted">цэсэнд</span>') : '<span class="pill" data-s="declined">нуусан</span>'}</td><td class="num">${can('desk.venues:manage') ? `<button class="btn" data-size="sm" data-v="quiet" type="button" data-item="${m.id}" data-on="${m.active}">${m.active ? 'Нуух' : 'Харуулах'}</button>` : ''}</td></tr>`)
     .join('') || '<tr><td colspan="6" class="empty">Цэс хоосон.</td></tr>'}</tbody></table></div>`);
   d.addEventListener('click', async (e) => {
     const b = e.target.closest('button[data-item]');
@@ -1564,7 +2064,7 @@ async function openLunch(id) {
       <div class="card" id="acts">
         <div class="card-head"><h3>Ops-ийн үйлдэл</h3></div>
         <div class="card-body acts">
-          ${!can('desk.dine.manage') ? '<div class="hint">Үйлдлийг ops, админ хийнэ.</div>' : DINE_FREE.includes(o.state) || ['ARMED', 'HELD', 'FIRED', 'COOKING', 'READY'].includes(o.state) ? `
+          ${!can('desk.lunches:manage') ? '<div class="hint">Үйлдлийг ops, админ хийнэ.</div>' : DINE_FREE.includes(o.state) || ['ARMED', 'HELD', 'FIRED', 'COOKING', 'READY'].includes(o.state) ? `
           <label class="field"><span>Тэмдэглэл</span><input id="note" placeholder="Бүртгэлд үлдэнэ"></label>
           ${DINE_FREE.includes(o.state) ? '<button class="btn" data-v="danger" type="button" data-a="cancel">Зочны өмнөөс цуцлах</button><div class="hint">Гал дээр гараагүй тул мөнгө бүтэн түрийвч рүү буцна.</div>' : '<div class="hint">Гал дээр гарсан: цуцлах боломжгүй.</div>'}
           ${['ARMED', 'HELD', 'FIRED', 'COOKING', 'READY'].includes(o.state) ? '<div class="sep"></div><button class="btn" type="button" data-a="no-show">Зочин ирээгүй гэж тэмдэглэх</button><div class="hint">Ширээ суллагдана; мөнгө буцахгүй.</div>' : ''}
@@ -1641,7 +2141,7 @@ const TOPUP_PILL = { pending: 'PAID', settled: 'contracted', failed: 'declined',
 const RECEIPT_PILL = { queued: 'PAID', issued: 'contracted', failed: 'declined' };
 let moneyView = localStorage.getItem('basu.ops.money') ?? 'checks';
 let moneyFilter = { kind: '', from: '', to: '', topupState: '', receiptState: '' };
-const canMoney = () => can('desk.money.manage');
+const canMoney = () => can('desk.money:manage');
 
 /** A CSV the browser saves, fetched with the desk's token because a plain link cannot carry one. */
 async function download(path, name) {
@@ -1880,7 +2380,7 @@ async function loadMessages() {
   for (const m of data.messages) {
     list.append(el(`<li data-message="${m.id}"><span class="who">${m.channel === 'sms' ? 'SMS' : 'Push'}<small>${esc(m.guest ?? 'зочин')}<br><span class="mono">${esc(m.guest_phone ?? '')}</span></small></span>
       <div>${esc(TEMPLATE_WORD[m.template] ?? m.title ?? m.template)}<small>${esc(m.body)}</small></div>
-      <span class="when meta">${when(m.created_at)} ${clockOf(m.created_at)}<br><span class="pill" data-s="${MSG_PILL[m.state] ?? 'off'}">${MSG_WORD[m.state] ?? m.state}</span>${m.read_at ? ' <span class="cap">уншсан</span>' : ''}${m.state === 'failed' && can('desk.notify.retry') ? ` <button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${m.id}">Дахин</button>` : ''}</span></li>`));
+      <span class="when meta">${when(m.created_at)} ${clockOf(m.created_at)}<br><span class="pill" data-s="${MSG_PILL[m.state] ?? 'off'}">${MSG_WORD[m.state] ?? m.state}</span>${m.read_at ? ' <span class="cap">уншсан</span>' : ''}${m.state === 'failed' && can('desk.notify:retry') ? ` <button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${m.id}">Дахин</button>` : ''}</span></li>`));
   }
   list.addEventListener('click', async (e) => {
     const b = e.target.closest('button[data-retry]');
@@ -1958,8 +2458,8 @@ async function drawSystem() {
         <tr><td>Идэшний дүрэм</td><td class="end">шимтгэл ${s.rules.commission_pct}% · суутгал ${s.rules.forfeit_pct}% · ирээгүй ${s.rules.no_show_days} хоног</td></tr>
       </tbody></table></div></div></section>
       <section class="section"><h2 class="section-label">Тохиргоо</h2><div class="card card-body" id="settings">${s.settings
-        .map((k) => `<label class="field"><span>${esc(k.label)}</span><input data-key="${k.key}" ${k.kind === 'number' ? 'type="number" min="0" step="1"' : 'type="text" maxlength="500"'} value="${esc(String(k.value))}"${can('desk.system.manage') ? '' : ' disabled'}><small>${esc(k.hint)}${k.updated_by ? ` · ${esc(k.updated_by.replace('ops:', ''))}, ${when(k.updated_at)}` : ''}</small></label>`)
-        .join('')}${can('desk.system.manage') ? '<div class="form-foot"><button class="btn" data-v="primary" type="button" id="save-settings">Хадгалах</button></div>' : '<div class="hint">Тохиргоог зөвхөн админ өөрчилнө.</div>'}</div></section>
+        .map((k) => `<label class="field"><span>${esc(k.label)}</span><input data-key="${k.key}" ${k.kind === 'number' ? 'type="number" min="0" step="1"' : 'type="text" maxlength="500"'} value="${esc(String(k.value))}"${can('desk.system:manage') ? '' : ' disabled'}><small>${esc(k.hint)}${k.updated_by ? ` · ${esc(k.updated_by.replace('ops:', ''))}, ${when(k.updated_at)}` : ''}</small></label>`)
+        .join('')}${can('desk.system:manage') ? '<div class="form-foot"><button class="btn" data-v="primary" type="button" id="save-settings">Хадгалах</button></div>' : '<div class="hint">Тохиргоог зөвхөн админ өөрчилнө.</div>'}</div></section>
     </div>
   </div>`);
   page.querySelector('#save-settings')?.addEventListener('click', async (e) => {
@@ -2132,7 +2632,7 @@ async function openOrder(id) {
       <div class="card" id="acts">
         <div class="card-head"><h3>Ops-ийн үйлдэл</h3></div>
         <div class="card-body acts">
-          ${live && !can('desk.idesh.manage') ? '<div class="hint">Үйлдлийг ops, админ хийнэ.</div>' : live ? `
+          ${live && !can('desk.orders:manage') ? '<div class="hint">Үйлдлийг ops, админ хийнэ.</div>' : live ? `
           <label class="field"><span>Тэмдэглэл</span><input id="note" placeholder="Бүртгэлд үлдэнэ"></label>
           <button class="btn" type="button" data-a="resend">Мэдэгдэл дахин илгээх</button>
           ${['READY', 'DISPATCHED'].includes(o.state) ? '<button class="btn" data-v="primary" type="button" data-a="hand">Хүлээлгэн өгсөн гэж тэмдэглэх</button>' : ''}
@@ -2186,7 +2686,7 @@ function renderSuppliers(view) {
   const list = view.querySelector('#all .rows');
   if (!rest.length) list.append(el('<div class="card empty">Нийлүүлэгч алга.</div>'));
   for (const s of rest) list.append(renderRow(s));
-  if (can('desk.idesh.manage')) view.querySelector('#new').append(newForm());
+  if (can('desk.suppliers:manage')) view.querySelector('#new').append(newForm());
   else view.querySelector('#new').remove();
 }
 
@@ -2239,8 +2739,8 @@ function renderRow(s) {
   };
 
   // Each button only for a seat that may press it: ops runs the suppliers, finance the contract's money.
-  const runs = can('desk.idesh.manage');
-  const signs = can('desk.idesh.terms');
+  const runs = can('desk.suppliers:manage');
+  const signs = can('desk.suppliers:terms');
   if (s.state === 'applied' && runs) {
     const ok = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
     ok.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/approve`, null, showCode));
@@ -2433,7 +2933,7 @@ function renderSettlement(t) {
       }</small></div>
       <div class="right"><span class="amount">${money(t.amount_mnt)}</span><span class="pill" data-s="${status[0]}">${status[1]}</span><div class="btns"></div></div>
     </div>`);
-  if (t.state === 'due' && t.bank_verified && !t.approved_at && can('desk.payouts.approve')) {
+  if (t.state === 'due' && t.bank_verified && !t.approved_at && can('desk.pay:approve')) {
     // Two people, not one: releasing the money and sending it are different
     // hands, so the row only ever offers the half that is this member's.
     const approve = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
@@ -2451,7 +2951,7 @@ function renderSettlement(t) {
     });
     row.querySelector('.btns').append(approve);
   }
-  if (t.state === 'due' && t.bank_verified && t.approved_at && can('desk.payouts.approve')) {
+  if (t.state === 'due' && t.bank_verified && t.approved_at && can('desk.pay:approve')) {
     const paid = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="paid">Шилжүүлсэн</button>');
     paid.addEventListener('click', async () => {
       const reference = prompt(`${mnt(t.amount_mnt)} → ${bank}\nБанкны гүйлгээний дугаар (заавал биш):`, '');
@@ -2511,6 +3011,7 @@ async function renderRequests(view) {
   }
   cache.requests = requests;
   badges();
+  const roles = await deskRoleList();
   const section = el(`<section class="section"><h2 class="section-label">Эрхийн хүсэлт${requests.length ? ` · ${requests.length}` : ''}</h2><div class="card" data-rows id="requests"></div></section>`);
   const list = section.querySelector('#requests');
   if (!requests.length) list.append(el('<div class="empty">Хүлээгдэж буй хүсэлт алга. Хүн dashboard-д нэвтэрч «Эрх хүсэх» дарахад энд гарна.</div>'));
@@ -2521,7 +3022,7 @@ async function renderRequests(view) {
           <div class="title">${esc(r.name)}${r.contact ? ` <span class="who-contact">${esc(r.contact)}</span>` : ''}</div>
           ${r.note ? `<p class="cap">${esc(r.note)}</p>` : ''}
           <div class="req-actions">
-            <select class="input" aria-label="Олгох эрх">${ROLE_ASK.map(([k, l]) => `<option value="${k}"${k === r.role ? ' selected' : ''}>${l}</option>`).join('')}</select>
+            <select class="input" aria-label="Олгох эрх">${roles.map((x) => roleOption(x, r.role)).join('')}</select>
             <button class="btn" data-v="primary" type="button" data-a="approve">Зөвшөөрөх</button>
             <span class="gap" aria-hidden="true"></span>
             <input class="input" name="reason" placeholder="Татгалзах шалтгаан" aria-label="Татгалзах шалтгаан">
@@ -2533,7 +3034,7 @@ async function renderRequests(view) {
     row.querySelector('[data-a="approve"]').addEventListener('click', async () => {
       try {
         const done = await ops(`/v1/ops/requests/${r.id}/approve`, { method: 'POST', body: { role: row.querySelector('select').value } });
-        toast(`${done.member.name}: ${ROLE_WORD[done.member.role] ?? done.member.role} эрх олголоо.`, 'good');
+        toast(`${done.member.name}: ${roles.find((x) => x.key === done.member.role)?.name ?? done.member.role} эрх олголоо.`, 'good');
         show('members');
       } catch (error) {
         toast(error.message, 'bad');
@@ -2566,20 +3067,21 @@ async function renderMembers(view) {
   }
   const body = view.querySelector('#members');
   if (!body) return;
+  const roleNames = new Map((await deskRoleList()).map((r) => [r.key, r.name]));
   body.replaceChildren();
   if (!data.members.length) body.append(el('<tr><td colspan="5" class="empty">Гишүүн алга. Хүн нэвтэрч эрх хүсэхэд дээр гарч ирнэ.</td></tr>'));
   for (const m of data.members) {
     const address = [m.phone ? `<span class="mono">${esc(m.phone)}</span>` : '', m.email ? `<span>${esc(m.email)}</span>` : ''].filter(Boolean).join('<br>');
     // Named but not in yet: the address has not signed in.
     const state = !m.active ? ['off', 'хаасан'] : m.joined ? ['contracted', 'идэвхтэй'] : ['applied', 'ороогүй'];
-    const tr = el(`<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td>${address}</td><td data-role>${ROLE_WORD[m.role] ?? m.role}</td><td><span class="pill" data-s="${state[0]}">${state[1]}</span></td><td class="num"></td></tr>`);
+    const tr = el(`<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td>${address}</td><td data-role>${esc(roleNames.get(m.role) ?? m.role)}</td><td><span class="pill" data-s="${state[0]}">${state[1]}</span></td><td class="num"></td></tr>`);
     if (m.id !== me?.id) {
-      // Anybody else's role is a choice here; your own is another admin's to change.
-      const pick = el(`<select class="input" data-size="sm" aria-label="${esc(m.name)}-ийн эрх">${Object.entries(ROLE_WORD).map(([k, w]) => `<option value="${k}"${k === m.role ? ' selected' : ''}>${w}</option>`).join('')}</select>`);
+      // Anybody else's role is a choice here, from the desk's roles; your own is another admin's to change.
+      const pick = el(`<select class="input" data-size="sm" aria-label="${esc(m.name)}-ийн эрх">${[...roleNames.keys()].map((k) => `<option value="${esc(k)}"${k === m.role ? ' selected' : ''}>${esc(roleNames.get(k))}</option>`).join('')}</select>`);
       pick.addEventListener('change', async () => {
         try {
           await ops(`/v1/ops/members/${m.id}/role`, { method: 'POST', body: { role: pick.value } });
-          toast(`${m.name}: ${ROLE_WORD[pick.value]} эрхтэй боллоо.`, 'good');
+          toast(`${m.name}: ${roleNames.get(pick.value) ?? pick.value} эрхтэй боллоо.`, 'good');
           m.role = pick.value;
         } catch (error) {
           pick.value = m.role;
@@ -2608,7 +3110,7 @@ async function renderMembers(view) {
       <div class="fields">
         <label class="field"><span>Нэр</span><input name="name" placeholder="Нэр"></label>
         <label class="field"><span>Имэйл</span><input name="email" type="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com"></label>
-        <label class="field"><span>Эрх</span><select name="role"><option value="ops">ops — захиалга, нийлүүлэгч</option><option value="finance">санхүү — олголт, буцаалт, данс</option><option value="viewer">зөвхөн харах</option><option value="admin">админ</option></select></label>
+        <label class="field"><span>Эрх</span><select name="role">${[...roleNames.keys()].map((k) => `<option value="${esc(k)}"${k === 'ops' ? ' selected' : ''}>${esc(roleNames.get(k))}</option>`).join('')}</select></label>
       </div>
       <div class="form-foot"><button class="btn" type="button" id="add-member">Нэмэх</button></div>
     </div></div></section>`);
@@ -2623,11 +3125,20 @@ async function renderMembers(view) {
     }
   });
   view.append(form);
-  // What each role opens, before a role is handed to anybody: the same table the server keeps.
+  // What each role opens, before a role is handed to anybody: made and changed on the roles page.
+  if (hasPage('roles')) {
+    const go = el('<p class="cap" style="margin-top:20px" id="desk-roles">Үүрэг бүр ямар хуудас, үйлдэл нээхийг <a class="link" href="#desk/roles">«Үүрэг, эрх»</a> хуудсанд үүсгэж, засна.</p>');
+    go.querySelector('a').addEventListener('click', (e) => {
+      e.preventDefault();
+      show('roles');
+    });
+    view.append(go);
+    return;
+  }
   try {
     const table = await ops('/v1/access/roles?scope=desk');
     if (tab !== 'members') return;
-    const roles = roleTable(table);
+    const roles = matrixTable(table);
     roles.prepend(el('<h2 class="section-label">Эрх бүр юу хийдэг</h2>'));
     roles.id = 'desk-roles';
     view.append(roles);

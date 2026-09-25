@@ -15,7 +15,6 @@ import {
 } from '../platform/ledger/index.js';
 import type { Ctx } from '../ports.js';
 import { sendError } from './errors.js';
-import type { Permission } from '../platform/access/index.js';
 
 /**
  * The money side of the desk.
@@ -29,7 +28,7 @@ import type { Permission } from '../platform/access/index.js';
 
 export interface MoneyGuards {
   /** A route for a desk seat that holds the permission. */
-  desk: (permission: Permission) => RouteShorthandOptions;
+  desk: (permission: string) => RouteShorthandOptions;
   who: (request: FastifyRequest) => string;
 }
 
@@ -102,7 +101,7 @@ type TopupQuery = { state?: string; from?: string; to?: string; limit?: string }
 
 export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, who }: MoneyGuards): void {
   /** The books at a glance: the checks, and every named account. */
-  app.get('/v1/ops/money', desk('desk.money.view'), async () => {
+  app.get('/v1/ops/money', desk('desk.money'), async () => {
     const [checks, accounts] = await Promise.all([reconciliationForDesk(ctx.clock.now()), accountsForDesk()]);
     const names = await namesFor(accounts.named.map((a) => a.label ?? ''));
     return {
@@ -135,14 +134,14 @@ export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, who }:
     limit: limit ?? (Number(q.limit) || undefined),
   });
 
-  app.get<{ Querystring: TransferQuery }>('/v1/ops/money/transfers', desk('desk.money.view'), async (request) => {
+  app.get<{ Querystring: TransferQuery }>('/v1/ops/money/transfers', desk('desk.money'), async (request) => {
     const transfers = await transfersForDesk(transferFilter(request.query));
     const names = await namesFor(transfers.flatMap((t) => [t.from, t.to]));
     return { transfers: transfers.map((t) => shapeTransfer(t, names)) };
   });
 
   /** For the accountant: every movement in the window, one line each. */
-  app.get<{ Querystring: TransferQuery }>('/v1/ops/money/transfers.csv', desk('desk.money.manage'), async (request, reply) => {
+  app.get<{ Querystring: TransferQuery }>('/v1/ops/money/transfers.csv', desk('desk.money:manage'), async (request, reply) => {
     const transfers = await transfersForDesk(transferFilter(request.query, 5000));
     const names = await namesFor(transfers.flatMap((t) => [t.from, t.to]));
     await recordAudit({ who: who(request), action: 'ledger.export', targetKind: 'ledger', targetId: LEDGER_ID, note: `transfers ${request.query.from ?? ''}..${request.query.to ?? ''} (${transfers.length})` });
@@ -158,7 +157,7 @@ export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, who }:
 
   const topupFilter = (q: TopupQuery, limit?: number) => ({ state: q.state || undefined, from: q.from || undefined, to: q.to || undefined, limit: limit ?? (Number(q.limit) || undefined) });
 
-  app.get<{ Querystring: TopupQuery }>('/v1/ops/money/topups', desk('desk.money.view'), async (request) => {
+  app.get<{ Querystring: TopupQuery }>('/v1/ops/money/topups', desk('desk.money'), async (request) => {
     const topups = await topupsForDesk(topupFilter(request.query));
     const ids = topups.map((t) => t.guestId);
     const [names, contacts] = await Promise.all([displayNamesFor(ids), contactsFor(ids)]);
@@ -179,7 +178,7 @@ export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, who }:
   });
 
   /** For the QPay statement: what we think they sent, to hold against what they say. */
-  app.get<{ Querystring: TopupQuery }>('/v1/ops/money/topups.csv', desk('desk.money.manage'), async (request, reply) => {
+  app.get<{ Querystring: TopupQuery }>('/v1/ops/money/topups.csv', desk('desk.money:manage'), async (request, reply) => {
     const topups = await topupsForDesk(topupFilter(request.query, 5000));
     const contacts = await contactsFor(topups.map((t) => t.guestId));
     await recordAudit({ who: who(request), action: 'ledger.export', targetKind: 'ledger', targetId: LEDGER_ID, note: `topups ${request.query.from ?? ''}..${request.query.to ?? ''} (${topups.length})` });
@@ -193,7 +192,7 @@ export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, who }:
     );
   });
 
-  app.get<{ Querystring: { state?: string } }>('/v1/ops/money/receipts', desk('desk.money.view'), async (request) => ({
+  app.get<{ Querystring: { state?: string } }>('/v1/ops/money/receipts', desk('desk.money'), async (request) => ({
     receipts: (await receiptsForDesk(request.query.state || undefined)).map((r) => ({
       id: r.id,
       kind: r.kind,
@@ -210,14 +209,14 @@ export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, who }:
     })),
   }));
 
-  app.post<{ Params: { id: string } }>('/v1/ops/money/receipts/:id/retry', desk('desk.money.manage'), async (request, reply) => {
+  app.post<{ Params: { id: string } }>('/v1/ops/money/receipts/:id/retry', desk('desk.money:manage'), async (request, reply) => {
     if (!(await retryReceipt(request.params.id))) return sendError(reply, new IdeshError('NOT_FOUND', 'no failed receipt under that id'));
     await recordAudit({ who: who(request), action: 'receipt.retry', targetKind: 'receipt', targetId: request.params.id });
     return reply.send({ id: request.params.id, state: 'queued' });
   });
 
   /** Run the checks now rather than at 23:30, and push the receipt queue while at it. */
-  app.post('/v1/ops/money/checks', desk('desk.money.manage'), async (request) => {
+  app.post('/v1/ops/money/checks', desk('desk.money:manage'), async (request) => {
     const [ledger, receipts, pushed] = await Promise.all([reconcileLedger(), reconcile(), processReceipts(ctx)]);
     await recordAudit({
       who: who(request),

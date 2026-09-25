@@ -2,27 +2,20 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { supplierOfOrg } from '../idesh/index.js';
 import { requestOf } from '../ops/index.js';
 import {
-  DESK_ROLES,
-  DESK_ROLE_WORD,
-  MODULE_WORD,
-  ORG_ROLES,
-  ORG_ROLE_WORD,
-  catalogue,
-  deskGrants,
-  deskMenu,
-  deskRoleHas,
-  meMenu,
-  modulesOf,
-  orgGrants,
-  orgMenu,
-  orgRoleHas,
-  type Grants,
+  PAGES,
+  TOP,
+  buildMenu,
+  layoutOf,
+  orgCeiling,
+  rolesForOrg,
+  rolesOf,
+  type Layout,
   type MenuGroup,
-  type OrgModule,
-  type Permission,
+  type Role,
+  type Scope,
 } from '../platform/access/index.js';
 import { profileOf } from '../platform/identity/index.js';
-import { orgById, orgsOf, roleIn, type OrgRole, type OrgState } from '../platform/org/index.js';
+import { orgById, roleIn, seatsOf, type OrgState } from '../platform/org/index.js';
 import type { Ctx } from '../ports.js';
 import { unauthorized } from './errors.js';
 import { limits } from './hardening.js';
@@ -33,10 +26,10 @@ import { deskSeatFor } from './ops.js';
  *
  * The dashboard's first question. The answer is a list of workspaces — the
  * person's own corner, Basu's desk if they sit at it, and every business
- * they belong to — each with the permissions it grants and the menu those
- * permissions draw. The page renders that and nothing else, and the route
- * behind every page checks the same permission again: hiding a page is a
- * courtesy, refusing it is the rule.
+ * they belong to — each with the permissions its role opens and the menu
+ * those draw, laid out in modules as Basu arranged them. The page renders
+ * that and nothing else, and the route behind every page checks the same
+ * permission again: hiding a page is a courtesy, refusing it is the rule.
  */
 
 interface Workspace {
@@ -48,13 +41,12 @@ interface Workspace {
   role: string | null;
   role_label: string | null;
   state?: OrgState;
-  /** Why the desk said no, for a business it turned down. */
   decline_reason?: string | null;
-  modules?: OrgModule[];
+  kinds?: { supplier: boolean; restaurant: boolean };
   supplier?: { id: string; state: string; active: boolean } | null;
   /** The desk member this seat is, for the desk's own pages. */
   seat?: { id: string; name: string };
-  permissions: Permission[];
+  permissions: string[];
   menu: MenuGroup[];
 }
 
@@ -65,15 +57,66 @@ const STATE_WORD: Record<OrgState, string> = {
   suspended: 'Түр хаасан',
 };
 
+/** A person's own corner: always there, whatever else they sit in. Nobody's role decides it. */
+const ME_MENU: MenuGroup[] = [
+  {
+    key: TOP,
+    label: null,
+    icon: 'overview',
+    items: [
+      { key: 'home', label: 'Нүүр', icon: 'overview' },
+      { key: 'profile', label: 'Профайл', icon: 'person' },
+    ],
+  },
+];
+
+/** A business still waiting for the desk, or turned down: its front page, which says so, and nothing else. */
+const WAITING_MENU: MenuGroup[] = [{ key: TOP, label: null, icon: 'overview', items: [{ key: 'home', label: 'Нүүр', icon: 'overview' }] }];
+
 function bearer(request: FastifyRequest): string | undefined {
   const header = request.headers.authorization;
   return header?.startsWith('Bearer ') ? header.slice(7) : undefined;
 }
 
-const workspace = (w: Omit<Workspace, 'permissions'> & { grants: Grants }): Workspace => {
-  const { grants, ...rest } = w;
-  return { ...rest, permissions: grants.list() };
-};
+const kindWords = (k: { supplier: boolean; restaurant: boolean }) =>
+  [k.supplier && 'Нийлүүлэгч', k.restaurant && 'Ресторан'].filter(Boolean).join(', ');
+
+/**
+ * The table of who may do what: the pages of a scope as Basu laid them out,
+ * each with what can be done on it, and the roles with what each opens.
+ * `only`, when given, keeps to those permissions — a business's kind.
+ */
+export function matrix(scope: Scope, layout: Layout, roles: Role[], only?: Set<string>) {
+  const specs = new Map(PAGES[scope].map((p) => [p.key, p]));
+  const visible = layout.pages.filter((p) => !only || only.has(`${scope}.${p.key}`)).sort((a, b) => a.sort - b.sort);
+  return {
+    modules: layout.modules
+      .filter((m) => visible.some((p) => p.module === m.key))
+      .map((m) => ({ key: m.key, name: m.key === TOP ? 'Үндсэн' : m.name, icon: m.icon })),
+    pages: visible.map((p) => ({
+      key: p.key,
+      module: p.module,
+      name: p.name,
+      icon: p.icon,
+      hidden: p.hidden,
+      link: p.href,
+      kind: specs.get(p.key)?.kind ?? null,
+      permission: `${scope}.${p.key}`,
+      actions: Object.entries(specs.get(p.key)?.actions ?? {}).map(([key, label]) => ({ key, label, permission: `${scope}.${p.key}:${key}` })),
+    })),
+    roles: roles.map((r) => ({
+      key: r.key,
+      name: r.name,
+      description: r.description,
+      locked: r.locked,
+      head: r.head,
+      everyone: r.everyone,
+      builtin: r.builtin,
+      // A locked role opens everything; there is no list to show.
+      permissions: r.locked ? null : r.permissions.filter((p) => !only || only.has(p)),
+    })),
+  };
+}
 
 export async function registerAccessRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> {
   const limit = { config: { rateLimit: limits().ops } };
@@ -84,61 +127,51 @@ export async function registerAccessRoutes(app: FastifyInstance, ctx: Ctx): Prom
 
     const workspaces: Workspace[] = [];
     if (seat) {
-      const grants = deskGrants(seat.role);
-      workspaces.push(
-        workspace({
-          id: 'desk',
-          kind: 'desk',
-          name: 'Basu',
-          sub: `Ops · ${DESK_ROLE_WORD[seat.role]}`,
-          role: seat.role,
-          role_label: DESK_ROLE_WORD[seat.role],
-          seat: { id: seat.id, name: seat.name },
-          grants,
-          menu: deskMenu(grants),
-        }),
-      );
+      workspaces.push({
+        id: 'desk',
+        kind: 'desk',
+        name: 'Basu',
+        sub: `Ops · ${seat.roleName}`,
+        role: seat.role,
+        role_label: seat.roleName,
+        seat: { id: seat.id, name: seat.name },
+        permissions: seat.grants.list(),
+        menu: buildMenu('desk', await layoutOf('desk'), seat.grants),
+      });
     }
     if (!guestId) return { account: null, workspaces, desk_request: null };
 
-    const [profile, memberships, asked] = await Promise.all([profileOf(guestId), orgsOf(guestId), requestOf(guestId)]);
-    for (const { org, role } of memberships) {
-      const modules = modulesOf(org);
+    const [profile, seats, asked, orgLayout] = await Promise.all([profileOf(guestId), seatsOf(guestId), requestOf(guestId), layoutOf('org')]);
+    for (const { org, role, roleKey, grants } of seats) {
       const active = org.state === 'active';
-      const grants = active ? orgGrants(role, modules) : orgGrants(null, []);
       const supplier = org.supplier && active ? await supplierOfOrg(org.id) : null;
-      const what = modules.map((m) => MODULE_WORD[m]).join(', ');
-      workspaces.push(
-        workspace({
-          id: org.id,
-          kind: 'org',
-          name: org.name,
-          // Waiting or turned down, the state is the news; the kind is on the page.
-          sub: active ? `${what} · ${ORG_ROLE_WORD[role]}` : STATE_WORD[org.state],
-          role,
-          role_label: ORG_ROLE_WORD[role],
-          state: org.state,
-          decline_reason: org.declineReason,
-          modules,
-          supplier: supplier ? { id: supplier.id, state: supplier.state, active: supplier.active } : null,
-          grants,
-          menu: orgMenu(grants, { orgId: org.id, modules, active }),
-        }),
-      );
+      const roleName = role?.name ?? roleKey;
+      workspaces.push({
+        id: org.id,
+        kind: 'org',
+        name: org.name,
+        sub: active ? `${kindWords(org)} · ${roleName}` : STATE_WORD[org.state],
+        role: roleKey,
+        role_label: roleName,
+        state: org.state,
+        decline_reason: org.declineReason,
+        kinds: { supplier: org.supplier, restaurant: org.restaurant },
+        supplier: supplier ? { id: supplier.id, state: supplier.state, active: supplier.active } : null,
+        permissions: grants.list(),
+        menu: active ? buildMenu('org', orgLayout, grants, { orgId: org.id }) : WAITING_MENU,
+      });
     }
     const name = profile?.displayName ?? null;
-    workspaces.unshift(
-      workspace({
-        id: 'me',
-        kind: 'me',
-        name: name ?? profile?.email ?? profile?.phone ?? 'Миний бүртгэл',
-        sub: 'Миний бүртгэл',
-        role: null,
-        role_label: null,
-        grants: orgGrants(null, []),
-        menu: meMenu(orgGrants(null, [])),
-      }),
-    );
+    workspaces.unshift({
+      id: 'me',
+      kind: 'me',
+      name: name ?? profile?.email ?? profile?.phone ?? 'Миний бүртгэл',
+      sub: 'Миний бүртгэл',
+      role: null,
+      role_label: null,
+      permissions: [],
+      menu: ME_MENU,
+    });
     return {
       account: { id: guestId, name, email: profile?.email ?? null, phone: profile?.phone ?? null },
       workspaces,
@@ -157,37 +190,35 @@ export async function registerAccessRoutes(app: FastifyInstance, ctx: Ctx): Prom
   });
 
   /**
-   * Who may do what, laid out as a table: every permission of the desk or of
-   * a business, and the roles that hold it. The rules are no secret — an
-   * owner should read them before handing somebody a role — so anybody
-   * signed in may ask. With `org`, a business's table has only the modules
-   * that business runs, and says which role the asker holds there.
+   * Who may do what, laid out as a table. The rules are no secret — an owner
+   * should read them before handing somebody a role, and anybody asking for
+   * a seat at the desk should see what each seat opens — so anybody signed in
+   * may ask. With `org`, a business's table has only its own roles and the
+   * pages that run at a business of its kind, and says which role the asker
+   * holds there.
    */
   app.get<{ Querystring: { scope?: string; org?: string } }>('/v1/access/roles', limit, async (request, reply) => {
     const { guestId, seat } = await deskSeatFor(ctx, bearer(request));
     if (!guestId && !seat) return unauthorized(reply);
     if (request.query.scope === 'desk') {
-      return {
-        scope: 'desk',
-        yours: seat?.role ?? null,
-        roles: DESK_ROLES.map((r) => ({ key: r, label: DESK_ROLE_WORD[r] })),
-        permissions: catalogue('desk').map((p) => ({ ...p, roles: DESK_ROLES.filter((r) => deskRoleHas(r, p.key)) })),
-      };
+      const layout = await layoutOf('desk');
+      const shown = new Set(layout.pages.filter((p) => !p.hidden).flatMap((p) => [`desk.${p.key}`]));
+      const table = matrix('desk', { ...layout, pages: layout.pages.filter((p) => shown.has(`desk.${p.key}`)) }, await rolesOf('desk'));
+      return { scope: 'desk', yours: seat?.role ?? null, ...table };
     }
-    let modules: OrgModule[] | undefined;
-    let yours: OrgRole | null = null;
     const orgId = request.query.org;
     if (orgId && guestId && /^[0-9a-f-]{36}$/i.test(orgId)) {
       const org = await orgById(orgId);
-      yours = org ? await roleIn(orgId, guestId) : null;
-      if (org && yours) modules = modulesOf(org);
+      const yours = org ? await roleIn(orgId, guestId) : null;
+      if (org && yours) {
+        const layout = await layoutOf('org');
+        const only = orgCeiling(org);
+        for (const p of layout.pages) if (p.href) only.add(`org.${p.key}`);
+        const shown = { ...layout, pages: layout.pages.filter((p) => !p.hidden) };
+        return { scope: 'org', yours, kinds: { supplier: org.supplier, restaurant: org.restaurant }, ...matrix('org', shown, await rolesForOrg(org.id), only) };
+      }
     }
-    return {
-      scope: 'org',
-      yours,
-      modules: modules ?? ['idesh', 'dine'],
-      roles: ORG_ROLES.map((r) => ({ key: r, label: ORG_ROLE_WORD[r] })),
-      permissions: catalogue('org', modules).map((p) => ({ ...p, roles: ORG_ROLES.filter((r) => orgRoleHas(r, p.key)) })),
-    };
+    const layout = await layoutOf('org');
+    return { scope: 'org', yours: null, ...matrix('org', { ...layout, pages: layout.pages.filter((p) => !p.hidden) }, await rolesOf('org')) };
   });
 }

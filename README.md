@@ -94,7 +94,7 @@ src/platform/   Аль ч vertical-д хамаарахгүй, бүгдэд нь 
   ledger/       Мөнгө: түрийвч, давхар бичилт, цэнэглэлт, е-баримт
   notify/       Мэдэгдэл: дараалал, суваг, төхөөрөмж, inbox
   org/          Байгууллага (ресторан, нийлүүлэгч) ба хүмүүс нь, үүрэг, эрхийн түүх
-  access/       Хэн юу хийж болох вэ: эрх, үүрэг, модуль, dashboard-ын цэс — нэг хүснэгт (ADR 0003)
+  access/       Хэн юу хийж болох вэ: кодын хуудас, үйлдлүүд; Basu-гийн үүсгэсэн үүрэг, цэс (ADR 0004)
 src/db/         Pool, гүйлгээ, миграц, станцын дэвтэр
 src/ports.ts    Гадаад системүүдийн интерфейс + тестийн хуурамч хувилбарууд
 src/sim/        Өдрийн симуляц
@@ -135,7 +135,7 @@ grid бол grid биш. Сүүлийн үеийн зүйл ИДЭВХТЭЙ х�
 | ledger | `ledger.*` | `src/platform/ledger/index.ts` |
 | notify | `notify.*` | `src/platform/notify/index.ts` |
 | org | `org.*` | `src/platform/org/index.ts` |
-| access | — (хүснэгтгүй, дүрэм л) | `src/platform/access/index.ts` |
+| access | `access.*` | `src/platform/access/index.ts` |
 | хоол (vertical) | `dine.*` | — |
 | идэш (vertical) | `idesh.*` | `src/idesh/index.ts` |
 

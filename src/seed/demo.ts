@@ -73,7 +73,7 @@ export async function seedDemo(): Promise<{
              dine.dining_order, dine.slot, dine.dining_table, dine.menu_item, dine.station,
              dine.trust_profile, dine.kds_device, dine.restaurant,
              idesh.order_event, idesh.idesh_order, idesh.listing, idesh.supplier_device,
-             idesh.supplier, org.membership, org.organization,
+             idesh.supplier, org.membership_log, org.membership, org.organization, access.org_role,
              identity.profile, identity.guest_session, identity.guest, identity.otp_challenge
     RESTART IDENTITY CASCADE
   `);

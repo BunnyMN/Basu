@@ -106,7 +106,7 @@ describe('a supplier that sells only идэш', () => {
     expect(mine.sub).toBe('Нийлүүлэгч · Ажилтан');
     expect(pages(mine.menu)).toEqual(['home', 'idesh.today', 'idesh.orders', 'idesh.stall', 'idesh.profile', 'team', 'profile', 'roles']);
     expect(mine.menu.map((g) => g.label)).not.toContain('Хоол');
-    expect(mine.permissions).not.toContain('idesh.money.view');
+    expect(mine.permissions).not.toContain('org.idesh.money');
 
     // The doors behind the pages it does not show stay shut.
     expect((await call('GET', '/v1/supplier/money', staff)).statusCode).toBe(403);
@@ -123,8 +123,8 @@ describe('a supplier that sells only идэш', () => {
     // What the supplier's own page asks before drawing its tabs.
     const me = (await call('GET', '/v1/supplier/me', staff)).json().supplier;
     expect(me).toMatchObject({ role: 'staff', org_id: orgId });
-    expect(me.permissions).toContain('idesh.orders.act');
-    expect(me.permissions).not.toContain('idesh.money.view');
+    expect(me.permissions).toContain('org.idesh.orders:act');
+    expect(me.permissions).not.toContain('org.idesh.money');
   });
 
   it('shows its accountant the money and the orders, and keeps the counter and the stall shut', async () => {
@@ -150,7 +150,7 @@ describe('a restaurant', () => {
     const mine = (await access(owner)).workspaces.find((w) => w.id === orgId)!;
     expect(mine.sub).toBe('Ресторан · Эзэн');
     expect(pages(mine.menu)).toEqual(['home', 'dine.orders', 'dine.menu', 'dine.kitchen', 'dine.money', 'team', 'profile', 'roles', 'log']);
-    expect(mine.permissions.some((p) => p.startsWith('idesh.'))).toBe(false);
+    expect(mine.permissions.some((p) => p.startsWith('org.idesh.'))).toBe(false);
     expect((await call('GET', '/v1/supplier/board', owner, undefined, { 'x-basu-org': orgId })).statusCode).toBe(403);
     expect((await call('GET', '/v1/supplier/me', owner)).json().supplier).toBeNull();
   });
@@ -231,16 +231,20 @@ describe('the record of who holds what', () => {
 });
 
 describe('the table of roles', () => {
-  it('lays out only the modules the business runs, and says which role the asker holds', async () => {
+  it('lays out only the pages the business runs and the roles it may hand out, and says which the asker holds', async () => {
     const owner = await person('+97699120001', 'Дорж');
     const orgId = await aBusiness(owner, 'Хэрлэн мах', { supplier: true });
     const table = (await call('GET', `/v1/access/roles?org=${orgId}`, owner)).json();
-    expect(table).toMatchObject({ scope: 'org', yours: 'owner', modules: ['idesh'] });
-    expect(table.permissions.some((p: { key: string }) => p.key.startsWith('dine.'))).toBe(false);
-    expect(table.permissions.find((p: { key: string }) => p.key === 'idesh.money.view').roles).toEqual(['owner', 'manager', 'accountant']);
+    expect(table).toMatchObject({ scope: 'org', yours: 'owner', kinds: { supplier: true, restaurant: false } });
+    expect(table.pages.some((p: { key: string }) => p.key.startsWith('dine.'))).toBe(false);
+    const staff = table.roles.find((r: { key: string }) => r.key === 'staff');
+    expect(staff.permissions).toContain('org.idesh.orders:act');
+    expect(staff.permissions).not.toContain('org.dine.menu');
+    expect(table.modules.map((m: { name: string }) => m.name)).toEqual(['Үндсэн', 'Идэш', 'Байгууллага']);
 
     const deskTable = (await call('GET', '/v1/access/roles?scope=desk', owner)).json();
     expect(deskTable.roles.map((r: { key: string }) => r.key)).toEqual(['admin', 'ops', 'finance', 'viewer']);
+    expect(deskTable.roles[0]).toMatchObject({ locked: true, permissions: null });
     expect(deskTable.yours).toBeNull();
   });
 });

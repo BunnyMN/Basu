@@ -1,232 +1,168 @@
+import { TOP, known, orgCeiling, parse, permissionsOf, type Scope } from './catalog.js';
+
 /**
- * Who may do what, in one place.
+ * What a role lets a person do, worked out from the role Basu wrote and
+ * what the code can draw. Pure: the rows come from `store.ts`, the menu's
+ * layout too; nothing here touches the database.
  *
- * Basu has two kinds of seat. At Basu's own desk a member is an admin, ops,
- * finance or a viewer, and sees the whole house through that role. In a
- * business — a restaurant, a supplier, or both — a member is its owner, a
- * manager, staff or its accountant, and sees only that business, and of it
- * only what the role reaches.
- *
- * Everything a person can open or press is a permission named here; a role
- * is a list of permissions; and a business runs only the modules of what it
- * is. So a butcher's staff never meet a menu, whatever their role would
- * allow at a restaurant, and an accountant reads the money without being
- * able to cancel anybody's sheep.
- *
- * The pages ask this module what to draw and the routes ask it what to
- * allow, so the menu a person sees and the doors the server opens are the
- * same list. Deny is the default: a permission no role names is nobody's.
+ * Deny is the default. A role opens exactly the permissions in its list
+ * that the code still knows — a page renamed away in a release simply
+ * stops being opened — and a business's role opens only the pages that
+ * run at a business of its kind. Nobody may hand out, or write into a role,
+ * more than they hold themselves.
  */
 
-export type DeskRole = 'admin' | 'ops' | 'finance' | 'viewer';
-export type OrgRole = 'owner' | 'manager' | 'staff' | 'accountant';
-
-/** What a business is decides which of Basu's modules it runs. */
-export type OrgModule = 'idesh' | 'dine';
-
-interface Spec {
-  /** Where the permission can hold at all. */
-  scope: 'desk' | 'org';
-  /** The module a business must run for it to mean anything; none is every business. */
-  module?: OrgModule;
-  /** What it lets a person do, as the roles page says it. */
-  mn: string;
+export interface RoleShape {
+  scope: Scope;
+  key: string;
+  name: string;
+  permissions: readonly string[];
+  locked: boolean;
+  head: boolean;
 }
-
-export const PERMISSIONS = {
-  /* ── Basu's desk ── */
-  'desk.overview': { scope: 'desk', mn: 'Самбар — бүх системийн тойм' },
-  'desk.guests.view': { scope: 'desk', mn: 'Зочин хайх, файлыг нь харах' },
-  'desk.guests.sessions': { scope: 'desk', mn: 'Алдсан утсыг бүртгэлээс гаргах' },
-  'desk.guests.close': { scope: 'desk', mn: 'Зочны бүртгэл хаах' },
-  'desk.money.view': { scope: 'desk', mn: 'Түрийвч, дансны бүртгэл харах' },
-  'desk.money.manage': { scope: 'desk', mn: 'Тулгалт хийх, CSV татах, баримт дахин илгээх' },
-  'desk.notify.view': { scope: 'desk', mn: 'Илгээсэн мэдэгдэл харах' },
-  'desk.notify.retry': { scope: 'desk', mn: 'Мэдэгдэл дахин илгээх' },
-  'desk.system.view': { scope: 'desk', mn: 'Системийн төлөв харах' },
-  'desk.system.manage': { scope: 'desk', mn: 'Системийн тохиргоо өөрчлөх' },
-  'desk.dine.view': { scope: 'desk', mn: 'Ресторан, хоолны захиалга, үнэлгээ харах' },
-  'desk.dine.manage': { scope: 'desk', mn: 'Ресторан, таблет, цэс, хоолны захиалга удирдах' },
-  'desk.idesh.view': { scope: 'desk', mn: 'Идэшний захиалга, нийлүүлэгч, тоо харах' },
-  'desk.idesh.manage': { scope: 'desk', mn: 'Нийлүүлэгч батлах, захиалга цуцлах, зар нуух' },
-  'desk.idesh.terms': { scope: 'desk', mn: 'Гэрээний шимтгэл, данс, дансны баталгаажуулалт' },
-  'desk.payouts.view': { scope: 'desk', mn: 'Олголт, буцаалтын жагсаалт харах' },
-  'desk.payouts.approve': { scope: 'desk', mn: 'Олголт батлах, шилжүүлснийг тэмдэглэх' },
-  'desk.orgs.view': { scope: 'desk', mn: 'Байгууллагуудын бүртгэл харах' },
-  'desk.orgs.decide': { scope: 'desk', mn: 'Байгууллага батлах, татгалзах' },
-  'desk.members.manage': { scope: 'desk', mn: 'Гишүүд, эрхийн хүсэлт шийдэх' },
-  'desk.audit.view': { scope: 'desk', mn: 'Үйлдлийн түүх харах' },
-
-  /* ── a business, whatever it is ── */
-  'org.view': { scope: 'org', mn: 'Байгууллагын нүүр, мэдээлэл харах' },
-  'org.team.view': { scope: 'org', mn: 'Хамт ажиллагсдаа харах' },
-  'org.team.manage': { scope: 'org', mn: 'Ажилтан, нягтлан нэмэх, хасах' },
-  'org.managers.manage': { scope: 'org', mn: 'Менежер, эзэн томилох' },
-  'org.profile.edit': { scope: 'org', mn: 'Байгууллагын мэдээлэл засах' },
-  'org.bank.manage': { scope: 'org', mn: 'Мөнгө очих данс солих' },
-  'org.log.view': { scope: 'org', mn: 'Эрхийн өөрчлөлтийн түүх харах' },
-
-  /* ── a supplier: өвлийн идэш ── */
-  'idesh.board': { scope: 'org', module: 'idesh', mn: 'Өнөөдрийн ажил' },
-  'idesh.orders.view': { scope: 'org', module: 'idesh', mn: 'Идэшний захиалга харах' },
-  'idesh.orders.act': { scope: 'org', module: 'idesh', mn: 'Захиалга бэлтгэх, хүлээлгэн өгөх, цуцлах' },
-  'idesh.listings.view': { scope: 'org', module: 'idesh', mn: 'Зар харах' },
-  'idesh.listings.edit': { scope: 'org', module: 'idesh', mn: 'Зар нэмэх, засах' },
-  'idesh.money.view': { scope: 'org', module: 'idesh', mn: 'Орлого, олголт, шимтгэл, данс харах' },
-
-  /* ── a restaurant: хоол ── */
-  'dine.orders.view': { scope: 'org', module: 'dine', mn: 'Хоолны захиалга харах' },
-  'dine.orders.act': { scope: 'org', module: 'dine', mn: 'Захиалгыг гал тогоонд удирдах' },
-  'dine.menu.view': { scope: 'org', module: 'dine', mn: 'Цэс харах' },
-  'dine.menu.edit': { scope: 'org', module: 'dine', mn: 'Цэс засах, үнэ өөрчлөх' },
-  'dine.kitchen': { scope: 'org', module: 'dine', mn: 'Гал тогооны дэлгэц холбох' },
-  'dine.money.view': { scope: 'org', module: 'dine', mn: 'Орлого, олголт харах' },
-} as const satisfies Record<string, Spec>;
-
-export type Permission = keyof typeof PERMISSIONS;
-
-const ALL = Object.keys(PERMISSIONS) as Permission[];
-const inScope = (scope: Spec['scope']) => ALL.filter((p) => PERMISSIONS[p].scope === scope);
-
-export const DESK_ROLES: readonly DeskRole[] = ['admin', 'ops', 'finance', 'viewer'];
-export const ORG_ROLES: readonly OrgRole[] = ['owner', 'manager', 'staff', 'accountant'];
-
-export const DESK_ROLE_WORD: Record<DeskRole, string> = { admin: 'Админ', ops: 'Ops', finance: 'Санхүү', viewer: 'Зөвхөн харах' };
-export const ORG_ROLE_WORD: Record<OrgRole, string> = { owner: 'Эзэн', manager: 'Менежер', staff: 'Ажилтан', accountant: 'Нягтлан' };
-export const MODULE_WORD: Record<OrgModule, string> = { idesh: 'Нийлүүлэгч', dine: 'Ресторан' };
-
-/**
- * The desk. Admin holds everything; ops runs orders, suppliers, kitchens and
- * businesses; finance moves money and checks accounts; a viewer reads what
- * the others read and presses nothing. Only admin decides who sits here.
- */
-const DESK: Record<DeskRole, readonly Permission[]> = {
-  admin: inScope('desk'),
-  ops: [
-    'desk.overview',
-    'desk.guests.view',
-    'desk.guests.sessions',
-    'desk.notify.view',
-    'desk.notify.retry',
-    'desk.system.view',
-    'desk.dine.view',
-    'desk.dine.manage',
-    'desk.idesh.view',
-    'desk.idesh.manage',
-    'desk.payouts.view',
-    'desk.orgs.view',
-    'desk.orgs.decide',
-    'desk.audit.view',
-  ],
-  finance: [
-    'desk.overview',
-    'desk.guests.view',
-    'desk.money.view',
-    'desk.money.manage',
-    'desk.idesh.view',
-    'desk.idesh.terms',
-    'desk.payouts.view',
-    'desk.payouts.approve',
-    'desk.orgs.view',
-    'desk.audit.view',
-  ],
-  viewer: [
-    'desk.overview',
-    'desk.guests.view',
-    'desk.money.view',
-    'desk.notify.view',
-    'desk.system.view',
-    'desk.dine.view',
-    'desk.idesh.view',
-    'desk.payouts.view',
-    'desk.orgs.view',
-    'desk.audit.view',
-  ],
-};
-
-/**
- * A business. The owner holds everything, and alone appoints managers and
- * says where the money goes. A manager runs the day and the people in it.
- * Staff do the work — orders, the stall, the kitchen — and never see the
- * money. The accountant sees the money and the orders it came from, and
- * changes nothing.
- */
-const ORG: Record<OrgRole, readonly Permission[]> = {
-  owner: inScope('org'),
-  manager: inScope('org').filter((p) => p !== 'org.managers.manage' && p !== 'org.bank.manage'),
-  staff: [
-    'org.view',
-    'org.team.view',
-    'idesh.board',
-    'idesh.orders.view',
-    'idesh.orders.act',
-    'idesh.listings.view',
-    'idesh.listings.edit',
-    'dine.orders.view',
-    'dine.orders.act',
-    'dine.menu.view',
-  ],
-  accountant: ['org.view', 'org.team.view', 'idesh.orders.view', 'idesh.money.view', 'dine.orders.view', 'dine.money.view'],
-};
 
 /** A set of permissions, asked one at a time. */
 export interface Grants {
-  has(permission: Permission): boolean;
-  list(): Permission[];
+  has(permission: string): boolean;
+  list(): string[];
 }
 
-function grants(permissions: Iterable<Permission>): Grants {
+export function grants(permissions: Iterable<string>): Grants {
   const held = new Set(permissions);
-  return { has: (p) => held.has(p), list: () => ALL.filter((p) => held.has(p)) };
+  return { has: (p) => held.has(p), list: () => [...held] };
 }
 
 export const NO_GRANTS: Grants = grants([]);
 
-/** What a member of the desk may do. An unknown role is nothing. */
-export function deskGrants(role: string | null | undefined): Grants {
-  return grants(role && role in DESK ? DESK[role as DeskRole] : []);
+/**
+ * What a role opens: a locked role everything of its scope — every page the
+ * code draws and every link Basu added to the menu — and any other role its
+ * own list, less whatever the code no longer knows. `links` are the view
+ * permissions of the links in that scope's menu.
+ */
+export function grantsOf(role: RoleShape | null | undefined, links: readonly string[] = []): Grants {
+  if (!role) return NO_GRANTS;
+  const linkSet = new Set(links);
+  if (role.locked) return grants([...permissionsOf(role.scope), ...links]);
+  return grants(role.permissions.filter((p) => parse(p)?.scope === role.scope && (known(p) || linkSet.has(p))));
 }
 
 /**
- * What a member of a business may do there: the role's permissions, less
- * those of modules the business does not run. A supplier's manager holds no
- * menu; a restaurant's staff hold no listings.
+ * What a role opens at one business: its grants, less the pages that do
+ * not run at a business of that kind — a butcher's staff hold no menu,
+ * whatever their role says elsewhere.
  */
-export function orgGrants(role: string | null | undefined, modules: readonly OrgModule[]): Grants {
-  if (!role || !(role in ORG)) return NO_GRANTS;
-  return grants(
-    ORG[role as OrgRole].filter((p) => {
-      const module = (PERMISSIONS[p] as Spec).module;
-      return !module || modules.includes(module);
-    }),
-  );
+export function orgGrantsOf(role: RoleShape | null | undefined, kinds: { supplier: boolean; restaurant: boolean }, links: readonly string[] = []): Grants {
+  if (!role || role.scope !== 'org') return NO_GRANTS;
+  const ceiling = orgCeiling(kinds);
+  for (const l of links) ceiling.add(l);
+  return grants(grantsOf(role, links).list().filter((p) => ceiling.has(p)));
 }
 
-/** The modules a business runs, from what it registered as. */
-export function modulesOf(org: { supplier: boolean; restaurant: boolean }): OrgModule[] {
-  return [...(org.supplier ? (['idesh'] as const) : []), ...(org.restaurant ? (['dine'] as const) : [])];
+/** Whether every permission in `wanted` is one the actor holds. */
+const within = (actor: Grants, wanted: Iterable<string>): boolean => [...wanted].every((p) => actor.has(p));
+
+/** The permissions that put a person in charge of people at a business. */
+const RULES_PEOPLE = ['org.team:manage', 'org.team:heads'];
+
+/**
+ * Whether somebody at a business, holding `actor`, may give, change or take
+ * away `role` there. They must manage the team; the role must open nothing
+ * they cannot open themselves; and a head role, or one that manages people,
+ * is only for somebody who may appoint heads.
+ */
+export function mayHandOut(actor: Grants, role: RoleShape, kinds: { supplier: boolean; restaurant: boolean }, links: readonly string[] = []): boolean {
+  if (role.scope !== 'org' || !actor.has('org.team:manage')) return false;
+  const opens = orgGrantsOf(role, kinds, links).list();
+  if (!within(actor, opens)) return false;
+  if ((role.head || opens.some((p) => RULES_PEOPLE.includes(p))) && !actor.has('org.team:heads')) return false;
+  return true;
 }
 
 /**
- * Whether a member in `actor`'s role may give, change or take away `role`.
- * Staff and accountants are the managers' to handle; managers and owners
- * are the owner's alone. Changing somebody's role needs both their old role
- * and the new one to be within reach.
+ * Whether a desk member holding `actor` may seat somebody in `role`: they
+ * manage the members, and the role opens nothing they cannot. Only somebody
+ * in a locked role seats somebody in one.
  */
-export function mayAssign(actor: string | null | undefined, role: OrgRole): boolean {
-  const reach: Permission = role === 'staff' || role === 'accountant' ? 'org.team.manage' : 'org.managers.manage';
-  return orgGrants(actor, ['idesh', 'dine']).has(reach);
+export function mayHandOutDesk(actor: Grants, role: RoleShape, links: readonly string[] = [], actorLocked = false): boolean {
+  if (role.scope !== 'desk' || !actor.has('desk.members:manage')) return false;
+  if (role.locked) return actorLocked;
+  return within(actor, grantsOf(role, links).list());
 }
 
-/** Every permission of a scope, with its words — what the roles page lays out as a table. */
-export function catalogue(scope: 'desk' | 'org', modules?: readonly OrgModule[]) {
-  return inScope(scope)
-    .filter((p) => {
-      const module = (PERMISSIONS[p] as Spec).module;
-      return !module || !modules || modules.includes(module);
-    })
-    .map((p) => ({ key: p, module: (PERMISSIONS[p] as Spec).module ?? null, mn: PERMISSIONS[p].mn }));
+/** Whether the actor may write these permissions into a role: only those they hold. */
+export const mayShape = (actor: Grants, permissions: Iterable<string>): boolean => within(actor, permissions);
+
+/* ── the menu ───────────────────────────────────────────────────────── */
+
+export interface LayoutModule {
+  key: string;
+  name: string | null;
+  icon: string;
+  sort: number;
 }
 
-export const deskRoleHas = (role: DeskRole, p: Permission): boolean => DESK[role].includes(p);
-export const orgRoleHas = (role: OrgRole, p: Permission): boolean => ORG[role].includes(p);
+export interface LayoutPage {
+  key: string;
+  module: string;
+  name: string;
+  icon: string;
+  sort: number;
+  hidden: boolean;
+  /** Set for a link Basu added; a page the code draws has none. */
+  href: string | null;
+}
+
+export interface Layout {
+  modules: LayoutModule[];
+  pages: LayoutPage[];
+}
+
+export interface MenuItem {
+  key: string;
+  label: string;
+  icon: string;
+  /** Another page draws it — the supplier's screen, or a link Basu added. */
+  href?: string;
+}
+
+export interface MenuGroup {
+  key: string;
+  /** Null for the top of the menu, whose pages need no heading. */
+  label: string | null;
+  icon: string;
+  items: MenuItem[];
+}
+
+/**
+ * The menu one person sees in one place: Basu's modules in Basu's order,
+ * under each the pages Basu put there that this person may open, and no
+ * module left with nothing in it. A supplier's pages are the supplier's own
+ * screen, opened for this business.
+ */
+export function buildMenu(scope: Scope, layout: Layout, held: Grants, opts: { orgId?: string } = {}): MenuGroup[] {
+  const modules = [...layout.modules].sort((a, b) => Number(b.key === TOP) - Number(a.key === TOP) || a.sort - b.sort);
+  return modules
+    .map((m) => ({
+      key: m.key,
+      label: m.key === TOP ? null : m.name,
+      icon: m.icon,
+      items: layout.pages
+        .filter((p) => p.module === m.key && !p.hidden && held.has(`${scope}.${p.key}`))
+        .sort((a, b) => a.sort - b.sort)
+        .map((p) => ({
+          key: p.key,
+          label: p.name,
+          icon: p.icon,
+          ...(p.href
+            ? { href: p.href }
+            : scope === 'org' && p.key.startsWith('idesh.') && opts.orgId
+              ? { href: `/supplier?org=${opts.orgId}#${p.key.slice('idesh.'.length)}` }
+              : {}),
+        })),
+    }))
+    .filter((g) => g.items.length > 0);
+}
+
+/** Every page key a menu opens. */
+export const pagesOf = (menu: MenuGroup[]): string[] => menu.flatMap((g) => g.items.map((i) => i.key));

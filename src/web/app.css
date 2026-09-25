@@ -707,30 +707,47 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .ws-opt:focus-visible,.ws-act:focus-visible{outline-offset:-2px}
 .ws-sep{height:1px;margin:4px 2px;background:var(--line)}
 
-/* the place's menu: the top items bare, then one folding group per module */
+/* the place's menu, as a tree: pages that stand alone at the top, then each
+   module a row of its own — its icon, its name, a fold — and its pages
+   beneath it on a guide line. The open page is filled and marked on the
+   line; its module's icon takes the accent. */
 .sidebar .tabs{display:flex;flex-direction:column;gap:2px;flex:1;min-height:0;overflow-y:auto;margin:0 -4px;padding:0 4px 8px;position:static;height:auto;border:0;background:none}
-.nav-top,.grp-items{display:flex;flex-direction:column;gap:2px}
-.nav-group{margin-top:10px}
-.sidebar .grp{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:28px;padding:0 10px;border:0;border-radius:var(--r-sm);background:none;font-family:var(--mono);font-size:var(--t-eyebrow);font-weight:500;letter-spacing:var(--track-eyebrow);text-transform:uppercase;color:var(--ink-3);text-align:left}
-.sidebar .grp svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform var(--dur) var(--ease)}
-@media (hover:hover){.sidebar .grp:hover{background:var(--surface-2);color:var(--ink-2)}}
-.nav-group[data-shut] .grp svg{transform:rotate(-90deg)}
-.nav-group[data-shut] .grp-items{display:none}
-.grp-items{margin-top:2px}
+.nav-top{display:flex;flex-direction:column;gap:2px}
+.nav-mod{margin-top:2px}
+.nav-top + .nav-mod{margin-top:8px}
+.sidebar .mod{
+  display:flex;align-items:center;gap:10px;width:100%;min-height:38px;padding:0 10px;
+  border:0;border-radius:var(--r-sm);background:none;font-family:var(--sans);font-size:var(--t-body);font-weight:600;color:var(--ink);text-align:left;
+}
+.sidebar .mod svg{flex:none;fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}
+.sidebar .mod > svg:first-child{width:18px;height:18px;stroke-width:1.6;color:var(--ink-3)}
+.sidebar .mod > svg:last-child{width:14px;height:14px;stroke-width:1.8;color:var(--ink-3);transition:transform var(--dur) var(--ease)}
+.sidebar .mod .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (hover:hover){.sidebar .mod:hover{background:var(--surface-2)}}
+.nav-mod[data-here] > .mod > svg:first-child{color:var(--accent)}
+.nav-mod[data-shut] > .mod > svg:last-child{transform:rotate(-90deg)}
+.nav-mod:not([data-shut]) > .mod > .n{display:none}
+.mod-items{display:flex;flex-direction:column;gap:1px;margin:2px 0 6px 19px;padding-left:10px;border-left:1px solid var(--line)}
+.nav-mod[data-shut] > .mod-items{display:none}
 .sidebar [data-tab]{
-  display:flex;flex-direction:row;align-items:center;gap:10px;width:100%;flex:none;min-height:34px;padding:0 10px;
+  display:flex;flex-direction:row;align-items:center;gap:10px;width:100%;flex:none;min-height:36px;padding:0 10px;
   border:0;border-radius:var(--r-sm);background:none;font-family:var(--sans);font-size:var(--t-body);font-weight:500;color:var(--ink-2);text-align:left;text-decoration:none;
 }
 .sidebar [data-tab] svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3)}
 .sidebar [data-tab] span.t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sidebar [data-tab].sub{position:relative;min-height:32px;padding:0 10px}
+.sidebar [data-tab] .away{display:inline-flex;margin-left:auto}
+.sidebar [data-tab] .away svg{width:13px;height:13px;color:var(--ink-3)}
 .sidebar [data-tab][data-on]{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
 .sidebar [data-tab][data-on] svg{color:var(--accent)}
+.sidebar [data-tab].sub[data-on]::before{content:"";position:absolute;left:-11px;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--accent)}
 @media (hover:hover){.sidebar [data-tab]:hover{background:var(--surface-2);color:var(--ink)}.sidebar [data-tab][data-on]:hover{background:var(--accent-soft);color:var(--accent-ink)}}
-.sidebar [data-tab] .n,.sidebar .count{
+.sidebar [data-tab] .n,.sidebar .mod .n,.sidebar .count{
   margin-left:auto;display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:var(--r-sm);
   background:var(--surface-2);color:var(--ink-2);font-family:var(--mono);font-size:.6875rem;font-weight:600;font-variant-numeric:tabular-nums;
 }
-.sidebar [data-tab] .n[data-hot]{background:var(--accent);color:var(--on-accent)}
+.sidebar [data-tab] .away + .n{margin-left:6px}
+.sidebar [data-tab] .n[data-hot],.sidebar .mod .n[data-hot]{background:var(--accent);color:var(--on-accent)}
 
 /* the person, and the way out */
 .acct{display:flex;align-items:center;gap:10px;margin-top:8px;padding:12px 2px 0 6px;border-top:1px solid var(--line)}
@@ -761,7 +778,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
   .nav-scrim:not([hidden]){display:block;position:fixed;inset:0;z-index:var(--z-scrim);background:var(--scrim)}
   :root[data-nav-open]{overflow:hidden}
 }
-@media (prefers-reduced-motion:reduce){.sidebar,.sidebar .grp svg{transition:none}}
+@media (prefers-reduced-motion:reduce){.sidebar,.sidebar .mod svg{transition:none}}
 
 /* ── segmented control ────────────────────────────────────────────── */
 .seg{display:inline-flex;gap:2px;padding:3px;border-radius:var(--r-ctl);background:var(--surface-2);border:1px solid var(--line)}

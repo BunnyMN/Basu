@@ -55,6 +55,7 @@ import { registerPaymentRoutes } from './payments.js';
 import { registerAuthRoutes } from './auth.js';
 import { registerOrgRoutes } from './orgs.js';
 import { registerAccessRoutes } from './access.js';
+import { ensureRoles } from '../platform/access/index.js';
 import { FakeMailer, type Ctx } from '../ports.js';
 
 /**
@@ -98,6 +99,8 @@ export interface ServerOptions {
 
 export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({ logger: options.logger ?? false, trustProxy: options.trustProxy ?? false, bodyLimit: 64 * 1024 });
+  // The roles every server starts with, where they are missing. What Basu changed is left as it is.
+  await ensureRoles();
   const db = getPool();
 
   // Every response, the same headers; every address, a ceiling on how often

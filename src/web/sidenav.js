@@ -43,6 +43,16 @@ export const NAV_ICON = {
   burger: '<svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   key: '<svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg>',
+  home: '<svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-6h4v6"/></svg>',
+  layers: '<svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>',
+  bowl: '<svg viewBox="0 0 24 24"><path d="M3 11h18a9 9 0 0 1-18 0z"/><path d="M8 7c0-1.5 1-2 1-3.5M12 7c0-1.5 1-2 1-3.5M16 7c0-1.5 1-2 1-3.5"/></svg>',
+  settings: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
+  layout: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M9 10h12"/></svg>',
+  link: '<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1"/><path d="M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/></svg>',
+  truck: '<svg viewBox="0 0 24 24"><path d="M3 6h11v10H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>',
+  tag: '<svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg>',
+  file: '<svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>',
+  away: '<svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></svg>',
 };
 
 /**
@@ -91,20 +101,27 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', o
   };
   const shutKey = (group) => `${current.kind}:${group}`;
 
-  const item = (it) => {
-    const inner = `${icon(it.icon)}<span class="t">${esc(it.label)}</span><span class="n" data-badge="${esc(it.key)}" hidden></span>`;
+  /**
+   * One page of the menu. At the top a page wears its own icon; under a
+   * module the module's icon speaks for all of them, and the page is text
+   * on the module's guide line. A link to elsewhere says so, and opens apart.
+   */
+  const item = (it, sub) => {
+    const away = Boolean(it.href && /^https?:/.test(it.href));
+    const inner = `${sub ? '' : icon(it.icon)}<span class="t">${esc(it.label)}</span>${away ? `<span class="away" aria-label="шинэ цонхонд">${NAV_ICON.away}</span>` : ''}<span class="n" data-badge="${esc(it.key)}" hidden></span>`;
+    const cls = sub ? 'nav-item sub' : 'nav-item';
     return it.href
-      ? `<a class="nav-item" data-tab="${esc(it.key)}" href="${esc(it.href)}">${inner}</a>`
-      : `<button class="nav-item" type="button" data-tab="${esc(it.key)}">${inner}</button>`;
+      ? `<a class="${cls}" data-tab="${esc(it.key)}" href="${esc(it.href)}"${away ? ' target="_blank" rel="noopener noreferrer"' : ''}>${inner}</a>`
+      : `<button class="${cls}" type="button" data-tab="${esc(it.key)}">${inner}</button>`;
   };
   const groups = current.menu
     .map((g) => {
-      if (!g.label) return `<div class="nav-top">${g.items.map(item).join('')}</div>`;
+      if (!g.label) return `<div class="nav-top">${g.items.map((it) => item(it, false)).join('')}</div>`;
       const id = `nav-${current.kind}-${g.key}`;
       const open = !shut.has(shutKey(g.key));
-      return `<section class="nav-group" data-group="${esc(g.key)}"${open ? '' : ' data-shut'}>
-          <button class="grp" type="button" aria-expanded="${open}" aria-controls="${id}"><span>${esc(g.label)}</span>${NAV_ICON.chev}</button>
-          <div class="grp-items" id="${id}">${g.items.map(item).join('')}</div>
+      return `<section class="nav-mod" data-group="${esc(g.key)}"${open ? '' : ' data-shut'}>
+          <button class="mod" type="button" aria-expanded="${open}" aria-controls="${id}">${icon(g.icon)}<span class="t">${esc(g.label)}</span><span class="n" data-mod-badge hidden></span>${NAV_ICON.chev}</button>
+          <div class="mod-items" id="${id}" role="group" aria-label="${esc(g.label)}">${g.items.map((it) => item(it, true)).join('')}</div>
         </section>`;
     })
     .join('');
@@ -208,8 +225,8 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', o
     } else if (side.hasAttribute('data-open')) drawer(false);
   });
 
-  /* ── the groups fold ── */
-  for (const button of root.querySelectorAll('.nav-group > .grp')) {
+  /* ── the modules fold ── */
+  for (const button of root.querySelectorAll('.nav-mod > .mod')) {
     button.addEventListener('click', () => {
       const box = button.parentElement;
       const open = box.hasAttribute('data-shut');
@@ -229,10 +246,11 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', o
     const it = items.find((x) => x.key === node.dataset.tab);
     if (!it) return;
     // A link to another page leaves by itself, unless the page says it draws that item here.
-    if (node.tagName === 'A' && e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
+    if (node.tagName === 'A') {
+      if (node.target === '_blank' || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
       if (onPage(it) === false) return;
       e.preventDefault();
-    } else if (node.tagName !== 'A') onPage(it);
+    } else onPage(it);
     drawer(false);
   });
   root.querySelector('#out').addEventListener('click', () => onSignOut());
@@ -241,23 +259,39 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', o
     root.querySelector('[data-title]').textContent = text ?? '';
   };
   const select = (key) => {
+    for (const box of root.querySelectorAll('.nav-mod')) box.removeAttribute('data-here');
     for (const node of root.querySelectorAll('.tabs [data-tab]')) {
       const on = node.dataset.tab === key;
       node.toggleAttribute('data-on', on);
       if (on) node.setAttribute('aria-current', 'page');
       else node.removeAttribute('aria-current');
-      // The open page's group is never folded shut over it.
-      if (on) node.closest('.nav-group')?.removeAttribute('data-shut');
+      if (!on) continue;
+      // The open page's module is marked, and never folded shut over it.
+      const box = node.closest('.nav-mod');
+      if (box) {
+        box.setAttribute('data-here', '');
+        box.removeAttribute('data-shut');
+        box.querySelector('.mod')?.setAttribute('aria-expanded', 'true');
+      }
     }
     const it = items.find((x) => x.key === key);
     title(it?.label ?? '');
   };
+  /** A count on a page, and the module's total beside its name for when the module is folded. */
   const badge = (key, n, hot) => {
     const b = [...root.querySelectorAll('[data-badge]')].find((node) => node.dataset.badge === key);
     if (!b) return;
     b.hidden = !n;
     b.textContent = String(n);
     b.toggleAttribute('data-hot', Boolean(hot));
+    const box = b.closest('.nav-mod');
+    if (!box) return;
+    const counts = [...box.querySelectorAll('[data-badge]:not([hidden])')];
+    const total = counts.reduce((sum, c) => sum + Number(c.textContent || 0), 0);
+    const sum = box.querySelector('[data-mod-badge]');
+    sum.hidden = !total;
+    sum.textContent = String(total);
+    sum.toggleAttribute('data-hot', counts.some((c) => c.hasAttribute('data-hot')));
   };
   return { root, view: root.querySelector('#view'), select, badge, title, close: () => drawer(false) };
 }

@@ -15,7 +15,6 @@ import {
   type DineScope,
 } from '../services/deskDine.js';
 import { badRequest, sendError } from './errors.js';
-import type { Permission } from '../platform/access/index.js';
 
 /**
  * The lunch side of the desk.
@@ -27,7 +26,9 @@ import type { Permission } from '../platform/access/index.js';
 
 export interface DeskGuards {
   /** A route for a desk seat that holds the permission. */
-  desk: (permission: Permission) => RouteShorthandOptions;
+  desk: (permission: string) => RouteShorthandOptions;
+  /** A route two pages read from: a seat that holds either. */
+  deskAny: (...permissions: string[]) => RouteShorthandOptions;
   who: (request: FastifyRequest) => string;
 }
 
@@ -52,8 +53,8 @@ const shapeOrder = (o: DeskDineOrder) => ({
   created_at: o.createdAt.toISOString(),
 });
 
-export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, who }: DeskGuards): void {
-  app.get('/v1/ops/dine/restaurants', desk('desk.dine.view'), async () => ({
+export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, deskAny, who }: DeskGuards): void {
+  app.get('/v1/ops/dine/restaurants', deskAny('desk.venues', 'desk.lunches'), async () => ({
     restaurants: (await restaurantsForDesk(ctx.clock.now())).map((r) => ({
       id: r.id,
       name: r.name,
@@ -80,7 +81,7 @@ export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, who }: 
 
   app.post<{ Params: { id: string }; Body: { active?: boolean; note?: string } }>(
     '/v1/ops/dine/restaurants/:id/active',
-    desk('desk.dine.manage'),
+    desk('desk.venues:manage'),
     async (request, reply) => {
       const active = request.body?.active;
       if (typeof active !== 'boolean') return badRequest(reply, 'active: true эсвэл false.', 'active must be a boolean');
@@ -91,20 +92,20 @@ export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, who }: 
   );
 
   /** A code for a new tablet, good for ten minutes. */
-  app.post<{ Params: { id: string }; Body: { label?: string } }>('/v1/ops/dine/restaurants/:id/devices', desk('desk.dine.manage'), async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { label?: string } }>('/v1/ops/dine/restaurants/:id/devices', desk('desk.venues:manage'), async (request, reply) => {
     const label = request.body?.label?.trim() || 'Гал тогооны таблет';
     const code = await createPairingCode(ctx, request.params.id, label);
     await recordAudit({ who: who(request), action: 'device.pair_code', targetKind: 'restaurant', targetId: request.params.id, note: label });
     return reply.status(201).send({ pairing_code: code, expires_in_minutes: 10 });
   });
 
-  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/dine/devices/:id/revoke', desk('desk.dine.manage'), async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/dine/devices/:id/revoke', desk('desk.venues:manage'), async (request, reply) => {
     await revokeDevice(request.params.id, ctx.clock.now());
     await recordAudit({ who: who(request), action: 'device.revoke', targetKind: 'device', targetId: request.params.id, note: request.body?.note ?? null });
     return reply.send({ id: request.params.id, revoked: true });
   });
 
-  app.get<{ Params: { id: string } }>('/v1/ops/dine/restaurants/:id/menu', desk('desk.dine.view'), async (request) => ({
+  app.get<{ Params: { id: string } }>('/v1/ops/dine/restaurants/:id/menu', desk('desk.venues'), async (request) => ({
     items: (await menuForDesk(request.params.id)).map((m) => ({
       id: m.id,
       name: m.name,
@@ -118,7 +119,7 @@ export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, who }: 
     })),
   }));
 
-  app.post<{ Params: { id: string }; Body: { active?: boolean; note?: string } }>('/v1/ops/dine/menu/:id/active', desk('desk.dine.manage'), async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { active?: boolean; note?: string } }>('/v1/ops/dine/menu/:id/active', desk('desk.venues:manage'), async (request, reply) => {
     const active = request.body?.active;
     if (typeof active !== 'boolean') return badRequest(reply, 'active: true эсвэл false.', 'active must be a boolean');
     if (!(await setMenuItemActive(request.params.id, active))) return sendError(reply, new IdeshError('NOT_FOUND', 'no such menu item'));
@@ -126,7 +127,7 @@ export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, who }: 
     return reply.send({ id: request.params.id, active });
   });
 
-  app.get<{ Querystring: { scope?: string; restaurant?: string; day?: string; q?: string } }>('/v1/ops/dine/orders', desk('desk.dine.view'), async (request) => {
+  app.get<{ Querystring: { scope?: string; restaurant?: string; day?: string; q?: string } }>('/v1/ops/dine/orders', desk('desk.lunches'), async (request) => {
     const scope = (['live', 'done', 'all'] as const).includes(request.query.scope as DineScope) ? (request.query.scope as DineScope) : 'live';
     const orders = await dineOrdersForDesk(
       { scope, restaurantId: request.query.restaurant || undefined, day: request.query.day || undefined, q: request.query.q },
@@ -135,7 +136,7 @@ export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, who }: 
     return { orders: orders.map(shapeOrder) };
   });
 
-  app.get<{ Params: { id: string } }>('/v1/ops/dine/orders/:id', desk('desk.dine.view'), async (request, reply) => {
+  app.get<{ Params: { id: string } }>('/v1/ops/dine/orders/:id', desk('desk.lunches'), async (request, reply) => {
     const file = await dineOrderFile(request.params.id, ctx.clock.now());
     if (!file) return sendError(reply, new IdeshError('NOT_FOUND', 'no such order'));
     return reply.send({
@@ -154,7 +155,7 @@ export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, who }: 
   });
 
   /** Cancelling for a guest who rang: only while it is still free to, and the money goes back the way it came. */
-  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/dine/orders/:id/cancel', desk('desk.dine.manage'), async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/dine/orders/:id/cancel', desk('desk.lunches:manage'), async (request, reply) => {
     const note = request.body?.note?.trim();
     if (!note) return badRequest(reply, 'Шалтгаан бичнэ үү.', 'note required');
     try {
@@ -167,7 +168,7 @@ export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, who }: 
   });
 
   /** The table was held and nobody came; the kitchen rang the desk. */
-  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/dine/orders/:id/no-show', desk('desk.dine.manage'), async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/dine/orders/:id/no-show', desk('desk.lunches:manage'), async (request, reply) => {
     try {
       await markNoShow(ctx, request.params.id);
       await recordAudit({ who: who(request), action: 'order.no_show', targetKind: 'order', targetId: request.params.id, note: request.body?.note ?? null });
@@ -178,7 +179,7 @@ export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, who }: 
     }
   });
 
-  app.get<{ Querystring: { restaurant?: string } }>('/v1/ops/dine/reviews', desk('desk.dine.view'), async (request) => ({
+  app.get<{ Querystring: { restaurant?: string } }>('/v1/ops/dine/reviews', desk('desk.reviews'), async (request) => ({
     reviews: (await reviewsForDesk(request.query.restaurant || undefined)).map((v) => ({
       order_id: v.orderId,
       order_code: v.orderCode,

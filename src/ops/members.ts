@@ -1,5 +1,5 @@
 import { getPool, tx, type Db } from '../db/pool.js';
-import { DESK_ROLES, type DeskRole } from '../platform/access/index.js';
+import { ensureRoles, roleOf } from '../platform/access/index.js';
 
 /**
  * The people at the desk.
@@ -15,13 +15,18 @@ import { DESK_ROLES, type DeskRole } from '../platform/access/index.js';
  * One person may come in through a few accounts — the number they signed up
  * with, the Google account they use at work — and each is the same seat.
  *
- * Roles are few and flat: admin does everything, finance moves money, ops
- * runs orders and suppliers, viewer looks. What each may open and press is
- * `platform/access`'s table; this module keeps who sits in which.
+ * A role is the key of one of the desk's roles in `platform/access` —
+ * admin, ops, finance and viewer to begin with, and whatever else Basu
+ * makes there. What each may open and press lives there; this module keeps
+ * who sits in which.
  */
 
-export type Role = DeskRole;
-export const ROLES: readonly Role[] = DESK_ROLES;
+export type Role = string;
+
+/** Whether the desk has a role of that key. */
+export async function deskRoleExists(key: string | null | undefined, db: Db = getPool()): Promise<boolean> {
+  return Boolean(key && (await roleOf('desk', key, db)));
+}
 
 export interface Member {
   id: string;
@@ -120,7 +125,7 @@ export async function upsertMember(
   if (!phone && !email) throw new Error('a member needs a phone or an email');
   if (phone && !PHONE.test(phone)) throw new Error('a member’s phone is +976 and eight digits');
   if (email && (email.length > 254 || !EMAIL.test(email))) throw new Error('that is not an email address');
-  if (!ROLES.includes(input.role)) throw new Error(`no such role: ${input.role}`);
+  if (!(await deskRoleExists(input.role, db))) throw new Error(`no such role: ${input.role}`);
   const name = input.name.trim();
   if (name.length < 2) throw new Error('a member needs a name');
 
@@ -169,7 +174,7 @@ export class MemberError extends Error {
  * active admin: without one, nobody could say yes to the next seat.
  */
 export async function setMemberRole(id: string, role: Role): Promise<Member> {
-  if (!ROLES.includes(role)) throw new Error(`no such role: ${role}`);
+  if (!(await deskRoleExists(role))) throw new Error(`no such role: ${role}`);
   await tx(async (client) => {
     const { rows } = await client.query<{ role: Role; active: boolean }>(
       'SELECT role, active FROM ops.member WHERE id = $1 FOR UPDATE',
@@ -201,6 +206,8 @@ export async function setMemberRole(id: string, role: Role): Promise<Member> {
  */
 export async function syncMembersFromEnv(raw: string | undefined, db: Db = getPool()): Promise<number> {
   if (!raw?.trim()) return 0;
+  // Boot runs this before the server writes its roles: the roles named here must exist first.
+  await ensureRoles(db);
   let n = 0;
   for (const entry of raw.split(',')) {
     const [address, name, role] = entry.split(':').map((s) => s?.trim());

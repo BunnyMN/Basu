@@ -9,7 +9,6 @@ import { channelPulse, messagesForDesk, monthlyVolume, retryMessage } from '../p
 import { getPool } from '../db/pool.js';
 import type { Ctx } from '../ports.js';
 import { badRequest, sendError } from './errors.js';
-import type { Permission } from '../platform/access/index.js';
 
 /**
  * Two more sections of the desk: what we told people, and whether the
@@ -22,7 +21,7 @@ import type { Permission } from '../platform/access/index.js';
 
 export interface SystemGuards {
   /** A route for a desk seat that holds the permission. */
-  desk: (permission: Permission) => RouteShorthandOptions;
+  desk: (permission: string) => RouteShorthandOptions;
   who: (request: FastifyRequest) => string;
 }
 
@@ -46,7 +45,7 @@ export function registerSystemDesk(app: FastifyInstance, ctx: Ctx, { desk, who }
 
   type MessageQuery = { state?: string; channel?: string; template?: string; q?: string; from?: string; to?: string; limit?: string };
 
-  app.get<{ Querystring: MessageQuery }>('/v1/ops/notify/messages', desk('desk.notify.view'), async (request) => {
+  app.get<{ Querystring: MessageQuery }>('/v1/ops/notify/messages', desk('desk.notify'), async (request) => {
     const q = request.query.q?.trim();
     let guestIds: string[] | undefined;
     if (q) {
@@ -85,14 +84,14 @@ export function registerSystemDesk(app: FastifyInstance, ctx: Ctx, { desk, who }
     };
   });
 
-  app.post<{ Params: { id: string } }>('/v1/ops/notify/messages/:id/retry', desk('desk.notify.retry'), async (request, reply) => {
+  app.post<{ Params: { id: string } }>('/v1/ops/notify/messages/:id/retry', desk('desk.notify:retry'), async (request, reply) => {
     if (!(await retryMessage(request.params.id))) return sendError(reply, new IdeshError('NOT_FOUND', 'no failed message under that id'));
     await recordAudit({ who: who(request), action: 'message.retry', targetKind: 'message', targetId: request.params.id });
     return reply.send({ id: request.params.id, state: 'queued' });
   });
 
   /** The bill: each month's volume by channel, priced by the desk's own unit costs. */
-  app.get('/v1/ops/notify/volume', desk('desk.notify.view'), async () => {
+  app.get('/v1/ops/notify/volume', desk('desk.notify'), async () => {
     const [months, knobs] = await Promise.all([monthlyVolume(12), settings()]);
     const unit = (key: string) => Number(knobs.find((s) => s.key === key)?.value ?? 0);
     const sms = unit('sms_unit_mnt');
@@ -105,7 +104,7 @@ export function registerSystemDesk(app: FastifyInstance, ctx: Ctx, { desk, who }
 
   /* ── the machine ── */
 
-  app.get('/v1/ops/system', desk('desk.system.view'), async () => {
+  app.get('/v1/ops/system', desk('desk.system'), async () => {
     const now = ctx.clock.now();
     const [beat, channels, money, knobs, database] = await Promise.all([
       pulse(now),
@@ -175,11 +174,11 @@ export function registerSystemDesk(app: FastifyInstance, ctx: Ctx, { desk, who }
     };
   });
 
-  app.get('/v1/ops/system/ticks', desk('desk.system.view'), async () => ({
+  app.get('/v1/ops/system/ticks', desk('desk.system'), async () => ({
     ticks: (await lastTicks(60)).map((t) => ({ at: t.at.toISOString(), took_ms: t.tookMs, report: t.report })),
   }));
 
-  app.put<{ Params: { key: string }; Body: { value?: unknown } }>('/v1/ops/system/settings/:key', desk('desk.system.manage'), async (request, reply) => {
+  app.put<{ Params: { key: string }; Body: { value?: unknown } }>('/v1/ops/system/settings/:key', desk('desk.system:manage'), async (request, reply) => {
     try {
       const saved = await setSetting(request.params.key, request.body?.value, who(request));
       await recordAudit({ who: who(request), action: 'setting.change', targetKind: 'setting', targetId: NIL, note: `${saved.key} = ${String(saved.value)}` });

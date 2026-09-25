@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest';
  */
 
 const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
-const SCHEMAS = ['identity', 'ledger', 'notify', 'idesh', 'dine', 'ops', 'org'] as const;
+const SCHEMAS = ['identity', 'ledger', 'notify', 'idesh', 'dine', 'ops', 'org', 'access'] as const;
 
 /**
  * Fixtures and harnesses are exempt, and named one by one so that the
@@ -80,7 +80,7 @@ describe('module boundaries', () => {
       // Only where SQL can name a table. `ledger.occupy(...)` in the station
       // load code is a local variable, and `guest.notify.cooking` is an outbox
       // topic — neither is a query, and neither is a trespass.
-      const sql = /\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\s+(identity|ledger|notify|idesh|dine|ops|org)\.([a-z_]+)/g;
+      const sql = /\b(?:FROM|JOIN|INTO|UPDATE|TABLE|TRUNCATE)\s+(identity|ledger|notify|idesh|dine|ops|org|access)\.([a-z_]+)/g;
       for (const match of body.matchAll(sql)) {
         const [, schema, table] = match;
         if (schema !== mine) seen.add(`${schema}.${table}`);
@@ -106,7 +106,7 @@ describe('module boundaries', () => {
   });
 
   it('every platform module has one front door', () => {
-    for (const schema of ['identity', 'ledger', 'notify', 'org']) {
+    for (const schema of ['identity', 'ledger', 'notify', 'org', 'access']) {
       const index = join(SRC, 'platform', schema, 'index.ts');
       expect(statSync(index).isFile(), `platform/${schema}/index.ts`).toBe(true);
     }

@@ -4,7 +4,7 @@
  * schema.
  */
 export {
-  ROLES,
+  deskRoleExists,
   listMembers,
   memberForAccount,
   linkByProof,

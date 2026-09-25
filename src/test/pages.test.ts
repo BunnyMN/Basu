@@ -1171,7 +1171,7 @@ describe('нийлүүлэгч болох', () => {
     await until(desk, 'the front page', (d) => d.querySelectorAll('#now .kpi').length === 6);
     const doc = desk.window.document;
     expect(doc.querySelector('.tabs button[data-tab="overview"]')?.hasAttribute('data-on')).toBe(true);
-    expect(doc.querySelector('.tabs .grp')?.textContent).toBe('Платформ');
+    expect(doc.querySelector('.tabs .mod .t')?.textContent).toBe('Платформ');
     // The seeded application is waiting, and the page says so before anything else.
     expect([...doc.querySelectorAll('#alerts .alert')].map((a) => a.textContent)).toEqual(
       expect.arrayContaining([expect.stringContaining('нийлүүлэгчийн өргөдөл')]),
@@ -1323,11 +1323,16 @@ describe('who sees what', () => {
     storage.removeItem('basu.dash.ws');
     const dash = await openPage('ops.html');
     await until(dash, 'the business', (d) => Boolean(d.querySelector('.tabs [data-tab="idesh.today"]')));
+    // Its front page draws: a door to each part the role opens.
+    await until(dash, 'the front page', (d) => d.querySelectorAll('.org-doors .org-door').length === 2);
     const doc = dash.window.document;
     expect(doc.querySelector('.ws-btn')?.textContent).toContain('Хэрлэн мах · тест');
     expect(doc.querySelector('.ws-btn')?.textContent).toContain('Нийлүүлэгч · Ажилтан');
     expect(tabs(dash)).toEqual(['home', 'idesh.today', 'idesh.orders', 'idesh.stall', 'idesh.profile', 'team', 'profile', 'roles']);
-    expect(doc.querySelector('.nav-group[data-group="dine"]')).toBeNull();
+    expect(doc.querySelector('.nav-mod[data-group="dine"]')).toBeNull();
+    // The module is a row of its own, its pages beneath it.
+    expect(doc.querySelector('.nav-mod[data-group="idesh"] .mod .t')?.textContent).toBe('Идэш');
+    expect(doc.querySelectorAll('.nav-mod[data-group="idesh"] .mod-items [data-tab]')).toHaveLength(4);
     // The supplier's pages are the supplier's own screen, opened for this business.
     expect(doc.querySelector('.tabs a[data-tab="idesh.orders"]')?.getAttribute('href')).toBe(`/supplier?org=${orgId}#orders`);
     // The table of roles marks the staff's own column.
@@ -1358,7 +1363,7 @@ describe('who sees what', () => {
 
     (doc.querySelector('.tabs [data-tab="log"]') as HTMLElement).click();
     await until(dash, 'the record', (d) => d.querySelectorAll('#org-log li').length >= 3);
-    expect(doc.querySelector('#org-log li')?.textContent).toContain('Туяа нэмэгдсэн · нягтлан');
+    expect(doc.querySelector('#org-log li')?.textContent).toContain('Туяа нэмэгдсэн · Нягтлан');
   });
 
   it('gives an accountant the orders and the money on the supplier’s screen, and no counter or stall', async () => {
@@ -1393,6 +1398,87 @@ describe('who sees what', () => {
     expect(seen).toEqual(expect.arrayContaining(['overview', 'money', 'pay', 'audit']));
     for (const hidden of ['venues', 'lunches', 'notify', 'system', 'members']) expect(seen).not.toContain(hidden);
     storage.removeItem('basu.ops');
+  });
+});
+
+describe('Basu decides who may do what', () => {
+  /** The demo's desk: the shared secret, prefilled, one press. */
+  async function theDesk(): Promise<JSDOM> {
+    storage.removeItem('basu.ops');
+    const desk = await openPage('ops.html');
+    await until(desk, 'the secret prefilled', (d) => Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value));
+    clickText(desk, '.pair button', 'Нэвтрэх');
+    return desk;
+  }
+  const deskToken = async () => ((await (await fetch(`${base}/dev/ops-token`)).json()) as { token: string }).token;
+
+  it('makes a role by ticking its pages, an action bringing its page along', async () => {
+    const desk = await theDesk();
+    await opsTab(desk, 'roles');
+    await until(desk, 'the roles', (d) => d.querySelectorAll('#roles-list [data-role]').length >= 5);
+    const doc = desk.window.document;
+    (doc.querySelector('#roles-list [data-role="+"]') as HTMLElement).click();
+    await until(desk, 'an empty role', (d) => (d.querySelector('#role-edit [name="name"]') as HTMLInputElement | null)?.value === '');
+    (doc.querySelector('#role-edit [name="name"]') as HTMLInputElement).value = 'Туслах · тест';
+    const tick = (value: string) => {
+      const box = doc.querySelector(`#role-edit input[value="${value}"]`) as HTMLInputElement;
+      box.checked = true;
+      box.dispatchEvent(new desk.window.Event('change', { bubbles: true }));
+    };
+    tick('desk.guests');
+    tick('desk.orders:manage');
+    expect((doc.querySelector('#role-edit input[value="desk.orders"]') as HTMLInputElement).checked).toBe(true);
+    (doc.querySelector('#role-edit [data-save]') as HTMLElement).click();
+    await until(desk, 'the new role chosen', (d) =>
+      Boolean([...d.querySelectorAll('#roles-list [data-role][data-on]')].find((r) => r.textContent?.includes('Туслах · тест'))),
+    );
+    const ticked = [...doc.querySelectorAll('#role-edit .perm-pages input:checked')].map((i) => (i as HTMLInputElement).value).sort();
+    expect(ticked).toEqual(['desk.guests', 'desk.orders', 'desk.orders:manage']);
+  });
+
+  it('renames a module and hides a page, and the sidebar follows the moment it is saved', async () => {
+    const desk = await theDesk();
+    await opsTab(desk, 'menus');
+    await until(desk, 'the menu', (d) => d.querySelectorAll('#menu-board .menu-mod').length >= 6);
+    const doc = desk.window.document;
+    (doc.querySelector('.menu-mod[data-module="platform"] .menu-mod-head [name="name"]') as HTMLInputElement).value = 'Үндсэн үйлчилгээ';
+    const shown = doc.querySelector('.menu-page[data-page="reviews"] [name="shown"]') as HTMLInputElement;
+    shown.checked = false;
+    shown.dispatchEvent(new desk.window.Event('change', { bubbles: true }));
+    (doc.querySelector('#save-menu') as HTMLElement).click();
+    await until(desk, 'the sidebar renamed', (d) => d.querySelector('.nav-mod[data-group="platform"] .mod .t')?.textContent === 'Үндсэн үйлчилгээ');
+    expect(doc.querySelector('.tabs [data-tab="reviews"]')).toBeNull();
+    // Put it back for whoever comes next.
+    await fetch(`${base}/v1/ops/menus/desk`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${await deskToken()}` },
+      body: JSON.stringify({ modules: [{ key: 'platform', name: 'Платформ' }], pages: [{ key: 'reviews', hidden: false }] }),
+    });
+  });
+
+  it('opens a business from the desk and gives somebody there another role', async () => {
+    const reg = async (phone: string, name: string) =>
+      ((await (await fetch(`${base}/v1/auth/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone, password: GUEST_PASSWORD, name }) })).json()) as { token: string }).token;
+    const owner = await reg('+97688040001', 'Эзэн · тест');
+    await reg('+97688040003', 'Ажилтан · тест');
+    const as = (t: string) => ({ 'content-type': 'application/json', authorization: `Bearer ${t}` });
+    const made = (await (await fetch(`${base}/v1/orgs`, { method: 'POST', headers: as(owner), body: JSON.stringify({ name: 'Эрхийн мах · тест', supplier: true, phone: '8811 0001', address: 'Нарантуул' }) })).json()) as { id: string };
+    await fetch(`${base}/v1/ops/orgs/${made.id}/approve`, { method: 'POST', headers: { authorization: `Bearer ${await deskToken()}` } });
+    const found = (await (await fetch(`${base}/v1/orgs/${made.id}/lookup?contact=88040003`, { headers: as(owner) })).json()) as { guest_id: string };
+    await fetch(`${base}/v1/orgs/${made.id}/members`, { method: 'POST', headers: as(owner), body: JSON.stringify({ guest_id: found.guest_id, role: 'staff' }) });
+
+    const desk = await theDesk();
+    await opsTab(desk, 'orgs');
+    await until(desk, 'the business', (d) => [...d.querySelectorAll('.row.request')].some((r) => r.textContent?.includes('Эрхийн мах · тест')));
+    const row = [...desk.window.document.querySelectorAll('.row.request')].find((r) => r.textContent?.includes('Эрхийн мах · тест'))!;
+    (row.querySelector('[data-a="access"]') as HTMLElement).click();
+    await until(desk, 'its people', (d) => d.querySelectorAll('[data-people] tr[data-member]').length === 2);
+    const select = desk.window.document.querySelector(`[data-people] tr[data-member="${found.guest_id}"] select`) as HTMLSelectElement;
+    select.value = 'accountant';
+    select.dispatchEvent(new desk.window.Event('change', { bubbles: true }));
+    await until(desk, 'the role saved', (d) => (d.getElementById('toast')?.textContent ?? '').includes('Нягтлан'));
+    const now = (await (await fetch(`${base}/v1/orgs/${made.id}`, { headers: as(owner) })).json()) as { members: Array<{ guest_id: string; role: string }> };
+    expect(now.members.find((m) => m.guest_id === found.guest_id)?.role).toBe('accountant');
   });
 });
 

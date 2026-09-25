@@ -55,12 +55,12 @@ import {
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import { confirmPassword, contactsFor, resolveGuest } from '../platform/identity/index.js';
 import { enqueue } from '../platform/notify/index.js';
-import { orgGrants, type Permission } from '../platform/access/index.js';
-import { membersOf } from '../platform/org/index.js';
+import { LONE_OWNER_PERMISSIONS, SCREEN_PERMISSIONS, grants, headRoles, type Grants } from '../platform/access/index.js';
+import { accessIn, membersOf } from '../platform/org/index.js';
 import type { Ctx } from '../ports.js';
 import { limits } from './hardening.js';
 import { shapeOrder, shapeSettlement, shapeSummary } from './shapes.js';
-import { holds, need } from './guards.js';
+import { holds, need, needAny } from './guards.js';
 
 /**
  * Өвлийн идэш over HTTP: the guest's side under /v1/idesh, the supplier's
@@ -217,6 +217,16 @@ export async function registerIdeshRoutes(
    * on the same routes and the same ownership checks; the actor string tells
    * them apart in the order's events.
    */
+  /**
+   * What a person may do at a supplier: what their role opens at its
+   * business, as Basu wrote the role. A supplier from before there were
+   * businesses is its one owner's, every supplier page.
+   */
+  const supplierGrants = async (guestId: string, orgId: string | null): Promise<Grants | null> => {
+    if (!orgId) return grants(LONE_OWNER_PERMISSIONS);
+    return (await accessIn(orgId, guestId))?.grants ?? null;
+  };
+
   const requireSupplier = async (request: FastifyRequest, reply: FastifyReply) => {
     const token = bearer(request);
     if (!token) return unauthorized(reply);
@@ -224,8 +234,8 @@ export async function registerIdeshRoutes(
     if (device) {
       // A screen on the counter does the day's work, as a manager would —
       // never the bank, which takes a person's password.
-      request.supplierDevice = { ...device, role: 'manager' };
-      request.grants = orgGrants('manager', ['idesh']);
+      request.supplierDevice = { ...device, role: 'screen' };
+      request.grants = grants(SCREEN_PERMISSIONS);
       return undefined;
     }
     const guestId = await resolveGuest(ctx, token);
@@ -236,9 +246,11 @@ export async function registerIdeshRoutes(
       // Signed in, and asking for a business that is not theirs: a refusal, not a sign-out.
       return asked ? forbidden(reply, 'not a member of that supplier') : unauthorized(reply);
     }
-    const actor = mine.role === 'owner' ? `owner:${guestId}` : `${mine.role}:${guestId}`;
+    const held = await supplierGrants(guestId, mine.orgId);
+    if (!held) return asked ? forbidden(reply, 'not a member of that supplier') : unauthorized(reply);
+    const actor = mine.role === 'owner' ? `owner:${guestId}` : `member:${guestId}`;
     request.supplierDevice = { deviceId: actor, supplierId: mine.id, role: mine.role, person: guestId, orgId: mine.orgId };
-    request.grants = orgGrants(mine.role, ['idesh']);
+    request.grants = held;
     return undefined;
   };
   /**
@@ -247,9 +259,11 @@ export async function registerIdeshRoutes(
    * the money, only an owner or a manager changes the details. The table is
    * `platform/access`'s.
    */
-  const asSupplierMay = (permission: Permission) => ({ preHandler: [requireSupplier, need(permission)] });
+  const asSupplierMay = (permission: string) => ({ preHandler: [requireSupplier, need(permission)] });
+  /** A supplier route two pages read from: either opens it. */
+  const asSupplierMayAny = (...permissions: string[]) => ({ preHandler: [requireSupplier, needAny(...permissions)] });
   /** What a seat without the money sees of an amount that is the supplier's own: nothing. */
-  const moneyFor = (request: FastifyRequest, value: number | null | undefined) => (holds(request, 'idesh.money.view') ? value ?? null : null);
+  const moneyFor = (request: FastifyRequest, value: number | null | undefined) => (holds(request, 'org.idesh.money') ? value ?? null : null);
 
   /* ── browsing — no sign-in, the way the restaurant list works ─────── */
 
@@ -514,9 +528,9 @@ export async function registerIdeshRoutes(
     };
   });
 
-  app.get('/v1/supplier/board', asSupplierMay('idesh.board'), async (request) => {
+  app.get('/v1/supplier/board', asSupplierMay('org.idesh.today'), async (request) => {
     const board = await screen(request.supplierDevice!.supplierId);
-    if (holds(request, 'idesh.money.view')) return board;
+    if (holds(request, 'org.idesh.money')) return board;
     // What the supplier keeps of each order is the money; the staff at the counter see the order.
     const blind = (tickets: typeof board.lanes.paid) => tickets.map((t) => ({ ...t, payout_mnt: null }));
     const { paid, preparing, ready, dispatched } = board.lanes;
@@ -540,7 +554,7 @@ export async function registerIdeshRoutes(
             state: mine.state,
             role: mine.role,
             org_id: mine.orgId,
-            permissions: mine.state === 'contracted' ? orgGrants(mine.role, ['idesh']).list() : [],
+            permissions: mine.state === 'contracted' ? (await supplierGrants(request.guestId!, mine.orgId))?.list() ?? [] : [],
           }
         : null,
     };
@@ -548,7 +562,7 @@ export async function registerIdeshRoutes(
 
 
   /** The numbers the supplier opens the app to. The money in them only for a seat that holds the money. */
-  app.get('/v1/supplier/home', asSupplierMay('idesh.orders.view'), async (request) => {
+  app.get('/v1/supplier/home', asSupplierMayAny('org.idesh.today', 'org.idesh.orders'), async (request) => {
     const home = await homeOf(request.supplierDevice!.supplierId, ctx.clock.now());
     return {
       today: home.today,
@@ -573,14 +587,14 @@ export async function registerIdeshRoutes(
     return { ...shaped, payout_mnt: moneyFor(request, shaped.payout_mnt) };
   };
 
-  app.get<{ Querystring: { scope?: string; q?: string } }>('/v1/supplier/orders', asSupplierMay('idesh.orders.view'), async (request) => {
+  app.get<{ Querystring: { scope?: string; q?: string } }>('/v1/supplier/orders', asSupplierMay('org.idesh.orders'), async (request) => {
     const raw = request.query.scope;
     const scope: OrderScope = raw === 'live' || raw === 'done' ? raw : 'all';
     const orders = await ordersOf(request.supplierDevice!.supplierId, { scope, q: request.query.q ?? '' });
     return { scope, orders: orders.map((o) => orderFor(request, o)) };
   });
 
-  app.get<{ Params: { id: string } }>('/v1/supplier/orders/:id', asSupplierMay('idesh.orders.view'), async (request, reply) => {
+  app.get<{ Params: { id: string } }>('/v1/supplier/orders/:id', asSupplierMay('org.idesh.orders'), async (request, reply) => {
     const found = await orderForSupplier(request.supplierDevice!.supplierId, request.params.id);
     if (!found) return sendError(reply, new IdeshError('NOT_FOUND', 'no such order of yours'));
     return reply.send({
@@ -610,11 +624,11 @@ export async function registerIdeshRoutes(
   /** The profile as this seat may read it: where the money goes, and at what rate, is the money's. */
   const profileFor = (request: FastifyRequest, row: NonNullable<Awaited<ReturnType<typeof supplierById>>>) => {
     const shaped = shapeProfile(row);
-    if (holds(request, 'idesh.money.view')) return shaped;
+    if (holds(request, 'org.idesh.money')) return shaped;
     return { ...shaped, commission_pct: null, bank_name: null, bank_account: null, bank_holder: null, bank_verified: null };
   };
 
-  app.get('/v1/supplier/profile', asSupplierMay('org.view'), async (request, reply) => {
+  app.get('/v1/supplier/profile', asSupplierMay('org.idesh.profile'), async (request, reply) => {
     const row = await supplierById(request.supplierDevice!.supplierId);
     if (!row) return sendError(reply, new IdeshError('NOT_FOUND', 'no such supplier'));
     return reply.send(profileFor(request, row));
@@ -628,7 +642,7 @@ export async function registerIdeshRoutes(
    */
   app.patch<{
     Body: { name?: string; address?: string; about?: string | null; lat?: number | null; lon?: number | null; bank_name?: string; bank_account?: string; bank_holder?: string; password?: string };
-  }>('/v1/supplier/profile', asSupplierMay('org.profile.edit'), async (request, reply) => {
+  }>('/v1/supplier/profile', asSupplierMay('org.idesh.profile:edit'), async (request, reply) => {
     const body = request.body ?? {};
     const supplierId = request.supplierDevice!.supplierId;
     try {
@@ -639,7 +653,7 @@ export async function registerIdeshRoutes(
         // pressing the button proves it is them with their own password —
         // whichever owner they are, and never a screen on the counter.
         const person = request.supplierDevice!.person;
-        if (!holds(request, 'org.bank.manage') || !person) {
+        if (!holds(request, 'org.idesh.profile:bank') || !person) {
           return forbidden(reply, 'only an owner changes where the money goes');
         }
         if (!body.password) {
@@ -664,7 +678,8 @@ export async function registerIdeshRoutes(
         // Every owner hears of it — the one who registered the business and
         // any it has now — so a change nobody meant is caught by somebody.
         const orgId = request.supplierDevice!.orgId;
-        const owners = new Set<string>(orgId ? (await membersOf(orgId)).filter((m) => m.role === 'owner').map((m) => m.guestId) : []);
+        const heads = await headRoles();
+        const owners = new Set<string>(orgId ? (await membersOf(orgId)).filter((m) => heads.includes(m.role)).map((m) => m.guestId) : []);
         const registered = await ownerOf(supplierId);
         if (registered) owners.add(registered);
         const stamp = ctx.clock.now().getTime();
@@ -688,7 +703,7 @@ export async function registerIdeshRoutes(
   });
 
   /** The supplier's money: their rate, what they are owed, what was sent. */
-  app.get('/v1/supplier/money', asSupplierMay('idesh.money.view'), async (request) => {
+  app.get('/v1/supplier/money', asSupplierMay('org.idesh.money'), async (request) => {
     const supplierId = request.supplierDevice!.supplierId;
     const me = (await listSuppliers()).find((s) => s.id === supplierId);
     return {
@@ -740,7 +755,7 @@ export async function registerIdeshRoutes(
 
   app.post<{ Params: { id: string; action: string }; Body: { reason?: string } }>(
     '/v1/supplier/orders/:id/:action',
-    asSupplierMay('idesh.orders.act'),
+    asSupplierMay('org.idesh.orders:act'),
     async (request, reply) => {
       const device = request.supplierDevice!;
       if (!(await ownedBySupplier(request.params.id, device.supplierId))) {
@@ -761,13 +776,13 @@ export async function registerIdeshRoutes(
     },
   );
 
-  app.get('/v1/supplier/listings', asSupplierMay('idesh.listings.view'), async (request) => ({
+  app.get('/v1/supplier/listings', asSupplierMay('org.idesh.stall'), async (request) => ({
     listings: (await listingsOf(request.supplierDevice!.supplierId)).map(shapeListing),
   }));
 
   app.post<{ Body: Record<string, unknown> }>(
     '/v1/supplier/listings',
-    asSupplierMay('idesh.listings.edit'),
+    asSupplierMay('org.idesh.stall:edit'),
     async (request, reply) => {
       const input = readListing(request.body ?? {});
       if (typeof input === 'string') return badRequest(reply, 'Зарын мэдээлэл дутуу байна.', input);
@@ -786,7 +801,7 @@ export async function registerIdeshRoutes(
 
   app.patch<{ Params: { id: string }; Body: Record<string, unknown> }>(
     '/v1/supplier/listings/:id',
-    asSupplierMay('idesh.listings.edit'),
+    asSupplierMay('org.idesh.stall:edit'),
     async (request, reply) => {
       try {
         const listing = await updateListing(

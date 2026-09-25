@@ -724,7 +724,7 @@ function renderTicket(ticket, lane) {
   };
 
   // An accountant reads the order; the buttons are for whoever does the work.
-  if (!watchingAll() && !may('idesh.orders.act')) return node;
+  if (!watchingAll() && !may('org.idesh.orders:act')) return node;
   if (lane === 'paid') {
     add('Бэлтгэж эхлэх', 'prepare', 'primary');
     cancelWith(['guest_asked', 'cannot_fulfil', 'vet']);
@@ -786,7 +786,7 @@ function renderStall(listings) {
   if (!listings.length) rows.append(el('<div class="card empty"><b>Зар алга</b>Доор эхний зараа нэмнэ үү.</div>'));
   for (const l of listings) rows.append(renderRow(l));
   stall.append(rows);
-  if (may('idesh.listings.edit')) stall.append(newForm());
+  if (may('org.idesh.stall:edit')) stall.append(newForm());
 }
 
 function renderRow(l) {
@@ -800,12 +800,12 @@ function renderRow(l) {
         <span class="num">${money(l.price_mnt)}<small>үнэ</small></span>
         <span class="num">${l.sold} / ${l.quantity}<small>зарагдсан</small></span>
       </span>
-      ${may('idesh.listings.edit') ? `<span class="btns">
+      ${may('org.idesh.stall:edit') ? `<span class="btns">
         <button class="btn" type="button" data-a="edit">Засах</button>
         <button class="btn quiet" type="button" data-a="toggle">${l.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>
       </span>` : ''}
     </div>`);
-  if (!may('idesh.listings.edit')) return row;
+  if (!may('org.idesh.stall:edit')) return row;
 
   const patch = async (body) => {
     try {
@@ -1008,11 +1008,11 @@ function when(iso) {
 /* ── the module ──────────────────────────────────────────────────── */
 
 const TABS = [
-  { key: 'today', label: 'Өнөөдөр', icon: ICON.today, nav: 'today', needs: 'idesh.board' },
-  { key: 'orders', label: 'Захиалга', icon: ICON.orders, nav: 'orders', needs: 'idesh.orders.view' },
-  { key: 'stall', label: 'Зар', icon: ICON.stall, nav: 'stall', needs: 'idesh.listings.view' },
-  { key: 'money', label: 'Мөнгө', icon: ICON.money, nav: 'pay', needs: 'idesh.money.view' },
-  { key: 'profile', label: 'Профайл', icon: ICON.profile, nav: 'person', needs: 'org.view' },
+  { key: 'today', label: 'Өнөөдөр', icon: ICON.today, nav: 'today', needs: 'org.idesh.today' },
+  { key: 'orders', label: 'Захиалга', icon: ICON.orders, nav: 'orders', needs: 'org.idesh.orders' },
+  { key: 'stall', label: 'Зар', icon: ICON.stall, nav: 'stall', needs: 'org.idesh.stall' },
+  { key: 'money', label: 'Мөнгө', icon: ICON.money, nav: 'pay', needs: 'org.idesh.money' },
+  { key: 'profile', label: 'Профайл', icon: ICON.profile, nav: 'person', needs: 'org.idesh.profile' },
 ];
 /** The tab to open: the one the address names — the dashboard links straight to one — else today. */
 let tab = location.hash.slice(1) || 'today';
@@ -1314,7 +1314,7 @@ async function loadOrders() {
     box.replaceChildren(el(`
       <div class="table-wrap">
         <table class="table"${rows.length ? '' : ' data-empty'}>
-          <thead><tr><th>№</th><th>Мах</th><th>Зочин</th><th>Авах</th><th>Өдөр</th><th>Төлөв</th><th class="num">${may('idesh.money.view') ? 'Танд' : 'Нийт'}</th></tr></thead>
+          <thead><tr><th>№</th><th>Мах</th><th>Зочин</th><th>Авах</th><th>Өдөр</th><th>Төлөв</th><th class="num">${may('org.idesh.money') ? 'Танд' : 'Нийт'}</th></tr></thead>
           <tbody>${rows.join('') || `<tr><td colspan="7" class="empty"><b>Захиалга алга</b>${none}</td></tr>`}</tbody>
         </table>
       </div>`));
@@ -1368,7 +1368,11 @@ const EVENT_WORD = {
 /** The dot each event takes in the story: red for a cancellation, blue on the road, green when handed. */
 const EVENT_TONE = { CANCELLED: 'stop', REFUND_DUE: 'stop', REFUNDED: 'stop', DISPATCHED: 'route', HANDED: 'ready', CLOSED: 'ready' };
 const ACTOR_WORD = (a) =>
-  a.startsWith('guest:') ? 'зочин' : a.startsWith('supplier:owner:') ? 'та (утас)' : a.startsWith('supplier:') ? 'таны дэлгэц' : a.startsWith('ops') ? 'Basu' : 'систем';
+  a.startsWith('guest:') ? 'зочин'
+    : a.startsWith('supplier:owner:') ? 'эзэн'
+      : /^supplier:[a-z0-9-]+:[0-9a-f-]{36}$/.test(a) ? 'ажилтан'
+        : a.startsWith('supplier:') ? 'таны дэлгэц'
+          : a.startsWith('ops') ? 'Basu' : 'систем';
 const REASON_SHORT = {
   guest_asked: 'зочин хүссэн', vet: 'мал эмнэлэг', cannot_fulfil: 'биелүүлж чадаагүй',
   no_show: 'зочин ирээгүй', unreachable: 'хаяг дээр холбогдоогүй', draft_expired: 'төлөгдөөгүй',
@@ -1440,9 +1444,9 @@ async function renderProfile(view) {
     view.append(el('<div class="card empty">Ачаалж чадсангүй.</div>'));
     return;
   }
-  const edits = may('org.profile.edit');
-  const seesBank = may('idesh.money.view');
-  const movesBank = may('org.bank.manage');
+  const edits = may('org.idesh.profile:edit');
+  const seesBank = may('org.idesh.money');
+  const movesBank = may('org.idesh.profile:bank');
   const terms = [
     `Утас <b class="mn">${esc(p.phone)}</b>`,
     p.merchant_tin ? `ТТД <b class="mn">${esc(p.merchant_tin)}</b>` : 'ТТД алга',

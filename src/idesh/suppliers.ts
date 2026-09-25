@@ -154,7 +154,9 @@ export async function supplierForOrg(input: {
 /** Who a person is at a supplier: their role in the organisation it belongs to. */
 export type SupplierRole = OrgRole;
 
-const ROLE_RANK: Record<OrgRole, number> = { owner: 0, manager: 1, accountant: 2, staff: 3 };
+/** Which business to open for somebody in several who did not say: where they hold the most, as the built-in roles go. */
+const ROLE_RANK: Record<string, number> = { owner: 0, manager: 1, accountant: 2, staff: 3 };
+const rank = (role: OrgRole) => ROLE_RANK[role] ?? 4;
 
 /**
  * The supplier this guest works at, if any that is not declined, and their
@@ -189,7 +191,7 @@ export async function supplierOf(
     const roleOf = (orgId: string) => memberships.find((m) => m.org.id === orgId)!.role;
     const best = rows.sort(
       (a, b) =>
-        ROLE_RANK[roleOf(a.org_id)] - ROLE_RANK[roleOf(b.org_id)] ||
+        rank(roleOf(a.org_id)) - rank(roleOf(b.org_id)) ||
         Number(b.state === 'contracted') - Number(a.state === 'contracted') ||
         (b.contracted_at?.getTime() ?? 0) - (a.contracted_at?.getTime() ?? 0),
     )[0];

@@ -1,5 +1,5 @@
 import { getPool, tx, type Db } from '../db/pool.js';
-import { ROLES, memberForAccount, type Member, type Role } from './members.js';
+import { deskRoleExists, memberForAccount, type Member, type Role } from './members.js';
 
 /**
  * Asking for a seat at the desk.
@@ -76,7 +76,7 @@ export async function requestAccess(
 ): Promise<AccessRequest> {
   const name = input.name.trim();
   if (name.length < 2 || name.length > 60) throw new RequestError('BAD_REQUEST', 'a request needs a name');
-  if (!ROLES.includes(input.role)) throw new RequestError('BAD_REQUEST', `no such role: ${input.role}`);
+  if (!(await deskRoleExists(input.role, db))) throw new RequestError('BAD_REQUEST', `no such role: ${input.role}`);
   const member = await memberForAccount(input.guestId, db);
   if (member?.active) throw new RequestError('ALREADY_MEMBER', 'this account already sits at the desk');
   const note = input.note?.trim().slice(0, 500) || null;
@@ -118,7 +118,7 @@ export async function approveRequest(
   input: { id: string; role?: Role | null; by: string; now: Date; email?: string | null; phone?: string | null },
   db: Db = getPool(),
 ): Promise<{ request: AccessRequest; member: Member }> {
-  if (input.role && !ROLES.includes(input.role)) throw new RequestError('BAD_REQUEST', `no such role: ${input.role}`);
+  if (input.role && !(await deskRoleExists(input.role))) throw new RequestError('BAD_REQUEST', `no such role: ${input.role}`);
   const decided = await tx(async (client) => {
     const { rows } = await client.query<Row>(
       `SELECT ${COLUMNS} FROM ops.access_request WHERE id = $1 AND state = 'pending' FOR UPDATE`,
