@@ -81,10 +81,21 @@ jobs:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          # Keys the server's .env should hold, kept as repository secrets
+          # (Settings → Secrets and variables → Actions). One that is not set
+          # is not sent, and the server keeps whatever it had.
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          SMTP_URL: ${{ secrets.SMTP_URL }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          OPS_MEMBERS: ${{ secrets.OPS_MEMBERS }}
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           # The command is the commit; the server's forced command reads it
-          # and refuses anything that is not on main.
-          ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes "root@$DEPLOY_HOST" "${{ github.sha }}"
+          # and refuses anything that is not on main. The keys go on stdin,
+          # where scripts/deploy.sh reads them — never on the command line.
+          for key in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET SMTP_URL MAIL_FROM OPS_MEMBERS; do
+            if [ -n "${!key}" ]; then printf '%s=%s\n' "$key" "${!key}"; fi
+          done | ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes "root@$DEPLOY_HOST" "${{ github.sha }}"

@@ -247,7 +247,7 @@ async function showToken() {
     <div class="card pair">
       <div class="brand wordmark">Basu<small>Ops</small></div>
       <h2 id="door-title">Нэвтрэх</h2>
-      <p id="door-lead">Гишүүн Google, имэйл эсвэл утас, нууц үгээрээ нэвтэрнэ.</p>
+      <p id="door-lead">Гишүүн утас, нууц үгээрээ нэвтэрнэ.</p>
       <div data-doors></div>
       <div class="or" data-phone-or hidden>эсвэл утас, нууц үгээр</div>
       <input class="input" name="invite" inputmode="numeric" placeholder="Урилгын код · 12345 67890" aria-label="Урилгын код" autocomplete="one-time-code" hidden>
@@ -268,8 +268,13 @@ async function showToken() {
     emailHint: 'Гишүүнээр бүртгэгдсэн имэйл рүү 6 оронтой код илгээнэ.',
   });
   card.querySelector('[data-doors]').replaceWith(doors);
+  // Say only the ways that are really on the card.
+  let everyday = 'Гишүүн утас, нууц үгээрээ нэвтэрнэ.';
   doors.ready.then((open) => {
     const others = open.google || open.email;
+    const ways = [open.google && 'Google', open.email && 'имэйл'].filter(Boolean);
+    if (ways.length) everyday = `Гишүүн ${ways.join(', ')} эсвэл утас, нууц үгээрээ нэвтэрнэ.`;
+    if (!claiming) card.querySelector('#door-lead').textContent = everyday;
     card.querySelector('[data-phone-or]').hidden = !others;
     // One primary on the card: with Google or email above, the phone is the quieter way.
     if (others) card.querySelector('#send').removeAttribute('data-v');
@@ -291,7 +296,7 @@ async function showToken() {
     card.querySelector('#door-title').textContent = claiming ? 'Урилгаар нэвтрэх' : 'Нэвтрэх';
     card.querySelector('#door-lead').textContent = claiming
       ? 'Админаас авсан кодоо, өөрийн утас, шинэ нууц үгээ оруулна. Код нэг удаа хүчинтэй.'
-      : 'Гишүүн Google, имэйл эсвэл утас, нууц үгээрээ нэвтэрнэ.';
+      : everyday;
     send.textContent = claiming ? 'Нэвтрэх' : 'Нэвтрэх';
     e.target.textContent = claiming ? 'Нууц үгтэй юу? Энгийнээр нэвтрэх' : 'Урилгын код байгаа юу?';
     (claiming ? invite : phone).focus();

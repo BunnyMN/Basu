@@ -27,6 +27,15 @@ PROD_DB=basu_prod
 # production database has no active admin; after that it is inert.
 BOOTSTRAP_INVITE_SHA256=7ef25995cf1e6e64cbb5891e8fe0df3189032019d51719affd0a8d3430bafdf7
 
+# Keys for the server's .env that live as repository secrets on GitHub, so
+# nobody has to log in to the server to turn on Google or email: the deploy
+# job sends them on stdin, one KEY=value a line. Read once, here, before
+# anything below can swallow stdin; a deploy run by hand from a terminal
+# sends none.
+incoming=""
+if [ ! -t 0 ]; then incoming=$(timeout 10 cat || true); fi
+exec </dev/null
+
 cd "$APP"
 # git is run as the checkout's owner throughout; root in another user's repo is
 # "dubious ownership" and a refusal.
@@ -112,6 +121,31 @@ if ! sudo -u "$RUN_AS" grep -q '^BASU_MODE=production$' .env; then
           systemctl disable -q --now basu-scheduler 2>/dev/null || true
           systemctl restart basu-api
         fi' EXIT
+fi
+
+# ── Keys from the repository's secrets ─────────────────────────────────
+# Only these names, and a name the secrets do not set is left as it is on
+# the server: an unset secret never wipes a key. The log says which key was
+# set, never what to — it is public.
+MANAGED_KEYS=" GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET SMTP_URL MAIL_FROM OPS_MEMBERS "
+if [ -n "$incoming" ]; then
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    key=${line%%=*}
+    value=${line#*=}
+    case "$MANAGED_KEYS" in *" $key "*) ;; *) echo "  .env: ignored a key the deploy does not manage"; continue ;; esac
+    [ -n "$value" ] || continue
+    case "$value" in *'"'*) echo "  .env: $key refused — a double quote in the value"; continue ;; esac
+    wanted="$key=\"$value\""
+    grep -qxF "$wanted" .env && continue
+    tmp=$(mktemp .env.XXXXXX)
+    { grep -v "^$key=" .env || true; printf '%s\n' "$wanted"; } > "$tmp"
+    # Each its own step: any of them failing stops the deploy, red.
+    chown --reference=.env "$tmp"
+    chmod 600 "$tmp"
+    mv "$tmp" .env
+    echo "  .env: $key set from the repository's secrets"
+  done <<< "$incoming"
 fi
 
 # The migration runner does not load .env on its own, and the backup needs

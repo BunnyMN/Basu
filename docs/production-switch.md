@@ -64,10 +64,27 @@ APNS_TEAM_ID= APNS_KEY_ID= APNS_KEY_FILE=/opt/basu/apns.p8 APNS_ENV=production
 
 ## 2a. Имэйл код ба Google нэвтрэлт
 
-Хоёулаа `.env`-ийн мөрөөр нээгдэнэ; тавиагүй бол товч нь хуудсан дээр
-харагдахгүй, утас + нууц үг ганцаараа үлдэнэ. Тавьсны дараа
-`systemctl restart basu-api`, дараа нь
-`curl -s https://basu.burzai.cloud/v1/auth/methods` — `"email":true,"google":true`.
+Хоёулаа серверийн `.env`-ийн мөрөөр нээгдэнэ; тавиагүй бол товч нь
+хуудсан дээр харагдахгүй, утас + нууц үг ганцаараа үлдэнэ.
+
+**Сервер рүү орохгүйгээр:** түлхүүрүүдийг GitHub-ийн repository secret
+болгож тавиад redeploy хийхэд deploy өөрөө `.env`-д бичиж, API-г дахин
+асаана (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SMTP_URL`,
+`MAIL_FROM`, `OPS_MEMBERS` — өөр нэр хүлээж авахгүй, утга нь логт хэзээ ч
+гарахгүй):
+
+```bash
+gh secret set GOOGLE_CLIENT_ID        # асуухад утгаа paste хийнэ
+gh secret set GOOGLE_CLIENT_SECRET
+gh workflow run verify.yml            # redeploy
+```
+
+(эсвэл GitHub → Settings → Secrets and variables → Actions → New
+repository secret; дараа нь Actions → verify → Run workflow.) Утгыг
+хашилтгүй бичнэ: `MAIL_FROM` = `Basu <basu.noreply@gmail.com>`.
+
+Шалгах: `curl -s https://basu.burzai.cloud/v1/auth/methods` —
+`"email":true,"google":true`; deploy-ийн логт `sign-in:` мөр ч үүнийг хэлнэ.
 
 **Имэйл (SMTP).** Хамгийн хурдан нь Gmail:
 
@@ -113,8 +130,8 @@ Secret-ийг чатаар, commit-оор, deploy-ийн лог руу хэзэ�
 имэйлээр нь нэмнэ: админ «Гишүүд» → Нэр, **Имэйл** (Gmail), эрх → «Гишүүн
 нэмэх». Урилгын код хэрэггүй — тэр хүн /dashboard дээр «Google-ээр нэвтрэх»
 дарахад л суудалдаа орно. Утсаар нэвтэрдэг админ өөрийн Gmail-ийг өөрийн
-мөрөнд нэмбэл хоёр аргаар хоёулаа орно. Анхны админыг `.env`-ээр ч өгч болно:
-`OPS_MEMBERS=нэр@gmail.com:Нэр:admin`. Суудал зөвхөн нотолгоогоор холбогдоно:
+мөрөнд нэмбэл хоёр аргаар хоёулаа орно. Анхны админыг secret-ээр ч өгч болно:
+`gh secret set OPS_MEMBERS` → `нэр@gmail.com:Нэр:admin`, дараа нь redeploy. Суудал зөвхөн нотолгоогоор холбогдоно:
 Google/Apple/имэйл кодоор баталгаажсан хаяг, эсвэл админы өгсөн урилга —
 дугаар бичсэн төдийгөөр биш.
 
