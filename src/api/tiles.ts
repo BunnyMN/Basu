@@ -4,12 +4,12 @@ import type { FastifyInstance, FastifyReply } from 'fastify';
  * Map tiles and label glyphs, served from our own origin.
  *
  * The vector tiles are Mongolia's, rendered from OpenStreetMap by a Martin
- * instance the FuelNet project already runs. The reasoning for hosting rather
- * than buying is theirs and holds here unchanged: tiles cost the server they
- * run on and nothing per view, they carry Mongolian detail no global provider
- * has — khashaa boundaries, local POI names — and a Google Dynamic Map is
- * billed per load. Every office worker in a tower opening the app at noon is
- * exactly the shape of traffic that per-load pricing punishes.
+ * instance we already run. The reasoning for hosting rather than buying: tiles
+ * cost the server they run on and nothing per view, they carry Mongolian
+ * detail no global provider has — khashaa boundaries, local POI names — and
+ * a Google Dynamic Map is billed per load. Every office worker in a tower
+ * opening the app at noon is exactly the shape of traffic that per-load
+ * pricing punishes.
  *
  * # Why a proxy rather than pointing the browser at the tile host
  *

@@ -19,8 +19,8 @@
 <link rel="preload" as="image" href="/brand/meat/hero.webp">
 <link rel="stylesheet" href="/app.css">
 <style>
-/* The front page. Clean and quiet: white paper, black type, one orange, and
-   photographs of the meat itself. Everything it says is true today — the
+/* The front page. Clean and quiet: white paper, black type, and photographs
+   of the meat itself — the colour on the page is the meat's. Everything it says is true today — the
    stall board and the counts on the four animals come from the API, and it
    says so plainly when there is nothing yet.
 
@@ -29,15 +29,14 @@
 
 :root{
   --bg:#FFFFFF;
-  --bg-2:#F6F5F3;
-  --ink:#111111;
-  --ink-2:#555350;
-  --ink-3:#8B8883;
-  --line:#E8E6E2;
-  --dark:#0B0B0B;
-  --dark-2:#181818;
-  --ember:#E8621A;
-  --ember-deep:#C2500F;
+  --bg-2:#F7F6F4;
+  --ink:#161514;
+  --ink-2:#57534D;
+  --ink-3:#6B665F;
+  --line:#E2DFDA;
+  --dark:#0E0E0D;
+  --dark-2:#171716;
+  --ink-hover:#2E2B28;
   --wrap:1200px;
   --round:18px;
 }
@@ -48,7 +47,7 @@ a{color:inherit}
 .wrap{max-width:var(--wrap);margin:0 auto;padding:0 max(20px,var(--gutter))}
 h1,h2,h3{font-weight:600;letter-spacing:-.03em;text-wrap:balance}
 p{text-wrap:pretty}
-.kicker{display:inline-block;font-size:.8125rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ember-deep)}
+.kicker{display:inline-block;font-size:.75rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
 section.band{padding:clamp(72px,9vw,120px) 0}
 .head{max-width:40em}
 .head h2{margin:12px 0 0;font-size:clamp(2rem,4.2vw,3.25rem);line-height:1.05}
@@ -61,17 +60,17 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 .go svg{width:20px;height:20px;flex:none}
 .go .two{display:flex;flex-direction:column;align-items:flex-start;line-height:1.1;text-align:left}
 .go .two small{font-size:.6875rem;font-weight:500;opacity:.7}
-.go-ember{background:var(--ember);color:#fff}
 .go-dark{background:var(--ink);color:#fff}
+.go-light{background:#fff;color:var(--ink)}
 .go-line{border-color:var(--line);color:var(--ink);background:#fff}
 .go-glass{border-color:rgba(255,255,255,.28);color:#fff;background:rgba(255,255,255,.06)}
 @media (hover:hover){
-  .go-ember:hover{background:#D5550F}
-  .go-dark:hover{background:#000}
+  .go-dark:hover{background:var(--ink-hover)}
+  .go-light:hover{background:#EAE8E4}
   .go-line:hover{border-color:#CFCBC5}
   .go-glass:hover{background:rgba(255,255,255,.12)}
 }
-.onward{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--ember-deep);text-decoration:none}
+.onward{display:inline-flex;align-items:center;gap:6px;font-weight:600;color:var(--ink);text-decoration:none}
 .onward::after{content:"→";transition:transform var(--dur)}
 @media (hover:hover){.onward:hover::after{transform:translateX(3px)}}
 
@@ -79,8 +78,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 .bar{position:sticky;top:0;z-index:30;padding-top:var(--safe-t);background:rgba(255,255,255,.88);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid transparent;transition:border-color var(--dur)}
 .bar[data-scrolled]{border-bottom-color:var(--line)}
 .bar .wrap{display:flex;align-items:center;gap:32px;min-height:64px}
-.logo{display:inline-flex;align-items:center;gap:10px;text-decoration:none;font-size:1.25rem;font-weight:600;letter-spacing:-.02em}
-.logo img{width:32px;height:32px;border-radius:8px}
+.logo{display:inline-flex;align-items:center;text-decoration:none;font-size:1.375rem;font-weight:600;letter-spacing:-.035em}
 .bar nav{display:flex;gap:26px}
 .bar nav a{text-decoration:none;font-size:.9375rem;font-weight:500;color:var(--ink-2)}
 @media (hover:hover){.bar nav a:hover{color:var(--ink)}}
@@ -94,7 +92,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 .hero .wrap{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);align-items:center;min-height:min(78svh,720px)}
 .hero .copy{position:relative;z-index:1;padding:clamp(56px,7vw,96px) 0}
 .hero .season{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.08);font-size:.8125rem;font-weight:500;color:rgba(255,255,255,.8)}
-.hero .season::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ember)}
+.hero .season::before{content:"";width:6px;height:6px;border-radius:50%;background:#fff}
 .hero h1{margin:22px 0 0;font-size:clamp(3rem,6.6vw,5.6rem);line-height:.98}
 .hero .lead{margin:22px 0 32px;max-width:30em;font-size:clamp(1.0625rem,1.35vw,1.1875rem);line-height:1.6;color:rgba(255,255,255,.74)}
 .hero .fine{margin:18px 0 0;font-size:.875rem;color:rgba(255,255,255,.5)}
@@ -114,7 +112,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 .keeps ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
 .keeps li{display:grid;grid-template-columns:40px 1fr;gap:4px 14px;padding:28px 24px 28px 0}
 .keeps li + li{padding-left:24px;border-left:1px solid var(--line)}
-.keeps svg{grid-row:span 2;width:40px;height:40px;padding:9px;border-radius:12px;background:var(--bg-2);color:var(--ember-deep)}
+.keeps svg{grid-row:span 2;width:40px;height:40px;padding:9px;border-radius:12px;background:var(--bg-2);color:var(--ink)}
 .keeps b{font-size:1rem;font-weight:600;line-height:1.3}
 .keeps span{font-size:.875rem;line-height:1.5;color:var(--ink-2)}
 @media (max-width:980px){
@@ -154,16 +152,16 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 .stall .money{font-size:.9375rem;text-align:right;white-space:nowrap}
 .stall .money small{font-family:var(--sans);font-weight:500;color:var(--ink-3)}
 .board-empty{display:flex;gap:14px;align-items:flex-start;margin-top:12px}
-.board-empty i{flex:none;width:9px;height:9px;margin-top:8px;border-radius:50%;background:var(--ember);box-shadow:0 0 0 5px rgba(232,98,26,.16)}
+.board-empty i{flex:none;width:8px;height:8px;margin-top:8px;border-radius:50%;background:var(--ink);box-shadow:0 0 0 5px rgba(22,21,20,.08)}
 .board-empty p{margin:0;line-height:1.6;color:var(--ink-2)}
-.board-empty a{color:var(--ember-deep);font-weight:600}
+.board-empty a{color:var(--ink);font-weight:600;text-decoration:underline;text-underline-offset:.2em}
 
 /* ── how it goes: on black, beside a cut on its board ────────────── */
 .steps-band{position:relative;background:var(--dark);color:#fff;overflow:hidden;isolation:isolate}
 .steps-band > img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:30% 50%;z-index:-2}
 .steps-band::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(11,11,11,0) 0%,rgba(11,11,11,.35) 40%,rgba(11,11,11,.9) 62%)}
 .steps-band .inner{margin-left:auto;max-width:540px}
-.steps-band .kicker{color:#FF9A5C}
+.steps-band .kicker{color:rgba(255,255,255,.55)}
 .steps-band .head p{color:rgba(255,255,255,.7)}
 .steps{list-style:none;margin:36px 0 0;padding:0;counter-reset:s}
 .steps li{counter-increment:s;display:grid;grid-template-columns:44px 1fr;gap:2px 14px;padding:18px 0;border-top:1px solid rgba(255,255,255,.12)}
@@ -220,12 +218,12 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 @media (max-width:900px){.dine{grid-template-columns:1fr}}
 .dine .ph{border-radius:var(--round);overflow:hidden}
 .dine .ph img{width:100%;aspect-ratio:4/3;object-fit:cover}
-.soon{display:inline-block;padding:5px 12px;border-radius:999px;background:rgba(232,98,26,.1);color:var(--ember-deep);font-size:.8125rem;font-weight:600}
+.soon{display:inline-block;padding:5px 12px;border-radius:999px;border:1px solid var(--line);color:var(--ink-2);font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 .ticks{list-style:none;margin:24px 0 0;padding:0}
 .ticks li{position:relative;padding:10px 0 10px 32px;border-top:1px solid var(--line);line-height:1.5}
-.ticks li::before{content:"";position:absolute;left:0;top:13px;width:20px;height:20px;border-radius:50%;background:var(--bg-2) no-repeat center/12px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23C2500F' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5 9-10'/%3E%3C/svg%3E")}
+.ticks li::before{content:"";position:absolute;left:0;top:13px;width:20px;height:20px;border-radius:50%;background:var(--bg-2) no-repeat center/12px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23161514' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5 9-10'/%3E%3C/svg%3E")}
 .dine .note{margin:24px 0 0;line-height:1.6;color:var(--ink-2)}
-.dine .note a{color:var(--ember-deep);font-weight:600}
+.dine .note a{color:var(--ink);font-weight:600;text-decoration:underline;text-underline-offset:.2em}
 
 /* ── the phone ───────────────────────────────────────────────────── */
 .app-band{background:var(--bg-2)}
@@ -239,14 +237,14 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 
 /* ── for the people who sell ─────────────────────────────────────── */
 .trade{background:var(--dark);color:#fff}
-.trade .kicker{color:#FF9A5C}
+.trade .kicker{color:rgba(255,255,255,.55)}
 .trade .head p{color:rgba(255,255,255,.7)}
 .trade-grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:clamp(32px,6vw,88px);align-items:center}
 @media (max-width:900px){.trade-grid{grid-template-columns:1fr}}
 .trade .ph{border-radius:var(--round);overflow:hidden}
 .trade .ph img{width:100%;aspect-ratio:4/5;object-fit:cover}
 @media (max-width:900px){.trade .ph img{aspect-ratio:4/3}}
-.trade .steps li::before{background:rgba(232,98,26,.2);color:#FF9A5C}
+.trade .steps li::before{background:rgba(255,255,255,.1);color:#fff}
 .roles{display:flex;flex-wrap:wrap;gap:8px;margin-top:26px}
 .roles span{padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.18);font-size:.875rem;color:rgba(255,255,255,.85)}
 .trade .fine{margin:14px 0 0;font-size:.9375rem;line-height:1.6;color:rgba(255,255,255,.6)}
@@ -261,7 +259,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 .qa summary::after{content:"";flex:none;width:28px;height:28px;border-radius:50%;background:var(--bg-2) no-repeat center/13px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23111111' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");transition:transform var(--dur)}
 .qa details[open] summary::after{transform:rotate(45deg)}
 .qa details p{margin:0 0 22px;max-width:44em;line-height:1.7;color:var(--ink-2)}
-.qa details a{color:var(--ember-deep);font-weight:600}
+.qa details a{color:var(--ink);font-weight:600;text-decoration:underline;text-underline-offset:.2em}
 .center{text-align:center}
 .center .head{margin:0 auto}
 
@@ -295,7 +293,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 
 <header class="bar" id="bar">
   <div class="wrap">
-    <a class="logo" href="/" aria-label="Basu, нүүр хуудас"><img src="/brand/app-icon.webp" alt="" width="32" height="32">Basu</a>
+    <a class="logo" href="/" aria-label="Basu, нүүр хуудас">Basu</a>
     <nav aria-label="Хэсгүүд">
       <a href="#meat">Мах</a>
       <a href="#how">Хэрхэн</a>
@@ -305,7 +303,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
     </nav>
     <div class="right">
       <a class="go go-line" href="/app" id="mine" hidden>Миний Basu</a>
-      <a class="go go-ember" href="/idesh">Зар үзэх</a>
+      <a class="go go-dark" href="/idesh">Зар үзэх</a>
     </div>
   </div>
 </header>
@@ -319,7 +317,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
         <h1>Шинэ мах.<br>Эцсийн үнэ.</h1>
         <p class="lead">Хонь, ямаа, үхэр, адууны махыг гэрээт нийлүүлэгчээс толгойгоор нь эсвэл кг-аар захиална. Мал таны захиалгаар нядлагдаж, сонгосон өдөр тань бэлэн болно.</p>
         <div class="btns">
-          <a class="go go-ember" href="/idesh">Зар үзэх →</a>
+          <a class="go go-light" href="/idesh">Зар үзэх →</a>
           <a class="go go-glass" href="https://apps.apple.com/app/id6810541939" data-store>
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.62c.03 3.03 2.66 4.04 2.69 4.05-.02.07-.42 1.44-1.39 2.85-.84 1.22-1.71 2.44-3.08 2.46-1.35.03-1.78-.8-3.32-.8-1.54 0-2.02.78-3.3.83-1.32.05-2.33-1.32-3.18-2.53-1.73-2.5-3.05-7.06-1.28-10.14.88-1.53 2.45-2.5 4.15-2.52 1.3-.03 2.52.87 3.31.87.79 0 2.28-1.08 3.84-.92.65.03 2.48.26 3.66 1.99-.1.06-2.18 1.27-2.16 3.79M13.85 3.2c.7-.85 1.17-2.03 1.04-3.2-1.01.04-2.23.67-2.95 1.52-.65.75-1.22 1.95-1.07 3.1 1.13.09 2.28-.57 2.98-1.42"/></svg>
             <span class="two"><small>iPhone-д</small>App Store</span>
@@ -517,7 +515,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
         <div class="roles reveal"><span>Эзэн</span><span>Менежер</span><span>Ажилтан</span><span>Нягтлан</span></div>
         <p class="fine reveal">Хамт ажиллагсаддаа эрх өгнө. Хүн бүр өөрийн ажлаа л харна. Ресторанд зориулсан цэс, гал тогооны самбарыг эхний ресторануудтайгаа хамт тохируулж байна.</p>
         <div class="btns reveal">
-          <a class="go go-ember" href="/dashboard">Бизнесээ бүртгүүлэх →</a>
+          <a class="go go-light" href="/dashboard">Бизнесээ бүртгүүлэх →</a>
           <a class="go go-glass" href="/supplier">Нийлүүлэгчийн хэсэг</a>
         </div>
       </div>
@@ -551,7 +549,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
   <div class="wrap">
     <div class="foot-top">
       <div>
-        <a class="logo" href="/"><img src="/brand/app-icon.webp" alt="" width="32" height="32">Basu</a>
+        <a class="logo" href="/">Basu</a>
         <p class="who">Улаанбаатар · <a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a><br>© <span id="year">2026</span> Basu</p>
       </div>
       <nav class="links" aria-label="Холбоос">

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#E9EBEC" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0E1315" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F4F3F0" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E0E0D" media="(prefers-color-scheme: dark)">
 <title>Basu · Миний апп</title>
 <link rel="icon" href="/brand/favicon.png">
 <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
@@ -70,7 +70,7 @@ main:has(.live[data-any]) .hello,main:has(.live[data-loading]) .hello{display:no
   transition:transform 120ms var(--ease),border-color var(--dur),background var(--dur);
 }
 .app .tile svg{width:34px;height:34px;fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-/* A tile with art is the art, edge to edge — the render the iPhone launcher shows. */
+/* A tile with a photograph is the photograph, edge to edge: the thing itself, not a drawing of it. */
 .app .tile:has(> img){padding:0;overflow:hidden;background:none}
 .app .tile > img{width:100%;height:100%;display:block;object-fit:cover}
 @media (hover:hover){.app:hover .tile{border-color:var(--line-2);background:var(--surface-2)}}
@@ -165,7 +165,7 @@ const SUPPLIER_APP = {
   tag: 'миний зар',
   href: '/supplier',
   // A ger with a sheep by its door: where the meat comes from.
-  icon: '<img src="/brand/supplier-tile.svg" alt="" width="92" height="92">',
+  icon: '<img src="/brand/supplier-tile.webp" alt="" width="92" height="92">',
 };
 
 function tileOf(app) {

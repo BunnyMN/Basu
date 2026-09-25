@@ -220,11 +220,11 @@ export async function sendEmailCode(ctx: Ctx, rawEmail: string, purpose: CodePur
         '',
         letter.unasked,
       ].join('\n'),
-      html: `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.6;color:#14181B">
+      html: `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.6;color:#161514">
 <p>${letter.lead}</p>
 <p style="font-family:ui-monospace,Menlo,monospace;font-size:28px;font-weight:600;letter-spacing:.12em;margin:8px 0 16px">${code}</p>
-<p style="color:#4A555C">Код ${EMAIL_CODE_TTL_MINUTES} минут хүчинтэй. Хэнд ч бүү хэлээрэй — Basu-гийн ажилтан ч танаас код асуухгүй.</p>
-<p style="color:#62727A;font-size:13px">${letter.unasked}</p>
+<p style="color:#57534D">Код ${EMAIL_CODE_TTL_MINUTES} минут хүчинтэй. Хэнд ч бүү хэлээрэй — Basu-гийн ажилтан ч танаас код асуухгүй.</p>
+<p style="color:#6B665F;font-size:13px">${letter.unasked}</p>
 </div>`,
     });
   } catch (error) {

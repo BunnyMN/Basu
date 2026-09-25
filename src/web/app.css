@@ -26,21 +26,24 @@
   --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
 
   /* ground + surfaces */
-  --bg:#E9EBEC; --surface:#FFFFFF; --surface-2:#F3F5F6; --sunk:#DFE3E4;
-  --ground:linear-gradient(176deg,#EFF1F2 0%,#E9EBEC 46%,#DFE3E4 100%);
-  --glass:rgba(255,255,255,.74); --blur:blur(12px) saturate(1.05);
-  --scrim:rgba(20,24,27,.40);
+  --bg:#F4F3F0; --surface:#FFFFFF; --surface-2:#F7F6F4; --sunk:#EAE8E4;
+  --ground:linear-gradient(176deg,#F7F6F3 0%,#F4F3F0 46%,#ECEAE6 100%);
+  --glass:rgba(255,255,255,.78); --blur:blur(12px) saturate(1.05);
+  --scrim:rgba(22,21,20,.40);
   --map-dim:0;            /* veil over light map tiles; .35 in dark until mapStyle.js has a dark palette */
 
-  /* ink + lines. ink-3 is lifted from the shell's #78868E (3.75:1) to 4.99:1
-     on white; port the same value to BasuColor.ink3 so both halves agree. */
-  --ink:#14181B; --ink-2:#4A555C; --ink-3:#62727A; --ink-inverse:#F3F5F6;
-  --line:#D2D8DA; --line-2:#C0C8CB;
+  /* ink + lines: warm neutrals, not blue-grey. ink-3 is 5.7:1 on white and
+     5.1:1 on the ground; port the same values to BasuColor so both halves agree. */
+  --ink:#161514; --ink-2:#57534D; --ink-3:#6B665F; --ink-inverse:#F7F6F4;
+  --line:#E2DFDA; --line-2:#CFCBC4;
 
-  /* the one brand colour. --accent fills; --accent-ink is accent as TEXT
-     (5.1:1 on accent-soft, 6.1:1 on white); --on-accent sits on a fill. */
-  --accent:#C64E08; --accent-ink:#A84206; --accent-soft:#FAE7DA; --accent-line:#E9B893;
-  --on-accent:#FFFFFF;
+  /* The accent is ink. Basu has no hue of its own: a black primary on white,
+     like a receipt or a good butcher's card, is what reads as trustworthy.
+     --accent fills; --accent-ink is accent as TEXT; --accent-soft is the
+     wash behind a chosen tab or chip; --on-accent sits on a fill. Colour is
+     kept for meaning only — route, hold, ready, stop. */
+  --accent:#161514; --accent-ink:#161514; --accent-soft:#ECEAE6; --accent-line:#CFCBC4;
+  --accent-hover:#2E2B28; --on-accent:#FFFFFF;
 
   /* semantic: route = waiting on the system / in transit, hold = waiting on a
      person, ready = done / credit, stop = attention / failed / destructive. */
@@ -52,10 +55,10 @@
 
   /* depth: one resting shadow (native y1 b2), one for things that float,
      one that rises from the bottom edge. */
-  --shadow:0 1px 2px rgba(20,24,27,.05);
-  --shadow-float:0 1px 2px rgba(20,24,27,.06),0 12px 32px -12px rgba(20,24,27,.22);
-  --shadow-sheet:0 -1px 0 var(--line),0 -16px 40px -20px rgba(20,24,27,.30);
-  --ring:0 0 0 3px var(--accent-soft);
+  --shadow:0 1px 2px rgba(22,21,20,.05);
+  --shadow-float:0 1px 2px rgba(22,21,20,.06),0 12px 32px -12px rgba(22,21,20,.20);
+  --shadow-sheet:0 -1px 0 var(--line),0 -16px 40px -20px rgba(22,21,20,.28);
+  --ring:0 0 0 3px rgba(22,21,20,.12);
 
   /* shape. Nothing else is legal: 4 code/checkbox, 8 badges/thumbs, 10
      controls, 12 cards, 16 sheet top, 18 app tiles, 2 the channel chip. */
@@ -92,11 +95,11 @@
   --track-eyebrow:.14em;
 
   /* icons drawn by CSS (masks take alpha only; chevrons and the check need a fill) */
-  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2362727A' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B665F' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
-  --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2362727A' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+  --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B665F' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
   --mask-chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
-  --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2362727A' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
+  --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B665F' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
 
   /* motion + layers */
   --ease:cubic-bezier(.2,.8,.3,1); --dur:200ms; --dur-sheet:260ms;
@@ -107,15 +110,15 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     color-scheme:dark;
-    --bg:#0E1315; --surface:#161D20; --surface-2:#1C2428; --sunk:#0A0E10;
-    --ground:linear-gradient(176deg,#141B1E 0%,#0E1315 46%,#0A0E10 100%);
-    --glass:rgba(22,29,32,.74);
-    --scrim:rgba(4,7,8,.60);
+    --bg:#0E0E0D; --surface:#171716; --surface-2:#1E1E1C; --sunk:#090908;
+    --ground:linear-gradient(176deg,#141413 0%,#0E0E0D 46%,#090908 100%);
+    --glass:rgba(23,23,22,.76);
+    --scrim:rgba(5,5,4,.60);
     --map-dim:.35;
-    --ink:#E7ECED; --ink-2:#A2B0B6; --ink-3:#84949B; --ink-inverse:#14181B;
-    --line:#283236; --line-2:#374348;
-    --accent:#FF8A3D; --accent-ink:#FF9B57; --accent-soft:#33200F; --accent-line:#5E3A1B;
-    --on-accent:#160B03;
+    --ink:#F3F2EF; --ink-2:#B3AEA7; --ink-3:#928D86; --ink-inverse:#161514;
+    --line:#2A2927; --line-2:#3B3A37;
+    --accent:#F3F2EF; --accent-ink:#F3F2EF; --accent-soft:#2A2927; --accent-line:#4A4844;
+    --accent-hover:#FFFFFF; --on-accent:#161514;
     --route:#78B0E0; --route-soft:#16242F; --route-line:#2E4A61;
     --ready:#57C295; --ready-soft:#0F2620; --ready-line:#1F4A3A;
     --hold:#DAB65A;  --hold-soft:#2A2312;  --hold-line:#4E4222;
@@ -124,23 +127,23 @@
     --shadow:0 1px 2px rgba(0,0,0,.40);
     --shadow-float:0 1px 2px rgba(0,0,0,.40),0 14px 36px -12px rgba(0,0,0,.70);
     --shadow-sheet:0 -1px 0 var(--line),0 -16px 40px -20px rgba(0,0,0,.70);
-    --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2384949B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23160B03' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
-    --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2384949B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
-    --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2384949B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
+    --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23928D86' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23161514' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
+    --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23928D86' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+    --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23928D86' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
   }
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
-  --bg:#0E1315; --surface:#161D20; --surface-2:#1C2428; --sunk:#0A0E10;
-  --ground:linear-gradient(176deg,#141B1E 0%,#0E1315 46%,#0A0E10 100%);
-  --glass:rgba(22,29,32,.74);
-  --scrim:rgba(4,7,8,.60);
+  --bg:#0E0E0D; --surface:#171716; --surface-2:#1E1E1C; --sunk:#090908;
+  --ground:linear-gradient(176deg,#141413 0%,#0E0E0D 46%,#090908 100%);
+  --glass:rgba(23,23,22,.76);
+  --scrim:rgba(5,5,4,.60);
   --map-dim:.35;
-  --ink:#E7ECED; --ink-2:#A2B0B6; --ink-3:#84949B; --ink-inverse:#14181B;
-  --line:#283236; --line-2:#374348;
-  --accent:#FF8A3D; --accent-ink:#FF9B57; --accent-soft:#33200F; --accent-line:#5E3A1B;
-  --on-accent:#160B03;
+  --ink:#F3F2EF; --ink-2:#B3AEA7; --ink-3:#928D86; --ink-inverse:#161514;
+  --line:#2A2927; --line-2:#3B3A37;
+  --accent:#F3F2EF; --accent-ink:#F3F2EF; --accent-soft:#2A2927; --accent-line:#4A4844;
+  --accent-hover:#FFFFFF; --on-accent:#161514;
   --route:#78B0E0; --route-soft:#16242F; --route-line:#2E4A61;
   --ready:#57C295; --ready-soft:#0F2620; --ready-line:#1F4A3A;
   --hold:#DAB65A;  --hold-soft:#2A2312;  --hold-line:#4E4222;
@@ -149,10 +152,10 @@
   --shadow:0 1px 2px rgba(0,0,0,.40);
   --shadow-float:0 1px 2px rgba(0,0,0,.40),0 14px 36px -12px rgba(0,0,0,.70);
   --shadow-sheet:0 -1px 0 var(--line),0 -16px 40px -20px rgba(0,0,0,.70);
-  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2384949B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23160B03' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
-  --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2384949B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
-  --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2384949B' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
+  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23928D86' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23161514' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
+  --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23928D86' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+  --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23928D86' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
 }
 :root[data-theme="light"]{color-scheme:light}
 
@@ -193,6 +196,11 @@ button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:tra
 input,select,textarea{font:inherit;color:inherit}
 img{max-width:100%}
 a{color:var(--accent-ink);text-decoration:none}
+/* The accent is ink, so a link inside a sentence would read as the sentence:
+   it carries a hairline underline instead of a colour. */
+:where(p,.help,.cap,.callout,.doc li) a:not(.btn):not(.link):not(.go){text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.2em;text-decoration-color:color-mix(in srgb,currentColor 38%,transparent)}
+@media (hover:hover){:where(p,.help,.cap,.callout,.doc li) a:not(.btn):not(.link):not(.go):hover{text-decoration-color:currentColor}}
+.doc .toc a{text-decoration:none}
 hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 /* Outline, not box-shadow: it never fights an element's own shadow and
    follows the element's radius in every current engine. */
@@ -303,7 +311,7 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
 .btn[data-v="link"]{min-height:0;padding:0;border:0;background:none;color:var(--accent-ink);font-size:var(--t-cap);border-radius:var(--r-xs)}
 @media (hover:hover){
   .btn:hover{background:var(--surface-2);border-color:var(--ink-3)}
-  .btn[data-v="primary"]:hover{background:var(--accent);border-color:var(--accent);filter:brightness(1.06)}
+  .btn[data-v="primary"]:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
   .btn[data-v="quiet"]:hover,.btn.quiet:hover{background:var(--surface-2);border-color:transparent;color:var(--ink)}
   .btn[data-v="danger"]:hover{background:var(--stop-soft);border-color:var(--stop-line)}
   .btn[data-v="danger"][data-fill]:hover{background:var(--stop);border-color:var(--stop);filter:brightness(1.06)}
