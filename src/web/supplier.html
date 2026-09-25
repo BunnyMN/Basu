@@ -170,7 +170,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mnt, money, KIND, dayLabel, signInDoors } from '/api.js';
+import { api, store, toast, mnt, money, KIND, dayLabel, signInDoors, accountWays } from '/api.js';
 
 const root = document.getElementById('root');
 const el = (html) => {
@@ -245,10 +245,10 @@ const DOOR_FOOT = '<div class="door-foot"><a href="/terms">Үйлчилгээн�
 /* ── the doors ─────────────────────────────────────────────────────── */
 
 /**
- * The ways in — Google, a code by email, or the phone and password a
- * contract was signed with — the same block the guests' pages use. Whoever
- * is new becomes an account by any of them, and the application form is the
- * next card.
+ * The ways in — Google, a code by email, or a password (the phone and
+ * password a contract was signed with, or an address) — the same block the
+ * guests' pages use. Whoever is new becomes an account by any of them, and
+ * the application form is the next card.
  */
 function signInCard() {
   const card = el(`
@@ -1361,6 +1361,9 @@ async function renderProfile(view) {
     }
   });
   view.append(form);
+  // The owner's own account — a paired screen has none. Most owners came in
+  // by phone, and an address is their only way back from a forgotten password.
+  if (mode() === 'owner') view.append(accountWays({ token: store.guestToken }));
 }
 
 /* ── boot ────────────────────────────────────────────────────────── */

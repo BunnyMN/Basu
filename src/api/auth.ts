@@ -8,6 +8,8 @@ import {
   googleConfigFromEnv,
   safeReturn,
   sendEmailCode,
+  sendPasswordCode,
+  setPasswordWithCode,
   signInWithApple,
   takeGoogleState,
   verifyEmailCode,
@@ -17,7 +19,8 @@ import { badRequest, sendError } from './errors.js';
 import { limits } from './hardening.js';
 
 /**
- * The ways in that do not need a phone: a code by email, Google, Apple.
+ * The ways in that do not need a phone: a code by email, Google, Apple — and
+ * a password, which is set only by proving an inbox (see `register.ts`).
  *
  * Google is a redirect: `/v1/auth/google/start` sends the person to Google
  * with a state we remember, Google sends them back to `/callback`, and we
@@ -92,6 +95,60 @@ export async function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): Promis
       if (!email || !code) return badRequest(reply, 'Имэйл, кодоо оруулна уу.', 'email and code are required');
       try {
         return reply.send(shapeSession(await verifyEmailCode(ctx, email, code.trim(), device ?? null)));
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  /* ── a password, by way of a code to an inbox ── */
+
+  /**
+   * A code for setting a password: `sign_up` for a new account by email,
+   * `reset` for a forgotten one, named by its address or its phone number.
+   * `to` says where the letter went — masked when only a number was typed.
+   */
+  app.post<{ Body: { login?: string; purpose?: string } }>(
+    '/v1/auth/password/code',
+    { config: { rateLimit: rate.otp } },
+    async (request, reply) => {
+      const login = request.body?.login?.trim();
+      const purpose = request.body?.purpose ?? 'reset';
+      if (!login) return badRequest(reply, 'Имэйл эсвэл утасны дугаараа оруулна уу.', 'login is required');
+      if (purpose !== 'sign_up' && purpose !== 'reset') {
+        return badRequest(reply, 'Хүсэлт буруу байна.', 'purpose must be sign_up or reset');
+      }
+      try {
+        const { sentTo } = await sendPasswordCode(ctx, { login, purpose });
+        return reply.status(202).send({ sent: true, to: sentTo });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  /**
+   * The code, the password, and a session. `created` says whether an account
+   * was made — false means the address already had one, now with this password.
+   */
+  app.post<{ Body: { login?: string; code?: string; password?: string; name?: string; device?: string } }>(
+    '/v1/auth/password',
+    { config: { rateLimit: rate.verify } },
+    async (request, reply) => {
+      const { code, password, name, device } = request.body ?? {};
+      const login = request.body?.login?.trim();
+      if (!login || !code || !password) {
+        return badRequest(reply, 'Код, шинэ нууц үгээ оруулна уу.', 'login, code and password are required');
+      }
+      try {
+        const { session, created } = await setPasswordWithCode(ctx, {
+          login,
+          code: code.trim(),
+          password,
+          name: name ?? null,
+          device: device ?? null,
+        });
+        return reply.status(created ? 201 : 200).send({ ...shapeSession(session), created });
       } catch (error) {
         return sendError(reply, error);
       }

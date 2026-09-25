@@ -185,6 +185,79 @@ describe('a code by email', () => {
   });
 });
 
+describe('a password, by way of the inbox', () => {
+  const post = (url: string, payload: Record<string, unknown>, token?: string) =>
+    app.inject({ method: 'POST', url, payload, headers: token ? bearer(token) : {} });
+
+  it('signs up by an address, signs in by it, and gets a forgotten password back', async () => {
+    const asked = await post('/v1/auth/password/code', { login: 'saraa@example.mn', purpose: 'sign_up' });
+    expect(asked.statusCode, asked.body).toBe(202);
+    expect(asked.json()).toEqual({ sent: true, to: 'saraa@example.mn' });
+    expect(asked.body).not.toContain(mailer.codeFor('saraa@example.mn')!);
+
+    const made = await post('/v1/auth/password', {
+      login: 'saraa@example.mn',
+      code: mailer.codeFor('saraa@example.mn'),
+      password: 'сайн нууц үг',
+      name: 'Сараа',
+      device: 'Chrome',
+    });
+    expect(made.statusCode, made.body).toBe(201);
+    expect(made.json()).toMatchObject({ token: expect.any(String), created: true });
+    expect(await whoIs(made.json().token)).toMatchObject({ email: 'saraa@example.mn', display_name: 'Сараа', has_password: true });
+
+    const signedIn = await post('/v1/auth/login', { login: 'saraa@example.mn', password: 'сайн нууц үг' });
+    expect(signedIn.statusCode, signedIn.body).toBe(200);
+
+    await post('/v1/auth/password/code', { login: 'saraa@example.mn' });
+    const reset = await post('/v1/auth/password', {
+      login: 'saraa@example.mn',
+      code: mailer.codeFor('saraa@example.mn'),
+      password: 'шинэ нууц үг',
+    });
+    expect(reset.statusCode, reset.body).toBe(200);
+    expect(reset.json().created).toBe(false);
+    // Signed out wherever the old password had signed in.
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(signedIn.json().token) })).statusCode).toBe(401);
+  });
+
+  it('still takes `phone` on the login, for the app builds already out', async () => {
+    await post('/v1/auth/register', { phone: '+97699001122', password: 'сайн нууц үг' });
+    const old = await post('/v1/auth/login', { phone: '+97699001122', password: 'сайн нууц үг' });
+    expect(old.statusCode, old.body).toBe(200);
+    const wrong = await post('/v1/auth/login', { login: '99001122', password: 'буруу нууц үг' });
+    expect(wrong.json().error.message_mn).toBe('Имэйл/утас эсвэл нууц үг буруу байна.');
+  });
+
+  it('tells a number with no address where it stands, in Mongolian', async () => {
+    const refused = await post('/v1/auth/password/code', { login: '99001122' });
+    expect(refused.statusCode).toBe(404);
+    expect(refused.json().error.code).toBe('NO_EMAIL');
+    expect(refused.json().error.message_mn).toContain('имэйл холбогдоогүй');
+  });
+
+  it('lets a phone account add an address, change its password, and end its other sessions', async () => {
+    const first = (await post('/v1/auth/register', { phone: '+97699001122', password: 'сайн нууц үг' })).json().token;
+    const second = (await post('/v1/auth/login', { login: '99001122', password: 'сайн нууц үг' })).json().token;
+    expect(await whoIs(first)).toMatchObject({ email: null, has_password: true });
+
+    const noPassword = await post('/v1/me/email/code', { email: 'bat@example.mn' }, first);
+    expect(noPassword.json().error.code).toBe('WRONG_PASSWORD');
+    expect((await post('/v1/me/email/code', { email: 'bat@example.mn', password: 'сайн нууц үг' }, first)).statusCode).toBe(202);
+    const attached = await post('/v1/me/email', { email: 'bat@example.mn', code: mailer.codeFor('bat@example.mn') }, first);
+    expect(attached.statusCode, attached.body).toBe(200);
+    expect(attached.json().email).toBe('bat@example.mn');
+
+    const wrong = await post('/v1/me/password', { current: 'таамаг', next: 'шинэ нууц үг' }, first);
+    expect(wrong.statusCode).toBe(403);
+    expect(wrong.json().error.message_mn).toBe('Одоогийн нууц үг буруу байна.');
+    const changed = await post('/v1/me/password', { current: 'сайн нууц үг', next: 'шинэ нууц үг' }, first);
+    expect(changed.json()).toEqual({ changed: true, revoked: 1 });
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(second) })).statusCode).toBe(401);
+    expect((await post('/v1/auth/login', { login: 'bat@example.mn', password: 'шинэ нууц үг' })).statusCode).toBe(200);
+  });
+});
+
 describe('Google', () => {
   it('sends the person to Google with a state, a PKCE challenge and our own return address', async () => {
     const start = await app.inject({ method: 'GET', url: '/v1/auth/google/start?return=/supplier' });

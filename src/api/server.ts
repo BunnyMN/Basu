@@ -318,14 +318,18 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     },
   );
 
-  app.post<{ Body: { phone?: string; password?: string; device?: string } }>(
+  /** By an email address or a phone number, as `login`; the app's older builds send `phone`. */
+  app.post<{ Body: { login?: string; phone?: string; password?: string; device?: string } }>(
     '/v1/auth/login',
     { config: { rateLimit: rate.verify } },
     async (request, reply) => {
-      const { phone, password, device } = request.body ?? {};
-      if (!phone || !password) return badRequest(reply, 'Утас, нууц үгээ оруулна уу.', 'phone and password are required');
+      const { password, device } = request.body ?? {};
+      const login = request.body?.login?.trim() || request.body?.phone;
+      if (!login || !password) {
+        return badRequest(reply, 'Имэйл эсвэл утас, нууц үгээ оруулна уу.', 'login and password are required');
+      }
       try {
-        const session = await signInWithPassword(ctx, { phone, password, device: device ?? null });
+        const session = await signInWithPassword(ctx, { login, password, device: device ?? null });
         return reply.send({
           token: session.token,
           guest_id: session.guestId,

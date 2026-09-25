@@ -158,7 +158,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mnt, money, KIND, HEADLINE, dayLabel, signInDoors, authReturn } from '/api.js';
+import { api, store, toast, mnt, money, KIND, HEADLINE, dayLabel, signInDoors, accountWays, authReturn } from '/api.js';
 
 const root = document.getElementById('root');
 const el = (html) => {
@@ -270,79 +270,65 @@ async function showToken() {
     <div class="card pair">
       <div class="brand wordmark">Basu<small>Ops</small></div>
       <h2 id="door-title">Нэвтрэх</h2>
-      <p id="door-lead">Утас, нууц үгээрээ нэвтэрнэ үү. Гишүүн биш бол нэвтэрсний дараа эрх хүсэж болно.</p>
+      <p id="door-lead">Нэвтэрнэ үү. Гишүүн биш бол нэвтэрсний дараа эрх хүсэж болно.</p>
       <div data-doors></div>
-      <div class="or" data-phone-or hidden>эсвэл утас, нууц үгээр</div>
-      <input class="input" name="invite" inputmode="numeric" placeholder="Урилгын код · 12345 67890" aria-label="Урилгын код" autocomplete="one-time-code" hidden>
-      <input class="input" name="name" placeholder="Таны нэр" aria-label="Нэр" autocomplete="name" hidden>
-      <input class="input" name="phone" type="tel" inputmode="tel" placeholder="+976 XXXX XXXX" aria-label="Утас" autocomplete="tel">
-      <input class="input" name="password" type="password" placeholder="Нууц үг" aria-label="Нууц үг" autocomplete="current-password">
-      <button class="btn" data-v="primary" data-size="lg" type="button" id="send">Нэвтрэх</button>
+      <div data-claim hidden>
+        <input class="input" name="invite" inputmode="numeric" placeholder="Урилгын код · 12345 67890" aria-label="Урилгын код" autocomplete="one-time-code">
+        <input class="input" name="name" placeholder="Таны нэр" aria-label="Нэр" autocomplete="name">
+        <input class="input" name="phone" type="tel" inputmode="tel" placeholder="+976 XXXX XXXX" aria-label="Утас" autocomplete="tel">
+        <input class="input" name="password" type="password" placeholder="Шинэ нууц үг · дор хаяж 8 тэмдэгт" aria-label="Нууц үг" autocomplete="new-password">
+        <button class="btn" data-v="primary" data-size="lg" type="button" id="send">Нэвтрэх</button>
+      </div>
       <button class="btn" data-v="link" type="button" id="use-invite">Урилгын код байгаа юу?</button>
     </div>`);
-  // Google and a code by email, above the desk's own phone door. The desk
-  // keeps its session under its own key, so the block hands the token here.
-  const doors = signInDoors({
-    device: 'Ops',
-    returnTo: '/dashboard',
-    onToken: enterDesk,
-    keep: false,
-    phone: false,
-    emailHint: 'Гишүүнээр бүртгэгдсэн имэйл рүү 6 оронтой код илгээнэ.',
-  });
-  card.querySelector('[data-doors]').replaceWith(doors);
+  // Every way in — Google, a code by email, a password and its reset — is
+  // the shared block; the desk keeps its session under its own key, so the
+  // block hands the token here.
+  const doors = signInDoors({ device: 'Ops', returnTo: '/dashboard', onToken: enterDesk, keep: false });
+  card.querySelector('[data-doors]').append(doors);
   // Say only the ways that are really on the card.
-  let everyday = 'Утас, нууц үгээрээ нэвтэрнэ үү. Гишүүн биш бол нэвтэрсний дараа эрх хүсэж болно.';
+  let everyday = 'Нэвтэрнэ үү. Гишүүн биш бол нэвтэрсний дараа эрх хүсэж болно.';
   doors.ready.then((open) => {
-    const others = open.google || open.email;
-    const ways = [open.google && 'Google', open.email && 'имэйл'].filter(Boolean);
-    if (ways.length) everyday = `${ways.join(', ')} эсвэл утас, нууц үгээрээ нэвтэрнэ үү. Гишүүн биш бол нэвтэрсний дараа эрх хүсэж болно.`;
+    const others = [open.google && 'Google', open.email && 'имэйл'].filter(Boolean);
+    const ways = others.length ? `${others.join(', ')} эсвэл нууц үгээрээ` : 'нууц үгээрээ';
+    everyday = `${ways[0].toUpperCase()}${ways.slice(1)} нэвтэрнэ үү. Гишүүн биш бол нэвтэрсний дараа эрх хүсэж болно.`;
     if (!claiming) card.querySelector('#door-lead').textContent = everyday;
-    card.querySelector('[data-phone-or]').hidden = !others;
-    // One primary on the card: with Google or email above, the phone is the quieter way.
-    if (others) card.querySelector('#send').removeAttribute('data-v');
   });
-  const phone = card.querySelector('[name="phone"]');
-  const code = card.querySelector('[name="password"]');
-  const invite = card.querySelector('[name="invite"]');
-  const who = card.querySelector('[name="name"]');
-  const send = card.querySelector('#send');
+  const claim = card.querySelector('[data-claim]');
+  const field = (name) => claim.querySelector(`[name="${name}"]`);
   // A person the desk has invited redeems the code once, with their own
-  // number and the password they choose; after that the ordinary door.
+  // number and the password they choose; after that the ordinary doors.
   let claiming = false;
   card.querySelector('#use-invite').addEventListener('click', (e) => {
     claiming = !claiming;
-    invite.hidden = !claiming;
-    who.hidden = !claiming;
-    code.setAttribute('autocomplete', claiming ? 'new-password' : 'current-password');
-    code.placeholder = claiming ? 'Шинэ нууц үг · дор хаяж 8 тэмдэгт' : 'Нууц үг';
+    claim.hidden = !claiming;
+    card.querySelector('[data-doors]').hidden = claiming;
     card.querySelector('#door-title').textContent = claiming ? 'Урилгаар нэвтрэх' : 'Нэвтрэх';
     card.querySelector('#door-lead').textContent = claiming
       ? 'Админаас авсан кодоо, өөрийн утас, шинэ нууц үгээ оруулна. Код нэг удаа хүчинтэй.'
       : everyday;
-    send.textContent = claiming ? 'Нэвтрэх' : 'Нэвтрэх';
-    e.target.textContent = claiming ? 'Нууц үгтэй юу? Энгийнээр нэвтрэх' : 'Урилгын код байгаа юу?';
-    (claiming ? invite : phone).focus();
+    e.target.textContent = claiming ? 'Урилгагүй бол энгийнээр нэвтрэх' : 'Урилгын код байгаа юу?';
+    if (claiming) field('invite').focus();
   });
   const submit = async () => {
     try {
-      const number = phone.value.replace(/\s+/g, '');
-      const { token: t } = claiming
-        ? await api('/v1/auth/claim', {
-            method: 'POST',
-            body: { code: invite.value, phone: number, password: code.value, name: who.value, device: 'Ops' },
-          })
-        : await api('/v1/auth/login', {
-            method: 'POST',
-            body: { phone: number, password: code.value, device: 'Ops' },
-          });
+      const { token: t } = await api('/v1/auth/claim', {
+        method: 'POST',
+        body: {
+          code: field('invite').value,
+          phone: field('phone').value.replace(/\s+/g, ''),
+          password: field('password').value,
+          name: field('name').value,
+          device: 'Ops',
+        },
+      });
       enterDesk(t);
     } catch (error) {
       toast(error.message, 'bad');
     }
   };
-  send.addEventListener('click', submit);
-  for (const input of [code, phone, invite, who]) input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
+  card.querySelector('#send').addEventListener('click', submit);
+  for (const input of claim.querySelectorAll('input')) input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
   door.append(card);
   root.append(door);
 }
@@ -490,8 +476,16 @@ function showFrontRoom({ account, request }) {
     e.target.replaceWith(box);
     box.querySelector('input').focus();
   });
+  card.querySelector('#front-orgs').after(accountWays({ token: store.opsToken }));
   root.replaceChildren(card);
   void renderMyOrgs(card.querySelector('#front-orgs'));
+}
+
+/** «Би» at the desk: a member's own businesses, and the ways back into their account. */
+function renderMine(view) {
+  const orgs = el('<div></div>');
+  view.append(orgs, accountWays({ token: store.opsToken }));
+  void renderMyOrgs(orgs);
 }
 
 /* ── a person's businesses ─────────────────────────────────────────── */
@@ -867,7 +861,7 @@ function show(key) {
   const view = document.getElementById('view');
   view.replaceChildren();
   window.scrollTo(0, 0);
-  ({ overview: renderOverview, guests: renderGuests, money: renderMoney, notify: renderNotify, system: renderSystem, venues: renderVenues, lunches: renderLunches, reviews: renderReviews, stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers, orgs: renderOrgsDesk, myorgs: (v) => renderMyOrgs(v) })[key]?.(view);
+  ({ overview: renderOverview, guests: renderGuests, money: renderMoney, notify: renderNotify, system: renderSystem, venues: renderVenues, lunches: renderLunches, reviews: renderReviews, stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, audit: renderAudit, members: renderMembers, orgs: renderOrgsDesk, myorgs: renderMine })[key]?.(view);
 }
 
 const head = (title, sub, right = '') =>

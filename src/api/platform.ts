@@ -1,10 +1,14 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
   ClosureError,
+  attachEmail,
+  changePassword,
   closeAccount,
+  hasPassword,
   profileOf,
   revokeOtherSessions,
   revokeSession,
+  sendAttachCode,
   sessionsOf,
   updateProfile,
   type Profile,
@@ -29,6 +33,7 @@ import {
   unreadCount,
 } from '../platform/notify/index.js';
 import { badRequest, sendError } from './errors.js';
+import { limits } from './hardening.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -72,6 +77,7 @@ export async function registerPlatformRoutes(
   requireGuest: Guard,
 ): Promise<void> {
   const guarded = { preHandler: requireGuest };
+  const rate = limits();
 
   /* ── profile ──────────────────────────────────────────────────────── */
 
@@ -86,8 +92,8 @@ export async function registerPlatformRoutes(
     const guestId = request.guestId!;
     const profile = await profileOf(guestId);
     if (!profile) return sendError(reply, new Error('profile missing'));
-    const [balanceMnt, unread] = await Promise.all([balance(guestId), unreadCount(guestId)]);
-    return { ...shape(profile), wallet: { balance_mnt: balanceMnt, currency: 'MNT' }, unread };
+    const [balanceMnt, unread, password] = await Promise.all([balance(guestId), unreadCount(guestId), hasPassword(guestId)]);
+    return { ...shape(profile), has_password: password, wallet: { balance_mnt: balanceMnt, currency: 'MNT' }, unread };
   });
 
   app.patch<{ Body: { display_name?: string | null; locale?: 'mn' | 'en' } }>(
@@ -106,6 +112,65 @@ export async function registerPlatformRoutes(
       if (locale !== undefined) edit.locale = locale;
       const profile = await updateProfile(request.guestId!, edit, ctx.clock.now());
       return profile ? shape(profile) : sendError(reply, new Error('profile missing'));
+    },
+  );
+
+  /* ── the ways back in ─────────────────────────────────────────────── */
+
+  /**
+   * A password: changed knowing the old one, or set for the first time by an
+   * account that never had one. Every other session ends — whoever knew the
+   * old one is out — and the one in hand stays.
+   */
+  app.post<{ Body: { current?: string; next?: string } }>(
+    '/v1/me/password',
+    { preHandler: requireGuest, config: { rateLimit: rate.otp } },
+    async (request, reply) => {
+      const { current, next } = request.body ?? {};
+      if (!next) return badRequest(reply, 'Шинэ нууц үгээ оруулна уу.', 'next is required');
+      try {
+        await changePassword(ctx, { guestId: request.guestId!, current: current ?? '', next });
+        const revoked = await revokeOtherSessions(request.guestId!, bearer(request) ?? '', ctx.clock.now());
+        return { changed: true, revoked };
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  /**
+   * An address, for an account that has none — the way back when a password
+   * is forgotten. A code goes to it first; an account with a password types
+   * that too, so a stolen session cannot give itself a way back.
+   */
+  app.post<{ Body: { email?: string; password?: string } }>(
+    '/v1/me/email/code',
+    { preHandler: requireGuest, config: { rateLimit: rate.otp } },
+    async (request, reply) => {
+      const { email, password } = request.body ?? {};
+      if (!email) return badRequest(reply, 'Имэйл хаягаа оруулна уу.', 'email is required');
+      try {
+        await sendAttachCode(ctx, { guestId: request.guestId!, email, password: password ?? null });
+        return reply.status(202).send({ sent: true });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  app.post<{ Body: { email?: string; code?: string } }>(
+    '/v1/me/email',
+    { preHandler: requireGuest, config: { rateLimit: rate.verify } },
+    async (request, reply) => {
+      const { email, code } = request.body ?? {};
+      if (!email || !code) return badRequest(reply, 'Имэйл, кодоо оруулна уу.', 'email and code are required');
+      try {
+        await attachEmail(ctx, { guestId: request.guestId!, email, code: code.trim() });
+        const profile = await profileOf(request.guestId!);
+        return profile ? shape(profile) : sendError(reply, new Error('profile missing'));
+      } catch (error) {
+        return sendError(reply, error);
+      }
     },
   );
 

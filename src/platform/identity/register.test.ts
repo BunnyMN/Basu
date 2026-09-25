@@ -65,7 +65,7 @@ describe('signing up', () => {
       code: 'PHONE_TAKEN',
     });
     // And the first password still opens it.
-    await expect(signInWithPassword(ctx, { phone: '+97699001122', password: 'сайн нууц үг' })).resolves.toMatchObject({
+    await expect(signInWithPassword(ctx, { login: '+97699001122', password: 'сайн нууц үг' })).resolves.toMatchObject({
       guestId: expect.any(String),
     });
   });
@@ -78,7 +78,7 @@ describe('signing up', () => {
     await expect(registerGuest(ctx, { phone: '+97688010001', password: 'булаах гэсэн' })).rejects.toMatchObject({
       code: 'PHONE_TAKEN',
     });
-    await expect(signInWithPassword(ctx, { phone: '+97688010001', password: 'булаах гэсэн' })).rejects.toMatchObject({
+    await expect(signInWithPassword(ctx, { login: '+97688010001', password: 'булаах гэсэн' })).rejects.toMatchObject({
       code: 'BAD_CREDENTIALS',
     });
   });
@@ -93,7 +93,7 @@ describe('a number as people type it', () => {
   it('is one account whether it was typed with +976, without, or with spaces', async () => {
     const made = await registerGuest(ctx, { phone: '8811 2233', password: 'нэг хоёр гурав' });
     await expect(registerGuest(ctx, { phone: '+97688112233', password: 'нэг хоёр гурав' })).rejects.toMatchObject({ code: 'PHONE_TAKEN' });
-    const session = await signInWithPassword(ctx, { phone: '976-8811-2233', password: 'нэг хоёр гурав' });
+    const session = await signInWithPassword(ctx, { login: '976-8811-2233', password: 'нэг хоёр гурав' });
     expect(await resolveGuest(ctx, session.token)).toBe(made.guestId);
   });
 });
@@ -104,13 +104,13 @@ describe('signing in', () => {
   });
 
   it('opens with the right password', async () => {
-    const session = await signInWithPassword(ctx, { phone: '+97699001122', password: 'сайн нууц үг', device: 'iPhone' });
+    const session = await signInWithPassword(ctx, { login: '+97699001122', password: 'сайн нууц үг', device: 'iPhone' });
     expect(await resolveGuest(ctx, session.token)).toBe(session.guestId);
   });
 
   it('says the same thing for a wrong password and an unknown number', async () => {
-    const wrong = await signInWithPassword(ctx, { phone: '+97699001122', password: 'буруу нууц үг' }).catch((e: unknown) => e);
-    const unknown = await signInWithPassword(ctx, { phone: '+97688009999', password: 'ямар ч нууц үг' }).catch((e: unknown) => e);
+    const wrong = await signInWithPassword(ctx, { login: '+97699001122', password: 'буруу нууц үг' }).catch((e: unknown) => e);
+    const unknown = await signInWithPassword(ctx, { login: '+97688009999', password: 'ямар ч нууц үг' }).catch((e: unknown) => e);
     expect(wrong).toMatchObject({ code: 'BAD_CREDENTIALS' });
     expect(unknown).toMatchObject({ code: 'BAD_CREDENTIALS' });
     expect((wrong as Error).message).toBe((unknown as Error).message);
@@ -118,28 +118,28 @@ describe('signing in', () => {
 
   it('rests the door after five wrong guesses, even for the right password', async () => {
     for (let i = 0; i < 5; i++) {
-      await expect(signInWithPassword(ctx, { phone: '+97699001122', password: `буруу ${i}` })).rejects.toMatchObject({
+      await expect(signInWithPassword(ctx, { login: '+97699001122', password: `буруу ${i}` })).rejects.toMatchObject({
         code: 'BAD_CREDENTIALS',
       });
     }
-    await expect(signInWithPassword(ctx, { phone: '+97699001122', password: 'сайн нууц үг' })).rejects.toMatchObject({
+    await expect(signInWithPassword(ctx, { login: '+97699001122', password: 'сайн нууц үг' })).rejects.toMatchObject({
       code: 'LOCKED',
     });
     // A quarter of an hour later it opens again.
     (ctx.clock as VirtualClock).advanceMinutes(16);
-    await expect(signInWithPassword(ctx, { phone: '+97699001122', password: 'сайн нууц үг' })).resolves.toBeTruthy();
+    await expect(signInWithPassword(ctx, { login: '+97699001122', password: 'сайн нууц үг' })).resolves.toBeTruthy();
   });
 
   it('forgets the failures once somebody gets in', async () => {
-    await expect(signInWithPassword(ctx, { phone: '+97699001122', password: 'буруу' })).rejects.toBeTruthy();
-    await signInWithPassword(ctx, { phone: '+97699001122', password: 'сайн нууц үг' });
+    await expect(signInWithPassword(ctx, { login: '+97699001122', password: 'буруу' })).rejects.toBeTruthy();
+    await signInWithPassword(ctx, { login: '+97699001122', password: 'сайн нууц үг' });
     for (let i = 0; i < 4; i++) {
-      await expect(signInWithPassword(ctx, { phone: '+97699001122', password: 'буруу' })).rejects.toMatchObject({
+      await expect(signInWithPassword(ctx, { login: '+97699001122', password: 'буруу' })).rejects.toMatchObject({
         code: 'BAD_CREDENTIALS',
       });
     }
     // Four after a success is still under the ceiling.
-    await expect(signInWithPassword(ctx, { phone: '+97699001122', password: 'сайн нууц үг' })).resolves.toBeTruthy();
+    await expect(signInWithPassword(ctx, { login: '+97699001122', password: 'сайн нууц үг' })).resolves.toBeTruthy();
   });
 });
 
@@ -147,10 +147,10 @@ describe('changing it', () => {
   it('needs the old one, and the new one opens the door', async () => {
     const { guestId } = await registerGuest(ctx, { phone: '+97699001122', password: 'хуучин нууц үг' });
     await expect(changePassword(ctx, { guestId, current: 'таамаг', next: 'шинэ нууц үг' })).rejects.toMatchObject({
-      code: 'BAD_CREDENTIALS',
+      code: 'WRONG_PASSWORD',
     });
     await changePassword(ctx, { guestId, current: 'хуучин нууц үг', next: 'шинэ нууц үг' });
-    await expect(signInWithPassword(ctx, { phone: '+97699001122', password: 'хуучин нууц үг' })).rejects.toBeTruthy();
-    await expect(signInWithPassword(ctx, { phone: '+97699001122', password: 'шинэ нууц үг' })).resolves.toBeTruthy();
+    await expect(signInWithPassword(ctx, { login: '+97699001122', password: 'хуучин нууц үг' })).rejects.toBeTruthy();
+    await expect(signInWithPassword(ctx, { login: '+97699001122', password: 'шинэ нууц үг' })).resolves.toBeTruthy();
   });
 });

@@ -20,6 +20,8 @@ export {
   emailAddress,
   requestEmailCode,
   sendEmailCode,
+  EMAIL_CODES_PER_DAY,
+  type CodePurpose,
   checkEmailCode,
   verifyEmailCode,
   CODES_PER_EMAIL_PER_HOUR,
@@ -51,7 +53,21 @@ export { guestCensus, type GuestCensus } from './census.js';
 export { accountByContact, findGuests, guestCard, type GuestCard } from './directory.js';
 
 export { MIN_PASSWORD, PasswordError, checkPassword, hashPassword, verifyPassword } from './password.js';
-export { registerGuest, signInWithPassword, claimAccount, changePassword, confirmPassword, hasPassword, phoneE164, requirePhone } from './register.js';
+export {
+  registerGuest,
+  signInWithPassword,
+  claimAccount,
+  changePassword,
+  confirmPassword,
+  hasPassword,
+  phoneE164,
+  requirePhone,
+  maskEmail,
+  sendPasswordCode,
+  setPasswordWithCode,
+  sendAttachCode,
+  attachEmail,
+} from './register.js';
 export { verifyIdToken, emailVerified, IdTokenError, type IdClaims } from './idtoken.js';
 export {
   APP_RETURN,

@@ -45,6 +45,10 @@ export class AuthError extends Error {
       | 'BAD_CREDENTIALS'
       | 'LOCKED'
       | 'BAD_EMAIL'
+      | 'NO_EMAIL'
+      | 'EMAIL_TAKEN'
+      | 'EMAIL_SET'
+      | 'WRONG_PASSWORD'
       | 'EMAIL_CLOSED'
       | 'EMAIL_FAILED'
       | 'SOCIAL_CLOSED'
@@ -145,17 +149,26 @@ export function emailAddress(raw: string): string {
 const EMAIL_CODE_TTL_MINUTES = 10;
 /** Letters can go to spam and be re-asked for; a few more than SMS, still few. */
 export const CODES_PER_EMAIL_PER_HOUR = 5;
+/**
+ * Codes by email the whole service sends in a day. The letters go out through
+ * a Gmail account, which stops sending — and may be suspended — past about
+ * 500 a day; this leaves room under that for the other letters Basu sends.
+ */
+export const EMAIL_CODES_PER_DAY = 400;
 
 export async function requestEmailCode(ctx: Ctx, rawEmail: string): Promise<OtpIssued> {
   const email = emailAddress(rawEmail);
   const now = ctx.clock.now();
 
   if (mode() === 'production') {
-    const { rows: day } = await getPool().query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM identity.otp_challenge WHERE created_at > $1::timestamptz - interval '24 hours'`,
+    const { rows: day } = await getPool().query<{ n: number; by_email: number }>(
+      `SELECT count(*)::int AS n, count(email)::int AS by_email
+         FROM identity.otp_challenge WHERE created_at > $1::timestamptz - interval '24 hours'`,
       [now],
     );
-    if ((day[0]?.n ?? 0) >= OTP_PER_DAY) throw new AuthError('RATE_LIMITED', 'the day’s allowance of codes is spent');
+    if ((day[0]?.n ?? 0) >= OTP_PER_DAY || (day[0]?.by_email ?? 0) >= EMAIL_CODES_PER_DAY) {
+      throw new AuthError('RATE_LIMITED', 'the day’s allowance of codes is spent');
+    }
   }
   const { rows } = await getPool().query<{ n: number }>(
     `SELECT count(*)::int AS n FROM identity.otp_challenge
@@ -176,29 +189,61 @@ export async function requestEmailCode(ctx: Ctx, rawEmail: string): Promise<OtpI
 }
 
 /**
+ * What a code by email is for. The code is the same kind whatever it is for —
+ * each proves only that the person can read that inbox — so only the letter's
+ * words change, so that nobody is told they are signing in when they asked to
+ * reset a password.
+ */
+export type CodePurpose = 'sign_in' | 'sign_up' | 'reset' | 'attach';
+
+const LETTERS: Record<CodePurpose, { subject: string; lead: string; unasked: string }> = {
+  sign_in: {
+    subject: 'Basu нэвтрэх код',
+    lead: 'Таны Basu-д нэвтрэх код:',
+    unasked: 'Та нэвтрэх гэж оролдоогүй бол энэ захидлыг үл тоомсорлоорой.',
+  },
+  sign_up: {
+    subject: 'Basu бүртгэлийн код',
+    lead: 'Basu-д бүртгүүлэх код:',
+    unasked: 'Та бүртгүүлэх гэж оролдоогүй бол энэ захидлыг үл тоомсорлоорой.',
+  },
+  reset: {
+    subject: 'Basu нууц үг сэргээх код',
+    lead: 'Basu-гийн нууц үгээ шинэчлэх код:',
+    unasked: 'Та нууц үгээ сэргээх хүсэлт гаргаагүй бол энэ захидлыг үл тоомсорлоорой — нууц үг тань хэвээр байна.',
+  },
+  attach: {
+    subject: 'Basu имэйл баталгаажуулах код',
+    lead: 'Энэ хаягийг Basu бүртгэлдээ холбох код:',
+    unasked: 'Та хаягаа холбох гэж оролдоогүй бол энэ захидлыг үл тоомсорлоорой.',
+  },
+};
+
+/**
  * The code, by email — the one way it leaves. The subject carries it too,
  * so it can be read off the notification without opening the letter.
  */
-export async function sendEmailCode(ctx: Ctx, rawEmail: string): Promise<void> {
+export async function sendEmailCode(ctx: Ctx, rawEmail: string, purpose: CodePurpose = 'sign_in'): Promise<void> {
   if (!ctx.mailer) throw new AuthError('EMAIL_CLOSED', 'this server has nothing to send email with');
   const email = emailAddress(rawEmail);
   const { code } = await requestEmailCode(ctx, email);
+  const letter = LETTERS[purpose];
   try {
     await ctx.mailer.send({
       to: email,
-      subject: `Basu нэвтрэх код: ${code}`,
+      subject: `${letter.subject}: ${code}`,
       text: [
-        `Таны Basu-д нэвтрэх код: ${code}`,
+        `${letter.lead} ${code}`,
         '',
         `Код ${EMAIL_CODE_TTL_MINUTES} минут хүчинтэй. Хэнд ч бүү хэлээрэй — Basu-гийн ажилтан ч танаас код асуухгүй.`,
         '',
-        'Та нэвтрэх гэж оролдоогүй бол энэ захидлыг үл тоомсорлоорой.',
+        letter.unasked,
       ].join('\n'),
       html: `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.6;color:#14181B">
-<p>Таны Basu-д нэвтрэх код:</p>
+<p>${letter.lead}</p>
 <p style="font-family:ui-monospace,Menlo,monospace;font-size:28px;font-weight:600;letter-spacing:.12em;margin:8px 0 16px">${code}</p>
 <p style="color:#4A555C">Код ${EMAIL_CODE_TTL_MINUTES} минут хүчинтэй. Хэнд ч бүү хэлээрэй — Basu-гийн ажилтан ч танаас код асуухгүй.</p>
-<p style="color:#62727A;font-size:13px">Та нэвтрэх гэж оролдоогүй бол энэ захидлыг үл тоомсорлоорой.</p>
+<p style="color:#62727A;font-size:13px">${letter.unasked}</p>
 </div>`,
     });
   } catch (error) {

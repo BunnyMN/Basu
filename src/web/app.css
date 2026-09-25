@@ -781,6 +781,12 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .ways .fold[data-alone] > summary{display:none}
 .ways .fold[data-alone] > .body{padding-top:0}
 
+/* The ways back into an account (api.js accountWays): two rows, and the
+   one form that opens under a row in place of its button. */
+.account-ways .account-form .btn[data-go]{width:100%}
+.account-ways .account-form [data-code]{margin:0 0 12px}
+.account-ways .account-form .cap{margin:-4px 0 14px}
+
 /* ── toast ────────────────────────────────────────────────────────── */
 /* Ink on the ground; bad is stop on its own text. Pages with a bottom bar
    raise it with --toast-lift. It never carries a code a person must keep. */

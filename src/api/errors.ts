@@ -100,13 +100,20 @@ const PASSWORD_ERRORS: Record<PasswordError['code'], Spec> = {
 
 const AUTH_ERRORS: Record<AuthError['code'], Spec> = {
   BAD_EMAIL: { status: 400, mn: 'Имэйл хаягаа шалгана уу.' },
+  NO_EMAIL: {
+    status: 404,
+    mn: 'Энэ дугаарт имэйл холбогдоогүй тул код илгээх боломжгүй. Имэйл хаягаараа оролдох, эсвэл basuappmn@gmail.com руу бичнэ үү.',
+  },
+  EMAIL_TAKEN: { status: 409, mn: 'Энэ имэйл өөр бүртгэлд холбогдсон байна.' },
+  EMAIL_SET: { status: 409, mn: 'Таны бүртгэлд имэйл аль хэдийн холбогдсон байна.' },
+  WRONG_PASSWORD: { status: 403, mn: 'Одоогийн нууц үг буруу байна.' },
   EMAIL_CLOSED: { status: 503, mn: 'Имэйлээр нэвтрэх түр ажиллахгүй байна. Өөр аргаар нэвтэрнэ үү.' },
   EMAIL_FAILED: { status: 502, mn: 'Код илгээж чадсангүй. Хэсэг хүлээгээд дахин оролдоно уу.' },
   SOCIAL_CLOSED: { status: 503, mn: 'Энэ аргаар нэвтрэх түр ажиллахгүй байна.' },
   SOCIAL_REFUSED: { status: 401, mn: 'Нэвтрэлт баталгаажсангүй. Дахин оролдоно уу.' },
   BAD_PHONE: { status: 400, mn: 'Утасны дугаараа шалгана уу (+976XXXXXXXX).' },
   PHONE_TAKEN: { status: 409, mn: 'Энэ дугаар аль хэдийн бүртгэлтэй. Нэвтэрнэ үү.' },
-  BAD_CREDENTIALS: { status: 401, mn: 'Дугаар эсвэл нууц үг буруу байна.' },
+  BAD_CREDENTIALS: { status: 401, mn: 'Имэйл/утас эсвэл нууц үг буруу байна.' },
   LOCKED: { status: 429, mn: 'Нууц үг хэд хэдэн удаа буруу орлоо. 15 минутын дараа дахин оролдоно уу.' },
   RATE_LIMITED: {
     status: 429,
