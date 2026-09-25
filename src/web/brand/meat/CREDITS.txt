@@ -1,0 +1,14 @@
+Photographs on the front page (src/web/index.html) and the idesh stall art
+(src/web/idesh/*.jpg), all under the Unsplash License
+(https://unsplash.com/license): free for commercial use, no attribution
+required, credited here anyway. Cropped and re-encoded.
+
+hero.webp, hero-square.webp  Rickie-Tom Schünemann  https://unsplash.com/photos/raw-meat-on-green-textile-TEaC_tItywg
+sheep.webp, idesh/sheep.jpg  alireza nikzad         https://unsplash.com/photos/a-piece-of-meat-sitting-on-top-of-a-cutting-board-s5MCHa20XDY
+goat.webp, idesh/goat.jpg    Satmar Meats           https://unsplash.com/photos/raw-chopped-meat-is-piled-up-SsneeyLFdHw
+beef.webp, idesh/beef.jpg    David Foodphototasty   https://unsplash.com/photos/two-steaks-on-a-plate-with-parsley-U5lLwx17rWs
+horse.webp, idesh/horse.jpg  Studio Crevettes       https://unsplash.com/photos/raw-meat-on-brown-wooden-chopping-board-OPKugD7b9Vk
+board.webp                   Sergey Kotenev         https://unsplash.com/photos/a-piece-of-meat-sitting-on-top-of-a-cutting-board-next-to-a-knife-t1BL-LkyJdo
+cuts.webp                    Sergey Kotenev         https://unsplash.com/photos/a-group-of-raw-meats-laid-out-on-a-table-qXrrbHUzmkE
+butcher.webp                 Madie Hamilton         https://unsplash.com/photos/person-holding-red-plastic-shovel-l9vXx8aEYJ8
+buuz.webp                    Tuguldur Baatar        https://unsplash.com/photos/a-pan-filled-with-dumplings-sitting-on-top-of-a-table-FWFHxrn5OGA
