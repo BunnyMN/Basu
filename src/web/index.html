@@ -1,374 +1,603 @@
 <!doctype html>
-<html lang="mn">
+<html lang="mn" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#E9EBEC" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0E1315" media="(prefers-color-scheme: dark)">
-<title>Basu</title>
+<meta name="theme-color" content="#FBF5EE">
+<title>Basu — Хоолоо урьдчил, идэшээ малчнаас</title>
+<meta name="description" content="Basu: ресторанд очихоосоо өмнө хоолоо захиалж суумагц бэлэн байлгадаг, өвлийн идэшээ гэрээт малчин, нийлүүлэгчээс тогтмол үнээр авдаг Монгол супер апп.">
+<meta name="apple-itunes-app" content="app-id=6810541939">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Basu">
+<meta property="og:title" content="Basu — Хоолоо урьдчил, идэшээ малчнаас">
+<meta property="og:description" content="Хоолоо урьдчилан захиалж, өвлийн идэшээ гэрээт малчнаас тогтмол үнээр. iPhone апп болон вэбээр.">
+<meta property="og:image" content="https://basu.burzai.cloud/brand/og.jpg">
+<meta property="og:url" content="https://basu.burzai.cloud/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/brand/favicon.png">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<link rel="preload" as="image" href="/brand/mascot.webp">
 <link rel="stylesheet" href="/app.css">
 <style>
-/* The home screen. Basu is one app with several things inside it, and this is
-   the page that says which ones exist. It owns no domain logic: everything
-   here is a name, an icon and a link — plus whatever of the guest's is
-   currently running, because a launcher that cannot tell you your lunch is on
-   the fire is just a menu of links.
+/* The front page: what Basu is, for somebody who has never heard of it.
+   The app itself starts at /app; everything here is there to send people to
+   it, to the App Store, or — for a restaurant or a supplier — to the desk.
 
-   Layout only. Faces, colours, radii, rows, chips and the section label all
-   come from app.css; the one component drawn here is the launcher tile,
-   which no other page has. */
+   Pinned light: this is a poster, not a tool, and it is drawn once, warm. */
 
-/* ── the column ───────────────────────────────────────────────────── */
-/* One 560 column on the ground. The page is a flex column so the footer
-   rests at the foot of the screen when the content is shorter than it. */
-main.wrap{
-  display:flex;flex-direction:column;min-height:100dvh;
-  padding-top:calc(var(--s-5) + var(--safe-t));
+:root{
+  --paper:#FBF5EE;
+  --paper-2:#F4EADF;
+  --ember:#E8621A;
+  --ember-deep:#B8480A;
+  --night:#14181B;
+  --night-2:#1E2428;
+  --wrap:1160px;
+}
+body{background:var(--paper);color:var(--ink);overflow-x:hidden}
+img{max-width:100%;height:auto;display:block}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 max(20px,var(--gutter))}
+.kicker{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.75rem;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--ember-deep)}
+.kicker::before{content:"";width:18px;height:2px;border-radius:2px;background:currentColor}
+h1,h2,h3{text-wrap:balance}
+p{text-wrap:pretty}
+
+/* ── buttons ─────────────────────────────────────────────────────── */
+.cta{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:0 22px;border-radius:999px;font-size:1rem;font-weight:600;text-decoration:none;border:1px solid transparent;transition:transform 140ms var(--ease),box-shadow var(--dur),background var(--dur)}
+.cta:active{transform:scale(.98)}
+.cta svg{width:20px;height:20px;flex:none}
+.cta-store{background:var(--night);color:#fff;box-shadow:0 10px 24px -12px rgba(20,24,27,.55)}
+.cta-store small{display:block;font-size:.6875rem;font-weight:500;opacity:.75;line-height:1.1}
+.cta-store span{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;text-align:left}
+.cta-ember{background:var(--ember);color:#fff;box-shadow:0 10px 24px -12px rgba(232,98,26,.8)}
+.cta-ghost{background:rgba(255,255,255,.7);color:var(--ink);border-color:rgba(20,24,27,.12)}
+@media (hover:hover){
+  .cta-store:hover{background:#000}
+  .cta-ember:hover{background:#D9560F}
+  .cta-ghost:hover{background:#fff}
+}
+.ctas{display:flex;flex-wrap:wrap;gap:12px}
+
+/* ── the bar ─────────────────────────────────────────────────────── */
+.bar{position:sticky;top:0;z-index:20;padding-top:var(--safe-t);background:color-mix(in srgb,var(--paper) 82%,transparent);backdrop-filter:saturate(1.4) blur(14px);-webkit-backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid transparent;transition:border-color var(--dur)}
+.bar[data-scrolled]{border-bottom-color:rgba(20,24,27,.08)}
+.bar .wrap{display:flex;align-items:center;gap:24px;min-height:64px}
+.logo{display:inline-flex;align-items:center;gap:10px;color:var(--ink);text-decoration:none;font-size:1.375rem;font-weight:600;letter-spacing:-.02em}
+.logo img{width:34px;height:34px;border-radius:9px;box-shadow:0 2px 6px -2px rgba(20,24,27,.35)}
+.bar nav{display:flex;gap:4px;margin-left:8px}
+.bar nav a{padding:8px 12px;border-radius:999px;color:var(--ink-2);text-decoration:none;font-size:.9375rem;font-weight:500}
+@media (hover:hover){.bar nav a:hover{background:rgba(20,24,27,.05);color:var(--ink)}}
+.bar .right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.bar .cta{min-height:42px;padding:0 18px;font-size:.9375rem}
+@media (max-width:860px){.bar nav{display:none}}
+
+/* ── the opening ─────────────────────────────────────────────────── */
+.hero{position:relative;padding:48px 0 32px;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:-20% -10% auto auto;width:72vw;max-width:980px;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 50% 50%,rgba(255,154,84,.45),rgba(255,154,84,0) 62%);pointer-events:none}
+.hero .wrap{position:relative;display:grid;grid-template-columns:1.05fr .95fr;gap:32px;align-items:center}
+.hero h1{margin:18px 0 0;font-size:clamp(2.6rem,5.8vw,4.6rem);line-height:1.02;letter-spacing:-.035em;font-weight:600}
+.hero h1 em{font-style:normal;color:var(--ember);position:relative;white-space:nowrap}
+.hero h1 em::after{content:"";position:absolute;left:2%;right:2%;bottom:.02em;height:.14em;border-radius:1em;background:rgba(232,98,26,.18)}
+.hero .lead{margin:22px 0 30px;max-width:34em;font-size:clamp(1.05rem,1.4vw,1.2rem);line-height:1.6;color:var(--ink-2)}
+.hero .fine{margin:18px 0 0;font-size:.875rem;color:var(--ink-3);display:flex;flex-wrap:wrap;gap:6px 14px}
+.hero .fine span{display:inline-flex;align-items:center;gap:6px}
+.hero .fine span::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--ember)}
+
+/* the stage: the wrestler, and what Basu does, floating round him */
+.stage{position:relative;height:clamp(440px,52vw,600px)}
+.stage .disc{position:absolute;left:50%;bottom:6%;width:78%;aspect-ratio:1;transform:translateX(-50%);border-radius:50%;background:radial-gradient(circle at 50% 38%,#FFB27A 0%,#F4803A 52%,#DD5A12 100%);box-shadow:inset 0 -30px 60px rgba(120,40,0,.25),0 40px 80px -40px rgba(184,72,10,.7)}
+.stage .disc::after{content:"";position:absolute;inset:7%;border-radius:50%;border:2px dashed rgba(255,255,255,.35)}
+.stage .mascot{position:absolute;left:50%;bottom:0;height:88%;width:auto;max-width:none;transform:translateX(-50%);filter:drop-shadow(0 24px 30px rgba(90,30,0,.35))}
+.float{position:absolute;animation:bob 6s var(--ease) infinite}
+.float.b{animation-delay:-2s}.float.c{animation-delay:-4s}
+@keyframes bob{0%,100%{transform:translateY(0) rotate(var(--r,0deg))}50%{transform:translateY(-10px) rotate(var(--r,0deg))}}
+@media (prefers-reduced-motion:reduce){.float{animation:none}}
+.tilecard{width:92px;height:92px;border-radius:24px;overflow:hidden;background:#fff;box-shadow:0 18px 30px -16px rgba(20,24,27,.45),0 0 0 1px rgba(20,24,27,.05)}
+.tilecard img{width:100%;height:100%;object-fit:cover}
+.stage .t1{left:2%;top:10%;--r:-8deg}
+.stage .t2{right:4%;top:4%;--r:7deg}
+.stage .t3{right:0;top:44%;--r:-4deg;width:74px;height:74px;border-radius:19px}
+.bubble{display:flex;gap:12px;align-items:center;padding:12px 14px;border-radius:18px;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);box-shadow:0 18px 40px -18px rgba(20,24,27,.45),0 0 0 1px rgba(20,24,27,.05);min-width:230px}
+.bubble .ic{width:38px;height:38px;border-radius:11px;flex:none;display:grid;place-items:center;background:var(--ember);color:#fff}
+.bubble .ic svg{width:20px;height:20px}
+.bubble b{display:block;font-size:.875rem;font-weight:600;line-height:1.25}
+.bubble small{display:block;font-size:.8125rem;color:var(--ink-2);line-height:1.3;margin-top:1px}
+.stage .n1{left:-2%;bottom:18%}
+.stage .n2{right:-2%;bottom:5%}
+.bubble .track{height:4px;border-radius:4px;background:rgba(20,24,27,.08);margin-top:8px;overflow:hidden}
+.bubble .track i{display:block;height:100%;width:72%;border-radius:4px;background:linear-gradient(90deg,var(--ember),#FFA15E)}
+
+@media (max-width:900px){
+  .hero{padding-top:20px}
+  .hero .wrap{grid-template-columns:1fr}
+  .stage{height:420px;margin-top:8px}
+  .stage .t1{left:0;top:6%}.stage .t2{right:0;top:0}
+  .stage .t3{display:none}
+  .stage .n1{left:0;bottom:22%}.stage .n2{right:0;bottom:2%}
+  .bubble{min-width:0;max-width:62vw}
+}
+@media (max-width:420px){
+  .tilecard{width:70px;height:70px;border-radius:18px}
+  .bubble{padding:10px 12px}
+  .bubble .ic{width:32px;height:32px}
 }
 
-/* ── the brand line ───────────────────────────────────────────────── */
-/* The city is the wordmark's own small: app.css sets its face and its 10px offset. */
-.wordmark{margin:0 0 var(--s-2)}
-.hello{margin:0;font-size:var(--t-body-lg);line-height:var(--lh-body);color:var(--ink-2)}
-/* The greeting is for a stranger; a guest with something running sees that
-   instead — and does not see it flash while their rows are on the way. */
-main:has(.live[data-any]) .hello,main:has(.live[data-loading]) .hello{display:none}
+/* ── the promises ────────────────────────────────────────────────── */
+.promises{padding:22px 0;border-block:1px solid rgba(20,24,27,.07);background:rgba(255,255,255,.45)}
+.promises ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:12px 36px}
+.promises li{display:inline-flex;align-items:center;gap:10px;font-size:.9375rem;font-weight:500;color:var(--ink)}
+.promises svg{width:22px;height:22px;color:var(--ember);flex:none}
 
-/* ── what of the guest's is running ───────────────────────────────── */
-.live{margin-top:var(--s-6)}
-.live:not([data-any]){display:none}
-/* A token means rows are coming: hold their place instead of letting the grid jump. */
-.live[data-loading]{display:block}
-/* Rows are hairline-separated (5.3). app.css's row reset outranks its own
-   separator rule for now, so the page draws the line until app.css does. */
-#live-list > .row + .row{border-top:1px solid var(--line)}
-/* The tone dot belongs to the name, not to the middle of a three-line row:
-   it sits on the title's first line, centred in that line box. */
-#live-list{--dot-top:calc((var(--t-row) * var(--lh-snug) - 6px) / 2)}
-#live-list > .row > .lead{align-self:flex-start;margin-top:var(--dot-top)}
-/* The skeleton copies the row it stands in for: dot at the head, three lines
-   (name, what, meta), a corner block the height of the mono value + label. */
-#live-list .skel-row{min-height:85px;padding:12px 16px}
-#live-list .skel-row::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:var(--line-2);align-self:flex-start;margin-top:var(--dot-top)}
-#live-list .skel-row > .skel-lines{gap:8px}
-#live-list .skel-row .skel-lines .skel{min-height:0;height:14px;width:60%}
-#live-list .skel-row .skel-lines .skel:nth-child(2){height:12px;width:80%}
-#live-list .skel-row .skel-lines .skel:nth-child(3){height:10px;width:35%}
-#live-list .skel-row > .skel:last-child{width:56px;height:38px}
+/* ── a section ───────────────────────────────────────────────────── */
+section.block{padding:clamp(72px,9vw,120px) 0}
+.block h2{margin:14px 0 0;font-size:clamp(2rem,4vw,3.1rem);line-height:1.08;letter-spacing:-.03em;font-weight:600;max-width:16em}
+.block .intro{margin:18px 0 0;max-width:40em;font-size:1.125rem;line-height:1.65;color:var(--ink-2)}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:clamp(32px,6vw,80px);align-items:center}
+@media (max-width:900px){.split{grid-template-columns:1fr}}
 
-/* ── the grid of apps ─────────────────────────────────────────────── */
-.apps{
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));
-  gap:10px 14px;margin:0 0 var(--s-7);padding:0;list-style:none;
-}
-.app{display:block;color:inherit;text-decoration:none;text-align:center;border-radius:var(--r-lg)}
-.app .tile{
-  width:92px;height:92px;margin:0 auto;display:grid;place-items:center;
-  border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);
-  transition:transform 120ms var(--ease),border-color var(--dur),background var(--dur);
-}
-.app .tile svg{width:34px;height:34px;fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-@media (hover:hover){.app:hover .tile{border-color:var(--line-2);background:var(--surface-2)}}
-.app:active .tile{transform:scale(.97)}
-.app .name{display:block;margin-top:var(--s-2);font-size:var(--t-cap);font-weight:600;line-height:1.3;color:var(--ink)}
-.app .tag{display:block;margin-top:2px;font-size:var(--t-eyebrow);line-height:1.35;color:var(--ink-3)}
+/* the kinds of meat */
+.kinds{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:40px}
+.kind{position:relative;border-radius:22px;overflow:hidden;aspect-ratio:3/4;background:#ddd;box-shadow:0 20px 40px -26px rgba(20,24,27,.6)}
+.kind img{width:100%;height:100%;object-fit:cover;transition:transform 600ms var(--ease)}
+@media (hover:hover){.kind:hover img{transform:scale(1.05)}}
+.kind::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,0) 45%,rgba(0,0,0,.62))}
+.kind span{position:absolute;left:18px;right:18px;bottom:16px;z-index:1;color:#fff}
+.kind b{display:block;font-size:1.375rem;font-weight:600;letter-spacing:-.01em}
+.kind small{display:block;font-size:.8125rem;opacity:.85;margin-top:2px}
+@media (max-width:760px){.kinds{grid-template-columns:repeat(2,1fr)}}
 
-/* ── the quiet bottom of the page ─────────────────────────────────── */
-.foot{
-  margin-top:auto;display:flex;flex-wrap:wrap;align-items:center;gap:0 var(--s-5);
-  border-top:1px solid var(--line);
+/* the order's journey */
+.journey{list-style:none;margin:44px 0 0;padding:0;display:grid;grid-template-columns:repeat(5,1fr);gap:0;position:relative}
+.journey::before{content:"";position:absolute;left:10%;right:10%;top:23px;height:2px;background:repeating-linear-gradient(90deg,rgba(232,98,26,.45) 0 8px,transparent 8px 14px)}
+.journey li{position:relative;text-align:center;padding:0 8px}
+.journey .dot{width:48px;height:48px;margin:0 auto;border-radius:50%;display:grid;place-items:center;background:#fff;color:var(--ember);box-shadow:0 10px 22px -12px rgba(20,24,27,.5),0 0 0 1px rgba(20,24,27,.06);position:relative;z-index:1}
+.journey .dot svg{width:22px;height:22px}
+.journey li:last-child .dot{background:var(--ember);color:#fff}
+.journey b{display:block;margin-top:14px;font-size:1rem;font-weight:600}
+.journey small{display:block;margin-top:4px;font-size:.875rem;color:var(--ink-2);line-height:1.45}
+@media (max-width:760px){
+  .journey{grid-template-columns:1fr;gap:18px}
+  .journey::before{left:23px;right:auto;top:10px;bottom:10px;width:2px;height:auto;background:repeating-linear-gradient(180deg,rgba(232,98,26,.45) 0 8px,transparent 8px 14px)}
+  .journey li{display:grid;grid-template-columns:48px 1fr;gap:0 16px;text-align:left;padding:0}
+  .journey .dot{margin:0;grid-row:span 2}
+  .journey b{margin-top:4px}
 }
-.foot a{display:inline-flex;align-items:center;min-height:var(--target);font-size:var(--t-cap);font-weight:500;color:var(--ink-2)}
-@media (hover:hover){.foot a:hover{color:var(--ink)}}
-/* The kitchen display is a staff door: it shows only where the demo strip does. */
-.foot .staff{display:none;color:var(--ink-3)}
-.clockbar ~ .wrap .staff{display:inline-flex}
+
+/* live listings, when there are any */
+.now{margin-top:44px}
+.now[hidden]{display:none}
+.now-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-top:14px}
+.listing{display:flex;gap:14px;align-items:center;padding:12px;border-radius:18px;background:#fff;color:inherit;text-decoration:none;box-shadow:0 12px 26px -20px rgba(20,24,27,.6),0 0 0 1px rgba(20,24,27,.05)}
+.listing img{width:64px;height:64px;border-radius:14px;object-fit:cover;flex:none}
+.listing b{display:block;font-size:.9375rem;font-weight:600;line-height:1.3}
+.listing small{display:block;font-size:.8125rem;color:var(--ink-2)}
+.listing .price{display:block;margin-top:4px;font-family:var(--mono);font-size:.9375rem;font-weight:600;color:var(--ink)}
+
+/* three steps, in cards */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:32px}
+.step{padding:22px 20px;border-radius:22px;background:#fff;box-shadow:0 14px 30px -24px rgba(20,24,27,.6),0 0 0 1px rgba(20,24,27,.05)}
+.step i{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:10px;background:rgba(232,98,26,.12);color:var(--ember-deep);font-style:normal;font-family:var(--mono);font-weight:600;font-size:.9375rem}
+.step b{display:block;margin-top:14px;font-size:1.0625rem;font-weight:600}
+.step p{margin:6px 0 0;font-size:.9375rem;line-height:1.55;color:var(--ink-2)}
+@media (max-width:760px){.steps{grid-template-columns:1fr}}
+.soon{display:inline-flex;align-items:center;gap:8px;margin-top:26px;padding:8px 14px;border-radius:999px;background:rgba(232,98,26,.1);color:var(--ember-deep);font-size:.875rem;font-weight:600}
+.soon::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ember);box-shadow:0 0 0 4px rgba(232,98,26,.2)}
+.more{display:inline-flex;align-items:center;gap:6px;margin-top:28px;font-weight:600;color:var(--ember-deep);text-decoration:none}
+.more::after{content:"→";transition:transform var(--dur)}
+@media (hover:hover){.more:hover::after{transform:translateX(3px)}}
+
+/* ── a phone, drawn ──────────────────────────────────────────────── */
+.phone{position:relative;width:min(320px,82vw);aspect-ratio:9/19.3;margin:0 auto;border-radius:48px;padding:12px;background:linear-gradient(145deg,#2A3136,#0C0F11);box-shadow:0 50px 80px -40px rgba(20,24,27,.75),inset 0 0 0 2px rgba(255,255,255,.08)}
+.phone .screen{position:relative;height:100%;border-radius:37px;overflow:hidden;background:#F2EEE9}
+.phone .island{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:34%;height:26px;border-radius:20px;background:#000;z-index:3}
+.phone .sb{display:flex;justify-content:space-between;padding:15px 26px 0;font-size:.8125rem;font-weight:600}
+.app-mock{padding:28px 16px 16px}
+.app-mock .top{display:flex;align-items:center;gap:8px;font-size:.8125rem;color:var(--ink-2)}
+.app-mock .top b{color:var(--ink);font-weight:600}
+.app-mock .state{margin-top:18px;padding:18px;border-radius:22px;background:#fff;box-shadow:0 10px 24px -18px rgba(20,24,27,.6)}
+.app-mock .state .lab{font-family:var(--mono);font-size:.6875rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ember-deep)}
+.app-mock .state h4{margin:8px 0 2px;font-size:1.75rem;line-height:1.05;letter-spacing:-.02em;font-weight:600}
+.app-mock .state p{margin:0;font-size:.875rem;color:var(--ink-2)}
+.app-mock .bars{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-top:16px}
+.app-mock .bars i{height:5px;border-radius:5px;background:rgba(20,24,27,.1)}
+.app-mock .bars i.on{background:var(--ember)}
+.app-mock .bars i.cur{background:linear-gradient(90deg,var(--ember) 50%,rgba(20,24,27,.1) 50%)}
+.app-mock .steps-mini{display:flex;justify-content:space-between;margin-top:8px;font-size:.6875rem;color:var(--ink-3)}
+.app-mock .lines{margin-top:14px;padding:6px 16px;border-radius:18px;background:#fff}
+.app-mock .lines div{display:flex;justify-content:space-between;padding:10px 0;font-size:.875rem;border-top:1px solid rgba(20,24,27,.07)}
+.app-mock .lines div:first-child{border-top:0}
+.app-mock .lines span:last-child{font-family:var(--mono);font-weight:600}
+.app-mock .eta{margin-top:14px;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;background:var(--night);color:#fff;font-size:.8125rem}
+.app-mock .eta svg{width:18px;height:18px;color:#FFA15E;flex:none}
+
+/* the lock screen: the order on it */
+.phone .screen.lock{background:radial-gradient(120% 80% at 50% 0%,#3B4A57 0%,#1C2329 55%,#0E1215 100%);color:#fff}
+.lock .when{text-align:center;padding-top:44px}
+.lock .when small{display:block;font-size:.875rem;opacity:.75}
+.lock .when b{display:block;font-size:4.2rem;font-weight:600;letter-spacing:-.03em;line-height:1}
+.lock .activity{margin:26px 12px 0;padding:14px;border-radius:24px;background:rgba(20,24,27,.72);backdrop-filter:blur(14px);box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+.lock .activity .row1{display:flex;align-items:center;gap:10px}
+.lock .activity img{width:34px;height:34px;border-radius:9px}
+.lock .activity b{font-size:.9375rem;font-weight:600}
+.lock .activity small{display:block;font-size:.75rem;opacity:.7}
+.lock .activity .big{margin-left:auto;text-align:right;font-family:var(--mono);font-size:1.25rem;font-weight:600;color:#FFA15E}
+.lock .activity .track{height:5px;border-radius:5px;background:rgba(255,255,255,.14);margin-top:12px;overflow:hidden}
+.lock .activity .track i{display:block;height:100%;width:78%;background:linear-gradient(90deg,#E8621A,#FFA15E);border-radius:5px}
+.lock .island-live{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:58%;height:30px;border-radius:20px;background:#000;z-index:3;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-family:var(--mono);font-size:.75rem;color:#FFA15E}
+.lock .island-live img{width:18px;height:18px;border-radius:5px}
+
+.lock .lock-foot{position:absolute;left:26px;right:26px;bottom:26px;display:flex;justify-content:space-between}
+.lock .lock-foot i{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.14);backdrop-filter:blur(8px)}
+/* the app's features */
+.features{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:32px}
+.feature{padding:20px;border-radius:20px;background:#fff;box-shadow:0 14px 30px -26px rgba(20,24,27,.6),0 0 0 1px rgba(20,24,27,.05)}
+.feature svg{width:26px;height:26px;color:var(--ember)}
+.feature b{display:block;margin-top:12px;font-size:1rem;font-weight:600}
+.feature p{margin:4px 0 0;font-size:.9375rem;line-height:1.5;color:var(--ink-2)}
+@media (max-width:520px){.features{grid-template-columns:1fr}}
+
+/* ── for businesses: the dark room ───────────────────────────────── */
+.dark{background:var(--night);color:#fff;border-radius:36px;margin:0 max(12px,calc((100vw - var(--wrap) - 48px) / 2));position:relative;overflow:hidden}
+.dark::before{content:"";position:absolute;right:-12%;top:-30%;width:60%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,rgba(232,98,26,.35),rgba(232,98,26,0) 65%)}
+.dark .wrap{position:relative}
+.dark .kicker{color:#FFA15E}
+.dark h2{color:#fff}
+.dark .intro{color:rgba(255,255,255,.72)}
+.biz{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:40px}
+.biz > div{padding:22px 20px;border-radius:22px;background:var(--night-2);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07)}
+.biz svg{width:26px;height:26px;color:#FFA15E}
+.biz b{display:block;margin-top:14px;font-size:1.0625rem;font-weight:600}
+.biz p{margin:6px 0 0;font-size:.9375rem;line-height:1.55;color:rgba(255,255,255,.66)}
+.biz .roles{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.biz .roles span{padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.08);font-size:.8125rem}
+@media (max-width:980px){.biz{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:560px){.biz{grid-template-columns:1fr}.dark{border-radius:26px}}
+.dark .ctas{margin-top:40px}
+.dark .cta-ghost{background:rgba(255,255,255,.06);color:#fff;border-color:rgba(255,255,255,.18)}
+@media (hover:hover){.dark .cta-ghost:hover{background:rgba(255,255,255,.12)}}
+
+/* ── questions ───────────────────────────────────────────────────── */
+.faq{max-width:820px;margin:36px auto 0}
+.faq details{border-top:1px solid rgba(20,24,27,.1)}
+.faq details:last-child{border-bottom:1px solid rgba(20,24,27,.1)}
+.faq summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:22px 2px;font-size:1.125rem;font-weight:600}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"";flex:none;width:28px;height:28px;border-radius:50%;background:rgba(232,98,26,.1) no-repeat center/14px url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B8480A' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");transition:transform var(--dur)}
+.faq details[open] summary::after{transform:rotate(45deg)}
+.faq details p{margin:0 0 22px;max-width:44em;font-size:1rem;line-height:1.7;color:var(--ink-2)}
+.faq details a{color:var(--ember-deep);font-weight:600}
+
+/* ── the last word ───────────────────────────────────────────────── */
+.last{position:relative;padding:clamp(64px,8vw,110px) 0 0;text-align:center;overflow:hidden}
+.last h2{margin:0 auto;max-width:14em;font-size:clamp(2rem,4.4vw,3.4rem);line-height:1.06;letter-spacing:-.03em;font-weight:600}
+.last .ctas{justify-content:center;margin-top:30px}
+.last img{width:min(220px,48vw);margin:44px auto 0;filter:drop-shadow(0 24px 30px rgba(90,30,0,.3))}
+.last::before{content:"";position:absolute;left:50%;bottom:-40%;width:min(900px,120vw);aspect-ratio:1;transform:translateX(-50%);border-radius:50%;background:radial-gradient(circle,rgba(255,154,84,.5),rgba(255,154,84,0) 60%)}
+
+footer.foot{position:relative;background:#fff;border-top:1px solid rgba(20,24,27,.07);padding:36px 0 calc(36px + var(--safe-b))}
+footer.foot .wrap{display:flex;flex-wrap:wrap;gap:20px 40px;align-items:flex-start;justify-content:space-between}
+footer.foot .links{display:flex;flex-wrap:wrap;gap:8px 22px}
+footer.foot a{color:var(--ink-2);text-decoration:none;font-size:.9375rem;font-weight:500}
+@media (hover:hover){footer.foot a:hover{color:var(--ink)}}
+footer.foot small{display:block;color:var(--ink-3);font-size:.8125rem;margin-top:8px}
+
+/* things arrive as they come into view */
+.reveal{opacity:0;transform:translateY(22px);transition:opacity 700ms var(--ease),transform 700ms var(--ease)}
+.reveal[data-in]{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}}
 </style>
 </head>
 <body>
 
-<main class="wrap">
-  <h1 class="wordmark">Basu<small>Улаанбаатар</small></h1>
-  <p class="hello" id="hello">Өнөөдөр юу хийх вэ?</p>
+<header class="bar" id="bar">
+  <div class="wrap">
+    <a class="logo" href="/" aria-label="Basu нүүр"><img src="/brand/app-icon.webp" alt="" width="34" height="34">Basu</a>
+    <nav aria-label="Хэсгүүд">
+      <a href="#idesh">Идэш</a>
+      <a href="#hool">Хоол</a>
+      <a href="#app">Апп</a>
+      <a href="#business">Бизнест</a>
+      <a href="#faq">Асуулт</a>
+    </nav>
+    <div class="right">
+      <a class="cta cta-ghost" href="/app" id="mine" hidden>Миний Basu</a>
+      <a class="cta cta-store" href="https://apps.apple.com/app/id6810541939" id="bar-store">Апп татах</a>
+    </div>
+  </div>
+</header>
 
-  <section class="live" id="live">
-    <div id="live-list" data-rows aria-busy="true">
-      <h2 class="section-label">Идэвхтэй</h2>
-      <div class="skel-row" aria-hidden="true"><span class="skel-lines"><span class="skel"></span><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></div>
-      <div class="skel-row" aria-hidden="true"><span class="skel-lines"><span class="skel"></span><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></div>
-      <div class="skel-row" aria-hidden="true"><span class="skel-lines"><span class="skel"></span><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></div>
+<main>
+  <!-- ── the opening ── -->
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="kicker">Улаанбаатарын супер апп</span>
+        <h1>Хоолоо урьдчил.<br>Идэшээ <em>малчнаас</em>.</h1>
+        <p class="lead">Basu дээр ресторанд очихоосоо өмнө хоолоо захиалж суумагц бэлэн байлгана. Өвлийн идэшээ гэрээт малчин, нийлүүлэгчээс тогтмол үнээр авч, хаалган дээрээ хүргүүлнэ.</p>
+        <div class="ctas">
+          <a class="cta cta-store" href="https://apps.apple.com/app/id6810541939">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.62c.03 3.03 2.66 4.04 2.69 4.05-.02.07-.42 1.44-1.39 2.85-.84 1.22-1.71 2.44-3.08 2.46-1.35.03-1.78-.8-3.32-.8-1.54 0-2.02.78-3.3.83-1.32.05-2.33-1.32-3.18-2.53-1.73-2.5-3.05-7.06-1.28-10.14.88-1.53 2.45-2.5 4.15-2.52 1.3-.03 2.52.87 3.31.87.79 0 2.28-1.08 3.84-.92.65.03 2.48.26 3.66 1.99-.1.06-2.18 1.27-2.16 3.79M13.85 3.2c.7-.85 1.17-2.03 1.04-3.2-1.01.04-2.23.67-2.95 1.52-.65.75-1.22 1.95-1.07 3.1 1.13.09 2.28-.57 2.98-1.42"/></svg>
+            <span><small>Татах</small>App Store</span>
+          </a>
+          <a class="cta cta-ghost" href="/idesh">Вэбээр идэш үзэх →</a>
+        </div>
+        <p class="fine"><span>iPhone апп</span><span>Андроид, компьютер дээр вэбээр</span><span>Google, Apple, имэйлээр нэвтэрнэ</span></p>
+      </div>
+
+      <div class="stage" aria-hidden="true">
+        <div class="disc"></div>
+        <img class="mascot" src="/brand/mascot.webp" alt="" width="573" height="880">
+        <div class="float t1"><div class="tilecard"><img src="/brand/food-tile.webp" alt=""></div></div>
+        <div class="float t2 b"><div class="tilecard"><img src="/brand/idesh-tile.webp" alt=""></div></div>
+        <div class="float t3 c"><div class="tilecard" style="width:74px;height:74px;border-radius:19px"><img src="/brand/supplier-tile.svg" alt=""></div></div>
+        <div class="float n1 b">
+          <div class="bubble">
+            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c1 3 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5.3 1.6 1.2 2.5 2 2.5 0-3 1-5.5 1-8z"/></svg></div>
+            <div><b>Гал тогоо хоолыг тань тавьлаа</b><small>Алтан тогоо · 12:21-д бэлэн</small></div>
+          </div>
+        </div>
+        <div class="float n2 c">
+          <div class="bubble">
+            <div class="ic" style="background:#fff;padding:0;overflow:hidden"><img src="/brand/idesh-tile.webp" alt="" style="width:100%;height:100%"></div>
+            <div style="flex:1"><b>Хонь, бүтэн · Замд</b><small>14:30 орчим хүргэнэ</small><div class="track"><i></i></div></div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
-  <h2 class="section-label">Аппууд</h2>
-  <ul class="apps" id="apps"></ul>
+  <!-- ── the promises ── -->
+  <div class="promises">
+    <div class="wrap">
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>Гэрээт нийлүүлэгч</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg>Үнэ эцсийн, тогтмол</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M15.5 15h2"/></svg>QPay, Basu түрийвчээр</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg>Нядлахаас өмнө бүтэн буцаалт</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="11" rx="2"/><path d="M7 7V5h10v2M3 12h18"/></svg>Хүргэлт эсвэл очиж авах</li>
+      </ul>
+    </div>
+  </div>
 
-  <footer class="foot">
-    <a href="/terms">Үйлчилгээний нөхцөл</a>
-    <a href="/privacy">Нууцлалын бодлого</a>
-    <a class="staff" href="/kds">Гал тогооны дэлгэц →</a>
-  </footer>
+  <!-- ── winter meat ── -->
+  <section class="block" id="idesh">
+    <div class="wrap">
+      <span class="kicker reveal">Өвлийн идэш</span>
+      <h2 class="reveal">Өвлийн идэшээ малчнаас шууд.</h2>
+      <p class="intro reveal">Хонь, ямаа, үхэр, адууг бүтнээр нь эсвэл кг-аар. Зар дээрх үнэ эцсийнх — бодит жин нь зөрсөн ч нэмж төлөхгүй. Хүргүүлэх үү, очиж авах уу, өдрөө өөрөө сонгоно.</p>
+
+      <div class="kinds">
+        <a class="kind reveal" href="/idesh"><img src="/idesh/sheep.jpg" alt="Хонины мах" loading="lazy" width="320" height="320"><span><b>Хонь</b><small>бүтнээр · кг-аар</small></span></a>
+        <a class="kind reveal" href="/idesh"><img src="/idesh/goat.jpg" alt="Ямааны мах" loading="lazy" width="320" height="320"><span><b>Ямаа</b><small>бүтнээр · кг-аар</small></span></a>
+        <a class="kind reveal" href="/idesh"><img src="/idesh/beef.jpg" alt="Үхрийн мах" loading="lazy" width="320" height="320"><span><b>Үхэр</b><small>хагас · кг-аар</small></span></a>
+        <a class="kind reveal" href="/idesh"><img src="/idesh/horse.jpg" alt="Адууны мах" loading="lazy" width="320" height="320"><span><b>Адуу</b><small>хагас · кг-аар</small></span></a>
+      </div>
+
+      <ol class="journey reveal" aria-label="Захиалгын явц">
+        <li><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18"/></svg></span><b>Төлсөн</b><small>Нийлүүлэгчид шууд очно</small></li>
+        <li><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l8-16 8 16"/><path d="M8 13h8"/></svg></span><b>Бэлтгэж байна</b><small>Мал нядлагдаж байна</small></li>
+        <li><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-10"/></svg></span><b>Бэлэн</b><small>Мах савлагдлаа</small></li>
+        <li><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg></span><b>Замд</b><small>Хаалга руу тань явж байна</small></li>
+        <li><span class="dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/></svg></span><b>Гэрт тань</b><small>Сайхан өвөлжөөрэй</small></li>
+      </ol>
+
+      <div class="now" id="now" hidden>
+        <span class="kicker">Одоо захиалж болох</span>
+        <div class="now-list" id="now-list"></div>
+      </div>
+
+      <a class="more" href="/idesh">Идэш захиалах</a>
+    </div>
+  </section>
+
+  <!-- ── lunch ahead ── -->
+  <section class="block" id="hool" style="padding-top:0">
+    <div class="wrap split">
+      <div>
+        <span class="kicker reveal">Урьдчилсан хоол</span>
+        <h2 class="reveal">Суумагц хоол тань бэлэн.</h2>
+        <p class="intro reveal">Цэснээс сонгоод, ирэх цагаа тавиад, төлнө. Та замдаа гарахад Basu таныг хэр ойртсоныг гал тогоонд хэлж, хоолыг тань яг таарах мөчид гал дээр тавина. Хүлээлт ч, хөрсөн хоол ч үгүй.</p>
+        <div class="steps">
+          <div class="step reveal"><i>1</i><b>Цэс, цагаа сонго</b><p>Хоол, ширээ, ирэх цаг — нэг дор, урьдчилж.</p></div>
+          <div class="step reveal"><i>2</i><b>Замдаа гар</b><p>Утас тань ойртож буйг гал тогоонд хэлнэ.</p></div>
+          <div class="step reveal"><i>3</i><b>Ирэхэд бэлэн</b><p>Суумагц халуун хоол ширээн дээр.</p></div>
+        </div>
+        <span class="soon reveal">Ресторанууд одоо нэгдэж байна</span><br>
+        <a class="more" href="/dashboard">Рестораноо нэгтгэх</a>
+      </div>
+      <div class="reveal">
+        <div class="phone">
+          <div class="screen">
+            <div class="island"></div>
+            <div class="sb"><span>12:14</span><span>5G</span></div>
+            <div class="app-mock">
+              <div class="top"><b>Алтан тогоо</b><span>· №4821 · 2 хүн</span></div>
+              <div class="state">
+                <div class="lab">Гал дээр</div>
+                <h4>12:21-д бэлэн</h4>
+                <p>Та 6 минутын зайтай байна</p>
+                <div class="bars"><i class="on"></i><i class="on"></i><i class="cur"></i><i></i></div>
+                <div class="steps-mini"><span>Захиалсан</span><span>Баталсан</span><span>Гал дээр</span><span>Бэлэн</span></div>
+              </div>
+              <div class="lines">
+                <div><span>Хуушуур ×4</span><span>16,000₮</span></div>
+                <div><span>Цуйван</span><span>14,500₮</span></div>
+                <div><span>Сүүтэй цай ×2</span><span>6,000₮</span></div>
+              </div>
+              <div class="eta"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/></svg>Ширээ №7 таныг хүлээж байна</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── the app ── -->
+  <section class="block" id="app" style="padding-top:0">
+    <div class="wrap split">
+      <div class="reveal">
+        <div class="phone">
+          <div class="screen lock">
+            <div class="island-live"><img src="/brand/idesh-tile.webp" alt=""><span>14:30</span></div>
+            <div class="when"><small>Лхагва, 10-р сарын 15</small><b>12:14</b></div>
+            <div class="activity">
+              <div class="row1"><img src="/brand/idesh-tile.webp" alt=""><div><b>Хонь, бүтэн</b><small>Хэрлэн мах · Замд</small></div><div class="big">14:30</div></div>
+              <div class="track"><i></i></div>
+            </div>
+            <div class="lock-foot"><i></i><i></i></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <span class="kicker reveal">iPhone апп</span>
+        <h2 class="reveal">Захиалга тань түгжигдсэн дэлгэцэн дээр.</h2>
+        <p class="intro reveal">Захиалгынхаа явцыг апп нээлгүйгээр Live Activity, Dynamic Island дээрээс харна. Хоол, идэш хоёр нэг апп-д, нэг түрийвчтэй.</p>
+        <div class="features">
+          <div class="feature reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M9 6h6"/><rect x="8.5" y="12" width="7" height="4" rx="1.2"/></svg><b>Live Activity</b><p>Бэлтгэж байна, замд, бэлэн — дэлгэц дээрээ шууд.</p></div>
+          <div class="feature reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M15.5 15h2"/></svg><b>Нэг түрийвч</b><p>QPay-ээр цэнэглээд хоол, идэш хоёуланд.</p></div>
+          <div class="feature reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><b>Цагтаа мэдэгдэнэ</b><p>Нийлүүлэгч бэлтгэж эхлэхэд, хоол гал дээр гарахад.</p></div>
+          <div class="feature reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1-3.5 3.6-5 7-5s6 1.5 7 5"/></svg><b>Нэг товшилтоор нэвтэрнэ</b><p>Apple, Google эсвэл имэйлд ирэх кодоор.</p></div>
+        </div>
+        <div class="ctas reveal" style="margin-top:30px">
+          <a class="cta cta-store" href="https://apps.apple.com/app/id6810541939">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.62c.03 3.03 2.66 4.04 2.69 4.05-.02.07-.42 1.44-1.39 2.85-.84 1.22-1.71 2.44-3.08 2.46-1.35.03-1.78-.8-3.32-.8-1.54 0-2.02.78-3.3.83-1.32.05-2.33-1.32-3.18-2.53-1.73-2.5-3.05-7.06-1.28-10.14.88-1.53 2.45-2.5 4.15-2.52 1.3-.03 2.52.87 3.31.87.79 0 2.28-1.08 3.84-.92.65.03 2.48.26 3.66 1.99-.1.06-2.18 1.27-2.16 3.79M13.85 3.2c.7-.85 1.17-2.03 1.04-3.2-1.01.04-2.23.67-2.95 1.52-.65.75-1.22 1.95-1.07 3.1 1.13.09 2.28-.57 2.98-1.42"/></svg>
+            <span><small>Татах</small>App Store</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── for businesses ── -->
+  <section class="block dark" id="business">
+    <div class="wrap">
+      <span class="kicker reveal">Бизнест</span>
+      <h2 class="reveal">Ресторан, нийлүүлэгч үү? Basu-д нэгдээрэй.</h2>
+      <p class="intro reveal">Бүртгүүлээд, Basu шалгаж баталмагц захиалга авч эхэлнэ. Ажилтнууддаа эрх өгч, захиалга, мөнгөө нэг дороос хянана.</p>
+      <div class="biz">
+        <div class="reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 20h8M12 17v3M7 9h4M7 12h7"/></svg><b>Захиалгын самбар</b><p>Шинэ захиалга, бэлтгэл, хүлээлгэн өгөлт — таблет дээр, бодит цагаар.</p></div>
+        <div class="reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c.8-3.2 3-4.8 6-4.8s5.2 1.6 6 4.8"/><circle cx="17" cy="9.5" r="2.4"/><path d="M15.5 15.2c2.6.2 4.4 1.6 5 4.8"/></svg><b>Ажилтны эрх</b><p>Хүн бүр өөрийн ажлаа л хийнэ.</p><div class="roles"><span>эзэн</span><span>менежер</span><span>ажилтан</span><span>нягтлан</span></div></div>
+        <div class="reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16M7 16V9M12 16V5M17 16v-6"/></svg><b>Ил тод тооцоо</b><p>Борлуулалт, шимтгэл, олголт — захиалга бүрээр харагдана.</p></div>
+        <div class="reveal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><b>Баталгаат нэр</b><p>Гэрээт газар гэдэг тэмдэг таныг худалдан авагчид итгэлтэй болгоно.</p></div>
+      </div>
+      <div class="ctas reveal">
+        <a class="cta cta-ember" href="/dashboard">Бизнесээ бүртгүүлэх →</a>
+        <a class="cta cta-ghost" href="/supplier">Нийлүүлэгчийн хэсэг</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── questions ── -->
+  <section class="block" id="faq">
+    <div class="wrap">
+      <div style="text-align:center">
+        <span class="kicker reveal">Түгээмэл асуулт</span>
+        <h2 class="reveal" style="margin-left:auto;margin-right:auto">Асуух зүйл байна уу?</h2>
+      </div>
+      <div class="faq">
+        <details class="reveal"><summary>Basu гэж юу вэ?</summary><p>Хоолоо ресторанд урьдчилан захиалж, өвлийн идэшээ гэрээт малчин, нийлүүлэгчээс авдаг Монгол супер апп. iPhone дээр апп хэлбэрээр, Андроид болон компьютер дээр basu.burzai.cloud вэбээр ажиллана.</p></details>
+        <details class="reveal"><summary>Идэшний үнэ яагаад тогтмол вэ?</summary><p>Зар дээр бичсэн үнэ эцсийнх. Бүтэн малын бодит жин зар дээрх ойролцоо жингээс зөрсөн ч нэмж төлөхгүй, буцааж авахгүй. Хүргэлтийн төлбөр зар дээр тусдаа бичигдэнэ.</p></details>
+        <details class="reveal"><summary>Цуцлагдвал мөнгө маань яах вэ?</summary><p>Мал нядлахаас өмнө ямар ч шалтгаанаар цуцлагдвал төлсөн дүн бүтнээрээ буцна. Нийлүүлэгчийн буруугаас цуцлагдвал хэзээ ч бүтнээрээ буцна. Дэлгэрэнгүйг <a href="/terms">Үйлчилгээний нөхцөл</a>-өөс уншина уу.</p></details>
+        <details class="reveal"><summary>Яаж төлөх вэ?</summary><p>QPay-ээр банкны аппаасаа эсвэл Basu түрийвчээсээ төлнө. Түрийвчээ нэг цэнэглээд хоол, идэш хоёуланд хэрэглэнэ.</p></details>
+        <details class="reveal"><summary>Идэшээ хүргүүлж болох уу?</summary><p>Болно. Захиалахдаа хүргүүлэх эсвэл нийлүүлэгчийн цэгээс очиж авахаа, мөн өдрөө сонгоно. Захиалгын явцыг апп дээрээс, iPhone дээр бол түгжигдсэн дэлгэцээсээ харна.</p></details>
+        <details class="reveal"><summary>Рестораноо, малаа Basu-д яаж нэгтгэх вэ?</summary><p><a href="/dashboard">Хяналтын самбар</a> руу Google, имэйл эсвэл утсаараа нэвтэрч «Байгууллага бүртгүүлэх» дарна. Basu шалгаж баталмагц ажилтнуудаа нэмж, захиалга авч эхэлнэ.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── the last word ── -->
+  <section class="last">
+    <div class="wrap">
+      <h2 class="reveal">Энэ өвлийн идэшээ Basu-гаар.</h2>
+      <div class="ctas reveal">
+        <a class="cta cta-store" href="https://apps.apple.com/app/id6810541939">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.62c.03 3.03 2.66 4.04 2.69 4.05-.02.07-.42 1.44-1.39 2.85-.84 1.22-1.71 2.44-3.08 2.46-1.35.03-1.78-.8-3.32-.8-1.54 0-2.02.78-3.3.83-1.32.05-2.33-1.32-3.18-2.53-1.73-2.5-3.05-7.06-1.28-10.14.88-1.53 2.45-2.5 4.15-2.52 1.3-.03 2.52.87 3.31.87.79 0 2.28-1.08 3.84-.92.65.03 2.48.26 3.66 1.99-.1.06-2.18 1.27-2.16 3.79M13.85 3.2c.7-.85 1.17-2.03 1.04-3.2-1.01.04-2.23.67-2.95 1.52-.65.75-1.22 1.95-1.07 3.1 1.13.09 2.28-.57 2.98-1.42"/></svg>
+          <span><small>Татах</small>App Store</span>
+        </a>
+        <a class="cta cta-ghost" href="/app">Вэбээр нээх</a>
+      </div>
+      <img class="reveal" src="/brand/mascot.webp" alt="Basu-гийн бөх" loading="lazy" width="573" height="880">
+    </div>
+  </section>
 </main>
 
-<script type="module">
-import { api, store, hhmm, mountClock, HEADLINE, IDESH_HEADLINE, dayShort } from '/api.js';
+<footer class="foot">
+  <div class="wrap">
+    <div>
+      <a class="logo" href="/"><img src="/brand/app-icon.webp" alt="" width="34" height="34">Basu</a>
+      <small>© <span id="year">2026</span> Basu · Улаанбаатар · <a href="mailto:geregevending@gmail.com">geregevending@gmail.com</a></small>
+    </div>
+    <div class="links">
+      <a href="/app">Апп</a>
+      <a href="/idesh">Өвлийн идэш</a>
+      <a href="/dine">Хоол</a>
+      <a href="/dashboard">Бизнест</a>
+      <a href="/supplier">Нийлүүлэгч</a>
+      <a href="/terms">Үйлчилгээний нөхцөл</a>
+      <a href="/privacy">Нууцлалын бодлого</a>
+    </div>
+  </div>
+</footer>
 
-/** Text into markup, never the other way: a supplier's name is a name. */
+<script type="module">
+import { api, store, mnt } from '/api.js';
+
+const $ = (id) => document.getElementById(id);
 const esc = (value) => {
   const node = document.createElement('span');
   node.textContent = value ?? '';
   return node.innerHTML;
 };
 
-const $ = (id) => document.getElementById(id);
-const el = (html) => {
-  const t = document.createElement('template');
-  t.innerHTML = html.trim();
-  return t.content.firstElementChild;
-};
+// Somebody who already uses Basu goes straight to their own things.
+if (store.guestToken) $('mine').hidden = false;
+$('year').textContent = String(new Date().getFullYear());
 
-/**
- * Everything inside Basu, in the order it appears on the home screen.
- *
- * A list rather than markup because this is the file that will grow: the
- * second app is a new entry here and nothing else. Icons are inline so a
- * launcher never waits on a network round trip to draw itself.
- */
-const APPS = [
-  {
-    id: 'dine',
-    name: 'Хоол',
-    tag: 'урьдчилсан',
-    href: '/dine',
-    // A bowl with steam over it: the whole product in one glyph.
-    icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
-             <path d="M3.5 11h17c0 4.4-3.8 7.5-8.5 7.5S3.5 15.4 3.5 11Z"/>
-             <path d="M2.5 11h19"/>
-             <path d="M9 7.5c0-1 1-1.4 1-2.4S9 3.5 9 3.5"/>
-             <path d="M13.5 8c0-1.2 1.2-1.7 1.2-2.9s-1.2-1.6-1.2-1.6"/>
-           </svg>`,
-  },
-  {
-    id: 'idesh',
-    name: 'Идэш',
-    tag: 'өвлийн',
-    href: '/idesh',
-    // A cut of ribs: the spine and three bones. The object, not the animal —
-    // a sheep at 34 points is a cloud, and a hook is a fishmonger.
-    icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
-             <path d="M5 6c3.6 1.4 10.4 1.4 14 0"/>
-             <path d="M8 7.2v11.3"/>
-             <path d="M12 7.6v11.6"/>
-             <path d="M16 7.2v11.3"/>
-           </svg>`,
-  },
-];
+// The bar gets its hairline once the page moves under it.
+const bar = $('bar');
+const onScroll = () => bar.toggleAttribute('data-scrolled', window.scrollY > 8);
+addEventListener('scroll', onScroll, { passive: true });
+onScroll();
 
-/** The supplier's own side of the second app — on the launcher only for the few who are one. */
-const SUPPLIER_APP = {
-  id: 'supplier',
-  name: 'Нийлүүлэгч',
-  tag: 'миний зар',
-  href: '/supplier',
-  // A clipboard: the board, its clip, two lines of what is listed.
-  icon: `<svg viewBox="0 0 24 24" aria-hidden="true">
-           <rect x="5.5" y="4.6" width="13" height="16" rx="1.8"/>
-           <rect x="9.2" y="3" width="5.6" height="3.2" rx="1"/>
-           <path d="M8.6 11h6.8M8.6 15h4.6"/>
-         </svg>`,
-};
-
-function tileOf(app) {
-  return el(`
-    <li>
-      <a class="app" href="${app.href}" data-app="${app.id}">
-        <span class="tile">${app.icon}</span>
-        <span class="name">${app.name}</span>
-        <span class="tag mono">${app.tag}</span>
-      </a>
-    </li>`);
-}
-for (const app of APPS) $('apps').append(tileOf(app));
-
-/** Draw the supplier's tile when this guest is one; take it away when they are not. */
-async function loadSupplierTile() {
-  const token = store.guestToken;
-  const shown = $('apps').querySelector('[data-app="supplier"]');
-  if (!token) {
-    shown?.closest('li').remove();
-    return;
-  }
-  let mine = null;
-  try {
-    ({ supplier: mine } = await api('/v1/supplier/me', { token }));
-  } catch {
-    return;
-  }
-  // Asked again after the wait: two refreshes in flight at once must not
-  // both find the tile missing and both draw it.
-  const drawn = $('apps').querySelector('[data-app="supplier"]');
-  const isOne = mine?.state === 'contracted';
-  if (isOne && !drawn) $('apps').append(tileOf(SUPPLIER_APP));
-  if (!isOne && drawn) drawn.closest('li').remove();
-}
-
-/* ── what is already running ──────────────────────────────────────── */
-
-/**
- * The states that carry a time worth putting in the corner of the card, and
- * what that time is called. Anything else gets the slot it was booked for.
- */
-function moment(order) {
-  if (['FIRED', 'COOKING'].includes(order.state) && order.ready_at) {
-    return [hhmm(order.ready_at), 'бэлэн'];
-  }
-  if (order.fire_at && !['READY', 'SERVED'].includes(order.state)) {
-    return [hhmm(order.fire_at), 'гал'];
-  }
-  return [hhmm(order.slot_starts_at), 'суух'];
-}
-
-const SUB = {
-  SCHEDULED: 'Энэ цагт гал дээр гарна',
-  ARMED: 'Та замд гарсан уу?',
-  COOKING: 'Хоол хийгдэж байна',
-};
-
-/**
- * The colour of the dot at the head of a row: what the order is waiting on.
- * route — the system or the other side; hold — the guest; accent — on the
- * fire; ready — done; stop — needs a person now. A finished negative
- * outcome (cancelled, refunded) is neutral, not an alarm.
- */
-const TONE = {
-  PLACED: 'route', ACCEPTED: 'route', SCHEDULED: 'route', PAID: 'route', DISPATCHED: 'route',
-  ARMED: 'hold', DRAFT: 'hold',
-  FIRED: 'accent', COOKING: 'accent', PREPARING: 'accent',
-  READY: 'ready', SERVED: 'ready', CLOSED: 'ready', HANDED: 'ready',
-  HELD: 'stop',
-};
-
-/**
- * One row of ИДЭВХТЭЙ, whichever app it came from.
- *
- * The section is deliberately not "your lunches": rows are ordered by the
- * moment that matters, so a sheep arriving Tuesday sits under today's lunch
- * and above nothing else. Each vertical maps into this shape and the section
- * does not know the difference.
- */
-function dineRow(order) {
-  const [word, cap] = HEADLINE[order.state] ?? [order.state, ''];
-  const [time, label] = moment(order);
-  return {
-    at: new Date(order.ready_at ?? order.fire_at ?? order.slot_starts_at),
-    href: `/dine?order=${order.id}`,
-    source: 'Хоол',
-    title: order.restaurant.name,
-    what: SUB[order.state] ?? cap ?? '',
-    code: order.code,
-    state: order.state,
-    word,
-    time,
-    label,
-  };
-}
-
-function ideshRow(order) {
-  const [word, cap] = IDESH_HEADLINE[order.state] ?? [order.state, ''];
-  return {
-    // Noon on the day, in the restaurant's zone: a day, not an instant.
-    at: new Date(`${order.receive_on}T12:00:00+08:00`),
-    href: `/idesh?order=${order.id}`,
-    source: 'Идэш',
-    title: order.supplier.name,
-    what: `${esc(order.title)} ×${order.qty} · ${cap}`,
-    code: order.code,
-    state: order.state,
-    word,
-    // A cancelled order is still here for its refund, not for a day.
-    time: order.state === 'CANCELLED' ? '—' : dayShort(order.receive_on),
-    label: order.state === 'CANCELLED' ? 'буцаалт' : order.receive === 'delivery' ? 'ирэх' : 'авах',
-  };
+// Things arrive as they come into view — once, and only where motion is welcome.
+const io = 'IntersectionObserver' in window
+  ? new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        e.target.setAttribute('data-in', '');
+        io.unobserve(e.target);
+      }
+    }, { rootMargin: '0px 0px -8% 0px' })
+  : null;
+for (const node of document.querySelectorAll('.reveal')) {
+  if (io) io.observe(node);
+  else node.setAttribute('data-in', '');
 }
 
 /**
- * The guest's live orders, if there is a guest.
- *
- * No session is created here: signing in is the dine-in app's business, and a
- * launcher that quietly makes an account for anyone who opens it would be
- * lying about what a visit costs. No token simply means nothing to show.
- *
- * Two calls, one per vertical, merged here: the launcher is the one place
- * that knows there are two, and each app's list stays its own.
+ * What is on sale today, straight from the stalls — shown only when there is
+ * something to show. A front page that invents listings is lying to the
+ * first person who taps one.
  */
-async function loadLive() {
-  const token = store.guestToken;
-  if (!token) return paint([]);
-  const ask = (path, key) =>
-    api(path, { token }).then(
-      (body) => body[key],
-      (error) => {
-        // A token from a reseeded database is dead, not a reason to shout at
-        // somebody who has only just opened the app.
-        if (error.status === 401) store.guestToken = null;
-        return [];
-      },
-    );
-  const [lunches, provisions] = await Promise.all([
-    ask('/v1/orders', 'orders'),
-    ask('/v1/idesh', 'orders'),
-    loadSupplierTile(),
-  ]);
-  const rows = [...lunches.map(dineRow), ...provisions.map(ideshRow)];
-  rows.sort((a, b) => a.at - b.at);
-  paint(rows);
-}
-
-function paint(rows) {
-  const list = $('live-list');
-  // The section label is the list's own first row: it survives every repaint,
-  // and the skeleton under it does not.
-  const label = list.querySelector('.section-label');
-  list.replaceChildren(...(label ? [label] : []));
-  list.removeAttribute('aria-busy');
-  delete $('live').dataset.loading;
-  if (!rows.length) {
-    $('live').removeAttribute('data-any');
-    return;
+const KIND_PHOTO = { sheep: '/idesh/sheep.jpg', goat: '/idesh/goat.jpg', beef: '/idesh/beef.jpg', horse: '/idesh/horse.jpg' };
+try {
+  const { listings } = await api('/v1/idesh/listings');
+  const shown = listings.slice(0, 6);
+  if (shown.length) {
+    const list = $('now-list');
+    for (const l of shown) {
+      const a = document.createElement('a');
+      a.className = 'listing';
+      a.href = '/idesh';
+      a.innerHTML = `<img src="${KIND_PHOTO[l.kind] ?? '/idesh/sheep.jpg'}" alt="" loading="lazy">
+        <span><b>${esc(l.title)}</b><small>${esc(l.supplier?.name ?? '')}</small><span class="price">${mnt(l.price_mnt)}</span></span>`;
+      list.append(a);
+    }
+    $('now').hidden = false;
   }
-  $('live').dataset.any = String(rows.length);
-
-  for (const row of rows) {
-    const card = el(`
-      <a class="card row" href="${row.href}" data-source="${row.source}" data-chev>
-        <span class="lead"><span class="dot" data-tone="${TONE[row.state] ?? 'neutral'}"></span></span>
-        <span class="who main">
-          <span class="venue title">${esc(row.title)}</span>
-          <span class="what sub">${row.what}</span>
-          <span class="code meta">${row.source} · №${row.code}<span class="chip" data-s="${row.state}" data-inline>${row.word}</span></span>
-        </span>
-        <span class="end"><span class="when val" data-size="lg">${row.time}<small>${row.label}</small></span></span>
-      </a>`);
-    list.append(card);
-  }
+} catch {
+  // The page stands on its own without them.
 }
-
-/* ── boot ─────────────────────────────────────────────────────────── */
-
-// A guest with a token has rows on the way: show the skeleton, not a jump.
-if (store.guestToken) $('live').dataset.loading = '';
-mountClock(() => void loadLive());
-void loadLive();
-
-/**
- * The kitchen accepts and fires without anybody touching this page, so the
- * strip has to keep asking. It stops when the page is hidden and when it goes
- * away — a launcher left open in a background tab should cost nothing.
- */
-const poll = setInterval(() => {
-  if (!document.hidden) void loadLive();
-}, 4000);
-addEventListener('pagehide', () => clearInterval(poll));
 </script>
 </body>
 </html>

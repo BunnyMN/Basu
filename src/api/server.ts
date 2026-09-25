@@ -962,6 +962,9 @@ async function mountPages(app: FastifyInstance): Promise<void> {
   });
 
   // `/` is the Basu home screen; the dine-in pre-order app is one icon on it.
+  // The launcher: what a guest has running, and the apps. «/» is the front page for everybody.
+  app.get('/app', (_request, reply) => reply.sendFile('app.html'));
+  app.get('/favicon.ico', (_request, reply) => reply.type('image/png').sendFile('brand/favicon.png'));
   app.get('/dine', (_request, reply) => reply.sendFile('dine.html'));
   app.get('/kds', (_request, reply) => reply.sendFile('kds.html'));
   // The second app on the home screen, and the screen its suppliers hold.

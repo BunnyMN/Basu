@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#E9EBEC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1315" media="(prefers-color-scheme: dark)">
+<title>Basu · Миний апп</title>
+<link rel="icon" href="/brand/favicon.png">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+<link rel="stylesheet" href="/app.css">
+<style>
+/* The home screen. Basu is one app with several things inside it, and this is
+   the page that says which ones exist. It owns no domain logic: everything
+   here is a name, an icon and a link — plus whatever of the guest's is
+   currently running, because a launcher that cannot tell you your lunch is on
+   the fire is just a menu of links.
+
+   Layout only. Faces, colours, radii, rows, chips and the section label all
+   come from app.css; the one component drawn here is the launcher tile,
+   which no other page has. */
+
+/* ── the column ───────────────────────────────────────────────────── */
+/* One 560 column on the ground. The page is a flex column so the footer
+   rests at the foot of the screen when the content is shorter than it. */
+main.wrap{
+  display:flex;flex-direction:column;min-height:100dvh;
+  padding-top:calc(var(--s-5) + var(--safe-t));
+}
+
+/* ── the brand line ───────────────────────────────────────────────── */
+/* The city is the wordmark's own small: app.css sets its face and its 10px offset. */
+.wordmark{margin:0 0 var(--s-2)}
+.hello{margin:0;font-size:var(--t-body-lg);line-height:var(--lh-body);color:var(--ink-2)}
+/* The greeting is for a stranger; a guest with something running sees that
+   instead — and does not see it flash while their rows are on the way. */
+main:has(.live[data-any]) .hello,main:has(.live[data-loading]) .hello{display:none}
+
+/* ── what of the guest's is running ───────────────────────────────── */
+.live{margin-top:var(--s-6)}
+.live:not([data-any]){display:none}
+/* A token means rows are coming: hold their place instead of letting the grid jump. */
+.live[data-loading]{display:block}
+/* Rows are hairline-separated (5.3). app.css's row reset outranks its own
+   separator rule for now, so the page draws the line until app.css does. */
+#live-list > .row + .row{border-top:1px solid var(--line)}
+/* The tone dot belongs to the name, not to the middle of a three-line row:
+   it sits on the title's first line, centred in that line box. */
+#live-list{--dot-top:calc((var(--t-row) * var(--lh-snug) - 6px) / 2)}
+#live-list > .row > .lead{align-self:flex-start;margin-top:var(--dot-top)}
+/* The skeleton copies the row it stands in for: dot at the head, three lines
+   (name, what, meta), a corner block the height of the mono value + label. */
+#live-list .skel-row{min-height:85px;padding:12px 16px}
+#live-list .skel-row::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:var(--line-2);align-self:flex-start;margin-top:var(--dot-top)}
+#live-list .skel-row > .skel-lines{gap:8px}
+#live-list .skel-row .skel-lines .skel{min-height:0;height:14px;width:60%}
+#live-list .skel-row .skel-lines .skel:nth-child(2){height:12px;width:80%}
+#live-list .skel-row .skel-lines .skel:nth-child(3){height:10px;width:35%}
+#live-list .skel-row > .skel:last-child{width:56px;height:38px}
+
+/* ── the grid of apps ─────────────────────────────────────────────── */
+.apps{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));
+  gap:10px 14px;margin:0 0 var(--s-7);padding:0;list-style:none;
+}
+.app{display:block;color:inherit;text-decoration:none;text-align:center;border-radius:var(--r-lg)}
+.app .tile{
+  width:92px;height:92px;margin:0 auto;display:grid;place-items:center;
+  border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);
+  transition:transform 120ms var(--ease),border-color var(--dur),background var(--dur);
+}
+.app .tile svg{width:34px;height:34px;fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+/* A tile with art is the art, edge to edge — the render the iPhone launcher shows. */
+.app .tile:has(> img){padding:0;overflow:hidden;background:none}
+.app .tile > img{width:100%;height:100%;display:block;object-fit:cover}
+@media (hover:hover){.app:hover .tile{border-color:var(--line-2);background:var(--surface-2)}}
+.app:active .tile{transform:scale(.97)}
+.app .name{display:block;margin-top:var(--s-2);font-size:var(--t-cap);font-weight:600;line-height:1.3;color:var(--ink)}
+.app .tag{display:block;margin-top:2px;font-size:var(--t-eyebrow);line-height:1.35;color:var(--ink-3)}
+
+/* ── the quiet bottom of the page ─────────────────────────────────── */
+.foot{
+  margin-top:auto;display:flex;flex-wrap:wrap;align-items:center;gap:0 var(--s-5);
+  border-top:1px solid var(--line);
+}
+.foot a{display:inline-flex;align-items:center;min-height:var(--target);font-size:var(--t-cap);font-weight:500;color:var(--ink-2)}
+@media (hover:hover){.foot a:hover{color:var(--ink)}}
+/* The kitchen display is a staff door: it shows only where the demo strip does. */
+.foot .staff{display:none;color:var(--ink-3)}
+.clockbar ~ .wrap .staff{display:inline-flex}
+</style>
+</head>
+<body>
+
+<main class="wrap">
+  <h1 class="wordmark">Basu<small>Улаанбаатар</small></h1>
+  <p class="hello" id="hello">Өнөөдөр юу хийх вэ?</p>
+
+  <section class="live" id="live">
+    <div id="live-list" data-rows aria-busy="true">
+      <h2 class="section-label">Идэвхтэй</h2>
+      <div class="skel-row" aria-hidden="true"><span class="skel-lines"><span class="skel"></span><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></div>
+      <div class="skel-row" aria-hidden="true"><span class="skel-lines"><span class="skel"></span><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></div>
+      <div class="skel-row" aria-hidden="true"><span class="skel-lines"><span class="skel"></span><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></div>
+    </div>
+  </section>
+
+  <h2 class="section-label">Аппууд</h2>
+  <ul class="apps" id="apps"></ul>
+
+  <footer class="foot">
+    <a href="/terms">Үйлчилгээний нөхцөл</a>
+    <a href="/privacy">Нууцлалын бодлого</a>
+    <a class="staff" href="/kds">Гал тогооны дэлгэц →</a>
+  </footer>
+</main>
+
+<script type="module">
+import { api, store, hhmm, mountClock, HEADLINE, IDESH_HEADLINE, dayShort } from '/api.js';
+
+/** Text into markup, never the other way: a supplier's name is a name. */
+const esc = (value) => {
+  const node = document.createElement('span');
+  node.textContent = value ?? '';
+  return node.innerHTML;
+};
+
+const $ = (id) => document.getElementById(id);
+const el = (html) => {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+};
+
+/**
+ * Everything inside Basu, in the order it appears on the home screen.
+ *
+ * A list rather than markup because this is the file that will grow: the
+ * second app is a new entry here and nothing else. Icons are inline so a
+ * launcher never waits on a network round trip to draw itself.
+ */
+const APPS = [
+  {
+    id: 'dine',
+    name: 'Хоол',
+    tag: 'урьдчилсан',
+    href: '/dine',
+    // The cloche on a waiter's hand: the same render the iPhone launcher shows.
+    icon: '<img src="/brand/food-tile.webp" alt="" width="92" height="92">',
+  },
+  {
+    id: 'idesh',
+    name: 'Идэш',
+    tag: 'өвлийн',
+    href: '/idesh',
+    // A box of cuts beside a phone: the iPhone launcher's render too.
+    icon: '<img src="/brand/idesh-tile.webp" alt="" width="92" height="92">',
+  },
+];
+
+/** The supplier's own side of the second app — on the launcher only for the few who are one. */
+const SUPPLIER_APP = {
+  id: 'supplier',
+  name: 'Нийлүүлэгч',
+  tag: 'миний зар',
+  href: '/supplier',
+  // A ger with a sheep by its door: where the meat comes from.
+  icon: '<img src="/brand/supplier-tile.svg" alt="" width="92" height="92">',
+};
+
+function tileOf(app) {
+  return el(`
+    <li>
+      <a class="app" href="${app.href}" data-app="${app.id}">
+        <span class="tile">${app.icon}</span>
+        <span class="name">${app.name}</span>
+        <span class="tag mono">${app.tag}</span>
+      </a>
+    </li>`);
+}
+for (const app of APPS) $('apps').append(tileOf(app));
+
+/** Draw the supplier's tile when this guest is one; take it away when they are not. */
+async function loadSupplierTile() {
+  const token = store.guestToken;
+  const shown = $('apps').querySelector('[data-app="supplier"]');
+  if (!token) {
+    shown?.closest('li').remove();
+    return;
+  }
+  let mine = null;
+  try {
+    ({ supplier: mine } = await api('/v1/supplier/me', { token }));
+  } catch {
+    return;
+  }
+  // Asked again after the wait: two refreshes in flight at once must not
+  // both find the tile missing and both draw it.
+  const drawn = $('apps').querySelector('[data-app="supplier"]');
+  const isOne = mine?.state === 'contracted';
+  if (isOne && !drawn) $('apps').append(tileOf(SUPPLIER_APP));
+  if (!isOne && drawn) drawn.closest('li').remove();
+}
+
+/* ── what is already running ──────────────────────────────────────── */
+
+/**
+ * The states that carry a time worth putting in the corner of the card, and
+ * what that time is called. Anything else gets the slot it was booked for.
+ */
+function moment(order) {
+  if (['FIRED', 'COOKING'].includes(order.state) && order.ready_at) {
+    return [hhmm(order.ready_at), 'бэлэн'];
+  }
+  if (order.fire_at && !['READY', 'SERVED'].includes(order.state)) {
+    return [hhmm(order.fire_at), 'гал'];
+  }
+  return [hhmm(order.slot_starts_at), 'суух'];
+}
+
+const SUB = {
+  SCHEDULED: 'Энэ цагт гал дээр гарна',
+  ARMED: 'Та замд гарсан уу?',
+  COOKING: 'Хоол хийгдэж байна',
+};
+
+/**
+ * The colour of the dot at the head of a row: what the order is waiting on.
+ * route — the system or the other side; hold — the guest; accent — on the
+ * fire; ready — done; stop — needs a person now. A finished negative
+ * outcome (cancelled, refunded) is neutral, not an alarm.
+ */
+const TONE = {
+  PLACED: 'route', ACCEPTED: 'route', SCHEDULED: 'route', PAID: 'route', DISPATCHED: 'route',
+  ARMED: 'hold', DRAFT: 'hold',
+  FIRED: 'accent', COOKING: 'accent', PREPARING: 'accent',
+  READY: 'ready', SERVED: 'ready', CLOSED: 'ready', HANDED: 'ready',
+  HELD: 'stop',
+};
+
+/**
+ * One row of ИДЭВХТЭЙ, whichever app it came from.
+ *
+ * The section is deliberately not "your lunches": rows are ordered by the
+ * moment that matters, so a sheep arriving Tuesday sits under today's lunch
+ * and above nothing else. Each vertical maps into this shape and the section
+ * does not know the difference.
+ */
+function dineRow(order) {
+  const [word, cap] = HEADLINE[order.state] ?? [order.state, ''];
+  const [time, label] = moment(order);
+  return {
+    at: new Date(order.ready_at ?? order.fire_at ?? order.slot_starts_at),
+    href: `/dine?order=${order.id}`,
+    source: 'Хоол',
+    title: order.restaurant.name,
+    what: SUB[order.state] ?? cap ?? '',
+    code: order.code,
+    state: order.state,
+    word,
+    time,
+    label,
+  };
+}
+
+function ideshRow(order) {
+  const [word, cap] = IDESH_HEADLINE[order.state] ?? [order.state, ''];
+  return {
+    // Noon on the day, in the restaurant's zone: a day, not an instant.
+    at: new Date(`${order.receive_on}T12:00:00+08:00`),
+    href: `/idesh?order=${order.id}`,
+    source: 'Идэш',
+    title: order.supplier.name,
+    what: `${esc(order.title)} ×${order.qty} · ${cap}`,
+    code: order.code,
+    state: order.state,
+    word,
+    // A cancelled order is still here for its refund, not for a day.
+    time: order.state === 'CANCELLED' ? '—' : dayShort(order.receive_on),
+    label: order.state === 'CANCELLED' ? 'буцаалт' : order.receive === 'delivery' ? 'ирэх' : 'авах',
+  };
+}
+
+/**
+ * The guest's live orders, if there is a guest.
+ *
+ * No session is created here: signing in is the dine-in app's business, and a
+ * launcher that quietly makes an account for anyone who opens it would be
+ * lying about what a visit costs. No token simply means nothing to show.
+ *
+ * Two calls, one per vertical, merged here: the launcher is the one place
+ * that knows there are two, and each app's list stays its own.
+ */
+async function loadLive() {
+  const token = store.guestToken;
+  if (!token) return paint([]);
+  const ask = (path, key) =>
+    api(path, { token }).then(
+      (body) => body[key],
+      (error) => {
+        // A token from a reseeded database is dead, not a reason to shout at
+        // somebody who has only just opened the app.
+        if (error.status === 401) store.guestToken = null;
+        return [];
+      },
+    );
+  const [lunches, provisions] = await Promise.all([
+    ask('/v1/orders', 'orders'),
+    ask('/v1/idesh', 'orders'),
+    loadSupplierTile(),
+  ]);
+  const rows = [...lunches.map(dineRow), ...provisions.map(ideshRow)];
+  rows.sort((a, b) => a.at - b.at);
+  paint(rows);
+}
+
+function paint(rows) {
+  const list = $('live-list');
+  // The section label is the list's own first row: it survives every repaint,
+  // and the skeleton under it does not.
+  const label = list.querySelector('.section-label');
+  list.replaceChildren(...(label ? [label] : []));
+  list.removeAttribute('aria-busy');
+  delete $('live').dataset.loading;
+  if (!rows.length) {
+    $('live').removeAttribute('data-any');
+    return;
+  }
+  $('live').dataset.any = String(rows.length);
+
+  for (const row of rows) {
+    const card = el(`
+      <a class="card row" href="${row.href}" data-source="${row.source}" data-chev>
+        <span class="lead"><span class="dot" data-tone="${TONE[row.state] ?? 'neutral'}"></span></span>
+        <span class="who main">
+          <span class="venue title">${esc(row.title)}</span>
+          <span class="what sub">${row.what}</span>
+          <span class="code meta">${row.source} · №${row.code}<span class="chip" data-s="${row.state}" data-inline>${row.word}</span></span>
+        </span>
+        <span class="end"><span class="when val" data-size="lg">${row.time}<small>${row.label}</small></span></span>
+      </a>`);
+    list.append(card);
+  }
+}
+
+/* ── boot ─────────────────────────────────────────────────────────── */
+
+// A guest with a token has rows on the way: show the skeleton, not a jump.
+if (store.guestToken) $('live').dataset.loading = '';
+mountClock(() => void loadLive());
+void loadLive();
+
+/**
+ * The kitchen accepts and fires without anybody touching this page, so the
+ * strip has to keep asking. It stops when the page is hidden and when it goes
+ * away — a launcher left open in a background tab should cost nothing.
+ */
+const poll = setInterval(() => {
+  if (!document.hidden) void loadLive();
+}, 4000);
+addEventListener('pagehide', () => clearInterval(poll));
+</script>
+</body>
+</html>

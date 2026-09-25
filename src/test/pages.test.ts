@@ -536,22 +536,23 @@ describe('the Basu home screen', () => {
     // Nobody signed in: a launcher opened by a stranger shows the apps and
     // nothing of anybody's.
     storage.removeItem('basu.guest');
-    const home = await openPage('index.html');
+    const home = await openPage('app.html');
     await until(home, 'the app grid', (d) => d.querySelectorAll('.app').length > 0);
 
     const dine = home.window.document.querySelector('.app[data-app="dine"]') as HTMLAnchorElement;
     expect(dine.getAttribute('href')).toBe('/dine');
     expect(dine.textContent).toContain('Хоол');
-    // Every tile draws its own glyph; a launcher waiting on the network to
-    // show its icons is a launcher that looks broken on a slow morning.
-    expect(dine.querySelector('.tile svg')).toBeTruthy();
+    // Every tile is the app's own art — the same renders the iPhone
+    // launcher shows, served from here and sized in the markup so the grid
+    // never jumps while they load.
+    expect(dine.querySelector('.tile img')?.getAttribute('src')).toBe('/brand/food-tile.webp');
     expect(home.window.document.querySelectorAll('.card')).toHaveLength(0);
 
     // The second app: one entry in the list, and nothing else moved.
     const idesh = home.window.document.querySelector('.app[data-app="idesh"]') as HTMLAnchorElement;
     expect(idesh.getAttribute('href')).toBe('/idesh');
     expect(idesh.textContent).toContain('Идэш');
-    expect(idesh.querySelector('.tile svg')).toBeTruthy();
+    expect(idesh.querySelector('.tile img')?.getAttribute('src')).toBe('/brand/idesh-tile.webp');
     expect(home.window.document.querySelectorAll('.app')).toHaveLength(2);
   });
 
@@ -562,7 +563,7 @@ describe('the Basu home screen', () => {
     // Its own slot: three orders fill one, and the other tests have theirs.
     await orderFromMap(guest, pairedVenue, 'Хуушуур', '13:00');
 
-    const home = await openPage('index.html');
+    const home = await openPage('app.html');
     await until(home, 'the order on the home screen', (d) => d.querySelectorAll('.card').length > 0);
 
     const card = home.window.document.querySelector('.card') as HTMLAnchorElement;
@@ -803,7 +804,7 @@ describe('өвлийн идэш', () => {
     expect(dom.window.document.querySelector('#screen-sub')?.textContent).toContain(title);
 
     // …and it sits on the home screen beside whatever lunch there is.
-    const home = await openPage('index.html');
+    const home = await openPage('app.html');
     await until(home, 'the order on the home screen', (d) =>
       d.querySelectorAll('.card[data-source="Идэш"]').length > 0,
     );

@@ -66,7 +66,7 @@ describe('a server with no demo in it', () => {
   it('serves every page, and none of the shortcuts past the door', async () => {
     const real = await buildServer(ctx, { dev: false });
     try {
-      for (const url of ['/', '/idesh', '/dine', '/supplier', '/dashboard', '/kds', '/privacy', '/terms', '/api.js', '/app.css']) {
+      for (const url of ['/', '/app', '/idesh', '/dine', '/supplier', '/dashboard', '/kds', '/privacy', '/terms', '/api.js', '/app.css']) {
         const res = await real.inject({ method: 'GET', url });
         expect(res.statusCode, url).toBe(200);
       }
