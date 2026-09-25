@@ -73,8 +73,8 @@ describe('signing up', () => {
   it('will not attach a password to an account that exists without one', async () => {
     // An account made some other way — the desk, an older sign-in — has no
     // password. Knowing its number must not be enough to take it.
-    const { guestForPhone } = await import('./auth.js');
-    await guestForPhone('+97688010001');
+    const { startSession } = await import('./auth.js');
+    await startSession(ctx, '+97688010001');
     await expect(registerGuest(ctx, { phone: '+97688010001', password: 'булаах гэсэн' })).rejects.toMatchObject({
       code: 'PHONE_TAKEN',
     });

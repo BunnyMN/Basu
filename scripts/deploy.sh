@@ -21,12 +21,6 @@ PORT=3210
 KEEP_BACKUPS=10
 PG=/usr/lib/postgresql/16/bin
 PROD_DB=basu_prod
-# The first admin's way onto a fresh desk: the sha256 of a one-time invite
-# code (thirty digits, so this hash in a public repo cannot be walked back to
-# it). The code itself went to the owner privately. Used only while the
-# production database has no active admin; after that it is inert.
-BOOTSTRAP_INVITE_SHA256=7ef25995cf1e6e64cbb5891e8fe0df3189032019d51719affd0a8d3430bafdf7
-
 # Keys for the server's .env that live as repository secrets on GitHub, so
 # nobody has to log in to the server to turn on Google or email: the deploy
 # job sends them on stdin, one KEY=value a line. Read once, here, before
@@ -161,16 +155,6 @@ ls -1t /root/basu-predeploy-*.sql.gz | tail -n +$((KEEP_BACKUPS + 1)) | xargs -r
 
 echo "→ migrate"
 sudo -u "$RUN_AS" node --env-file=.env dist/db/migrate.js
-
-if sudo -u "$RUN_AS" grep -q '^BASU_MODE=production$' .env; then
-  # A desk with no admin can be entered only with the bootstrap invite; one
-  # with an admin ignores it. Re-running this is harmless either way.
-  sudo -u "$RUN_AS" "$PG/psql" "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -c "
-    INSERT INTO ops.invite (code_hash, role, created_by, expires_at)
-    SELECT '$BOOTSTRAP_INVITE_SHA256', 'admin', 'deploy:first-admin', now() + interval '72 hours'
-     WHERE NOT EXISTS (SELECT 1 FROM ops.member WHERE role = 'admin' AND active)
-    ON CONFLICT (code_hash) DO NOTHING"
-fi
 
 echo "→ restart"
 pin_mode

@@ -14,10 +14,7 @@ import {
   sendOtp,
   registerGuest,
   signInWithPassword,
-  claimAccount,
-  phoneE164,
 } from '../platform/identity/index.js';
-import { linkByInvite, releaseInvite, takeInvite, upsertMember } from '../ops/index.js';
 import { receiptsFor, wireConfigFromEnv } from '../platform/ledger/index.js';
 import {
   createPairingCode,
@@ -272,48 +269,6 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
           token: session.token,
           guest_id: session.guestId,
           expires_at: session.expiresAt.toISOString(),
-        });
-      } catch (error) {
-        return sendError(reply, error);
-      }
-    },
-  );
-
-  /**
-   * Redeem an invite: the way onto the desk, and the way an account that
-   * exists without a password gets its first one. The invite is taken first
-   * and handed back if the account step fails, so a mistyped password does
-   * not burn somebody's only code.
-   */
-  app.post<{ Body: { code?: string; phone?: string; password?: string; name?: string; device?: string } }>(
-    '/v1/auth/claim',
-    { config: { rateLimit: rate.verify } },
-    async (request, reply) => {
-      const { code, phone, password, name, device } = request.body ?? {};
-      if (!code || !phone || !password) {
-        return badRequest(reply, 'Код, утас, нууц үгээ оруулна уу.', 'code, phone and password are required');
-      }
-      const number = phoneE164(phone);
-      try {
-        const invite = await takeInvite(code, number, ctx.clock.now());
-        let session;
-        try {
-          session = await claimAccount(ctx, { phone: number, password, name: name ?? invite.name, device: device ?? null });
-        } catch (error) {
-          await releaseInvite(invite.id);
-          throw error;
-        }
-        if (invite.role) {
-          await upsertMember({ phone: number, name: name?.trim() || invite.name || number, role: invite.role });
-          // The invite is the proof: this account, and no other that merely
-          // typed the number, sits as that member.
-          await linkByInvite({ guestId: session.guestId, phone: number });
-        }
-        return reply.status(201).send({
-          token: session.token,
-          guest_id: session.guestId,
-          expires_at: session.expiresAt.toISOString(),
-          role: invite.role,
         });
       } catch (error) {
         return sendError(reply, error);

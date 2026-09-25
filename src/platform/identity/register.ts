@@ -82,8 +82,8 @@ export async function registerGuest(
     // Registering proves nothing about who holds the phone, so it must never
     // attach a password to an account that already exists — that would let
     // anybody who knows a number walk into its wallet, its orders, or the
-    // supplier it owns. An old account gets its first password through a
-    // session it already holds, or an invite from the desk.
+    // business it belongs to. An old account gets its first password through
+    // a session it already holds, or a code to the address on it.
     if (rows[0]) return true;
     const made = await client.query<{ id: string }>(
       `INSERT INTO identity.guest (phone_e164, name, password_hash, password_set_at)
@@ -98,41 +98,6 @@ export async function registerGuest(
   });
   if (taken) throw new AuthError('PHONE_TAKEN', 'that number already has an account');
 
-  return startSession(ctx, phone, input.device ?? null);
-}
-
-/**
- * An account for a person someone has vouched for — an invite from the desk.
- *
- * This is the one path allowed to give a password to an account that already
- * exists without one, because the caller has already proven who the person
- * is by other means. An account that already has a password is never
- * overwritten: the person must type it, which is them proving it is theirs.
- */
-export async function claimAccount(
-  ctx: Ctx,
-  input: { phone: string; password: string; name?: string | null; device?: string | null },
-): Promise<GuestSession> {
-  const phone = requirePhone(input.phone);
-  checkPassword(input.password);
-  const name = input.name?.trim() || null;
-  const { rows } = await getPool().query<Row>(
-    'SELECT id, password_hash, failed_sign_ins, locked_until, closed_at FROM identity.guest WHERE phone_e164 = $1',
-    [phone],
-  );
-  const existing = rows[0];
-  if (existing?.password_hash) {
-    if (!(await verifyPassword(input.password, existing.password_hash))) {
-      throw new AuthError('BAD_CREDENTIALS', 'this number already has a password, and that is not it');
-    }
-  } else if (existing) {
-    await getPool().query(
-      `UPDATE identity.guest SET password_hash = $2, password_set_at = $3, name = COALESCE(name, $4) WHERE id = $1`,
-      [existing.id, await hashPassword(input.password), ctx.clock.now(), name],
-    );
-  } else {
-    return registerGuest(ctx, { ...input, phone });
-  }
   return startSession(ctx, phone, input.device ?? null);
 }
 

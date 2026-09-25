@@ -1376,17 +1376,15 @@ describe('who sees what', () => {
 
   it('keeps the desk’s own pages to the roles that hold them', async () => {
     const desk = await deskToken();
-    const invited = (await (await fetch(`${base}/v1/ops/members`, {
+    // A seat is asked for by the person and given, with a role, by an admin.
+    const finance = await account('+97688030031', 'Санхүү');
+    const asked = (await (await fetch(`${base}/v1/ops/requests`, {
       method: 'POST',
-      headers: as(desk),
-      body: JSON.stringify({ phone: '+97688030031', name: 'Санхүү', role: 'finance' }),
-    })).json()) as { invite_code: string };
-    const claimed = (await (await fetch(`${base}/v1/auth/claim`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ code: invited.invite_code, phone: '+97688030031', password: GUEST_PASSWORD, name: 'Санхүү' }),
-    })).json()) as { token: string };
-    storage.setItem('basu.ops', claimed.token);
+      headers: as(finance),
+      body: JSON.stringify({ name: 'Санхүү', role: 'finance' }),
+    })).json()) as { id: string };
+    await fetch(`${base}/v1/ops/requests/${asked.id}/approve`, { method: 'POST', headers: as(desk), body: JSON.stringify({ role: 'finance' }) });
+    storage.setItem('basu.ops', finance);
     storage.removeItem('basu.dash.ws');
     storage.removeItem('basu.ops.tab');
     const dash = await openPage('ops.html');

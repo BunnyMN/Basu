@@ -16,7 +16,6 @@ export {
   sendOtp,
   startSession,
   startSessionFor,
-  guestForPhone,
   emailAddress,
   requestEmailCode,
   sendEmailCode,
@@ -56,7 +55,6 @@ export { MIN_PASSWORD, PasswordError, checkPassword, hashPassword, verifyPasswor
 export {
   registerGuest,
   signInWithPassword,
-  claimAccount,
   changePassword,
   confirmPassword,
   hasPassword,

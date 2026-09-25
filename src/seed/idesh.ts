@@ -131,8 +131,11 @@ export async function seedIdesh(
   const codes: Array<{ name: string; code: string }> = [];
 
   for (const s of SUPPLIERS) {
+    // Every owner is somebody with an account, as on the real server.
+    const { guestId: ownerId } = await startSession(ctx, s.phone, 'Демо');
     const id = await registerSupplier(
       {
+        ownerId,
         name: s.name,
         phone: s.phone,
         merchantTin: s.tin,

@@ -6,11 +6,11 @@ import { DESK_ROLES, type DeskRole } from '../platform/access/index.js';
  *
  * A member is a name and a role, named by a phone number, an email address,
  * or both. What makes a session ops is that its account is linked to an
- * active member — and an account is linked only by proof: the invite the
- * admin handed that person, a phone number an SMS code reached, or an
- * address Google, Apple or a code in the inbox vouched for. Knowing the
- * number an admin typed is not enough; with passwords, anybody can type
- * anybody's.
+ * active member — and an account is linked only by proof: an admin saying
+ * yes to the seat that account asked for, a phone number an SMS code
+ * reached, or an address Google, Apple or a code in the inbox vouched for.
+ * Knowing the number an admin typed is not enough; with passwords, anybody
+ * can type anybody's.
  *
  * One person may come in through a few accounts — the number they signed up
  * with, the Google account they use at work — and each is the same seat.
@@ -103,22 +103,6 @@ export async function linkByProof(
   return memberForAccount(input.guestId, db);
 }
 
-/**
- * The account that just redeemed an invite for this number sits as the
- * member named by it. The invite is the proof: the admin handed it to one
- * person.
- */
-export async function linkByInvite(input: { guestId: string; phone: string }, db: Db = getPool()): Promise<Member | null> {
-  const { rows } = await db.query<{ id: string }>('SELECT id FROM ops.member WHERE phone = $1', [input.phone]);
-  if (!rows[0]) return null;
-  await db.query(
-    `INSERT INTO ops.member_account (guest_id, member_id, how) VALUES ($1, $2, 'invite')
-     ON CONFLICT (guest_id) DO UPDATE SET member_id = EXCLUDED.member_id, how = 'invite', linked_at = now()`,
-    [input.guestId, rows[0].id],
-  );
-  return memberForAccount(input.guestId, db);
-}
-
 const PHONE = /^\+976\d{8}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -171,6 +155,39 @@ export async function upsertMember(
 export async function setMemberActive(id: string, active: boolean, db: Db = getPool()): Promise<void> {
   const { rowCount } = await db.query('UPDATE ops.member SET active = $2, updated_at = now() WHERE id = $1', [id, active]);
   if (!rowCount) throw new Error('no such member');
+}
+
+export class MemberError extends Error {
+  constructor(readonly code: 'NOT_FOUND' | 'LAST_ADMIN', message: string) {
+    super(message);
+    this.name = 'MemberError';
+  }
+}
+
+/**
+ * Another role for a member already at the desk. The desk always keeps one
+ * active admin: without one, nobody could say yes to the next seat.
+ */
+export async function setMemberRole(id: string, role: Role): Promise<Member> {
+  if (!ROLES.includes(role)) throw new Error(`no such role: ${role}`);
+  await tx(async (client) => {
+    const { rows } = await client.query<{ role: Role; active: boolean }>(
+      'SELECT role, active FROM ops.member WHERE id = $1 FOR UPDATE',
+      [id],
+    );
+    const current = rows[0];
+    if (!current) throw new MemberError('NOT_FOUND', 'no such member');
+    if (current.role === 'admin' && current.active && role !== 'admin') {
+      const { rows: admins } = await client.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM ops.member WHERE role = 'admin' AND active AND id <> $1`,
+        [id],
+      );
+      if (!admins[0]?.n) throw new MemberError('LAST_ADMIN', 'the desk keeps one active admin');
+    }
+    await client.query('UPDATE ops.member SET role = $2, updated_at = now() WHERE id = $1', [id, role]);
+  });
+  const { rows } = await getPool().query<Row>(`SELECT ${COLUMNS} FROM ops.member m WHERE m.id = $1`, [id]);
+  return shape(rows[0]!);
 }
 
 /**

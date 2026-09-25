@@ -46,8 +46,8 @@ import { badRequest, sendError, unauthorized } from './errors.js';
 import {
   ROLES,
   RequestError,
+  MemberError,
   approveRequest,
-  createInvite,
   declineRequest,
   linkByProof,
   listMembers,
@@ -56,12 +56,13 @@ import {
   requestAccess,
   requestOf,
   setMemberActive,
+  setMemberRole,
   upsertMember,
   type AccessRequest,
   type Member,
   type Role,
 } from '../ops/index.js';
-import { contactsFor, phoneE164, profileOf, resolveGuest } from '../platform/identity/index.js';
+import { accountByContact, contactsFor, profileOf, resolveGuest } from '../platform/identity/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import { approveOrg, declineOrg, listOrgs, membersOf, orgById } from '../platform/org/index.js';
 import { orgRefusal, shapeOrg } from './orgs.js';
@@ -70,9 +71,11 @@ import type { Ctx } from '../ports.js';
 /**
  * Ops: the few people at Basu who sign contracts and move money.
  *
- * They sign in like anybody — phone and a one-time code — and what makes
- * the session ops is that the phone is a member's, on the desk's own list,
- * with a role. Every action is recorded under that member. The shared
+ * They sign in like anybody — Google, a code by email, a password — and
+ * what makes the session ops is that the account holds a seat on the desk's
+ * own list, with a role: asked for by the person and granted by an admin, or
+ * named by an address the account proved. Every action is recorded under
+ * that member. The shared
  * `OPS_TOKEN` of the first weeks is kept only for the demo, where a
  * walkthrough needs a desk without a phone; in production it opens nothing.
  */
@@ -394,58 +397,51 @@ export async function registerOpsRoutes(
     name: m.name,
     role: m.role,
     active: m.active,
-    // Nobody has come in as this member yet: the invite is unused, or the
-    // address has not signed in.
+    // Nobody has come in as this member yet: the address has not signed in.
     joined: m.accounts > 0,
     created_at: m.createdAt.toISOString(),
   });
 
   app.get('/v1/ops/members', desk('desk.members.manage'), async () => ({ members: (await listMembers()).map(shapeMember) }));
 
-  app.post<{ Body: { phone?: string; email?: string; name?: string; role?: string } }>('/v1/ops/members', desk('desk.members.manage'), async (request, reply) => {
+  /**
+   * A seat for an email address, before its person has asked: the address
+   * proves itself — Google, Apple or a code to that inbox — and the account
+   * that proves it sits down. A phone number proves nothing when anybody can
+   * type it, so a person who signs in by phone asks for their seat instead.
+   */
+  app.post<{ Body: { email?: string; name?: string; role?: string } }>('/v1/ops/members', desk('desk.members.manage'), async (request, reply) => {
     const body = request.body ?? {};
+    if (!body.email?.trim()) return badRequest(reply, 'Имэйл хаягаа оруулна уу.', 'email is required');
     try {
-      const member = await upsertMember({
-        phone: body.phone?.trim() ? phoneE164(body.phone) : null,
-        email: body.email ?? null,
-        name: body.name ?? '',
-        role: (body.role ?? 'ops') as Role,
-      });
+      const member = await upsertMember({ email: body.email, name: body.name ?? '', role: (body.role ?? 'ops') as Role });
       await recordAudit({
         who: who(request),
         action: 'member.upsert',
         targetKind: 'member',
         targetId: member.id,
-        note: `${member.name} · ${member.role} · ${[member.email, member.phone].filter(Boolean).join(' · ')}`,
+        note: `${member.name} · ${member.role} · ${member.email ?? ''}`,
       });
-      // An address proves itself: the person signs in with Google, Apple or a
-      // code to that inbox, and is at the desk. A phone number proves nothing
-      // when anybody can type it, so a member named by phone also gets a
-      // one-time code this admin hands to that one person.
-      if (!member.phone || !body.phone?.trim()) return reply.status(201).send(shapeMember(member));
-      const { code, invite } = await createInvite({ phone: member.phone, role: member.role, name: member.name, by: who(request), now: ctx.clock.now() });
-      return reply.status(201).send({ ...shapeMember(member), invite_code: code, invite_expires_at: invite.expiresAt.toISOString() });
+      return reply.status(201).send(shapeMember(member));
     } catch (error) {
-      return badRequest(reply, 'Утас (+976XXXXXXXX) эсвэл имэйл, нэр, эрхээ шалгана уу.', (error as Error).message);
+      return badRequest(reply, 'Имэйл, нэр, эрхээ шалгана уу.', (error as Error).message);
     }
   });
 
-  app.post<{ Body: { phone?: string; role?: string; name?: string } }>('/v1/ops/invites', desk('desk.members.manage'), async (request, reply) => {
-    const body = request.body ?? {};
-    const role = body.role ? (body.role as Role) : null;
-    if (role && !ROLES.includes(role)) return badRequest(reply, 'Эрх буруу байна.', `no such role: ${body.role}`);
+  /** Another role for somebody already at the desk — never your own, and never the last admin's. */
+  app.post<{ Params: { id: string }; Body: { role?: string } }>('/v1/ops/members/:id/role', desk('desk.members.manage'), async (request, reply) => {
+    const role = request.body?.role as Role | undefined;
+    if (!role || !ROLES.includes(role)) return badRequest(reply, 'Эрх буруу байна.', `no such role: ${request.body?.role}`);
+    if (request.params.id === request.ops!.id) return badRequest(reply, 'Өөрийн эрхийг өөрчлөх боломжгүй.', 'cannot change your own role');
     try {
-      const { code, invite } = await createInvite({ phone: body.phone ?? null, role, name: body.name ?? null, by: who(request), now: ctx.clock.now() });
-      await recordAudit({
-        who: who(request),
-        action: 'member.invite',
-        targetKind: 'member',
-        targetId: '00000000-0000-0000-0000-000000000000',
-        note: `${invite.phone ?? 'дугааргүй'} · ${invite.role ?? 'эрхгүй'}`,
-      });
-      return reply.status(201).send({ code, phone: invite.phone, role: invite.role, expires_at: invite.expiresAt.toISOString() });
+      const member = await setMemberRole(request.params.id, role);
+      await recordAudit({ who: who(request), action: 'member.role', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
+      return reply.send(shapeMember(member));
     } catch (error) {
-      return badRequest(reply, 'Утас (+976XXXXXXXX) эсвэл эрхээ шалгана уу.', (error as Error).message);
+      if (error instanceof MemberError && error.code === 'LAST_ADMIN') {
+        return reply.status(409).send({ error: { code: 'LAST_ADMIN', message_mn: 'Ядаж нэг идэвхтэй админ үлдэх ёстой.', message_en: error.message } });
+      }
+      return sendError(reply, new IdeshError('NOT_FOUND', (error as Error).message));
     }
   });
 
@@ -466,11 +462,18 @@ export async function registerOpsRoutes(
     suppliers: (await listSuppliers()).map(shape),
   }));
 
-  /** Ops writes a contracted supplier straight in, as the script does. */
+  /**
+   * Ops writes a contracted supplier straight in, as the script does. Its
+   * owner is a Basu account that already exists — named by its phone or
+   * email, the supplier's phone when not given — and holds the business's
+   * owner role from the start; the people who work there come in by that
+   * role, as in any business.
+   */
   app.post<{
     Body: {
       name?: string;
       phone?: string;
+      owner?: string;
       tin?: string;
       address?: string;
       lat?: number;
@@ -487,8 +490,19 @@ export async function registerOpsRoutes(
     if (!/^\+976\d{8}$/.test(body.phone)) {
       return badRequest(reply, 'Утас +976XXXXXXXX хэлбэртэй байх ёстой.', 'phone must be +976XXXXXXXX');
     }
+    const owner = await accountByContact(body.owner?.trim() || body.phone);
+    if (!owner) {
+      return reply.status(400).send({
+        error: {
+          code: 'NO_ACCOUNT',
+          message_mn: 'Эзэмшигч Basu-д бүртгэлгүй байна. Тэр хүн эхлээд Basu-д нэвтэрч бүртгүүлнэ, дараа нь түүний утас эсвэл имэйлээр энд бүртгэнэ.',
+          message_en: 'the owner has no Basu account',
+        },
+      });
+    }
     try {
       const id = await registerSupplier({
+        ownerId: owner.guestId,
         name: body.name,
         phone: body.phone,
         merchantTin: body.tin?.trim() || null,

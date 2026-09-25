@@ -8,6 +8,7 @@ import { opsToken } from './ops.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { failReceipt, truncateAll } from '../test/seed.js';
 import { createListing, registerSupplier } from '../idesh/index.js';
+import { startSession } from '../platform/identity/index.js';
 
 /** The books over HTTP: the checks, the accounts, every movement, and the two exports. */
 
@@ -37,7 +38,8 @@ async function topUp(token: string, amountMnt: number): Promise<string> {
 
 /** A guest with 500 000₮ who bought a 460 000₮ sheep. */
 async function aSale(): Promise<{ guest: string; orderId: string }> {
-  const supplierId = await registerSupplier({ name: 'Архангай · Дорж', phone: '+97688010001', merchantTin: '6501234567', pickupAddress: 'Нарантуул' });
+  const { guestId: ownerId } = await startSession(ctx, '+97688010001');
+  const supplierId = await registerSupplier({ ownerId, name: 'Архангай · Дорж', phone: '+97688010001', merchantTin: '6501234567', pickupAddress: 'Нарантуул' });
   const sheep = await createListing(
     supplierId,
     { kind: 'sheep', unit: 'whole', title: 'Хонь', priceMnt: 460_000, approxKg: 38, quantity: 3, origin: 'Архангай', readyFrom: '2026-09-10' },

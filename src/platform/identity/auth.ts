@@ -113,25 +113,6 @@ export async function requestOtp(ctx: Ctx, phone: string): Promise<OtpIssued> {
   return { challengeId: inserted.rows[0]!.id, code };
 }
 
-/**
- * The account behind a phone number, made if there is none. What a supplier
- * written in from a contract needs so that messages can reach them — no
- * session, no code, just the row a sign-in would have made.
- */
-export async function guestForPhone(phone: string): Promise<string> {
-  return tx(async (client) => {
-    const guest = await client.query<{ id: string }>(
-      `INSERT INTO identity.guest (phone_e164) VALUES ($1)
-       ON CONFLICT (phone_e164) DO UPDATE SET phone_e164 = EXCLUDED.phone_e164
-       RETURNING id`,
-      [phone],
-    );
-    const guestId = guest.rows[0]!.id;
-    await client.query(`INSERT INTO identity.profile (guest_id) VALUES ($1) ON CONFLICT DO NOTHING`, [guestId]);
-    return guestId;
-  });
-}
-
 /* ── email ─────────────────────────────────────────────────────────── */
 
 /** An address, as a person types it, into the one spelling we store. */

@@ -4,7 +4,6 @@ import { closePool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
-import { createInvite } from '../ops/index.js';
 import { createListing, createSupplierCode, registerSupplier, type Listing } from '../idesh/index.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
@@ -35,14 +34,15 @@ async function signIn(phone = '+97699001122'): Promise<string> {
   const made = await app.inject({ method: 'POST', url: '/v1/auth/register', payload: { phone, password: PASSWORD } });
   if (made.statusCode === 201) return made.json().token as string;
   const back = await app.inject({ method: 'POST', url: '/v1/auth/login', payload: { phone, password: PASSWORD } });
-  if (back.statusCode === 200) return back.json().token as string;
-  // A supplier's owner is made by the desk from a phone number and has no
-  // password; registering on that number is refused. The way in is the one a
-  // real owner takes: an invite from the desk, bound to their number.
-  const { code } = await createInvite({ phone, by: 'ops:test', now: clock.now() });
-  const claimed = await app.inject({ method: 'POST', url: '/v1/auth/claim', payload: { code, phone, password: PASSWORD } });
-  expect(claimed.statusCode, claimed.body).toBe(201);
-  return claimed.json().token as string;
+  expect(back.statusCode, back.body).toBe(200);
+  return back.json().token as string;
+}
+
+/** A supplier's owner: a person who signed up first, as every owner is. */
+async function ownerAccount(phone: string): Promise<string> {
+  const made = await app.inject({ method: 'POST', url: '/v1/auth/register', payload: { phone, password: PASSWORD } });
+  expect(made.statusCode, made.body).toBe(201);
+  return made.json().guest_id as string;
 }
 
 async function topUp(token: string, amountMnt: number): Promise<void> {
@@ -94,12 +94,14 @@ beforeEach(async () => {
   app = await buildServer(ctx, { dev: true });
 
   supplierId = await registerSupplier({
+    ownerId: await ownerAccount('+97688010001'),
     name: 'Архангай · Дорж',
     phone: '+97688010001',
     merchantTin: '6501234567',
     pickupAddress: 'Нарантуул, хойд хаалга',
   });
   rivalId = await registerSupplier({
+    ownerId: await ownerAccount('+97688010002'),
     name: 'Хэнтий · Хэрлэн',
     phone: '+97688010002',
     pickupAddress: 'Эмээлт',

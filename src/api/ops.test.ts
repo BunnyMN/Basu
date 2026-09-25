@@ -9,6 +9,7 @@ import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '..
 import { storedBankOf, truncateAll } from '../test/seed.js';
 import { createListing, housekeeping, markHanded, markReady, registerSupplier, startPreparing } from '../idesh/index.js';
 import { listMembers, syncMembersFromEnv, upsertMember } from '../ops/index.js';
+import { startSession } from '../platform/identity/index.js';
 
 /**
  * Becoming a supplier, over HTTP: the guest's side, the ops desk, and the
@@ -148,6 +149,16 @@ describe('the ops desk', () => {
   });
 
   it('lets ops register a contracted supplier straight in, and mint a fresh code later', async () => {
+    // The owner is somebody who has signed in to Basu; nobody else can hold the business.
+    const nobody = await app.inject({
+      method: 'POST',
+      url: '/v1/ops/suppliers',
+      headers: auth(opsToken()!),
+      payload: { name: 'Хэнтий · Хэрлэн', phone: '+97688010002', tin: '6502345678', address: 'Эмээлт' },
+    });
+    expect(nobody.statusCode).toBe(400);
+    expect(nobody.json().error.code).toBe('NO_ACCOUNT');
+    await signIn('+97688010002');
     const made = await app.inject({
       method: 'POST',
       url: '/v1/ops/suppliers',
@@ -200,6 +211,7 @@ describe('the ops desk', () => {
 
 describe('the contract’s terms and the list to pay', () => {
   it('lets ops write the rate and the account in, and shows them on the row', async () => {
+    await signIn('+97688010004');
     const made = await app.inject({
       method: 'POST',
       url: '/v1/ops/suppliers',
@@ -279,7 +291,8 @@ async function topUp(token: string, amountMnt: number): Promise<void> {
 
 /** A contracted supplier with one sheep on offer, and a guest who has paid for it. */
 async function aPaidOrder() {
-  const supplierId = await registerSupplier({ name: 'Архангай · Дорж', phone: '+97688010001', merchantTin: '6501234567', pickupAddress: 'Нарантуул' });
+  const { guestId: ownerId } = await startSession(ctx, '+97688010001');
+  const supplierId = await registerSupplier({ ownerId, name: 'Архангай · Дорж', phone: '+97688010001', merchantTin: '6501234567', pickupAddress: 'Нарантуул' });
   const sheep = await createListing(
     supplierId,
     { kind: 'sheep', unit: 'whole', title: 'Хонь', priceMnt: 460_000, approxKg: 38, quantity: 3, origin: 'Архангай', readyFrom: '2026-09-10' },
@@ -371,8 +384,8 @@ describe('the desk’s window onto orders', () => {
   it('lays the whole house on one page, and says what needs somebody', async () => {
     const { id } = await aPaidOrder();
     const view = (await app.inject({ method: 'GET', url: '/v1/ops/overview', headers: desk() })).json();
-    // Two phones verified: the supplier's owner and the guest.
-    expect(view.guests).toMatchObject({ total: 2, closed: 0, joined: { season: 2 }, active: { season: 1 } });
+    // Two accounts, both signed in at some point: the supplier's owner and the guest.
+    expect(view.guests).toMatchObject({ total: 2, closed: 0, joined: { season: 2 }, active: { season: 2 } });
     expect(view.wallet).toMatchObject({
       drift: 0,
       liability_mnt: 40_000,
@@ -475,6 +488,7 @@ describe('the desk’s members', () => {
     const me = await app.inject({ method: 'GET', url: '/v1/ops/me', headers: auth(token) });
     expect(me.json().member).toMatchObject({ name: 'Баярцогт', role: 'admin', phone: '+97688102856' });
 
+    await signIn('+97688010002');
     const made = await app.inject({
       method: 'POST',
       url: '/v1/ops/suppliers',
@@ -578,6 +592,7 @@ describe('the desk’s members', () => {
 
   it('keeps a bank account out of the clear in the database, and still shows it at the desk', async () => {
     process.env['BANK_KEY'] = Buffer.alloc(32, 9).toString('base64');
+    await signIn('+97688010007');
     const made = await app.inject({
       method: 'POST',
       url: '/v1/ops/suppliers',
@@ -607,12 +622,15 @@ describe('the desk’s members', () => {
     expect((await listMembers()).map((m) => [m.name, m.role])).toEqual([['Аа', 'admin'], ['Бб', 'finance']]);
 
     const admin = await signIn('+97699000021');
-    const added = await app.inject({ method: 'POST', url: '/v1/ops/members', headers: auth(admin), payload: { phone: '+9769900 0023', name: 'Вв', role: 'viewer' } });
+    const added = await app.inject({ method: 'POST', url: '/v1/ops/members', headers: auth(admin), payload: { email: 'VV@example.mn', name: 'Вв', role: 'viewer' } });
     expect(added.statusCode, added.body).toBe(201);
-    expect(added.json()).toMatchObject({ phone: '+97699000023', role: 'viewer', active: true });
+    expect(added.json()).toMatchObject({ email: 'vv@example.mn', role: 'viewer', active: true });
     const closed = await app.inject({ method: 'POST', url: `/v1/ops/members/${added.json().id}/active`, headers: auth(admin), payload: { active: false } });
     expect(closed.json()).toEqual({ id: added.json().id, active: false });
-    const shut = await signIn('+97699000023');
+    // Switched off, the phone the environment named is off too.
+    const finance = (await listMembers()).find((m) => m.name === 'Бб')!;
+    await app.inject({ method: 'POST', url: `/v1/ops/members/${finance.id}/active`, headers: auth(admin), payload: { active: false } });
+    const shut = await signIn('+97699000022');
     expect((await app.inject({ method: 'GET', url: '/v1/ops/me', headers: auth(shut) })).statusCode).toBe(401);
     // Not yourself: the desk must keep at least the person closing doors.
     const self = (await app.inject({ method: 'GET', url: '/v1/ops/me', headers: auth(admin) })).json().member.id;

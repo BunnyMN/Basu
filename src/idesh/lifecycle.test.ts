@@ -11,7 +11,7 @@ import {
   startTopup,
   wallet,
 } from '../platform/ledger/index.js';
-import { guestForPhone } from '../platform/identity/index.js';
+import { startSession } from '../platform/identity/index.js';
 import { inbox, relay } from '../platform/notify/index.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { seedGuest, truncateAll } from '../test/seed.js';
@@ -58,6 +58,7 @@ let tax: FakeTaxProvider;
 let notifier: FakeNotifier;
 let ctx: Ctx;
 let supplierId: string;
+let ownerId: string;
 let sheep: Listing;
 let guestId: string;
 
@@ -109,7 +110,9 @@ beforeEach(async () => {
   notifier = new FakeNotifier();
   ctx = { clock, payments, tax, notifier };
 
+  ownerId = (await startSession(ctx, '+97688010001')).guestId;
   supplierId = await registerSupplier({
+    ownerId,
     name: 'Архангай · Дорж',
     phone: '+97688010001',
     merchantTin: TIN,
@@ -145,9 +148,8 @@ describe('paying for an идэш', () => {
   it('tells the supplier both ways the moment the money is down', async () => {
     const { orderId, code } = await book();
     await payIdesh(ctx, orderId);
-    // The supplier was written in by ops with a phone; that phone is who hears.
-    const owner = await guestForPhone('+97688010001');
-    const heard = (await inbox(owner)).filter((m) => m.template === 'supplier.order');
+    // The supplier's owner is who hears.
+    const heard = (await inbox(ownerId)).filter((m) => m.template === 'supplier.order');
     expect(heard.map((m) => m.channel).sort()).toEqual(['push', 'sms']);
     expect(heard[0]?.body).toContain(`№${code}`);
     expect(heard[0]?.body).toContain('өөрөө авна');

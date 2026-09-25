@@ -1,7 +1,7 @@
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { getPool, tx, type Db } from '../db/pool.js';
 import { addMinutes } from '../domain/time.js';
-import { AuthError, contactsFor, guestForPhone, requirePhone } from '../platform/identity/index.js';
+import { AuthError, contactsFor, requirePhone } from '../platform/identity/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import { orgForExisting, orgsOf, type OrgRole } from '../platform/org/index.js';
 import type { Ctx } from '../ports.js';
@@ -45,14 +45,20 @@ export interface SupplierInput extends BankDetails {
   lon?: number | null;
 }
 
-/** Ops writes a contracted supplier straight in — the script, or the ops page. */
-export async function registerSupplier(input: SupplierInput, db: Db = getPool()): Promise<string> {
+/**
+ * Ops writes a contracted supplier straight in — the script, or the ops page
+ * — for a person who already has a Basu account: `ownerId` is that account,
+ * and it owns the business from the start. An account is never made here
+ * for somebody who has not signed in; one made so would hold the business
+ * with nobody able to open it.
+ */
+export async function registerSupplier(input: SupplierInput & { ownerId: string }, db: Db = getPool()): Promise<string> {
   const id = await insertContracted(input, db);
   await giveOrganisation(id, db);
   return id;
 }
 
-async function insertContracted(input: SupplierInput, db: Db): Promise<string> {
+async function insertContracted(input: SupplierInput & { ownerId: string }, db: Db): Promise<string> {
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO idesh.supplier
        (name, phone, ebarimt_merchant_tin, pickup_address, lat, lon, state, contracted_at,
@@ -68,30 +74,19 @@ async function insertContracted(input: SupplierInput, db: Db): Promise<string> {
       input.bankName?.trim() || null,
       seal(input.bankAccount?.replace(/\s+/g, '')),
       seal(input.bankHolder?.trim()),
-      await guestForPhone(input.phone),
+      input.ownerId,
     ],
   );
   return rows[0]!.id;
 }
 
-/**
- * The person a supplier answers to — the guest whose phone it is. Made on
- * first need for suppliers written in before there were owners.
- */
+/** The account a supplier answers to, if it has one. */
 export async function ownerOf(supplierId: string, db: Db = getPool()): Promise<string | null> {
-  const { rows } = await db.query<{ owner_guest_id: string | null; phone: string }>(
-    'SELECT owner_guest_id, phone FROM idesh.supplier WHERE id = $1',
+  const { rows } = await db.query<{ owner_guest_id: string | null }>(
+    'SELECT owner_guest_id FROM idesh.supplier WHERE id = $1',
     [supplierId],
   );
-  const row = rows[0];
-  if (!row) return null;
-  if (row.owner_guest_id) return row.owner_guest_id;
-  const guestId = await guestForPhone(row.phone);
-  await db.query('UPDATE idesh.supplier SET owner_guest_id = $2 WHERE id = $1 AND owner_guest_id IS NULL', [
-    supplierId,
-    guestId,
-  ]);
-  return guestId;
+  return rows[0]?.owner_guest_id ?? null;
 }
 
 /**

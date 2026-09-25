@@ -18,7 +18,6 @@ import {
   registerSupplier,
   supplierOf,
 } from './index.js';
-import { guestForPhone } from '../platform/identity/index.js';
 
 /**
  * Becoming a supplier, against a real database.
@@ -67,7 +66,7 @@ describe('asking to become a supplier', () => {
     const [row] = await listSuppliers();
     expect(row).toMatchObject({ id, state: 'applied', phone: PHONE, merchantTin: '6505678901' });
     // Applications sort first: ops sees what is waiting before what is done.
-    await registerSupplier({ name: 'Aa contracted', phone: '+97688010001', pickupAddress: 'x' });
+    await registerSupplier({ ownerId: (await startSession(ctx, '+97688010001')).guestId, name: 'Aa contracted', phone: '+97688010001', pickupAddress: 'x' });
     expect((await listSuppliers())[0]!.id).toBe(id);
   });
 
@@ -190,7 +189,7 @@ describe('ops decides', () => {
   });
 
   it('cannot decide what is not waiting', async () => {
-    const contracted = await registerSupplier({ name: 'X', phone: '+97688010001', pickupAddress: 'x' });
+    const contracted = await registerSupplier({ ownerId: (await startSession(ctx, '+97688010001')).guestId, name: 'X', phone: '+97688010001', pickupAddress: 'x' });
     await expect(approveSupplier(ctx, contracted)).rejects.toMatchObject({ code: 'NOT_PENDING' });
     await expect(declineSupplier(ctx, contracted, 'y')).rejects.toMatchObject({ code: 'NOT_PENDING' });
   });
@@ -198,8 +197,8 @@ describe('ops decides', () => {
 
 describe('who a supplier answers to', () => {
   it('is the phone on the row — claimed at sign-in when the row predates owners', async () => {
-    const id = await registerSupplier({ name: 'Хэрлэн хоршоо', phone: '+97688010002', pickupAddress: 'x' });
-    const owner = await guestForPhone('+97688010002');
+    const owner = (await startSession(ctx, '+97688010002')).guestId;
+    const id = await registerSupplier({ ownerId: owner, name: 'Хэрлэн хоршоо', phone: '+97688010002', pickupAddress: 'x' });
     expect((await supplierOf(owner))?.id).toBe(id);
 
     // Written in before there were owners: the column is empty, the phone is not.
@@ -207,6 +206,6 @@ describe('who a supplier answers to', () => {
     expect((await supplierOf(owner))?.id).toBe(id);
     expect((await supplierOf(owner))?.id).toBe(id);
     // Somebody else's phone claims nothing.
-    expect(await supplierOf(await guestForPhone('+97699000099'))).toBeNull();
+    expect(await supplierOf((await startSession(ctx, '+97699000099')).guestId)).toBeNull();
   });
 });
