@@ -25,6 +25,9 @@ export interface Contact {
   guestId: string;
   /** Null when the account was made without one. */
   phone: string | null;
+  /** Whether an SMS code has reached that number — typing it proves nothing. */
+  phoneVerified: boolean;
+  /** Always one somebody vouched for: a code in the inbox, Google, Apple. */
   email: string | null;
 }
 
@@ -99,13 +102,21 @@ export async function updateProfile(
  */
 export async function contactsFor(guestIds: readonly string[]): Promise<Map<string, Contact>> {
   if (guestIds.length === 0) return new Map();
-  const { rows } = await getPool().query<{ id: string; phone_e164: string | null; email: string | null }>(
+  const { rows } = await getPool().query<{
+    id: string;
+    phone_e164: string | null;
+    phone_verified: boolean;
+    email: string | null;
+  }>(
     // A closed account keeps neither: its phone column holds a tombstone.
-    `SELECT id, CASE WHEN closed_at IS NULL THEN phone_e164 END AS phone_e164, email
+    `SELECT id, CASE WHEN closed_at IS NULL THEN phone_e164 END AS phone_e164,
+            (closed_at IS NULL AND phone_verified_at IS NOT NULL) AS phone_verified, email
        FROM identity.guest WHERE id = ANY($1::uuid[])`,
     [[...new Set(guestIds)]],
   );
-  return new Map(rows.map((r) => [r.id, { guestId: r.id, phone: r.phone_e164, email: r.email }]));
+  return new Map(
+    rows.map((r) => [r.id, { guestId: r.id, phone: r.phone_e164, phoneVerified: r.phone_verified, email: r.email }]),
+  );
 }
 
 /**

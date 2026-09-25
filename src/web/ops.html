@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="mn" data-theme="light" data-desk>
+<html lang="mn" data-theme="light" data-desk data-session="desk">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -135,7 +135,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mnt, money, KIND, HEADLINE, dayLabel } from '/api.js';
+import { api, store, toast, mnt, money, KIND, HEADLINE, dayLabel, signInDoors, authReturn } from '/api.js';
 
 const root = document.getElementById('root');
 const el = (html) => {
@@ -247,7 +247,9 @@ async function showToken() {
     <div class="card pair">
       <div class="brand wordmark">Basu<small>Ops</small></div>
       <h2 id="door-title">Нэвтрэх</h2>
-      <p id="door-lead">Гишүүн өөрийн утасны дугаар, нууц үгээрээ нэвтэрнэ.</p>
+      <p id="door-lead">Гишүүн Google, имэйл эсвэл утас, нууц үгээрээ нэвтэрнэ.</p>
+      <div data-doors></div>
+      <div class="or" data-phone-or hidden>эсвэл утас, нууц үгээр</div>
       <input class="input" name="invite" inputmode="numeric" placeholder="Урилгын код · 12345 67890" aria-label="Урилгын код" autocomplete="one-time-code" hidden>
       <input class="input" name="name" placeholder="Таны нэр" aria-label="Нэр" autocomplete="name" hidden>
       <input class="input" name="phone" type="tel" inputmode="tel" placeholder="+976 XXXX XXXX" aria-label="Утас" autocomplete="tel">
@@ -255,6 +257,23 @@ async function showToken() {
       <button class="btn" data-v="primary" data-size="lg" type="button" id="send">Нэвтрэх</button>
       <button class="btn" data-v="link" type="button" id="use-invite">Урилгын код байгаа юу?</button>
     </div>`);
+  // Google and a code by email, above the desk's own phone door. The desk
+  // keeps its session under its own key, so the block hands the token here.
+  const doors = signInDoors({
+    device: 'Ops',
+    returnTo: '/dashboard',
+    onToken: enterDesk,
+    keep: false,
+    phone: false,
+    emailHint: 'Гишүүнээр бүртгэгдсэн имэйл рүү 6 оронтой код илгээнэ.',
+  });
+  card.querySelector('[data-doors]').replaceWith(doors);
+  doors.ready.then((open) => {
+    const others = open.google || open.email;
+    card.querySelector('[data-phone-or]').hidden = !others;
+    // One primary on the card: with Google or email above, the phone is the quieter way.
+    if (others) card.querySelector('#send').removeAttribute('data-v');
+  });
   const phone = card.querySelector('[name="phone"]');
   const code = card.querySelector('[name="password"]');
   const invite = card.querySelector('[name="invite"]');
@@ -272,7 +291,7 @@ async function showToken() {
     card.querySelector('#door-title').textContent = claiming ? 'Урилгаар нэвтрэх' : 'Нэвтрэх';
     card.querySelector('#door-lead').textContent = claiming
       ? 'Админаас авсан кодоо, өөрийн утас, шинэ нууц үгээ оруулна. Код нэг удаа хүчинтэй.'
-      : 'Гишүүн өөрийн утасны дугаар, нууц үгээрээ нэвтэрнэ.';
+      : 'Гишүүн Google, имэйл эсвэл утас, нууц үгээрээ нэвтэрнэ.';
     send.textContent = claiming ? 'Нэвтрэх' : 'Нэвтрэх';
     e.target.textContent = claiming ? 'Нууц үгтэй юу? Энгийнээр нэвтрэх' : 'Урилгын код байгаа юу?';
     (claiming ? invite : phone).focus();
@@ -305,7 +324,23 @@ async function showToken() {
   for (const input of [code, phone, invite, who]) input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
   door.append(card);
   root.append(door);
-  phone.focus();
+}
+
+/**
+ * A session from any door — Google, a code by email, the phone — is the
+ * desk's only if the server seats it: an account that proved an address a
+ * member is named by. Anybody else is told so and stays at the door.
+ */
+async function enterDesk(t) {
+  try {
+    ({ member: me } = await api('/v1/ops/me', { token: t }));
+  } catch {
+    toast('Энэ бүртгэл ops-ийн гишүүн биш байна. Админ таныг имэйл эсвэл утсаар нь гишүүнээр нэмэх хэрэгтэй.', 'bad');
+    if (!document.querySelector('.door')) showToken();
+    return;
+  }
+  store.opsToken = t;
+  boot();
 }
 
 /* ── the desk ─────────────────────────────────────────────────────── */
@@ -1828,7 +1863,7 @@ async function renderAudit(view) {
 
 async function renderMembers(view) {
   view.append(head('Гишүүд', 'Хэн энэ хуудсанд орж, юу хийж болох вэ.'));
-  view.append(el('<div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Нэр</th><th>Утас</th><th>Эрх</th><th>Төлөв</th><th></th></tr></thead><tbody id="members"><tr><td colspan="5" class="empty">…</td></tr></tbody></table></div></div>'));
+  view.append(el('<div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Нэр</th><th>Утас, имэйл</th><th>Эрх</th><th>Төлөв</th><th></th></tr></thead><tbody id="members"><tr><td colspan="5" class="empty">…</td></tr></tbody></table></div></div>'));
   let data;
   try {
     data = await ops('/v1/ops/members');
@@ -1841,7 +1876,10 @@ async function renderMembers(view) {
   body.replaceChildren();
   if (!data.members.length) body.append(el('<tr><td colspan="5" class="empty">Бүртгэлтэй гишүүн алга. Доорх маягтаар нэмнэ.</td></tr>'));
   for (const m of data.members) {
-    const tr = el(`<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td><span class="mono">${esc(m.phone)}</span></td><td>${ROLE_WORD[m.role] ?? m.role}</td><td><span class="pill" data-s="${m.active ? 'contracted' : 'off'}">${m.active ? 'идэвхтэй' : 'хаасан'}</span></td><td class="num"></td></tr>`);
+    const address = [m.phone ? `<span class="mono">${esc(m.phone)}</span>` : '', m.email ? `<span>${esc(m.email)}</span>` : ''].filter(Boolean).join('<br>');
+    // Named but not in yet: the invite is unused, or the address has not signed in.
+    const state = !m.active ? ['off', 'хаасан'] : m.joined ? ['contracted', 'идэвхтэй'] : ['applied', 'ороогүй'];
+    const tr = el(`<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td>${address}</td><td>${ROLE_WORD[m.role] ?? m.role}</td><td><span class="pill" data-s="${state[0]}">${state[1]}</span></td><td class="num"></td></tr>`);
     if (m.id !== me?.id) {
       const b = el(`<button class="btn" data-size="sm" type="button"${m.active ? ' data-v="quiet"' : ''}>${m.active ? 'Хаах' : 'Нээх'}</button>`);
       b.addEventListener('click', async () => {
@@ -1859,8 +1897,9 @@ async function renderMembers(view) {
   const form = el(`
     <section class="section"><h2 class="section-label">Гишүүн нэмэх</h2><div class="card"><div class="card-body">
       <div class="fields">
-        <label class="field"><span>Утас</span><input name="phone" type="tel" placeholder="+976XXXXXXXX"></label>
         <label class="field"><span>Нэр</span><input name="name" placeholder="Нэр"></label>
+        <label class="field"><span>Имэйл · Google-ээр нэвтэрнэ</span><input name="email" type="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com"></label>
+        <label class="field"><span>Утас · урилгын кодоор нэвтэрнэ</span><input name="phone" type="tel" placeholder="+976XXXXXXXX"></label>
         <label class="field"><span>Эрх</span><select name="role"><option value="ops">ops — захиалга, нийлүүлэгч</option><option value="finance">санхүү — олголт, буцаалт, данс</option><option value="viewer">зөвхөн харах</option><option value="admin">админ</option></select></label>
       </div>
       <div class="form-foot"><button class="btn" data-v="primary" type="button" id="add-member">Гишүүн нэмэх</button></div>
@@ -1868,11 +1907,24 @@ async function renderMembers(view) {
   form.querySelector('#add-member').addEventListener('click', async () => {
     const v = (n) => form.querySelector(`[name="${n}"]`).value.trim();
     try {
-      const added = await ops('/v1/ops/members', { method: 'POST', body: { phone: v('phone'), name: v('name'), role: v('role') } });
+      const added = await ops('/v1/ops/members', {
+        method: 'POST',
+        body: { phone: v('phone'), email: v('email'), name: v('name'), role: v('role') },
+      });
       await show('members');
+      const view = document.getElementById('view');
+      if (!added.invite_code) {
+        // Named by address: the address proves itself, no code to hand over.
+        view.prepend(el(`
+          <div class="callout" data-k="ok" id="invite-shown" style="margin-bottom:16px">
+            <div><b>${esc(added.name)} нэмэгдлээ.</b>
+            <span>Тэр хүн dashboard-ын хаалган дээр «Google-ээр нэвтрэх» дарж (эсвэл имэйлээр код авч) ${esc(added.email ?? '')} хаягаараа орно. Урилгын код хэрэггүй.</span></div>
+          </div>`));
+        return;
+      }
       // The code is shown once and never again: it lives only as a hash.
       // The admin reads it to the new member, who redeems it on this door.
-      document.getElementById('view').prepend(el(`
+      view.prepend(el(`
         <div class="callout" data-k="ok" id="invite-shown" style="margin-bottom:16px">
           <div><b>${esc(added.name)}-д өгөх урилгын код: <span class="mono" style="font-size:1.25rem;letter-spacing:.08em">${esc(added.invite_code)}</span></b>
           <span>Энэ кодыг зөвхөн тэр хүнд, нууцаар хэлээрэй. 24 цаг хүчинтэй, нэг удаа. Тэр хүн dashboard-ын хаалган дээр «Урилгын код байгаа юу?» дарж, өөрийн утас (${esc(added.phone)}), шинэ нууц үгтэйгээ оруулна. Энэ код дахин харагдахгүй.</span></div>
@@ -1889,6 +1941,13 @@ async function renderMembers(view) {
 function boot() {
   root.replaceChildren();
   if (!token()) {
+    // Back from Google with a session: seated if it is a member's.
+    const back = authReturn?.token;
+    if (back && !boot.tried) {
+      boot.tried = true;
+      void enterDesk(back);
+      return;
+    }
     showToken();
     return;
   }

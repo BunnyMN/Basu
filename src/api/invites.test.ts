@@ -4,8 +4,9 @@ import { closePool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { guestForPhone } from '../platform/identity/index.js';
-import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
+import { FakeMailer, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
+import { syncMembersFromEnv } from '../ops/index.js';
 import { opsToken } from './ops.js';
 import { buildServer } from './server.js';
 
@@ -20,6 +21,7 @@ import { buildServer } from './server.js';
 let app: FastifyInstance;
 let clock: VirtualClock;
 let ctx: Ctx;
+let mailer: FakeMailer;
 
 const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
 const desk = () => bearer(opsToken()!);
@@ -27,7 +29,8 @@ const desk = () => bearer(opsToken()!);
 beforeEach(async () => {
   await truncateAll();
   clock = new VirtualClock(at('11:40'));
-  ctx = { clock, payments: new FakePaymentProvider(), tax: new FakeTaxProvider(), notifier: new FakeNotifier() };
+  mailer = new FakeMailer();
+  ctx = { clock, payments: new FakePaymentProvider(), tax: new FakeTaxProvider(), notifier: new FakeNotifier(), mailer };
   process.env['OPS_TOKEN'] = 'ops-secret-for-the-test';
   app = await buildServer(ctx, { dev: true });
 });
@@ -142,5 +145,85 @@ describe('who may make invites', () => {
     const { code } = (await app.inject({ method: 'POST', url: '/v1/ops/invites', headers: desk(), payload: { role: 'viewer' } })).json();
     const viewer = (await claim({ code, phone: '+97699112233', password: 'харагчийн нууц' })).json().token as string;
     expect((await app.inject({ method: 'POST', url: '/v1/ops/invites', headers: bearer(viewer), payload: { role: 'admin' } })).statusCode).toBe(403);
+  });
+});
+
+/** Signed in by a code to the inbox — an address proved, the way Google or Apple proves one. */
+async function byEmail(address: string): Promise<string> {
+  await app.inject({ method: 'POST', url: '/v1/auth/email/start', payload: { email: address } });
+  const verified = await app.inject({
+    method: 'POST',
+    url: '/v1/auth/email/verify',
+    payload: { email: address, code: mailer.codeFor(address) },
+  });
+  expect(verified.statusCode, verified.body).toBe(200);
+  return verified.json().token as string;
+}
+
+const addMember = (payload: Record<string, string>) =>
+  app.inject({ method: 'POST', url: '/v1/ops/members', headers: desk(), payload });
+const me = (token: string) => app.inject({ method: 'GET', url: '/v1/ops/me', headers: bearer(token) });
+
+describe('a seat is an account that proved the address', () => {
+  it('will not seat somebody who registered a member’s number before its owner came', async () => {
+    const added = await addMember({ phone: '+97699778899', name: 'Санхүү', role: 'finance' });
+    expect(added.json().joined).toBe(false);
+    // Anybody can type a number and choose a password for it.
+    const squatter = await app.inject({ method: 'POST', url: '/v1/auth/register', payload: { phone: '+97699778899', password: 'булаах гэсэн' } });
+    expect(squatter.statusCode).toBe(201);
+    expect((await me(squatter.json().token)).statusCode).toBe(401);
+  });
+
+  it('seats a member named by email the first time that address signs in', async () => {
+    const added = await addMember({ email: 'Bat@Gmail.com', name: 'Бат', role: 'ops' });
+    expect(added.statusCode, added.body).toBe(201);
+    // No invite code: the address proves itself.
+    expect(added.json()).toMatchObject({ email: 'bat@gmail.com', phone: null, joined: false });
+    expect(added.json().invite_code).toBeUndefined();
+
+    const token = await byEmail('bat@gmail.com');
+    const seat = await me(token);
+    expect(seat.statusCode, seat.body).toBe(200);
+    expect(seat.json().member).toMatchObject({ name: 'Бат', role: 'ops', email: 'bat@gmail.com' });
+
+    const listed = (await app.inject({ method: 'GET', url: '/v1/ops/members', headers: desk() })).json().members;
+    expect(listed.find((m: { email: string }) => m.email === 'bat@gmail.com')).toMatchObject({ joined: true });
+    // Somebody else's address is somebody else.
+    expect((await me(await byEmail('dorj@gmail.com'))).statusCode).toBe(401);
+  });
+
+  it('lets one person come in by phone and by Google alike, as the same seat', async () => {
+    const { code } = (await app.inject({ method: 'POST', url: '/v1/ops/invites', headers: desk(), payload: { role: 'admin' } })).json();
+    const byPhone = (await claim({ code, phone: '+97699112233', password: 'админы нууц үг', name: 'Ганхүлэг' })).json().token as string;
+    // The admin names their own address on their own seat.
+    const named = await app.inject({
+      method: 'POST',
+      url: '/v1/ops/members',
+      headers: bearer(byPhone),
+      payload: { phone: '+97699112233', email: 'gan@gmail.com', name: 'Ганхүлэг', role: 'admin' },
+    });
+    expect(named.statusCode, named.body).toBe(201);
+    const viaEmail = await byEmail('gan@gmail.com');
+    const [one, two] = await Promise.all([me(byPhone), me(viaEmail)]);
+    expect(one.json().member.id).toBe(two.json().member.id);
+
+    // Off the desk is off for every way in.
+    await app.inject({ method: 'POST', url: `/v1/ops/members/${one.json().member.id}/active`, headers: desk(), payload: { active: false } });
+    expect((await me(byPhone)).statusCode).toBe(401);
+    expect((await me(viaEmail)).statusCode).toBe(401);
+  });
+
+  it('refuses one phone and one address that already name two different people', async () => {
+    await addMember({ phone: '+97699000001', name: 'Нэг', role: 'viewer' });
+    await addMember({ email: 'hoyor@gmail.com', name: 'Хоёр', role: 'viewer' });
+    const mixed = await addMember({ phone: '+97699000001', email: 'hoyor@gmail.com', name: 'Хэн', role: 'admin' });
+    expect(mixed.statusCode).toBe(400);
+  });
+
+  it('takes a member named by email from the environment, which by itself seats nobody', async () => {
+    await syncMembersFromEnv('owner@gmail.com:Эзэн:admin');
+    const listed = (await app.inject({ method: 'GET', url: '/v1/ops/members', headers: desk() })).json().members;
+    expect(listed.find((m: { email: string }) => m.email === 'owner@gmail.com')).toMatchObject({ role: 'admin', joined: false });
+    expect((await me(await byEmail('owner@gmail.com'))).json().member).toMatchObject({ name: 'Эзэн', role: 'admin' });
   });
 });

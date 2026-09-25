@@ -40,8 +40,8 @@ import { registerSystemDesk } from './systemDesk.js';
 import { revokeSession } from '../platform/identity/index.js';
 import { mode } from '../mode.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
-import { ROLES, createInvite, listMembers, memberByPhone, setMemberActive, upsertMember, type Member, type Role } from '../ops/index.js';
-import { contactsFor, resolveGuest } from '../platform/identity/index.js';
+import { ROLES, createInvite, linkByProof, listMembers, memberForAccount, setMemberActive, upsertMember, type Member, type Role } from '../ops/index.js';
+import { contactsFor, phoneE164, resolveGuest } from '../platform/identity/index.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -58,7 +58,7 @@ type Guard = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
 
 declare module 'fastify' {
   interface FastifyRequest {
-    ops?: { id: string; name: string; role: Role; phone: string | null };
+    ops?: { id: string; name: string; role: Role; phone: string | null; email: string | null };
   }
 }
 
@@ -128,15 +128,25 @@ export async function registerOpsRoutes(
     if (!sent) return unauthorized(reply);
     const shared = opsToken();
     if (shared && same(sent, shared)) {
-      request.ops = { id: 'demo', name: 'Демо', role: 'admin', phone: null };
+      request.ops = { id: 'demo', name: 'Демо', role: 'admin', phone: null, email: null };
       return undefined;
     }
     const guestId = await resolveGuest(ctx, sent);
     if (!guestId) return unauthorized(reply);
-    const phone = (await contactsFor([guestId])).get(guestId)?.phone;
-    const member = phone ? await memberByPhone(phone) : null;
+    let member = await memberForAccount(guestId);
+    if (!member) {
+      // First time at the desk: a seat is taken only with an address this
+      // account has proved — an email somebody vouched for, or a number an
+      // SMS code reached. A number merely typed at sign-up is not one.
+      const contact = (await contactsFor([guestId])).get(guestId);
+      member = await linkByProof({
+        guestId,
+        email: contact?.email ?? null,
+        phone: contact?.phoneVerified ? contact.phone : null,
+      });
+    }
     if (!member?.active) return unauthorized(reply);
-    request.ops = { id: member.id, name: member.name, role: member.role, phone: member.phone };
+    request.ops = { id: member.id, name: member.name, role: member.role, phone: member.phone, email: member.email };
     return undefined;
   };
   /** A route that needs more than a seat at the desk. */
@@ -155,27 +165,51 @@ export async function registerOpsRoutes(
 
   /** Who am I at the desk — what the page asks after signing in. */
   app.get('/v1/ops/me', asOps, async (request) => ({
-    member: { id: request.ops!.id, name: request.ops!.name, role: request.ops!.role, phone: request.ops!.phone },
+    member: { id: request.ops!.id, name: request.ops!.name, role: request.ops!.role, phone: request.ops!.phone, email: request.ops!.email },
   }));
 
   /* ── the members, admin only ── */
 
-  const shapeMember = (m: Member) => ({ id: m.id, phone: m.phone, name: m.name, role: m.role, active: m.active, created_at: m.createdAt.toISOString() });
+  const shapeMember = (m: Member) => ({
+    id: m.id,
+    phone: m.phone,
+    email: m.email,
+    name: m.name,
+    role: m.role,
+    active: m.active,
+    // Nobody has come in as this member yet: the invite is unused, or the
+    // address has not signed in.
+    joined: m.accounts > 0,
+    created_at: m.createdAt.toISOString(),
+  });
 
   app.get('/v1/ops/members', asAdmin, async () => ({ members: (await listMembers()).map(shapeMember) }));
 
-  app.post<{ Body: { phone?: string; name?: string; role?: string } }>('/v1/ops/members', asAdmin, async (request, reply) => {
+  app.post<{ Body: { phone?: string; email?: string; name?: string; role?: string } }>('/v1/ops/members', asAdmin, async (request, reply) => {
     const body = request.body ?? {};
     try {
-      const member = await upsertMember({ phone: body.phone ?? '', name: body.name ?? '', role: (body.role ?? 'ops') as Role });
-      // A member signs in with a password they choose, and a phone number is
-      // no proof of who is typing it — so the way in is a one-time code this
-      // admin hands to that one person, bound to their number.
+      const member = await upsertMember({
+        phone: body.phone?.trim() ? phoneE164(body.phone) : null,
+        email: body.email ?? null,
+        name: body.name ?? '',
+        role: (body.role ?? 'ops') as Role,
+      });
+      await recordAudit({
+        who: who(request),
+        action: 'member.upsert',
+        targetKind: 'member',
+        targetId: member.id,
+        note: `${member.name} · ${member.role} · ${[member.email, member.phone].filter(Boolean).join(' · ')}`,
+      });
+      // An address proves itself: the person signs in with Google, Apple or a
+      // code to that inbox, and is at the desk. A phone number proves nothing
+      // when anybody can type it, so a member named by phone also gets a
+      // one-time code this admin hands to that one person.
+      if (!member.phone || !body.phone?.trim()) return reply.status(201).send(shapeMember(member));
       const { code, invite } = await createInvite({ phone: member.phone, role: member.role, name: member.name, by: who(request), now: ctx.clock.now() });
-      await recordAudit({ who: who(request), action: 'member.upsert', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
       return reply.status(201).send({ ...shapeMember(member), invite_code: code, invite_expires_at: invite.expiresAt.toISOString() });
     } catch (error) {
-      return badRequest(reply, 'Утас (+976XXXXXXXX), нэр, эрхээ шалгана уу.', (error as Error).message);
+      return badRequest(reply, 'Утас (+976XXXXXXXX) эсвэл имэйл, нэр, эрхээ шалгана уу.', (error as Error).message);
     }
   });
 

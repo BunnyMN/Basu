@@ -764,8 +764,9 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
    — as its guidelines ask; the one primary is the email step. */
 .ways .btn[data-google]{width:100%;gap:12px}
 .ways .btn[data-google] svg{width:18px;height:18px;stroke:none}
-.ways .or{display:flex;align-items:center;gap:12px;margin:18px 0;font-size:var(--t-cap);color:var(--ink-3)}
-.ways .or::before,.ways .or::after{content:"";flex:1;height:1px;background:var(--line)}
+/* «эсвэл» between two ways in: a hairline either side of the word. */
+.or{display:flex;align-items:center;gap:12px;margin:18px 0;font-size:var(--t-cap);color:var(--ink-3)}
+.or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
 .ways [data-code]{margin:0 0 12px}
 .ways .cap{margin:-4px 0 14px}
 .ways .again{display:flex;justify-content:space-between;gap:12px;margin-top:4px}

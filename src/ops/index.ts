@@ -6,7 +6,9 @@
 export {
   ROLES,
   listMembers,
-  memberByPhone,
+  memberForAccount,
+  linkByProof,
+  linkByInvite,
   upsertMember,
   setMemberActive,
   syncMembersFromEnv,

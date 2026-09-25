@@ -17,7 +17,7 @@ import {
   claimAccount,
   phoneE164,
 } from '../platform/identity/index.js';
-import { releaseInvite, takeInvite, upsertMember } from '../ops/index.js';
+import { linkByInvite, releaseInvite, takeInvite, upsertMember } from '../ops/index.js';
 import { receiptsFor, wireConfigFromEnv } from '../platform/ledger/index.js';
 import {
   createPairingCode,
@@ -300,6 +300,9 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
         }
         if (invite.role) {
           await upsertMember({ phone: number, name: name?.trim() || invite.name || number, role: invite.role });
+          // The invite is the proof: this account, and no other that merely
+          // typed the number, sits as that member.
+          await linkByInvite({ guestId: session.guestId, phone: number });
         }
         return reply.status(201).send({
           token: session.token,

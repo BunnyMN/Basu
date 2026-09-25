@@ -276,7 +276,13 @@ export async function verifyOtp(
   label?: string | null,
 ): Promise<GuestSession> {
   await checkOtp(ctx, phone, code);
-  return startSession(ctx, phone, label);
+  const session = await startSession(ctx, phone, label);
+  // The code reached this number: now, and only now, is it proved theirs.
+  await getPool().query(
+    'UPDATE identity.guest SET phone_verified_at = COALESCE(phone_verified_at, $2) WHERE id = $1',
+    [session.guestId, ctx.clock.now()],
+  );
+  return session;
 }
 
 /**

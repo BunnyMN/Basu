@@ -34,7 +34,7 @@ const PUBLIC_ORIGIN = () => process.env['PUBLIC_ORIGIN']?.trim() || 'https://bas
  * Our own pages, and the app's own scheme. Nothing else: a sign-in that
  * could return anywhere is an open redirect with a session token attached.
  */
-const RETURN_PATHS = ['/', '/idesh', '/dine', '/supplier'];
+const RETURN_PATHS = ['/', '/idesh', '/dine', '/supplier', '/dashboard'];
 export const APP_RETURN = 'basu://auth';
 
 export function safeReturn(raw: unknown): string {

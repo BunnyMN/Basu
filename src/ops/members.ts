@@ -1,12 +1,21 @@
-import { getPool, type Db } from '../db/pool.js';
+import { getPool, tx, type Db } from '../db/pool.js';
 
 /**
  * The people at the desk.
  *
- * A member is a phone number with a name and a role. Signing in is the same
- * OTP everybody uses; what makes the session ops is that its phone is on
- * this list and active. Roles are few and flat: admin does everything,
- * finance moves money, ops runs orders and suppliers, viewer looks.
+ * A member is a name and a role, named by a phone number, an email address,
+ * or both. What makes a session ops is that its account is linked to an
+ * active member — and an account is linked only by proof: the invite the
+ * admin handed that person, a phone number an SMS code reached, or an
+ * address Google, Apple or a code in the inbox vouched for. Knowing the
+ * number an admin typed is not enough; with passwords, anybody can type
+ * anybody's.
+ *
+ * One person may come in through a few accounts — the number they signed up
+ * with, the Google account they use at work — and each is the same seat.
+ *
+ * Roles are few and flat: admin does everything, finance moves money, ops
+ * runs orders and suppliers, viewer looks.
  */
 
 export type Role = 'admin' | 'finance' | 'ops' | 'viewer';
@@ -14,53 +23,146 @@ export const ROLES: readonly Role[] = ['admin', 'finance', 'ops', 'viewer'];
 
 export interface Member {
   id: string;
-  phone: string;
+  phone: string | null;
+  email: string | null;
   name: string;
   role: Role;
   active: boolean;
   createdAt: Date;
+  /** How many accounts have proved their way to this seat; 0 is somebody who has not come in yet. */
+  accounts: number;
 }
 
-const shape = (r: { id: string; phone: string; name: string; role: Role; active: boolean; created_at: Date }): Member => ({
+type Row = {
+  id: string;
+  phone: string | null;
+  email: string | null;
+  name: string;
+  role: Role;
+  active: boolean;
+  created_at: Date;
+  accounts: number;
+};
+
+const COLUMNS = `m.id, m.phone, m.email, m.name, m.role, m.active, m.created_at,
+  (SELECT count(*)::int FROM ops.member_account a WHERE a.member_id = m.id) AS accounts`;
+
+const shape = (r: Row): Member => ({
   id: r.id,
   phone: r.phone,
+  email: r.email,
   name: r.name,
   role: r.role,
   active: r.active,
   createdAt: r.created_at,
+  accounts: r.accounts,
 });
 
 export async function listMembers(db: Db = getPool()): Promise<Member[]> {
-  const { rows } = await db.query<{ id: string; phone: string; name: string; role: Role; active: boolean; created_at: Date }>(
-    'SELECT id, phone, name, role, active, created_at FROM ops.member ORDER BY active DESC, name',
-  );
+  const { rows } = await db.query<Row>(`SELECT ${COLUMNS} FROM ops.member m ORDER BY m.active DESC, m.name`);
   return rows.map(shape);
 }
 
-export async function memberByPhone(phone: string, db: Db = getPool()): Promise<Member | null> {
-  const { rows } = await db.query<{ id: string; phone: string; name: string; role: Role; active: boolean; created_at: Date }>(
-    'SELECT id, phone, name, role, active, created_at FROM ops.member WHERE phone = $1',
-    [phone],
+/** The member this account sits as, if it has proved its way to a seat. */
+export async function memberForAccount(guestId: string, db: Db = getPool()): Promise<Member | null> {
+  const { rows } = await db.query<Row>(
+    `SELECT ${COLUMNS} FROM ops.member m JOIN ops.member_account link ON link.member_id = m.id WHERE link.guest_id = $1`,
+    [guestId],
   );
   return rows[0] ? shape(rows[0]) : null;
 }
 
-/** Add a member, or change the name and role of one already there. */
+/**
+ * An account that has just proved an address: if the desk named a member by
+ * it, the account now sits as that member. `phone` must be a number an SMS
+ * code reached and `email` an address somebody vouched for — never merely
+ * one that was typed.
+ */
+export async function linkByProof(
+  input: { guestId: string; phone: string | null; email: string | null },
+  db: Db = getPool(),
+): Promise<Member | null> {
+  const email = input.email?.trim().toLowerCase() || null;
+  if (!email && !input.phone) return null;
+  const { rows } = await db.query<{ id: string; how: string }>(
+    `SELECT id, CASE WHEN $1::text IS NOT NULL AND lower(email) = $1 THEN 'email' ELSE 'phone' END AS how
+       FROM ops.member
+      WHERE ($1::text IS NOT NULL AND lower(email) = $1) OR ($2::text IS NOT NULL AND phone = $2)
+      ORDER BY (lower(email) = $1) DESC NULLS LAST, created_at
+      LIMIT 1`,
+    [email, input.phone],
+  );
+  const found = rows[0];
+  if (!found) return null;
+  await db.query(
+    `INSERT INTO ops.member_account (guest_id, member_id, how) VALUES ($1, $2, $3) ON CONFLICT (guest_id) DO NOTHING`,
+    [input.guestId, found.id, found.how],
+  );
+  return memberForAccount(input.guestId, db);
+}
+
+/**
+ * The account that just redeemed an invite for this number sits as the
+ * member named by it. The invite is the proof: the admin handed it to one
+ * person.
+ */
+export async function linkByInvite(input: { guestId: string; phone: string }, db: Db = getPool()): Promise<Member | null> {
+  const { rows } = await db.query<{ id: string }>('SELECT id FROM ops.member WHERE phone = $1', [input.phone]);
+  if (!rows[0]) return null;
+  await db.query(
+    `INSERT INTO ops.member_account (guest_id, member_id, how) VALUES ($1, $2, 'invite')
+     ON CONFLICT (guest_id) DO UPDATE SET member_id = EXCLUDED.member_id, how = 'invite', linked_at = now()`,
+    [input.guestId, rows[0].id],
+  );
+  return memberForAccount(input.guestId, db);
+}
+
+const PHONE = /^\+976\d{8}$/;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Add a member, or change one already there — found by the phone or the
+ * address given. A person named by both keeps one seat; two different
+ * members named by the two is a mistake, and refused.
+ */
 export async function upsertMember(
-  input: { phone: string; name: string; role: Role },
+  input: { phone?: string | null; email?: string | null; name: string; role: Role },
   db: Db = getPool(),
 ): Promise<Member> {
-  const phone = input.phone.replace(/\s+/g, '');
-  if (!/^\+976\d{8}$/.test(phone)) throw new Error('a member’s phone is +976 and eight digits');
+  const phone = input.phone?.replace(/\s+/g, '') || null;
+  const email = input.email?.trim().toLowerCase() || null;
+  if (!phone && !email) throw new Error('a member needs a phone or an email');
+  if (phone && !PHONE.test(phone)) throw new Error('a member’s phone is +976 and eight digits');
+  if (email && (email.length > 254 || !EMAIL.test(email))) throw new Error('that is not an email address');
   if (!ROLES.includes(input.role)) throw new Error(`no such role: ${input.role}`);
   const name = input.name.trim();
   if (name.length < 2) throw new Error('a member needs a name');
-  const { rows } = await db.query<{ id: string; phone: string; name: string; role: Role; active: boolean; created_at: Date }>(
-    `INSERT INTO ops.member (phone, name, role) VALUES ($1, $2, $3)
-     ON CONFLICT (phone) DO UPDATE SET name = EXCLUDED.name, role = EXCLUDED.role, active = true, updated_at = now()
-     RETURNING id, phone, name, role, active, created_at`,
-    [phone, name, input.role],
-  );
+
+  const id = await tx(async (client) => {
+    const { rows } = await client.query<{ id: string }>(
+      `SELECT id FROM ops.member
+        WHERE ($1::text IS NOT NULL AND phone = $1) OR ($2::text IS NOT NULL AND lower(email) = $2)
+        FOR UPDATE`,
+      [phone, email],
+    );
+    if (rows.length > 1) throw new Error('that phone and that email belong to two different members');
+    if (rows[0]) {
+      await client.query(
+        `UPDATE ops.member
+            SET phone = COALESCE($2, phone), email = COALESCE($3, email), name = $4, role = $5,
+                active = true, updated_at = now()
+          WHERE id = $1`,
+        [rows[0].id, phone, email, name, input.role],
+      );
+      return rows[0].id;
+    }
+    const made = await client.query<{ id: string }>(
+      'INSERT INTO ops.member (phone, email, name, role) VALUES ($1, $2, $3, $4) RETURNING id',
+      [phone, email, name, input.role],
+    );
+    return made.rows[0]!.id;
+  });
+  const { rows } = await db.query<Row>(`SELECT ${COLUMNS} FROM ops.member m WHERE m.id = $1`, [id]);
   return shape(rows[0]!);
 }
 
@@ -71,16 +173,21 @@ export async function setMemberActive(id: string, active: boolean, db: Db = getP
 
 /**
  * The first members come from the environment, so a fresh server has a
- * desk before anybody can sit at it: `OPS_MEMBERS="+97688102856:Баярцогт:admin,+976…:Нэр:finance"`.
- * Run at boot; a name or role changed there changes here.
+ * desk before anybody can sit at it. Each entry is `address:name:role`, the
+ * address a phone or an email:
+ * `OPS_MEMBERS="+97688102856:Баярцогт:admin,bat@gmail.com:Бат:finance"`.
+ * Run at boot; a name or role changed there changes here. Naming somebody
+ * here gives nobody a seat by itself — the account still has to prove the
+ * address.
  */
 export async function syncMembersFromEnv(raw: string | undefined, db: Db = getPool()): Promise<number> {
   if (!raw?.trim()) return 0;
   let n = 0;
   for (const entry of raw.split(',')) {
-    const [phone, name, role] = entry.split(':').map((s) => s?.trim());
-    if (!phone || !name || !role) continue;
-    await upsertMember({ phone, name, role: role as Role }, db);
+    const [address, name, role] = entry.split(':').map((s) => s?.trim());
+    if (!address || !name || !role) continue;
+    const byEmail = address.includes('@');
+    await upsertMember({ ...(byEmail ? { email: address } : { phone: address }), name, role: role as Role }, db);
     n++;
   }
   return n;

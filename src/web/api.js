@@ -144,7 +144,10 @@ export const authReturn = (() => {
   if (!token && !refused) return null;
   history.replaceState(null, '', location.pathname + location.search);
   if (token) {
-    store.guestToken = token;
+    // A page that keeps a session of its own — the desk, `data-session="desk"`
+    // on its root — decides where this one goes; everywhere else it is the
+    // guest's.
+    if (document.documentElement.dataset.session !== 'desk') store.guestToken = token;
     return { token };
   }
   setTimeout(() => toast(GOOGLE_REFUSALS[refused] ?? GOOGLE_REFUSALS.SOCIAL_REFUSED, 'bad'), 0);
@@ -166,9 +169,21 @@ const GOOGLE_MARK = `<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA
  *
  * `onToken(token)` is called once there is a session. Google does not call
  * it: the page is left for Google's and comes back to `returnTo`, signed in,
- * by way of `authReturn` above.
+ * by way of `authReturn` above. `keep: false` leaves the token for `onToken`
+ * to put where it belongs (the desk keeps its own); `phone: false` leaves the
+ * phone door out, for a page that has its own. `box.ready` resolves with
+ * which doors were drawn.
  */
-export function signInDoors({ device = 'Вэб', returnTo = location.pathname, onToken }) {
+const EMAIL_HINT = 'Хаяг руу тань 6 оронтой код илгээнэ. Анх удаа бол бүртгэл шууд үүснэ.';
+
+export function signInDoors({
+  device = 'Вэб',
+  returnTo = location.pathname,
+  onToken,
+  keep = true,
+  phone: withPhone = true,
+  emailHint = EMAIL_HINT,
+}) {
   const box = document.createElement('div');
   box.className = 'ways';
   box.innerHTML = `
@@ -176,7 +191,7 @@ export function signInDoors({ device = 'Вэб', returnTo = location.pathname, o
     <div class="or" data-or hidden>эсвэл</div>
     <div data-email hidden>
       <label class="field"><span>Имэйл хаяг</span><input name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com"></label>
-      <p class="cap" data-email-hint>Хаяг руу тань 6 оронтой код илгээнэ. Анх удаа бол бүртгэл шууд үүснэ.</p>
+      <p class="cap" data-email-hint>${emailHint}</p>
       <div data-code hidden><input name="code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" aria-label="Имэйлд ирсэн код"></div>
       <button class="btn" data-v="primary" data-size="lg" type="button" data-email-go>Код авах</button>
       <div class="again" data-again-row hidden>
@@ -196,7 +211,7 @@ export function signInDoors({ device = 'Вэб', returnTo = location.pathname, o
     </details>`;
   const $ = (selector) => box.querySelector(selector);
   const done = (token) => {
-    store.guestToken = token;
+    if (keep) store.guestToken = token;
     onToken(token);
   };
 
@@ -256,7 +271,7 @@ export function signInDoors({ device = 'Вэб', returnTo = location.pathname, o
     sentTo = null;
     $('[data-code]').hidden = true;
     $('[data-again-row]').hidden = true;
-    hint.textContent = 'Хаяг руу тань 6 оронтой код илгээнэ. Анх удаа бол бүртгэл шууд үүснэ.';
+    hint.textContent = emailHint;
     emailGo.textContent = 'Код авах';
   };
 
@@ -313,6 +328,7 @@ export function signInDoors({ device = 'Вэб', returnTo = location.pathname, o
   for (const input of [phone, password, again]) input.addEventListener('keydown', (e) => e.key === 'Enter' && passwordDoor());
 
   /* only the doors that are open */
+  if (!withPhone) $('[data-phone]').remove();
   box.ready = authMethods().then((open) => {
     // Google will not sign anybody in inside an app's web view; the app has its own sheet.
     const googleOpen = Boolean(open.google) && !shell.present;
@@ -320,10 +336,13 @@ export function signInDoors({ device = 'Вэб', returnTo = location.pathname, o
     $('[data-email]').hidden = !open.email;
     $('[data-or]').hidden = !(googleOpen && open.email);
     const phoneAlone = !googleOpen && !open.email;
-    const fold = $('[data-phone]');
-    fold.open = phoneAlone;
-    fold.toggleAttribute('data-alone', phoneAlone);
-    (open.email ? email : phoneAlone ? phone : google).focus?.();
+    if (withPhone) {
+      const fold = $('[data-phone]');
+      fold.open = phoneAlone;
+      fold.toggleAttribute('data-alone', phoneAlone);
+    }
+    (open.email ? email : phoneAlone && withPhone ? phone : google).focus?.();
+    return { google: googleOpen, email: Boolean(open.email) };
   });
   return box;
 }
