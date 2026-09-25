@@ -122,7 +122,7 @@ struct SignInSheet: View {
               doors
             }
           }
-          .padding(.top, gate ? 26 : 18)
+          .padding(.top, 18)
           if !showsAccount { legal }
           developerDoor
         }
@@ -169,43 +169,57 @@ struct SignInSheet: View {
   // MARK: - the head
 
   /**
-   The gate's head: the wrestler from the icon, the wordmark, and one line
-   that says what Basu is — the splash fades into it, so the name is where the
-   eye already is. Past the first face the wrestler steps back to make room
-   for the fields, and the line becomes the door that is open; while
-   anything is being typed he steps back as well, so the field and the
-   keyboard both fit.
+   The gate's head: a photograph of what Basu is for, the wordmark on it in
+   white, and one line that says it — the web's front page in miniature.
+   Past the first face, and while anything is typed, the picture folds to a
+   band so the fields and the keyboard both fit, and the line becomes the
+   door that is open.
+
+   The buuz are Tuguldur Baatar's, from Unsplash (free for commercial use;
+   credited with the web's photographs in src/web/brand/meat/CREDITS.txt).
    */
   private var hero: some View {
     let first = way == .doors
     let small = !first || focus != nil
-    return VStack(spacing: 8) {
-      Image("Mascot")
+    let shape = RoundedRectangle(cornerRadius: BasuMetric.authCard, style: .continuous)
+    return ZStack(alignment: .bottomLeading) {
+      Image("SignInPhoto")
         .resizable()
-        .scaledToFit()
-        .frame(height: small ? BasuMetric.mascot * 0.6 : BasuMetric.mascot)
-        .shadow(color: Color.tileShadow, radius: 18, y: 12)
+        .scaledToFill()
+        .frame(height: small ? BasuMetric.authPhoto * 0.55 : BasuMetric.authPhoto)
+        .frame(maxWidth: .infinity)
+        .clipped()
         .accessibilityHidden(true)
-      Text("Basu")
-        .font(.sans(first ? 40 : 32, .semibold))
-        .tracking(-0.03 * (first ? 40 : 32))
-        .foregroundStyle(Color.ink)
-      Text(first ? "Хоолоо урьдчилан захиалж, өвлийн идшээ гэрээт малчнаас ав." : title)
-        .font(.sans(first ? 15 : 17, first ? .regular : .medium))
-        .foregroundStyle(first ? Color.ink2 : Color.ink)
-        .multilineTextAlignment(.center)
-        .fixedSize(horizontal: false, vertical: true)
-        .contentTransition(.opacity)
+      // A shade for the words, from nothing at the middle to most of black
+      // at the foot: white type on a photograph needs somewhere to stand.
+      LinearGradient(
+        colors: [Color.black.opacity(0), Color.black.opacity(0.72)],
+        startPoint: UnitPoint(x: 0.5, y: 0.3),
+        endPoint: .bottom,
+      )
+      VStack(alignment: .leading, spacing: 4) {
+        Text("Basu")
+          .font(.sans(small ? 28 : 36, .semibold))
+          .tracking(-0.03 * (small ? 28 : 36))
+        Text(first ? "Хоолоо урьдчилан захиалж, өвлийн идшээ гэрээт малчнаас ав." : title)
+          .font(.sans(first ? 14 : 16, first ? .regular : .medium))
+          .opacity(0.86)
+          .fixedSize(horizontal: false, vertical: true)
+          .contentTransition(.opacity)
+      }
+      .foregroundStyle(.white)
+      .padding(18)
     }
-    .frame(maxWidth: .infinity)
-    .padding(.top, first ? 28 : 12)
+    .clipShape(shape)
+    .overlay(shape.strokeBorder(Color.line, lineWidth: BasuMetric.hairline))
+    .padding(.top, 8)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Basu · \(title)")
     .accessibilityAddTraits(.isHeader)
     .accessibilityIdentifier("signin.gate")
   }
 
-  /// A sheet over a page: no wrestler, the title large and on the ground.
+  /// A sheet over a page: no photograph, the title large and on the ground.
   private var sheetHead: some View {
     Text(title)
       .font(.sans(28, .semibold))
@@ -954,19 +968,10 @@ private struct GoogleButton: View {
 
 // MARK: - the way in's parts
 
-/// The ground, with the accent rising faintly behind the wrestler.
+/// The ground: warm white, or near black. The photograph is the colour.
 private struct Backdrop: View {
   var body: some View {
-    ZStack(alignment: .top) {
-      LinearGradient.ground
-      RadialGradient(
-        colors: [Color.accent.opacity(0.16), Color.accent.opacity(0)],
-        center: .top,
-        startRadius: 0,
-        endRadius: 420,
-      )
-      .frame(height: 520)
-    }
+    LinearGradient.ground
   }
 }
 

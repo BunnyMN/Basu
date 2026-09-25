@@ -14,10 +14,10 @@ extension Color {
   static let onAccent = BasuColor.onAccent
   static let surface = BasuColor.surface
   static let surface2 = BasuColor.surface2
-  static let sunk = dynamic(light: 0xDFE3E4, dark: 0x0A0E10)
+  static let sunk = dynamic(light: 0xEAE8E4, dark: 0x090908)
   /// The ground's first stop. A fixed title sits on this so the seam with the
   /// gradient underneath is invisible where they meet.
-  static let groundTop = dynamic(light: 0xEFF1F2, dark: 0x141B1E)
+  static let groundTop = dynamic(light: 0xF7F6F3, dark: 0x141413)
 
   static let ink = BasuColor.ink
   static let ink2 = BasuColor.ink2
@@ -28,10 +28,11 @@ extension Color {
 
   static let accent = BasuColor.accent
   static let accentInk = BasuColor.accent
+  static let accentSoft = BasuColor.accentSoft
   static let unread = BasuColor.unread
   /// `--ground2` in the prototype: the flat ground a read row takes while its
   /// Устгах is showing, so it has something to slide over.
-  static let swipeGround = dynamic(light: 0xEAECED, dark: 0x0F1417)
+  static let swipeGround = dynamic(light: 0xF4F3F0, dark: 0x0E0E0D)
 
   static let route = BasuColor.route
   static let ready = BasuColor.ready
@@ -53,7 +54,7 @@ extension Color {
     Color(uiColor: UIColor { traits in
       traits.userInterfaceStyle == .dark
         ? UIColor(white: 0, alpha: 0.4)
-        : UIColor(red: 20 / 255, green: 24 / 255, blue: 27 / 255, alpha: 0.05)
+        : UIColor(red: 22 / 255, green: 21 / 255, blue: 20 / 255, alpha: 0.05)
     })
   }
 

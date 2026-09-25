@@ -74,7 +74,7 @@ enum AppCatalogue {
   /// one: the same page a paired tablet shows, opened with the phone's own
   /// sign-in. Not in `shipped` — it is on the launcher only for them.
   static let supplier = LauncherApp(
-    id: "supplier", name: "Нийлүүлэгч", tag: "миний зар", icon: .glyph(.supplier), path: "/supplier",
+    id: "supplier", name: "Нийлүүлэгч", tag: "миний зар", icon: .raster("supplier-tile"), path: "/supplier",
   )
 
   /// What is actually built. Everything in `planned` is drawn and named only.

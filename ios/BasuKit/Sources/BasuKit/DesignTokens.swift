@@ -30,21 +30,26 @@ public enum BasuColor {
     // Surfaces. Cards are translucent over an 8pt backdrop blur
     // (.ultraThinMaterial); the 1pt hairline sits on top of the blur and is
     // what keeps edges legible.
-    public static let surface      = Color(light: 0xFFFFFF, dark: 0x161D20, opacity: 0.60)
-    public static let surface2     = Color(light: 0xF3F5F6, dark: 0x1C2428, opacity: 0.52)
+    public static let surface      = Color(light: 0xFFFFFF, dark: 0x171716, opacity: 0.60)
+    public static let surface2     = Color(light: 0xF7F6F4, dark: 0x1E1E1C, opacity: 0.52)
 
-    // Ink
-    public static let ink          = Color(light: 0x14181B, dark: 0xE7ECED)
-    public static let ink2         = Color(light: 0x4A555C, dark: 0xA2B0B6)
-    public static let ink3         = Color(light: 0x78868E, dark: 0x6E7E85)
+    // Ink: warm neutrals, not blue-grey.
+    public static let ink          = Color(light: 0x161514, dark: 0xF3F2EF)
+    public static let ink2         = Color(light: 0x57534D, dark: 0xB3AEA7)
+    public static let ink3         = Color(light: 0x6B665F, dark: 0x928D86)
 
     // Lines
-    public static let line         = Color(light: 0xD2D8DA, dark: 0x283236)
-    public static let line2        = Color(light: 0xC0C8CB, dark: 0x374348)
+    public static let line         = Color(light: 0xE2DFDA, dark: 0x2A2927)
+    public static let line2        = Color(light: 0xCFCBC4, dark: 0x3B3A37)
 
-    // The one brand colour
-    public static let accent       = Color(light: 0xC64E08, dark: 0xFF8A3D)
-    public static let onAccent     = Color(light: 0xFFFFFF, dark: 0x160B03)
+    // The accent is ink: a black primary on warm white, white on black in
+    // the dark. Colour is kept for meaning (ready, hold, stop, route) and
+    // the photographs bring the warmth — as on the web (app.css, §3 of
+    // docs/design-system.md) since 11143bb.
+    public static let accent       = Color(light: 0x161514, dark: 0xF3F2EF)
+    public static let onAccent     = Color(light: 0xFFFFFF, dark: 0x161514)
+    /// The wash behind a chosen tab or chip.
+    public static let accentSoft   = Color(light: 0xECEAE6, dark: 0x2A2927)
 
     // Semantic
     public static let ready        = Color(light: 0x136A4B, dark: 0x57C295)   // credits
@@ -68,9 +73,9 @@ public enum BasuColor {
     public static var ground: LinearGradient {
         LinearGradient(
             stops: [
-                .init(color: Color(light: 0xEFF1F2, dark: 0x141B1E), location: 0.00),
-                .init(color: Color(light: 0xE9EBEC, dark: 0x0E1315), location: 0.46),
-                .init(color: Color(light: 0xDFE3E4, dark: 0x0A0E10), location: 1.00)
+                .init(color: Color(light: 0xF7F6F3, dark: 0x141413), location: 0.00),
+                .init(color: Color(light: 0xF4F3F0, dark: 0x0E0E0D), location: 0.46),
+                .init(color: Color(light: 0xECEAE6, dark: 0x090908), location: 1.00)
             ],
             startPoint: .init(x: 0.03, y: 0), endPoint: .init(x: -0.03, y: 1))
     }
@@ -198,7 +203,7 @@ public enum BasuMetric {
     public static let control: CGFloat       = 14
     public static let controlHeight: CGFloat = 52
     public static let authCard: CGFloat      = 24
-    public static let mascot: CGFloat        = 150
+    public static let authPhoto: CGFloat     = 210
     public static let swipeAction: CGFloat   = 88
     public static let searchThreshold        = 7   // services before the filter field appears
 

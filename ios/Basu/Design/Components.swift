@@ -38,7 +38,7 @@ struct WideButton: View {
 
   private var foreground: Color {
     switch kind {
-    case .primary: .white
+    case .primary: .onAccent
     case .quiet: .ink2
     case .danger: .stop
     }

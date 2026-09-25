@@ -37,7 +37,7 @@ struct OrderLiveActivity: Widget {
         FoodTile(size: 22, radius: 6)
       }
       .widgetURL(URL(string: "basu://order/\(context.attributes.orderID)"))
-      .keylineTint(BasuColor.accent)
+      .keylineTint(BasuColor.onLock)
     }
   }
 }
@@ -75,7 +75,7 @@ struct ExpandedIsland: View {
         }
         .fixedSize()
       }
-      StageBar(stage: state.stage, track: Color(red: 0x2B / 255, green: 0x32 / 255, blue: 0x36 / 255))
+      StageBar(stage: state.stage, track: Color(red: 0x2B / 255, green: 0x32 / 255, blue: 0x36 / 255), fill: BasuColor.onLock)
     }
     .padding(.top, 6)
     .padding(.horizontal, 4)
@@ -115,7 +115,7 @@ struct LockScreenCard: View {
       }
 
       VStack(alignment: .leading, spacing: 7) {
-        StageBar(stage: state.stage, track: BasuColor.lockTrack)
+        StageBar(stage: state.stage, track: BasuColor.lockTrack, fill: BasuColor.onLock)
         HStack(alignment: .firstTextBaseline) {
           Text(state.stageLabel)
             .font(BasuFont.sans(12.5, .medium))
@@ -125,7 +125,7 @@ struct LockScreenCard: View {
             Text(BasuFormat.hhmm(fire))
               .font(BasuFont.mono(12.5, .semibold))
               .monospacedDigit()
-              .foregroundStyle(BasuColor.accent)
+              .foregroundStyle(BasuColor.onLock)
           }
         }
       }

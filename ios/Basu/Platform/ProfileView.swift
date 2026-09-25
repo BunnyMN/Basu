@@ -664,8 +664,10 @@ struct Switch: View {
     ZStack(alignment: isOn ? .trailing : .leading) {
       RoundedRectangle(cornerRadius: BasuMetric.switchTrack, style: .continuous)
         .fill(isOn ? Color.accent : Color.line2)
+      // White on the off track; on the accent track, whatever reads on the
+      // accent — white on black, black on white in the dark.
       Circle()
-        .fill(.white)
+        .fill(isOn ? Color.onAccent : .white)
         .frame(width: 27, height: 27)
         .shadow(color: .black.opacity(0.2), radius: 1, y: 1)
         .padding(2)

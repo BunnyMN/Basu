@@ -9,17 +9,21 @@ import SwiftUI
 public struct StageBar: View {
   public let stage: OrderStage
   public var track: Color
+  public var fill: Color
 
-  public init(stage: OrderStage, track: Color) {
+  /// `fill` is the accent in the app and a widget; on the lock screen, whose
+  /// glass is dark whatever the phone's appearance, it is `onLock`.
+  public init(stage: OrderStage, track: Color, fill: Color = BasuColor.accent) {
     self.stage = stage
     self.track = track
+    self.fill = fill
   }
 
   public var body: some View {
     HStack(spacing: 4) {
       ForEach(0..<3, id: \.self) { i in
         RoundedRectangle(cornerRadius: 2, style: .continuous)
-          .fill(i <= stage.index ? BasuColor.accent : track)
+          .fill(i <= stage.index ? fill : track)
           .frame(height: 3)
       }
     }
