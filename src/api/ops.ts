@@ -40,8 +40,26 @@ import { registerSystemDesk } from './systemDesk.js';
 import { revokeSession } from '../platform/identity/index.js';
 import { mode } from '../mode.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
-import { ROLES, createInvite, linkByProof, listMembers, memberForAccount, setMemberActive, upsertMember, type Member, type Role } from '../ops/index.js';
-import { contactsFor, phoneE164, resolveGuest } from '../platform/identity/index.js';
+import {
+  ROLES,
+  RequestError,
+  approveRequest,
+  createInvite,
+  declineRequest,
+  linkByProof,
+  listMembers,
+  memberForAccount,
+  pendingRequests,
+  requestAccess,
+  requestOf,
+  setMemberActive,
+  upsertMember,
+  type AccessRequest,
+  type Member,
+  type Role,
+} from '../ops/index.js';
+import { contactsFor, phoneE164, profileOf, resolveGuest } from '../platform/identity/index.js';
+import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -123,6 +141,23 @@ export async function registerOpsRoutes(
   ctx: Ctx,
   opts: { dev: boolean },
 ): Promise<void> {
+  /**
+   * The seat this account sits in, if any. First time at the desk, a seat
+   * is taken only with an address the account has proved — an email somebody
+   * vouched for, or a number an SMS code reached, that a member is named by.
+   * A number merely typed at sign-up is not one.
+   */
+  async function seatOf(guestId: string): Promise<Member | null> {
+    const member = await memberForAccount(guestId);
+    if (member) return member;
+    const contact = (await contactsFor([guestId])).get(guestId);
+    return linkByProof({
+      guestId,
+      email: contact?.email ?? null,
+      phone: contact?.phoneVerified ? contact.phone : null,
+    });
+  }
+
   const requireOps: Guard = async (request, reply) => {
     const sent = bearer(request);
     if (!sent) return unauthorized(reply);
@@ -133,20 +168,18 @@ export async function registerOpsRoutes(
     }
     const guestId = await resolveGuest(ctx, sent);
     if (!guestId) return unauthorized(reply);
-    let member = await memberForAccount(guestId);
-    if (!member) {
-      // First time at the desk: a seat is taken only with an address this
-      // account has proved — an email somebody vouched for, or a number an
-      // SMS code reached. A number merely typed at sign-up is not one.
-      const contact = (await contactsFor([guestId])).get(guestId);
-      member = await linkByProof({
-        guestId,
-        email: contact?.email ?? null,
-        phone: contact?.phoneVerified ? contact.phone : null,
-      });
-    }
+    const member = await seatOf(guestId);
     if (!member?.active) return unauthorized(reply);
     request.ops = { id: member.id, name: member.name, role: member.role, phone: member.phone, email: member.email };
+    return undefined;
+  };
+
+  /** Anybody signed in — the dashboard's front room, before a seat. */
+  const requireAccount: Guard = async (request, reply) => {
+    const sent = bearer(request);
+    const guestId = sent ? await resolveGuest(ctx, sent) : null;
+    if (!guestId) return unauthorized(reply);
+    request.guestId = guestId;
     return undefined;
   };
   /** A route that needs more than a seat at the desk. */
@@ -168,7 +201,116 @@ export async function registerOpsRoutes(
     member: { id: request.ops!.id, name: request.ops!.name, role: request.ops!.role, phone: request.ops!.phone, email: request.ops!.email },
   }));
 
+  /* ── the front room: anybody signed in ── */
+
+  const shapeRequest = (r: AccessRequest) => ({
+    id: r.id,
+    name: r.name,
+    contact: r.contact,
+    role: r.role,
+    note: r.note,
+    state: r.state,
+    created_at: r.createdAt.toISOString(),
+    decided_at: r.decidedAt?.toISOString() ?? null,
+    decline_reason: r.declineReason,
+  });
+
+  /**
+   * Who is signed in, whether they sit at the desk, and what they asked for.
+   * The dashboard's first question: a member gets the desk, anybody else
+   * their profile and the way to ask for a seat.
+   */
+  app.get('/v1/ops/whoami', { preHandler: requireAccount, config: limit }, async (request) => {
+    const guestId = request.guestId!;
+    const [profile, member, asked] = await Promise.all([profileOf(guestId), seatOf(guestId), requestOf(guestId)]);
+    return {
+      account: {
+        id: guestId,
+        name: profile?.displayName ?? null,
+        email: profile?.email ?? null,
+        phone: profile?.phone ?? null,
+      },
+      member: member?.active
+        ? { id: member.id, name: member.name, role: member.role, phone: member.phone, email: member.email }
+        : null,
+      request: asked ? shapeRequest(asked) : null,
+    };
+  });
+
+  const requestRefusal = (reply: FastifyReply, error: unknown) => {
+    if (!(error instanceof RequestError)) return sendError(reply, error);
+    const words = {
+      ALREADY_MEMBER: [409, 'Та аль хэдийн гишүүн байна.'],
+      NOT_PENDING: [409, 'Энэ хүсэлтэд аль хэдийн хариулсан байна.'],
+      BAD_REQUEST: [400, 'Нэр, эрхээ шалгана уу.'],
+    } as const;
+    const [status, mn] = words[error.code];
+    return reply.status(status).send({ error: { code: error.code, message_mn: mn, message_en: error.message } });
+  };
+
+  /** Ask for a seat, or change the ask while it waits. */
+  app.post<{ Body: { name?: string; role?: string; note?: string } }>(
+    '/v1/ops/requests',
+    { preHandler: requireAccount, config: limit },
+    async (request, reply) => {
+      const guestId = request.guestId!;
+      const body = request.body ?? {};
+      const contact = (await contactsFor([guestId])).get(guestId);
+      try {
+        const asked = await requestAccess({
+          guestId,
+          name: body.name ?? '',
+          contact: contact?.email ?? contact?.phone ?? null,
+          role: (body.role ?? 'ops') as Role,
+          note: body.note ?? null,
+          now: ctx.clock.now(),
+        });
+        return reply.status(201).send(shapeRequest(asked));
+      } catch (error) {
+        return requestRefusal(reply, error);
+      }
+    },
+  );
+
   /* ── the members, admin only ── */
+
+  app.get('/v1/ops/requests', asAdmin, async () => ({ requests: (await pendingRequests()).map(shapeRequest) }));
+
+  /** Tell the person how it went — in the app, and by email where they have one. */
+  const tellRequester = (guestId: string, id: string, title: string, body: string) =>
+    enqueue(ctx, { guestId, template: 'ops.request', title, body, channel: 'push', subject: 'ops_request', subjectId: id, dedupeKey: `ops_request:${id}` });
+
+  app.post<{ Params: { id: string }; Body: { role?: string } }>('/v1/ops/requests/:id/approve', asAdmin, async (request, reply) => {
+    const role = request.body?.role ? (request.body.role as Role) : null;
+    try {
+      const waiting = (await pendingRequests()).find((r) => r.id === request.params.id);
+      const contact = waiting ? (await contactsFor([waiting.guestId])).get(waiting.guestId) : undefined;
+      const { request: decided, member } = await approveRequest({
+        id: request.params.id,
+        role,
+        by: who(request),
+        now: ctx.clock.now(),
+        email: contact?.email ?? null,
+        phone: contact?.phone ?? null,
+      });
+      await recordAudit({ who: who(request), action: 'member.approve', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
+      await tellRequester(decided.guestId, decided.id, 'Ops эрх олголоо', `Таны Basu ops-ийн хүсэлт батлагдлаа (${member.role}). basu.burzai.cloud/dashboard-д нэвтэрнэ үү.`);
+      return reply.send({ request: shapeRequest(decided), member: shapeMember(member) });
+    } catch (error) {
+      return requestRefusal(reply, error);
+    }
+  });
+
+  app.post<{ Params: { id: string }; Body: { reason?: string } }>('/v1/ops/requests/:id/decline', asAdmin, async (request, reply) => {
+    try {
+      const decided = await declineRequest({ id: request.params.id, reason: request.body?.reason ?? null, by: who(request), now: ctx.clock.now() });
+      await recordAudit({ who: who(request), action: 'member.decline', targetKind: 'member', targetId: decided.id, note: `${decided.name}${decided.declineReason ? ` · ${decided.declineReason}` : ''}` });
+      await tellRequester(decided.guestId, decided.id, 'Ops эрхийн хүсэлт', `Таны Basu ops-ийн хүсэлтийг батлах боломжгүй байлаа.${decided.declineReason ? ` Шалтгаан: ${decided.declineReason}.` : ''}`);
+      return reply.send({ request: shapeRequest(decided) });
+    } catch (error) {
+      return requestRefusal(reply, error);
+    }
+  });
 
   const shapeMember = (m: Member) => ({
     id: m.id,

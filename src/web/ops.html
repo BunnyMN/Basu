@@ -27,6 +27,16 @@ p{margin:0}
 .page{max-width:var(--col-desk);margin:0 auto;padding:var(--s-7) var(--gutter) 64px}
 .page > .back{margin-bottom:4px}
 .page-head + .section{margin-top:0}
+/* an ask for a seat: who, why, and the answer on one line under it */
+.request .main{flex:1;min-width:0}
+.request .who-contact{font-weight:400;font-size:var(--t-cap);color:var(--ink-2);margin-left:6px}
+.request .cap{margin:2px 0 0}
+.req-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
+.req-actions .input{width:auto;min-width:0;height:var(--h-sm);min-height:var(--h-sm);font-size:var(--t-cap)}
+.req-actions select.input{width:240px}
+.req-actions [name="reason"]{width:200px}
+.req-actions .btn{min-height:var(--h-sm);font-size:var(--t-cap)}
+.req-actions .gap{width:12px}
 .pair-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:0 16px;align-items:start}
 @media (max-width:900px){
   .app{grid-template-columns:minmax(0,1fr)}
@@ -247,7 +257,7 @@ async function showToken() {
     <div class="card pair">
       <div class="brand wordmark">Basu<small>Ops</small></div>
       <h2 id="door-title">Нэвтрэх</h2>
-      <p id="door-lead">Гишүүн утас, нууц үгээрээ нэвтэрнэ.</p>
+      <p id="door-lead">Утас, нууц үгээрээ нэвтэрнэ үү. Гишүүн биш бол нэвтэрсний дараа эрх хүсэж болно.</p>
       <div data-doors></div>
       <div class="or" data-phone-or hidden>эсвэл утас, нууц үгээр</div>
       <input class="input" name="invite" inputmode="numeric" placeholder="Урилгын код · 12345 67890" aria-label="Урилгын код" autocomplete="one-time-code" hidden>
@@ -269,11 +279,11 @@ async function showToken() {
   });
   card.querySelector('[data-doors]').replaceWith(doors);
   // Say only the ways that are really on the card.
-  let everyday = 'Гишүүн утас, нууц үгээрээ нэвтэрнэ.';
+  let everyday = 'Утас, нууц үгээрээ нэвтэрнэ үү. Гишүүн биш бол нэвтэрсний дараа эрх хүсэж болно.';
   doors.ready.then((open) => {
     const others = open.google || open.email;
     const ways = [open.google && 'Google', open.email && 'имэйл'].filter(Boolean);
-    if (ways.length) everyday = `Гишүүн ${ways.join(', ')} эсвэл утас, нууц үгээрээ нэвтэрнэ.`;
+    if (ways.length) everyday = `${ways.join(', ')} эсвэл утас, нууц үгээрээ нэвтэрнэ үү. Гишүүн биш бол нэвтэрсний дараа эрх хүсэж болно.`;
     if (!claiming) card.querySelector('#door-lead').textContent = everyday;
     card.querySelector('[data-phone-or]').hidden = !others;
     // One primary on the card: with Google or email above, the phone is the quieter way.
@@ -313,14 +323,7 @@ async function showToken() {
             method: 'POST',
             body: { phone: number, password: code.value, device: 'Ops' },
           });
-      try {
-        ({ member: me } = await api('/v1/ops/me', { token: t }));
-      } catch {
-        toast('Энэ дугаар ops-ийн гишүүн биш байна.', 'bad');
-        return;
-      }
-      store.opsToken = t;
-      boot();
+      enterDesk(t);
     } catch (error) {
       toast(error.message, 'bad');
     }
@@ -332,20 +335,116 @@ async function showToken() {
 }
 
 /**
- * A session from any door — Google, a code by email, the phone — is the
- * desk's only if the server seats it: an account that proved an address a
- * member is named by. Anybody else is told so and stays at the door.
+ * A session from any door — Google, a code by email, the phone — comes in.
+ * What it sees is the server's to say: a member gets the desk, anybody else
+ * the front room, with their profile and the way to ask for a seat.
  */
-async function enterDesk(t) {
-  try {
-    ({ member: me } = await api('/v1/ops/me', { token: t }));
-  } catch {
-    toast('Энэ бүртгэл ops-ийн гишүүн биш байна. Админ таныг имэйл эсвэл утсаар нь гишүүнээр нэмэх хэрэгтэй.', 'bad');
-    if (!document.querySelector('.door')) showToken();
-    return;
-  }
+function enterDesk(t) {
   store.opsToken = t;
   boot();
+}
+
+/* ── the front room: signed in, not seated ─────────────────────────── */
+
+const ROLE_ASK = [
+  ['ops', 'ops — захиалга, нийлүүлэгч'],
+  ['finance', 'санхүү — олголт, буцаалт, данс'],
+  ['viewer', 'зөвхөн харах'],
+  ['admin', 'админ — бүгд, гишүүд'],
+];
+let frontPoll;
+
+/**
+ * Who you are, and your seat at the desk: asked for, waiting, or said no
+ * to. While a request waits the page keeps asking, so the yes opens the
+ * desk without anybody reloading anything.
+ */
+function showFrontRoom({ account, request }) {
+  clearInterval(frontPoll);
+  const name = account.name ?? request?.name ?? '';
+  const contact = account.email ?? account.phone ?? '';
+  const card = el(`
+    <div class="door"><div class="card pair" id="front">
+      <div class="brand wordmark">Basu<small>Ops</small></div>
+      <h2>${name ? `Сайн байна уу, ${esc(name)}` : 'Сайн байна уу'}</h2>
+      <p>${contact ? `${esc(contact)} хаягаар нэвтэрсэн байна. ` : ''}Ops-ийн хэсэгт орохын тулд эрх хүснэ үү — админ зөвшөөрөхөд шууд нээгдэнэ.</p>
+      <div data-state></div>
+      <div data-form></div>
+      <button class="btn" data-v="link" type="button" id="front-out">Гарах</button>
+    </div></div>`);
+  const state = card.querySelector('[data-state]');
+  const slot = card.querySelector('[data-form]');
+
+  const form = (asked) => {
+    const f = el(`
+      <div>
+        <input class="input" name="name" placeholder="Таны нэр" aria-label="Нэр" autocomplete="name">
+        <select class="input" name="role" aria-label="Хүсэх эрх">${ROLE_ASK.map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
+        <textarea class="input" name="note" rows="3" placeholder="Та хэн бэ, юунд хэрэгтэй вэ (заавал биш)" aria-label="Тайлбар"></textarea>
+        <button class="btn" data-v="primary" data-size="lg" type="button" id="ask">${asked ? 'Хүсэлтээ шинэчлэх' : 'Эрх хүсэх'}</button>
+      </div>`);
+    f.querySelector('[name="name"]').value = asked?.name ?? name;
+    f.querySelector('[name="role"]').value = asked?.role ?? 'ops';
+    f.querySelector('[name="note"]').value = asked?.note ?? '';
+    f.querySelector('#ask').addEventListener('click', async (e) => {
+      const v = (n) => f.querySelector(`[name="${n}"]`).value.trim();
+      e.target.setAttribute('data-busy', '');
+      try {
+        await ops('/v1/ops/requests', { method: 'POST', body: { name: v('name'), role: v('role'), note: v('note') } });
+        toast('Хүсэлт илгээгдлээ.');
+        boot();
+      } catch (error) {
+        toast(error.message, 'bad');
+      } finally {
+        e.target.removeAttribute('data-busy');
+      }
+    });
+    return f;
+  };
+
+  if (request?.state === 'pending') {
+    const role = ROLE_ASK.find(([k]) => k === request.role)?.[1] ?? request.role;
+    state.append(el(`
+      <div class="callout" data-k="ok" style="margin-bottom:16px">
+        <b>Хүсэлт хүлээгдэж байна</b>
+        <span>Хүссэн эрх: ${esc(role)} · ${when(request.created_at)} ${clockOf(request.created_at)}. Админ зөвшөөрмөгц энэ хуудас өөрөө нээгдэнэ.</span>
+      </div>`));
+    const change = el('<button class="btn" type="button" data-size="lg" style="width:100%">Хүсэлтээ өөрчлөх</button>');
+    change.addEventListener('click', () => {
+      change.remove();
+      slot.replaceChildren(form(request));
+    });
+    slot.append(change);
+    // Keep asking while it waits: the yes opens the desk on its own.
+    frontPoll = setInterval(async () => {
+      if (document.hidden) return;
+      try {
+        const now = await ops('/v1/ops/whoami');
+        if (now.member || now.request?.state !== 'pending') {
+          clearInterval(frontPoll);
+          boot();
+        }
+      } catch {
+        clearInterval(frontPoll);
+      }
+    }, 10_000);
+  } else {
+    if (request?.state === 'declined') {
+      state.append(el(`
+        <div class="callout" data-k="warn" style="margin-bottom:16px">
+          <b>Хүсэлтийг татгалзсан</b>
+          <span>${request.decline_reason ? `Шалтгаан: ${esc(request.decline_reason)}. ` : ''}Дахин хүсэж болно.</span>
+        </div>`));
+    }
+    slot.append(form(null));
+  }
+  card.querySelector('#front-out').addEventListener('click', () => {
+    clearInterval(frontPoll);
+    store.opsToken = null;
+    me = null;
+    showToken();
+  });
+  root.replaceChildren(card);
 }
 
 /* ── the desk ─────────────────────────────────────────────────────── */
@@ -377,13 +476,14 @@ const TABS = [
   { key: 'members', label: 'Гишүүд', icon: ICON.members, group: 'Ширээ', admin: true },
 ];
 let tab = localStorage.getItem('basu.ops.tab') ?? 'overview';
-let cache = { suppliers: [], settlements: [] };
+let cache = { suppliers: [], settlements: [], requests: [] };
 
 async function refresh() {
   try {
     const [{ suppliers }, { settlements }, whoami] = await Promise.all([ops('/v1/ops/suppliers'), ops('/v1/ops/settlements'), ops('/v1/ops/me')]);
-    cache = { suppliers, settlements };
     me = whoami.member;
+    const requests = me?.role === 'admin' ? (await ops('/v1/ops/requests')).requests : [];
+    cache = { suppliers, settlements, requests };
   } catch (error) {
     if (error.status === 401 || error.status === 503) {
       store.opsToken = null;
@@ -439,6 +539,7 @@ function badges() {
   };
   set('suppliers', applied, applied > 0);
   set('pay', due, due > 0);
+  set('members', cache.requests.length, cache.requests.length > 0);
 }
 
 function show(key) {
@@ -1842,7 +1943,7 @@ function renderSettlement(t) {
 const ACTION = {
   'order.cancel': 'Захиалга цуцалсан', 'order.hand': 'Хүлээлгэн өгсөн гэж тэмдэглэсэн', 'order.resend': 'Мэдэгдэл дахин илгээсэн',
   'supplier.suspend': 'Нийлүүлэгчийг түр зогсоосон', 'supplier.activate': 'Нийлүүлэгчийг идэвхжүүлсэн', 'supplier.terms': 'Гэрээний нөхцөл өөрчилсөн',
-  'supplier.bank_verify': 'Данс баталгаажуулсан', 'listing.hide': 'Зар нуусан', 'member.upsert': 'Гишүүн нэмсэн', 'member.activate': 'Гишүүн нээсэн', 'member.deactivate': 'Гишүүн хаасан',
+  'supplier.bank_verify': 'Данс баталгаажуулсан', 'listing.hide': 'Зар нуусан', 'member.upsert': 'Гишүүн нэмсэн', 'member.approve': 'Ops эрх олгосон', 'member.decline': 'Эрхийн хүсэлт татгалзсан', 'member.activate': 'Гишүүн нээсэн', 'member.deactivate': 'Гишүүн хаасан',
 };
 
 async function renderAudit(view) {
@@ -1866,9 +1967,63 @@ async function renderAudit(view) {
 
 /* ── the members ── */
 
+/** Asks for a seat, answered here: yes with a role, or no with a reason. */
+async function renderRequests(view) {
+  let requests;
+  try {
+    ({ requests } = await ops('/v1/ops/requests'));
+  } catch (error) {
+    toast(error.message, 'bad');
+    return;
+  }
+  cache.requests = requests;
+  badges();
+  const section = el(`<section class="section"><h2 class="section-label">Эрхийн хүсэлт${requests.length ? ` · ${requests.length}` : ''}</h2><div class="card" data-rows id="requests"></div></section>`);
+  const list = section.querySelector('#requests');
+  if (!requests.length) list.append(el('<div class="empty">Хүлээгдэж буй хүсэлт алга. Хүн dashboard-д нэвтэрч «Эрх хүсэх» дарахад энд гарна.</div>'));
+  for (const r of requests) {
+    const row = el(`
+      <div class="row request" data-request="${r.id}">
+        <div class="main">
+          <div class="title">${esc(r.name)}${r.contact ? ` <span class="who-contact">${esc(r.contact)}</span>` : ''}</div>
+          ${r.note ? `<p class="cap">${esc(r.note)}</p>` : ''}
+          <div class="req-actions">
+            <select class="input" aria-label="Олгох эрх">${ROLE_ASK.map(([k, l]) => `<option value="${k}"${k === r.role ? ' selected' : ''}>${l}</option>`).join('')}</select>
+            <button class="btn" data-v="primary" type="button" data-a="approve">Зөвшөөрөх</button>
+            <span class="gap" aria-hidden="true"></span>
+            <input class="input" name="reason" placeholder="Татгалзах шалтгаан" aria-label="Татгалзах шалтгаан">
+            <button class="btn" data-v="quiet" type="button" data-a="decline">Татгалзах</button>
+          </div>
+        </div>
+        <div class="end"><span class="meta">${when(r.created_at)} ${clockOf(r.created_at)}</span></div>
+      </div>`);
+    row.querySelector('[data-a="approve"]').addEventListener('click', async () => {
+      try {
+        const done = await ops(`/v1/ops/requests/${r.id}/approve`, { method: 'POST', body: { role: row.querySelector('select').value } });
+        toast(`${done.member.name}: ${ROLE_WORD[done.member.role] ?? done.member.role} эрх олголоо.`, 'good');
+        show('members');
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+    });
+    row.querySelector('[data-a="decline"]').addEventListener('click', async () => {
+      try {
+        await ops(`/v1/ops/requests/${r.id}/decline`, { method: 'POST', body: { reason: row.querySelector('[name="reason"]').value.trim() } });
+        toast('Татгалзлаа.');
+        show('members');
+      } catch (error) {
+        toast(error.message, 'bad');
+      }
+    });
+    list.append(row);
+  }
+  view.append(section);
+}
+
 async function renderMembers(view) {
-  view.append(head('Гишүүд', 'Хэн энэ хуудсанд орж, юу хийж болох вэ.'));
-  view.append(el('<div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Нэр</th><th>Утас, имэйл</th><th>Эрх</th><th>Төлөв</th><th></th></tr></thead><tbody id="members"><tr><td colspan="5" class="empty">…</td></tr></tbody></table></div></div>'));
+  view.append(head('Гишүүд', 'Хэн энэ хуудсанд орж, юу хийж болох вэ. Хүн өөрөө нэвтэрч эрх хүсдэг — та зөвшөөрнө.'));
+  await renderRequests(view);
+  view.append(el('<section class="section"><h2 class="section-label">Гишүүд</h2><div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Нэр</th><th>Утас, имэйл</th><th>Эрх</th><th>Төлөв</th><th></th></tr></thead><tbody id="members"><tr><td colspan="5" class="empty">…</td></tr></tbody></table></div></div></section>'));
   let data;
   try {
     data = await ops('/v1/ops/members');
@@ -1900,14 +2055,14 @@ async function renderMembers(view) {
     body.append(tr);
   }
   const form = el(`
-    <section class="section"><h2 class="section-label">Гишүүн нэмэх</h2><div class="card"><div class="card-body">
+    <section class="section"><h2 class="section-label">Гараар нэмэх</h2><div class="card"><div class="card-body">
       <div class="fields">
         <label class="field"><span>Нэр</span><input name="name" placeholder="Нэр"></label>
         <label class="field"><span>Имэйл · Google-ээр нэвтэрнэ</span><input name="email" type="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com"></label>
         <label class="field"><span>Утас · урилгын кодоор нэвтэрнэ</span><input name="phone" type="tel" placeholder="+976XXXXXXXX"></label>
         <label class="field"><span>Эрх</span><select name="role"><option value="ops">ops — захиалга, нийлүүлэгч</option><option value="finance">санхүү — олголт, буцаалт, данс</option><option value="viewer">зөвхөн харах</option><option value="admin">админ</option></select></label>
       </div>
-      <div class="form-foot"><button class="btn" data-v="primary" type="button" id="add-member">Гишүүн нэмэх</button></div>
+      <div class="form-foot"><button class="btn" type="button" id="add-member">Гишүүн нэмэх</button></div>
     </div></div></section>`);
   form.querySelector('#add-member').addEventListener('click', async () => {
     const v = (n) => form.querySelector(`[name="${n}"]`).value.trim();
@@ -1943,17 +2098,35 @@ async function renderMembers(view) {
 
 /* ── boot ─────────────────────────────────────────────────────────── */
 
-function boot() {
+async function boot() {
   root.replaceChildren();
+  clearInterval(frontPoll);
   if (!token()) {
-    // Back from Google with a session: seated if it is a member's.
+    // Back from Google with a session: in, whoever it is.
     const back = authReturn?.token;
     if (back && !boot.tried) {
       boot.tried = true;
-      void enterDesk(back);
+      enterDesk(back);
       return;
     }
     showToken();
+    return;
+  }
+  // A member sits at the desk; anybody else signed in stands in the front room.
+  try {
+    ({ member: me } = await ops('/v1/ops/me'));
+  } catch (error) {
+    if (error.status !== 401) {
+      toast(error.message, 'bad');
+      return;
+    }
+    try {
+      showFrontRoom(await ops('/v1/ops/whoami'));
+    } catch {
+      store.opsToken = null;
+      me = null;
+      showToken();
+    }
     return;
   }
   refresh();

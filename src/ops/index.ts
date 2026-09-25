@@ -19,3 +19,13 @@ export {
 export { recordTick, lastTicks, pulse, type Tick, type Pulse } from './ticks.js';
 export { SETTINGS, SettingError, settings, setting, setSetting, type Setting, type SettingSpec } from './settings.js';
 export { InviteError, createInvite, takeInvite, releaseInvite, openInvites, type Invite } from './invites.js';
+export {
+  RequestError,
+  requestAccess,
+  requestOf,
+  pendingRequests,
+  approveRequest,
+  declineRequest,
+  type AccessRequest,
+  type RequestState,
+} from './requests.js';
