@@ -29,9 +29,11 @@ struct ProfileView: View {
   /// What iOS itself says about notifications, apart from Basu's own switches.
   @State private var permission: UNAuthorizationStatus?
   @State private var cacheCleared = false
+  /// What the last password change did, said under the card it was made from.
+  @State private var passwordNote: String?
 
   enum Field: String, Identifiable {
-    case name
+    case name, email, password
     var id: String { rawValue }
   }
 
@@ -58,7 +60,11 @@ struct ProfileView: View {
     .safeAreaInset(edge: .top, spacing: 0) { ShellTitle("Профайл") }
     .toolbarVisibility(.hidden, for: .navigationBar)
     .sheet(item: $editing) { field in
-      ProfileEditSheet(field: field)
+      switch field {
+      case .name: ProfileEditSheet(field: field)
+      case .email: EmailAttachSheet()
+      case .password: PasswordChangeSheet { revoked, first in noteChanged(revoked: revoked, first: first) }
+      }
     }
     .confirmationDialog(
       "Бусад төхөөрөмжөөс гарах уу?",
@@ -145,14 +151,85 @@ struct ProfileView: View {
   private var fields: some View {
     VStack(alignment: .leading, spacing: 11) {
       SectionLabel("Бүртгэл")
-      Button { editing = .name } label: {
+      VStack(spacing: 0) {
+        Button { editing = .name } label: {
+          HStack(spacing: 12) {
+            RowLabel(title: "Нэр", symbol: "person")
+            Spacer(minLength: 8)
+            Text(platform.me?.displayName ?? "—")
+              .font(.sans(15, .medium))
+              .foregroundStyle(Color.ink)
+              .lineLimit(1)
+            Chevron(size: 13).foregroundStyle(Color.ink3)
+          }
+          .padding(.horizontal, 16)
+          .padding(.vertical, 14)
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("profile.name")
+
+        // A server that does not say whether there is a password has neither
+        // the changing of one nor the address to get one back with: rather
+        // than two rows that fail when tapped, none.
+        if let me = platform.me, let hasPassword = me.hasPassword {
+          Hairline()
+          emailRow(me)
+          // A password is a way in only beside an address or a number to type
+          // with it; an Apple account with neither adds its address first.
+          if hasPassword || me.email != nil || me.phone != nil {
+            Hairline()
+            passwordRow(hasPassword: hasPassword)
+          }
+        }
+      }
+      .glassCard()
+
+      if let passwordNote {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          Image(systemName: "checkmark")
+            .font(.sans(11, .semibold))
+            .foregroundStyle(Color.ready)
+          Text(passwordNote)
+            .font(.sans(12))
+            .lineSpacing(12 * 0.55 - 3)
+            .foregroundStyle(Color.ink2)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("profile.password.note")
+      }
+    }
+    .sensoryFeedback(.success, trigger: passwordNote) { _, now in now != nil }
+  }
+
+  /**
+   The address on the account, or the way to add one.
+
+   Without one, a forgotten password is a locked door: there is no SMS, and
+   the code that replaces a password goes to an inbox. The row says so, since
+   nobody adds an address for its own sake.
+   */
+  @ViewBuilder private func emailRow(_ me: Me) -> some View {
+    if let email = me.email {
+      HStack(spacing: 12) {
+        RowLabel(title: "Имэйл", symbol: "at")
+        Spacer(minLength: 8)
+        Text(email)
+          .font(.sans(15, .medium))
+          .foregroundStyle(Color.ink)
+          .lineLimit(1)
+          .truncationMode(.middle)
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 14)
+      .accessibilityElement(children: .combine)
+      .accessibilityIdentifier("profile.email")
+    } else {
+      Button { editing = .email } label: {
         HStack(spacing: 12) {
-          RowLabel(title: "Нэр", symbol: "person")
+          RowLabel(title: "Имэйл холбох", symbol: "at", detail: "Нууц үгээ мартвал энэ хаягаар сэргээнэ")
           Spacer(minLength: 8)
-          Text(platform.me?.displayName ?? "—")
-            .font(.sans(15, .medium))
-            .foregroundStyle(Color.ink)
-            .lineLimit(1)
           Chevron(size: 13).foregroundStyle(Color.ink3)
         }
         .padding(.horizontal, 16)
@@ -160,9 +237,34 @@ struct ProfileView: View {
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
-      .accessibilityIdentifier("profile.name")
-      .glassCard()
+      .accessibilityIdentifier("profile.email")
     }
+  }
+
+  private func passwordRow(hasPassword: Bool) -> some View {
+    Button { editing = .password } label: {
+      HStack(spacing: 12) {
+        RowLabel(
+          title: hasPassword ? "Нууц үг солих" : "Нууц үг тохируулах",
+          symbol: "key",
+          detail: hasPassword ? nil : "Имэйл эсвэл утас, нууц үгээр нэвтрэхийн тулд",
+        )
+        Spacer(minLength: 8)
+        Chevron(size: 13).foregroundStyle(Color.ink3)
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 14)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier("profile.password")
+  }
+
+  /// Every other device is signed out by a new password; saying how many is
+  /// what tells somebody who changed it after a lost phone that it worked.
+  private func noteChanged(revoked: Int, first: Bool) {
+    let done = first ? "Нууц үг тохирууллаа." : "Нууц үг солигдлоо."
+    passwordNote = revoked > 0 ? "\(done) Бусад \(revoked) төхөөрөмжөөс гаргалаа." : done
   }
 
   // MARK: - this phone
@@ -622,6 +724,346 @@ struct ProfileEditSheet: View {
     Task {
       await platform.save(displayName: name, locale: nil)
       dismiss()
+    }
+  }
+}
+
+/**
+ An address, for an account that has none: the way back when a password is
+ forgotten, since the code that replaces one goes to an inbox.
+
+ A code goes to the address first, so an address is never somebody else's.
+ An account with a password types it too — a session can be stolen, and a
+ stolen one must not be able to give itself a way back in.
+ */
+struct EmailAttachSheet: View {
+  fileprivate enum Field: Hashable { case email, password, passwordShown, code }
+
+  @Environment(Platform.self) private var platform
+  @Environment(\.dismiss) private var dismiss
+  @State private var email = ""
+  @State private var password = ""
+  @State private var reveal = false
+  @State private var code = ""
+  /// The address the code went to. Typing another starts over.
+  @State private var sentTo: String?
+  @State private var busy = false
+  @State private var trouble: String?
+  @FocusState private var focus: Field?
+
+  private var needsPassword: Bool { platform.me?.hasPassword == true }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        Section {
+          TextField("Имэйл хаяг", text: $email)
+            .keyboardType(.emailAddress)
+            .textContentType(.emailAddress)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .focused($focus, equals: .email)
+            .submitLabel(needsPassword ? .next : .send)
+            .onSubmit {
+              if needsPassword { focus = reveal ? .passwordShown : .password } else { Task { await send() } }
+            }
+            .onChange(of: email) { _, typed in
+              // Another address after a code went out is a new start, not a
+              // code for the old one.
+              if let sent = sentTo, Session.address(typed) != sent {
+                sentTo = nil
+                code = ""
+              }
+            }
+            .accessibilityIdentifier("profile.email.field")
+          if needsPassword {
+            HStack(spacing: 10) {
+              PasswordField(
+                title: "Одоогийн нууц үг",
+                text: $password,
+                reveal: reveal,
+                content: .password,
+                focus: $focus,
+                hidden: .password,
+                shown: .passwordShown,
+              )
+              .submitLabel(.send)
+              .onSubmit { Task { await send() } }
+              .accessibilityIdentifier("profile.email.password")
+              RevealButton(reveal: $reveal, focus: $focus, twins: [(.password, .passwordShown)])
+            }
+          }
+          if sentTo != nil {
+            TextField("······", text: $code)
+              .keyboardType(.numberPad)
+              .textContentType(.oneTimeCode)
+              .font(.mono(20, .semibold))
+              .tracking(6)
+              .focused($focus, equals: .code)
+              .onChange(of: code) { _, typed in
+                let digits = String(typed.filter(\.isNumber).prefix(6))
+                if digits != typed {
+                  code = digits
+                  return
+                }
+                // Six digits is the whole code: it goes without another tap.
+                if digits.count == 6 { Task { await confirm() } }
+              }
+              .accessibilityLabel("Имэйлд ирсэн код")
+              .accessibilityIdentifier("profile.email.code")
+          }
+        } footer: {
+          Text(footer)
+        }
+
+        if let trouble {
+          Section {
+            Banner(message: trouble)
+              .accessibilityIdentifier("profile.email.trouble")
+          }
+          .listRowBackground(Color.clear)
+          .listRowInsets(EdgeInsets())
+        }
+
+        Section {
+          WideButton(title: sentTo == nil ? "Код авах" : "Холбох", enabled: ready) {
+            Task { if sentTo == nil { await send() } else { await confirm() } }
+          }
+          .accessibilityIdentifier("profile.email.go")
+          .listRowInsets(EdgeInsets())
+          .listRowBackground(Color.clear)
+          .listRowSeparator(.hidden)
+          if sentTo != nil {
+            Button("Код дахин авах") { Task { await send() } }
+              .font(.sans(14))
+              .buttonStyle(.borderless)
+              .listRowBackground(Color.clear)
+              .listRowSeparator(.hidden)
+          }
+        }
+      }
+      .navigationTitle("Имэйл холбох")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .topBarLeading) {
+          Button("Болих") { dismiss() }
+        }
+      }
+    }
+    .presentationDetents([.large])
+  }
+
+  private var footer: String {
+    if let sentTo {
+      return "\(sentTo) хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Spam хавтсаа шалгаарай."
+    }
+    let why = "Нууц үгээ мартвал энэ хаяг руу код ирж, шинэ нууц үг тавина. Хаяг таных гэдгийг батлах 6 оронтой код илгээнэ."
+    return needsPassword ? why + " Бүртгэл таных гэдгийг нууц үгээр баталгаажуулна." : why
+  }
+
+  private var ready: Bool {
+    guard !busy else { return false }
+    if sentTo != nil { return code.count == 6 }
+    return Session.address(email).contains("@") && (!needsPassword || !password.isEmpty)
+  }
+
+  private func send() async {
+    guard !busy, Session.address(email).contains("@"), !needsPassword || !password.isEmpty else { return }
+    busy = true
+    trouble = nil
+    defer { busy = false }
+    do {
+      try await platform.requestEmailCode(email, password: needsPassword ? password : nil)
+      sentTo = Session.address(email)
+      code = ""
+      focus = .code
+    } catch let error as APIError {
+      trouble = error.message
+      if error.code == "WRONG_PASSWORD" { focus = reveal ? .passwordShown : .password }
+    } catch {
+      trouble = "Код илгээж чадсангүй. Дахин оролдоно уу."
+    }
+  }
+
+  private func confirm() async {
+    guard !busy, let sent = sentTo, code.count == 6 else { return }
+    busy = true
+    trouble = nil
+    defer { busy = false }
+    do {
+      try await platform.attachEmail(sent, code: code)
+      dismiss()
+    } catch let error as APIError {
+      trouble = error.message
+      code = ""
+      focus = .code
+    } catch {
+      trouble = "Холбож чадсангүй. Дахин оролдоно уу."
+    }
+  }
+}
+
+/**
+ A password: changed knowing the old one, or chosen for the first time by an
+ account made by email, Google or Apple, which has none to know.
+
+ Every other session ends — whoever knew the old password is out — and this
+ phone stays signed in. The profile says how many went (`changed`).
+ */
+struct PasswordChangeSheet: View {
+  /// How many other devices were signed out, and whether it was the first.
+  let changed: (_ revoked: Int, _ first: Bool) -> Void
+
+  fileprivate enum Field: Hashable { case current, currentShown, next, nextShown, again, againShown }
+
+  @Environment(Platform.self) private var platform
+  @Environment(\.dismiss) private var dismiss
+  @State private var current = ""
+  @State private var next = ""
+  @State private var again = ""
+  @State private var reveal = false
+  @State private var busy = false
+  @State private var trouble: String?
+  @FocusState private var focus: Field?
+
+  private var hasPassword: Bool { platform.me?.hasPassword == true }
+  private var title: String { hasPassword ? "Нууц үг солих" : "Нууц үг тохируулах" }
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        Section {
+          // The eye sits on the first row, whichever that is, and shows all three.
+          if hasPassword {
+            HStack(spacing: 10) {
+              PasswordField(
+                title: "Одоогийн нууц үг",
+                text: $current,
+                reveal: reveal,
+                content: .password,
+                focus: $focus,
+                hidden: .current,
+                shown: .currentShown,
+              )
+              .submitLabel(.next)
+              .onSubmit { focus = reveal ? .nextShown : .next }
+              .accessibilityIdentifier("profile.password.current")
+              eye
+            }
+            nextField
+          } else {
+            HStack(spacing: 10) {
+              nextField
+              eye
+            }
+          }
+          PasswordField(
+            title: "Нууц үгээ давтах",
+            text: $again,
+            reveal: reveal,
+            content: .newPassword,
+            focus: $focus,
+            hidden: .again,
+            shown: .againShown,
+          )
+          .submitLabel(.go)
+          .onSubmit { Task { await save() } }
+          .accessibilityIdentifier("profile.password.again")
+        } footer: {
+          Text(footer)
+        }
+
+        if let trouble {
+          Section {
+            Banner(message: trouble)
+              .accessibilityIdentifier("profile.password.trouble")
+          }
+          .listRowBackground(Color.clear)
+          .listRowInsets(EdgeInsets())
+        }
+
+        Section {
+          WideButton(title: title, enabled: ready) {
+            Task { await save() }
+          }
+          .accessibilityIdentifier("profile.password.go")
+          .listRowInsets(EdgeInsets())
+          .listRowBackground(Color.clear)
+        }
+      }
+      .navigationTitle(title)
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .topBarLeading) {
+          Button("Болих") { dismiss() }
+        }
+      }
+    }
+    .presentationDetents([.large])
+  }
+
+  private var nextField: some View {
+    PasswordField(
+      title: "Шинэ нууц үг · дор хаяж 8 тэмдэгт",
+      text: $next,
+      reveal: reveal,
+      content: .newPassword,
+      focus: $focus,
+      hidden: .next,
+      shown: .nextShown,
+    )
+    .submitLabel(.next)
+    .onSubmit { focus = reveal ? .againShown : .again }
+    .accessibilityIdentifier("profile.password.next")
+  }
+
+  private var eye: some View {
+    RevealButton(
+      reveal: $reveal,
+      focus: $focus,
+      twins: [(.current, .currentShown), (.next, .nextShown), (.again, .againShown)],
+    )
+    .accessibilityIdentifier("profile.password.reveal")
+  }
+
+  private var footer: String {
+    let cyrillic = "Кирилл үсэгтэй нууц үгийг нүдэн тэмдгийг дараад бичнэ."
+    return hasPassword
+      ? "Солимогц бусад төхөөрөмж дээрх нэвтрэлт хаагдана, энэ утас нэвтэрсэн хэвээр үлдэнэ. \(cyrillic)"
+      : "Дараа нь имэйл эсвэл утас, энэ нууц үгээрээ нэвтэрч болно. \(cyrillic)"
+  }
+
+  private var ready: Bool {
+    !busy && !next.isEmpty && !again.isEmpty && (!hasPassword || !current.isEmpty)
+  }
+
+  private func save() async {
+    guard ready else { return }
+    // Checked here rather than left to the server: a mistyped repeat is the
+    // one mistake the person can see for themselves.
+    if next.count < 8 {
+      trouble = "Нууц үг дор хаяж 8 тэмдэгт байх ёстой."
+      focus = reveal ? .nextShown : .next
+      return
+    }
+    if next != again {
+      trouble = "Хоёр нууц үг таарахгүй байна."
+      focus = reveal ? .againShown : .again
+      return
+    }
+    let first = !hasPassword
+    busy = true
+    trouble = nil
+    defer { busy = false }
+    do {
+      let revoked = try await platform.changePassword(current: first ? "" : current, next: next)
+      changed(revoked, first)
+      dismiss()
+    } catch let error as APIError {
+      trouble = error.message
+      if error.code == "WRONG_PASSWORD" { focus = reveal ? .currentShown : .current }
+    } catch {
+      trouble = "Нууц үг сольж чадсангүй. Дахин оролдоно уу."
     }
   }
 }

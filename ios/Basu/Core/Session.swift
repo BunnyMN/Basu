@@ -68,14 +68,52 @@ final class Session {
     typed.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
   }
 
-  // MARK: with a phone
+  // MARK: with a password
 
-  /// The number and the password it already has.
-  func signIn(phone: String, password: String) async throws {
-    let number = PhoneNumber.e164(phone)
-    let token = try await api.signIn(phone: number, password: password, device: Self.deviceName)
-    keep(token: token, phone: number, email: nil)
+  /// An address or a number, and the password it already has.
+  func signIn(login typed: String, password: String) async throws {
+    let login = Self.login(typed)
+    let token = try await api.signIn(login: login, password: password, device: Self.deviceName)
+    keep(token: token, login: login)
   }
+
+  /// A code for choosing a password, to the inbox the login names. Returns
+  /// where it went, which is all the sheet may show of an address it was
+  /// not typed.
+  func requestPasswordCode(login typed: String, purpose: PasswordPurpose) async throws -> String {
+    try await api.passwordCode(login: Self.login(typed), purpose: purpose)
+  }
+
+  /**
+   The code from the letter and the password it is for, and signed in —
+   to a new account when the address had none, or to the one it had.
+   Returns whether an account was made: somebody who meant to sign up and
+   landed in an account they already had should hear so.
+   */
+  @discardableResult
+  func setPassword(login typed: String, code: String, password: String, name: String? = nil) async throws -> Bool {
+    let login = Self.login(typed)
+    let answer = try await api.setPassword(
+      login: login, code: code, password: password, name: name, device: Self.deviceName,
+    )
+    keep(token: answer.token, login: login)
+    return answer.created
+  }
+
+  /// What somebody typed to name their account, the one way the server
+  /// stores it: an address when it has an @ in it, a number otherwise.
+  nonisolated static func login(_ typed: String) -> String {
+    typed.contains("@") ? address(typed) : PhoneNumber.e164(typed)
+  }
+
+  /// Enough of a login to be worth sending: an address, or a whole number.
+  /// An address is not checked further here — the server says what is wrong
+  /// with one, in Mongolian, as it does for the email door.
+  nonisolated static func looksLikeLogin(_ typed: String) -> Bool {
+    typed.contains("@") || PhoneNumber.looksComplete(typed)
+  }
+
+  // MARK: with a phone
 
   /// A new account, for a number nobody has used.
   func register(phone: String, password: String) async throws {
@@ -121,6 +159,12 @@ final class Session {
     email = nil
     store.delete("guest.phone")
     store.delete("guest.email")
+  }
+
+  /// A login is one or the other, and the profile says whichever it was.
+  private func keep(token: String, login: String) {
+    let byEmail = login.contains("@")
+    keep(token: token, phone: byEmail ? nil : login, email: byEmail ? login : nil)
   }
 
   private func keep(token: String, phone: String?, email: String?) {

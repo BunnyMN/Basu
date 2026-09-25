@@ -48,6 +48,13 @@ struct AuthMethods: Decodable, Sendable, Equatable {
   static let unknown = AuthMethods(password: true, email: false, google: false, apple: true)
 }
 
+/// What a code for a password is for: a new account by email, or a
+/// forgotten password.
+enum PasswordPurpose: String, Sendable {
+  case signUp = "sign_up"
+  case reset
+}
+
 /**
  What Google's round trip came back with: `basu://auth#auth=<token>`, or
  `#auth_error=<why>`. The session rides in the fragment, which no server or
@@ -137,15 +144,39 @@ struct API: Sendable {
 
   // MARK: signing in
   //
-  // A phone number and a password. Each call names the device — what this
-  // phone calls itself — so the session list on the profile screen is four
-  // different rows rather than four identical ones.
+  // An email address or a phone number, and a password. Each call names the
+  // device — what this phone calls itself — so the session list on the
+  // profile screen is four different rows rather than four identical ones.
 
-  func signIn(phone: String, password: String, device: String) async throws -> String {
+  /// `login` is an address when it has an @ in it, a number otherwise. The
+  /// server tells them apart the same way; older builds sent `phone`.
+  func signIn(login: String, password: String, device: String) async throws -> String {
     try await send(
-      .init(path: "/v1/auth/login", method: "POST", body: ["phone": phone, "password": password, "device": device]),
+      .init(path: "/v1/auth/login", method: "POST", body: ["login": login, "password": password, "device": device]),
       as: Token.self,
     ).token
+  }
+
+  /**
+   A code for choosing a password, to an inbox: `signUp` for an address that
+   is to become an account, `reset` for a forgotten password, named by its
+   address or its number. Returns where the letter went — the address as
+   typed, or masked («ba•••mn@gmail.com») when only a number was.
+   */
+  func passwordCode(login: String, purpose: PasswordPurpose) async throws -> String {
+    try await send(
+      .init(path: "/v1/auth/password/code", method: "POST", body: ["login": login, "purpose": purpose.rawValue]),
+      as: CodeSent.self,
+    ).to
+  }
+
+  /// The code from that letter and the password it is for. An address with
+  /// no account becomes one, named `name`; one with an account gets the new
+  /// password, and every other session of it ends.
+  func setPassword(login: String, code: String, password: String, name: String?, device: String) async throws -> PasswordSet {
+    var body: [String: Any] = ["login": login, "code": code, "password": password, "device": device]
+    if let name { body["name"] = name }
+    return try await send(.init(path: "/v1/auth/password", method: "POST", body: body), as: PasswordSet.self)
   }
 
   func register(phone: String, password: String, device: String) async throws -> String {
@@ -235,7 +266,16 @@ struct API: Sendable {
   // MARK: the wire
 
   private struct Token: Decodable { let token: String }
+  private struct CodeSent: Decodable { let to: String }
   struct Blank: Decodable {}
+
+  /// A session, and whether an account was made for it.
+  struct PasswordSet: Decodable, Sendable {
+    let token: String
+    /// False when the address already had an account, which now has this
+    /// password — worth telling somebody who thought they were signing up.
+    let created: Bool
+  }
 
   /// A payload that is one named array — `{ "restaurants": [...] }`.
   struct Wrapped<T: Decodable>: Decodable {

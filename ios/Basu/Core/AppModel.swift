@@ -20,6 +20,13 @@ final class AppModel {
   private(set) var supplier: SupplierMine?
   private(set) var trouble: String?
 
+  /**
+   A word for somebody who has just arrived, said once over wherever they
+   landed. The way in cannot say it itself: the moment there is a session
+   the root swaps it for the launcher, so it is left here for the root.
+   */
+  var notice: String?
+
   /// Whether the last call reached the server at all.
   ///
   /// An empty launcher and an unreachable server look the same — nothing —

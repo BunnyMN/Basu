@@ -124,6 +124,17 @@ struct RootView: View {
       }
     }
     .onChange(of: appearance, initial: true) { _, chosen in chosen.apply() }
+    .alert(
+      "Нэвтэрлээ",
+      isPresented: Binding(
+        get: { model.notice != nil && session.isSignedIn && !splash },
+        set: { if !$0 { model.notice = nil } },
+      ),
+    ) {
+      Button("Ойлголоо", role: .cancel) {}
+    } message: {
+      Text(model.notice ?? "")
+    }
     .onOpenURL { url in open(url) }
     .task {
       // APNs answers whenever it answers — before a sign-in or long after it —

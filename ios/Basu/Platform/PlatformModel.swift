@@ -143,6 +143,40 @@ final class Platform {
     }
   }
 
+  /* ── the ways back in ────────────────────────────────────────────── */
+  //
+  // These throw rather than setting `trouble`: each is a step in a sheet of
+  // its own, and the refusal belongs beside the field it is about, not at
+  // the foot of the profile under the sheet.
+
+  /// A code to the address, for an account that has none. `password` is the
+  /// current one, when the account has one.
+  func requestEmailCode(_ email: String, password: String?) async throws {
+    try await api.attachEmailCode(email: Session.address(email), password: password, token: bearer())
+  }
+
+  /// The code from the letter: the address is the account's, and the
+  /// profile says so.
+  func attachEmail(_ email: String, code: String) async throws {
+    try await api.attachEmail(email: Session.address(email), code: code, token: bearer())
+    await refresh()
+  }
+
+  /// Returns how many other devices it signed out; the list catches up.
+  func changePassword(current: String, next: String) async throws -> Int {
+    let revoked = try await api.changePassword(current: current, next: next, token: bearer())
+    await refresh()
+    await loadSessions()
+    return revoked
+  }
+
+  private func bearer() throws -> String {
+    guard let token = session.token else {
+      throw APIError(status: 401, code: "UNAUTHORIZED", message: "Нэвтэрч орно уу.")
+    }
+    return token
+  }
+
   /**
    Close the account.
 

@@ -10,17 +10,20 @@ import XCTest
  inbox, and is in — the six digits go without another tap. Apple's button is
  on the same sheet, as the App Store asks.
 
- By phone: a new number signs up with a password, signs out, and comes back
- with the same password — and a wrong one is told so, with the way to sign up
- offered beside it.
+ With a password: a new address signs up — the code from the letter proves
+ it, and six digits make the account without another tap — signs out, and
+ comes back with the same password, typed beside the address. A wrong one is
+ told so, with the way to sign up offered beside it. A server with no email
+ signs up by number instead, as it did before there was email, and the test
+ follows whichever the sheet draws.
 
  The password is in Cyrillic on purpose. A secure field on iOS offers only
  keyboards that type Latin, so a password chosen on the web in Mongolian can
  only be typed here with the field shown — which is what this checks.
 
  Runs against the developer's server on localhost and skips when nothing is
- listening, like the other flows. Every run uses a number nobody has used, so
- it never trips over an account from an earlier run.
+ listening, like the other flows. Every run uses an address or a number
+ nobody has used, so it never trips over an account from an earlier run.
  */
 @MainActor
 final class SignInFlowTests: XCTestCase {
@@ -83,35 +86,54 @@ final class SignInFlowTests: XCTestCase {
     try signOutIfSignedIn(app)
   }
 
-  func testANewNumberSignsUpSignsOutAndComesBack() async throws {
-    try await DemoAPI(base: base).requireServer()
+  func testANewAccountSignsUpWithAPasswordSignsOutAndComesBack() async throws {
+    let api = DemoAPI(base: base)
+    try await api.requireServer()
 
     let app = XCUIApplication()
     app.launchEnvironment["BASU_API"] = base.absoluteString
     app.launch()
     try signOutIfSignedIn(app)
 
-    let number = "88" + String(format: "%06d", Int.random(in: 0..<1_000_000))
     let password = "Хонь \(Int.random(in: 1000..<9999)) идэш"
+    let login: String
 
     // ── sign up, in Cyrillic, with the field shown ────────────────────
-    try openThePhoneDoor(app)
+    try openThePasswordDoor(app)
     let doors = app.segmentedControls["signin.door"]
     try check(doors.waitForExistence(timeout: 5), "the sheet should open on its two doors")
     doors.buttons["Бүртгүүлэх"].tap()
     app.buttons["signin.reveal"].tap()
-    try type(app.textFields["signin.phone"], number)
-    try type(app.textFields["signin.password"], password)
-    try type(app.textFields["signin.again"], password)
-    shot("1-sign-up")
-    app.buttons["signin.go"].tap()
+    if app.textFields["signin.name"].waitForExistence(timeout: 3) {
+      // By email: a name, the address, the password twice — then the code.
+      login = "ui\(Int.random(in: 100_000..<999_999))@example.mn"
+      try type(app.textFields["signin.name"], "Бат")
+      try type(app.textFields["signin.login"], login)
+      try type(app.textFields["signin.password"], password)
+      try type(app.textFields["signin.again"], password)
+      shot("1-sign-up")
+      app.buttons["signin.go"].tap()
+      let codeField = app.textFields["signin.signUpCode"]
+      try check(codeField.waitForExistence(timeout: 10), "a code went to the address, and the sheet asks for it")
+      let code = try await api.emailCode(to: login)
+      codeField.tap()
+      codeField.typeText(code)
+    } else {
+      // No email on this server: a number and a password, as before.
+      login = "88" + String(format: "%06d", Int.random(in: 0..<1_000_000))
+      try type(app.textFields["signin.phone"], login)
+      try type(app.textFields["signin.password"], password)
+      try type(app.textFields["signin.again"], password)
+      shot("1-sign-up")
+      app.buttons["signin.go"].tap()
+    }
     try check(app.buttons["home.inbox"].waitForExistence(timeout: 10), "signed up, the launcher replaces the way in")
     declineSavingThePassword(app)
 
     // ── out, and a wrong password ─────────────────────────────────────
     try signOutIfSignedIn(app)
-    try openThePhoneDoor(app)
-    try type(app.textFields["signin.phone"], number)
+    try openThePasswordDoor(app)
+    try type(app.textFields["signin.login"], login)
     try type(app.secureTextFields["signin.password"], "wrong-password-1")
     app.buttons["signin.go"].tap()
     try check(app.staticTexts["signin.trouble"].waitForExistence(timeout: 10), "a wrong password is said out loud")
@@ -139,14 +161,14 @@ final class SignInFlowTests: XCTestCase {
     if notNow.waitForExistence(timeout: 3) { notNow.tap() }
   }
 
-  /// The phone is one tap past the first face of the way in — unless the
-  /// server has no other door, and it opens on the phone. The link sits
+  /// The password is one tap past the first face of the way in — unless the
+  /// server has no other door, and it opens on the password. The link sits
   /// under the email door, perhaps below the fold.
-  private func openThePhoneDoor(_ app: XCUIApplication) throws {
-    let way = app.buttons["signin.phoneWay"]
+  private func openThePasswordDoor(_ app: XCUIApplication) throws {
+    let way = app.buttons["signin.passwordWay"]
     if !way.waitForExistence(timeout: 3), !app.segmentedControls["signin.door"].exists { app.swipeUp() }
     if way.waitForExistence(timeout: 5) { way.tap() }
-    try check(app.segmentedControls["signin.door"].waitForExistence(timeout: 5), "the phone door should be open")
+    try check(app.segmentedControls["signin.door"].waitForExistence(timeout: 5), "the password door should be open")
   }
 
   private func type(_ element: XCUIElement, _ text: String) throws {

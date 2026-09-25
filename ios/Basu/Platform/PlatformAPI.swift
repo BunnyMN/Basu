@@ -22,12 +22,18 @@ struct Me: Decodable, Sendable, Equatable {
   let memberSince: Date
   let wallet: WalletSummary
   let unread: Int
+  /// Whether the account has a password to change, or only one to set — an
+  /// account made by email, Google or Apple has none until it chooses one.
+  /// Nil from a server that predates passwords by email, which has neither
+  /// the changing nor the address to recover one with.
+  let hasPassword: Bool?
 
   enum CodingKeys: String, CodingKey {
     case id, phone, email, locale, wallet, unread
     case displayName = "display_name"
     case avatarSeed = "avatar_seed"
     case memberSince = "member_since"
+    case hasPassword = "has_password"
   }
 
   /// What to greet somebody as. A first name if we have one, never a number.
@@ -216,6 +222,41 @@ extension API {
     if let displayName { body["display_name"] = displayName }
     if let locale { body["locale"] = locale }
     return try await send(.init(path: "/v1/me", method: "PATCH", body: body, token: token))
+  }
+
+  // MARK: the ways back in
+
+  /**
+   A code to an address, for an account that has none. An account with a
+   password types it too: a session can be stolen, and an address is how a
+   password gets replaced, so a stolen one must not be able to add its own.
+   */
+  func attachEmailCode(email: String, password: String?, token: String) async throws {
+    var body: [String: Any] = ["email": email]
+    if let password { body["password"] = password }
+    _ = try await send(
+      .init(path: "/v1/me/email/code", method: "POST", body: body, token: token),
+      as: API.Blank.self,
+    )
+  }
+
+  /// The code from that letter. The answer is the bare profile, without the
+  /// balance `me` carries, so the caller asks for `me` again rather than
+  /// decoding half of one.
+  func attachEmail(email: String, code: String, token: String) async throws {
+    _ = try await send(
+      .init(path: "/v1/me/email", method: "POST", body: ["email": email, "code": code], token: token),
+      as: API.Blank.self,
+    )
+  }
+
+  /// A new password, knowing the old one — or the first, with `current`
+  /// empty. Every other session ends; the one in hand stays. Returns how many.
+  func changePassword(current: String, next: String, token: String) async throws -> Int {
+    let answer: Revoked = try await send(
+      .init(path: "/v1/me/password", method: "POST", body: ["current": current, "next": next], token: token),
+    )
+    return answer.revoked
   }
 
   func wallet(token: String, before: String? = nil) async throws -> WalletStatement {
