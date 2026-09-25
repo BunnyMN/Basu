@@ -37,25 +37,17 @@ final class IdeshFlowTests: XCTestCase {
     app.launchEnvironment["BASU_API"] = base.absoluteString
     app.launch()
 
-    // ── the launcher has two apps now ─────────────────────────────────
+    // ── in, and the launcher has two apps now ─────────────────────────
+    app.signInIfSignedOut()
+    // Whatever is running sits above the grid, and a lazy grid below the
+    // fold has not drawn its tiles yet — so scroll to it.
     let idesh = app.buttons["app.Идэш"]
-    XCTAssertTrue(idesh.waitForExistence(timeout: 10), "the home screen should offer the winter-meat app")
-    XCTAssertTrue(app.buttons["app.Хоол"].exists, "…beside the food one")
+    XCTAssertTrue(app.buttons["app.Хоол"].waitForExistence(timeout: 10), "the home screen should offer the food app")
+    scroll(app, to: idesh)
+    XCTAssertTrue(idesh.exists, "…and the winter-meat one beside it")
     shot("1-home-two-apps")
 
-    // Signed out, the header offers the way in where the bell will be. Signed
-    // in from an earlier run, there is a bell instead and nothing to do.
-    if app.buttons["home.account"].waitForExistence(timeout: 2) {
-      app.buttons["home.account"].firstMatch.tap()
-      let demo = app.buttons["signin.demo"]
-      if demo.waitForExistence(timeout: 5) { demo.tap() }
-    }
-
     // ── the page, inside the app ──────────────────────────────────────
-    // Signed in, whatever is running sits above the grid, and a lazy grid
-    // below the fold has not drawn its tiles yet — so scroll to it.
-    scroll(app, to: idesh)
-    XCTAssertTrue(idesh.exists, "the tile should still be on the launcher after signing in")
     idesh.tap()
 
     let page = app.webViews.firstMatch

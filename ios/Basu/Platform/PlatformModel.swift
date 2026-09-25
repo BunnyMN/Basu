@@ -150,6 +150,7 @@ final class Platform {
    running, and says which in Mongolian — so the refusal is shown rather than
    guessed at here. Returns whether it went through.
    */
+  @discardableResult
   func closeAccount() async -> Bool {
     guard let token = session.token else { return false }
     do {

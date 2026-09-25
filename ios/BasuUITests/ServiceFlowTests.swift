@@ -44,17 +44,10 @@ final class ServiceFlowTests: XCTestCase {
     app.launchEnvironment["BASU_API"] = base.absoluteString
     app.launch()
 
-    // ── the launcher ─────────────────────────────────────────────────
+    // ── in, and the launcher ─────────────────────────────────────────
+    app.signInIfSignedOut()
     let food = app.buttons["app.Хоол"]
     XCTAssertTrue(food.waitForExistence(timeout: 10), "the home screen should offer the food app")
-
-    // Signed out, the header offers the way in where the bell will be. Signed
-    // in from an earlier run, there is a bell instead and nothing to do.
-    if app.buttons["home.account"].waitForExistence(timeout: 2) {
-      app.buttons["home.account"].firstMatch.tap()
-      let demo = app.buttons["signin.demo"]
-      if demo.waitForExistence(timeout: 5) { demo.tap() }
-    }
     XCTAssertTrue(
       app.staticTexts["ИДЭВХТЭЙ"].waitForExistence(timeout: 15),
       "the order should be on the launcher",
@@ -110,16 +103,20 @@ final class ServiceFlowTests: XCTestCase {
     app.launchEnvironment["BASU_API"] = "http://127.0.0.1:9"
     app.launch()
 
+    // Signed in, on the launcher; signed out, on the way in. Either way the
+    // first screen says so.
     XCTAssertTrue(
       app.staticTexts["Серверт холбогдож чадсангүй"].waitForExistence(timeout: 20),
-      "an unreachable server should say so on the home screen",
+      "an unreachable server should say so on the first screen",
     )
     XCTAssertTrue(app.buttons["offline.retry"].exists, "…and offer to try again")
     XCTAssertTrue(app.otherElements["offline.banner"].exists, "…as one element")
     shot("5-offline")
 
     // The same inside an app: a page that cannot load is said out loud too,
-    // over the page's place, rather than left as a white rectangle.
+    // over the page's place, rather than left as a white rectangle. Only
+    // somebody signed in has apps to open.
+    guard app.landing() == .shell else { return }
     app.buttons["app.Хоол"].tap()
     XCTAssertTrue(
       app.staticTexts["Серверт холбогдож чадсангүй"].waitForExistence(timeout: 20),

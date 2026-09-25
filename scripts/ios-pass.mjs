@@ -41,6 +41,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const screens = [
   { name: 'splash', env: { BASU_SCREEN: 'splash' } },
+  { name: 'signin', env: { BASU_SCREEN: 'signin' } },
   { name: 'home-1', env: { BASU_APPS: '1' } },
   { name: 'home-4', env: { BASU_APPS: '4' } },
   { name: 'home-9', env: { BASU_APPS: '9' } },

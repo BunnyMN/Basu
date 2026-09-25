@@ -23,7 +23,6 @@ struct HomeView: View {
   @Environment(Session.self) private var session
   @Environment(Platform.self) private var platform
   @Environment(\.requestReview) private var requestReview
-  @State private var signingIn = false
   @State private var query = ""
 
   /// A guest who is also a supplier gets one more tile, after the two everybody has.
@@ -64,7 +63,6 @@ struct HomeView: View {
     .scrollIndicators(.hidden)
     .background(LinearGradient.ground)
     .toolbarVisibility(.hidden, for: .navigationBar)
-    .sheet(isPresented: $signingIn) { SignInSheet() }
     .refreshable {
       await model.refreshLive()
       await platform.refresh()
@@ -87,8 +85,8 @@ struct HomeView: View {
   // MARK: - header
 
   /// `Basu` on the left, the bell alone on the right. No city label, no
-  /// greeting, no avatar — all three were cut. Signed out there is no bell to
-  /// ring, so the way in stands where it would be.
+  /// greeting, no avatar — all three were cut. There is always a bell: the
+  /// launcher is only drawn for somebody signed in (see `RootView`).
   private var header: some View {
     HStack(alignment: .top, spacing: 16) {
       Text("Basu")
@@ -97,11 +95,7 @@ struct HomeView: View {
         .foregroundStyle(Color.ink)
         .padding(.top, 8)
       Spacer(minLength: 8)
-      if session.isSignedIn {
-        bell
-      } else {
-        signIn
-      }
+      bell
     }
   }
 
@@ -126,22 +120,6 @@ struct HomeView: View {
     .accessibilityIdentifier("home.inbox")
     .accessibilityLabel("Мэдэгдэл")
     .accessibilityValue(platform.unread > 0 ? "\(platform.unread) уншаагүй" : "уншаагүй алга")
-  }
-
-  private var signIn: some View {
-    Button {
-      signingIn = true
-    } label: {
-      Text("Нэвтрэх")
-        .font(.sans(15, .medium))
-        .foregroundStyle(Color.accent)
-        .frame(minHeight: BasuMetric.minTarget)
-        .contentShape(Rectangle())
-    }
-    .buttonStyle(.plain)
-    .padding(.top, -5)
-    .accessibilityIdentifier("home.account")
-    .accessibilityLabel("Нэвтрэх")
   }
 
   // MARK: - what is running

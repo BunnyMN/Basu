@@ -22,11 +22,20 @@ import SwiftUI
  address straight back to this screen — a link to it opened from anywhere
  else is ignored (see `BasuApp.open`).
 
+ The same doors are two things. Signed out, they are the whole app: `RootView`
+ draws them in place of the shell, with no tab bar and nothing to close, and
+ swaps them for the launcher the moment a session exists (`gate`). Signed in,
+ a page inside the app that needs a guest can still ask for them as a sheet.
+
  A debug build pointed at a developer's own server has one more button, which
  goes straight to a session the way that server allows. It is compiled out of
  anything shipped, and hidden against the pilot, which has no such door.
  */
 struct SignInSheet: View {
+  /// The whole screen of a signed-out app rather than a sheet over something:
+  /// the wordmark on top, nothing to close, nothing to dismiss once in.
+  var gate = false
+
   /// Which face the sheet shows: the doors most people take, or the phone.
   enum Way: Hashable { case doors, phone }
   enum Door: Hashable { case signIn, signUp, invite }
@@ -78,6 +87,10 @@ struct SignInSheet: View {
   var body: some View {
     NavigationStack {
       Form {
+        if gate {
+          wordmark
+          if model.offline { offline }
+        }
         if showsAccount {
           account
         } else if way == .phone {
@@ -86,12 +99,19 @@ struct SignInSheet: View {
           doors
         }
       }
-      .navigationTitle(title)
+      .navigationTitle(gate ? "" : title)
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
-        ToolbarItem(placement: .topBarLeading) {
-          Button("Хаах") { dismiss() }
+        if !gate {
+          ToolbarItem(placement: .topBarLeading) {
+            Button("Хаах") { dismiss() }
+          }
         }
+      }
+      .toolbarVisibility(gate ? .hidden : .automatic, for: .navigationBar)
+      .scrollContentBackground(gate ? .hidden : .automatic)
+      .background {
+        if gate { LinearGradient.ground.ignoresSafeArea() }
       }
     }
     .presentationDetents([.large])
@@ -105,6 +125,53 @@ struct SignInSheet: View {
       // A server with no door but the phone: the phone is the sheet.
       if !open.apple && !open.google && !open.email { way = .phone }
     }
+  }
+
+  // MARK: - the gate's head
+
+  /// The splash's wordmark and rule, at the splash's size, so the splash
+  /// fading into this screen reads as one picture rather than a jump. Under
+  /// them, which door is open — the words a sheet puts in its title bar.
+  private var wordmark: some View {
+    Section {
+      VStack(spacing: 14) {
+        Text("Basu")
+          .font(.sans(44, .semibold))
+          .tracking(-0.03 * 44)
+          .foregroundStyle(Color.ink)
+        RoundedRectangle(cornerRadius: 1, style: .continuous)
+          .fill(Color.accent)
+          .frame(width: 34, height: 2)
+        Text(title)
+          .font(.sans(15))
+          .foregroundStyle(Color.ink2)
+          .padding(.top, 4)
+      }
+      .frame(maxWidth: .infinity)
+      .padding(.top, 36)
+      .padding(.bottom, 8)
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel("Basu · \(title)")
+      .accessibilityAddTraits(.isHeader)
+      .accessibilityIdentifier("signin.gate")
+    }
+    .listRowBackground(Color.clear)
+    .listRowInsets(EdgeInsets())
+  }
+
+  /// Signed out, the gate is the whole app, so it says an unreachable server
+  /// out loud the way the launcher does — rather than leaving a door that
+  /// fails when knocked on. Once the server answers, it is asked again which
+  /// doors are open.
+  private var offline: some View {
+    Section {
+      OfflineBanner {
+        await model.retry()
+        if !model.offline { methods = await session.methods() }
+      }
+    }
+    .listRowBackground(Color.clear)
+    .listRowInsets(EdgeInsets())
   }
 
   // MARK: - signed in
@@ -477,8 +544,13 @@ struct SignInSheet: View {
    and the launcher's list and the profile catch up behind it. At once
    because iOS offers to keep a password the moment its field leaves the
    screen; offered over this sheet, the offer would hold the sheet open.
+
+   The gate has nothing to close and nothing to catch up: the root swaps it
+   for the launcher as soon as the session exists, and the launcher asks for
+   its list on arrival.
    */
   private func signedIn() {
+    guard !gate else { return }
     dismiss()
     Task {
       await model.refreshLive()

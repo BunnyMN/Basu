@@ -63,8 +63,13 @@ enum ShellTab: String, CaseIterable, Hashable {
 }
 
 /// Where the app opens, and the one place navigation is described.
+///
+/// Signed out, the app is the way in and nothing else: no launcher behind it,
+/// no tab bar over it. Everything the shell shows — the orders, the wallet,
+/// the bell, the profile — belongs to a guest, and there is none yet.
 struct RootView: View {
   @Environment(AppModel.self) private var model
+  @Environment(Session.self) private var session
   @Environment(Platform.self) private var platform
 
   @State private var tab: ShellTab = .home
@@ -72,6 +77,56 @@ struct RootView: View {
   @State private var splash = true
 
   var body: some View {
+    ZStack {
+      if session.isSignedIn {
+        shell
+          .transition(.opacity)
+      } else {
+        SignInSheet(gate: true)
+          .transition(.opacity)
+      }
+
+      if splash {
+        SplashView()
+          .transition(.opacity)
+          .zIndex(1)
+      }
+    }
+    .animation(.easeOut(duration: 0.25), value: session.isSignedIn)
+    // Out and back in lands on the launcher, not on whatever the last
+    // person left open.
+    .onChange(of: session.isSignedIn) { _, signedIn in
+      if !signedIn {
+        tab = .home
+        path = []
+      }
+    }
+    .onOpenURL { url in open(url) }
+    .task {
+      // APNs answers whenever it answers — before a sign-in or long after it —
+      // so the token is handed over on arrival rather than asked for at a moment.
+      PushRegistrar.shared.onToken = { token in
+        Task { await platform.registerPush(token: token) }
+      }
+      OrderActivity.shared.register = { orderId, token in
+        await platform.registerActivityToken(token, order: orderId)
+      }
+      Self.jumpForDebug(tab: &tab, path: &path)
+      await Self.signInForDebug(model)
+      async let boot: Void = model.bootstrap()
+      async let me: Void = platform.refresh()
+      // The splash lasts as long as the launch does and not a moment longer;
+      // the floor is so a fast launch does not flash.
+      async let floor: Void = { try? await Task.sleep(for: .milliseconds(650)) }()
+      _ = await (boot, me, floor)
+      if !Self.debugHoldsSplash {
+        withAnimation(.easeOut(duration: 0.35)) { splash = false }
+      }
+    }
+  }
+
+  /// The launcher and the three it shares a bar with.
+  private var shell: some View {
     ZStack(alignment: .bottom) {
       LinearGradient.ground.ignoresSafeArea()
 
@@ -99,38 +154,11 @@ struct RootView: View {
       if !inApp {
         TabBar(tab: $tab)
       }
-
-      if splash {
-        SplashView()
-          .transition(.opacity)
-          .zIndex(1)
-      }
     }
     // The bar is 66 from the screen's bottom edge, home indicator included —
-    // not 66 above the safe area. Content pads itself past it.
+    // not 66 above the safe area. Content pads itself past it. The shell's
+    // alone: the way in keeps the bottom edge, and the keyboard with it.
     .ignoresSafeArea(edges: .bottom)
-    .onOpenURL { url in open(url) }
-    .task {
-      // APNs answers whenever it answers — before a sign-in or long after it —
-      // so the token is handed over on arrival rather than asked for at a moment.
-      PushRegistrar.shared.onToken = { token in
-        Task { await platform.registerPush(token: token) }
-      }
-      OrderActivity.shared.register = { orderId, token in
-        await platform.registerActivityToken(token, order: orderId)
-      }
-      Self.jumpForDebug(tab: &tab, path: &path)
-      await Self.signInForDebug(model)
-      async let boot: Void = model.bootstrap()
-      async let me: Void = platform.refresh()
-      // The splash lasts as long as the launch does and not a moment longer;
-      // the floor is so a fast launch does not flash.
-      async let floor: Void = { try? await Task.sleep(for: .milliseconds(650)) }()
-      _ = await (boot, me, floor)
-      if !Self.debugHoldsSplash {
-        withAnimation(.easeOut(duration: 0.35)) { splash = false }
-      }
-    }
   }
 
   /// True while a vertical owns the screen. The shell's own pushes do not
@@ -146,7 +174,7 @@ struct RootView: View {
     case .wallet:
       WalletView()
     case .profile:
-      ProfileView(home: { tab = .home })
+      ProfileView()
     }
   }
 
@@ -179,8 +207,8 @@ struct RootView: View {
 
   // MARK: - the design pass
 
-  /// `BASU_SCREEN=wallet|profile|inbox|splash|food` lands the app on a screen
-  /// so the pass can photograph it. Debug only; production has no such door.
+  /// `BASU_SCREEN=wallet|profile|inbox|splash|food|signin` lands the app on a
+  /// screen so the pass can photograph it. Debug only; production has no such door.
   private static func jumpForDebug(tab: inout ShellTab, path: inout [Destination]) {
     #if DEBUG
       switch ProcessInfo.processInfo.environment["BASU_SCREEN"] {
@@ -194,10 +222,16 @@ struct RootView: View {
   }
 
   /// `BASU_DEMO_SIGNIN=1` signs the demo guest in before the first draw, so
-  /// the pass photographs a launcher with a bell rather than a way in.
+  /// the pass photographs the shell rather than the way in. `BASU_SCREEN=signin`
+  /// is the opposite: whoever an earlier run left signed in is signed out.
   private static func signInForDebug(_ model: AppModel) async {
     #if DEBUG
-      guard ProcessInfo.processInfo.environment["BASU_DEMO_SIGNIN"] == "1",
+      let environment = ProcessInfo.processInfo.environment
+      if environment["BASU_SCREEN"] == "signin" {
+        model.session.signOut()
+        return
+      }
+      guard environment["BASU_DEMO_SIGNIN"] == "1",
             !model.session.isSignedIn else { return }
       try? await model.session.demoSignIn()
     #endif

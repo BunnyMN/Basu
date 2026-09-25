@@ -34,17 +34,7 @@ final class PlatformFlowTests: XCTestCase {
     app.launch()
 
     // ── in ────────────────────────────────────────────────────────────
-    XCTAssertTrue(
-      app.buttons["app.Хоол"].waitForExistence(timeout: 10),
-      "the launcher should be up",
-    )
-    // Signed out, the header offers the way in where the bell will be. Signed
-    // in from an earlier run, there is a bell instead and nothing to do.
-    if app.buttons["home.account"].waitForExistence(timeout: 2) {
-      app.buttons["home.account"].firstMatch.tap()
-      let demo = app.buttons["signin.demo"]
-      if demo.waitForExistence(timeout: 5) { demo.tap() }
-    }
+    app.signInIfSignedOut()
 
     // ── the launcher, signed in ───────────────────────────────────────
     XCTAssertTrue(

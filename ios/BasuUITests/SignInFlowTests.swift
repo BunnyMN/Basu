@@ -3,6 +3,9 @@ import XCTest
 /**
  The way in, the way a person takes it.
 
+ Signed out, the app is the way in and nothing else: no launcher behind it,
+ no tab bar over it. Signed in, the gate is gone and the bell is up.
+
  By email: an address nobody has used asks for a code, reads it off the
  inbox, and is in — the six digits go without another tap. Apple's button is
  on the same sheet, as the App Store asks.
@@ -51,11 +54,10 @@ final class SignInFlowTests: XCTestCase {
     let app = XCUIApplication()
     app.launchEnvironment["BASU_API"] = base.absoluteString
     app.launch()
-    try check(app.buttons["app.Хоол"].waitForExistence(timeout: 10), "the launcher should be up")
     try signOutIfSignedIn(app)
 
-    app.buttons["home.account"].firstMatch.tap()
-    try check(app.buttons["signin.apple"].waitForExistence(timeout: 5), "Apple's button is on the first face of the sheet")
+    try check(app.buttons["signin.apple"].waitForExistence(timeout: 5), "Apple's button is on the first face of the way in")
+    try check(!app.buttons["tab.home"].exists, "and there is no tab bar under it")
     let field = app.textFields["signin.email"]
     guard field.waitForExistence(timeout: 5) else {
       throw XCTSkip("The server on \(base) has no email door.")
@@ -78,7 +80,6 @@ final class SignInFlowTests: XCTestCase {
     app.buttons["tab.profile"].tap()
     try check(app.staticTexts[address].waitForExistence(timeout: 10), "the profile shows the address")
     shot("4-profile")
-    app.buttons["tab.home"].tap()
     try signOutIfSignedIn(app)
   }
 
@@ -88,14 +89,12 @@ final class SignInFlowTests: XCTestCase {
     let app = XCUIApplication()
     app.launchEnvironment["BASU_API"] = base.absoluteString
     app.launch()
-    try check(app.buttons["app.Хоол"].waitForExistence(timeout: 10), "the launcher should be up")
     try signOutIfSignedIn(app)
 
     let number = "88" + String(format: "%06d", Int.random(in: 0..<1_000_000))
     let password = "Хонь \(Int.random(in: 1000..<9999)) идэш"
 
     // ── sign up, in Cyrillic, with the field shown ────────────────────
-    app.buttons["home.account"].firstMatch.tap()
     try openThePhoneDoor(app)
     let doors = app.segmentedControls["signin.door"]
     try check(doors.waitForExistence(timeout: 5), "the sheet should open on its two doors")
@@ -106,12 +105,11 @@ final class SignInFlowTests: XCTestCase {
     try type(app.textFields["signin.again"], password)
     shot("1-sign-up")
     app.buttons["signin.go"].tap()
-    try check(app.buttons["home.inbox"].waitForExistence(timeout: 10), "signed up, the bell replaces the way in")
+    try check(app.buttons["home.inbox"].waitForExistence(timeout: 10), "signed up, the launcher replaces the way in")
     declineSavingThePassword(app)
 
     // ── out, and a wrong password ─────────────────────────────────────
     try signOutIfSignedIn(app)
-    app.buttons["home.account"].firstMatch.tap()
     try openThePhoneDoor(app)
     try type(app.textFields["signin.phone"], number)
     try type(app.secureTextFields["signin.password"], "wrong-password-1")
@@ -141,10 +139,12 @@ final class SignInFlowTests: XCTestCase {
     if notNow.waitForExistence(timeout: 3) { notNow.tap() }
   }
 
-  /// The phone is one tap past the first face of the sheet — unless the
-  /// server has no other door, and the sheet opens on it.
+  /// The phone is one tap past the first face of the way in — unless the
+  /// server has no other door, and it opens on the phone. The link sits
+  /// under the email door, perhaps below the fold.
   private func openThePhoneDoor(_ app: XCUIApplication) throws {
     let way = app.buttons["signin.phoneWay"]
+    if !way.waitForExistence(timeout: 3), !app.segmentedControls["signin.door"].exists { app.swipeUp() }
     if way.waitForExistence(timeout: 5) { way.tap() }
     try check(app.segmentedControls["signin.door"].waitForExistence(timeout: 5), "the phone door should be open")
   }
@@ -166,14 +166,15 @@ final class SignInFlowTests: XCTestCase {
     element.typeText(text)
   }
 
-  /// Signed in from an earlier run: out through the profile, the one place that says «Гарах».
+  /// Signed in from an earlier run: out through the profile, the one place
+  /// that says «Гарах» — and the way in takes the whole screen again.
   private func signOutIfSignedIn(_ app: XCUIApplication) throws {
-    guard app.buttons["home.inbox"].waitForExistence(timeout: 2) else { return }
+    guard app.landing() == .shell else { return }
     app.buttons["tab.profile"].tap()
     let out = app.buttons["profile.signout"]
     if !out.waitForExistence(timeout: 5) { app.swipeUp() }
     out.tap()
-    app.buttons["tab.home"].tap()
-    try check(app.buttons["home.account"].waitForExistence(timeout: 10), "signed out, the way in is back")
+    try check(app.buttons["signin.apple"].waitForExistence(timeout: 10), "signed out, the way in is back")
+    try check(!app.buttons["tab.home"].exists, "…and the tab bar is gone with the launcher")
   }
 }

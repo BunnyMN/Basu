@@ -9,9 +9,6 @@ import SwiftUI
  address there. Anything only one app cares about belongs to that app.
  */
 struct ProfileView: View {
-  /// Where signing out or closing the account lands: the launcher.
-  let home: () -> Void
-
   @Environment(Platform.self) private var platform
   @Environment(Session.self) private var session
   @Environment(AppModel.self) private var model
@@ -19,7 +16,6 @@ struct ProfileView: View {
   @State private var editing: Field?
   @State private var closing = false
   @State private var signingOutOthers = false
-  @State private var signingIn = false
 
   enum Field: String, Identifiable {
     case name, locale
@@ -29,17 +25,15 @@ struct ProfileView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 26) {
-        if session.isSignedIn {
-          identity
-          fields
-          notifications
-          devices
-          help
-          signOut
-          closeAccount
-        } else {
-          signedOut
-        }
+        // Only ever drawn signed in: signing out, or closing the account,
+        // swaps the whole shell for the way in (see `RootView`).
+        identity
+        fields
+        notifications
+        devices
+        help
+        signOut
+        closeAccount
       }
       .padding(.horizontal, BasuMetric.screenPadding)
       .padding(.bottom, 78)
@@ -49,7 +43,6 @@ struct ProfileView: View {
     .background(LinearGradient.ground)
     .safeAreaInset(edge: .top, spacing: 0) { ShellTitle("Профайл") }
     .toolbarVisibility(.hidden, for: .navigationBar)
-    .sheet(isPresented: $signingIn) { SignInSheet() }
     .sheet(item: $editing) { field in
       ProfileEditSheet(field: field)
     }
@@ -71,7 +64,7 @@ struct ProfileView: View {
       titleVisibility: .visible,
     ) {
       Button("Хаах", role: .destructive) {
-        Task { if await platform.closeAccount() { home() } }
+        Task { await platform.closeAccount() }
       }
       Button("Болих", role: .cancel) {}
     } message: {
@@ -327,7 +320,6 @@ struct ProfileView: View {
         await model.refreshLive()
         await platform.refresh()
       }
-      home()
     } label: {
       Text("Гарах")
         .font(.sans(15, .medium))
@@ -359,32 +351,6 @@ struct ProfileView: View {
       }
     }
     .frame(maxWidth: .infinity, alignment: .center)
-  }
-}
-
-extension ProfileView {
-  /// Signed out there is no profile to show, and pretending otherwise would be
-  /// drawing a person who is not there. One card, one way in.
-  fileprivate var signedOut: some View {
-    VStack(alignment: .leading, spacing: 12) {
-      Text("Утасны дугаараараа нэвтэрнэ. Нууц үг байхгүй — нэг удаагийн код ирнэ.")
-        .font(.sans(14))
-        .lineSpacing(14 * 0.6 - 4)
-        .foregroundStyle(Color.ink2)
-        .fixedSize(horizontal: false, vertical: true)
-      Button {
-        signingIn = true
-      } label: {
-        Text("Нэвтрэх")
-          .font(.sans(15, .medium))
-          .foregroundStyle(Color.accent)
-          .frame(maxWidth: .infinity)
-          .padding(.vertical, 15)
-          .glassCard()
-      }
-      .buttonStyle(.plain)
-      .accessibilityIdentifier("profile.signin")
-    }
   }
 }
 

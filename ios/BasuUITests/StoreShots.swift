@@ -44,11 +44,7 @@ final class StoreShots: XCTestCase {
 
     let idesh = app.buttons["app.Идэш"]
     XCTAssertTrue(app.staticTexts["Basu"].firstMatch.waitForExistence(timeout: 30) || idesh.waitForExistence(timeout: 5))
-    if app.buttons["home.account"].waitForExistence(timeout: 2) {
-      app.buttons["home.account"].firstMatch.tap()
-      let demo = app.buttons["signin.demo"]
-      if demo.waitForExistence(timeout: 5) { demo.tap() }
-    }
+    app.signInIfSignedOut()
     try await Task.sleep(for: .seconds(2))
     try save("1-home", to: dir)
 
