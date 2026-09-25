@@ -53,9 +53,14 @@ const open: JSDOM[] = [];
  *
  * `search` is how a deep link is opened: the home screen sends people into
  * the dine-in app at `/dine?order=…`, and a page that reads location has to
- * be given one that says something.
+ * be given one that says something. `respond` answers a request in place of
+ * the server, for a state the seed cannot be put in — an empty market.
  */
-async function openPage(file: string, search = ''): Promise<JSDOM> {
+async function openPage(
+  file: string,
+  search = '',
+  respond?: (path: string) => Response | undefined,
+): Promise<JSDOM> {
   const html = await readFile(join(WEB, file), 'utf8');
   const dom = new JSDOM(html, {
     url: `${base}/${file.replace(/\.html$/, '')}${search}`,
@@ -66,8 +71,10 @@ async function openPage(file: string, search = ''): Promise<JSDOM> {
 
   // jsdom has no fetch; point it at the running server and resolve relative
   // paths the way a browser would.
-  (window as unknown as { fetch: typeof fetch }).fetch = ((input: string, init?: RequestInit) =>
-    fetch(new URL(String(input), base).toString(), init)) as typeof fetch;
+  (window as unknown as { fetch: typeof fetch }).fetch = ((input: string, init?: RequestInit) => {
+    const canned = respond?.(String(input));
+    return canned ? Promise.resolve(canned) : fetch(new URL(String(input), base).toString(), init);
+  }) as typeof fetch;
   Object.defineProperty(window, 'localStorage', { value: storage, writable: true });
 
   // Every local module the page imports, inlined. jsdom cannot resolve module
@@ -733,6 +740,69 @@ describe('the kitchen display', () => {
 
     await until(kds, 'the pairing screen', (d) => Boolean(d.querySelector('.pair')), 12_000);
     expect(text(kds)).toContain('Таблетаа холбоно уу');
+  });
+});
+
+describe('the front page', () => {
+  it('works out a winter of meat, in sheep and goats and kilograms', async () => {
+    const dom = await openPage('index.html');
+    const d = dom.window.document;
+    const text = (id: string) => d.getElementById(id)?.textContent;
+    const press = (selector: string, times = 1) => {
+      for (let i = 0; i < times; i++) (d.querySelector(selector) as HTMLButtonElement).click();
+    };
+    await until(dom, 'the sums', () => text('kg') !== null);
+
+    // Four people, four months, eating as most do: 4 × 4 × 7.
+    expect(text('kg')).toBe('112 кг');
+    expect(text('said')).toBe('6 хонь, эсвэл 7 ямаа орчим');
+    expect(d.querySelectorAll('#flock svg')).toHaveLength(6);
+
+    press('[data-step="people"][data-by="1"]');
+    expect(text('people')).toBe('5 хүн');
+    expect(text('kg')).toBe('140 кг');
+    press('[data-appetite="high"]');
+    expect(d.querySelector('[data-appetite="high"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(d.querySelector('[data-appetite="mid"]')?.getAttribute('aria-pressed')).toBe('false');
+    expect(text('kg')).toBe('200 кг');
+    expect(text('said')).toBe('10 хонь, эсвэл 13 ямаа орчим');
+
+    // Six months at most, one person at least: the buttons stop where the sums do.
+    press('[data-step="months"][data-by="1"]', 5);
+    expect(text('months')).toBe('6 сар');
+    expect((d.querySelector('[data-step="months"][data-by="1"]') as HTMLButtonElement).disabled).toBe(true);
+    press('[data-step="people"][data-by="-1"]', 9);
+    expect(text('people')).toBe('1 хүн');
+    expect((d.querySelector('[data-step="people"][data-by="-1"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(text('kg')).toBe('60 кг');
+  });
+
+  it('shows what is on sale from the stalls, and nothing it made up', async () => {
+    const dom = await openPage('index.html');
+    const d = dom.window.document;
+    await until(dom, 'the stall board', () => !d.getElementById('board')?.hidden);
+
+    const stalls = [...d.querySelectorAll('.stall')];
+    expect(stalls.length).toBeGreaterThan(0);
+    expect(stalls.length).toBeLessThanOrEqual(6);
+    for (const stall of stalls) {
+      expect(stall.getAttribute('href')).toBe('/idesh');
+      expect(stall.querySelector('.money')?.textContent).toMatch(/₮ \/ (толгой|кг)$/);
+    }
+    expect((d.getElementById('board-empty') as HTMLElement).hidden).toBe(true);
+  });
+
+  it('says so plainly when the market is empty', async () => {
+    const empty = new Response(JSON.stringify({ today: '2026-09-25', listings: [] }), {
+      headers: { 'content-type': 'application/json' },
+    });
+    const dom = await openPage('index.html', '', (path) => (path.startsWith('/v1/idesh/listings') ? empty : undefined));
+    const d = dom.window.document;
+    await until(dom, 'the stall board', () => !d.getElementById('board')?.hidden);
+
+    expect(d.querySelectorAll('.stall')).toHaveLength(0);
+    expect((d.getElementById('board-empty') as HTMLElement).hidden).toBe(false);
+    expect(d.getElementById('board-empty')?.textContent).toContain('Анхны зарууд удахгүй');
   });
 });
 
