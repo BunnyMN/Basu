@@ -87,6 +87,8 @@ targets:
         UIAppFonts: *fonts
         # The order's progress on the lock screen and in the Dynamic Island.
         NSSupportsLiveActivities: true
+        # Profile → Тохиргоо: the app lock (AppLock.swift).
+        NSFaceIDUsageDescription: Basu-г таныг л нээдэг байлгахын тулд Face ID ашиглана.
         # basu://order/{id}, basu://wallet, basu://notifications
         CFBundleURLTypes:
           - CFBundleURLName: mn.basu.app$(BASU_ID_SUFFIX)

@@ -23,6 +23,7 @@ struct BasuApp: App {
   @UIApplicationDelegateAdaptor(PushAppDelegate.self) private var pushDelegate
   @State private var model: AppModel
   @State private var platform: Platform
+  @State private var lock = AppLock()
 
   init() {
     let model = AppModel()
@@ -36,6 +37,7 @@ struct BasuApp: App {
         .environment(model)
         .environment(model.session)
         .environment(platform)
+        .environment(lock)
         .tint(.accent)
     }
   }
@@ -71,6 +73,9 @@ struct RootView: View {
   @Environment(AppModel.self) private var model
   @Environment(Session.self) private var session
   @Environment(Platform.self) private var platform
+  @Environment(AppLock.self) private var lock
+  @Environment(\.scenePhase) private var phase
+  @AppStorage(Appearance.key) private var appearance: Appearance = .system
 
   @State private var tab: ShellTab = .home
   @State private var path: [Destination] = []
@@ -86,6 +91,14 @@ struct RootView: View {
           .transition(.opacity)
       }
 
+      // Over the shell, under the splash: away, the app switcher sees the
+      // wordmark rather than a balance; locked, the face comes first.
+      if session.isSignedIn && (lock.locked || lock.curtained) {
+        LockView()
+          .transition(.opacity)
+          .zIndex(0.5)
+      }
+
       if splash {
         SplashView()
           .transition(.opacity)
@@ -96,11 +109,21 @@ struct RootView: View {
     // Out and back in lands on the launcher, not on whatever the last
     // person left open.
     .onChange(of: session.isSignedIn) { _, signedIn in
-      if !signedIn {
+      if signedIn {
+        lock.admitted()
+      } else {
         tab = .home
         path = []
       }
     }
+    .onChange(of: phase) { _, now in
+      switch now {
+      case .background: lock.left(at: .now)
+      case .active: lock.returned(at: .now)
+      default: break
+      }
+    }
+    .onChange(of: appearance, initial: true) { _, chosen in chosen.apply() }
     .onOpenURL { url in open(url) }
     .task {
       // APNs answers whenever it answers — before a sign-in or long after it —

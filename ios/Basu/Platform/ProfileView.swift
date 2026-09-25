@@ -1,24 +1,37 @@
 import BasuKit
 import SwiftUI
+import UserNotifications
+import WebKit
 
 /**
- The profile: who you are, and what Basu is allowed to send you.
+ The profile: who you are, how this phone shows Basu, and what Basu is
+ allowed to send you.
 
  Short on purpose. A profile that grows a field per product stops being one
  person and becomes four apps sharing a form — table preference here, drop-off
  address there. Anything only one app cares about belongs to that app.
+
+ Every switch here does what it says, today. The language row came off for
+ that reason: the app speaks Mongolian only, and a choice of English that
+ changed nothing was a setting in name only.
  */
 struct ProfileView: View {
   @Environment(Platform.self) private var platform
   @Environment(Session.self) private var session
   @Environment(AppModel.self) private var model
+  @Environment(AppLock.self) private var lock
+  @Environment(\.scenePhase) private var phase
+  @AppStorage(Appearance.key) private var appearance: Appearance = .system
 
   @State private var editing: Field?
   @State private var closing = false
   @State private var signingOutOthers = false
+  /// What iOS itself says about notifications, apart from Basu's own switches.
+  @State private var permission: UNAuthorizationStatus?
+  @State private var cacheCleared = false
 
   enum Field: String, Identifiable {
-    case name, locale
+    case name
     var id: String { rawValue }
   }
 
@@ -29,6 +42,7 @@ struct ProfileView: View {
         // swaps the whole shell for the way in (see `RootView`).
         identity
         fields
+        settings
         notifications
         devices
         help
@@ -74,6 +88,11 @@ struct ProfileView: View {
       await platform.refresh()
       await platform.loadPreferences()
       await platform.loadSessions()
+    }
+    // Back from the phone's Settings, where the answer may have changed.
+    .task(id: phase) {
+      guard phase == .active else { return }
+      permission = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
     }
   }
 
@@ -124,35 +143,78 @@ struct ProfileView: View {
   // MARK: - what
 
   private var fields: some View {
-    VStack(spacing: 0) {
-      row(label: "Нэр", value: platform.me?.displayName ?? "—") { editing = .name }
-      Hairline()
-      row(label: "Хэл", value: platform.me?.locale == "en" ? "English" : "Монгол") {
-        editing = .locale
+    VStack(alignment: .leading, spacing: 11) {
+      SectionLabel("Бүртгэл")
+      Button { editing = .name } label: {
+        HStack(spacing: 12) {
+          RowLabel(title: "Нэр", symbol: "person")
+          Spacer(minLength: 8)
+          Text(platform.me?.displayName ?? "—")
+            .font(.sans(15, .medium))
+            .foregroundStyle(Color.ink)
+            .lineLimit(1)
+          Chevron(size: 13).foregroundStyle(Color.ink3)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
       }
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("profile.name")
+      .glassCard()
     }
-    .glassCard()
   }
 
-  private func row(label: String, value: String, tap: @escaping () -> Void) -> some View {
-    Button(action: tap) {
-      HStack(spacing: 12) {
-        Text(label)
-          .font(.sans(15))
-          .foregroundStyle(Color.ink2)
-        Spacer(minLength: 8)
-        Text(value)
-          .font(.sans(15, .medium))
-          .foregroundStyle(Color.ink)
-          .lineLimit(1)
-        Chevron(size: 13).foregroundStyle(Color.ink3)
+  // MARK: - this phone
+
+  /// How Basu looks and who may open it — both about this phone, not the
+  /// account, and kept on it.
+  private var settings: some View {
+    VStack(alignment: .leading, spacing: 11) {
+      SectionLabel("Тохиргоо")
+      VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 14) {
+          RowLabel(title: "Харагдах байдал", symbol: "circle.lefthalf.filled")
+          AppearancePicker(selection: $appearance)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        Hairline()
+        lockRow
       }
-      .padding(.horizontal, 16)
-      .padding(.vertical, 14)
-      .contentShape(Rectangle())
+      .glassCard()
+
+      Text(lockFooter)
+        .font(.sans(12))
+        .lineSpacing(12 * 0.55 - 3)
+        .foregroundStyle(Color.ink3)
+        .fixedSize(horizontal: false, vertical: true)
     }
-    .buttonStyle(.plain)
-    .accessibilityIdentifier("profile.\(label == "Нэр" ? "name" : "locale")")
+  }
+
+  @ViewBuilder private var lockRow: some View {
+    let kind = lock.kind
+    if kind == .none {
+      RowLabel(title: "Апп түгжих", symbol: "lock", detail: "Утсандаа нууц код тавьсны дараа асаана")
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+        .opacity(0.6)
+        .accessibilityIdentifier("settings.lock")
+    } else {
+      switchRow(
+        "\(kind.by) түгжих",
+        symbol: kind.symbol,
+        detail: "Нээх бүрд таныг мөн эсэхийг шалгана",
+        isOn: lock.enabled,
+        id: "settings.lock",
+      ) { await lock.turn(on: $0) }
+    }
+  }
+
+  private var lockFooter: String {
+    let minutes = Int(AppLock.grace / 60)
+    return "Харагдах байдал зөвхөн энэ утсанд хадгалагдана. Түгжээ асаалттай үед апп-аас \(minutes) минутаас удаан гарвал дахин нээхэд \(lock.kind.by) баталгаажуулна."
   }
 
   // MARK: - what we may send
@@ -161,17 +223,33 @@ struct ProfileView: View {
     VStack(alignment: .leading, spacing: 11) {
       SectionLabel("Мэдэгдэл")
       VStack(spacing: 0) {
-        switchRow("Аппаар", isOn: platform.preferences.push) {
-          await platform.setPreference(push: $0)
+        if let permission, permission == .denied || permission == .notDetermined {
+          permissionRow(permission)
+          Hairline()
         }
+        switchRow(
+          "Апп-аар",
+          symbol: "bell",
+          detail: "Захиалга, түрийвчийн мэдээ шууд утсанд",
+          isOn: platform.preferences.push,
+          id: "profile.pref.push",
+        ) { await platform.setPreference(push: $0) }
         Hairline()
-        switchRow("Мессежээр", isOn: platform.preferences.sms) {
-          await platform.setPreference(sms: $0)
-        }
+        switchRow(
+          "SMS-ээр",
+          symbol: "message",
+          detail: "Апп-аар хүрэхгүй үед мессежээр",
+          isOn: platform.preferences.sms,
+          id: "profile.pref.sms",
+        ) { await platform.setPreference(sms: $0) }
         Hairline()
-        switchRow("Урамшуулал", isOn: platform.preferences.marketing) {
-          await platform.setPreference(marketing: $0)
-        }
+        switchRow(
+          "Урамшуулал",
+          symbol: "gift",
+          detail: "Шинэ үйлчилгээ, хямдралын тухай",
+          isOn: platform.preferences.marketing,
+          id: "profile.pref.marketing",
+        ) { await platform.setPreference(marketing: $0) }
       }
       .glassCard()
 
@@ -185,20 +263,54 @@ struct ProfileView: View {
     }
   }
 
+  /**
+   The phone's own answer comes before Basu's switches: with notifications
+   refused in iOS, «Апп-аар» on changes nothing, and saying so is kinder than
+   a switch that silently does not work.
+   */
+  private func permissionRow(_ status: UNAuthorizationStatus) -> some View {
+    HStack(spacing: 12) {
+      RowLabel(
+        title: status == .denied ? "Утасны тохиргоонд хаалттай" : "Зөвшөөрөл өгөөгүй",
+        symbol: "bell.slash",
+        detail: "Мэдэгдэл утсанд ирэхгүй байна",
+        tint: .hold,
+      )
+      Spacer(minLength: 8)
+      Button(status == .denied ? "Нээх" : "Зөвшөөрөх") {
+        Task {
+          if status == .denied {
+            if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+              await UIApplication.shared.open(url)
+            }
+          } else {
+            await PushRegistrar.shared.askIfNeeded()
+            permission = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+          }
+        }
+      }
+      .font(.sans(14, .semibold))
+      .foregroundStyle(Color.accent)
+      .accessibilityIdentifier("profile.permission")
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 13)
+    .background(Color.holdSoft.opacity(0.5))
+  }
+
   private func switchRow(
     _ name: String,
+    symbol: String,
+    detail: String? = nil,
     isOn: Bool,
+    id: String,
     set: @escaping (Bool) async -> Void,
   ) -> some View {
     Button {
       Task { await set(!isOn) }
     } label: {
       HStack(spacing: 14) {
-        Text(name)
-          .font(.sans(15))
-          .lineSpacing(15 * 0.35 - 4)
-          .foregroundStyle(Color.ink)
-          .fixedSize(horizontal: false, vertical: true)
+        RowLabel(title: name, symbol: symbol, detail: detail)
         Spacer(minLength: 8)
         Switch(isOn: isOn)
       }
@@ -207,10 +319,13 @@ struct ProfileView: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+    .accessibilityElement(children: .ignore)
     .accessibilityLabel(name)
+    .accessibilityHint(detail ?? "")
     .accessibilityValue(isOn ? "асаалттай" : "унтраалттай")
-    .accessibilityAddTraits(.isToggle)
-    .accessibilityIdentifier("profile.pref.\(name)")
+    .accessibilityAddTraits([.isToggle, .isButton])
+    .accessibilityIdentifier(id)
+    .sensoryFeedback(.selection, trigger: isOn)
   }
 
   // MARK: - where you are signed in
@@ -270,15 +385,20 @@ struct ProfileView: View {
 
   // MARK: - the footer everything else lives in
 
+  /// The terms and the privacy policy are the pages the server serves
+  /// itself — the same ones the web links to — so they open wherever the app
+  /// is talking to.
   private var help: some View {
     VStack(alignment: .leading, spacing: 11) {
       SectionLabel("Тусламж")
       VStack(spacing: 0) {
-        link("Үйлчилгээний нөхцөл", "https://basu.mn/terms")
+        link("Холбоо барих", symbol: "envelope", URL(string: "mailto:basuappmn@gmail.com")!)
         Hairline()
-        link("Нууцлалын бодлого", "https://basu.mn/privacy")
+        link("Үйлчилгээний нөхцөл", symbol: "doc.text", Endpoint.base.appending(path: "terms"))
         Hairline()
-        link("Холбоо барих", "mailto:tuslah@basu.mn")
+        link("Нууцлалын бодлого", symbol: "hand.raised", Endpoint.base.appending(path: "privacy"))
+        Hairline()
+        clearCache
       }
       .glassCard()
 
@@ -298,12 +418,10 @@ struct ProfileView: View {
     return "\(short) (\(build))"
   }
 
-  private func link(_ title: String, _ url: String) -> some View {
-    Link(destination: URL(string: url)!) {
+  private func link(_ title: String, symbol: String, _ url: URL) -> some View {
+    Link(destination: url) {
       HStack(spacing: 12) {
-        Text(title)
-          .font(.sans(15))
-          .foregroundStyle(Color.ink)
+        RowLabel(title: title, symbol: symbol)
         Spacer(minLength: 8)
         Chevron(size: 13).foregroundStyle(Color.ink3)
       }
@@ -311,6 +429,50 @@ struct ProfileView: View {
       .padding(.vertical, 14)
       .contentShape(Rectangle())
     }
+  }
+
+  /**
+   The apps inside Basu are web pages, and a page kept from last week can show
+   last week's picture. This throws the kept copies away — only copies: nobody
+   is signed out, and nothing of theirs is lost.
+   */
+  private var clearCache: some View {
+    Button {
+      Task {
+        let kept: Set<String> = [
+          WKWebsiteDataTypeDiskCache,
+          WKWebsiteDataTypeMemoryCache,
+          WKWebsiteDataTypeFetchCache,
+        ]
+        await WKWebsiteDataStore.default().removeData(ofTypes: kept, modifiedSince: .distantPast)
+        URLCache.shared.removeAllCachedResponses()
+        cacheCleared = true
+        try? await Task.sleep(for: .seconds(3))
+        cacheCleared = false
+      }
+    } label: {
+      HStack(spacing: 12) {
+        RowLabel(
+          title: "Кэш цэвэрлэх",
+          symbol: "arrow.clockwise",
+          detail: cacheCleared ? "Цэвэрлэлээ" : "Хуудас хуучин эсвэл буруу харагдвал",
+        )
+        Spacer(minLength: 8)
+        if cacheCleared {
+          Image(systemName: "checkmark")
+            .font(.sans(14, .semibold))
+            .foregroundStyle(Color.ready)
+            .transition(.opacity)
+        }
+      }
+      .padding(.horizontal, 16)
+      .padding(.vertical, 14)
+      .contentShape(Rectangle())
+      .animation(.easeOut(duration: 0.2), value: cacheCleared)
+    }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier("settings.cache")
+    .sensoryFeedback(.success, trigger: cacheCleared) { _, now in now }
   }
 
   private var signOut: some View {
@@ -354,6 +516,37 @@ struct ProfileView: View {
   }
 }
 
+/// A row's leading half: the mark, the name, and a line under it when the
+/// name alone would leave somebody guessing what the row does.
+struct RowLabel: View {
+  let title: String
+  let symbol: String
+  var detail: String?
+  var tint: Color = .ink2
+
+  var body: some View {
+    HStack(spacing: 12) {
+      Image(systemName: symbol)
+        .font(.sans(16))
+        .foregroundStyle(tint)
+        .frame(width: 24)
+        .accessibilityHidden(true)
+      VStack(alignment: .leading, spacing: 2) {
+        Text(title)
+          .font(.sans(15))
+          .foregroundStyle(Color.ink)
+          .fixedSize(horizontal: false, vertical: true)
+        if let detail {
+          Text(detail)
+            .font(.sans(12))
+            .foregroundStyle(Color.ink3)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
+    }
+  }
+}
+
 /**
  The switch, to the design's metrics: a 51 × 31 track at radius 16, `accent`
  on and `line2` off, a 27pt white knob inset 2 with a soft shadow.
@@ -394,31 +587,21 @@ struct ProfileEditSheet: View {
   @Environment(Platform.self) private var platform
   @Environment(\.dismiss) private var dismiss
   @State private var name = ""
-  @State private var locale = "mn"
 
   var body: some View {
     NavigationStack {
       Form {
-        switch field {
-        case .name:
-          Section {
-            TextField("Таныг юу гэж дуудах вэ?", text: $name)
-              .font(.sans(15))
-              .submitLabel(.done)
-              .onSubmit { save() }
-              .accessibilityIdentifier("profile.name.field")
-          } footer: {
-            Text("Ресторанд таны ширээн дээр энэ нэр очно.")
-          }
-        case .locale:
-          Picker("Хэл", selection: $locale) {
-            Text("Монгол").tag("mn")
-            Text("English").tag("en")
-          }
-          .pickerStyle(.inline)
+        Section {
+          TextField("Таныг юу гэж дуудах вэ?", text: $name)
+            .font(.sans(15))
+            .submitLabel(.done)
+            .onSubmit { save() }
+            .accessibilityIdentifier("profile.name.field")
+        } footer: {
+          Text("Ресторанд таны ширээн дээр энэ нэр очно.")
         }
       }
-      .navigationTitle(field == .name ? "Нэр" : "Хэл")
+      .navigationTitle("Нэр")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .topBarLeading) {
@@ -432,16 +615,12 @@ struct ProfileEditSheet: View {
     .presentationDetents([.medium])
     .task {
       name = platform.me?.displayName ?? ""
-      locale = platform.me?.locale ?? "mn"
     }
   }
 
   private func save() {
     Task {
-      switch field {
-      case .name: await platform.save(displayName: name, locale: nil)
-      case .locale: await platform.save(displayName: nil, locale: locale)
-      }
+      await platform.save(displayName: name, locale: nil)
       dismiss()
     }
   }
