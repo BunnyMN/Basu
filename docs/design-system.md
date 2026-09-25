@@ -422,7 +422,7 @@ Chrome: badge + «‹ Basu» → нэг `.topbar[data-fixed]` (back тэргүү
 
 ## 9. Эзний шийдэх асуултууд
 
-1. Terms/privacy meta: операторын хуулийн нэр, ТТД, хувилбар, холбоо барих (privacy `geregevending@gmail.com` vs профайлын `tuslah@basu.mn`, `basu.burzai.cloud` vs `basu.mn`) — юу ч зохиохгүй.
+1. Terms/privacy meta: операторын хуулийн нэр, ТТД, хувилбар, холбоо барих (privacy `basuappmn@gmail.com` vs профайлын `tuslah@basu.mn`, `basu.burzai.cloud` vs `basu.mn`) — юу ч зохиохгүй.
 2. Home: «Өнөөдөр юу хийх вэ?», «Улаанбаатар», «Гал тогооны дэлгэц →» — CSS-ээр нуух уу, устгах уу (текст устгах нь эзний шийдвэр).
 3. Idesh зарын зураг: төрөл×нэгж тус бүрийн зураг (бүтэн мал / кг) эсвэл нийлүүлэгчийн бодит зураг, үгүй бол зураггүй мөр — давтагдсан stock render итгэл алдуулна.
 4. Supplier cancel confirm: «Цуцлах» хоёр удаа vs «Захиалгыг цуцлах» (копи өөрчлөлт).
@@ -485,7 +485,7 @@ Chrome: badge + «‹ Basu» → нэг `.topbar[data-fixed]` (back тэргүү
 - Бүтэц: `view.lastElementChild.replaceWith/remove()` (loading `.empty` сүүлийн хүү), members `tr.lastElementChild.append(button)` (5 дахь td сүүлд), `card.append(drawer)` `.card.row`-д, `row.append(.code)`, ICON svg, mountClock import **байхгүй**, loader бүр `getElementById` + `tab !== key` guard — id яг.
 
 ### terms / privacy
-- Тестгүй, JS-гүй (script нэмвэл hash — restart). `server.ts:873-874` `/terms`, `/privacy` → `sendFile('terms.html'/'privacy.html')` (нэр, зам хэвээр; iOS `ProfileView.swift` `https://basu.mn/terms|privacy`; `idesh.html` `<a href="/terms" id="terms">`). Back: terms `href="/idesh"`, privacy `href="/"` (ServiceView `isHome`). Head: `lang="mn"`, viewport-fit=cover, `/app.css`, titles «Өвлийн идэш · Үйлчилгээний нөхцөл», «Basu · Нууцлалын бодлого». Копи: бүх h1/h2/p/li, «10%», «3 хоногт», «2026 оны намраас», «Хүчинтэй: 2026 оны 9-р сарын 10», «basu.burzai.cloud», `geregevending@gmail.com` (×2), 6 `<ol>` дүрэм, 11 `<ul>` баримт, англи хураангуй. Семантик: `<main>`, h1>h2, `<ol>`, `<ul>`, `<section class="en">`, `<b>`.
+- Тестгүй, JS-гүй (script нэмвэл hash — restart). `server.ts:873-874` `/terms`, `/privacy` → `sendFile('terms.html'/'privacy.html')` (нэр, зам хэвээр; iOS `ProfileView.swift` `https://basu.mn/terms|privacy`; `idesh.html` `<a href="/terms" id="terms">`). Back: terms `href="/idesh"`, privacy `href="/"` (ServiceView `isHome`). Head: `lang="mn"`, viewport-fit=cover, `/app.css`, titles «Өвлийн идэш · Үйлчилгээний нөхцөл», «Basu · Нууцлалын бодлого». Копи: бүх h1/h2/p/li, «10%», «3 хоногт», «2026 оны намраас», «Хүчинтэй: 2026 оны 9-р сарын 10», «basu.burzai.cloud», `basuappmn@gmail.com` (×2), 6 `<ol>` дүрэм, 11 `<ul>` баримт, англи хураангуй. Семантик: `<main>`, h1>h2, `<ol>`, `<ul>`, `<section class="en">`, `<b>`.
 
 ## Хавсралт Б. Шүүгчдийн хассан зүйлс (давтахгүй)
 

@@ -512,7 +512,7 @@ struct SignInSheet: View {
   private var footer: String {
     switch door {
     case .signIn:
-      "Кирилл үсэгтэй нууц үгийг нүдэн тэмдгийг дараад бичнэ. Нууц үгээ мартсан бол geregevending@gmail.com руу бичээрэй."
+      "Кирилл үсэгтэй нууц үгийг нүдэн тэмдгийг дараад бичнэ. Нууц үгээ мартсан бол basuappmn@gmail.com руу бичээрэй."
     case .signUp:
       "Утасны дугаар, өөрийн сонгосон нууц үгээр бүртгэл үүснэ. Нууц үгээ хэнд ч бүү хэл."
     case .invite:

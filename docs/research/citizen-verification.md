@@ -46,20 +46,11 @@
   - Basu-ийн одоогийн VPS-ийн IP нь RIPE бүртгэлээр Сингапурт (`SG`) бүртгэлтэй [32].
 - **Чиптэй үнэмлэхийг NFC-ээр уншихыг нотолгоо болгож болохгүй.**
   - Чипийн өгөгдөлд гарын үсэг (ICAO-ийн SOD шиг) байхгүй [23].
-  - Хэрэглэгчийн өөрийн eID платформ ч энэ замыг Монгол иргэнд хаалттай байлгадаг
-    (`eid-platform-mn/server/internal/httpapi/handlers_admin_kyc.go:193-207`).
 - **e-Mongolia-д «e-Mongolia-гаар нэвтрэх» нээлттэй OIDC байхгүй.** Түүний OAuth V3
   урсгал e-Mongolia доторх үйлчилгээнээс эхэлдэг бөгөөд буцаах талбаруудыг нь
   баримтжуулаагүй [29].
 - **Банкны нэвтрэлт нь ДАН доторх нэг арга.** Банкнуудын гуравдагч талд зориулсан
   танилтын API олдсонгүй [6].
-- **Хэрэглэгчийн өөрийн код.**
-  - sso.gov.mn-тэй шууд ажилладаг клиент аль ч төсөлд **алга**.
-  - Бүгд Gerege-ийн гарц (`dan.gerege.mn`, `xyp.gerege.mn`)-аар дамждаг, эсвэл mock
-    / ашиглагдаагүй код.
-  - Basu-д шууд хэрэг болох зүйл: eID Mongolia-ийн TypeScript SDK (иргэний
-    бүртгэлийн дугаар өгнө, гэхдээ хувийн CA дээр суурилсан) болон ДАН callback-ийн
-    хамгаалалтын загвар (§2.7).
 - **Хувийн мэдээллийн хууль.**
   - Зөвшөөрлийг 7 зүйлтэйгээр, бичгээр (цахим хэлбэрээр болно) авна (ХХМХТХ 8.2–8.4
     [18]).
@@ -83,9 +74,6 @@
    - овог нэр;
    - баталгаажсан огноо;
    - нэвтрэлтийн төрөл.
-4. Gerege-ийн `dan.gerege.mn` гарц эсвэл eID Mongolia-г түр зам болгох бол эхлээд
-   Gerege-ийн ДАН гэрээ Basu-ийн домэйнд хамаарах эсэхийг тодруул (§3-E). Үүнгүйгээр
-   бүү ашигла.
 
 ---
 
@@ -231,7 +219,7 @@
   - `WS100101` амжилттай (`resultCode = 0`) ирсэн эсэх;
   - `regnum` иргэний регистрийн хэлбэртэй эсэх. Үнэмлэхний чипийн баримтаар 10
     тэмдэгттэй [23]; практикт 2 кирилл үсэг ба 8 цифр. Энэ хэлбэрийг хуулиас
-    олоогүй бөгөөд хэрэглэгчийн `eid-platform-mn/docs/IDENTIFIERS.md:47`-д байна.
+    олоогүй тул ДАН-ы бодит хариугаар баталгаажуулна.
 
 ### 2.2 ХУР — Төрийн мэдээлэл солилцооны систем (xyp.gov.mn)
 
@@ -373,62 +361,6 @@
   байхгүй). Иймд уншсан өгөгдлийг хуулбарласан картаас ялгах аргагүй.
 - Баримт картын интерфейс (контакт эсвэл контактгүй)-ийг заагаагүй.
 
-**Хэрэглэгчийн код NFC-ээр уншдаг, гэхдээ итгэдэггүй.**
-- `eid-platform-mn/ios/eIDMongolia/project.yml:66-70` нь хоёр AID зарласан:
-  `A00000001840000001634200` («v500») ба `A0000000183414010000000000000000`
-  («legacy PKI»).
-- `NFCReader+MongolianID.swift:70-73` дээрх тайлбарт «dual-interface MPCOS chip»,
-  «No MRZ / BAC — plain SELECT + READ BINARY» гэж бичсэн.
-- Гэвч сервер нь `"citizenCard": false` буцаадаг
-  (`server/internal/httpapi/handlers_admin_kyc.go:193-207`). Тайлбарт «SOD/passive-auth
-  шалгадаг болтол ХААЛТТАЙ» гэжээ.
-- Монгол иргэн зөвхөн ДАН-аар бүртгүүлнэ (`server/internal/service/dan/service.go:203-210`).
-
-**iOS CoreNFC-ийн хязгаарлалт [26][27].**
-- `NFCTagReaderSession` ашиглахад дараах гурав хэрэгтэй:
-  - `com.apple.developer.nfc.readersession.formats` entitlement;
-  - `NFCReaderUsageDescription` тайлбар;
-  - дэмжих AID-уудын жагсаалтыг
-    `com.apple.developer.nfc.readersession.iso7816.select-identifiers`-д бичих.
-- Сесс эдгээр AID-ыг дарааллаар нь `SELECT` хийнэ. Эхний амжилттай `SELECT`-ийн дараа
-  л `NFCISO7816Tag` өгнө. Жагсаалтад байхгүй AID-тай карт апп-д хүрэхгүй.
-- Төлбөрийн AID-ыг дэмжихгүй.
-- Утас зөвхөн контактгүй (ISO 14443) чипийг уншина. Зөвхөн контакттай картыг ямар ч
-  утас уншихгүй.
-
-**Үнэмлэх дэх тоон гарын үсэг — хамгийн хүчтэй боловч гуравдагч талд хүрэхгүй
-нотолгоо.**
-- Цахим гарын үсгийн тухай хууль [19]:
-  - иргэний үнэмлэхийг тоон гарын үсгийн хэрэгсэл болгож болно (8.4);
-  - улсын бүртгэлээс иргэнд үнэгүй олгоно (12.2);
-  - 5 жил хүчинтэй (11.1);
-  - 16 наснаас дээш хүн хэрэглэнэ (6.1);
-  - гэрчилгээнд Монгол иргэн бол **иргэний бүртгэлийн дугаар**, гадаадын иргэн бол
-    бүртгэлийн дугаар бичигдэнэ (10.2.2);
-  - Монгол иргэн улсын бүртгэлийн байгууллагад, гадаадын иргэн лицензтэй
-    байгууллагад хүсэлт гаргана (15.1);
-  - тоон гарын үсгийг мэдээллийн системд хүнийг таньж баталгаажуулахад ашиглаж
-    болно (6.6).
-- УБЕГ [22]: гэрчилгээ ба хувийн түлхүүрийг «иргэний үнэмлэхийн санах ой болон
-  мобайл аппликейшнд» үнэгүй, 5 жилээр байршуулна. iOS апп «GSign mongolia»
-  (`mn.gov.gsign`) нь «зөвхөн 16 буюу түүнээс дээш насны Монгол улсын иргэд»-д
-  зориулагдсан [28].
-- **Гэрчилгээний гинж** (УБЕГ болон esign.gov.mn-ээс татаж, `openssl`-ээр шалгасан [24][25]):
-  - `CN=Mongolian National Root CA, O=CITA` (2021–2031);
-  - → `CN=Mongolian National Issuing CA, O=MDDC` (2022–2031; OCSP
-    `http://ocsp.esign.gov.mn`, CRL `http://esign.gov.mn/MNRCA-2021.crl`);
-  - → `CN=Government Civil Issuing CA, O=General Authority for State Registration`
-    (CRL `http://esign.gov.mn/MNICA-2022.crl`).
-- **Дүгнэлт.**
-  - «Government Civil Issuing CA»-гийн гэрчилгээгээр Basu-ийн challenge-д гарын үсэг
-    зурвал иргэншлийн хүчтэй нотолгоо болно. Энэ CA зөвхөн Монгол иргэнд олгодог
-    (15.1), гэрчилгээнд иргэний бүртгэлийн дугаар байдаг.
-  - Гэхдээ гуравдагч апп GSign аппаас гарын үсэг хүсэх нийтийн API, эсвэл картын
-    PKI-г NFC-ээр PIN-тэй ашиглах баримт **олдсонгүй**.
-  - Практикт энэ нотолгоог **ДАН-ы `signature` нэвтрэлтээр** дамжуулж авна.
-- Нэмэлт: Үндэсний дата төв 2022-11-01-ээс төрийн байгууллагад тоон гарын үсэг
-  олгохоо больсон [25].
-
 ### 2.5 Банкаар нэвтрэх
 
 - Банкаар нэвтрэх нь **ДАН-ы нэг арга**: «Банкны эрхээр нэвтрэх — Хаан, Голомт,
@@ -519,106 +451,6 @@
 - Гэрээний хавсралт «…-ийн ___ **домэйнд** … хүлээн авах мэдээлэл» гэсэн хэлбэртэй.
   Өөрөөр хэлбэл гэрээ тодорхой домэйнд байгуулагддаг.
 
-### 2.7 Хэрэглэгчийн өөрийн код (уншиж шалгасан)
-
-| Төсөл | Юу хийдэг | ДАН | ХУР | Чиптэй үнэмлэх | OIDC IdP |
-|---|---|---|---|---|---|
-| `~/Projects/open-gerege-nexus` | Go (chi, pgx) + Next.js ERP/платформ; `nexus.gerege.mn` | **Mock/үхсэн код** | Gerege-ийн прокси `xyp.gerege.mn` | Алга | **Тийм**, гэхдээ регистрийн дугаар өгдөггүй |
-| `~/Projects/eid-platform-mn` | Smart-ID маягийн eID ба CA (Go + SwiftUI + Kotlin); `eidmongolia.mn` | `dan.gerege.mn` гарцаар, HMAC-тай, ажилладаг | Алга (шинэ хувилбарт прокси) | NFC-ээр уншдаг, **итгэдэггүй** | OIDC биш, Smart-ID v3 API |
-| `~/Projects/new-e-id` | Дээрхийн шинэ хуулбарууд ба мобайл апп | Мөн адил | `xyp.gerege.mn` прокси | Мөн адил | — |
-| `~/Projects/Gereg-ID` | Хуучин хуулбар ба Gerege брэндийн wallet апп | Мөн адил | Прокси | Мөн адил | — |
-| `~/Projects/gerege-platform-mn` | gerege.mn портал, OIDC IdP (код нь `open-gerege-core` модульд) | eidmongolia.mn-ээр | Зөвхөн байгууллагын лавлагаа | — | **Тийм**, `national_id` claim-тай |
-
-**open-gerege-nexus.**
-- **ДАН:**
-  - `backend/internal/workspace/identity/dan/dan.go:6` бол «Gerege Systems DAN SSO
-    Gateway (dan.gerege.mn)», анхдагч хаяг нь `https://dan.gerege.mn/api/v1` (`:44-47`).
-  - Live горимд зөвхөн алдаа буцаадаг: «requires valid DAN_API_KEY» (`:101`), «live
-    OTP authentication is not implemented» (`:131`).
-- **sso.gov.mn-ийн OAuth код:**
-  - `identity/eid/eid.go:125-153` дотор `https://sso.gov.mn/oauth2/{authorize,token,userinfo}`
-    хаягууд бий.
-  - OIDC маягийн `scope="openid profile regnum civil_id phone email"`-тэй. Энэ нь
-    ДАН-ы жинхэнэ хэлбэр (`WS…` сервисийн scope, `/oauth2/api/v1/service`) биш.
-  - Энэ кодыг хаанаас ч дууддаггүй.
-- **Жинхэнэ ажилладаг танилт:** eID Mongolia-ийн RP клиент
-  (`backend/internal/kernel/eidrp/eidrp.go:71`, `https://eidmongolia.mn/v3`).
-- **OIDC provider** (`backend/internal/workspace/ssoprovider/endpoints.go:846-973`):
-  регистрийн дугаар, иргэншил, баталгаажсан түвшний claim **байхгүй**. Мөн
-  `email_verified: true`-г үргэлж тавьдаг.
-- **Бусад:** `docker-compose.prod.yml:211-212`-д ДАН/ХУР mock горимд байна;
-  `CHANGELOG.md:1428-1431`-д «жинхэнэ ДАН клиент байхгүй» гэж бичсэн.
-- **ESIGN протоколын баримт** (`native-apps/desktop/macos/ESIGN-DAN-PROTOCOL.md`):
-  - ДАН хуудасны «Тоон гарын үсэг (клиент програм)» сонголт браузераас
-    `ws://127.0.0.1:59001` руу холбогддог.
-  - 2026-09-01-ний туршилтаар sso.gov.mn/isf.mn нь `Tridum Key Issuing SubCA`-г
-    хүлээн авч, `eID Mongolia Issuing CA`-г «хүчин төгөлдөр бус» гэж татгалзсан
-    (§9, ойролцоогоор 195-213-р мөр).
-- **Орчны хувьсагчийн нэрс:**
-  - `DAN_ENDPOINT`, `DAN_MOCK_MODE`, `DAN_API_KEY`;
-  - `EID_CLIENT_ID/SECRET`, `EID_AUTHORIZE_URL/TOKEN_URL/USERINFO_URL`;
-  - `EID_BASE_URL`, `EID_RP_UUID`, `EID_RP_SECRET`, `EID_CERT_LEVEL`;
-  - `XYP_ENDPOINT`, `XYP_MOCK_MODE`, `XYP_CLIENT_ID`, `XYP_CLIENT_SECRET`;
-  - `SSO_ISSUER`, `OAUTH_REDIRECT_HOSTS` гэх мэт.
-
-**eid-platform-mn** (ба `new-e-id/eid-mobile-mn/platform`).
-- **ДАН гарц:**
-  - Утас `https://dan.gerege.mn/verify?callback_url=…&client_id=…&state=…`-ийг нээнэ
-    (`server/internal/service/dan/gateway.go:90-113`).
-  - Callback нь сервер хооронд дамжих POST. Үүнийг HMAC-SHA256-аар шалгана: түлхүүрээр
-    эрэмбэлсэн `k=v`, 5 минутын цонх, давталтын кэш (`:115-181`,
-    `service.go:217-293`).
-  - Задалдаг талбарууд: `reg_no`, `civil_id`, нэрс, төрсөн огноо, хүйс, үнэмлэхний
-    огноо, `image`.
-  - Routes: `/v3/kyc/dan/*` (`server/internal/httpapi/server.go:428-477`).
-  - iOS дээр ДАН-ыг 16.4-өөс доош хувилбарт хаадаг. Шалтгаан нь «sso.gov.mn ES2022
-    ашигладаг» гэсэн тайлбар
-    (`new-e-id/eid-mobile-mn/ios/App/Etalon/Features/Registration/Steps/VerifyMethodView.swift:23-30`).
-- **Нүүр тулгалт:** Python sidecar (`deploy/facematch/app.py`) ашигладаг. Basu-д
-  §2.6-ийн дагуу **хэрэглэхгүй**.
-- **NFC:** §2.4-ийг үз. Дахин ашиглах боломжтой ч нотолгоо болохгүй.
-- **PKI:**
-  - `new-e-id/eid-mobile-mn/platform/pki/chain/README.md` дээр гинж: CITA root →
-    MDDC issuing → Gerege Issuing → eID Mongolia Issuing.
-  - Гэрчилгээний subject `SERIALNUMBER=PNOMN-<civil_id>`; регистрийн дугаар
-    гэрчилгээнд **ордоггүй** (`docs/IDENTIFIERS.md:37-38`).
-  - TypeScript SDK (`sdk/typescript/src/validator.ts:97-190`) challenge-ийн гарын
-    үсэг болон гинжийг шалгадаг.
-- **Орчны хувьсагчийн нэрс:**
-  - `SMARTID_KYC_PROVIDER`;
-  - `SMARTID_KYC_DAN_{BASE_URL,CLIENT_ID,CALLBACK_URL,SECRET,TTL_SECONDS,…}`;
-  - `SMARTID_XYP_{URL,CLIENT_ID,SECRET}`;
-  - `RP_API_BASE`, `RP_API_SECRET`, `EID_TRUST_ANCHOR_PEM`.
-
-**gerege-platform-mn** (`~/go/pkg/mod/github.com/gerege-systems/open-gerege-core@v1.10.0`).
-- OIDC IdP: code + PKCE S256, RS256. `nationalid` scope-той.
-- Claim-ууд солигдсон: `national_id` нь регистрийн дугаар, харин `register_number`
-  нь civil ID (`core/business/usecases/oidc/claims.go:36-38`).
-- eID-ийн «COMPLETE+OK» хариуг гарын үсгийг нь шалгалгүйгээр хүлээн авдаг.
-
-**Бусад.** `~/Projects/Loan projects/mini_backends/modules/burenscore/buren.handler.go:37-73`
-дотор ХУР-ийн OTP зөвшөөрлийн хүсэлт (regnum, SMS/email/kiosk туг, `WS100101`)
-дотоод dispatcher-ээр дамжиж явдаг.
-
-**Basu дахин ашиглах боломж.**
-1. **open-gerege-nexus-ийг OIDC provider болгож холбох.** Техникийн хувьд болно
-   (Basu-ийн `verifyIdToken` + PKCE). Гэхдээ регистрийн дугаар, иргэншлийн нотолгоо
-   **ирэхгүй** тул зорилгод хүрэхгүй.
-2. **gerege.mn OIDC (`nationalid` scope).** Регистрийн дугаар өгнө. Гэхдээ:
-   - түүний итгэл нь eID Mongolia-гийн гарын үсэг шалгаагүй хариунд тулгуурладаг;
-   - Gerege-ийн ДАН гэрээ Basu-д хамаарах эсэх тодорхойгүй.
-3. **eID Mongolia-ийн RP (TS SDK).** Хамгийн бэлэн.
-   - Иргэний бүртгэлийн дугаар, регистрийн дугаар, нэрс өгнө. `PNOMN-<бүх цифр>` нь
-     ДАН-аар бүртгүүлсэн Монгол иргэн гэсэн үг.
-   - Сул тал 1: eID Mongolia-ийн CA нь лицензтэй гэрчилгээжүүлэх байгууллагын нийтийн
-     жагсаалтад **алга** [7][25].
-   - Сул тал 2: ДАН өөрөө энэ CA-г татгалздаг (дээрх ESIGN баримт).
-   - Сул тал 3: хэрэглэгч eID Mongolia апп суулгах шаардлагатай.
-4. **ДАН-ы callback шалгалтын загвар ба туршилтын хэлбэр.** Санаа нь ашиглагдана.
-   Basu ДАН-д шууд холбогдох тул HMAC гарц хэрэггүй.
-
----
-
 ## 3. Basu-д хэрэгжүүлэх алхам
 
 ### A. Гэрээ, бичиг баримт (хэн, юу)
@@ -699,8 +531,7 @@ Google урсгалыг (`src/platform/identity/social.ts:84` `beginGoogle`, `:1
 
 - Google-ийнхтэй ижил `ASWebAuthenticationSession`-оор start URL нээнэ; callback
   scheme нь `basu`.
-- ДАН-ы хуудас iOS 16.4-өөс доош хувилбарт ажиллахгүй байж магадгүй. Энэ нь
-  хэрэглэгчийн кодын тайлбар бөгөөд би шалгаагүй.
+- ДАН-ы хуудас хуучин iOS хувилбарт ажиллах эсэхийг туршиж шалгана.
 - Зөвшөөрлийн дэлгэцийг натив байдлаар ДАН-ы өмнө харуулна. Юу авах, яагаад, хэр
   удаан хадгалах, хэрхэн цуцлахыг бичнэ.
 
@@ -720,12 +551,6 @@ Google урсгалыг (`src/platform/identity/social.ts:84` `beginGoogle`, `:1
   - мэдээлэл алдагдвал авах арга хэмжээний төлөвлөгөө (20.1.2);
   - хадгалах хугацаа.
 - Зөрчлийн бүртгэл хөтөлж, 1-р сард ХЭҮК-т хүргүүлнэ (22.6).
-- **Gerege-ийн гарц эсвэл eID Mongolia-г түр ашиглах бол** эхлээд дараахыг
-  баталгаажуулна:
-  - Gerege-ийн ДАН гэрээний хавсралтад Basu-ийн домэйн орсон эсэх, эсвэл нэмэлт
-    гэрээ хийх боломж;
-  - гэрээний 8.1 (үүргийг гуравдагч этгээдэд шилжүүлэхгүй) зөрчигдөхгүй эсэх;
-  - ХХМХТХ 8.2.6/8.11-ийн дагуу дамжуулах зөвшөөрөл.
 
 ### Ажлын хэмжээ (ойролцоо)
 
@@ -774,7 +599,7 @@ Google урсгалыг (`src/platform/identity/social.ts:84` `beginGoogle`, `:1
 6. **Хамгийн бага сервис** (жишээ нь `WS100125_checkCitizenRegnum`)-ийг ДАН-ы scope-оор
    дуудаж болох эсэх. Үүнийг `image`/`nationality` авахгүйн тулд хүсэж байна.
 7. **Үнэмлэхний чипийн интерфейс ба PKI апплет.** УБЕГ-ын баримт [23]
-   контакт/контактгүйг заагаагүй. Хэрэглэгчийн код «dual-interface» гэж бичсэн.
+   контакт/контактгүйг заагаагүй.
    Картын түлхүүрээр NFC-ээр PIN-тэй гарын үсэг зурах боломжийг баталгаажуулаагүй.
 8. **e-Mongolia OAuth V3.** Буцаах талбарууд, production хаяг, хувийн байгууллагад
    нээлттэй эсэх тодорхойгүй [29].
@@ -785,10 +610,7 @@ Google урсгалыг (`src/platform/identity/social.ts:84` `beginGoogle`, `:1
    - `image`/`nationality`-г хадгалахгүй бол А/90 [21] хамаарахгүй гэсэн миний тайлбарыг
      мөн хуульчаар шалгуулах.
 10. **Basu-д хуулийн этгээд** байгаа эсэх, аль нь гэрээ байгуулахыг би мэдэхгүй.
-11. **Gerege-ийн ДАН гэрээ.** Хэрэглэгчийн код `dan.gerege.mn`-ийг ДАН-ы гарц гэж
-    үздэг. Gerege-д ДАН-ы гэрээ байгаа эсэх, ямар домэйнд байгуулсныг код, баримтаас
-    олоогүй.
-12. **Хүрч чадаагүй эсвэл хоёрдогч эх сурвалж.**
+11. **Хүрч чадаагүй эсвэл хоёрдогч эх сурвалж.**
     - Thales-ийн «Mongolia biometric electronic ID card» хуудас curl-ээр хаалттай
       байсан.
     - Монголбанкны нээлттэй банкны журам олдсонгүй.
@@ -859,18 +681,3 @@ Google урсгалыг (`src/platform/identity/social.ts:84` `beginGoogle`, `:1
 
 **Код (локал, уншсан)**
 - Basu: `src/platform/identity/social.ts`, `src/platform/identity/sessions.ts`.
-- `~/Projects/open-gerege-nexus`:
-  - `backend/internal/workspace/identity/{dan/dan.go,eid/eid.go,gerege/xyp.go}`;
-  - `backend/internal/kernel/eidrp/eidrp.go`;
-  - `backend/internal/workspace/ssoprovider/endpoints.go`;
-  - `native-apps/desktop/macos/ESIGN-DAN-PROTOCOL.md`;
-  - `docker-compose.prod.yml`, `CHANGELOG.md`.
-- `~/Projects/eid-platform-mn`:
-  - `server/internal/service/dan/{gateway.go,service.go}`;
-  - `server/internal/httpapi/{server.go,handlers_admin_kyc.go}`;
-  - `ios/eIDMongolia/project.yml`;
-  - `ios/eIDMongolia/App/Etalon/Core/NFC/NFCReader+MongolianID.swift`;
-  - `sdk/typescript/src/validator.ts`, `docs/IDENTIFIERS.md`.
-- `~/Projects/new-e-id/eid-mobile-mn`: `platform/pki/chain/README.md`, `ios/App/Etalon/Features/Registration/Steps/VerifyMethodView.swift`.
-- `~/go/pkg/mod/github.com/gerege-systems/open-gerege-core@v1.10.0/core/business/usecases/oidc/claims.go`.
-- `~/Projects/Loan projects/mini_backends/modules/burenscore/buren.handler.go`.
