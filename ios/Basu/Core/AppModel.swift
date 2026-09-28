@@ -20,6 +20,14 @@ final class AppModel {
   private(set) var supplier: SupplierMine?
   private(set) var trouble: String?
 
+  /// Signed out, but past the way in to look around: «Бүртгэлгүйгээр үзэх».
+  /// Kept until somebody signs in — then the next sign-out lands on the way in
+  /// again. App Review asks that products can be seen without an account
+  /// (guideline 5.1.1(v)); the account is asked for at the order.
+  var browsing = UserDefaults.standard.bool(forKey: "browsing") {
+    didSet { UserDefaults.standard.set(browsing, forKey: "browsing") }
+  }
+
   /**
    A word for somebody who has just arrived, said once over wherever they
    landed. The way in cannot say it itself: the moment there is a session

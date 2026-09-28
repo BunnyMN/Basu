@@ -24,6 +24,7 @@ struct HomeView: View {
   @Environment(Platform.self) private var platform
   @Environment(\.requestReview) private var requestReview
   @State private var query = ""
+  @State private var signingIn = false
 
   /// A guest who is also a supplier gets one more tile, after the two everybody has.
   private var bands: [AppBand] {
@@ -63,6 +64,7 @@ struct HomeView: View {
     .scrollIndicators(.hidden)
     .background(LinearGradient.ground)
     .toolbarVisibility(.hidden, for: .navigationBar)
+    .sheet(isPresented: $signingIn) { SignInSheet() }
     .refreshable {
       await model.refreshLive()
       await platform.refresh()
@@ -85,8 +87,9 @@ struct HomeView: View {
   // MARK: - header
 
   /// `Basu` on the left, the bell alone on the right. No city label, no
-  /// greeting, no avatar — all three were cut. There is always a bell: the
-  /// launcher is only drawn for somebody signed in (see `RootView`).
+  /// greeting, no avatar — all three were cut. Somebody only looking around
+  /// (see `RootView`) has no bell to ring, so the way in stands where it
+  /// would be.
   private var header: some View {
     HStack(alignment: .top, spacing: 16) {
       Text("Basu")
@@ -95,8 +98,31 @@ struct HomeView: View {
         .foregroundStyle(Color.ink)
         .padding(.top, 8)
       Spacer(minLength: 8)
-      bell
+      if session.isSignedIn {
+        bell
+      } else {
+        signIn
+      }
     }
+  }
+
+  private var signIn: some View {
+    Button {
+      signingIn = true
+    } label: {
+      Text("Нэвтрэх")
+        .font(.sans(15, .semibold))
+        .foregroundStyle(Color.onAccent)
+        .padding(.horizontal, 16)
+        .frame(minHeight: 36)
+        .background(Color.accent, in: Capsule())
+        .frame(minHeight: BasuMetric.minTarget)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .padding(.top, -2)
+    .accessibilityIdentifier("home.account")
+    .accessibilityLabel("Нэвтрэх")
   }
 
   private var bell: some View {
@@ -277,7 +303,7 @@ struct LiveRow: View {
             Text(Format.hhmm(extra.time))
               .font(.mono(12.5, .semibold))
               .monospacedDigit()
-              .foregroundStyle(Color.accent)
+              .foregroundStyle(Color.hiInk)
           }
           .padding(.top, 9)
         }

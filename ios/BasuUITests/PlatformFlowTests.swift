@@ -108,7 +108,9 @@ final class PlatformFlowTests: XCTestCase {
     )
     // This phone has to be in the list, or nobody can revoke a lost one.
     XCTAssertTrue(
-      app.staticTexts["Энэ утас"].waitForExistence(timeout: 10),
+      app.descendants(matching: .any)
+        .matching(NSPredicate(format: "label CONTAINS %@", "Энэ утас")).firstMatch
+        .waitForExistence(timeout: 10),
       "the session list should mark the phone doing the asking",
     )
     shot("5-profile")

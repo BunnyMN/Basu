@@ -105,7 +105,12 @@ struct SignInSheet: View {
     NavigationStack {
       ScrollView {
         VStack(spacing: 0) {
-          if gate { hero } else if !showsAccount { sheetHead }
+          if gate {
+            browse
+            hero
+          } else if !showsAccount {
+            sheetHead
+          }
           if gate && model.offline {
             OfflineBanner {
               await model.retry()
@@ -219,6 +224,33 @@ struct SignInSheet: View {
     .accessibilityIdentifier("signin.gate")
   }
 
+  /**
+   «Бүртгэлгүйгээр үзэх», at the top where it is seen before anything is
+   typed: looking needs no account; ordering, the wallet and the profile do
+   (App Review guideline 5.1.1(v)).
+   */
+  private var browse: some View {
+    HStack {
+      Spacer()
+      Button { model.browsing = true } label: {
+        HStack(spacing: 6) {
+          Text("Бүртгэлгүйгээр үзэх")
+          Image(systemName: "arrow.right")
+        }
+        .font(.sans(14, .semibold))
+        .foregroundStyle(Color.ink)
+        .padding(.horizontal, 14)
+        .frame(minHeight: 36)
+        .background(Color.surface, in: Capsule())
+        .overlay(Capsule().strokeBorder(Color.line2, lineWidth: BasuMetric.hairline))
+        .contentShape(Capsule())
+      }
+      .buttonStyle(Pressable())
+      .accessibilityIdentifier("signin.browse")
+    }
+    .padding(.top, 4)
+  }
+
   /// A sheet over a page: no photograph, the title large and on the ground.
   private var sheetHead: some View {
     Text(title)
@@ -311,6 +343,7 @@ struct SignInSheet: View {
         symbol: "key",
       ) { switchTo(.password) }
         .accessibilityIdentifier("signin.passwordWay")
+
     }
   }
 

@@ -26,8 +26,17 @@ extension XCUIApplication {
 
   /// On the gate, the debug door straight to the demo guest — a developer's
   /// own server only, and at the foot of the doors, so perhaps below the fold.
+  /// Looking around without an account («Бүртгэлгүйгээр үзэх») is signed out
+  /// too: the header's «Нэвтрэх» opens the same doors as a sheet.
   func signInIfSignedOut() {
-    guard landing() == .gate else { return }
+    switch landing() {
+    case .gate: break
+    case .shell:
+      let account = buttons["home.account"]
+      guard account.waitForExistence(timeout: 2) else { return }
+      account.tap()
+    case .neither: return
+    }
     let demo = buttons["signin.demo"]
     if !demo.waitForExistence(timeout: 3) { swipeUp() }
     if demo.waitForExistence(timeout: 5) { demo.tap() }

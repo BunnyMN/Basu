@@ -66,9 +66,12 @@ enum ShellTab: String, CaseIterable, Hashable {
 
 /// Where the app opens, and the one place navigation is described.
 ///
-/// Signed out, the app is the way in and nothing else: no launcher behind it,
-/// no tab bar over it. Everything the shell shows — the orders, the wallet,
-/// the bell, the profile — belongs to a guest, and there is none yet.
+/// Signed out, the app opens on the way in: no launcher behind it, no tab bar
+/// over it — and under the doors, «Бүртгэлгүйгээр үзэх», which opens the
+/// shell to look around without an account. App Review sends back an app that
+/// asks for an account before its products can be seen (guideline 5.1.1(v),
+/// 1.0.3 on 2026-09-26); the account is asked for at the order, the wallet
+/// and the profile.
 struct RootView: View {
   @Environment(AppModel.self) private var model
   @Environment(Session.self) private var session
@@ -83,7 +86,7 @@ struct RootView: View {
 
   var body: some View {
     ZStack {
-      if session.isSignedIn {
+      if session.isSignedIn || model.browsing {
         shell
           .transition(.opacity)
       } else {
@@ -106,11 +109,14 @@ struct RootView: View {
       }
     }
     .animation(.easeOut(duration: 0.25), value: session.isSignedIn)
+    .animation(.easeOut(duration: 0.25), value: model.browsing)
     // Out and back in lands on the launcher, not on whatever the last
     // person left open.
     .onChange(of: session.isSignedIn) { _, signedIn in
       if signedIn {
         lock.admitted()
+        // In now: signing out later lands on the way in, not on browsing.
+        model.browsing = false
       } else {
         tab = .home
         path = []
@@ -266,6 +272,7 @@ struct RootView: View {
       let environment = ProcessInfo.processInfo.environment
       if environment["BASU_SCREEN"] == "signin" {
         model.session.signOut()
+        model.browsing = false
         return
       }
       guard environment["BASU_DEMO_SIGNIN"] == "1",

@@ -30,26 +30,34 @@ public enum BasuColor {
     // Surfaces. Cards are translucent over an 8pt backdrop blur
     // (.ultraThinMaterial); the 1pt hairline sits on top of the blur and is
     // what keeps edges legible.
-    public static let surface      = Color(light: 0xFFFFFF, dark: 0x171716, opacity: 0.60)
-    public static let surface2     = Color(light: 0xF7F6F4, dark: 0x1E1E1C, opacity: 0.52)
+    public static let surface      = Color(light: 0xFFFFFF, dark: 0x171A18, opacity: 0.60)
+    public static let surface2     = Color(light: 0xF7F6F2, dark: 0x1D211E, opacity: 0.52)
 
-    // Ink: warm neutrals, not blue-grey.
-    public static let ink          = Color(light: 0x161514, dark: 0xF3F2EF)
-    public static let ink2         = Color(light: 0x57534D, dark: 0xB3AEA7)
-    public static let ink3         = Color(light: 0x6B665F, dark: 0x928D86)
+    // Ink: warm neutrals with a breath of green.
+    public static let ink          = Color(light: 0x181916, dark: 0xEEF1EC)
+    public static let ink2         = Color(light: 0x575A53, dark: 0xAEB5AD)
+    public static let ink3         = Color(light: 0x696C64, dark: 0x8D958C)
 
     // Lines
-    public static let line         = Color(light: 0xE2DFDA, dark: 0x2A2927)
-    public static let line2        = Color(light: 0xCFCBC4, dark: 0x3B3A37)
+    public static let line         = Color(light: 0xE2E0D8, dark: 0x29302B)
+    public static let line2        = Color(light: 0xCDCBC2, dark: 0x39423C)
 
-    // The accent is ink: a black primary on warm white, white on black in
-    // the dark. Colour is kept for meaning (ready, hold, stop, route) and
-    // the photographs bring the warmth — as on the web (app.css, §3 of
-    // docs/design-system.md) since 11143bb.
-    public static let accent       = Color(light: 0x161514, dark: 0xF3F2EF)
-    public static let onAccent     = Color(light: 0xFFFFFF, dark: 0x161514)
+    // The one brand colour: pine, a deep green — as on the web (app.css,
+    // §3 of docs/design-system.md) since ba03238. Orange went in 11143bb and
+    // the black that replaced it was too plain.
+    public static let accent       = Color(light: 0x1F5A43, dark: 0x7CCBA2)
+    /// The accent as text, a shade deeper so it reads at body size.
+    public static let accentInk    = Color(light: 0x1C5440, dark: 0x8FD4AE)
+    public static let onAccent     = Color(light: 0xFFFFFF, dark: 0x0D1F16)
     /// The wash behind a chosen tab or chip.
-    public static let accentSoft   = Color(light: 0xECEAE6, dark: 0x2A2927)
+    public static let accentSoft   = Color(light: 0xE3EFE8, dark: 0x16271F)
+    public static let accentLine   = Color(light: 0xB9D4C6, dark: 0x2A4A3B)
+
+    // Honey: small marks only — «on the fire», never a button or money — so
+    // what is cooking never looks like the green of done.
+    public static let hi           = Color(light: 0xD9A441, dark: 0xE3B458)
+    public static let hiInk        = Color(light: 0x7A5A12, dark: 0xE8C27A)
+    public static let hiSoft       = Color(light: 0xFBF1DC, dark: 0x2B2312)
 
     // Semantic
     public static let ready        = Color(light: 0x136A4B, dark: 0x57C295)   // credits
@@ -73,9 +81,9 @@ public enum BasuColor {
     public static var ground: LinearGradient {
         LinearGradient(
             stops: [
-                .init(color: Color(light: 0xF7F6F3, dark: 0x141413), location: 0.00),
-                .init(color: Color(light: 0xF4F3F0, dark: 0x0E0E0D), location: 0.46),
-                .init(color: Color(light: 0xECEAE6, dark: 0x090908), location: 1.00)
+                .init(color: Color(light: 0xF8F7F3, dark: 0x141815), location: 0.00),
+                .init(color: Color(light: 0xF4F3EE, dark: 0x0F1110), location: 0.46),
+                .init(color: Color(light: 0xECEBE4, dark: 0x0A0C0B), location: 1.00)
             ],
             startPoint: .init(x: 0.03, y: 0), endPoint: .init(x: -0.03, y: 1))
     }

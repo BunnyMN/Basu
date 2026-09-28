@@ -9,6 +9,7 @@ import SwiftUI
  see a trend, they open it to find out whether the next thing will work.
  */
 struct WalletView: View {
+  @Environment(Session.self) private var session
   @Environment(Platform.self) private var platform
   @State private var confirming: Int?
   @State private var customAmount = false
@@ -20,9 +21,20 @@ struct WalletView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 26) {
-        balance
-        topUp
-        statement
+        if session.isSignedIn {
+          balance
+          topUp
+          statement
+        } else {
+          // Somebody looking around has no wallet yet: it is the account's.
+          SignInPrompt(
+            symbol: "creditcard",
+            title: "Түрийвч таны бүртгэлд",
+            detail: "Нэвтэрмэгц үлдэгдэл, цэнэглэлт, буцаалт, баримт бүгд энд харагдана.",
+            id: "wallet.signin",
+          )
+          .padding(.top, 8)
+        }
       }
       .padding(.horizontal, BasuMetric.screenPadding)
       .padding(.bottom, 78)

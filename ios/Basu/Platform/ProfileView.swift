@@ -40,16 +40,28 @@ struct ProfileView: View {
   var body: some View {
     ScrollView {
       VStack(alignment: .leading, spacing: 26) {
-        // Only ever drawn signed in: signing out, or closing the account,
-        // swaps the whole shell for the way in (see `RootView`).
-        identity
-        fields
-        settings
-        notifications
-        DevicesSection(confirmingOthers: $signingOutOthers)
-        help
-        signOut
-        closeAccount
+        if session.isSignedIn {
+          identity
+          fields
+          settings
+          notifications
+          DevicesSection(confirmingOthers: $signingOutOthers)
+          help
+          signOut
+          closeAccount
+        } else {
+          // Looking around (see `RootView`): the way in, and what is this
+          // phone's rather than the account's — how it looks, and the help.
+          SignInPrompt(
+            symbol: "person.crop.circle",
+            title: "Нэвтэрч, захиалгаа хийгээрэй",
+            detail: "Захиалга, түрийвч, мэдэгдэл таны бүртгэлд хадгалагдана. Apple, Google эсвэл имэйлээр нэг алхамд.",
+            id: "profile.signin",
+          )
+          .padding(.top, 8)
+          settings
+          help
+        }
       }
       .padding(.horizontal, BasuMetric.screenPadding)
       .padding(.bottom, 78)
@@ -281,12 +293,14 @@ struct ProfileView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        Hairline()
-        lockRow
+        if session.isSignedIn {
+          Hairline()
+          lockRow
+        }
       }
       .glassCard()
 
-      Text(lockFooter)
+      Text(session.isSignedIn ? lockFooter : "Харагдах байдал зөвхөн энэ утсанд хадгалагдана.")
         .font(.sans(12))
         .lineSpacing(12 * 0.55 - 3)
         .foregroundStyle(Color.ink3)
