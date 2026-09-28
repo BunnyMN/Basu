@@ -39,14 +39,32 @@ final class AppModel {
   }
 
   func bootstrap() async {
-    offline = await !api.reachable()
+    let reached = await api.reachable()
+    // A cancelled ask learned nothing about the server.
+    guard !Task.isCancelled else { return }
+    offline = !reached
     await refreshLive()
   }
 
   /// Ask again, after the person holding the phone has done something about it.
   func retry() async {
-    offline = await !api.reachable()
+    let reached = await api.reachable()
+    guard !Task.isCancelled else { return }
+    offline = !reached
     if !offline { await bootstrap() }
+  }
+
+  /**
+   While the server is unreachable, keep asking — every ten seconds — so the
+   banner goes by itself when the network or the server comes back, rather
+   than staying up until somebody thinks to press «Дахин».
+   */
+  func watchWhileOffline() async {
+    while offline, !Task.isCancelled {
+      try? await Task.sleep(for: .seconds(10))
+      guard !Task.isCancelled else { return }
+      await retry()
+    }
   }
 
   /// Every call that lands says so, and every one that never arrives says that.
@@ -79,11 +97,15 @@ final class AppModel {
     async let lunches = api.liveOrders(token: token)
     async let provisions = api.liveIdesh(token: token)
     async let mine = api.supplierMine(token: token)
+    // Asked for by a screen that has since gone, an answer never came: nothing
+    // was learned, so nothing on the launcher changes.
     do {
       live = try await lunches
       noted(nil)
       await OrderActivity.shared.sync(live: live)
       if live.contains(where: { $0.state == .served }) { ReviewMoment.noteFinished() }
+    } catch is CancellationError {
+      return
     } catch let error as APIError where error.isUnauthorised {
       // A token from a reseeded database is dead, not a reason to shout at
       // somebody who has only just opened the app.
@@ -99,9 +121,21 @@ final class AppModel {
     // A server that predates the second service answers 404 here; that is an
     // empty list, not an outage. Likewise a server without the supplier's
     // side: no tile, not an error.
-    liveIdesh = (try? await provisions) ?? []
+    do {
+      liveIdesh = try await provisions
+    } catch is CancellationError {
+      return
+    } catch {
+      liveIdesh = []
+    }
     if liveIdesh.contains(where: { $0.state == .handed }) { ReviewMoment.noteFinished() }
-    supplier = (try? await mine) ?? nil
+    do {
+      supplier = try await mine
+    } catch is CancellationError {
+      return
+    } catch {
+      supplier = nil
+    }
   }
 
   func say(_ trouble: String?) { self.trouble = trouble }

@@ -138,8 +138,15 @@ struct API: Sendable {
   /// Is anything listening? Used to tell "nobody is cooking today" apart from
   /// "this phone cannot reach the server", which look identical on screen and
   /// mean completely different things to whoever is holding it.
+  /// Asked twice, a second apart, before the answer is no: a phone waking,
+  /// or stepping from Wi-Fi to the mobile network, drops one request now and
+  /// then, and one dropped request is not a server that is down.
   func reachable() async -> Bool {
-    ((try? await send(.init(path: "/health"), as: Blank.self)) != nil)
+    for attempt in 0..<2 {
+      if attempt > 0 { try? await Task.sleep(for: .seconds(1)) }
+      if (try? await send(.init(path: "/health"), as: Blank.self)) != nil { return true }
+    }
+    return false
   }
 
   // MARK: signing in
@@ -324,6 +331,13 @@ struct API: Sendable {
     do {
       (data, response) = try await urlSession.data(for: urlRequest)
     } catch {
+      // A request given up on — its screen closed, its task cancelled — is
+      // not a network that is down. Called «OFFLINE», it put «Серверт
+      // холбогдож чадсангүй» on the launcher, and hid the supplier's tile,
+      // every time somebody left a page inside the app.
+      if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
+        throw CancellationError()
+      }
       throw APIError.offline
     }
 

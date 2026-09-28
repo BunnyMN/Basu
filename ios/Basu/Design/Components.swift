@@ -58,8 +58,11 @@ struct WideButton: View {
 
  Said out loud rather than left as an empty screen: "no restaurants today" and
  "this phone cannot reach anything" are the same picture and completely
- different problems, and only one of them is the guest's to wait out. A debug
- build adds the line the developer actually needs.
+ different problems, and only one of them is the guest's to wait out.
+
+ The words are for whoever holds the phone, in every build. A debug build
+ once added the API's address and `npm run dev` here, and a debug copy on a
+ phone showed that to its owner; the developer's line goes to the console.
  */
 struct OfflineBanner: View {
   let retry: () async -> Void
@@ -105,15 +108,14 @@ struct OfflineBanner: View {
     // anybody — VoiceOver or a test — can point at.
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("offline.banner")
+    .onAppear {
+      #if DEBUG
+        NSLog("Basu: no answer from \(Endpoint.base.absoluteString) — is `npm run dev` running?")
+      #endif
+    }
   }
 
-  private var hint: String {
-    #if DEBUG
-      return "API: \(Endpoint.base.absoluteString) — `npm run dev` ажиллаж байгаа эсэхийг шалгана уу."
-    #else
-      return "Сүлжээгээ шалгаад дахин оролдоно уу."
-    #endif
-  }
+  private var hint: String { "Сүлжээгээ шалгаад дахин оролдоно уу." }
 }
 
 /// A line of trouble, said in Mongolian, in the place it happened.

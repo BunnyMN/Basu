@@ -335,6 +335,8 @@ final class Platform {
   }
 
   private func note(_ error: Error) {
+    // A screen that left before its answer came has nothing to be told.
+    guard !(error is CancellationError) else { return }
     trouble = (error as? APIError)?.message ?? "Алдаа гарлаа."
   }
 }

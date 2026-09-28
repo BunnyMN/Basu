@@ -124,6 +124,9 @@ struct RootView: View {
       }
     }
     .onChange(of: appearance, initial: true) { _, chosen in chosen.apply() }
+    // Offline anywhere — the launcher, the way in — clears by itself once
+    // the server answers again.
+    .task(id: model.offline) { await model.watchWhileOffline() }
     .alert(
       "Нэвтэрлээ",
       isPresented: Binding(
