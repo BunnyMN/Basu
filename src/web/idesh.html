@@ -252,6 +252,11 @@
 #refund .why{margin:12px 0 0}
 #refund .btn{margin-top:12px}
 .assure{display:none}
+/* who is signed in, and the way out — in a browser; the app has its own */
+.me{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin:12px 0 0;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}
+.me[hidden]{display:none}
+.me b{color:var(--ink);font-weight:600;overflow-wrap:anywhere}
+.me .link{min-height:32px;font-size:var(--t-cap);text-decoration:underline;text-underline-offset:.2em}
 </style>
 </head>
 <body>
@@ -262,6 +267,7 @@
   <div class="top page-head" data-large>
     <h1>Өвлийн идэш</h1>
     <p class="sub">Гэрээт малчин, махны газраас. Үнэ нь зар дээр бичсэнээрээ эцсийнх.</p>
+    <p class="me" id="me" hidden><span>Нэвтэрсэн: <b id="me-name"></b></span><button class="link" type="button" id="sign-out">Гарах</button></p>
   </div>
 
   <!-- The three things a buyer is trusting. All three are true by
@@ -464,12 +470,50 @@ async function loadListings() {
   }
   if (gone) return;
   showMarket(true);
+  void paintMe(token);
   const { today, listings } = answer;
   state.today = today;
   state.listings = listings;
   paintKinds();
   paintListings();
 }
+
+/**
+ * Who this browser is signed in as, said plainly under the title, with the
+ * way out beside it: a session left from a week ago is otherwise invisible,
+ * and the stalls look open to anybody. Inside the phone app the account is
+ * the shell's, and so is signing out.
+ */
+async function paintMe(token) {
+  if (shell.present) return;
+  try {
+    const me = await api('/v1/me', { token });
+    if (gone || store.guestToken !== token) return;
+    $('me-name').textContent = me.display_name || me.email || me.phone || 'Basu хэрэглэгч';
+    $('me').hidden = false;
+  } catch {
+    // Nobody to name: the stalls call will find out the same and show the door.
+  }
+}
+
+/** Sign out here: end this session on the server, forget it, and close the stalls. */
+async function signOutHere() {
+  const token = store.guestToken;
+  store.guestToken = null;
+  $('me').hidden = true;
+  state.listings = [];
+  paintMine([]);
+  paintGate();
+  if (!token) return;
+  try {
+    const { sessions } = await api('/v1/me/sessions', { token });
+    const current = sessions.find((s) => s.current);
+    if (current) await api(`/v1/me/sessions/${current.id}`, { method: 'DELETE', token });
+  } catch {
+    // Forgotten here is signed out here; a session the server still holds ends on its own.
+  }
+}
+$('sign-out').addEventListener('click', () => void signOutHere());
 
 /** The stalls, or the door in their place. */
 function showMarket(open) {

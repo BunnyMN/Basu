@@ -867,6 +867,29 @@ describe('өвлийн идэш', () => {
     expect((d.getElementById('gate') as HTMLElement).hidden).toBe(true);
   });
 
+  it('says who is signed in, and signs out for real', async () => {
+    await ownGuest('+97699004014');
+    const token = storage.getItem('basu.guest')!;
+    const dom = await openPage('idesh.html');
+    const d = dom.window.document;
+    await until(dom, 'the account line', () => !(d.getElementById('me') as HTMLElement).hidden);
+    expect(d.getElementById('me-name')?.textContent).toBe('+97699004014');
+    expect(d.querySelectorAll('.listing').length).toBeGreaterThan(0);
+
+    (d.getElementById('sign-out') as HTMLButtonElement).click();
+    await until(dom, 'the door', () => !(d.getElementById('gate') as HTMLElement).hidden);
+    expect((d.getElementById('listings') as HTMLElement).hidden).toBe(true);
+    expect((d.getElementById('me') as HTMLElement).hidden).toBe(true);
+    expect(storage.getItem('basu.guest')).toBeNull();
+    // The session is over on the server too, not only forgotten here.
+    let status = 0;
+    for (let i = 0; i < 40 && status !== 401; i++) {
+      status = (await fetch(`${base}/v1/idesh/listings`, { headers: { authorization: `Bearer ${token}` } })).status;
+      if (status !== 401) await new Promise((resolve) => setTimeout(resolve, 60));
+    }
+    expect(status).toBe(401);
+  });
+
   it('lists every stall, names the supplier, and says it is under contract', async () => {
     await ownGuest('+97699004010');
     const dom = await openPage('idesh.html');
