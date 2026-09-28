@@ -66,34 +66,96 @@ p{margin:0}
 .table.roles .yes svg{width:18px;height:18px;fill:none;stroke:var(--ready);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
 .table.roles .no{color:var(--ink-3)}
 .table.roles tr.role-sec td{padding-top:18px;font-family:var(--mono);font-size:var(--t-eyebrow);font-weight:500;letter-spacing:var(--track-eyebrow);text-transform:uppercase;color:var(--ink-3);background:none}
-/* the roles page: every role on the left, the one chosen on the right as a tree to tick */
-.roles-grid{display:grid;grid-template-columns:minmax(240px,320px) minmax(0,1fr);gap:16px;align-items:start}
+/* the roles page: every role on the left with what it opens at a glance; the one chosen on the right, module by module */
+.roles-grid{display:grid;grid-template-columns:minmax(260px,340px) minmax(0,1fr);gap:20px;align-items:start}
 @media (max-width:1000px){.roles-grid{grid-template-columns:1fr}}
-.roles-list{overflow:hidden}
-.role-row{display:flex;align-items:flex-start;gap:12px;width:100%;padding:12px 16px;border:0;border-bottom:1px solid var(--line);background:none;text-align:left;color:var(--ink)}
-.role-row:last-child{border-bottom:0}
-.role-row .main{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
-.role-row .title{font-size:var(--t-row);font-weight:600}
-.role-row .sub{font-size:var(--t-cap);color:var(--ink-2);line-height:1.4}
-.role-row .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
-.role-row .end{flex:none;padding-top:2px}
-.role-row[data-on]{background:var(--accent-soft)}
-.role-row[data-on] .title{color:var(--accent-ink)}
-@media (hover:hover){.role-row:not([data-on]):hover{background:var(--surface-2)}}
-.role-add .title{color:var(--accent-ink)}
-.role-flags{margin:0 0 16px}
-.perm-tree{display:flex;flex-direction:column;gap:12px;margin-bottom:16px}
-.perm-mod{border:1px solid var(--line);border-radius:var(--r-ctl);overflow:hidden}
-.perm-mod-head{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--line);font-weight:600;cursor:pointer}
+.roles-side{position:sticky;top:16px;max-height:calc(100dvh - 32px);overflow-y:auto;padding-bottom:2px}
+@media (max-width:1000px){.roles-side{position:static;max-height:none;overflow:visible}}
+.roles-head{display:flex;align-items:center;gap:8px;min-height:52px;padding:8px 10px 8px 16px}
+.roles-head h3{flex:1;min-width:0;font-size:var(--t-body);font-weight:600}
+.roles-head h3 .n{margin-left:8px;font-family:var(--mono);font-size:var(--t-meta);font-weight:500;color:var(--ink-3)}
+[data-rows] > .role-row{align-items:flex-start;min-height:0;padding:14px 16px}
+.role-row .title{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.role-row .sub{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.role-row .end{padding-top:2px}
+.role-row[data-on]{background:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+@media (hover:hover){[data-rows] > .role-row[data-on]:hover{background:var(--accent-soft)}}
+.role-mark{display:grid;place-items:center;width:36px;height:36px;flex:none;border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--line);font-size:var(--t-cap);font-weight:600;color:var(--ink-2)}
+.role-mark svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.role-mark[data-locked]{background:var(--ink);border-color:var(--ink);color:var(--ink-inverse)}
+.role-row[data-on] .role-mark:not([data-locked]){background:var(--surface);border-color:var(--line-2);color:var(--ink)}
+/* a role's fingerprint: every module in menu order, lit where the role opens it */
+.role-strip{display:flex;align-items:center;gap:6px;margin-top:10px;color:var(--ink-2)}
+.role-strip span{display:grid}
+.role-strip svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.role-strip [data-off]{color:var(--line-2)}
+.role-strip small{margin-left:4px;font-family:var(--mono);font-size:var(--t-meta);color:var(--ink-3)}
+.role-editor{display:flex;flex-direction:column;gap:16px;min-width:0}
+.role-top{display:flex;align-items:flex-start;gap:14px;padding:2px 0 4px}
+.role-top .role-mark{width:48px;height:48px;border-radius:var(--r-ctl);font-size:var(--t-body-lg)}
+.role-top .role-mark svg{width:22px;height:22px}
+.role-id{flex:1;min-width:0}
+.role-id h2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:var(--t-title-2);font-weight:600;overflow-wrap:anywhere}
+.role-id p{margin-top:4px;font-size:var(--t-cap);color:var(--ink-2);max-width:62ch}
+.role-id p:empty{display:none}
+.role-stats{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:10px;font-size:var(--t-cap);color:var(--ink-3)}
+.role-stats b{margin-right:4px;font-family:var(--mono);font-weight:600;color:var(--ink)}
+.role-tools{display:flex;gap:8px;flex:none}
+.role-step{display:inline-grid;place-items:center;width:22px;height:22px;margin-right:10px;border-radius:50%;background:var(--ink);color:var(--ink-inverse);font-family:var(--mono);font-size:var(--t-meta);font-weight:600;vertical-align:1px}
+.role-editor .card-head h3{display:flex;align-items:center}
+.role-editor .card-head .meta{font-family:var(--mono);font-size:var(--t-meta);color:var(--ink-3)}
+@media (min-width:640px){.role-editor .fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.role-flags{display:flex;flex-direction:column;margin-top:8px;border-top:1px solid var(--line)}
+.role-flag{display:flex;align-items:flex-start;gap:12px;padding:12px 0 0;cursor:pointer}
+.role-flag b{display:block;font-size:var(--t-body);font-weight:600;color:var(--ink)}
+.role-flag small{display:block;margin-top:2px;font-size:var(--t-cap);color:var(--ink-3);line-height:1.4}
+/* one module a row: its level on the right, its pages and actions unfolded below */
+.role-hint{margin:0;padding:12px 16px;border-bottom:1px solid var(--line);font-size:var(--t-cap);line-height:1.5;color:var(--ink-2)}
+.role-hint b{font-weight:600;color:var(--ink)}
+.role-mod + .role-mod{border-top:1px solid var(--line)}
+.role-mod-head{display:flex;align-items:center;gap:12px;padding:10px 16px 10px 8px;flex-wrap:wrap}
+.role-fold{flex:1 1 240px;min-width:0;display:flex;align-items:center;gap:12px;padding:6px 8px;border:0;border-radius:var(--r-sm);background:none;color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+@media (hover:hover){.role-fold:hover{background:var(--surface-2)}}
+.role-fold .ic{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--line);color:var(--ink)}
+.role-fold .ic svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.role-fold .t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.role-fold .t b{font-size:var(--t-body-lg);font-weight:600}
+.role-fold .t small{font-size:var(--t-cap);color:var(--ink-3)}
+.role-fold .fold{display:grid;color:var(--ink-3)}
+.role-fold .fold svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:transform var(--dur)}
+.role-fold[aria-expanded="false"] .fold svg{transform:rotate(-90deg)}
+.role-mod[data-level="none"] .role-fold .ic{color:var(--ink-3)}
+.role-mod[data-level="none"] .role-fold .t b{color:var(--ink-2)}
+.role-mod[data-level="full"] .role-fold .ic{background:var(--ink);border-color:var(--ink);color:var(--ink-inverse)}
+.role-mod[data-level="view"] .role-fold .ic,.role-mod[data-level="some"] .role-fold .ic{background:var(--accent-soft);border-color:var(--line-2)}
+.role-level{flex:none}
+.role-level button{min-height:30px;padding:0 12px}
+.role-level button[disabled]{cursor:default}
+.role-pages{padding:0 16px 8px 62px}
+.role-page{display:grid;grid-template-columns:minmax(150px,220px) minmax(0,1fr);gap:8px 24px;padding:12px 0;border-top:1px solid var(--line)}
+@media (max-width:640px){
+  .role-mod-head{padding:10px 12px 12px 4px}
+  .role-level{display:flex;width:100%;margin-left:8px}
+  .role-level button{flex:1;min-height:36px}
+  .role-editor .card-head .meta{display:none}
+  .role-pages{padding-left:16px}
+  .role-page{grid-template-columns:1fr}
+  .role-acts{padding-left:30px}
+}
+.role-view{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
+.role-view b{display:block;font-size:var(--t-body);font-weight:600;line-height:20px}
+.role-view small{display:block;font-size:var(--t-meta);color:var(--ink-3);margin-top:2px}
+.role-acts{display:flex;flex-direction:column;gap:10px}
+.role-acts label{display:flex;align-items:flex-start;gap:10px;font-size:var(--t-cap);line-height:20px;color:var(--ink-2);cursor:pointer}
+.role-acts .none{font-size:var(--t-cap);line-height:20px;color:var(--ink-3)}
+.role-page:not(:has([data-view]:checked)) .role-acts label{color:var(--ink-3)}
+/* the bar that saves: it stays in reach while the modules scroll */
+.role-foot{position:sticky;bottom:12px;z-index:2;display:flex;align-items:center;gap:8px;padding:10px 10px 10px 16px;background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-md);box-shadow:var(--shadow-float)}
+.role-foot .sum{flex:1;min-width:0;font-size:var(--t-cap);color:var(--ink-2)}
+.role-foot .sum b{font-family:var(--mono);font-weight:600;color:var(--ink)}
+.role-foot[data-dirty] .sum::before{content:"";display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:var(--hold);vertical-align:1px}
 .sec-mod{display:inline-flex;align-items:center;gap:8px}
 .sec-mod svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3)}
-.perm-pages{display:flex;flex-direction:column}
-.perm-page{padding:10px 14px}
-.perm-page + .perm-page{border-top:1px solid var(--line)}
-.perm-view{display:flex;align-items:center;gap:10px;cursor:pointer}
-.perm-view small{font-size:var(--t-meta);color:var(--ink-3);font-weight:400}
-.perm-acts{display:flex;flex-wrap:wrap;gap:6px 18px;margin:8px 0 0 28px}
-.perm-acts label{display:flex;align-items:center;gap:8px;font-size:var(--t-cap);color:var(--ink-2);cursor:pointer}
 .table.roles tr.perm-act td:first-child{padding-left:28px;font-size:var(--t-cap);color:var(--ink-2)}
 .table.roles tr.perm-page td:first-child{font-weight:500}
 /* the menu page: each module a card, its pages rows to rename, move, reorder and hide */
@@ -1020,19 +1082,88 @@ function matrixTable(table) {
   return el(`<section class="section"><div class="card"><div class="table-wrap"><table class="table roles"><thead>${thead}</thead><tbody>${body}</tbody></table></div></div></section>`);
 }
 
+/** Text for an attribute: esc() leaves quotes as they are. */
+const attr = (value) => esc(value).replace(/"/g, '&quot;');
+
+/** A scope's modules in menu order, each with its pages and every permission in it. */
+const moduleTree = (data) =>
+  data.modules
+    .map((m) => {
+      const pages = data.pages.filter((p) => p.module === m.key);
+      const kinds = new Set(pages.map((p) => p.kind ?? ''));
+      return {
+        ...m,
+        pages,
+        views: pages.map((p) => p.permission),
+        acts: pages.flatMap((p) => p.actions.map((a) => a.permission)),
+        // A module whose pages all run at one kind of business says so once, not on every page.
+        kind: kinds.size === 1 ? [...kinds][0] || null : null,
+      };
+    })
+    .filter((m) => m.pages.length > 0);
+
+/** What a role opens, as a set: the admin role every page and action there is. */
+const opensOf = (data, role) =>
+  new Set(role.locked ? data.pages.flatMap((p) => [p.permission, ...p.actions.map((a) => a.permission)]) : role.permissions ?? []);
+
+/** How far a role opens a module: not at all, every page to read, every page and action, or something in between. */
+function levelOf(m, held) {
+  const views = m.views.filter((p) => held.has(p)).length;
+  const acts = m.acts.filter((p) => held.has(p)).length;
+  if (!views && !acts) return 'none';
+  if (views === m.views.length && acts === m.acts.length) return 'full';
+  if (views === m.views.length && !acts) return 'view';
+  return 'some';
+}
+
+/** Open a module to a level: its pages to read unless shut, its actions only when whole. */
+function setLevel(m, held, level) {
+  for (const p of m.views) {
+    if (level === 'none') held.delete(p);
+    else held.add(p);
+  }
+  for (const p of m.acts) {
+    if (level === 'full') held.add(p);
+    else held.delete(p);
+  }
+}
+
+/** A role's mark: the admin role's shield, else the first letters of its name. */
+function roleMark(role) {
+  if (role.locked) return `<span class="role-mark" data-locked>${NAV_ICON.shield}</span>`;
+  const words = (role.name ?? '').trim().split(/\s+/).filter(Boolean).map((w) => [...w]);
+  const letters = words.length > 1 ? words.slice(0, 2).map((w) => w[0].toUpperCase()).join('') : words.length ? words[0][0].toUpperCase() + (words[0][1] ?? '') : '';
+  return `<span class="role-mark">${letters ? esc(letters) : NAV_ICON.plus}</span>`;
+}
+
+/** A role not made yet: empty, or a copy of another role's pages and actions. */
+const draftRole = (data, from) => ({
+  key: null,
+  name: from ? `${from.name} (хуулбар)`.slice(0, 40) : '',
+  description: from?.description ?? '',
+  permissions: from ? [...opensOf(data, from)] : [],
+  locked: false,
+  head: false,
+  everyone: from ? from.everyone !== false : true,
+  builtin: false,
+});
+
 /**
- * The roles page. On the left every role of the desk or of businesses, with
- * who holds it; on the right the one chosen, as a tree of modules, their
- * pages and what can be done on each, ticked for what the role opens. A new
- * role starts empty. The admin role opens everything and stays as it is.
+ * The roles page. On the left every role of the desk or of businesses: what
+ * it opens at a glance, module by module, and who holds it. On the right the
+ * one chosen, module by module too — each shut, open to read, or open whole,
+ * and unfolded for anything in between: its pages and what can be done on
+ * each. A new role is made in two steps, a name and then its modules, from
+ * nothing or from a copy of another role. The admin role opens everything
+ * and stays as it is.
  */
 async function renderRoles(view) {
   const pick = rolePick;
   rolePick = null;
   const manage = can('desk.roles:manage');
-  view.append(head('Үүрэг, эрх', 'Үүрэг үүсгээд, ямар хуудас, ямар үйлдэл нээхийг нь чагтаар сонгоно. Хүн бүрийн цэс, эрх үүнээс шууд гарна.', '<div data-seg></div>'));
+  view.append(head('Үүрэг, эрх', 'Үүрэг бүр ямар модуль, хуудас, үйлдэл нээхийг энд тохируулна. Хүн бүрийн цэс, эрх үүнээс шууд гарна.', '<div data-seg></div>'));
   view.querySelector('[data-seg]').replaceWith(scopeSeg(() => show('roles')));
-  const box = el('<div class="roles-grid"><div class="card roles-list" data-rows id="roles-list"></div><div class="card role-edit" id="role-edit"></div></div>');
+  const box = el('<div class="roles-grid"><div class="roles-side"><div data-rows id="roles-list"></div></div><div id="role-edit"></div></div>');
   view.append(box);
   let data;
   try {
@@ -1042,132 +1173,269 @@ async function renderRoles(view) {
     return;
   }
   if (tab !== 'roles') return;
+  const mods = moduleTree(data);
   const list = box.querySelector('#roles-list');
   const edit = box.querySelector('#role-edit');
-  const draw = (key) => {
-    for (const r of list.querySelectorAll('[data-role]')) r.toggleAttribute('data-on', r.dataset.role === key);
-    const role = key === '+' ? { key: null, name: '', description: '', permissions: [], locked: false, head: false, everyone: true, builtin: false } : data.roles.find((r) => r.key === key);
-    edit.replaceChildren(roleEditor(data, role, manage));
+  let editor = null;
+  /** Open a role, or '+' for a new one (a copy of `from`, when given) — asking first if that would drop unsaved changes. */
+  const draw = (key, { from = null, force = false } = {}) => {
+    if (!force && editor?.dirty() && !confirm('Хадгалаагүй өөрчлөлт алга болно. Үргэлжлүүлэх үү?')) return;
+    for (const r of list.querySelectorAll('.role-row')) r.toggleAttribute('data-on', r.dataset.role === key);
+    const role = key === '+' ? draftRole(data, from) : data.roles.find((r) => r.key === key);
+    editor = roleEditor(data, mods, role, {
+      manage,
+      from,
+      onCopy: () => draw('+', { from: role }),
+      onReset: () => draw(key, { force: true }),
+      onCancel: () => draw(data.roles[0]?.key ?? '+', { force: true }),
+    });
+    edit.replaceChildren(editor.root);
+    if (key === '+') editor.root.querySelector('[name="name"]')?.focus();
   };
+
+  const top = el(`<div class="roles-head"><h3>Үүргүүд<span class="n">${data.roles.length}</span></h3></div>`);
+  if (manage) {
+    const add = el(`<button class="btn" data-size="sm" type="button" data-role="+">${NAV_ICON.plus}Шинэ үүрэг</button>`);
+    add.addEventListener('click', () => draw('+'));
+    top.append(add);
+  }
+  list.append(top);
   for (const r of data.roles) {
-    const flags = [
-      r.locked && '<span class="pill" data-size="sm">бүгдийг нээнэ</span>',
-      r.head && '<span class="pill" data-size="sm">эзэн</span>',
-      accessScope === 'org' && !r.everyone && '<span class="pill" data-size="sm" data-s="applied">сонгосон байгууллагад</span>',
+    const held = opensOf(data, r);
+    const pages = data.pages.filter((p) => held.has(p.permission)).length;
+    const tags = [
+      r.locked && '<span class="badge" data-tone="neutral">бүгдийг нээнэ</span>',
+      r.head && '<span class="badge" data-tone="neutral">эзэн</span>',
+      accessScope === 'org' && !r.everyone && '<span class="badge" data-tone="hold">сонгосон байгууллагад</span>',
     ].filter(Boolean).join('');
-    const count = data.usage[r.key] ?? 0;
+    const strip = mods.map((m) => `<span title="${attr(m.name)}"${levelOf(m, held) === 'none' ? ' data-off' : ''}>${NAV_ICON[m.icon] ?? ''}</span>`).join('');
     const row = el(`
-      <button class="row role-row" type="button" data-role="${esc(r.key)}">
-        <span class="main"><span class="title">${esc(r.name)}</span><span class="sub">${esc(r.description ?? '')}</span>${flags ? `<span class="tags">${flags}</span>` : ''}</span>
-        <span class="end"><span class="meta">${count} хүн</span></span>
+      <button class="row role-row" type="button" data-role="${attr(r.key)}">
+        <span class="lead">${roleMark(r)}</span>
+        <span class="main">
+          <span class="title">${esc(r.name)}${tags}</span>
+          <span class="sub">${esc(r.description ?? '')}</span>
+          <span class="role-strip">${strip}<small>${pages}/${data.pages.length} хуудас</small></span>
+        </span>
+        <span class="end"><span class="val">${data.usage[r.key] ?? 0}<small>хүн</small></span></span>
       </button>`);
     row.addEventListener('click', () => draw(r.key));
     list.append(row);
   }
-  if (manage) {
-    const add = el('<button class="row role-row role-add" type="button" data-role="+"><span class="main"><span class="title">+ Шинэ үүрэг</span><span class="sub">Нэр өгөөд хуудсуудаа сонгоно</span></span></button>');
-    add.addEventListener('click', () => draw('+'));
-    list.append(add);
-  }
-  draw(pick && (pick === '+' || data.roles.some((r) => r.key === pick)) ? pick : data.roles[0]?.key ?? '+');
+  draw(pick && data.roles.some((r) => r.key === pick) ? pick : data.roles[0]?.key ?? '+');
 }
 
-/** One role, as a tree to tick: modules, their pages, and what can be done on each. */
-function roleEditor(data, role, manage) {
+/**
+ * One role, module by module. `held` is what the role opens as it is being
+ * edited, and every box, level and count is drawn from it, so a module's
+ * level, a page's box and an action's box never disagree. An action brings
+ * its page along; a page taken away takes its actions with it.
+ */
+function roleEditor(data, mods, role, { manage, from, onCopy, onReset, onCancel }) {
+  const fresh = !role.key;
   const fixed = role.locked || !manage;
-  const held = new Set(role.locked ? data.pages.flatMap((p) => [p.permission, ...p.actions.map((a) => a.permission)]) : role.permissions ?? []);
+  const org = data.scope === 'org';
+  const all = data.pages.flatMap((p) => [p.permission, ...p.actions.map((a) => a.permission)]);
+  const actsTotal = all.length - data.pages.length;
+  let held = opensOf(data, role);
   const kindWord = { supplier: 'нийлүүлэгчид', restaurant: 'ресторанд' };
-  const f = el(`
-    <div class="card-body">
-      <div class="fields">
-        <label class="field"><span>Үүргийн нэр</span><input name="name" maxlength="40" placeholder="Кассир, Тогооч, Нягтлан…"></label>
-        <label class="field"><span>Тайлбар</span><input name="description" maxlength="200" placeholder="Юу хийдэг вэ, нэг өгүүлбэр"></label>
-      </div>
-      ${data.scope === 'org' ? `<div class="checks role-flags">
-        <label><input type="checkbox" name="everyone"> Бүх байгууллагад нээлттэй</label>
-        <label><input type="checkbox" name="head"> Эзэн — байгууллагын тэргүүн</label>
-      </div>` : ''}
-      ${role.locked ? '<div class="callout" style="margin-bottom:16px"><b>Бүх хуудас, бүх үйлдэл</b><span>Админ үүрэг бүгдийг нээдэг, засагдахгүй — ингэснээр Basu өөрийгөө хэзээ ч түгжихгүй.</span></div>' : ''}
-      <div class="perm-tree" data-tree></div>
-      ${fixed ? '' : `<div class="form-foot">
-        ${role.key && !role.builtin ? '<button class="btn" data-v="quiet" type="button" data-drop>Устгах</button>' : ''}
-        <button class="btn" data-v="primary" type="button" data-save>${role.key ? 'Хадгалах' : 'Үүрэг үүсгэх'}</button>
+  const step = (n) => (fresh ? `<span class="role-step">${n}</span>` : '');
+  const badges = [
+    role.locked && '<span class="badge" data-tone="neutral">бүгдийг нээнэ</span>',
+    role.builtin && !role.locked && '<span class="badge" data-tone="neutral">үндсэн</span>',
+    role.head && '<span class="badge" data-tone="neutral">эзэн</span>',
+    org && !fresh && !role.everyone && '<span class="badge" data-tone="hold">сонгосон байгууллагад</span>',
+  ].filter(Boolean).join('');
+  const root = el(`
+    <div class="role-editor">
+      <header class="role-top">
+        ${roleMark(role)}
+        <div class="role-id">
+          <h2><span data-title></span>${badges}</h2>
+          <p data-desc></p>
+          <div class="role-stats" data-stats></div>
+        </div>
+        ${fresh || !manage ? '' : `<div class="role-tools">
+          <button class="btn" data-size="sm" type="button" data-copy>Хуулах</button>
+          ${role.builtin ? '' : '<button class="btn" data-size="sm" data-v="danger" type="button" data-drop>Устгах</button>'}
+        </div>`}
+      </header>
+      ${role.locked
+        ? '<div class="callout"><b>Бүх модуль, бүх хуудас, бүх үйлдэл</b><span>Админ үүрэг бүгдийг нээдэг, засагдахгүй — ингэснээр Basu өөрийгөө хэзээ ч түгжихгүй. Шинэ хуудас нэмэгдэхэд ч өөрөө нээгдэнэ.</span></div>'
+        : `<section class="card">
+        <div class="card-head"><h3>${step(1)}${fresh ? 'Нэр өгөх' : 'Нэр, тайлбар'}</h3></div>
+        <div class="card-body">
+          <div class="fields">
+            <label class="field"><span>Үүргийн нэр</span><input name="name" maxlength="40" autocomplete="off" placeholder="Кассир, Тогооч, Нягтлан…"></label>
+            <label class="field"><span>Тайлбар</span><input name="description" maxlength="200" autocomplete="off" placeholder="Юу хийдэг вэ, нэг өгүүлбэр"></label>
+            ${fresh ? `<label class="field wide"><span>Эхлэх цэг</span><select name="from"><option value="">Хоосноос — бүх модуль хаалттай</option>${data.roles.map((r) => `<option value="${attr(r.key)}">«${esc(r.name)}» үүргээс хуулах</option>`).join('')}</select></label>` : ''}
+          </div>
+          ${org ? `<div class="role-flags">
+            <label class="role-flag"><input type="checkbox" name="everyone"><span><b>Бүх байгууллагад нээлттэй</b><small>Унтраавал Basu сонгосон байгууллагад л энэ үүргийг олгоно.</small></span></label>
+            <label class="role-flag"><input type="checkbox" name="head"><span><b>Эзэн — байгууллагын тэргүүн</b><small>Байгууллага бүрт дор хаяж нэг эзэн байна. Эзэн төрлийн үүргийг зөвхөн эзэн томилох эрхтэй хүн олгоно.</small></span></label>
+          </div>` : ''}
+        </div>
+      </section>`}
+      <section class="card role-mods">
+        <div class="card-head"><h3>${step(2)}${fresh ? 'Модуль сонгох' : 'Модуль, хуудас'}</h3><span class="meta" data-open></span><button class="btn" data-v="link" type="button" data-unfold>Бүгдийг дэлгэх</button></div>
+        ${fresh ? '<p class="role-hint">Модуль бүрт: <b>Хаах</b> — цэсэнд харагдахгүй; <b>Харах</b> — хуудсууд нь нээгдэнэ, үйлдэл хийхгүй; <b>Бүрэн</b> — бүх үйлдэлтэй. Дэлгээд хуудас, үйлдэл тус бүрээр сонгож болно.</p>' : ''}
+        <div data-mods></div>
+      </section>
+      ${fixed ? '' : `<div class="role-foot"${fresh ? '' : ' hidden'}>
+        <span class="sum" data-foot-sum></span>
+        <button class="btn" data-v="quiet" type="button" data-cancel>Болих</button>
+        <button class="btn" data-v="primary" type="button" data-save>${fresh ? 'Үүрэг үүсгэх' : 'Хадгалах'}</button>
       </div>`}
     </div>`);
-  f.querySelector('[name="name"]').value = role.name ?? '';
-  f.querySelector('[name="description"]').value = role.description ?? '';
-  if (data.scope === 'org') {
-    f.querySelector('[name="everyone"]').checked = role.everyone !== false;
-    f.querySelector('[name="head"]').checked = Boolean(role.head);
-  }
-  const tree = f.querySelector('[data-tree]');
-  for (const m of data.modules) {
-    const pages = data.pages.filter((p) => p.module === m.key);
-    if (!pages.length) continue;
+
+  const rows = new Map();
+  const modBox = root.querySelector('[data-mods]');
+  for (const m of mods) {
+    const id = `role-mod-${data.scope}-${m.key}`;
+    const levels = m.acts.length ? [['none', 'Хаах'], ['view', 'Харах'], ['full', 'Бүрэн']] : [['none', 'Хаах'], ['full', 'Нээх']];
     const mod = el(`
-      <div class="perm-mod">
-        <label class="perm-mod-head"><input type="checkbox" data-all> <span class="sec-mod">${NAV_ICON[m.icon] ?? ''}${esc(m.name)}</span></label>
-        <div class="perm-pages"></div>
+      <div class="role-mod" data-module="${attr(m.key)}">
+        <div class="role-mod-head">
+          <button class="role-fold" type="button" aria-expanded="false" aria-controls="${attr(id)}">
+            <span class="ic">${NAV_ICON[m.icon] ?? ''}</span>
+            <span class="t"><b>${esc(m.name)}</b><small data-sum></small></span>
+            <span class="fold">${NAV_ICON.chev}</span>
+          </button>
+          <div class="seg role-level" role="group" aria-label="${attr(m.name)}">${levels.map(([k, l]) => `<button type="button" data-level="${k}" aria-pressed="false"${fixed ? ' disabled' : ''}>${l}</button>`).join('')}</div>
+        </div>
+        <div class="role-pages" id="${attr(id)}" hidden></div>
       </div>`);
-    for (const p of pages) {
-      const note = [p.hidden && 'цэснээс нуусан', p.kind && `зөвхөн ${kindWord[p.kind]}`, p.link && 'холбоос'].filter(Boolean).join(' · ');
-      const page = el(`
-        <div class="perm-page" data-page="${esc(p.key)}">
-          <label class="perm-view"><input type="checkbox" value="${esc(p.permission)}" data-view> <b>${esc(p.name)}</b>${note ? ` <small>${esc(note)}</small>` : ''}</label>
-          ${p.actions.length ? `<div class="perm-acts">${p.actions.map((a) => `<label><input type="checkbox" value="${esc(a.permission)}" data-act> ${esc(a.label)}</label>`).join('')}</div>` : ''}
-        </div>`);
-      page.querySelectorAll('input').forEach((i) => (i.checked = held.has(i.value)));
-      mod.querySelector('.perm-pages').append(page);
+    for (const p of m.pages) {
+      const note = [p.hidden && 'цэснээс нуусан', !m.kind && p.kind && `зөвхөн ${kindWord[p.kind]}`, p.link && 'холбоос'].filter(Boolean).join(' · ');
+      mod.querySelector('.role-pages').append(el(`
+        <div class="role-page" data-page="${attr(p.key)}">
+          <label class="role-view"><input type="checkbox" value="${attr(p.permission)}" data-view><span><b>${esc(p.name)}</b>${note ? `<small>${esc(note)}</small>` : ''}</span></label>
+          <div class="role-acts">${p.actions.length
+            ? p.actions.map((a) => `<label><input type="checkbox" value="${attr(a.permission)}" data-act><span>${esc(a.label)}</span></label>`).join('')
+            : '<span class="none">Зөвхөн харна, үйлдэлгүй хуудас</span>'}</div>
+        </div>`));
     }
-    tree.append(mod);
+    rows.set(m, mod);
+    modBox.append(mod);
   }
-  // A module's box says whether all, some or none of it is ticked; a page's actions need the page.
+
+  const name = root.querySelector('[name="name"]');
+  const desc = root.querySelector('[name="description"]');
+  const everyone = root.querySelector('[name="everyone"]');
+  const headBox = root.querySelector('[name="head"]');
+  const fromPick = root.querySelector('[name="from"]');
+  if (name) {
+    name.value = role.name ?? '';
+    desc.value = role.description ?? '';
+  }
+  if (everyone) {
+    everyone.checked = role.everyone !== false;
+    headBox.checked = Boolean(role.head);
+  }
+  if (fromPick && from) fromPick.value = from.key;
+  if (fixed) root.querySelectorAll('input, select').forEach((i) => (i.disabled = true));
+
+  // What there is to lose: everything typed and ticked, against the role as it was drawn (a new one against nothing at all).
+  const state = () => JSON.stringify([name?.value.trim() ?? '', desc?.value.trim() ?? '', all.filter((p) => held.has(p)), everyone?.checked ?? null, headBox?.checked ?? null]);
+  const start = fresh ? JSON.stringify(['', '', [], everyone ? true : null, headBox ? false : null]) : state();
+  const dirty = () => !fixed && state() !== start;
+
   const sync = () => {
-    for (const mod of tree.querySelectorAll('.perm-mod')) {
-      const boxes = [...mod.querySelectorAll('.perm-pages input')];
-      const on = boxes.filter((b) => b.checked).length;
-      const all = mod.querySelector('[data-all]');
-      all.checked = on === boxes.length && on > 0;
-      all.indeterminate = on > 0 && on < boxes.length;
+    for (const b of root.querySelectorAll('[data-view],[data-act]')) b.checked = held.has(b.value);
+    let open = 0;
+    for (const [m, mod] of rows) {
+      const level = levelOf(m, held);
+      const views = m.views.filter((p) => held.has(p)).length;
+      const acts = m.acts.filter((p) => held.has(p)).length;
+      if (level !== 'none') open += 1;
+      mod.dataset.level = level;
+      for (const b of mod.querySelectorAll('.role-level button')) b.setAttribute('aria-pressed', String(b.dataset.level === level));
+      mod.querySelector('[data-sum]').textContent = [
+        `${views}/${m.views.length} хуудас`,
+        m.acts.length ? `${acts}/${m.acts.length} үйлдэл` : null,
+        level === 'some' ? 'хэсэгчлэн' : null,
+        m.kind ? `зөвхөн ${kindWord[m.kind]}` : null,
+      ].filter(Boolean).join(' · ');
+    }
+    const pages = data.pages.filter((p) => held.has(p.permission)).length;
+    const acts = all.filter((p) => p.includes(':') && held.has(p)).length;
+    root.querySelector('[data-title]').textContent = name?.value.trim() || (fresh ? 'Шинэ үүрэг' : role.name);
+    root.querySelector('[data-desc]').textContent = desc?.value.trim() || (fresh ? 'Нэр өгөөд, ямар модуль нээхийг сонгоно.' : role.locked ? role.description ?? '' : '');
+    root.querySelector('[data-stats]').innerHTML = [
+      fresh ? '' : `<span><b>${data.usage[role.key] ?? 0}</b>хүн</span>`,
+      `<span><b>${open}/${mods.length}</b>модуль</span>`,
+      `<span><b>${pages}/${data.pages.length}</b>хуудас</span>`,
+      `<span><b>${acts}/${actsTotal}</b>үйлдэл</span>`,
+    ].join('');
+    root.querySelector('[data-open]').textContent = `${open}/${mods.length} нээлттэй`;
+    const foot = root.querySelector('.role-foot');
+    if (foot) {
+      const changed = dirty();
+      foot.hidden = !fresh && !changed;
+      foot.toggleAttribute('data-dirty', changed);
+      foot.querySelector('[data-foot-sum]').innerHTML = fresh
+        ? `Сонгосон: <b>${open}</b> модуль · <b>${pages}</b> хуудас · <b>${acts}</b> үйлдэл`
+        : 'Хадгалаагүй өөрчлөлт бий';
     }
   };
-  tree.addEventListener('change', (e) => {
-    const input = e.target;
-    if (input.matches('[data-all]')) {
-      for (const b of input.closest('.perm-mod').querySelectorAll('.perm-pages input')) b.checked = input.checked;
-    } else if (input.matches('[data-act]') && input.checked) {
-      input.closest('.perm-page').querySelector('[data-view]').checked = true;
-    } else if (input.matches('[data-view]') && !input.checked) {
-      for (const b of input.closest('.perm-page').querySelectorAll('[data-act]')) b.checked = false;
+
+  const unfoldAll = root.querySelector('[data-unfold]');
+  const unfold = (mod, open) => {
+    mod.querySelector('.role-fold').setAttribute('aria-expanded', String(open));
+    mod.querySelector('.role-pages').hidden = !open;
+    unfoldAll.textContent = [...rows.values()].some((m) => m.querySelector('.role-pages').hidden) ? 'Бүгдийг дэлгэх' : 'Бүгдийг хураах';
+  };
+  modBox.addEventListener('click', (e) => {
+    const level = e.target.closest('.role-level button');
+    if (level) {
+      if (fixed) return;
+      const m = [...rows].find(([, mod]) => mod.contains(level))[0];
+      setLevel(m, held, level.dataset.level);
+      sync();
+      return;
+    }
+    const fold = e.target.closest('.role-fold');
+    if (fold) unfold(fold.closest('.role-mod'), fold.getAttribute('aria-expanded') !== 'true');
+  });
+  modBox.addEventListener('change', (e) => {
+    const b = e.target;
+    if (!b.matches('[data-view],[data-act]')) return;
+    const page = b.closest('.role-page');
+    if (b.checked) {
+      held.add(b.value);
+      if (b.matches('[data-act]')) held.add(page.querySelector('[data-view]').value);
+    } else {
+      held.delete(b.value);
+      if (b.matches('[data-view]')) for (const a of page.querySelectorAll('[data-act]')) held.delete(a.value);
     }
     sync();
   });
-  sync();
-  if (fixed) f.querySelectorAll('input').forEach((i) => (i.disabled = true));
-
-  f.querySelector('[data-save]')?.addEventListener('click', async (e) => {
-    const body = {
-      name: f.querySelector('[name="name"]').value.trim(),
-      description: f.querySelector('[name="description"]').value.trim(),
-      permissions: [...tree.querySelectorAll('.perm-pages input:checked')].map((i) => i.value),
-      ...(data.scope === 'org' ? { everyone: f.querySelector('[name="everyone"]').checked, head: f.querySelector('[name="head"]').checked } : {}),
-    };
-    e.target.setAttribute('data-busy', '');
-    try {
-      const saved = role.key
-        ? await ops(`/v1/ops/roles/${data.scope}/${role.key}`, { method: 'PATCH', body })
-        : await ops(`/v1/ops/roles/${data.scope}`, { method: 'POST', body });
-      toast(role.key ? 'Хадгалагдлаа.' : 'Үүрэг үүслээ.', 'good');
-      deskRoles = null;
-      rolePick = saved.key;
-      await reload();
-    } catch (error) {
-      toast(error.message, 'bad');
-    } finally {
-      e.target.removeAttribute('data-busy');
-    }
+  unfoldAll.addEventListener('click', () => {
+    const open = [...rows.values()].some((mod) => mod.querySelector('.role-pages').hidden);
+    for (const mod of rows.values()) unfold(mod, open);
   });
-  f.querySelector('[data-drop]')?.addEventListener('click', async () => {
+  name?.addEventListener('input', () => {
+    name.removeAttribute('aria-invalid');
+    root.querySelector('.role-top .role-mark').replaceWith(el(roleMark({ name: name.value })));
+    sync();
+  });
+  desc?.addEventListener('input', sync);
+  everyone?.addEventListener('change', sync);
+  headBox?.addEventListener('change', sync);
+  fromPick?.addEventListener('change', () => {
+    const copy = data.roles.find((r) => r.key === fromPick.value);
+    held = copy ? opensOf(data, copy) : new Set();
+    sync();
+  });
+
+  root.querySelector('[data-copy]')?.addEventListener('click', onCopy);
+  root.querySelector('[data-cancel]')?.addEventListener('click', fresh ? onCancel : onReset);
+  root.querySelector('[data-drop]')?.addEventListener('click', async () => {
+    const people = data.usage[role.key] ?? 0;
+    if (people > 0) {
+      toast(`${people} хүн энэ үүрэгтэй байна. Эхлээд тэдэнд өөр үүрэг өгөөд дараа нь устгана.`, 'bad');
+      return;
+    }
     if (!confirm(`«${role.name}» үүргийг устгах уу?`)) return;
     try {
       await ops(`/v1/ops/roles/${data.scope}/${role.key}`, { method: 'DELETE' });
@@ -1178,7 +1446,43 @@ function roleEditor(data, role, manage) {
       toast(error.message, 'bad');
     }
   });
-  return f;
+  root.querySelector('[data-save]')?.addEventListener('click', async (e) => {
+    const button = e.currentTarget;
+    const wanted = name.value.trim();
+    if (wanted.length < 2) {
+      name.setAttribute('aria-invalid', 'true');
+      name.focus();
+      toast('Үүргийн нэрийг хоёроос доошгүй үсгээр бичнэ үү.', 'bad');
+      return;
+    }
+    if (fresh && !all.some((p) => held.has(p))) {
+      toast('Дор хаяж нэг модуль, эсвэл нэг хуудас нээнэ үү.', 'bad');
+      return;
+    }
+    const body = {
+      name: wanted,
+      description: desc.value.trim(),
+      // Only what the page draws: a page a release took away is dropped here rather than refused by the server.
+      permissions: all.filter((p) => held.has(p)),
+      ...(org ? { everyone: everyone.checked, head: headBox.checked } : {}),
+    };
+    button.setAttribute('data-busy', '');
+    try {
+      const saved = fresh
+        ? await ops(`/v1/ops/roles/${data.scope}`, { method: 'POST', body })
+        : await ops(`/v1/ops/roles/${data.scope}/${role.key}`, { method: 'PATCH', body });
+      toast(fresh ? 'Үүрэг үүслээ.' : 'Хадгалагдлаа.', 'good');
+      deskRoles = null;
+      rolePick = saved.key;
+      await reload();
+    } catch (error) {
+      toast(error.message, 'bad');
+    } finally {
+      button.removeAttribute('data-busy');
+    }
+  });
+  sync();
+  return { root, dirty };
 }
 
 /**

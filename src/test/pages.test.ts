@@ -1472,28 +1472,45 @@ describe('Basu decides who may do what', () => {
   }
   const deskToken = async () => ((await (await fetch(`${base}/dev/ops-token`)).json()) as { token: string }).token;
 
-  it('makes a role by ticking its pages, an action bringing its page along', async () => {
+  it('makes a role module by module, then page by page, an action bringing its page along', async () => {
     const desk = await theDesk();
     await opsTab(desk, 'roles');
-    await until(desk, 'the roles', (d) => d.querySelectorAll('#roles-list [data-role]').length >= 5);
+    await until(desk, 'the roles', (d) => d.querySelectorAll('#roles-list .role-row').length >= 4);
     const doc = desk.window.document;
     (doc.querySelector('#roles-list [data-role="+"]') as HTMLElement).click();
     await until(desk, 'an empty role', (d) => (d.querySelector('#role-edit [name="name"]') as HTMLInputElement | null)?.value === '');
-    (doc.querySelector('#role-edit [name="name"]') as HTMLInputElement).value = 'Туслах · тест';
-    const tick = (value: string) => {
+    const name = doc.querySelector('#role-edit [name="name"]') as HTMLInputElement;
+    name.value = 'Туслах · тест';
+    name.dispatchEvent(new desk.window.Event('input', { bubbles: true }));
+    const level = (module: string) => doc.querySelector(`#role-edit .role-mod[data-module="${module}"]`)?.getAttribute('data-level');
+    const ticked = () => [...doc.querySelectorAll('#role-edit .role-pages input:checked')].map((i) => (i as HTMLInputElement).value).sort();
+    expect(level('platform')).toBe('none');
+
+    // A whole module to read, at one press: every page of it, none of its actions.
+    (doc.querySelector('#role-edit .role-mod[data-module="platform"] .role-level [data-level="view"]') as HTMLElement).click();
+    expect(level('platform')).toBe('view');
+    expect(ticked()).toEqual(['desk.guests', 'desk.money', 'desk.notify']);
+
+    // Then one page out of it, and one action in another module — which brings its page along.
+    const tick = (value: string, on: boolean) => {
       const box = doc.querySelector(`#role-edit input[value="${value}"]`) as HTMLInputElement;
-      box.checked = true;
+      box.checked = on;
       box.dispatchEvent(new desk.window.Event('change', { bubbles: true }));
     };
-    tick('desk.guests');
-    tick('desk.orders:manage');
+    tick('desk.money', false);
+    tick('desk.orders:manage', true);
+    expect(level('platform')).toBe('some');
     expect((doc.querySelector('#role-edit input[value="desk.orders"]') as HTMLInputElement).checked).toBe(true);
     (doc.querySelector('#role-edit [data-save]') as HTMLElement).click();
     await until(desk, 'the new role chosen', (d) =>
-      Boolean([...d.querySelectorAll('#roles-list [data-role][data-on]')].find((r) => r.textContent?.includes('Туслах · тест'))),
+      Boolean([...d.querySelectorAll('#roles-list .role-row[data-on]')].find((r) => r.textContent?.includes('Туслах · тест'))),
     );
-    const ticked = [...doc.querySelectorAll('#role-edit .perm-pages input:checked')].map((i) => (i as HTMLInputElement).value).sort();
-    expect(ticked).toEqual(['desk.guests', 'desk.orders', 'desk.orders:manage']);
+    expect(ticked()).toEqual(['desk.guests', 'desk.notify', 'desk.orders', 'desk.orders:manage']);
+
+    // A copy starts from the same pages, under a name of its own.
+    (doc.querySelector('#role-edit [data-copy]') as HTMLElement).click();
+    expect((doc.querySelector('#role-edit [name="name"]') as HTMLInputElement).value).toBe('Туслах · тест (хуулбар)');
+    expect(ticked()).toEqual(['desk.guests', 'desk.notify', 'desk.orders', 'desk.orders:manage']);
   });
 
   it('renames a module and hides a page, and the sidebar follows the moment it is saved', async () => {
