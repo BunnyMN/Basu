@@ -921,6 +921,7 @@ async function mountPages(app: FastifyInstance): Promise<void> {
   // The website: its own pages for somebody in a browser. The app's pages
   // (/app, /idesh, /dine) are the phone shell's, and send a browser here.
   app.get('/login', (_request, reply) => reply.sendFile('login.html'));
+  app.get('/home', (_request, reply) => reply.sendFile('home.html'));
   app.get('/shop', (_request, reply) => reply.sendFile('shop.html'));
   app.get('/shop/:id', (_request, reply) => reply.sendFile('shop.html'));
   app.get('/orders', (_request, reply) => reply.sendFile('orders.html'));

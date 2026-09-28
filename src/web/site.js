@@ -21,6 +21,7 @@ const ICON = {
   down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>',
   orders: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h12v16l-3-2-3 2-3-2-3 2z"/><path d="M9 9h6M9 13h4"/></svg>',
   shop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9l1.5-4h13L20 9"/><path d="M4 9c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3"/><path d="M6 12v8h12v-8"/></svg>',
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg>',
   person: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1-3.5 3.6-5 7-5s6 1.5 7 5"/></svg>',
   out: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 16l-4-4 4-4M6 12h10"/></svg>',
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
@@ -30,7 +31,7 @@ export { ICON };
 /* ── where to go after signing in ──────────────────────────────────── */
 
 /** A path on this site to come back to — never another site, never the door itself. */
-export function safeNext(raw, fallback = '/shop') {
+export function safeNext(raw, fallback = '/home') {
   if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/login')) return fallback;
   return raw;
 }
@@ -100,7 +101,7 @@ export async function signOut() {
 export async function accountSlot(slot) {
   const person = await me();
   if (!person) {
-    slot.replaceChildren(el(`<a class="s-btn s-btn-dark s-btn-sm" href="${loginUrl(location.pathname === '/' ? '/shop' : location.pathname + location.search)}">Нэвтрэх</a>`));
+    slot.replaceChildren(el(`<a class="s-btn s-btn-dark s-btn-sm" href="${loginUrl(location.pathname === '/' ? '/home' : location.pathname + location.search)}">Нэвтрэх</a>`));
     return null;
   }
   const box = el(`
@@ -108,6 +109,7 @@ export async function accountSlot(slot) {
       <button type="button" aria-haspopup="menu" aria-expanded="false"><i class="s-ini" aria-hidden="true">${esc(initialOf(person))}</i><span>${esc(nameOf(person))}</span>${ICON.down}</button>
       <div class="s-menu" role="menu" hidden>
         <div class="who"><b>${esc(nameOf(person))}</b><small>${esc(person.email || person.phone || '')}</small></div>
+        <a role="menuitem" href="/home">${ICON.home}Миний Basu</a>
         <a role="menuitem" href="/shop">${ICON.shop}Зах</a>
         <a role="menuitem" href="/orders">${ICON.orders}Миний захиалга</a>
         <a role="menuitem" href="/account">${ICON.person}Бүртгэл</a>
@@ -137,6 +139,7 @@ export async function accountSlot(slot) {
 /* ── the frame ─────────────────────────────────────────────────────── */
 
 const NAV = [
+  ['home', '/home', 'Нүүр'],
   ['shop', '/shop', 'Зах'],
   ['orders', '/orders', 'Миний захиалга'],
   ['business', '/dashboard', 'Бизнест'],
@@ -147,7 +150,7 @@ export function mountFrame(active) {
   const bar = el(`
     <header class="s-bar">
       <div class="s-wrap">
-        <a class="s-word" href="/">Basu</a>
+        <a class="s-word" href="${store.guestToken ? '/home' : '/'}">Basu</a>
         <nav class="s-nav" aria-label="Цэс">${NAV.map(
           ([key, href, label]) => `<a href="${href}"${key === active ? ' aria-current="page"' : ''}>${label}</a>`,
         ).join('')}</nav>
@@ -158,7 +161,7 @@ export function mountFrame(active) {
     <footer class="s-foot">
       <div class="s-wrap">
         <span>© ${new Date().getFullYear()} Basu · Улаанбаатар · <a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a></span>
-        <nav aria-label="Холбоос"><a href="/">Нүүр</a><a href="/shop">Зах</a><a href="/dashboard">Бизнест</a><a href="/terms">Үйлчилгээний нөхцөл</a><a href="/privacy">Нууцлалын бодлого</a></nav>
+        <nav aria-label="Холбоос"><a href="/">Basu-гийн тухай</a><a href="/home">Миний Basu</a><a href="/shop">Зах</a><a href="/dashboard">Бизнест</a><a href="/terms">Үйлчилгээний нөхцөл</a><a href="/privacy">Нууцлалын бодлого</a></nav>
       </div>
     </footer>`);
   document.body.prepend(bar);

@@ -837,6 +837,33 @@ describe('the website', () => {
     await until(dom, 'a session', () => Boolean(storage.getItem('basu.guest')));
   });
 
+  it('has a home with the apps’ own tiles, and what of the guest’s is going on', async () => {
+    storage.removeItem('basu.guest');
+    const stranger = await openPage('home.html');
+    const d = stranger.window.document;
+    await until(stranger, 'the tiles', () => d.querySelectorAll('.h-app').length >= 2);
+    // The same art as the phone's launcher, going where a browser can use it.
+    expect(d.querySelector('[data-app="idesh"] img')?.getAttribute('src')).toBe('/brand/idesh-tile.webp');
+    expect(d.querySelector('[data-app="idesh"]')?.getAttribute('href')).toBe('/shop');
+    expect(d.querySelector('[data-app="dine"] img')?.getAttribute('src')).toBe('/brand/food-tile.webp');
+    expect((d.getElementById('live') as HTMLElement).hidden).toBe(true);
+
+    await ownGuest('+97699005003');
+    const token = storage.getItem('basu.guest')!;
+    const listing = (await (await fetch(`${base}/v1/idesh/listings`, { headers: { authorization: `Bearer ${token}` } })).json()).listings
+      .find((l: { unit: string; remaining: number }) => l.unit === 'whole' && l.remaining > 0);
+    const made = await (await fetch(`${base}/v1/idesh`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'idempotency-key': 'home-1' },
+      body: JSON.stringify({ listing_id: listing.id, qty: 1, receive: 'pickup', receive_on: listing.ready_from }),
+    })).json();
+    await fetch(`${base}/v1/idesh/${made.id}/pay`, { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+
+    const home = await openPage('home.html');
+    await until(home, 'the order on home', () => Boolean(home.window.document.querySelector(`[data-order="${made.id}"]`)));
+    expect(home.window.document.querySelector(`[data-order="${made.id}"]`)?.getAttribute('href')).toBe(`/orders/${made.id}`);
+  });
+
   it('keeps the market from somebody not signed in, and asks for no listing', async () => {
     storage.removeItem('basu.guest');
     const asked: string[] = [];

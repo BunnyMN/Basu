@@ -67,7 +67,7 @@ describe('a server with no demo in it', () => {
     const real = await buildServer(ctx, { dev: false });
     try {
       for (const url of ['/', '/app', '/idesh', '/dine', '/supplier', '/dashboard', '/kds', '/privacy', '/terms', '/api.js', '/app.css',
-        '/login', '/shop', '/shop/7a0a3c3e-1f0b-4c55-9f59-3f1f7f0c2a11', '/orders', '/orders/7a0a3c3e-1f0b-4c55-9f59-3f1f7f0c2a11', '/account', '/site.js', '/site.css']) {
+        '/login', '/home', '/shop', '/shop/7a0a3c3e-1f0b-4c55-9f59-3f1f7f0c2a11', '/orders', '/orders/7a0a3c3e-1f0b-4c55-9f59-3f1f7f0c2a11', '/account', '/site.js', '/site.css']) {
         const res = await real.inject({ method: 'GET', url });
         expect(res.statusCode, url).toBe(200);
       }

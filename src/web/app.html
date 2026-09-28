@@ -3,9 +3,10 @@
 <head>
 <meta charset="utf-8">
 <script>
-/* The launcher is the phone app's. A browser gets the website's market. */
+/* The launcher is the phone app's. A browser gets the website's own home,
+   with the same tiles. */
 if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.basu)) {
-  location.replace('/shop');
+  location.replace('/home');
 }
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
