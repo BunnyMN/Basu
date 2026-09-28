@@ -36,12 +36,11 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 .top .sub{margin-bottom:0}
 
 /* the three promises: one card, hairline rows; three columns on a wide screen */
-.trust{display:grid;grid-template-columns:minmax(0,1fr);gap:1px;padding:0;margin:0 0 24px;overflow:hidden;background:var(--line)}
-.trust div{display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:12px;align-items:start;padding:12px 16px;background:var(--surface)}
-.trust svg{width:20px;height:20px;grid-row:1 / span 2;margin-top:1px;fill:none;stroke:var(--ink-3);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.trust b{font-size:var(--t-row);font-weight:600;line-height:var(--lh-snug)}
-.trust span{font-size:var(--t-cap);line-height:1.4;color:var(--ink-2);margin-top:2px}
-@media (min-width:640px){.trust{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* The three promises, as one line of small marks: said, and out of the way
+   of the stalls, which are what somebody opened this page for. */
+.trust{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 20px;padding:0;list-style:none}
+.trust li{display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 8px;border-radius:var(--r-pill);background:var(--accent-soft);color:var(--accent-ink);font-size:var(--t-cap);font-weight:500;line-height:1.3;white-space:nowrap}
+.trust svg{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 
 /* ── what of mine is running ─────────────────────────────────────── */
 .mine{margin:0 0 24px}
@@ -105,7 +104,6 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
   /* pinned only while it is short: a column of thirteen orders scrolls with the page instead */
   .intro:has(.mine:not([data-any])){position:sticky;top:24px}
   .market{padding-top:44px}
-  .trust{grid-template-columns:minmax(0,1fr)}
 }
 
 /* ── the screen ──────────────────────────────────────────────────── */
@@ -269,29 +267,17 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
   <a class="home" href="/app" id="home" aria-label="Basu нүүр"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Basu</a>
   <div class="top page-head" data-large>
     <h1>Өвлийн идэш</h1>
-    <p class="sub">Гэрээт малчин, махны газраас. Үнэ нь зар дээр бичсэнээрээ эцсийнх.</p>
+    <p class="sub">Гэрээт малчин, махны газраас.</p>
     <p class="me" id="me" hidden><span>Нэвтэрсэн: <b id="me-name"></b></span><button class="link" type="button" id="sign-out">Гарах</button></p>
   </div>
 
   <!-- The three things a buyer is trusting. All three are true by
        construction: contract, fixed price, a supplier they can ring. -->
-  <div class="trust card" aria-label="Баталгаа">
-    <div>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
-      <b>Гэрээт нийлүүлэгч</b>
-      <span>Basu шалгаж, гэрээ байгуулсан</span>
-    </div>
-    <div>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12l-8 8-8-8V4h8l8 8z"/><circle cx="8.5" cy="8.5" r="1.3"/></svg>
-      <b>Үнэ эцсийнх</b>
-      <span>Зар дээр бичсэнээс өөрчлөгдөхгүй</span>
-    </div>
-    <div>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 12l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/></svg>
-      <b>Утсаар холбоотой</b>
-      <span>Төлсний дараа нийлүүлэгчийн утас гарна</span>
-    </div>
-  </div>
+  <ul class="trust" aria-label="Баталгаа">
+    <li title="Basu шалгаж, гэрээ байгуулсан"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>Гэрээт нийлүүлэгч</li>
+    <li title="Зар дээр бичсэнээс өөрчлөгдөхгүй"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12l-8 8-8-8V4h8l8 8z"/><circle cx="8.5" cy="8.5" r="1.3"/></svg>Эцсийн үнэ</li>
+    <li title="Төлсний дараа нийлүүлэгчийн утас гарна"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 12l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/></svg>Утсаар холбогдоно</li>
+  </ul>
 
   <section class="mine" id="mine">
     <h2 class="sec section-label">Миний идэш</h2>

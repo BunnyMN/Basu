@@ -1017,7 +1017,7 @@ describe('өвлийн идэш', () => {
     }
     // The page says how much there is to choose from, and who stands behind it.
     expect(dom.window.document.querySelector('#tally')?.textContent).toMatch(/^\d+ зар · \d+ гэрээт нийлүүлэгч$/);
-    expect(dom.window.document.querySelectorAll('.trust div')).toHaveLength(3);
+    expect(dom.window.document.querySelectorAll('.trust li')).toHaveLength(3);
     // The filter narrows by animal, never rearranges.
     clickText(dom, '#kinds button', 'Үхэр');
     await until(dom, 'only beef', (d) =>
