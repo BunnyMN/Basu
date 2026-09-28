@@ -101,7 +101,7 @@ export async function signOut() {
 export async function accountSlot(slot) {
   const person = await me();
   if (!person) {
-    slot.replaceChildren(el(`<a class="s-btn s-btn-dark s-btn-sm" href="${loginUrl(location.pathname === '/' ? '/home' : location.pathname + location.search)}">Нэвтрэх</a>`));
+    slot.replaceChildren(el(`<a class="s-btn s-btn-line s-btn-sm" href="${loginUrl(location.pathname === '/' ? '/home' : location.pathname + location.search)}">Нэвтрэх</a>`));
     return null;
   }
   const box = el(`

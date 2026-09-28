@@ -20,7 +20,7 @@
 .sh-kinds{display:flex;flex-wrap:wrap;gap:8px}
 .sh-kinds button{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 16px;border:1px solid var(--line);border-radius:999px;background:#fff;font:inherit;font-size:.9375rem;font-weight:500;color:var(--ink-2);cursor:pointer}
 .sh-kinds button small{font-family:var(--mono);font-size:.75rem;color:var(--ink-3)}
-.sh-kinds button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.sh-kinds button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .sh-kinds button[aria-pressed="true"] small{color:rgba(255,255,255,.6)}
 @media (hover:hover){.sh-kinds button:not([aria-pressed="true"]):hover{border-color:var(--line-2);color:var(--ink)}}
 .sh-tools{display:flex;flex-wrap:wrap;align-items:center;gap:14px}
@@ -35,7 +35,8 @@
 .sh-card .ph img{width:100%;height:100%;object-fit:cover;transition:transform 700ms var(--ease)}
 @media (hover:hover){.sh-card:hover .ph img{transform:scale(1.04)}}
 .sh-card .tags{position:absolute;left:10px;top:10px;right:10px;display:flex;justify-content:space-between;gap:6px}
-.sh-card .tags .s-pill{background:rgba(255,255,255,.94);border-color:transparent;color:var(--ink)}
+.sh-card .tags .s-pill{background:rgba(255,255,255,.94);border-color:transparent;color:var(--accent-ink)}
+.sh-card .tags .s-pill[data-tone="hi"]{background:var(--hi-soft);color:var(--hi-ink)}
 .sh-card[data-gone] .ph::after{content:"Дууссан";position:absolute;inset:0;display:grid;place-items:center;background:rgba(255,255,255,.72);font-weight:600;color:var(--ink)}
 .sh-card .bd{padding:14px 2px 0}
 .sh-card b{display:block;font-size:1.0625rem;font-weight:600;line-height:1.35}
@@ -79,14 +80,15 @@
 .sd-qty button{width:40px;height:40px;border:0;border-radius:50%;background:none;font-size:1.25rem;line-height:1;color:var(--ink);cursor:pointer}
 .sd-qty button:disabled{opacity:.3;cursor:default}
 @media (hover:hover){.sd-qty button:not(:disabled):hover{background:var(--surface-2)}}
+.sd-qty button{color:var(--accent-ink)}
 .sd-qty output{min-width:88px;text-align:center;font-family:var(--mono);font-weight:600}
 .sd-qty output small{font-family:var(--sans);font-weight:500;color:var(--ink-3)}
 .sd-ways{display:grid;gap:10px}
 .sd-way{display:grid;grid-template-columns:22px 1fr auto;gap:12px;align-items:start;padding:14px;border:1px solid var(--line-2);border-radius:14px;background:#fff;font:inherit;text-align:left;cursor:pointer}
 .sd-way:disabled{opacity:.5;cursor:default}
 .sd-way i{width:20px;height:20px;margin-top:1px;border:1.5px solid var(--line-2);border-radius:50%}
-.sd-way[aria-checked="true"]{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
-.sd-way[aria-checked="true"] i{border:6px solid var(--ink)}
+.sd-way[aria-checked="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:color-mix(in srgb,var(--accent-soft) 45%,#fff)}
+.sd-way[aria-checked="true"] i{border:6px solid var(--accent)}
 .sd-way b{display:block;font-weight:600}
 .sd-way small{display:block;margin-top:2px;font-size:.8125rem;line-height:1.45;color:var(--ink-2)}
 .sd-way em{font-style:normal;font-size:.875rem;font-weight:600;white-space:nowrap}
@@ -220,7 +222,7 @@ function paintGrid() {
       el(`<a class="sh-card" href="/shop/${l.id}" data-id="${l.id}" data-kind="${l.kind}"${gone ? ' data-gone' : ''}>
             <span class="ph"><img src="${PHOTO(l.kind)}" alt="" loading="lazy" width="960" height="720">
               <span class="tags">${l.supplier.contracted ? `<span class="s-pill">${MARK.check}Гэрээт</span>` : '<span></span>'}${
-                l.delivers ? `<span class="s-pill">${MARK.truckSm}Хүргэлттэй</span>` : ''
+                l.delivers ? `<span class="s-pill" data-tone="hi">${MARK.truckSm}Хүргэлттэй</span>` : ''
               }</span></span>
             <span class="bd">
               <b>${esc(l.title)}</b>
@@ -248,7 +250,7 @@ function drawStall(l) {
     el(`<a class="s-crumb" href="/shop">${MARK.back}Бүх зар</a>`),
     el(`<div class="sd-title">
           <h1>${esc(l.title)}</h1>
-          <div class="sd-who">${l.supplier.contracted ? `<span class="s-pill" data-tone="ready">${MARK.check}Гэрээт нийлүүлэгч</span>` : ''}<span>${esc(l.supplier.name)} · ${esc(l.origin)}</span></div>
+          <div class="sd-who">${l.supplier.contracted ? `<span class="s-pill" data-tone="brand">${MARK.check}Гэрээт нийлүүлэгч</span>` : ''}<span>${esc(l.supplier.name)} · ${esc(l.origin)}</span></div>
         </div>`),
     el(`<div class="sd">
           <div>

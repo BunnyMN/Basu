@@ -26,24 +26,27 @@
   --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
 
   /* ground + surfaces */
-  --bg:#F4F3F0; --surface:#FFFFFF; --surface-2:#F7F6F4; --sunk:#EAE8E4;
-  --ground:linear-gradient(176deg,#F7F6F3 0%,#F4F3F0 46%,#ECEAE6 100%);
+  --bg:#F4F3EE; --surface:#FFFFFF; --surface-2:#F7F6F2; --sunk:#EAE9E3;
+  --ground:linear-gradient(176deg,#F8F7F3 0%,#F4F3EE 46%,#ECEBE4 100%);
   --glass:rgba(255,255,255,.78); --blur:blur(12px) saturate(1.05);
-  --scrim:rgba(22,21,20,.40);
+  --scrim:rgba(18,26,21,.40);
   --map-dim:0;            /* veil over light map tiles; .35 in dark until mapStyle.js has a dark palette */
 
-  /* ink + lines: warm neutrals, not blue-grey. ink-3 is 5.7:1 on white and
-     5.1:1 on the ground; port the same values to BasuColor so both halves agree. */
-  --ink:#161514; --ink-2:#57534D; --ink-3:#6B665F; --ink-inverse:#F7F6F4;
-  --line:#E2DFDA; --line-2:#CFCBC4;
+  /* ink + lines: warm neutrals leaning to the pine, not blue-grey. ink-3 is
+     5.3:1 on white and 4.8:1 on the ground; port the same values to BasuColor. */
+  --ink:#181916; --ink-2:#575A53; --ink-3:#696C64; --ink-inverse:#F7F6F2;
+  --line:#E2E0D8; --line-2:#CDCBC2;
 
-  /* The accent is ink. Basu has no hue of its own: a black primary on white,
-     like a receipt or a good butcher's card, is what reads as trustworthy.
-     --accent fills; --accent-ink is accent as TEXT; --accent-soft is the
-     wash behind a chosen tab or chip; --on-accent sits on a fill. Colour is
-     kept for meaning only — route, hold, ready, stop. */
-  --accent:#161514; --accent-ink:#161514; --accent-soft:#ECEAE6; --accent-line:#CFCBC4;
-  --accent-hover:#2E2B28; --on-accent:#FFFFFF;
+  /* Basu's colour is pine: a deep green that reads fresh and trustworthy,
+     and against which red meat looks its best. --accent fills (primary
+     buttons, the chosen tab, a pin); --accent-ink is it as TEXT (8.8:1 on
+     white); --accent-soft is the wash behind a chosen tab or chip;
+     --on-accent sits on a fill. --deep is the pine at night, for the dark
+     bands of the front page and the door. --hi is honey: a small warm mark
+     (a dot, a «new», food on the fire) — never a button, never money. */
+  --accent:#1F5A43; --accent-ink:#1C5440; --accent-soft:#E3EFE8; --accent-line:#B9D4C6;
+  --accent-hover:#184A37; --on-accent:#FFFFFF; --deep:#123A2C;
+  --hi:#D9A441; --hi-ink:#7A5A12; --hi-soft:#FBF1DC; --hi-line:#EBCF94;
 
   /* semantic: route = waiting on the system / in transit, hold = waiting on a
      person, ready = done / credit, stop = attention / failed / destructive. */
@@ -55,10 +58,10 @@
 
   /* depth: one resting shadow (native y1 b2), one for things that float,
      one that rises from the bottom edge. */
-  --shadow:0 1px 2px rgba(22,21,20,.05);
-  --shadow-float:0 1px 2px rgba(22,21,20,.06),0 12px 32px -12px rgba(22,21,20,.20);
-  --shadow-sheet:0 -1px 0 var(--line),0 -16px 40px -20px rgba(22,21,20,.28);
-  --ring:0 0 0 3px rgba(22,21,20,.12);
+  --shadow:0 1px 2px rgba(18,26,21,.05);
+  --shadow-float:0 1px 2px rgba(18,26,21,.06),0 12px 32px -12px rgba(18,26,21,.20);
+  --shadow-sheet:0 -1px 0 var(--line),0 -16px 40px -20px rgba(18,26,21,.28);
+  --ring:0 0 0 3px var(--accent-soft);
 
   /* shape. Nothing else is legal: 4 code/checkbox, 8 badges/thumbs, 10
      controls, 12 cards, 16 sheet top, 18 app tiles, 2 the channel chip. */
@@ -95,11 +98,11 @@
   --track-eyebrow:.14em;
 
   /* icons drawn by CSS (masks take alpha only; chevrons and the check need a fill) */
-  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B665F' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23696C64' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
-  --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B665F' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+  --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23696C64' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
   --mask-chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
-  --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236B665F' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
+  --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23696C64' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
 
   /* motion + layers */
   --ease:cubic-bezier(.2,.8,.3,1); --dur:200ms; --dur-sheet:260ms;
@@ -110,15 +113,16 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     color-scheme:dark;
-    --bg:#0E0E0D; --surface:#171716; --surface-2:#1E1E1C; --sunk:#090908;
-    --ground:linear-gradient(176deg,#141413 0%,#0E0E0D 46%,#090908 100%);
-    --glass:rgba(23,23,22,.76);
-    --scrim:rgba(5,5,4,.60);
+    --bg:#0F1110; --surface:#171A18; --surface-2:#1D211E; --sunk:#0A0C0B;
+    --ground:linear-gradient(176deg,#141815 0%,#0F1110 46%,#0A0C0B 100%);
+    --glass:rgba(23,26,24,.76);
+    --scrim:rgba(4,6,5,.60);
     --map-dim:.35;
-    --ink:#F3F2EF; --ink-2:#B3AEA7; --ink-3:#928D86; --ink-inverse:#161514;
-    --line:#2A2927; --line-2:#3B3A37;
-    --accent:#F3F2EF; --accent-ink:#F3F2EF; --accent-soft:#2A2927; --accent-line:#4A4844;
-    --accent-hover:#FFFFFF; --on-accent:#161514;
+    --ink:#EEF1EC; --ink-2:#AEB5AD; --ink-3:#8D958C; --ink-inverse:#181916;
+    --line:#29302B; --line-2:#39423C;
+    --accent:#7CCBA2; --accent-ink:#8FD4AE; --accent-soft:#16271F; --accent-line:#2A4A3B;
+    --accent-hover:#95D8B4; --on-accent:#0D1F16; --deep:#0C2219;
+    --hi:#E3B458; --hi-ink:#E8C27A; --hi-soft:#2B2312; --hi-line:#4E4222;
     --route:#78B0E0; --route-soft:#16242F; --route-line:#2E4A61;
     --ready:#57C295; --ready-soft:#0F2620; --ready-line:#1F4A3A;
     --hold:#DAB65A;  --hold-soft:#2A2312;  --hold-line:#4E4222;
@@ -127,23 +131,24 @@
     --shadow:0 1px 2px rgba(0,0,0,.40);
     --shadow-float:0 1px 2px rgba(0,0,0,.40),0 14px 36px -12px rgba(0,0,0,.70);
     --shadow-sheet:0 -1px 0 var(--line),0 -16px 40px -20px rgba(0,0,0,.70);
-    --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23928D86' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23161514' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
-    --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23928D86' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
-    --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23928D86' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
+    --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238D958C' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230D1F16' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
+    --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238D958C' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+    --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238D958C' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
   }
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
-  --bg:#0E0E0D; --surface:#171716; --surface-2:#1E1E1C; --sunk:#090908;
-  --ground:linear-gradient(176deg,#141413 0%,#0E0E0D 46%,#090908 100%);
-  --glass:rgba(23,23,22,.76);
-  --scrim:rgba(5,5,4,.60);
+  --bg:#0F1110; --surface:#171A18; --surface-2:#1D211E; --sunk:#0A0C0B;
+  --ground:linear-gradient(176deg,#141815 0%,#0F1110 46%,#0A0C0B 100%);
+  --glass:rgba(23,26,24,.76);
+  --scrim:rgba(4,6,5,.60);
   --map-dim:.35;
-  --ink:#F3F2EF; --ink-2:#B3AEA7; --ink-3:#928D86; --ink-inverse:#161514;
-  --line:#2A2927; --line-2:#3B3A37;
-  --accent:#F3F2EF; --accent-ink:#F3F2EF; --accent-soft:#2A2927; --accent-line:#4A4844;
-  --accent-hover:#FFFFFF; --on-accent:#161514;
+  --ink:#EEF1EC; --ink-2:#AEB5AD; --ink-3:#8D958C; --ink-inverse:#181916;
+  --line:#29302B; --line-2:#39423C;
+  --accent:#7CCBA2; --accent-ink:#8FD4AE; --accent-soft:#16271F; --accent-line:#2A4A3B;
+  --accent-hover:#95D8B4; --on-accent:#0D1F16; --deep:#0C2219;
+  --hi:#E3B458; --hi-ink:#E8C27A; --hi-soft:#2B2312; --hi-line:#4E4222;
   --route:#78B0E0; --route-soft:#16242F; --route-line:#2E4A61;
   --ready:#57C295; --ready-soft:#0F2620; --ready-line:#1F4A3A;
   --hold:#DAB65A;  --hold-soft:#2A2312;  --hold-line:#4E4222;
@@ -152,10 +157,10 @@
   --shadow:0 1px 2px rgba(0,0,0,.40);
   --shadow-float:0 1px 2px rgba(0,0,0,.40),0 14px 36px -12px rgba(0,0,0,.70);
   --shadow-sheet:0 -1px 0 var(--line),0 -16px 40px -20px rgba(0,0,0,.70);
-  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23928D86' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-  --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23161514' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
-  --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23928D86' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
-  --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23928D86' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
+  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238D958C' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230D1F16' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
+  --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238D958C' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+  --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238D958C' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
 }
 :root[data-theme="light"]{color-scheme:light}
 
@@ -196,8 +201,8 @@ button{font:inherit;color:inherit;cursor:pointer;-webkit-tap-highlight-color:tra
 input,select,textarea{font:inherit;color:inherit}
 img{max-width:100%}
 a{color:var(--accent-ink);text-decoration:none}
-/* The accent is ink, so a link inside a sentence would read as the sentence:
-   it carries a hairline underline instead of a colour. */
+/* A link inside a sentence is pine and carries a hairline underline, so it
+   reads as a link on a colour screen and on a grey one alike. */
 :where(p,.help,.cap,.callout,.doc li) a:not(.btn):not(.link):not(.go){text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.2em;text-decoration-color:color-mix(in srgb,currentColor 38%,transparent)}
 @media (hover:hover){:where(p,.help,.cap,.callout,.doc li) a:not(.btn):not(.link):not(.go):hover{text-decoration-color:currentColor}}
 .doc .toc a{text-decoration:none}
@@ -503,9 +508,12 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .chip[data-s="ARMED"],.chip[data-s="applied"],.chip[data-s="due"],.chip[data-s="hold"],.chip[data-s="needs_account"],.chip[data-s="pending"],.chip[data-tone="hold"],
 .pill[data-s="ARMED"],.pill[data-s="applied"],.pill[data-s="due"],.pill[data-s="hold"],.pill[data-s="needs_account"],.pill[data-s="pending"],.pill[data-tone="hold"]{
   --tone:var(--hold);--tone-soft:var(--hold-soft);--tone-line:var(--hold-line);--tone-ink:var(--hold)}
-/* accent: committed, on the fire */
-.chip[data-s="FIRED"],.chip[data-s="COOKING"],.chip[data-s="PREPARING"],.chip[data-tone="accent"],
-.pill[data-s="FIRED"],.pill[data-s="COOKING"],.pill[data-s="PREPARING"],.pill[data-tone="accent"]{
+/* honey: committed, on the fire — warm, and never mistaken for the green of «done» */
+.chip[data-s="FIRED"],.chip[data-s="COOKING"],.chip[data-s="PREPARING"],
+.pill[data-s="FIRED"],.pill[data-s="COOKING"],.pill[data-s="PREPARING"]{
+  --tone:var(--hi);--tone-soft:var(--hi-soft);--tone-line:var(--hi-line);--tone-ink:var(--hi-ink)}
+/* the brand, where a chip means «Basu's own» */
+.chip[data-tone="accent"],.pill[data-tone="accent"]{
   --tone:var(--accent);--tone-soft:var(--accent-soft);--tone-line:var(--accent-line);--tone-ink:var(--accent-ink)}
 /* ready: done, credit, verified, online */
 .chip[data-s="READY"],.chip[data-s="SERVED"],.chip[data-s="CLOSED"],.chip[data-s="HANDED"],.chip[data-s="contracted"],.chip[data-s="paid"],.chip[data-s="on"],.chip[data-s="ok"],.chip[data-s="good"],.chip[data-s="issued"],.chip[data-s="settled"],.chip[data-s="active"],.chip[data-s="verified"],.chip[data-tone="ready"],
@@ -705,7 +713,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 @media (hover:hover){.ws-btn:not(:disabled):hover{border-color:var(--line-2);background:var(--surface)}}
 .ws-btn[aria-expanded="true"]{border-color:var(--line-2);background:var(--surface)}
 .ws-mark{flex:none;display:inline-grid;place-items:center;width:32px;height:32px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--line-2);font-size:var(--t-cap);font-weight:600;letter-spacing:.02em;line-height:1;color:var(--ink-2)}
-.ws-mark[data-kind="desk"]{background:var(--ink);border-color:var(--ink);color:var(--ink-inverse)}
+.ws-mark[data-kind="desk"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .ws-mark[data-kind="me"]{border-radius:50%}
 .ws-text{display:flex;flex-direction:column;flex:1;min-width:0}
 .ws-text b{font-size:var(--t-body);font-weight:600;line-height:1.3;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -906,7 +914,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .popup .popup-icons label{position:relative;display:grid;place-items:center;height:40px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);cursor:pointer;color:var(--ink-2)}
 .popup .popup-icons input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
 .popup .popup-icons svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.popup .popup-icons label:has(input:checked){border-color:var(--ink);background:var(--ink);color:var(--surface)}
+.popup .popup-icons label:has(input:checked){border-color:var(--accent);background:var(--accent);color:var(--on-accent)}
 .popup .popup-icons label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
 @media (hover:hover){.popup .popup-icons label:hover{border-color:var(--line-2);color:var(--ink)}}
 .popup > footer{flex-direction:row;justify-content:flex-end;align-items:center;gap:8px;background:var(--surface)}
@@ -997,7 +1005,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .avatar[data-mark] i{display:block;background:var(--ink-2);border-radius:1px}
 .avatar[data-mark] i[data-k="o"]{border-radius:50%}
 .avatar[data-mark] i[data-k="x"]{background:transparent}
-.avatar[data-mark] i[data-hi]{background:var(--ink)}
+.avatar[data-mark] i[data-hi]{background:var(--deep)}
 .avatar[data-mark] i[data-a]{background:var(--accent)}
 
 /* ── callouts ─────────────────────────────────────────────────────── */
@@ -1174,7 +1182,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
   background:none;color:var(--ink-2);font-family:var(--mono);font-size:var(--t-cap);cursor:pointer;
 }
 .dt-page svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.dt-page[aria-current]{background:var(--ink);color:var(--ink-inverse);font-weight:600}
+.dt-page[aria-current]{background:var(--accent);color:var(--on-accent);font-weight:600}
 .dt-page:disabled{opacity:.35;cursor:default}
 @media (hover:hover){.dt-page:not(:disabled):not([aria-current]):hover{background:var(--surface-2);color:var(--ink)}}
 .dt-gap{padding:0 4px;color:var(--ink-3)}

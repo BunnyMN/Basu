@@ -10,7 +10,7 @@
 
 1. **Юу ч өөрийн агуулгаасаа чанга биш.** Үг нь нэг sans фонт (Golos Text) 400/500/600 жингээр; 600-аас хүнд юу ч байхгүй. Гарчиг том, жин биш хэмжээгээрээ ялгарна. Uppercase зөвхөн mono eyebrow шошгонд.
 2. **Тоо бол тоо шиг харагдана.** Мөнгө, цаг, тоо ширхэг, код, утас — бүгд нэг mono фонт (JetBrains Mono, shell-тэй адил), `tabular-nums`, `--ink` өнгөтэй. ₮ тэмдэг sans фонтоор, 0.1em зайтай. Мөнгө хэзээ ч өнгөтэй биш.
-3. **Brand өнгө байхгүй — бэх (ink) л бий.** Basu өөрийн гэсэн hue-гүй: primary товч хар (dark-д цагаан), сонгосон цэс саарал угаалттай, өгүүлбэр доторх холбоос нимгэн доогуур зураастай. Өнгийг зөвхөн утгад зарцуулна (замд, хүлээж, болсон, анхаар). Өнгө, дулааныг зураг (мах, хоол) авчирна. Дэлгэц бүрт хар дүүргэлттэй нэг л primary товч.
+3. **Basu-гийн өнгө — нарс ногоон, зөгийн балны шартай.** Primary товч, сонгосон цэс, холбоос, газрын зургийн тэмдэг нарс ногоон (`--accent` #1F5A43). Урд нүүрний болон нэвтрэх хуудасны бараан зурвас нь шөнийн нарс (`--deep` #123A2C). Зөгийн балны шар (`--hi` #D9A441) жижиг онцлох тэмдэгт л: шинэ, «гал дээр», «удахгүй». Хэзээ ч товч, мөнгө биш. Утгын өнгө (замд, хүлээж, болсон, анхаар) хэвээр. Дэлгэц бүрт ногоон дүүргэлттэй нэг л primary товч. Улбар шар, хар-цагаан ганцаараа — хоёулаа хэрэглэгч татгалзсан.
 4. **Карт бол бүлэг, мөр бол хайрцаг биш.** Хэсэг бүр нэг карт (`--surface`, 1px `--line`, радиус 12, y1/b2 сүүдэр), дотор нь мөрүүд 1px hairline-аар тусгаарлагдана. Карт дотор карт байхгүй; зүүн талын өнгөт зураас байхгүй; хоосон төлөв — hairline ба нэг мөр бичвэр, хоосон карт биш.
 5. **Нэг хэмжүүр.** Зай 4pt масштаб, радиус зургаан утга, гүн гурван түвшин, бичвэрийн доод хэмжээ 11px (уншигдах ёстой бүх зүйл ≥12.5px), хүрэлтийн бай ≥44px, оролтын талбар 16px (iOS zoom хийхгүй).
 
@@ -92,18 +92,20 @@
 
 | Token | Light | Dark | Тайлбар |
 |---|---|---|---|
-| `--bg` | #F4F3F0 | #0E0E0D | flat fallback — дулаан саарал, цэнхэр биш |
-| `--ground` | 176° #F7F6F3→#F4F3F0 46%→#ECEAE6 | #141413→#0E0E0D→#090908 | `html` дээр; shell-ийн ground |
-| `--surface` / `--surface-2` / `--sunk` | #FFFFFF / #F7F6F4 / #EAE8E4 | #171716 / #1E1E1C / #090908 | карт / оролт, plate / dev strip |
-| `--glass` | rgba(255,255,255,.78) | rgba(23,23,22,.76) | зөвхөн chrome (topbar, tabbar, sheet) |
-| `--ink` / `--ink-2` | #161514 / #57534D | #F3F2EF / #B3AEA7 | гарчиг, тоо / body |
-| `--ink-3` | **#6B665F** | **#928D86** | 5.7:1 цагаан, 5.1:1 ground, 5.5:1 dark surface. `BasuColor.ink3`-д мөн адил утгыг зөөнө |
-| `--line` / `--line-2` | #E2DFDA / #CFCBC4 | #2A2927 / #3B3A37 | hairline / оролтын хүрээ |
-| `--accent` | **#161514** (= ink) | **#F3F2EF** | **дүүргэлт**: primary товч, badge, checkbox |
-| `--accent-hover` | #2E2B28 | #FFFFFF | primary товчны hover |
-| `--accent-ink` | #161514 | #F3F2EF | **текст**: холбоос, идэвхтэй tab; өгүүлбэр доторх холбоос нимгэн доогуур зураастай |
-| `--accent-soft` / `--accent-line` | #ECEAE6 / #CFCBC4 | #2A2927 / #4A4844 | идэвхтэй цэсний угаалт, FIRED чип |
-| `--on-accent` | #FFFFFF | #161514 | accent дүүргэлт дээрх текст |
+| `--bg` | #F4F3EE | #0F1110 | flat fallback — дулаан, нарс руу хазайсан саарал |
+| `--ground` | 176° #F8F7F3→#F4F3EE 46%→#ECEBE4 | #141815→#0F1110→#0A0C0B | `html` дээр; shell-ийн ground |
+| `--surface` / `--surface-2` / `--sunk` | #FFFFFF / #F7F6F2 / #EAE9E3 | #171A18 / #1D211E / #0A0C0B | карт / оролт, plate / dev strip |
+| `--glass` | rgba(255,255,255,.78) | rgba(23,26,24,.76) | зөвхөн chrome (topbar, tabbar, sheet) |
+| `--ink` / `--ink-2` | #181916 / #575A53 | #EEF1EC / #AEB5AD | гарчиг, тоо / body |
+| `--ink-3` | **#696C64** | **#8D958C** | 5.3:1 цагаан, 4.8:1 ground, 5.7:1 dark surface. `BasuColor.ink3`-д мөн адил утгыг зөөнө |
+| `--line` / `--line-2` | #E2E0D8 / #CDCBC2 | #29302B / #39423C | hairline / оролтын хүрээ |
+| `--accent` | **#1F5A43** нарс | **#7CCBA2** | **дүүргэлт**: primary товч, badge, checkbox, pin |
+| `--accent-hover` | #184A37 | #95D8B4 | primary товчны hover |
+| `--accent-ink` | #1C5440 | #8FD4AE | **текст**: холбоос, идэвхтэй tab (8.8:1 цагаан); өгүүлбэр доторх холбоос нимгэн доогуур зураастай |
+| `--accent-soft` / `--accent-line` | #E3EFE8 / #B9D4C6 | #16271F / #2A4A3B | идэвхтэй цэсний угаалт |
+| `--on-accent` | #FFFFFF | #0D1F16 | accent дүүргэлт дээрх текст (8.1:1 / 8.9:1) |
+| `--deep` | #123A2C | #0C2219 | шөнийн нарс: урд нүүрний зурвас, нэвтрэх хуудасны зураг, toast |
+| `--hi` / `--hi-ink` / `--hi-soft` / `--hi-line` | #D9A441 / #7A5A12 / #FBF1DC / #EBCF94 | #E3B458 / #E8C27A / #2B2312 / #4E4222 | зөгийн бал: жижиг онцлох тэмдэг, FIRED / COOKING / PREPARING чип, «удахгүй» |
 | `--route` (+soft/line) | #1B5B8F / #DFEAF3 / #A8C6DE | #78B0E0 / #16242F / #2E4A61 | хүлээж байна, замд |
 | `--ready` | #136A4B / #DCEDE6 / #9CCBB7 | #57C295 / #0F2620 / #1F4A3A | дууссан, кредит, гэрээт |
 | `--hold` | #7E6113 / #F1E9D2 / #D9C48A | #DAB65A / #2A2312 / #4E4222 | хүнийг хүлээж байна, хугацаа |
@@ -119,7 +121,7 @@ Dark `@media (prefers-color-scheme: dark)` доор `:root:not([data-theme="ligh
 
 ### 3.2 Accent-ийн төсөв
 
-Accent нь бэх тул «өнгөний» бус «жингийн» төсөв: хар дүүргэлт дэлгэцэд нэг л удаа. Зөвшөөрөгдөх газар, бүрэн жагсаалт: (1) дэлгэцийн нэг primary товч; (2) идэвхтэй tab / sidebar item (дүрс + текст, `--accent-soft` угаалттай); (3) холбоос, inline үйлдэл (`--accent-ink`); (4) focus ring; (5) stepper-ийн одоогийн цэг ба «гал дээр» төлөв (FIRED / COOKING / PREPARING); (6) launcher tile-ийн дүрс, хонхны badge; (7) сонгосон цагийн slot / шүүлтүүр (soft + accent-ink). Хаана ч өөр газар байхгүй: wordmark (`--ink`), мөнгө, KPI утга, гарчиг, картын зураас, утасны дугаар (`--ink` 500 + утасны дүрс), мөрийн булангийн цаг (`--ink`), demo strip.
+Нарс ногоон дүүргэлт дэлгэцэд нэг л удаа. Зөвшөөрөгдөх газар, бүрэн жагсаалт: (1) дэлгэцийн нэг primary товч; (2) идэвхтэй tab / sidebar item (дүрс + текст, `--accent-soft` угаалттай); (3) холбоос, inline үйлдэл (`--accent-ink`); (4) focus ring; (5) stepper-ийн одоогийн цэг ба «гал дээр» төлөв (FIRED / COOKING / PREPARING); (6) launcher tile-ийн дүрс, хонхны badge; (7) сонгосон цагийн slot / шүүлтүүр (soft + accent-ink). Хаана ч өөр газар байхгүй: wordmark (`--ink`), мөнгө, KPI утга, гарчиг, картын зураас, утасны дугаар (`--ink` 500 + утасны дүрс), мөрийн булангийн цаг (`--ink`), demo strip.
 
 ### 3.3 Утга бүхий өнгө — нэг утга тус бүрт
 
@@ -127,7 +129,7 @@ Accent нь бэх тул «өнгөний» бус «жингийн» төсө�
 |---|---|---|
 | route | системийг / нөгөө талыг хүлээж, замд | PLACED ACCEPTED SCHEDULED PAID DISPATCHED queued info |
 | hold | хүнийг хүлээж, хугацаа | ARMED applied due hold needs_account pending |
-| accent | амласан, гал дээр — бэхэн soft дүүргэлт | FIRED COOKING PREPARING |
+| hi (зөгийн бал) | амласан, гал дээр — ногоон «болсон»-оос ялгарахаар дулаан | FIRED COOKING PREPARING |
 | ready | дууссан, кредит, баталгаажсан | READY SERVED CLOSED HANDED contracted paid on ok issued settled active verified |
 | stop | анхаарал, алдаа, устгах | HELD declined failed warn bad late error; danger товч |
 | neutral | дууссан сөрөг үр дүн — **сэрэмжлүүлэг биш** | CANCELLED REFUNDED NO_SHOW REJECTED off зогссон, мэдэгдээгүй төлөв |
@@ -142,7 +144,7 @@ Accent нь бэх тул «өнгөний» бус «жингийн» төсө�
 
 ### 3.5 Контраст (шалгасан)
 
-`--ink-3` 5.7:1 цагаан, 5.1:1 ground, 5.5:1 dark surface; `--ink` 18:1 цагаан; `--accent-ink` (= ink) 15:1 accent-soft дээр; `--on-accent` 18:1 light, 16:1 dark; tone текст soft дээр ≥4.8:1 хоёр сэдэвт.
+`--ink-3` 5.3:1 цагаан, 4.8:1 ground, 5.7:1 dark surface; `--accent-ink` 8.8:1 цагаан, 7.4:1 accent-soft, dark 10.2:1 surface; `--on-accent` 8.1:1 light, 8.9:1 dark; `--hi-ink` 5.7:1 hi-soft дээр; tone текст soft дээр ≥4.8:1 хоёр сэдэвт.
 
 ---
 
@@ -378,7 +380,7 @@ Flex, 18px дүрс, 12×14, radius 10, `--surface-2` + line (default info); `da
 
 | Гадаргуу | Сэдэв | Шалтгаан |
 |---|---|---|
-| home, dine, idesh, terms, privacy | системийг дагана (light default, dark `prefers-color-scheme`, `data-theme=dark` ч ажиллана) | iOS shell-ийн SwiftUI дэлгэцүүд утасны тохиргоог дагадаг; харанхуй апп дотор гэрэлтэй WebView хамгийн харагдахуйц оёдол. `color-scheme:light dark`, `<meta name=theme-color>` хоёр (#F4F3F0 / #0E0E0D), `maximum-scale=1` устгана. Газрын зураг — dark палитр ирэх хүртэл overlay. |
+| home, dine, idesh, terms, privacy | системийг дагана (light default, dark `prefers-color-scheme`, `data-theme=dark` ч ажиллана) | iOS shell-ийн SwiftUI дэлгэцүүд утасны тохиргоог дагадаг; харанхуй апп дотор гэрэлтэй WebView хамгийн харагдахуйц оёдол. `color-scheme:light dark`, `<meta name=theme-color>` хоёр (#F4F3EE / #0F1110), `maximum-scale=1` устгана. Газрын зураг — dark палитр ирэх хүртэл overlay. |
 | supplier | системийг дагана; ≥900px `data-desk` (тунгалаг бус bar, blur-гүй) | хашаанд өдөр гэрэлтэй утас, лангуун дээр орой харанхуй tablet; `color-scheme`-ээр select/date/radio нийцнэ |
 | kds | системийг дагана (tablet-ийн тохиргоо л унтраалга), самбар 20px суурь | гал тогооны гэрэл ээлжээр өөр; band тон 15–32px хоёр сэдэвт уншигдана |
 | dashboard (/dashboard, ops.html) | **зөвхөн light**: `<html data-theme="light" data-desk>` + `color-scheme:light` | эзний хүсэлт; өдөржин монитор дээр нягт хүснэгт цагаан дээр найдвартай; screenshot хуваалцах нэг палитр; 14 tab × 2 сэдэв шалгах зардал. Ижил token файл — light талдаа нэг систем. |
@@ -451,7 +453,7 @@ Chrome: badge + «‹ Basu» → нэг `.topbar[data-fixed]` (back тэргүү
 3. Idesh зарын зураг: төрөл×нэгж тус бүрийн зураг (бүтэн мал / кг) эсвэл нийлүүлэгчийн бодит зураг, үгүй бол зураггүй мөр — давтагдсан stock render итгэл алдуулна.
 4. Supplier cancel confirm: «Цуцлах» хоёр удаа vs «Захиалгыг цуцлах» (копи өөрчлөлт).
 5. Demo цагийн strip: дээд нам strip (одоогийн) vs доод pill (`api.js`-д 2 мөр toggle).
-6. Бэхэн палитр (`--ink*`, `--line*`, `--bg`/`--surface*`, accent = ink) — `DesignTokens.swift`-д зөөх (shell ба WebView нэг саарал, нэг хар товч).
+6. Нарсан палитр (`--ink*`, `--line*`, `--bg`/`--surface*`, `--accent*`, `--deep`, `--hi*`) — `DesignTokens.swift`-д зөөх (shell ба WebView нэг өнгө).
 7. Ops зөвхөн light, supplier/kds систем дагана — батлах уу; ops утсанд гэрэлтэй гарна.
 8. Фонтыг `/fonts`-оос self-host хийх үү (офлайн/Google хамааралгүй)?
 9. `9/20` огноо: хэвээр (тест) эсвэл «Ня 20 · 9-р сар» + тест өөрчлөх?
@@ -512,4 +514,4 @@ Chrome: badge + «‹ Basu» → нэг `.topbar[data-fixed]` (back тэргүү
 
 ## Хавсралт Б. Шүүгчдийн хассан зүйлс (давтахгүй)
 
-11px-ээс жижиг веб шошго (native 10/9.5/9); 16px-ээс жижиг оролт утсанд; 40/32px товч утсанд + `::before` hit-area; dot-only чип default (supplier/KDS/ширээнд); `dayCorner` тестгүйгээр; ops статус-KPI-г `.kpi`-гүй мөр болгох; `@import`-only фонт; `background-attachment:fixed`; карт/жагсаалт дээр blur; `.kpi` negative-margin, seg thumb float сүүдэр; CANCELLED/REFUNDED/NO_SHOW/REJECTED улаан цэг; demo strip-ийг hostname-аар гаргах; холбоосыг өнгөөр ялгах (бэхэн систем — өгүүлбэр доторх холбоос доогуур зураасаар); `#money` бүх нэрийг солих; ops мөрүүдийг эхний шатанд `<table>` болгох; idesh `.art img` хасах; `target=_blank` terms; бүх товч 600; brand hue нэмэх (улбар шар, ногоон, алт) — өнгө зөвхөн утгад; хуудасны `:root` блок үлдээх; монгол текст устгах; JS зан үйлийн өөрчлөлтийг эхний CSS шаттай хамт.
+11px-ээс жижиг веб шошго (native 10/9.5/9); 16px-ээс жижиг оролт утсанд; 40/32px товч утсанд + `::before` hit-area; dot-only чип default (supplier/KDS/ширээнд); `dayCorner` тестгүйгээр; ops статус-KPI-г `.kpi`-гүй мөр болгох; `@import`-only фонт; `background-attachment:fixed`; карт/жагсаалт дээр blur; `.kpi` negative-margin, seg thumb float сүүдэр; CANCELLED/REFUNDED/NO_SHOW/REJECTED улаан цэг; demo strip-ийг hostname-аар гаргах; холбоосыг өнгөөр ялгах (бэхэн систем — өгүүлбэр доторх холбоос доогуур зураасаар); `#money` бүх нэрийг солих; ops мөрүүдийг эхний шатанд `<table>` болгох; idesh `.art img` хасах; `target=_blank` terms; бүх товч 600; нарснаас өөр brand hue нэмэх (улбар шар г.м.), зөгийн балыг товч эсвэл мөнгөнд хэрэглэх; хуудасны `:root` блок үлдээх; монгол текст устгах; JS зан үйлийн өөрчлөлтийг эхний CSS шаттай хамт.

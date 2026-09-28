@@ -17,7 +17,7 @@
 .so-tabs{display:flex;gap:8px;margin:0 0 20px}
 .so-tabs button{min-height:40px;padding:0 16px;border:1px solid var(--line);border-radius:999px;background:#fff;font:inherit;font-size:.9375rem;font-weight:500;color:var(--ink-2);cursor:pointer}
 .so-tabs button small{margin-left:6px;font-family:var(--mono);font-size:.75rem;color:var(--ink-3)}
-.so-tabs button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.so-tabs button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .so-tabs button[aria-pressed="true"] small{color:rgba(255,255,255,.6)}
 .so-list{border:1px solid var(--line);border-radius:18px;overflow:hidden}
 .so-row{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:18px;align-items:center;padding:16px 20px;color:inherit;text-decoration:none;background:#fff}
@@ -49,11 +49,11 @@
 .od-steps li:last-child{padding-bottom:0}
 .od-steps li::before{content:"";position:absolute;left:13px;top:28px;bottom:2px;width:2px;background:var(--line)}
 .od-steps li:last-child::before{display:none}
-.od-steps li[data-done]::before{background:var(--ink)}
+.od-steps li[data-done]::before{background:var(--accent)}
 .od-steps i{position:relative;z-index:1;width:28px;height:28px;border-radius:50%;border:2px solid var(--line-2);background:#fff;display:grid;place-items:center}
-.od-steps li[data-done] i{border-color:var(--ink);background:var(--ink);color:#fff}
-.od-steps li[data-next] i{border-color:var(--ink)}
-.od-steps li[data-next] i::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--ink)}
+.od-steps li[data-done] i{border-color:var(--accent);background:var(--accent);color:var(--on-accent)}
+.od-steps li[data-next] i{border-color:var(--hi)}
+.od-steps li[data-next] i::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--hi)}
 .od-steps i svg{width:14px;height:14px}
 .od-steps b{display:block;font-weight:600;line-height:1.3;color:var(--ink-3)}
 .od-steps li[data-done] b,.od-steps li[data-next] b{color:var(--ink)}
@@ -61,7 +61,7 @@
 .od-steps time{font-family:var(--mono);font-size:.8125rem;color:var(--ink-3)}
 .od-code{padding:24px;text-align:center}
 .od-code span{display:block;font-size:.875rem;color:var(--ink-2)}
-.od-code b{display:block;margin:8px 0;font-family:var(--mono);font-size:2.75rem;letter-spacing:.14em;line-height:1}
+.od-code b{display:block;margin:8px 0;font-family:var(--mono);font-size:2.75rem;letter-spacing:.14em;line-height:1;color:var(--accent-ink)}
 .od-code small{display:block;font-size:.8125rem;line-height:1.5;color:var(--ink-3)}
 .od-side{display:grid;gap:16px}
 .od-box{padding:22px}
@@ -95,7 +95,7 @@ const page = document.getElementById('page');
 const PHOTO = (kind) => `/brand/meat/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}.webp`;
 const unitWord = (o) => (o.unit === 'whole' ? 'толгой' : 'кг');
 const LIVE = ['PAID', 'PREPARING', 'READY', 'DISPATCHED'];
-const TONE = { PAID: 'route', PREPARING: 'dark', READY: 'ready', DISPATCHED: 'route', HANDED: 'ready', CLOSED: '', CANCELLED: 'stop', REFUNDED: '' };
+const TONE = { PAID: 'route', PREPARING: 'hi', READY: 'ready', DISPATCHED: 'route', HANDED: 'ready', CLOSED: '', CANCELLED: 'stop', REFUNDED: '' };
 const pill = (state) => `<span class="s-pill" data-state="${state}"${TONE[state] ? ` data-tone="${TONE[state]}"` : ''}>${IDESH_HEADLINE[state]?.[0] ?? state}</span>`;
 const MARK = {
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',

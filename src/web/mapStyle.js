@@ -52,7 +52,7 @@ export function mapStyle() {
     sources: { base: { type: 'vector', tiles: [TILE_URL], minzoom: 0, maxzoom: 16 } },
     glyphs: GLYPHS_URL,
     layers: [
-      { id: 'bg', type: 'background', paint: { 'background-color': '#F4F3F0' } },
+      { id: 'bg', type: 'background', paint: { 'background-color': '#F4F3EE' } },
       { id: 'water', type: 'fill', source: 'base', 'source-layer': 'water',
         paint: { 'fill-color': '#CFDCE4' } },
       { id: 'park', type: 'fill', source: 'base', 'source-layer': 'landuse',
