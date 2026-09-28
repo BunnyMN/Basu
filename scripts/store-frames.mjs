@@ -48,7 +48,7 @@ html,body{width:${W}px;height:${H}px;overflow:hidden}
 body{font-family:Golos,sans-serif;background:${ground};color:${ink};position:relative}
 .glow{position:absolute;inset:0;background:radial-gradient(1100px 900px at 50% 16%, ${brand.glow}, transparent 70%)}
 .words{position:absolute;top:150px;left:96px;right:96px;text-align:center}
-.eyebrow{display:inline-block;font-size:34px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:${brand.accent};margin-bottom:34px}
+.eyebrow{display:inline-block;font-size:34px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:${dark ? brand.accentDark ?? brand.accent : brand.accent};margin-bottom:34px}
 h1{font-size:${shot.headline.length > 34 ? 92 : 104}px;font-weight:600;line-height:1.07;letter-spacing:-.025em}
 p{margin-top:30px;font-size:44px;line-height:1.35;color:${ink2}}
 .phone{position:absolute;left:50%;top:${shot.eyebrow ? 640 : 580}px;width:1010px;transform:translateX(-50%);

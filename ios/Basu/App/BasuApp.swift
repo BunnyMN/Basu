@@ -250,8 +250,10 @@ struct RootView: View {
 
   // MARK: - the design pass
 
-  /// `BASU_SCREEN=wallet|profile|inbox|splash|food|signin` lands the app on a
-  /// screen so the pass can photograph it. Debug only; production has no such door.
+  /// `BASU_SCREEN=wallet|profile|inbox|splash|food|idesh|signin` lands the app
+  /// on a screen so the pass — and the store's pictures — can photograph it.
+  /// `BASU_BROWSE=1` with `signin` looks around signed out instead of stopping
+  /// at the way in. Debug only; production has no such door.
   private static func jumpForDebug(tab: inout ShellTab, path: inout [Destination]) {
     #if DEBUG
       switch ProcessInfo.processInfo.environment["BASU_SCREEN"] {
@@ -259,6 +261,7 @@ struct RootView: View {
       case "profile": tab = .profile
       case "inbox": path = [.inbox]
       case "food": path = [AppCatalogue.food.destination].compactMap { $0 }
+      case "idesh": path = [AppCatalogue.idesh.destination].compactMap { $0 }
       default: break
       }
     #endif
@@ -270,14 +273,18 @@ struct RootView: View {
   private static func signInForDebug(_ model: AppModel) async {
     #if DEBUG
       let environment = ProcessInfo.processInfo.environment
-      if environment["BASU_SCREEN"] == "signin" {
+      if environment["BASU_SCREEN"] == "signin" || environment["BASU_BROWSE"] == "1" {
         model.session.signOut()
-        model.browsing = false
+        model.browsing = environment["BASU_BROWSE"] == "1"
         return
       }
-      guard environment["BASU_DEMO_SIGNIN"] == "1",
-            !model.session.isSignedIn else { return }
-      try? await model.session.demoSignIn()
+      guard environment["BASU_DEMO_SIGNIN"] == "1" else { return }
+      // `BASU_DEMO_PHONE` picks whose account: the store's pictures use one
+      // with nobody else's business in it.
+      let phone = environment["BASU_DEMO_PHONE"] ?? "+97699001122"
+      if model.session.isSignedIn, model.session.phone == phone { return }
+      model.session.signOut()
+      try? await model.session.demoSignIn(phone: phone)
     #endif
   }
 

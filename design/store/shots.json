@@ -1,15 +1,51 @@
 {
   "brand": {
     "accent": "#1F5A43",
-    "glow": "rgba(31,90,67,.16)",
-    "lightGround": "linear-gradient(176deg,#F7F6F3 0%,#F1EFEA 55%,#E8E5DF 100%)",
-    "darkGround": "linear-gradient(176deg,#151513 0%,#0E0E0D 55%,#090908 100%)"
+    "glow": "rgba(31,90,67,.15)",
+    "lightGround": "linear-gradient(176deg,#F8F7F3 0%,#F1F2EC 55%,#E6EBE3 100%)",
+    "darkGround": "linear-gradient(176deg,#16201A 0%,#0F1411 55%,#0A0C0B 100%)",
+    "accentDark": "#7CCBA2"
   },
   "shots": [
-    { "name": "home", "screen": "home.png", "theme": "light", "eyebrow": "Basu", "headline": "Хоол, өвлийн идэш — нэг апп-д", "sub": "Улаанбаатарт, таны утсанд." },
-    { "name": "idesh", "screen": "idesh.png", "theme": "light", "eyebrow": "Идэш", "headline": "Өвлийн идшээ гэрээт нийлүүлэгчээс", "sub": "Basu шалгаж, гэрээ байгуулсан. Үнэ нь зар дээрээ." },
-    { "name": "signin", "screen": "signin.png", "theme": "light", "eyebrow": "Нэвтрэх", "headline": "Нэг алхамд нэвтэр", "sub": "Apple, Google эсвэл имэйлээр." },
-    { "name": "wallet", "screen": "wallet.png", "theme": "light", "eyebrow": "Түрийвч", "headline": "Гүйлгээ бүр нэг дор", "sub": "Үлдэгдэл, буцаалт, баримт — тодорхой." },
-    { "name": "settings", "screen": "settings.png", "theme": "dark", "eyebrow": "Тохиргоо", "headline": "Цайвар ч, бараан ч", "sub": "Face ID түгжээ, мэдэгдэл — өөрийнхөөрөө." }
+    {
+      "name": "signin",
+      "screen": "signin.png",
+      "theme": "light",
+      "eyebrow": "Basu",
+      "headline": "Хоол, өвлийн идэш — нэг апп-д",
+      "sub": "Apple, Google эсвэл имэйлээр нэг алхамд нэвтэр."
+    },
+    {
+      "name": "idesh",
+      "screen": "idesh.png",
+      "theme": "light",
+      "eyebrow": "Идэш",
+      "headline": "Өвлийн идшээ гэрээт нийлүүлэгчээс",
+      "sub": "Basu шалгаж, гэрээ байгуулсан. Үнэ нь зар дээрээ."
+    },
+    {
+      "name": "home",
+      "screen": "home.png",
+      "theme": "light",
+      "eyebrow": "Нүүр",
+      "headline": "Апп бүр нэг товшилтод",
+      "sub": "Хоол, Идэш — удахгүй такси, хүргэлт, тасалбар."
+    },
+    {
+      "name": "wallet",
+      "screen": "wallet.png",
+      "theme": "light",
+      "eyebrow": "Түрийвч",
+      "headline": "Гүйлгээ бүр нэг дор",
+      "sub": "Үлдэгдэл, буцаалт, баримт — тодорхой."
+    },
+    {
+      "name": "settings",
+      "screen": "settings.png",
+      "theme": "dark",
+      "eyebrow": "Тохиргоо",
+      "headline": "Цайвар ч, бараан ч",
+      "sub": "Face ID түгжээ, мэдэгдэл — өөрийнхөөрөө."
+    }
   ]
 }
