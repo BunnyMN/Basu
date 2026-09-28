@@ -777,7 +777,23 @@ describe('the front page', () => {
     expect(text('kg')).toBe('60 кг');
   });
 
+  it('keeps the stalls from somebody not signed in', async () => {
+    storage.removeItem('basu.guest');
+    const asked: string[] = [];
+    const dom = await openPage('index.html', '', (path) => {
+      asked.push(path);
+      return undefined;
+    });
+    const d = dom.window.document;
+    await until(dom, 'the sums', () => d.getElementById('kg')?.textContent === '112 кг');
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(asked.filter((path) => path.startsWith('/v1/idesh/listings'))).toEqual([]);
+    expect((d.getElementById('board') as HTMLElement).hidden).toBe(true);
+    expect([...d.querySelectorAll('.animal .ktag')].map((t) => t.textContent)).toEqual(['', '', '', '']);
+  });
+
   it('shows what is on sale from the stalls, and nothing it made up', async () => {
+    await ownGuest('+97699004012');
     const dom = await openPage('index.html');
     const d = dom.window.document;
     await until(dom, 'the stall board', () => !d.getElementById('board')?.hidden);
@@ -793,6 +809,7 @@ describe('the front page', () => {
   });
 
   it('says so plainly when the market is empty', async () => {
+    await ownGuest('+97699004013');
     const empty = new Response(JSON.stringify({ today: '2026-09-25', listings: [] }), {
       headers: { 'content-type': 'application/json' },
     });
@@ -832,7 +849,26 @@ describe('өвлийн идэш', () => {
     return title;
   }
 
+  it('shows a stranger the ways in, not the stalls', async () => {
+    storage.removeItem('basu.guest');
+    const dom = await openPage('idesh.html');
+    const d = dom.window.document;
+    await until(dom, 'the door', () => !(d.getElementById('gate') as HTMLElement).hidden);
+    expect(d.querySelectorAll('.listing')).toHaveLength(0);
+    expect((d.getElementById('listings') as HTMLElement).hidden).toBe(true);
+    expect((d.getElementById('kinds') as HTMLElement).hidden).toBe(true);
+    expect(d.getElementById('tally')?.textContent).toBe('');
+    expect(d.querySelector('#gate-doors .ways')).not.toBeNull();
+
+    // Signed in — here by the demo's own way, which has no inbox — the stalls open.
+    await until(dom, 'the demo way in', () => Boolean(d.querySelector('#gate .demo')));
+    (d.querySelector('#gate .demo') as HTMLButtonElement).click();
+    await until(dom, 'the stalls', () => d.querySelectorAll('.listing').length >= seeded.listings);
+    expect((d.getElementById('gate') as HTMLElement).hidden).toBe(true);
+  });
+
   it('lists every stall, names the supplier, and says it is under contract', async () => {
+    await ownGuest('+97699004010');
     const dom = await openPage('idesh.html');
     await until(dom, 'the stalls', (d) => d.querySelectorAll('.listing').length >= seeded.listings);
 
@@ -1079,6 +1115,7 @@ describe('өвлийн идэш', () => {
       ),
     ).toBe(true);
     // …and the guests can see it at once.
+    await ownGuest('+97699004011');
     const guest = await openPage('idesh.html');
     await until(guest, 'the new stall', (d) =>
       [...d.querySelectorAll('.listing .name')].some((n) => n.textContent === 'Хонь, шинэ зар'),

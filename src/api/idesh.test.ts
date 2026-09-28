@@ -130,8 +130,20 @@ afterAll(async () => {
 });
 
 describe('browsing', () => {
-  it('shows every listing to anybody, with the supplier and the day it is ready', async () => {
-    const response = await app.inject({ method: 'GET', url: '/v1/idesh/listings' });
+  it('shows nothing to somebody who is not signed in', async () => {
+    const list = await app.inject({ method: 'GET', url: '/v1/idesh/listings' });
+    expect(list.statusCode).toBe(401);
+    expect(list.body).not.toContain('Хонь, залуу ирэг');
+    const one = await app.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}` });
+    expect(one.statusCode).toBe(401);
+    expect(one.body).not.toContain('Хонь, залуу ирэг');
+    // A token that means nothing is nobody.
+    const forged = await app.inject({ method: 'GET', url: '/v1/idesh/listings', headers: auth('not-a-session') });
+    expect(forged.statusCode).toBe(401);
+  });
+
+  it('shows every listing to a signed-in guest, with the supplier and the day it is ready', async () => {
+    const response = await app.inject({ method: 'GET', url: '/v1/idesh/listings', headers: auth(await signIn()) });
     expect(response.statusCode).toBe(200);
     const body = response.json();
     expect(body.today).toBe('2026-09-02');
@@ -197,7 +209,7 @@ describe('ordering', () => {
     expect(again.headers['idempotent-replay']).toBe('true');
     expect(again.json().id).toBe(first.json().id);
 
-    const listing = await app.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}` });
+    const listing = await app.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}`, headers: auth(token) });
     expect(listing.json().listing.sold).toBe(1);
   });
 
@@ -410,7 +422,7 @@ describe('the supplier’s screen', () => {
       headers: auth(screen),
       payload: { active: false },
     });
-    const open = await app.inject({ method: 'GET', url: '/v1/idesh/listings' });
+    const open = await app.inject({ method: 'GET', url: '/v1/idesh/listings', headers: auth(await signIn()) });
     expect(open.json().listings.map((l: { id: string }) => l.id)).toEqual([sheep.id]);
 
     // The rival cannot touch it.

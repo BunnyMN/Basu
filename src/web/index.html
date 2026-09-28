@@ -665,6 +665,9 @@ drawCalc();
  * What is on sale today, straight from the stalls: a count on each animal and
  * the first few listings. When there is nothing yet the board says so; a
  * front page that invents listings is lying to the first person who taps one.
+ *
+ * The stalls are for people signed in, so a stranger sees neither the board
+ * nor the counts — «Зар үзэх» takes them to the door on /idesh.
  */
 const STALL_PHOTO = {
   sheep: '/brand/meat/sheep.webp',
@@ -672,35 +675,37 @@ const STALL_PHOTO = {
   beef: '/brand/meat/beef.webp',
   horse: '/brand/meat/horse.webp',
 };
-try {
-  const { listings } = await api('/v1/idesh/listings');
-  const byKind = {};
-  for (const l of listings) byKind[l.kind] = (byKind[l.kind] ?? 0) + 1;
-  for (const card of document.querySelectorAll('.animal')) {
-    const n = byKind[card.dataset.kind];
-    card.querySelector('.ktag').textContent = n ? `${n} зар` : '';
-  }
-  const shown = listings.slice(0, 6);
-  if (shown.length) {
-    const list = $('board-list');
-    for (const l of shown) {
-      const a = document.createElement('a');
-      a.className = 'stall';
-      a.href = '/idesh';
-      const where = [l.supplier?.name, l.origin].filter(Boolean).join(' · ');
-      a.innerHTML = `<img src="${STALL_PHOTO[l.kind] ?? STALL_PHOTO.sheep}" alt="" loading="lazy">
-        <span><b>${esc(l.title)}</b><small>${esc(where)}</small></span>
-        <span class="money">${mnt(l.price_mnt)}<small> / ${l.unit === 'whole' ? 'толгой' : 'кг'}</small></span>`;
-      list.append(a);
+if (store.guestToken) {
+  try {
+    const { listings } = await api('/v1/idesh/listings', { token: store.guestToken });
+    const byKind = {};
+    for (const l of listings) byKind[l.kind] = (byKind[l.kind] ?? 0) + 1;
+    for (const card of document.querySelectorAll('.animal')) {
+      const n = byKind[card.dataset.kind];
+      card.querySelector('.ktag').textContent = n ? `${n} зар` : '';
     }
-    $('board-title').textContent = listings.length > shown.length ? `Одоо ${listings.length} зар байна` : 'Одоо зартай';
-  } else {
-    $('board-title').textContent = 'Одоогийн зар';
-    $('board-empty').hidden = false;
+    const shown = listings.slice(0, 6);
+    if (shown.length) {
+      const list = $('board-list');
+      for (const l of shown) {
+        const a = document.createElement('a');
+        a.className = 'stall';
+        a.href = '/idesh';
+        const where = [l.supplier?.name, l.origin].filter(Boolean).join(' · ');
+        a.innerHTML = `<img src="${STALL_PHOTO[l.kind] ?? STALL_PHOTO.sheep}" alt="" loading="lazy">
+          <span><b>${esc(l.title)}</b><small>${esc(where)}</small></span>
+          <span class="money">${mnt(l.price_mnt)}<small> / ${l.unit === 'whole' ? 'толгой' : 'кг'}</small></span>`;
+        list.append(a);
+      }
+      $('board-title').textContent = listings.length > shown.length ? `Одоо ${listings.length} зар байна` : 'Одоо зартай';
+    } else {
+      $('board-title').textContent = 'Одоогийн зар';
+      $('board-empty').hidden = false;
+    }
+    $('board').hidden = false;
+  } catch {
+    // An ended session, or no server: the page stands on its own without them.
   }
-  $('board').hidden = false;
-} catch {
-  // The page stands on its own without them.
 }
 </script>
 </body>

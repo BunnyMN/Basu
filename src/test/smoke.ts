@@ -360,7 +360,7 @@ async function idesh(guest: string): Promise<void> {
       price_mnt: number;
       supplier: { id: string; name: string; contracted: boolean };
     }>;
-  }>('/v1/idesh/listings');
+  }>('/v1/idesh/listings', { token: guest });
   check(`${listed.body.listings.length} зар, бүгд гэрээт нийлүүлэгчээс`,
     listed.body.listings.length >= 10 && listed.body.listings.every((l) => l.supplier.contracted));
   const stall = listed.body.listings.find((l) => l.unit === 'whole' && l.remaining > 0);

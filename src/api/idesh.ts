@@ -265,14 +265,19 @@ export async function registerIdeshRoutes(
   /** What a seat without the money sees of an amount that is the supplier's own: nothing. */
   const moneyFor = (request: FastifyRequest, value: number | null | undefined) => (holds(request, 'org.idesh.money') ? value ?? null : null);
 
-  /* ── browsing — no sign-in, the way the restaurant list works ─────── */
+  /* ── browsing — for somebody signed in ─────────────────────────────
+   *
+   * The stalls are shown to people with a Basu account and nobody else: a
+   * supplier's prices, stock and district are not for scraping, and a guest
+   * who can see a stall can also buy from it. The page asks a stranger to
+   * sign in first; this is the part that holds whatever the page does. */
 
-  app.get('/v1/idesh/listings', async () => ({
+  app.get('/v1/idesh/listings', guarded, async () => ({
     today: dayOf(ctx.clock.now()),
     listings: (await openListings()).map(shapeListing),
   }));
 
-  app.get<{ Params: { id: string } }>('/v1/idesh/listings/:id', async (request, reply) => {
+  app.get<{ Params: { id: string } }>('/v1/idesh/listings/:id', guarded, async (request, reply) => {
     const listing = await listingById(request.params.id);
     if (!listing) return sendError(reply, new IdeshError('NOT_FOUND', 'no such listing'));
     return reply.send({ today: dayOf(ctx.clock.now()), listing: shapeListing(listing) });

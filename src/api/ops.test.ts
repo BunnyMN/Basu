@@ -107,7 +107,7 @@ describe('the ops desk', () => {
     // The applicant sees it waiting; a guest sees nothing of it.
     const waiting = await app.inject({ method: 'GET', url: '/v1/supplier/application', headers: auth(guest) });
     expect(waiting.json().application).toMatchObject({ id, state: 'applied', pairing_code: null });
-    expect((await app.inject({ method: 'GET', url: '/v1/idesh/listings' })).json().listings).toEqual([]);
+    expect((await app.inject({ method: 'GET', url: '/v1/idesh/listings', headers: auth(guest) })).json().listings).toEqual([]);
 
     // Ops sees it first in the list, with the phone that was proved.
     const desk = await app.inject({ method: 'GET', url: '/v1/ops/suppliers', headers: auth(opsToken()!) });
@@ -459,11 +459,13 @@ describe('the desk’s window onto orders', () => {
 
   it('takes a supplier off the market, and a listing out of sight, with the reason kept', async () => {
     const { supplierId, listingId } = await aPaidOrder();
-    expect((await app.inject({ method: 'GET', url: '/v1/idesh/listings' })).json().listings).toHaveLength(1);
+    const shopper = await signIn('+97699088001');
+    const stalls = () => app.inject({ method: 'GET', url: '/v1/idesh/listings', headers: auth(shopper) });
+    expect((await stalls()).json().listings).toHaveLength(1);
 
     const hidden = await app.inject({ method: 'POST', url: `/v1/ops/listings/${listingId}/hide`, headers: desk(), payload: { note: 'зураг буруу' } });
     expect(hidden.json()).toEqual({ id: listingId, active: false });
-    expect((await app.inject({ method: 'GET', url: '/v1/idesh/listings' })).json().listings).toEqual([]);
+    expect((await stalls()).json().listings).toEqual([]);
 
     const off = await app.inject({ method: 'POST', url: `/v1/ops/suppliers/${supplierId}/active`, headers: desk('Bayaraa'), payload: { active: false, note: 'гэрээ зөрчсөн' } });
     expect(off.json()).toMatchObject({ id: supplierId, active: false });
