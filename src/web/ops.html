@@ -29,19 +29,7 @@ p{margin:0}
 .page-head + .section{margin-top:0}
 .page-head + .kpi-band{margin-bottom:8px}
 .org-row{cursor:pointer}
-.org-form .checks{display:flex;gap:20px;margin:0 0 16px}
-.org-form .checks label{display:flex;align-items:center;gap:8px;font-size:var(--t-body-lg)}
-.add-member{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.add-member .input{width:auto;flex:1 1 220px}
-.add-member [data-found]{flex-basis:100%;font-size:var(--t-body)}
 .pair-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:0 16px;align-items:start}
-/* a business's people: on a phone the address folds under the name, and the table fits */
-.table.team td .sub{display:none}
-@media (max-width:720px){
-  .table.team{min-width:0}
-  .table.team th:nth-child(2),.table.team td:nth-child(2){display:none}
-  .table.team td .sub{display:block}
-}
 /* a business's front page: a door to each of its parts */
 .org-doors{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
 .org-door h3{font-size:var(--t-row);margin:0 0 10px}
@@ -152,32 +140,34 @@ p{margin:0}
 .sec-mod svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3)}
 .table.roles tr.perm-act td:first-child{padding-left:28px;font-size:var(--t-cap);color:var(--ink-2)}
 .table.roles tr.perm-page td:first-child{font-weight:500}
-/* the menu page: each module a card, its pages rows to rename, move, reorder and hide */
-.menu-tools{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;padding:10px 0;margin-bottom:8px;background:var(--bg)}
-.menu-tools .gap{flex:1}
+/* the menu page: each module a card, its pages rows under it, read as the sidebar draws them;
+   every change is a popup, the arrows reorder */
 .menu-board{display:flex;flex-direction:column;gap:12px}
-.menu-mod-head{display:flex;align-items:center;gap:10px;padding:12px 16px;background:var(--surface-2);border-bottom:1px solid var(--line);border-radius:var(--r-md) var(--r-md) 0 0}
-.menu-mod-head [name="name"]{flex:1;min-width:0;font-weight:600}
-.menu-page{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 16px;border-top:1px solid var(--line)}
+.menu-mod-head,.menu-page{display:flex;align-items:center;gap:12px;padding:10px 16px}
+.menu-mod-head{padding:12px 16px;background:var(--surface-2);border-bottom:1px solid var(--line);border-radius:var(--r-md) var(--r-md) 0 0}
+.menu-page{border-top:1px solid var(--line)}
 .menu-page:first-child{border-top:0}
-.menu-board .input{width:auto;min-width:0;height:var(--h-sm);min-height:var(--h-sm);font-size:var(--t-body)}
-.menu-page [name="name"]{flex:1 1 220px}
-.menu-page [name="module"]{flex:0 0 190px}
-.icon-pick select{flex:0 0 120px}
-.menu-page[data-off] [name="name"]{color:var(--ink-3);text-decoration:line-through}
-.menu-page .menu-href{flex-basis:100%;font-size:var(--t-meta);color:var(--ink-3);padding-left:170px;overflow-wrap:anywhere}
-@media (max-width:720px){.menu-page [name="module"]{flex:1 1 100%}.menu-page .menu-href{padding-left:0}}
+.menu-mod-head .t,.menu-page .t{flex:1;min-width:0}
+.menu-mod-head .t b{display:block;font-size:var(--t-row);font-weight:600}
+.menu-page .t b{display:block;font-size:var(--t-body);font-weight:500}
+.menu-mod-head .t small,.menu-page .t small{display:block;margin-top:2px;font-size:var(--t-meta);color:var(--ink-3);overflow-wrap:anywhere}
+.menu-page[data-off] .t b{color:var(--ink-3)}
+.menu-page[data-off] .menu-ico{opacity:.45}
+.menu-ico{display:inline-grid;place-items:center;flex:none;width:32px;height:32px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface)}
+.menu-ico svg{width:18px;height:18px;fill:none;stroke:var(--ink-2);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.menu-acts{display:flex;align-items:center;gap:6px;flex:none}
+.menu-moves{display:flex;align-items:center;gap:2px;margin-right:4px}
+.menu-moves .btn:disabled{visibility:hidden}   /* the first cannot go up, the last cannot go down: nothing to press, nothing drawn */
 .menu-pages > .empty{padding:12px 16px}
-.menu-moves{display:flex;align-items:center;gap:4px}
-.menu-shown{display:flex;align-items:center;gap:6px;margin-left:6px;font-size:var(--t-cap);color:var(--ink-2)}
-.icon-pick{display:flex;align-items:center;gap:6px}
-.icon-pick [data-preview]{display:inline-grid;place-items:center;width:32px;height:32px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface)}
-.icon-pick [data-preview] svg{width:18px;height:18px;fill:none;stroke:var(--ink-2);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+@media (max-width:600px){
+  .menu-mod-head,.menu-page{gap:8px;padding-left:12px;padding-right:12px}
+  .menu-mod-head .t small{display:none}
+}
 
-/* a business's roles, from the desk */
-.org-roles{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
-.org-role{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-ctl)}
-.org-role small{flex-basis:100%;padding-left:26px;font-size:var(--t-cap);color:var(--ink-2)}
+/* rows in one card (settings, a business's roles, the businesses): a hairline between each */
+[data-rows] > .row + .row{border-top:1px solid var(--line)}
+/* a setting's value, at the right of its row: a long one wraps rather than pushing the row wide */
+.setting-value{max-width:45%;text-align:right;overflow-wrap:anywhere;font-size:var(--t-body)}
 /* a page whose part of Basu is not joined up yet */
 .soon{display:flex;flex-direction:column;align-items:center;text-align:center;padding:40px 24px}
 .soon-mark{display:inline-grid;place-items:center;width:48px;height:48px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);margin-bottom:12px}
@@ -245,8 +235,12 @@ p{margin:0}
 .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px 20px;padding:20px;font-size:var(--t-body);line-height:1.45;color:var(--ink-2)}
 .facts .lab{display:block;margin-bottom:4px}
 .facts b{font-size:var(--t-row);font-weight:600;color:var(--ink)}
-.detail-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px}
 .section-label .btn{margin-left:auto}
+.section-label:has(.btn){align-items:center}
+.section-label .label-acts{display:flex;gap:6px;margin-left:auto}
+.section-label .label-acts .btn{margin-left:0}
+/* a page's own buttons: at the right of its head, the one that adds a thing inked */
+.head-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 a.tel{display:inline-flex;align-items:center;gap:4px;color:var(--ink);font-weight:500}
 a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .acts{display:flex;flex-direction:column;gap:10px}
@@ -273,7 +267,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mnt, money, KIND, HEADLINE, dayLabel, signInDoors, accountWays, authReturn } from '/api.js';
+import { api, store, toast, mnt, money, KIND, HEADLINE, dayLabel, signInDoors, accountWays, authReturn, popup, confirmPopup } from '/api.js';
 import { NAV_ICON, deskFrame } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -419,13 +413,17 @@ const kinds = (o) => [o.restaurant && 'Ресторан', o.supplier && 'Ний�
  */
 function renderMeHome(view) {
   const account = access.account ?? {};
-  view.append(head(account.name ? `Сайн байна уу, ${esc(account.name)}` : 'Тавтай морил', 'Таны байгууллагууд, Basu-гийн ops эрх нэг дор.'));
+  view.append(
+    headActs(
+      head(account.name ? `Сайн байна уу, ${esc(account.name)}` : 'Тавтай морил', 'Таны байгууллагууд, Basu-гийн ops эрх нэг дор.'),
+      button(`${NAV_ICON.plus}Байгууллага бүртгүүлэх`, () => orgPopup(), 'data-v="primary" id="org-new"'),
+    ),
+  );
 
   const orgs = access.workspaces.filter((w) => w.kind === 'org');
   const section = el(`
     <section class="section"><h2 class="section-label">Миний байгууллагууд</h2>
       <div class="card" data-rows id="org-list"></div>
-      <div class="form-foot" style="justify-content:flex-start;margin-top:12px"><button class="btn" data-v="primary" type="button" id="org-new">Байгууллага бүртгүүлэх</button></div>
     </section>`);
   const list = section.querySelector('#org-list');
   if (!orgs.length) {
@@ -447,20 +445,33 @@ function renderMeHome(view) {
     row.addEventListener('keydown', (e) => e.key === 'Enter' && go());
     list.append(row);
   }
-  const newOrg = section.querySelector('#org-new');
-  newOrg.addEventListener('click', () => {
-    newOrg.remove();
-    section.append(orgForm(async (id) => {
-      await reload(id);
-    }));
-  });
   view.append(section);
   view.append(deskSection());
 
-  if (wanted === 'new-org') newOrg.click();
-  if (wanted) view.querySelector(wanted === 'new-org' ? '.org-form' : '#front')?.scrollIntoView({ block: 'start' });
+  if (wanted === 'new-org') void orgPopup();
   if (wanted === 'ask-desk') view.querySelector('#ask-open')?.click();
   wanted = null;
+}
+
+/** Asking for a seat at Basu's desk, or changing the ask: a name, the role wanted, and why. */
+async function deskAskPopup(asked) {
+  const roles = await deskRoleList();
+  return popup({
+    title: asked ? 'Хүсэлтээ өөрчлөх' : 'Ops эрх хүсэх',
+    sub: 'Basu-гийн ажилтан бол ops-ийн хэсэгт орох эрх хүснэ үү — админ зөвшөөрөхөд шууд нээгдэнэ.',
+    width: 520,
+    fields: [
+      { name: 'name', label: 'Таны нэр', autocomplete: 'name', value: asked?.name ?? access.account?.name ?? '', required: true, wide: true },
+      { name: 'role', label: 'Хүсэх эрх', type: 'select', options: roles.map((r) => [r.key, r.description ? `${r.name} — ${r.description}` : r.name]), value: asked?.role ?? 'ops', wide: true },
+      { name: 'note', label: 'Та хэн бэ, юунд хэрэгтэй вэ', type: 'textarea', placeholder: 'Заавал биш', value: asked?.note ?? '' },
+    ],
+    submit: asked ? 'Шинэчлэх' : 'Хүсэлт илгээх',
+    onSubmit: async (v) => {
+      await ops('/v1/ops/requests', { method: 'POST', body: { name: v.name, role: v.role, note: v.note } });
+      toast('Хүсэлт илгээгдлээ.', 'good');
+      await reload('me');
+    },
+  });
 }
 
 /** Basu's own desk, from the corner: the seat held, or the ask for one. */
@@ -472,47 +483,16 @@ function deskSection() {
       <div class="card"><div class="card-body" id="front">
         <p class="cap" style="margin:0 0 14px">Basu-гийн ажилтан бол ops-ийн хэсэгт орох эрх хүснэ үү — админ зөвшөөрөхөд шууд нээгдэнэ.</p>
         <div data-state></div>
-        <div data-form></div>
+        <div class="form-foot" style="justify-content:flex-start;margin:0" data-act></div>
       </div></div>
     </section>`);
   const state = box.querySelector('[data-state]');
-  const slot = box.querySelector('[data-form]');
+  const act = box.querySelector('[data-act]');
   if (seat) {
     box.querySelector('.cap').textContent = `Та Basu ops-ийн гишүүн — ${seat.role_label}.`;
-    const go = el('<button class="btn" type="button">Ops ширээ нээх</button>');
-    go.addEventListener('click', () => open(seat));
-    slot.append(go);
+    act.append(button('Ops ширээ нээх', () => open(seat)));
     return box;
   }
-  const form = (asked) => {
-    const f = el(`
-      <div>
-        <input class="input" name="name" placeholder="Таны нэр" aria-label="Нэр" autocomplete="name">
-        <select class="input" name="role" aria-label="Хүсэх эрх"></select>
-        <textarea class="input" name="note" rows="3" placeholder="Та хэн бэ, юунд хэрэгтэй вэ (заавал биш)" aria-label="Тайлбар"></textarea>
-        <button class="btn" data-size="lg" type="button" id="ask" style="width:100%">${asked ? 'Хүсэлтээ шинэчлэх' : 'Эрх хүсэх'}</button>
-      </div>`);
-    f.querySelector('[name="name"]').value = asked?.name ?? access.account?.name ?? '';
-    // The desk's roles as Basu has them now, each with what it is for.
-    void deskRoleList().then((roles) => {
-      f.querySelector('[name="role"]').innerHTML = roles.map((r) => roleOption(r, asked?.role ?? 'ops')).join('');
-    });
-    f.querySelector('[name="note"]').value = asked?.note ?? '';
-    f.querySelector('#ask').addEventListener('click', async (e) => {
-      const v = (n) => f.querySelector(`[name="${n}"]`).value.trim();
-      e.target.setAttribute('data-busy', '');
-      try {
-        await ops('/v1/ops/requests', { method: 'POST', body: { name: v('name'), role: v('role'), note: v('note') } });
-        toast('Хүсэлт илгээгдлээ.');
-        await reload('me');
-      } catch (error) {
-        toast(error.message, 'bad');
-      } finally {
-        e.target.removeAttribute('data-busy');
-      }
-    });
-    return f;
-  };
 
   if (request?.state === 'pending') {
     const waiting = el(`
@@ -524,12 +504,7 @@ function deskSection() {
       waiting.querySelector('[data-asked]').textContent = roles.find((r) => r.key === request.role)?.name ?? request.role;
     });
     state.append(waiting);
-    const change = el('<button class="btn" type="button" data-size="lg" style="width:100%">Хүсэлтээ өөрчлөх</button>');
-    change.addEventListener('click', () => {
-      change.remove();
-      slot.replaceChildren(form(request));
-    });
-    slot.append(change);
+    act.append(button('Хүсэлтээ өөрчлөх', () => deskAskPopup(request), 'id="ask-open"'));
     // Keep asking while it waits: the yes opens the desk on its own.
     frontPoll = setInterval(async () => {
       if (document.hidden) return;
@@ -554,16 +529,9 @@ function deskSection() {
         <b>Хүсэлтийг татгалзсан</b>
         <span>${request.decline_reason ? `Шалтгаан: ${esc(request.decline_reason)}. ` : ''}Дахин хүсэж болно.</span>
       </div>`));
-    slot.append(form(null));
-    return box;
   }
   // Most people here run a business; asking for Basu's own desk is the rarer thing, one tap away.
-  const ask = el('<button class="btn" type="button" id="ask-open">Ops эрх хүсэх</button>');
-  ask.addEventListener('click', () => {
-    ask.remove();
-    slot.append(form(null));
-  });
-  slot.append(ask);
+  act.append(button(request?.state === 'declined' ? 'Дахин хүсэх' : 'Ops эрх хүсэх', () => deskAskPopup(null), 'id="ask-open"'));
   return box;
 }
 
@@ -573,93 +541,94 @@ async function renderMeProfile(view) {
   view.append(head('Профайл', 'Таны нэр, нэвтэрдэг хаяг, нэвтэрсэн төхөөрөмжүүд.'));
   const card = el(`
     <section class="section"><h2 class="section-label">Та</h2>
-      <div class="card"><div class="card-body">
-        <label class="field"><span>Нэр</span><input name="display_name" placeholder="Таны нэр" autocomplete="name"></label>
-        <div class="facts" style="padding:0 0 16px">
-          <div><span class="lab">Имэйл</span><b>${account.email ? esc(account.email) : '—'}</b></div>
-          <div><span class="lab">Утас</span><b class="mono">${account.phone ? esc(account.phone) : '—'}</b></div>
-        </div>
-        <div class="form-foot" style="justify-content:flex-start"><button class="btn" data-v="primary" type="button" id="save-name">Хадгалах</button></div>
+      <div class="card"><div class="facts" id="me-facts">
+        <div><span class="lab">Нэр</span><b>${account.name ? esc(account.name) : '—'}</b></div>
+        <div><span class="lab">Имэйл</span><b>${account.email ? esc(account.email) : '—'}</b></div>
+        <div><span class="lab">Утас</span><b class="mono">${account.phone ? esc(account.phone) : '—'}</b></div>
       </div></div>
     </section>`);
-  const input = card.querySelector('[name="display_name"]');
-  input.value = account.name ?? '';
-  const save = async () => {
-    try {
-      await ops('/v1/me', { method: 'PATCH', body: { display_name: input.value.trim() } });
-      toast('Нэр хадгалагдлаа.', 'good');
-      await reload('me');
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
-  };
-  card.querySelector('#save-name').addEventListener('click', save);
-  input.addEventListener('keydown', (e) => e.key === 'Enter' && save());
+  card.querySelector('.section-label').append(
+    button(
+      'Нэр засах',
+      () =>
+        popup({
+          title: 'Нэр засах',
+          sub: 'Байгууллага, Basu-гийн ажилтнууд таныг энэ нэрээр харна.',
+          width: 440,
+          fields: [{ name: 'display_name', label: 'Нэр', autocomplete: 'name', value: account.name ?? '', required: true, wide: true }],
+          onSubmit: async (v) => {
+            await ops('/v1/me', { method: 'PATCH', body: { display_name: v.display_name } });
+            toast('Нэр хадгалагдлаа.', 'good');
+            await reload('me');
+          },
+        }),
+      'data-size="sm" id="edit-name"',
+    ),
+  );
   view.append(card);
   // The ways back into the account: an address to reset a forgotten password by, and the password itself.
   view.append(accountWays({ token: store.opsToken }));
 
   const sessions = el(`
     <section class="section"><h2 class="section-label">Нэвтэрсэн төхөөрөмжүүд</h2>
-      <div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Төхөөрөмж</th><th>Нэвтэрсэн</th><th>Сүүлд</th></tr></thead><tbody id="sessions"><tr><td colspan="3" class="empty">…</td></tr></tbody></table></div>
-      <div class="card-foot"><button class="btn" data-v="quiet" data-size="sm" type="button" id="revoke-others">Бусад бүх төхөөрөмжөөс гарах</button></div></div>
+      <div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Төхөөрөмж</th><th>Нэвтэрсэн</th><th>Сүүлд</th></tr></thead><tbody id="sessions"><tr><td colspan="3" class="empty">…</td></tr></tbody></table></div></div>
     </section>`);
+  sessions.querySelector('.section-label').append(
+    button(
+      'Бусад төхөөрөмжөөс гарах',
+      () =>
+        confirmPopup({
+          title: 'Бусад төхөөрөмжөөс гарах',
+          text: 'Энэ төхөөрөмжөөс бусад бүх газарт нэвтрэлт хаагдана. Тэнд дахин нэвтрэх шаардлагатай болно.',
+          ok: 'Гарах',
+          danger: true,
+          onConfirm: async () => {
+            const { revoked } = await ops('/v1/me/sessions/revoke', { method: 'POST' });
+            toast(revoked ? `${revoked} төхөөрөмжөөс гарлаа.` : 'Өөр төхөөрөмж алга.', 'good');
+            show('profile');
+          },
+        }),
+      'data-size="sm" id="revoke-others"',
+    ),
+  );
   view.append(sessions);
   try {
     const { sessions: list } = await ops('/v1/me/sessions');
     const body = sessions.querySelector('#sessions');
     body.replaceChildren(...list.map((s) => el(`<tr><td><b>${esc(s.label ?? 'Төхөөрөмж')}</b>${s.current ? ' <span class="pill" data-size="sm" data-s="contracted">энэ</span>' : ''}</td><td>${stamp(s.created_at)}</td><td>${s.last_seen_at ? stamp(s.last_seen_at) : '—'}</td></tr>`)));
+    // Nothing else signed in: nothing to sign out of.
+    if (list.length < 2) sessions.querySelector('#revoke-others').remove();
   } catch (error) {
     sessions.querySelector('#sessions').replaceChildren(el(`<tr><td colspan="3" class="empty">${esc(error.message)}</td></tr>`));
   }
-  sessions.querySelector('#revoke-others').addEventListener('click', async () => {
-    if (!confirm('Энэ төхөөрөмжөөс бусад бүх газраас гарах уу?')) return;
-    try {
-      const { revoked } = await ops('/v1/me/sessions/revoke', { method: 'POST' });
-      toast(revoked ? `${revoked} төхөөрөмжөөс гарлаа.` : 'Өөр төхөөрөмж алга.', 'good');
-      show('profile');
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
-  });
 }
 
-/** Registering a business: its owner is whoever sends this; Basu approves it. */
-function orgForm(done) {
-  const f = el(`
-    <div class="card org-form" style="margin-top:12px"><div class="card-body">
-      <label class="field"><span>Байгууллагын нэр</span><input name="name" placeholder="Хэрлэн мах, Алтан тогоо ресторан…"></label>
-      <div class="checks">
-        <label><input type="checkbox" name="restaurant"> Ресторан</label>
-        <label><input type="checkbox" name="supplier"> Идэшний нийлүүлэгч</label>
-      </div>
-      <div class="fields">
-        <label class="field"><span>Холбогдох утас</span><input name="phone" type="tel" placeholder="+976 XXXX XXXX"></label>
-        <label class="field"><span>ТТД (байвал)</span><input name="tin" inputmode="numeric" placeholder="7–10 орон"></label>
-      </div>
-      <label class="field"><span>Хаяг</span><input name="address" placeholder="Дүүрэг, хороо, байр / зах, хаалга"></label>
-      <label class="field"><span>Товч тайлбар</span><textarea name="about" placeholder="Юу хийдэг, хэдэн хүнтэй…"></textarea></label>
-      <p class="cap">Бүртгүүлсэн хүн байгууллагын эзэн болно. Basu шалгаж баталсны дараа ажилтнуудаа нэмнэ.</p>
-      <div class="form-foot"><button class="btn" data-v="primary" type="button" data-send>Бүртгүүлэх</button></div>
-    </div></div>`);
-  f.querySelector('[data-send]').addEventListener('click', async (e) => {
-    const v = (n) => f.querySelector(`[name="${n}"]`).value.trim();
-    const on = (n) => f.querySelector(`[name="${n}"]`).checked;
-    e.target.setAttribute('data-busy', '');
-    try {
+/** Registering a business, in a popup: its owner is whoever sends it; Basu approves it. */
+function orgPopup() {
+  return popup({
+    title: 'Байгууллага бүртгүүлэх',
+    sub: 'Бүртгүүлсэн хүн байгууллагын эзэн болно. Basu шалгаж баталсны дараа ажилтнуудаа нэмнэ.',
+    width: 600,
+    id: 'org-form',
+    fields: [
+      { name: 'name', label: 'Байгууллагын нэр', placeholder: 'Хэрлэн мах, Алтан тогоо ресторан…', required: true, wide: true },
+      { type: 'checks', label: 'Юу хийдэг вэ', options: [['restaurant', 'Ресторан'], ['supplier', 'Идэшний нийлүүлэгч']] },
+      { name: 'phone', label: 'Холбогдох утас', type: 'tel', placeholder: '+976 XXXX XXXX' },
+      { name: 'tin', label: 'ТТД (байвал)', inputmode: 'numeric', placeholder: '7–10 орон' },
+      { name: 'address', label: 'Хаяг', placeholder: 'Дүүрэг, хороо, байр / зах, хаалга', wide: true },
+      { name: 'about', label: 'Товч тайлбар', type: 'textarea', placeholder: 'Юу хийдэг, хэдэн хүнтэй…' },
+    ],
+    submit: 'Бүртгүүлэх',
+    onSubmit: async (v) => {
+      if (!v.restaurant && !v.supplier) throw new Error('Ресторан эсвэл нийлүүлэгч — дор хаяж нэгийг сонгоно уу.');
       const made = await ops('/v1/orgs', {
         method: 'POST',
-        body: { name: v('name'), restaurant: on('restaurant'), supplier: on('supplier'), phone: v('phone'), tin: v('tin'), address: v('address'), about: v('about') },
+        body: { name: v.name, restaurant: v.restaurant, supplier: v.supplier, phone: v.phone, tin: v.tin, address: v.address, about: v.about },
       });
       toast('Бүртгэл илгээгдлээ. Basu батлахад мэдэгдэнэ.', 'good');
-      await done(made.id);
-    } catch (error) {
-      toast(error.message, 'bad');
-    } finally {
-      e.target.removeAttribute('data-busy');
-    }
+      await reload(made.id);
+    },
   });
-  return f;
 }
 
 /* ── a business ────────────────────────────────────────────────────── */
@@ -686,11 +655,8 @@ async function renderOrgHome(view) {
     }[w.state] ?? ['warn', w.state, ''];
     view.append(el(`<div class="callout" data-k="${word[0]}"><b>${word[1]}</b><span>${word[2]}</span></div>`));
     if (w.state === 'declined') {
-      const again = el('<div class="form-foot" style="justify-content:flex-start;margin-top:16px"><button class="btn" type="button">Дахин бүртгүүлэх</button></div>');
-      again.querySelector('button').addEventListener('click', () => {
-        wanted = 'new-org';
-        open(access.workspaces.find((x) => x.kind === 'me'), 'home');
-      });
+      const again = el('<div class="form-foot" style="justify-content:flex-start;margin-top:16px"></div>');
+      again.append(button('Дахин бүртгүүлэх', () => orgPopup()));
       view.append(again);
     }
     return;
@@ -742,10 +708,11 @@ async function renderOrgHome(view) {
 /**
  * Who works at the business, and — for its owner and managers — bringing
  * somebody in by the phone or address they sign in with, changing a role,
- * taking somebody out. Anybody may leave.
+ * taking somebody out. Anybody may leave. Each of those is a popup.
  */
 async function renderOrgTeam(view) {
-  view.append(head('Ажилтнууд', 'Хэн энэ байгууллагад ажилладаг, ямар эрхтэй.'));
+  const h = head('Ажилтнууд', 'Хэн энэ байгууллагад ажилладаг, ямар эрхтэй.');
+  view.append(h);
   let data;
   try {
     data = await orgFile();
@@ -756,52 +723,93 @@ async function renderOrgTeam(view) {
   const { org, members } = data;
   // The roles this business may hand out that this person may give — never more than they hold themselves.
   const giving = data.roles.filter((r) => r.assignable);
-  const options = (chosen) => giving.map((r) => `<option value="${esc(r.key)}"${r.key === chosen ? ' selected' : ''}>${esc(r.name)}</option>`).join('');
-  const section = el(`
-    <section class="section">
-      <div data-members></div>
-      <div data-add></div>
-    </section>`);
+  const roleField = (chosen) => ({ name: 'role', label: 'Эрх', type: 'select', options: giving.map((r) => [r.key, r.name]), value: chosen, wide: true });
+
+  /** Two steps: find the person by what they sign in with, then the role. */
+  const addPopup = () => {
+    let who = null;
+    return popup({
+      title: 'Хүн нэмэх',
+      sub: 'Тэр хүний Basu-д нэвтэрдэг утас эсвэл имэйлээр хайна. Урьд нь нэг удаа нэвтэрсэн байх ёстой.',
+      width: 480,
+      id: 'member-add',
+      fields: [{ name: 'contact', label: 'Утас эсвэл имэйл', inputmode: 'email', placeholder: '9911 2233 эсвэл нэр@gmail.com', required: true, wide: true }],
+      submit: 'Хайх',
+      onSubmit: async (v, { step }) => {
+        if (!who) {
+          who = await ops(`/v1/orgs/${org.id}/lookup?contact=${encodeURIComponent(v.contact)}`);
+          step({
+            sub: 'Олдлоо. Ямар эрхтэй ажиллахыг сонгоно уу.',
+            fields: [
+              { type: 'static', label: 'Хүн', html: `<b>${esc(who.name ?? 'Нэргүй')}</b> · <span class="mono">${esc(who.contact ?? '')}</span>` },
+              roleField(giving.find((r) => !r.head)?.key),
+            ],
+            submit: 'Нэмэх',
+          });
+          return false;
+        }
+        await ops(`/v1/orgs/${org.id}/members`, { method: 'POST', body: { guest_id: who.guest_id, role: v.role } });
+        toast(`${who.name ?? 'Хүн'} нэмэгдлээ.`, 'good');
+        show('team');
+      },
+    });
+  };
+  if (giving.length) headActs(h, button(`${NAV_ICON.plus}Хүн нэмэх`, addPopup, 'data-v="primary" id="team-add"'));
+
   const team = dataTable({
     columns: [
       { key: 'name', label: 'Нэр', value: (m) => m.name ?? '', render: (m) => `<b>${esc(m.name ?? '—')}</b>${m.you ? ' <small class="muted">(та)</small>' : ''}` },
       { key: 'contact', label: 'Утас, имэйл', render: (m) => dtCell.mono(m.contact) },
-      {
-        key: 'role',
-        label: 'Эрх',
-        value: (m) => m.role_name,
-        render: (m) => {
-          if (!m.manageable) return esc(m.role_name);
-          const pick = el(`<select class="input dt-select" aria-label="Эрх">${options(m.role)}</select>`);
-          pick.addEventListener('change', async () => {
-            try {
-              await ops(`/v1/orgs/${org.id}/members/${m.guest_id}`, { method: 'PATCH', body: { role: pick.value } });
-              toast(`${m.name ?? ''}: ${pick.selectedOptions[0]?.textContent ?? ''}`, 'good');
-              m.role = pick.value;
-            } catch (error) {
-              toast(error.message, 'bad');
-              pick.value = m.role;
-            }
-          });
-          return pick;
-        },
-      },
+      { key: 'role', label: 'Эрх', value: (m) => m.role_name },
     ],
     search: members.length > 8 ? { placeholder: 'Нэр, утас, имэйл…' } : false,
     actions: (m) => {
-      if (!m.manageable && !m.you) return null;
-      const out = el(`<button class="btn" data-v="quiet" data-size="sm" type="button">${m.you ? 'Гарах' : 'Хасах'}</button>`);
-      out.addEventListener('click', async () => {
-        if (!confirm(m.you ? `«${org.name}»-оос гарах уу?` : `${m.name ?? 'Энэ хүн'}-ийг хасах уу?`)) return;
-        try {
-          await ops(`/v1/orgs/${org.id}/members/${m.guest_id}`, { method: 'DELETE' });
-          if (m.you) return reload('me');
-          show('team');
-        } catch (error) {
-          toast(error.message, 'bad');
-        }
-      });
-      return out;
+      const out = [];
+      if (m.manageable) {
+        out.push(
+          button(
+            'Эрх солих',
+            () =>
+              popup({
+                title: 'Эрх солих',
+                sub: `${esc(m.name ?? '')} · <span class="mono">${esc(m.contact ?? '')}</span>`,
+                width: 440,
+                fields: [roleField(m.role)],
+                onSubmit: async (v) => {
+                  if (v.role === m.role) return true;
+                  await ops(`/v1/orgs/${org.id}/members/${m.guest_id}`, { method: 'PATCH', body: { role: v.role } });
+                  toast(`${m.name ?? ''}: ${giving.find((r) => r.key === v.role)?.name ?? v.role}`, 'good');
+                  show('team');
+                },
+              }),
+            'data-v="quiet" data-size="sm" data-a="role"',
+          ),
+        );
+      }
+      if (m.manageable || m.you) {
+        out.push(
+          button(
+            m.you ? 'Гарах' : 'Хасах',
+            () =>
+              confirmPopup({
+                title: m.you ? 'Байгууллагаас гарах' : 'Ажилтныг хасах',
+                text: m.you
+                  ? `Та <b>${esc(org.name)}</b>-оос гарна. Буцаж орохын тулд эзэн, менежер таныг дахин нэмнэ.`
+                  : `<b>${esc(m.name ?? 'Энэ хүн')}</b> <b>${esc(org.name)}</b>-д ажиллахаа болино. Дараа нь дахин нэмж болно.`,
+                ok: m.you ? 'Гарах' : 'Хасах',
+                danger: true,
+                onConfirm: async () => {
+                  await ops(`/v1/orgs/${org.id}/members/${m.guest_id}`, { method: 'DELETE' });
+                  if (m.you) return reload('me');
+                  toast(`${m.name ?? 'Хүн'} хасагдлаа.`, 'good');
+                  show('team');
+                },
+              }),
+            'data-v="quiet" data-size="sm" data-a="remove"',
+          ),
+        );
+      }
+      return out.length ? out : null;
     },
     rowAttrs: (m) => ({ 'data-member': m.guest_id }),
     noun: 'хүн',
@@ -809,57 +817,14 @@ async function renderOrgTeam(view) {
     rows: members,
   });
   team.el.setAttribute('data-members', '');
-  section.querySelector('[data-members]').replaceWith(team.el);
-  if (giving.length) {
-    const add = el(`
-      <div class="card" style="margin-top:12px"><div class="card-body">
-        <h3 class="section-label" style="margin-top:0">Хүн нэмэх</h3>
-        <p class="cap" style="margin:0 0 12px">Тэр хүний Basu-д нэвтэрдэг утас эсвэл имэйлээр хайна. Урьд нь нэг удаа нэвтэрсэн байх ёстой.</p>
-        <div class="add-member">
-          <input class="input" name="contact" placeholder="Утас эсвэл имэйл" aria-label="Утас эсвэл имэйл" autocapitalize="none">
-          <button class="btn" type="button" data-find>Хайх</button>
-          <div data-found hidden></div>
-        </div>
-      </div></div>`);
-    const found = add.querySelector('[data-found]');
-    const find = async () => {
-      const contact = add.querySelector('[name="contact"]').value.trim();
-      if (!contact) return;
-      try {
-        const who = await ops(`/v1/orgs/${org.id}/lookup?contact=${encodeURIComponent(contact)}`);
-        found.hidden = false;
-        found.replaceChildren(el(`
-          <div class="add-member" style="margin-top:8px">
-            <span><b>${esc(who.name ?? 'Нэргүй')}</b> · ${esc(who.contact ?? '')}</span>
-            <select class="input" style="width:auto;flex:0 0 auto" aria-label="Эрх">${options(giving.find((r) => !r.head)?.key)}</select>
-            <button class="btn" data-v="primary" type="button" data-add-go>Нэмэх</button>
-          </div>`));
-        found.querySelector('[data-add-go]').addEventListener('click', async () => {
-          try {
-            await ops(`/v1/orgs/${org.id}/members`, { method: 'POST', body: { guest_id: who.guest_id, role: found.querySelector('select').value } });
-            toast(`${who.name ?? 'Хүн'} нэмэгдлээ.`, 'good');
-            show('team');
-          } catch (error) {
-            toast(error.message, 'bad');
-          }
-        });
-      } catch (error) {
-        found.hidden = false;
-        found.replaceChildren(el(`<p class="cap" style="margin:8px 0 0">${esc(error.message)}</p>`));
-      }
-    };
-    add.querySelector('[data-find]').addEventListener('click', find);
-    add.querySelector('[name="contact"]').addEventListener('keydown', (e) => e.key === 'Enter' && find());
-    section.querySelector('[data-add]').append(add);
-  } else {
-    section.append(el('<p class="cap" style="margin-top:12px">Хүн нэмэх, эрх өөрчлөх нь эзэн, менежерийн ажил.</p>'));
-  }
-  view.append(section);
+  view.append(team.el);
+  if (!giving.length) view.append(el('<p class="cap" style="margin-top:12px">Хүн нэмэх, эрх өөрчлөх нь эзэн, менежерийн ажил.</p>'));
 }
 
-/** The business's own details — what Basu knows it by — changed by its owner or a manager, read by everybody else. */
+/** The business's own details — what Basu knows it by — read here, changed in a popup by its owner or a manager. */
 async function renderOrgProfile(view) {
-  view.append(head('Мэдээлэл', 'Basu-д бүртгэлтэй байгууллагын мэдээлэл.'));
+  const h = head('Мэдээлэл', 'Basu-д бүртгэлтэй байгууллагын мэдээлэл.');
+  view.append(h);
   let data;
   try {
     data = await orgFile();
@@ -869,37 +834,48 @@ async function renderOrgProfile(view) {
   }
   const { org } = data;
   const editable = can('org.profile:edit');
-  const card = el(`
-    <section class="section"><div class="card"><div class="card-body">
-      <label class="field"><span>Байгууллагын нэр</span><input name="name"></label>
-      <div class="fields">
-        <label class="field"><span>Холбогдох утас</span><input name="phone" type="tel"></label>
-        <label class="field"><span>ТТД</span><input name="tin" inputmode="numeric" placeholder="7–10 орон"></label>
+  const fact = (label, value, mono = false) => `<div><span class="lab">${label}</span><b${mono ? ' class="mono"' : ''}>${value ? esc(value) : '—'}</b></div>`;
+  view.append(el(`
+    <section class="section"><div class="card">
+      <div class="facts" id="org-facts">
+        ${fact('Нэр', org.name)}
+        <div><span class="lab">Төрөл</span><b>${kinds(org).join(' · ') || '—'}</b></div>
+        ${fact('Холбогдох утас', org.phone, true)}
+        ${fact('ТТД', org.tin, true)}
+        ${fact('Хаяг', org.address)}
+        <div><span class="lab">Бүртгүүлсэн</span><b>${when(org.created_at)}</b>${org.decided_at ? `<br><small class="muted">батлагдсан ${when(org.decided_at)}</small>` : ''}</div>
       </div>
-      <label class="field"><span>Хаяг</span><input name="address"></label>
-      <label class="field"><span>Товч тайлбар</span><textarea name="about"></textarea></label>
-      <p class="cap">${kinds(org).join(' · ')} · бүртгүүлсэн ${when(org.created_at)}${org.decided_at ? ` · батлагдсан ${when(org.decided_at)}` : ''}</p>
-      ${editable ? '<div class="form-foot"><button class="btn" data-v="primary" type="button" id="save-org">Хадгалах</button></div>' : '<p class="cap">Мэдээллийг эзэн эсвэл менежер засна.</p>'}
-    </div></div></section>`);
-  for (const [name, value] of Object.entries({ name: org.name, phone: org.phone, tin: org.tin, address: org.address, about: org.about })) {
-    const input = card.querySelector(`[name="${name}"]`);
-    input.value = value ?? '';
-    input.disabled = !editable;
+      ${org.about ? `<div class="card-foot"><span class="cap">${esc(org.about)}</span></div>` : ''}
+    </div>
+    ${editable ? '' : '<p class="cap" style="margin-top:12px">Мэдээллийг эзэн эсвэл менежер засна.</p>'}
+    </section>`));
+  if (editable) {
+    headActs(
+      h,
+      button(
+        'Засах',
+        () =>
+          popup({
+            title: 'Байгууллагын мэдээлэл',
+            sub: esc(org.name),
+            width: 600,
+            fields: [
+              { name: 'name', label: 'Байгууллагын нэр', value: org.name ?? '', required: true, wide: true },
+              { name: 'phone', label: 'Холбогдох утас', type: 'tel', value: org.phone ?? '' },
+              { name: 'tin', label: 'ТТД', inputmode: 'numeric', placeholder: '7–10 орон', value: org.tin ?? '' },
+              { name: 'address', label: 'Хаяг', value: org.address ?? '', wide: true },
+              { name: 'about', label: 'Товч тайлбар', type: 'textarea', value: org.about ?? '' },
+            ],
+            onSubmit: async (v) => {
+              await ops(`/v1/orgs/${org.id}`, { method: 'PATCH', body: { name: v.name, phone: v.phone, tin: v.tin, address: v.address, about: v.about } });
+              toast('Хадгалагдлаа.', 'good');
+              await reload(org.id);
+            },
+          }),
+        'data-v="primary" id="edit-org"',
+      ),
+    );
   }
-  card.querySelector('#save-org')?.addEventListener('click', async (e) => {
-    const v = (n) => card.querySelector(`[name="${n}"]`).value.trim();
-    e.target.setAttribute('data-busy', '');
-    try {
-      await ops(`/v1/orgs/${org.id}`, { method: 'PATCH', body: { name: v('name'), phone: v('phone'), tin: v('tin'), address: v('address'), about: v('about') } });
-      toast('Хадгалагдлаа.', 'good');
-      await reload(org.id);
-    } catch (error) {
-      toast(error.message, 'bad');
-    } finally {
-      e.target.removeAttribute('data-busy');
-    }
-  });
-  view.append(card);
   if (org.supplier && orgLink('idesh.profile')) {
     view.append(el(`<div class="callout" style="margin-top:16px"><b>Зочдод харагдах профайл, олголтын данс</b><span>Нийлүүлэгчийн нэр, мах авах цэг, данс нь <a class="link" href="${esc(orgLink('idesh.profile').href)}">нийлүүлэгчийн профайл</a> дээр.</span></div>`));
   }
@@ -1016,28 +992,38 @@ async function renderOrgsDesk(view) {
     ],
     actions: (o) => {
       if (o.state === 'applied' && decides) {
-        const ok = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
-        ok.addEventListener('click', async () => {
-          try {
-            await ops(`/v1/ops/orgs/${o.id}/approve`, { method: 'POST' });
-            toast(`«${o.name}» батлагдлаа.`, 'good');
-            show('orgs');
-          } catch (error) {
-            toast(error.message, 'bad');
-          }
-        });
-        const no = el('<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="decline">Татгалзах</button>');
-        no.addEventListener('click', async () => {
-          const reason = prompt(`«${o.name}»-ийг татгалзах шалтгаан:`, '');
-          if (reason === null) return;
-          try {
-            await ops(`/v1/ops/orgs/${o.id}/decline`, { method: 'POST', body: { reason: reason.trim() } });
-            toast('Татгалзлаа.');
-            show('orgs');
-          } catch (error) {
-            toast(error.message, 'bad');
-          }
-        });
+        const ok = button(
+          'Батлах',
+          () =>
+            confirmPopup({
+              title: 'Байгууллагыг батлах',
+              text: `<b>${esc(o.name)}</b> (${kinds(o).join(', ')}) Basu-д ажиллаж эхэлнэ. Бүртгүүлсэн <b>${esc(o.applicant ?? 'хүн')}</b> эзэн нь болж, ажилтнуудаа өөрөө нэмнэ.`,
+              ok: 'Батлах',
+              onConfirm: async () => {
+                await ops(`/v1/ops/orgs/${o.id}/approve`, { method: 'POST' });
+                toast(`«${o.name}» батлагдлаа.`, 'good');
+                show('orgs');
+              },
+            }),
+          'data-v="primary" data-size="sm" data-a="approve"',
+        );
+        const no = button(
+          'Татгалзах',
+          () =>
+            confirmPopup({
+              title: 'Бүртгэлийг татгалзах',
+              text: `<b>${esc(o.name)}</b>-ийн бүртгэлийг татгалзана. Шалтгааныг нь бүртгүүлсэн хүн харж, засаад дахин бүртгүүлж болно.`,
+              ok: 'Татгалзах',
+              danger: true,
+              reason: { label: 'Шалтгаан', placeholder: 'ТТД буруу, хаяг тодорхойгүй…', required: true },
+              onConfirm: async (reason) => {
+                await ops(`/v1/ops/orgs/${o.id}/decline`, { method: 'POST', body: { reason } });
+                toast('Татгалзлаа.', 'good');
+                show('orgs');
+              },
+            }),
+          'data-v="quiet" data-size="sm" data-a="decline"',
+        );
         return [ok, no];
       }
       if (o.state === 'active') {
@@ -1087,7 +1073,6 @@ async function deskRoleList() {
   deskRoles ??= ops('/v1/access/roles?scope=desk').then((t) => t.roles).catch(() => []);
   return deskRoles;
 }
-const roleOption = (r, chosen) => `<option value="${esc(r.key)}"${r.key === chosen ? ' selected' : ''}>${esc(r.name)}${r.description ? ` — ${esc(r.description)}` : ''}</option>`;
 
 /** Desk or business: the switch the roles and menu pages share. */
 function scopeSeg(onChange) {
@@ -1268,9 +1253,24 @@ function openRoleSheet(data, mods, role, { manage, from = null, onCopy }) {
   const scrim = el('<div class="scrim"></div>');
   let editor = null;
   let closed = false;
-  const close = (force = false) => {
+  /** Close, or — with something typed and not saved — ask first, and do `after` once it is closed. */
+  const close = (force = false, after = null) => {
     if (closed) return true;
-    if (!force && editor.dirty() && !confirm('Хадгалаагүй өөрчлөлт алга болно. Хаах уу?')) return false;
+    if (!force && editor.dirty()) {
+      void confirmPopup({
+        title: 'Хадгалаагүй өөрчлөлт',
+        text: 'Энэ үүрэгт хийсэн өөрчлөлт хадгалагдаагүй байна. Хаавал алга болно.',
+        ok: 'Хадгалахгүй хаах',
+        cancel: 'Үргэлжлүүлэх',
+        danger: true,
+        onConfirm: () => {
+          close(true);
+          after?.();
+          return true;
+        },
+      });
+      return false;
+    }
     closed = true;
     document.removeEventListener('keydown', onKey, true);
     const sheet = editor.root;
@@ -1287,6 +1287,8 @@ function openRoleSheet(data, mods, role, { manage, from = null, onCopy }) {
     return true;
   };
   const onKey = (e) => {
+    // A question asked over this popup answers the keys itself.
+    if (document.querySelector('.sheet.popup[data-open]')) return;
     if (e.key === 'Escape') {
       e.preventDefault();
       close();
@@ -1310,7 +1312,7 @@ function openRoleSheet(data, mods, role, { manage, from = null, onCopy }) {
     from,
     close,
     copy: () => {
-      if (close()) onCopy(role);
+      if (close(false, () => onCopy(role))) onCopy(role);
     },
   });
   scrim.addEventListener('click', () => close());
@@ -1537,16 +1539,19 @@ function roleEditor(data, mods, role, { manage, from, close, copy }) {
       toast(`${people} хүн энэ үүрэгтэй байна. Эхлээд тэдэнд өөр үүрэг өгөөд дараа нь устгана.`, 'bad');
       return;
     }
-    if (!confirm(`«${role.name}» үүргийг устгах уу?`)) return;
-    try {
-      await ops(`/v1/ops/roles/${data.scope}/${role.key}`, { method: 'DELETE' });
-      close(true);
-      toast('Устгалаа.');
-      deskRoles = null;
-      await reload();
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
+    await confirmPopup({
+      title: 'Үүрэг устгах',
+      text: `<b>${esc(role.name)}</b> үүрэг устгагдана. Энэ үүрэгтэй хүн алга; буцаах боломжгүй.`,
+      ok: 'Устгах',
+      danger: true,
+      onConfirm: async () => {
+        await ops(`/v1/ops/roles/${data.scope}/${role.key}`, { method: 'DELETE' });
+        close(true);
+        toast('Устгалаа.', 'good');
+        deskRoles = null;
+        await reload();
+      },
+    });
   });
   save?.addEventListener('click', async () => {
     const wanted = name.value.trim();
@@ -1589,14 +1594,16 @@ function roleEditor(data, mods, role, { manage, from, close, copy }) {
 
 /**
  * The menu page: every module of the desk or of businesses, in order, with
- * its pages under it — each renamed, reordered, moved to another module,
- * given another icon or hidden, right here; a module or a link added; and
- * all of it saved at once, the sidebar following the moment it is.
+ * its pages under it, read as the sidebar will draw them. A module or a page
+ * is renamed, given another icon, moved or hidden in a popup; a module or a
+ * link is added in one too; the arrows reorder. Each change is saved the
+ * moment it is made, and the sidebar follows.
  */
 async function renderMenus(view) {
   const manage = can('desk.menus:manage');
-  view.append(head('Цэс', 'Зүүн цэсний модуль, хуудсыг нэрлэж, эрэмбэлж, зөөж, нууна. Хэн юу харах нь «Үүрэг, эрх»-ээр.', '<div data-seg></div>'));
-  view.querySelector('[data-seg]').replaceWith(scopeSeg(() => show('menus')));
+  const h = head('Цэс', 'Зүүн цэсний модуль, хуудсыг нэрлэж, эрэмбэлж, зөөж, нууна. Хэн юу харах нь «Үүрэг, эрх»-ээр.', '<div data-seg></div>');
+  view.append(h);
+  h.querySelector('[data-seg]').replaceWith(scopeSeg(() => show('menus')));
   let data;
   try {
     data = await ops(`/v1/ops/access/${accessScope}`);
@@ -1605,156 +1612,175 @@ async function renderMenus(view) {
     return;
   }
   if (tab !== 'menus') return;
-  const icons = (chosen) => data.icons.map((k) => `<option value="${k}"${k === chosen ? ' selected' : ''}>${ICON_WORD[k] ?? k}</option>`).join('');
-  const moduleOptions = (chosen) => data.all_modules.map((m) => `<option value="${esc(m.key)}"${m.key === chosen ? ' selected' : ''}>${esc(m.key === 'main' ? 'Дээд хэсэг' : m.name)}</option>`).join('');
+  const TOP = 'main';
+  const modules = data.all_modules;
+  const custom = modules.filter((m) => m.key !== TOP);
+  const pagesIn = (key) => data.pages.filter((p) => p.module === key);
+  const iconField = (value) => ({ name: 'icon', label: 'Дүрс', type: 'icons', value, options: data.icons.map((k) => [k, NAV_ICON[k] ?? '', ICON_WORD[k] ?? k]) });
+  const moduleWord = (m) => (m.key === TOP ? 'Дээд хэсэг' : m.name);
+
+  /** Save a part of the menu, then draw everything again from what the server now has. */
+  const save = async (body, said) => {
+    await ops(`/v1/ops/menus/${accessScope}`, { method: 'PUT', body });
+    if (said) toast(said, 'good');
+    await reload();
+  };
+  /** One step up or down among its neighbours: every neighbour's order written again, so ties never stick. */
+  const move = async (list, i, by, kind) => {
+    const next = [...list];
+    [next[i], next[i + by]] = [next[i + by], next[i]];
+    try {
+      await save({ [kind]: next.map((x, n) => ({ key: x.key, sort: (n + 1) * 10 })) });
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  };
+
+  const editModule = (m) =>
+    popup({
+      title: 'Модуль засах',
+      width: 520,
+      fields: [{ name: 'name', label: 'Нэр', value: m.name ?? '', required: true, wide: true }, iconField(m.icon)],
+      onSubmit: (v) => save({ modules: [{ key: m.key, name: v.name, icon: v.icon ?? m.icon }] }, 'Хадгалагдлаа.'),
+    });
+  const dropModule = (m) =>
+    confirmPopup({
+      title: 'Модуль устгах',
+      text: `<b>${esc(m.name)}</b> модуль цэснээс алга болно. Хуудастай модулийг устгахгүй — эхлээд хуудсыг нь өөр модуль руу зөөнө.`,
+      ok: 'Устгах',
+      danger: true,
+      onConfirm: async () => {
+        await ops(`/v1/ops/menus/${accessScope}/modules/${m.key}`, { method: 'DELETE' });
+        toast('Модуль устлаа.', 'good');
+        await reload();
+      },
+    });
+  const editPage = (p) =>
+    popup({
+      title: p.link ? 'Холбоос засах' : 'Хуудас засах',
+      sub: p.link ? `<span class="mono">${esc(p.link)}</span>` : '',
+      width: 560,
+      fields: [
+        { name: 'name', label: 'Цэсэнд харагдах нэр', value: p.name, required: true, wide: true },
+        { name: 'module', label: 'Модуль', type: 'select', options: modules.map((m) => [m.key, moduleWord(m)]), value: p.module },
+        { name: 'shown', label: 'Цэсэнд', type: 'select', options: [['1', 'Харагдана'], ['0', 'Нуусан']], value: p.hidden ? '0' : '1' },
+        iconField(p.icon),
+      ],
+      onSubmit: (v) => {
+        const page = { key: p.key, name: v.name, icon: v.icon ?? p.icon, hidden: v.shown === '0' };
+        if (v.module !== p.module) {
+          // Into another module: at its end.
+          page.module = v.module;
+          page.sort = Math.max(0, ...pagesIn(v.module).map((x) => x.sort ?? 0)) + 10;
+        }
+        return save({ pages: [page] }, 'Хадгалагдлаа.');
+      },
+    });
+  const dropLink = (p) =>
+    confirmPopup({
+      title: 'Холбоос устгах',
+      text: `<b>${esc(p.name)}</b> холбоос цэснээс алга болно.<br><span class="mono">${esc(p.link)}</span>`,
+      ok: 'Устгах',
+      danger: true,
+      onConfirm: async () => {
+        await ops(`/v1/ops/menus/${accessScope}/links/${p.key}`, { method: 'DELETE' });
+        toast('Холбоос устлаа.', 'good');
+        await reload();
+      },
+    });
+  const addModule = () =>
+    popup({
+      title: 'Модуль нэмэх',
+      sub: 'Шинэ модуль цэсний доод талд гарна. Дараа нь хуудсуудаа түүн рүү зөөнө.',
+      width: 520,
+      fields: [{ name: 'name', label: 'Нэр', placeholder: 'Тайлан', required: true, wide: true }, iconField('layers')],
+      submit: 'Нэмэх',
+      onSubmit: async (v) => {
+        await ops(`/v1/ops/menus/${accessScope}/modules`, { method: 'POST', body: { name: v.name, icon: v.icon } });
+        toast('Модуль нэмэгдлээ.', 'good');
+        await reload();
+      },
+    });
+  const addLink = () =>
+    popup({
+      title: 'Холбоос нэмэх',
+      sub: 'Basu-гийн өөр хуудас, эсвэл гадны https хаяг. Хэн харахыг «Үүрэг, эрх»-ээс сонгоно.',
+      width: 560,
+      fields: [
+        { name: 'name', label: 'Цэсэнд харагдах нэр', placeholder: 'Гарын авлага', required: true, wide: true },
+        { name: 'href', label: 'Хаяг', placeholder: '/kds эсвэл https://…', inputmode: 'url', required: true, wide: true },
+        { name: 'module', label: 'Модуль', type: 'select', options: modules.map((m) => [m.key, moduleWord(m)]), value: TOP, wide: true },
+      ],
+      submit: 'Нэмэх',
+      onSubmit: async (v) => {
+        await ops(`/v1/ops/menus/${accessScope}/links`, { method: 'POST', body: { name: v.name, href: v.href, module: v.module } });
+        toast('Холбоос нэмэгдлээ. Хэн харахыг «Үүрэг, эрх»-ээс сонгоно.', 'good');
+        await reload();
+      },
+    });
+
+  if (manage) {
+    headActs(
+      h,
+      button(`${NAV_ICON.plus}Холбоос`, addLink, 'id="add-link"'),
+      button(`${NAV_ICON.plus}Модуль`, addModule, 'data-v="primary" id="add-module"'),
+    );
+  }
+
+  const arrows = (list, i, kind) => {
+    const box = el('<span class="menu-moves"></span>');
+    const up = button('↑', () => move(list, i, -1, kind), `data-size="sm" data-v="quiet" data-icon data-up aria-label="Дээш"${i === 0 ? ' disabled' : ''}`);
+    const down = button('↓', () => move(list, i, 1, kind), `data-size="sm" data-v="quiet" data-icon data-down aria-label="Доош"${i === list.length - 1 ? ' disabled' : ''}`);
+    box.append(up, down);
+    return box;
+  };
+
   const board = el('<div class="menu-board" id="menu-board"></div>');
-  const mods = new Map();
-  for (const m of data.all_modules) {
-    const top = m.key === 'main';
+  for (const m of modules) {
+    const top = m.key === TOP;
+    const pages = pagesIn(m.key);
     const card = el(`
       <section class="card menu-mod" data-module="${esc(m.key)}">
         <div class="menu-mod-head">
-          <span class="icon-pick"><span data-preview>${NAV_ICON[m.icon] ?? ''}</span><select class="input" data-size="sm" name="icon" aria-label="Дүрс"${top ? ' disabled' : ''}>${icons(m.icon)}</select></span>
-          <input class="input" name="name" maxlength="40" aria-label="Модулийн нэр"${top ? ' disabled' : ''}>
-          <span class="menu-moves">
-            <button class="btn" data-size="sm" data-v="quiet" data-icon type="button" data-up aria-label="Дээш"${top ? ' disabled' : ''}>↑</button>
-            <button class="btn" data-size="sm" data-v="quiet" data-icon type="button" data-down aria-label="Доош"${top ? ' disabled' : ''}>↓</button>
-            ${m.key.startsWith('m-') ? '<button class="btn" data-size="sm" data-v="quiet" type="button" data-drop-mod>Устгах</button>' : ''}
-          </span>
+          <span class="menu-ico">${top ? NAV_ICON.home : NAV_ICON[m.icon] ?? ''}</span>
+          <div class="t"><b>${esc(top ? 'Дээд хэсэг' : m.name)}</b><small>${top ? 'Модульгүй хуудсууд, цэсний хамгийн дээр' : `${pages.length} хуудас`}</small></div>
+          <span class="menu-acts"></span>
         </div>
-        <div class="menu-pages" data-rows></div>
+        <div class="menu-pages"></div>
       </section>`);
-    card.querySelector('[name="name"]').value = top ? 'Дээд хэсэг — модульгүй хуудсууд' : m.name ?? '';
-    mods.set(m.key, card);
+    const acts = card.querySelector('.menu-acts');
+    if (manage && !top) {
+      acts.append(arrows(custom, custom.indexOf(m), 'modules'));
+      acts.append(button('Засах', () => editModule(m), 'data-size="sm" data-edit-mod'));
+      if (m.key.startsWith('m-')) acts.append(button('Устгах', () => dropModule(m), 'data-size="sm" data-v="quiet" data-drop-mod'));
+    }
+    const list = card.querySelector('.menu-pages');
+    if (!pages.length) list.append(el('<div class="empty">Хоосон — хуудсыг «Засах»-аар энэ модуль руу зөөнө.</div>'));
+    pages.forEach((p, i) => {
+      const row = el(`
+        <div class="menu-page" data-page="${esc(p.key)}"${p.hidden ? ' data-off' : ''}>
+          <span class="menu-ico">${NAV_ICON[p.icon] ?? ''}</span>
+          <div class="t"><b>${esc(p.name)}</b>${p.link ? `<small class="mono">${esc(p.link)}</small>` : ''}</div>
+          ${p.hidden ? '<span class="pill" data-s="off">нуусан</span>' : ''}
+          <span class="menu-acts"></span>
+        </div>`);
+      const acts = row.querySelector('.menu-acts');
+      if (manage) {
+        acts.append(arrows(pages, i, 'pages'));
+        acts.append(button('Засах', () => editPage(p), 'data-size="sm" data-edit-page'));
+        if (p.link) acts.append(button('Устгах', () => dropLink(p), 'data-size="sm" data-v="quiet" data-drop-link'));
+      }
+      list.append(row);
+    });
     board.append(card);
   }
-  const pageRow = (p) => {
-    const row = el(`
-      <div class="menu-page" data-page="${esc(p.key)}"${p.hidden ? ' data-off' : ''}>
-        <span class="icon-pick"><span data-preview>${NAV_ICON[p.icon] ?? ''}</span><select class="input" data-size="sm" name="icon" aria-label="Дүрс">${icons(p.icon)}</select></span>
-        <input class="input" name="name" maxlength="40" aria-label="Хуудасны нэр">
-        <select class="input" data-size="sm" name="module" aria-label="Модуль">${moduleOptions(p.module)}</select>
-        <span class="menu-moves">
-          <button class="btn" data-size="sm" data-v="quiet" data-icon type="button" data-up aria-label="Дээш">↑</button>
-          <button class="btn" data-size="sm" data-v="quiet" data-icon type="button" data-down aria-label="Доош">↓</button>
-          <label class="menu-shown"><input type="checkbox" name="shown"${p.hidden ? '' : ' checked'}> харагдана</label>
-          ${p.link ? `<button class="btn" data-size="sm" data-v="quiet" type="button" data-drop-link title="${esc(p.link)}">Холбоос устгах</button>` : ''}
-        </span>
-        ${p.link ? `<span class="menu-href mono">${esc(p.link)}</span>` : ''}
-      </div>`);
-    row.querySelector('[name="name"]').value = p.name;
-    return row;
-  };
-  for (const p of data.pages) mods.get(p.module)?.querySelector('.menu-pages').append(pageRow(p));
-  for (const card of mods.values()) {
-    if (!card.querySelector('.menu-page')) card.querySelector('.menu-pages').append(el('<div class="empty">Хоосон — хуудсыг энд зөөвөл харагдана.</div>'));
-  }
-
-  board.addEventListener('change', (e) => {
-    const t = e.target;
-    if (t.name === 'icon') t.closest('.icon-pick').querySelector('[data-preview]').innerHTML = NAV_ICON[t.value] ?? '';
-    if (t.name === 'module') {
-      const row = t.closest('.menu-page');
-      const target = mods.get(t.value).querySelector('.menu-pages');
-      target.querySelector('.empty')?.remove();
-      target.append(row);
-    }
-    if (t.name === 'shown') t.closest('.menu-page').toggleAttribute('data-off', !t.checked);
-  });
-  board.addEventListener('click', async (e) => {
-    const b = e.target.closest('button');
-    if (!b) return;
-    const unit = b.closest('.menu-page') ?? b.closest('.menu-mod');
-    if (b.matches('[data-up]')) {
-      const prev = unit.previousElementSibling;
-      if (prev && !prev.matches('[data-module="main"]') && !prev.matches('.empty')) prev.before(unit);
-    } else if (b.matches('[data-down]')) {
-      unit.nextElementSibling?.after(unit);
-    } else if (b.matches('[data-drop-mod]')) {
-      try {
-        await ops(`/v1/ops/menus/${accessScope}/modules/${unit.dataset.module}`, { method: 'DELETE' });
-        await reload();
-      } catch (error) {
-        toast(error.message, 'bad');
-      }
-    } else if (b.matches('[data-drop-link]')) {
-      if (!confirm('Энэ холбоосыг цэснээс устгах уу?')) return;
-      try {
-        await ops(`/v1/ops/menus/${accessScope}/links/${unit.dataset.page}`, { method: 'DELETE' });
-        await reload();
-      } catch (error) {
-        toast(error.message, 'bad');
-      }
-    }
-  });
-
-  const tools = el(`
-    <div class="menu-tools">
-      <button class="btn" type="button" data-add-mod>+ Модуль</button>
-      <button class="btn" type="button" data-add-link>+ Холбоос</button>
-      <span class="gap"></span>
-      <button class="btn" data-v="primary" type="button" data-save-menu id="save-menu">Хадгалах</button>
-    </div>`);
-  tools.querySelector('[data-add-mod]').addEventListener('click', async () => {
-    const name = prompt('Модулийн нэр:', '');
-    if (!name?.trim()) return;
-    try {
-      await ops(`/v1/ops/menus/${accessScope}/modules`, { method: 'POST', body: { name: name.trim() } });
-      await reload();
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
-  });
-  tools.querySelector('[data-add-link]').addEventListener('click', async () => {
-    const name = prompt('Холбоосын нэр (цэсэнд харагдах):', '');
-    if (!name?.trim()) return;
-    const href = prompt('Хаяг — /kds гэх мэт Basu-гийн зам, эсвэл https://…', 'https://');
-    if (!href?.trim()) return;
-    try {
-      await ops(`/v1/ops/menus/${accessScope}/links`, { method: 'POST', body: { name: name.trim(), href: href.trim() } });
-      toast('Холбоос нэмэгдлээ. Хэн харахыг «Үүрэг, эрх»-ээс сонгоно.', 'good');
-      await reload();
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
-  });
-  tools.querySelector('[data-save-menu]').addEventListener('click', async (e) => {
-    const modules = [...board.querySelectorAll('.menu-mod')].map((card, i) => ({
-      key: card.dataset.module,
-      name: card.querySelector('[name="name"]').value.trim(),
-      icon: card.querySelector('[name="icon"]').value,
-      sort: i * 10,
-    }));
-    const pages = [...board.querySelectorAll('.menu-mod')].flatMap((card) =>
-      [...card.querySelectorAll('.menu-page')].map((row, i) => ({
-        key: row.dataset.page,
-        module: card.dataset.module,
-        name: row.querySelector('[name="name"]').value.trim(),
-        icon: row.querySelector('[name="icon"]').value,
-        sort: (i + 1) * 10,
-        hidden: !row.querySelector('[name="shown"]').checked,
-      })),
-    );
-    e.target.setAttribute('data-busy', '');
-    try {
-      await ops(`/v1/ops/menus/${accessScope}`, { method: 'PUT', body: { modules: modules.filter((m) => m.key !== 'main'), pages } });
-      toast('Цэс хадгалагдлаа.', 'good');
-      await reload();
-    } catch (error) {
-      toast(error.message, 'bad');
-    } finally {
-      e.target.removeAttribute('data-busy');
-    }
-  });
-  if (manage) view.append(tools);
   view.append(board);
-  if (!manage) board.querySelectorAll('input, select, button').forEach((i) => (i.disabled = true));
 }
 
 /**
  * One business, from the desk: the people in it and their roles — any of
  * them the desk may change, its head too — and which roles, beyond those
- * open to every business, it may hand out.
+ * open to every business, it may hand out. Both read here, changed in a popup.
  */
 async function openOrgAccess(orgId) {
   const view = nav.view;
@@ -1768,57 +1794,91 @@ async function openOrgAccess(orgId) {
     return show('orgs');
   }
   const deciding = can('desk.orgs:access');
-  const back = el('<button class="back link" type="button">← Байгууллагууд</button>');
+  const back = el(`<button class="back link" type="button" id="back">${CHEV}Байгууллагууд</button>`);
   back.addEventListener('click', () => show('orgs'));
   view.append(back, head(esc(data.org.name), `${kinds(data.org).join(' · ')} · ${ORG_STATE[data.org.state]?.[1] ?? data.org.state}`));
   const open = data.roles.filter((r) => r.open);
-  const people = el(`
-    <section class="section"><h2 class="section-label">Хүмүүс, үүрэг</h2>
-      <div class="card"><div class="table-wrap"><table class="table team"><thead><tr><th>Нэр</th><th>Утас, имэйл</th><th>Үүрэг</th></tr></thead><tbody data-people></tbody></table></div></div>
-    </section>`);
-  for (const m of data.members) {
-    const tr = el(`<tr data-member="${esc(m.guest_id)}"><td><b>${esc(m.name ?? '—')}</b><span class="sub mono">${esc(m.contact ?? '')}</span></td><td class="mono">${esc(m.contact ?? '—')}</td><td></td></tr>`);
-    const cell = tr.lastElementChild;
-    if (deciding) {
-      const select = el(`<select class="input" data-size="sm" style="width:auto" aria-label="Үүрэг">${open.map((r) => `<option value="${esc(r.key)}"${r.key === m.role ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select>`);
-      select.addEventListener('change', async () => {
-        try {
-          await ops(`/v1/ops/orgs/${orgId}/members/${m.guest_id}`, { method: 'PATCH', body: { role: select.value } });
-          toast(`${m.name ?? 'Хүн'}: ${select.selectedOptions[0].textContent}`, 'good');
-          m.role = select.value;
-        } catch (error) {
-          toast(error.message, 'bad');
-          select.value = m.role;
-        }
-      });
-      cell.append(select);
-    } else cell.textContent = m.role_name;
-    people.querySelector('[data-people]').append(tr);
-  }
-  view.append(people);
+  const nameOf = (key) => data.roles.find((r) => r.key === key)?.name ?? key;
+
+  const people = dataTable({
+    columns: [
+      { key: 'name', label: 'Нэр', value: (m) => m.name ?? '', render: (m) => `<b>${esc(m.name ?? '—')}</b>` },
+      { key: 'contact', label: 'Утас, имэйл', render: (m) => dtCell.mono(m.contact) },
+      { key: 'role', label: 'Үүрэг', value: (m) => m.role_name ?? nameOf(m.role) },
+    ],
+    search: data.members.length > 8 ? { placeholder: 'Нэр, утас, имэйл…' } : false,
+    actions: deciding
+      ? (m) =>
+          button(
+            'Үүрэг солих',
+            () =>
+              popup({
+                title: 'Үүрэг солих',
+                sub: `${esc(m.name ?? '')} · ${esc(data.org.name)}`,
+                width: 480,
+                fields: [{ name: 'role', label: 'Үүрэг', type: 'select', options: open.map((r) => [r.key, r.name]), value: m.role, wide: true }],
+                onSubmit: async (v) => {
+                  if (v.role === m.role) return true;
+                  await ops(`/v1/ops/orgs/${orgId}/members/${m.guest_id}`, { method: 'PATCH', body: { role: v.role } });
+                  toast(`${m.name ?? 'Хүн'}: ${nameOf(v.role)}`, 'good');
+                  await openOrgAccess(orgId);
+                },
+              }),
+            'data-v="quiet" data-size="sm" data-a="role"',
+          )
+      : null,
+    rowAttrs: (m) => ({ 'data-member': m.guest_id }),
+    noun: 'хүн',
+    empty: { title: 'Хүн алга', text: '' },
+    rows: data.members,
+  });
+  people.el.setAttribute('data-people', '');
+  const who = el('<section class="section"><h2 class="section-label">Хүмүүс, үүрэг</h2></section>');
+  who.append(people.el);
+  view.append(who);
 
   const roles = el(`
     <section class="section"><h2 class="section-label">Энэ байгууллагад нээлттэй үүрэг</h2>
-      <div class="card"><div class="card-body">
-        <p class="cap" style="margin:0 0 12px">«Бүх байгууллагад» үүргийг хүн бүр ашиглана. Бусдыг нь зөвхөн чагталсан байгууллага ажилтандаа өгнө. Үүрэг бүр юу нээхийг «Үүрэг, эрх»-ээр засна.</p>
-        <div class="org-roles" data-org-roles></div>
-        ${deciding ? '<div class="form-foot"><button class="btn" data-v="primary" type="button" data-save-roles>Хадгалах</button></div>' : ''}
-      </div></div>
+      <div class="card" data-rows data-org-roles>${open
+        .map(
+          (r) => `
+        <div class="row" data-role="${esc(r.key)}">
+          <div class="main"><span class="title">${esc(r.name)}${r.head ? ' <span class="pill" data-size="sm">эзэн</span>' : ''}</span>${r.description ? `<span class="sub">${esc(r.description)}</span>` : ''}</div>
+          <div class="end"><span class="cap">${r.everyone ? 'бүх байгууллагад' : 'зөвхөн энд'}</span></div>
+        </div>`,
+        )
+        .join('')}</div>
+      <p class="cap" style="margin-top:10px">«Бүх байгууллагад» үүргийг хүн бүр ашиглана; бусдыг зөвхөн сонгосон байгууллага ажилтандаа өгнө. Үүрэг бүр юу нээхийг «Үүрэг, эрх»-ээр засна.</p>
     </section>`);
-  const holder = roles.querySelector('[data-org-roles]');
-  for (const r of data.roles) {
-    holder.append(el(`<label class="org-role"><input type="checkbox" value="${esc(r.key)}"${r.open ? ' checked' : ''}${r.everyone || !deciding ? ' disabled' : ''}> <b>${esc(r.name)}</b>${r.head ? ' <span class="pill" data-size="sm">эзэн</span>' : ''}${r.everyone ? ' <span class="meta">бүх байгууллагад</span>' : ''}${r.description ? `<small>${esc(r.description)}</small>` : ''}</label>`));
+  const choosable = data.roles.filter((r) => !r.everyone);
+  if (deciding && choosable.length) {
+    roles.querySelector('.section-label').append(
+      button(
+        'Засах',
+        () =>
+          popup({
+            title: 'Нээлттэй үүрэг',
+            sub: `«Бүх байгууллагад» үүргээс гадна <b>${esc(data.org.name)}</b> юуг ажилтандаа өгч болох вэ.`,
+            width: 560,
+            fields: [
+              {
+                type: 'checks',
+                label: 'Сонгосон байгууллагад өгөх үүрэг',
+                list: true,
+                options: choosable.map((r) => [r.key, r.name, r.open, { hint: r.description ?? '' }]),
+              },
+            ],
+            onSubmit: async (v) => {
+              const keys = choosable.filter((r) => v[r.key]).map((r) => r.key);
+              await ops(`/v1/ops/orgs/${orgId}/roles`, { method: 'PUT', body: { keys } });
+              toast('Хадгалагдлаа.', 'good');
+              await openOrgAccess(orgId);
+            },
+          }),
+        'data-size="sm" id="edit-org-roles"',
+      ),
+    );
   }
-  roles.querySelector('[data-save-roles]')?.addEventListener('click', async () => {
-    const keys = [...holder.querySelectorAll('input:checked:not(:disabled)')].map((i) => i.value);
-    try {
-      await ops(`/v1/ops/orgs/${orgId}/roles`, { method: 'PUT', body: { keys } });
-      toast('Хадгалагдлаа.', 'good');
-      openOrgAccess(orgId);
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
-  });
   view.append(roles);
 }
 
@@ -1990,6 +2050,24 @@ function show(key) {
 
 const head = (title, sub, right = '') =>
   el(`<div class="page-head"><div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${right}</div>`);
+
+/**
+ * A button and the one thing it does — on this page that is almost always
+ * opening a popup. `attrs` is the rest of the tag: data-v, data-size, an id.
+ */
+const button = (label, onClick, attrs = '') => {
+  const b = el(`<button class="btn" type="button" ${attrs}>${label}</button>`);
+  b.addEventListener('click', onClick);
+  return b;
+};
+
+/** A page's own buttons, at the right of its head: where adding a thing always is. */
+const headActs = (h, ...buttons) => {
+  const box = el('<div class="head-acts"></div>');
+  box.append(...buttons.filter(Boolean));
+  if (box.childElementCount) h.append(box);
+  return h;
+};
 
 /* ── the whole house ── */
 
@@ -2206,7 +2284,6 @@ async function openGuest(id) {
           ${closed ? '' : `
           <div class="sep"></div>
           ${can('desk.guests:close') ? `
-          <label class="field"><span>Бүртгэл хаах шалтгаан</span><input id="why" placeholder="Зочин бичгээр хүссэн…"></label>
           <button class="btn" data-v="danger" type="button" data-a="close">Бүртгэл хаах</button>
           <div class="hint">Түрийвчид мөнгөтэй эсвэл идэвхтэй захиалгатай бол хаагдахгүй. Нэр, утас арилна; захиалга, гүйлгээ бүртгэлд үлдэнэ.</div>` : '<div class="hint">Бүртгэл хаахыг зөвхөн админ хийнэ.</div>'}`}
         </div>
@@ -2272,24 +2349,35 @@ async function openGuest(id) {
     empty: { title: 'Мэдэгдэл алга', text: '' },
     rows: f.messages,
   }));
-  page.querySelector('#acts').addEventListener('click', async (e) => {
+  page.querySelector('#acts').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-a]');
     if (!b) return;
-    try {
-      if (b.dataset.a === 'revoke') {
-        if (!confirm('Энэ сессийг гаргах уу? Тэр утсан дээр дахин нэвтрэх шаардлагатай болно.')) return;
-        await ops(`/v1/ops/guests/${id}/sessions/${b.dataset.sid}/revoke`, { method: 'POST', body: {} });
-        toast('Сесс гаргалаа.', 'good');
-      } else if (b.dataset.a === 'close') {
-        const note = page.querySelector('#why').value.trim();
-        if (!note) return toast('Шалтгаан бичнэ үү.', 'bad');
-        if (!confirm(`${g.phone ?? g.email ?? 'Энэ'} бүртгэлийг хаах уу? Буцаах боломжгүй.`)) return;
-        await ops(`/v1/ops/guests/${id}/close`, { method: 'POST', body: { note } });
-        toast('Бүртгэл хаагдлаа.', 'good');
-      }
-      await openGuest(id);
-    } catch (error) {
-      toast(error.message, 'bad');
+    if (b.dataset.a === 'revoke') {
+      const session = f.sessions.find((x) => String(x.id) === b.dataset.sid);
+      void confirmPopup({
+        title: 'Сесс гаргах',
+        text: `<b>${esc(session?.label ?? 'Энэ төхөөрөмж')}</b> дээрх нэвтрэлт хаагдана. Тэнд дахин нэвтрэх шаардлагатай болно.`,
+        ok: 'Гаргах',
+        danger: true,
+        onConfirm: async () => {
+          await ops(`/v1/ops/guests/${id}/sessions/${b.dataset.sid}/revoke`, { method: 'POST', body: {} });
+          toast('Сесс гаргалаа.', 'good');
+          await openGuest(id);
+        },
+      });
+    } else if (b.dataset.a === 'close') {
+      void confirmPopup({
+        title: 'Бүртгэл хаах',
+        text: `<b>${esc(g.phone ?? g.email ?? 'Энэ зочин')}</b>-ийн бүртгэл хаагдана. Нэр, утас арилна; захиалга, гүйлгээ бүртгэлд үлдэнэ. <b>Буцаах боломжгүй.</b>`,
+        ok: 'Бүртгэл хаах',
+        danger: true,
+        reason: { label: 'Шалтгаан', placeholder: 'Зочин бичгээр хүссэн…', required: true },
+        onConfirm: async (note) => {
+          await ops(`/v1/ops/guests/${id}/close`, { method: 'POST', body: { note } });
+          toast('Бүртгэл хаагдлаа.', 'good');
+          await openGuest(id);
+        },
+      });
     }
   });
   view.append(page);
@@ -2382,16 +2470,22 @@ async function renderVenues(view) {
     actions: manage
       ? (r) => {
           const b = el(`<button class="btn${r.active ? ' ink-stop' : ''}" data-size="sm" data-v="quiet" type="button" data-a="active">${r.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>`);
-          b.addEventListener('click', async () => {
-            const note = prompt(r.active ? 'Зогсоох шалтгаан:' : 'Идэвхжүүлэх тэмдэглэл:', '');
-            if (note === null) return;
-            try {
-              await ops(`/v1/ops/dine/restaurants/${r.id}/active`, { method: 'POST', body: { active: !r.active, note } });
-              await loadVenues(table);
-            } catch (error) {
-              toast(error.message, 'bad');
-            }
-          });
+          b.addEventListener('click', () =>
+            confirmPopup({
+              title: r.active ? 'Ресторан зогсоох' : 'Ресторан идэвхжүүлэх',
+              text: r.active
+                ? `<b>${esc(r.name)}</b> зочдод харагдахаа болиж, шинэ захиалга авахгүй. Авсан захиалга хэвээр үргэлжилнэ.`
+                : `<b>${esc(r.name)}</b> дахин зочдод харагдаж, захиалга авна.`,
+              ok: r.active ? 'Зогсоох' : 'Идэвхжүүлэх',
+              danger: r.active,
+              reason: { label: r.active ? 'Шалтгаан' : 'Тэмдэглэл', placeholder: 'Бүртгэлд үлдэнэ', required: r.active },
+              onConfirm: async (note) => {
+                await ops(`/v1/ops/dine/restaurants/${r.id}/active`, { method: 'POST', body: { active: !r.active, note } });
+                toast(r.active ? 'Зогсоолоо.' : 'Идэвхжлээ.', 'good');
+                await loadVenues(table);
+              },
+            }),
+          );
           return b;
         }
       : null,
@@ -2442,16 +2536,20 @@ async function openVenue(r) {
     actions: manage
       ? (m) => {
           const b = el(`<button class="btn" data-size="sm" data-v="quiet" type="button" data-item="${m.id}">${m.active ? 'Нуух' : 'Харуулах'}</button>`);
-          b.addEventListener('click', async () => {
-            const note = prompt(m.active ? 'Нуух шалтгаан:' : 'Цэсэнд буцаах тэмдэглэл:', '');
-            if (note === null) return;
-            try {
-              await ops(`/v1/ops/dine/menu/${m.id}/active`, { method: 'POST', body: { active: !m.active, note } });
-              table.setRows((await ops(`/v1/ops/dine/restaurants/${r.id}/menu`)).items);
-            } catch (error) {
-              toast(error.message, 'bad');
-            }
-          });
+          b.addEventListener('click', () =>
+            confirmPopup({
+              title: m.active ? 'Хоолыг цэснээс нуух' : 'Хоолыг цэсэнд буцаах',
+              text: m.active ? `<b>${esc(m.name)}</b> зочдод харагдахаа болино. Авсан захиалгад нөлөөлөхгүй.` : `<b>${esc(m.name)}</b> дахин цэсэнд харагдана.`,
+              ok: m.active ? 'Нуух' : 'Цэсэнд буцаах',
+              danger: m.active,
+              reason: { label: m.active ? 'Шалтгаан' : 'Тэмдэглэл', placeholder: 'Бүртгэлд үлдэнэ', required: m.active },
+              onConfirm: async (note) => {
+                await ops(`/v1/ops/dine/menu/${m.id}/active`, { method: 'POST', body: { active: !m.active, note } });
+                toast(m.active ? 'Нуулаа.' : 'Цэсэнд буцлаа.', 'good');
+                table.setRows((await ops(`/v1/ops/dine/restaurants/${r.id}/menu`)).items);
+              },
+            }),
+          );
           return b;
         }
       : null,
@@ -2590,26 +2688,30 @@ async function openLunch(id) {
         <div class="card-head"><h3>Ops-ийн үйлдэл</h3></div>
         <div class="card-body acts">
           ${!can('desk.lunches:manage') ? '<div class="hint">Үйлдлийг ops, админ хийнэ.</div>' : DINE_FREE.includes(o.state) || ['ARMED', 'HELD', 'FIRED', 'COOKING', 'READY'].includes(o.state) ? `
-          <label class="field"><span>Тэмдэглэл</span><input id="note" placeholder="Бүртгэлд үлдэнэ"></label>
           ${DINE_FREE.includes(o.state) ? '<button class="btn" data-v="danger" type="button" data-a="cancel">Зочны өмнөөс цуцлах</button><div class="hint">Гал дээр гараагүй тул мөнгө бүтэн түрийвч рүү буцна.</div>' : '<div class="hint">Гал дээр гарсан: цуцлах боломжгүй.</div>'}
           ${['ARMED', 'HELD', 'FIRED', 'COOKING', 'READY'].includes(o.state) ? '<div class="sep"></div><button class="btn" type="button" data-a="no-show">Зочин ирээгүй гэж тэмдэглэх</button><div class="hint">Ширээ суллагдана; мөнгө буцахгүй.</div>' : ''}
           ` : `<div class="hint">${DINE_LIVE.includes(o.state) ? 'Үйлчилсэн: ops-ийн үйлдэл алга.' : 'Дууссан захиалгад үйлдэл алга.'}</div>`}
         </div>
       </div>
     </div>`);
-  page.querySelector('#acts').addEventListener('click', async (e) => {
+  page.querySelector('#acts').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-a]');
     if (!b) return;
-    const note = page.querySelector('#note')?.value.trim() ?? '';
-    if (b.dataset.a === 'cancel' && !note) return toast('Шалтгаан бичнэ үү.', 'bad');
-    if (!confirm(b.dataset.a === 'cancel' ? `№${o.code}-г цуцалж, ${mnt(o.total_mnt)}-г буцаах уу?` : `№${o.code}: зочин ирээгүй гэж тэмдэглэх үү?`)) return;
-    try {
-      await ops(`/v1/ops/dine/orders/${id}/${b.dataset.a}`, { method: 'POST', body: { note } });
-      toast(b.dataset.a === 'cancel' ? 'Цуцлагдлаа, мөнгө буцлаа.' : 'Тэмдэглэлээ.', 'good');
-      await openLunch(id);
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
+    const cancel = b.dataset.a === 'cancel';
+    void confirmPopup({
+      title: cancel ? 'Зочны өмнөөс цуцлах' : 'Зочин ирээгүй',
+      text: cancel
+        ? `№${esc(o.code)} цуцлагдаж, <b>${mnt(o.total_mnt)}</b> зочны түрийвч рүү бүтэн буцна.`
+        : `№${esc(o.code)}: зочин ирээгүй гэж тэмдэглэнэ. Ширээ суллагдана; мөнгө буцахгүй.`,
+      ok: cancel ? 'Цуцлах' : 'Тэмдэглэх',
+      danger: true,
+      reason: { label: cancel ? 'Шалтгаан' : 'Тэмдэглэл', placeholder: 'Бүртгэлд үлдэнэ', required: cancel },
+      onConfirm: async (note) => {
+        await ops(`/v1/ops/dine/orders/${id}/${b.dataset.a}`, { method: 'POST', body: { note } });
+        toast(cancel ? 'Цуцлагдлаа, мөнгө буцлаа.' : 'Тэмдэглэлээ.', 'good');
+        await openLunch(id);
+      },
+    });
   });
   view.append(page);
 }
@@ -3114,26 +3216,50 @@ async function drawSystem() {
         <tr><td>Асаасан</td><td class="num">${when(s.started_at)} ${clockOf(s.started_at)}</td></tr>
         <tr><td>Идэшний дүрэм</td><td class="end">шимтгэл ${s.rules.commission_pct}% · суутгал ${s.rules.forfeit_pct}% · ирээгүй ${s.rules.no_show_days} хоног</td></tr>
       </tbody></table></div></div></section>
-      <section class="section"><h2 class="section-label">Тохиргоо</h2><div class="card card-body" id="settings">${s.settings
-        .map((k) => `<label class="field"><span>${esc(k.label)}</span><input data-key="${k.key}" ${k.kind === 'number' ? 'type="number" min="0" step="1"' : 'type="text" maxlength="500"'} value="${esc(String(k.value))}"${can('desk.system:manage') ? '' : ' disabled'}><small>${esc(k.hint)}${k.updated_by ? ` · ${esc(k.updated_by.replace('ops:', ''))}, ${when(k.updated_at)}` : ''}</small></label>`)
-        .join('')}${can('desk.system:manage') ? '<div class="form-foot"><button class="btn" data-v="primary" type="button" id="save-settings">Хадгалах</button></div>' : '<div class="hint">Тохиргоог зөвхөн админ өөрчилнө.</div>'}</div></section>
+      <section class="section"><h2 class="section-label">Тохиргоо</h2><div class="card" data-rows id="settings">${s.settings
+        .map(
+          (k) => `
+        <div class="row" data-key="${esc(k.key)}">
+          <div class="main"><span class="title">${esc(k.label)}</span><span class="sub">${esc(k.hint)}${k.updated_by ? ` · ${esc(k.updated_by.replace('ops:', ''))}, ${when(k.updated_at)}` : ''}</span></div>
+          <div class="end setting-value">${String(k.value) === '' ? '<span class="muted">—</span>' : `<b${k.kind === 'number' ? ' class="mono"' : ''}>${esc(String(k.value))}</b>`}</div>
+        </div>`,
+        )
+        .join('')}</div>${can('desk.system:manage') ? '' : '<p class="cap" style="margin-top:10px">Тохиргоог зөвхөн админ өөрчилнө.</p>'}</section>
     </div>
   </div>`);
-  page.querySelector('#save-settings')?.addEventListener('click', async (e) => {
-    e.target.disabled = true;
-    try {
-      for (const input of page.querySelectorAll('#settings input[data-key]')) {
-        const before = s.settings.find((k) => k.key === input.dataset.key);
-        if (String(before.value) === input.value) continue;
-        await ops(`/v1/ops/system/settings/${input.dataset.key}`, { method: 'PUT', body: { value: input.value } });
-      }
-      toast('Хадгаллаа.', 'good');
-      await drawSystem();
-    } catch (error) {
-      toast(error.message, 'bad');
-      e.target.disabled = false;
-    }
-  });
+  if (can('desk.system:manage')) {
+    page.querySelector('#settings').previousElementSibling.append(
+      button(
+        'Засах',
+        () =>
+          popup({
+            title: 'Тохиргоо',
+            sub: 'Өөрчилсөн утга шууд үйлчилнэ; хэн, хэзээ өөрчилсөн нь үлдэнэ.',
+            width: 600,
+            id: 'settings-edit',
+            fields: s.settings.map((k) => ({
+              name: k.key,
+              label: k.label,
+              type: k.kind === 'number' ? 'number' : 'text',
+              value: String(k.value),
+              hint: esc(k.hint),
+              wide: true,
+            })),
+            onSubmit: async (v) => {
+              let changed = 0;
+              for (const k of s.settings) {
+                if (String(k.value) === v[k.key]) continue;
+                await ops(`/v1/ops/system/settings/${k.key}`, { method: 'PUT', body: { value: v[k.key] } });
+                changed += 1;
+              }
+              toast(changed ? 'Хадгаллаа.' : 'Өөрчлөлт алга.', 'good');
+              await drawSystem();
+            },
+          }),
+        'data-size="sm" id="edit-settings"',
+      ),
+    );
+  }
   box.replaceChildren(page);
 }
 
@@ -3317,12 +3443,10 @@ async function openOrder(id) {
         <div class="card-head"><h3>Ops-ийн үйлдэл</h3></div>
         <div class="card-body acts">
           ${live && !can('desk.orders:manage') ? '<div class="hint">Үйлдлийг ops, админ хийнэ.</div>' : live ? `
-          <label class="field"><span>Тэмдэглэл</span><input id="note" placeholder="Бүртгэлд үлдэнэ"></label>
-          <button class="btn" type="button" data-a="resend">Мэдэгдэл дахин илгээх</button>
           ${['READY', 'DISPATCHED'].includes(o.state) ? '<button class="btn" data-v="primary" type="button" data-a="hand">Хүлээлгэн өгсөн гэж тэмдэглэх</button>' : ''}
+          <button class="btn" type="button" data-a="resend">Мэдэгдэл дахин илгээх</button>
           <div class="sep"></div>
-          <label class="field"><span>Нийлүүлэгчийн өмнөөс цуцлах</span><select id="reason"><option value="">Шалтгаан сонгох…</option>${Object.entries(REASON).filter(([k]) => k !== 'draft_expired').map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>
-          <button class="btn" data-v="danger" type="button" data-a="cancel" disabled>Цуцлах</button>
+          <button class="btn" data-v="danger" type="button" data-a="cancel">Нийлүүлэгчийн өмнөөс цуцлах</button>
           <div class="hint">Буцаалтын дүнг шалтгаан ба дүрэм тогтооно; хүн сонгохгүй.</div>
           ` : '<div class="hint">Дууссан захиалгад үйлдэл алга.</div>'}
         </div>
@@ -3332,25 +3456,48 @@ async function openOrder(id) {
   if (d.settlements.length) moneyBox.append(settlementTable(d.settlements, false).el);
   else moneyBox.append(el('<div class="card empty">Тооцоо үүсээгүй — хүлээлгэн өгснөөс хойш нэг хоногт үүснэ.</div>'));
   const acts = page.querySelector('#acts');
-  const reason = acts.querySelector('#reason');
-  reason?.addEventListener('change', () => (acts.querySelector('[data-a="cancel"]').disabled = !reason.value));
-  acts.addEventListener('click', async (e) => {
+  const done = async () => {
+    await refresh();
+    await openOrder(id);
+  };
+  const ASK = {
+    hand: { title: 'Хүлээлгэн өгсөн', text: `№${esc(o.code)}-г зочинд хүлээлгэн өгсөн гэж тэмдэглэнэ. Нийлүүлэгчийн олголт нэг хоногийн дараа үүснэ.`, ok: 'Тэмдэглэх' },
+    resend: { title: 'Мэдэгдэл дахин илгээх', text: `№${esc(o.code)}-ийн сүүлийн мэдэгдлийг зочинд дахин илгээнэ.`, ok: 'Илгээх' },
+  };
+  acts.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-a]');
     if (!b) return;
     const action = b.dataset.a;
-    const body = { note: acts.querySelector('#note')?.value ?? '' };
-    if (action === 'cancel') body.reason = reason.value;
-    if (action === 'cancel' && !confirm(`№${o.code}-г «${REASON[reason.value]}» шалтгаанаар цуцлах уу? Буцаалтыг дүрэм тогтооно.`)) return;
-    b.disabled = true;
-    try {
-      await ops(`/v1/ops/orders/${id}/${action}`, { method: 'POST', body });
-      toast('Болсон, бүртгэгдлээ.');
-      await refresh();
-      await openOrder(id);
-    } catch (error) {
-      toast(error.message, 'bad');
-      b.disabled = false;
+    if (action === 'cancel') {
+      void popup({
+        title: 'Нийлүүлэгчийн өмнөөс цуцлах',
+        sub: `№${esc(o.code)} · ${esc(o.title)} · ${mnt(o.total_mnt)}`,
+        width: 520,
+        danger: true,
+        submit: 'Цуцлах',
+        fields: [
+          { type: 'note', text: 'Буцаалтын дүнг сонгосон шалтгаан ба дүрэм тогтооно; хүн сонгохгүй.' },
+          { name: 'reason', label: 'Шалтгаан', type: 'select', required: true, wide: true, options: [['', 'Сонгох…'], ...Object.entries(REASON).filter(([k]) => k !== 'draft_expired')] },
+          { name: 'note', label: 'Тэмдэглэл', type: 'textarea', placeholder: 'Бүртгэлд үлдэнэ' },
+        ],
+        onSubmit: async (v) => {
+          await ops(`/v1/ops/orders/${id}/cancel`, { method: 'POST', body: { reason: v.reason, note: v.note } });
+          toast(`№${o.code} цуцлагдлаа.`, 'good');
+          await done();
+        },
+      });
+      return;
     }
+    const ask = ASK[action];
+    void confirmPopup({
+      ...ask,
+      reason: { label: 'Тэмдэглэл', placeholder: 'Бүртгэлд үлдэнэ (заавал биш)' },
+      onConfirm: async (note) => {
+        await ops(`/v1/ops/orders/${id}/${action}`, { method: 'POST', body: { note } });
+        toast('Болсон, бүртгэгдлээ.', 'good');
+        await done();
+      },
+    });
   });
   view.append(page);
 }
@@ -3360,53 +3507,109 @@ async function openOrder(id) {
 /** A supplier's word and tone: an application, under contract (or paused), or declined. */
 const supplierState = (s) => (s.state === 'contracted' ? (s.active ? ['contracted', 'гэрээт'] : ['off', 'түр зогссон']) : [s.state, STATE[s.state] ?? s.state]);
 
+/** Yes to an application, after one look at who it is. */
+const approveSupplier = (s, done) =>
+  confirmPopup({
+    title: 'Нийлүүлэгчийг батлах',
+    text: `<b>${esc(s.name)}</b> гэрээт нийлүүлэгч болно. Хүсэлт гаргасан хүн эзэн нь болж, өөрийн бүртгэлээр /supplier-д нэвтэрнэ — SMS очно.`,
+    ok: 'Батлах',
+    onConfirm: async () => {
+      await ops(`/v1/ops/suppliers/${s.id}/approve`, { method: 'POST', body: {} });
+      toast(`«${s.name}» батлагдлаа.`, 'good');
+      await done();
+    },
+  });
+
+/** No to an application, with the reason the applicant will read. */
+const declineSupplier = (s, done) =>
+  confirmPopup({
+    title: 'Хүсэлтийг татгалзах',
+    text: `<b>${esc(s.name)}</b>-ийн хүсэлтийг татгалзана. Шалтгааныг SMS-ээр илгээнэ; засаад дахин хүсэж болно.`,
+    ok: 'Татгалзах',
+    danger: true,
+    reason: { label: 'Шалтгаан', placeholder: 'ТТД баталгаажаагүй, хаяг тодорхойгүй…', required: true },
+    onConfirm: async (reason) => {
+      await ops(`/v1/ops/suppliers/${s.id}/decline`, { method: 'POST', body: { reason } });
+      toast('Татгалзлаа.', 'good');
+      await done();
+    },
+  });
+
+/** A supplier the desk writes in straight away: the contract is signed, the owner has a Basu account. */
+const registerSupplier = () =>
+  popup({
+    title: 'Нийлүүлэгч бүртгэх',
+    sub: 'Гэрээ байгуулсан нийлүүлэгч. Эзэмшигч нь Basu-д бүртгэлтэй байх ёстой — бүртгэмэгц өөрийн бүртгэлээр /supplier-д орно.',
+    width: 640,
+    id: 'new-supplier',
+    fields: [
+      { name: 'name', label: 'Нэр', placeholder: 'Хэнтий · «Хэрлэн» хоршоо', required: true, wide: true },
+      { name: 'phone', label: 'Утас', type: 'tel', placeholder: '+976XXXXXXXX', required: true },
+      { name: 'owner', label: 'Эзэмшигчийн Basu бүртгэл', inputmode: 'email', placeholder: 'Утас эсвэл имэйл', hint: 'Хоосон бол дээрх утас.' },
+      { name: 'address', label: 'Мах авах цэг', placeholder: 'Дүүрэг, зах, хаалга', required: true, wide: true },
+      { name: 'lat', label: 'Өргөрөг', inputmode: 'decimal', placeholder: '47.9…' },
+      { name: 'lon', label: 'Уртраг', inputmode: 'decimal', placeholder: '106.9…' },
+      { name: 'tin', label: 'ТТД', inputmode: 'numeric', placeholder: '7–10 орон' },
+      { name: 'bank_name', label: 'Банк', placeholder: 'Хаан банк' },
+      { name: 'bank_account', label: 'Данс', inputmode: 'numeric', placeholder: '5012345678' },
+      { name: 'bank_holder', label: 'Данс эзэмшигч', placeholder: 'Гэрээний нэр' },
+    ],
+    submit: 'Бүртгэх',
+    onSubmit: async (v) => {
+      const body = { name: v.name, phone: v.phone, owner: v.owner || undefined, tin: v.tin, address: v.address, bank_name: v.bank_name, bank_account: v.bank_account, bank_holder: v.bank_holder };
+      if (v.lat) body.lat = Number(v.lat);
+      if (v.lon) body.lon = Number(v.lon);
+      const { owner } = await ops('/v1/ops/suppliers', { method: 'POST', body });
+      toast(`Бүртгэгдлээ. Эзэмшигч: ${owner.name ?? owner.email ?? owner.phone} — өөрийн бүртгэлээр /supplier-д орно.`, 'good');
+      await refresh();
+    },
+  });
+
+/**
+ * The suppliers: the applications waiting for an answer — only while there
+ * are some — then everybody under contract, paused or said no to. A supplier
+ * is registered, approved, declined in a popup; a row opens its file.
+ */
 function renderSuppliers(view) {
   const applied = cache.suppliers.filter((s) => s.state === 'applied');
   const rest = cache.suppliers.filter((s) => s.state !== 'applied');
   const runs = can('desk.suppliers:manage');
-  view.append(head('Нийлүүлэгчид', `${applied.length} хүсэлт хүлээгдэж байна · ${rest.filter((s) => s.state === 'contracted').length} гэрээт. Мөр дээр дарж нөхцөл, данс, зарыг нь үзнэ.`));
+  view.append(
+    headActs(
+      head('Нийлүүлэгчид', 'Гэрээт нийлүүлэгчид ба ирсэн хүсэлтүүд. Мөр дээр дарж нөхцөл, данс, зарыг нь үзнэ.'),
+      runs && button(`${NAV_ICON.plus}Нийлүүлэгч бүртгэх`, registerSupplier, 'data-v="primary" id="add-supplier"'),
+    ),
+  );
 
-  const act = async (path, body, said) => {
-    try {
-      await ops(path, { method: 'POST', body: body ?? {} });
-      if (said) toast(said, 'good');
-      await refresh();
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
-  };
+  if (applied.length) {
+    const asked = dataTable({
+      columns: [
+        { key: 'name', label: 'Хүсэлт гаргагч', render: (s) => dtCell.two(s.name, s.about ?? '') },
+        { key: 'phone', label: 'Утас', render: (s) => dtCell.mono(s.phone) },
+        { key: 'merchant_tin', label: 'ТТД', render: (s) => dtCell.mono(s.merchant_tin), phone: false },
+        { key: 'pickup_address', label: 'Авах цэг', phone: false },
+        { key: 'applied_at', label: 'Ирсэн', render: (s) => dtCell.when(s.applied_at) },
+      ],
+      search: false,
+      actions: runs
+        ? (s) => [
+            button('Батлах', () => approveSupplier(s, refresh), 'data-v="primary" data-size="sm" data-a="approve"'),
+            button('Татгалзах', () => declineSupplier(s, refresh), 'data-v="quiet" data-size="sm" data-a="decline"'),
+          ]
+        : null,
+      sort: { key: 'applied_at', desc: true },
+      onRow: (s) => openSupplier(s.id),
+      rowAttrs: (s) => ({ 'data-supplier': s.id, 'data-state': s.state }),
+      noun: 'хүсэлт',
+      empty: { title: 'Хүлээгдэж буй хүсэлт алга', text: '' },
+      rows: applied,
+    });
+    asked.el.id = 'applied';
+    const section = el(`<section class="section"><h2 class="section-label">Хариу хүлээж буй хүсэлт · ${applied.length}</h2></section>`);
+    section.append(asked.el);
+    view.append(section);
+  }
 
-  const asked = dataTable({
-    columns: [
-      { key: 'name', label: 'Хүсэлт гаргагч', render: (s) => dtCell.two(s.name, s.about ?? '') },
-      { key: 'phone', label: 'Утас', render: (s) => dtCell.mono(s.phone) },
-      { key: 'merchant_tin', label: 'ТТД', render: (s) => dtCell.mono(s.merchant_tin), phone: false },
-      { key: 'pickup_address', label: 'Авах цэг', phone: false },
-      { key: 'applied_at', label: 'Ирсэн', render: (s) => dtCell.when(s.applied_at) },
-    ],
-    search: false,
-    actions: runs
-      ? (s) => {
-          const ok = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
-          ok.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/approve`, null, 'Батлагдлаа. Эзэн нь өөрийн бүртгэлээр /supplier-д нэвтэрнэ — SMS очно.'));
-          const no = el('<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="decline">Татгалзах</button>');
-          no.addEventListener('click', () => {
-            const reason = prompt('Шалтгаан (нийлүүлэгчид SMS-ээр очно):', '');
-            if (reason !== null) void act(`/v1/ops/suppliers/${s.id}/decline`, { reason });
-          });
-          return [ok, no];
-        }
-      : null,
-    sort: { key: 'applied_at', desc: true },
-    onRow: (s) => openSupplier(s.id),
-    rowAttrs: (s) => ({ 'data-supplier': s.id, 'data-state': s.state }),
-    noun: 'хүсэлт',
-    empty: { title: 'Хүлээгдэж буй хүсэлт алга', text: 'Нийлүүлэгч болох хүсэлт ирэхэд энд гарна.' },
-    rows: applied,
-  });
-  asked.el.id = 'applied';
-
-  const add = runs ? el(`<button class="btn" data-v="primary" data-size="sm" type="button" id="add-supplier">${NAV_ICON.plus}Бүртгэх</button>`) : null;
   const all = dataTable({
     columns: [
       { key: 'name', label: 'Нийлүүлэгч', render: (s) => dtCell.two(s.name, s.pickup_address) },
@@ -3437,43 +3640,28 @@ function renderSuppliers(view) {
         test: (s, v) => v === 'all' || (v === 'on' ? s.state === 'contracted' && s.active : v === 'off' ? s.state === 'contracted' && !s.active : s.state === v),
       },
     ],
-    tools: [add],
     sort: { key: 'name' },
     onRow: (s) => openSupplier(s.id),
     rowAttrs: (s) => ({ 'data-supplier': s.id, 'data-state': s.state }),
     noun: 'нийлүүлэгч',
-    empty: { title: 'Нийлүүлэгч алга', text: 'Гэрээ байгуулсан нийлүүлэгч бүртгэгдээгүй.' },
+    empty: { title: 'Нийлүүлэгч алга', text: 'Гэрээ байгуулсан нийлүүлэгчийг «Нийлүүлэгч бүртгэх»-ээр нэмнэ.' },
     stateKey: 'basu.dt.suppliers',
     rows: rest,
   });
   all.el.id = 'all';
-
-  view.append(
-    el('<section class="section"><h2 class="section-label">Хүсэлт</h2><div data-applied></div></section>'),
-    el('<section class="section"><h2 class="section-label">Нийлүүлэгчид</h2><div data-all></div></section>'),
-  );
-  view.querySelector('[data-applied]').replaceWith(asked.el);
-  view.querySelector('[data-all]').replaceWith(all.el);
-  if (runs) {
-    const section = el('<section class="section" id="new" hidden><h2 class="section-label">Шинэ нийлүүлэгч, гэрээтэй</h2></section>');
-    section.append(newForm());
-    view.append(section);
-    add.addEventListener('click', () => {
-      section.hidden = !section.hidden;
-      if (!section.hidden) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  }
+  const section = el(`<section class="section">${applied.length ? '<h2 class="section-label">Нийлүүлэгчид</h2>' : ''}</section>`);
+  section.append(all.el);
+  view.append(section);
 }
 
-/** One supplier, whole: who, the contract's terms, the money's account, the listings — and what ops may do. */
+/** One supplier, whole: who, the contract's terms, the money's account, the listings — and what ops may do, each in a popup. */
 async function openSupplier(id) {
   const view = document.getElementById('view');
   const s = cache.suppliers.find((x) => x.id === id);
   if (!s) return show('suppliers');
   const runs = can('desk.suppliers:manage');
   const signs = can('desk.suppliers:terms');
-  const again = async (said) => {
-    if (said) toast(said, 'good');
+  const again = async () => {
     try {
       cache.suppliers = (await ops('/v1/ops/suppliers')).suppliers;
       badges();
@@ -3482,50 +3670,39 @@ async function openSupplier(id) {
     }
     await openSupplier(id);
   };
-  const act = async (path, body, said) => {
-    try {
-      await ops(path, { method: 'POST', body: body ?? {} });
-      await again(said);
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
-  };
   view.replaceChildren();
   const back = el(`<button class="back link" type="button" id="back">${CHEV}Нийлүүлэгчид</button>`);
   back.addEventListener('click', () => show('suppliers'));
   const [tone, word] = supplierState(s);
-  view.append(back, head(`${esc(s.name)} ${dtCell.pill(tone, word)}`, `${tel(s.phone)} · ${esc(s.pickup_address)}`));
+  const h = head(`${esc(s.name)} ${dtCell.pill(tone, word)}`, `${tel(s.phone)} · ${esc(s.pickup_address)}`);
 
-  const buttons = el('<div class="detail-actions"></div>');
+  // What may be done to it: at the top right, each a popup.
   if (s.state === 'applied' && runs) {
-    const ok = el('<button class="btn" data-v="primary" type="button" data-a="approve">Батлах</button>');
-    ok.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/approve`, null, 'Батлагдлаа. Эзэн нь өөрийн бүртгэлээр /supplier-д нэвтэрнэ — SMS очно.'));
-    const no = el('<button class="btn" type="button" data-a="decline">Татгалзах</button>');
-    no.addEventListener('click', () => {
-      const reason = prompt('Шалтгаан (нийлүүлэгчид SMS-ээр очно):', '');
-      if (reason !== null) void act(`/v1/ops/suppliers/${s.id}/decline`, { reason });
-    });
-    buttons.append(ok, no);
-  }
-  if (s.state === 'contracted' && s.bank_account && !s.bank_verified && signs) {
-    // A changed account pays out nothing until somebody holds it up against the contract.
-    const check = el('<button class="btn" data-v="primary" type="button" data-a="bank-verify">Данс баталгаажуулах</button>');
-    check.addEventListener('click', () => {
-      if (!confirm(`${s.name}: ${s.bank_name} ${s.bank_account} (${s.bank_holder}) гэрээний данстай таарч байна уу?`)) return;
-      void act(`/v1/ops/suppliers/${s.id}/bank-verify`, { note: 'гэрээтэй тулгасан' }, 'Данс баталгаажлаа.');
-    });
-    buttons.append(check);
+    headActs(h, button('Татгалзах', () => declineSupplier(s, again), 'data-a="decline"'), button('Батлах', () => approveSupplier(s, again), 'data-v="primary" data-a="approve"'));
   }
   if (s.state === 'contracted' && runs) {
-    // Off the market, or back on it — with the reason kept.
-    const toggle = el(`<button class="btn${s.active ? ' ink-stop' : ''}" type="button" data-a="active">${s.active ? 'Түр зогсоох' : 'Идэвхжүүлэх'}</button>`);
-    toggle.addEventListener('click', () => {
-      const note = prompt(s.active ? 'Түр зогсоох шалтгаан (бүртгэлд үлдэнэ):' : 'Идэвхжүүлэх тэмдэглэл:', '');
-      if (note !== null) void act(`/v1/ops/suppliers/${s.id}/active`, { active: !s.active, note });
-    });
-    buttons.append(toggle);
+    headActs(
+      h,
+      button(
+        s.active ? 'Түр зогсоох' : 'Идэвхжүүлэх',
+        () =>
+          confirmPopup({
+            title: s.active ? 'Нийлүүлэгчийг түр зогсоох' : 'Нийлүүлэгчийг идэвхжүүлэх',
+            text: s.active ? `<b>${esc(s.name)}</b>-ийн зарууд зочдод харагдахаа болино. Авсан захиалга хэвээр үргэлжилнэ.` : `<b>${esc(s.name)}</b>-ийн зарууд дахин зочдод харагдана.`,
+            ok: s.active ? 'Түр зогсоох' : 'Идэвхжүүлэх',
+            danger: s.active,
+            reason: { label: s.active ? 'Шалтгаан' : 'Тэмдэглэл', placeholder: 'Бүртгэлд үлдэнэ', required: s.active },
+            onConfirm: async (note) => {
+              await ops(`/v1/ops/suppliers/${s.id}/active`, { method: 'POST', body: { active: !s.active, note } });
+              toast(s.active ? 'Түр зогсоолоо.' : 'Идэвхжлээ.', 'good');
+              await again();
+            },
+          }),
+        `data-a="active"${s.active ? '' : ' data-v="primary"'}`,
+      ),
+    );
   }
-  if (buttons.childElementCount) view.append(buttons);
+  view.append(back, h);
 
   const terms = el(`
     <section class="section"><h2 class="section-label">Гэрээ, данс</h2>
@@ -3534,45 +3711,62 @@ async function openSupplier(id) {
         <div><span class="lab">ТТД</span><b class="mono">${esc(s.merchant_tin ?? '—')}</b></div>
         <div><span class="lab">Банк</span><b>${esc(s.bank_name ?? '—')}</b></div>
         <div><span class="lab">Данс</span><b class="mono">${esc(s.bank_account ?? '—')}</b>${s.bank_account ? (s.bank_verified ? ' <span class="pill" data-s="verified">баталгаажсан</span>' : ' <span class="pill" data-s="warn">баталгаажаагүй</span>') : ''}</div>
-        <div><span class="lab">Эзэмшигч</span><b>${esc(s.bank_holder ?? '—')}</b></div>
-        <div><span class="lab">${s.state === 'applied' ? 'Хүсэлт' : s.state === 'declined' ? 'Татгалзсан' : 'Гэрээ'}</span><b>${when(s.state === 'applied' ? s.applied_at : s.state === 'declined' ? s.decided_at : s.contracted_at)}</b>${s.state === 'declined' && s.decline_reason ? `<small class="muted"> · ${esc(s.decline_reason)}</small>` : ''}</div>
+        <div><span class="lab">Данс эзэмшигч</span><b>${esc(s.bank_holder ?? '—')}</b></div>
+        <div><span class="lab">${s.state === 'applied' ? 'Хүсэлт' : s.state === 'declined' ? 'Татгалзсан' : 'Гэрээ'}</span><b>${when(s.state === 'applied' ? s.applied_at : s.state === 'declined' ? s.decided_at : s.contracted_at)}</b>${s.state === 'declined' && s.decline_reason ? `<br><small class="muted">${esc(s.decline_reason)}</small>` : ''}</div>
       </div></div>
     </section>`);
+  const label = terms.querySelector('.section-label');
+  const tools = el('<span class="label-acts"></span>');
+  if (s.state === 'contracted' && s.bank_account && !s.bank_verified && signs) {
+    // A changed account pays out nothing until somebody holds it up against the contract.
+    tools.append(
+      button(
+        'Данс баталгаажуулах',
+        () =>
+          confirmPopup({
+            title: 'Данс баталгаажуулах',
+            text: `<b>${esc(s.bank_name ?? '')} <span class="mono">${esc(s.bank_account)}</span></b> · ${esc(s.bank_holder ?? '')}<br>Гэрээний данстай таарч байна уу? Баталгаажсаны дараа олголт энэ данс руу явна.`,
+            ok: 'Таарч байна',
+            onConfirm: async () => {
+              await ops(`/v1/ops/suppliers/${s.id}/bank-verify`, { method: 'POST', body: { note: 'гэрээтэй тулгасан' } });
+              toast('Данс баталгаажлаа.', 'good');
+              await again();
+            },
+          }),
+        'data-v="primary" data-size="sm" data-a="bank-verify"',
+      ),
+    );
+  }
   if (s.state !== 'declined' && signs) {
     // The contract's terms: written in once it is signed, corrected here.
-    const edit = el('<button class="btn" data-size="sm" type="button" data-a="terms">Засах</button>');
-    terms.querySelector('.section-label').append(edit);
-    edit.addEventListener('click', () => {
-      if (terms.querySelector('.terms')) return terms.querySelector('.terms').remove();
-      const form = el(`
-        <div class="card terms" style="margin-top:12px"><div class="card-body">
-          <div class="fields">
-            <label class="field"><span>Шимтгэл, %</span><input name="commission_pct" inputmode="decimal" value="${s.commission_pct}"></label>
-            <label class="field"><span>ТТД</span><input name="tin" inputmode="numeric" value="${esc(s.merchant_tin ?? '')}" placeholder="7–14 орон"></label>
-            <label class="field"><span>Банк</span><input name="bank_name" value="${esc(s.bank_name ?? '')}"></label>
-            <label class="field"><span>Данс</span><input name="bank_account" inputmode="numeric" value="${esc(s.bank_account ?? '')}"></label>
-            <label class="field"><span>Эзэмшигч</span><input name="bank_holder" value="${esc(s.bank_holder ?? '')}"></label>
-          </div>
-          <div class="form-foot">
-            <button class="btn" data-v="quiet" type="button" data-a="close">Болих</button>
-            <button class="btn" data-v="primary" type="button" data-a="save">Хадгалах</button>
-          </div>
-        </div></div>`);
-      form.querySelector('[data-a="close"]').addEventListener('click', () => form.remove());
-      form.querySelector('[data-a="save"]').addEventListener('click', async () => {
-        const v = (name) => form.querySelector(`[name="${name}"]`).value.trim();
-        const body = { tin: v('tin'), bank_name: v('bank_name'), bank_account: v('bank_account'), bank_holder: v('bank_holder') };
-        if (v('commission_pct') !== '') body.commission_pct = Number(v('commission_pct'));
-        try {
-          await ops(`/v1/ops/suppliers/${s.id}`, { method: 'PATCH', body });
-          await again('Хадгалагдлаа.');
-        } catch (error) {
-          toast(error.message, 'bad');
-        }
-      });
-      terms.append(form);
-    });
+    tools.append(
+      button(
+        'Засах',
+        () =>
+          popup({
+            title: 'Гэрээ, данс',
+            sub: esc(s.name),
+            width: 600,
+            fields: [
+              { name: 'commission_pct', label: 'Шимтгэл, %', inputmode: 'decimal', value: s.commission_pct },
+              { name: 'tin', label: 'ТТД', inputmode: 'numeric', placeholder: '7–14 орон', value: s.merchant_tin ?? '' },
+              { name: 'bank_name', label: 'Банк', value: s.bank_name ?? '' },
+              { name: 'bank_account', label: 'Данс', inputmode: 'numeric', value: s.bank_account ?? '', hint: 'Данс өөрчлөгдвөл дахин баталгаажуулах хүртэл олголт гарахгүй.' },
+              { name: 'bank_holder', label: 'Данс эзэмшигч', value: s.bank_holder ?? '', wide: true },
+            ],
+            onSubmit: async (v) => {
+              const body = { tin: v.tin, bank_name: v.bank_name, bank_account: v.bank_account, bank_holder: v.bank_holder };
+              if (v.commission_pct !== '') body.commission_pct = Number(v.commission_pct);
+              await ops(`/v1/ops/suppliers/${s.id}`, { method: 'PATCH', body });
+              toast('Хадгалагдлаа.', 'good');
+              await again();
+            },
+          }),
+        'data-size="sm" data-a="terms"',
+      ),
+    );
   }
+  if (tools.childElementCount) label.append(tools);
   view.append(terms);
   if (s.about) view.append(el(`<section class="section"><h2 class="section-label">Тухай</h2><div class="card"><div class="card-body">${esc(s.about)}</div></div></section>`));
 
@@ -3586,15 +3780,26 @@ async function openSupplier(id) {
       ],
       search: false,
       actions: runs
-        ? (l) => {
-            if (!l.active) return null;
-            const hide = el('<button class="btn" data-v="quiet" data-size="sm" type="button">Нуух</button>');
-            hide.addEventListener('click', () => {
-              const note = prompt('Нуух шалтгаан (бүртгэлд үлдэнэ):', '');
-              if (note !== null) void act(`/v1/ops/listings/${l.id}/hide`, { note }, 'Зар нуугдлаа.');
-            });
-            return hide;
-          }
+        ? (l) =>
+            l.active
+              ? button(
+                  'Нуух',
+                  () =>
+                    confirmPopup({
+                      title: 'Зарыг нуух',
+                      text: `<b>${esc(l.title)}</b> зочдод харагдахаа болино. Авсан захиалгад нөлөөлөхгүй.`,
+                      ok: 'Нуух',
+                      danger: true,
+                      reason: { label: 'Шалтгаан', placeholder: 'Бүртгэлд үлдэнэ', required: true },
+                      onConfirm: async (note) => {
+                        await ops(`/v1/ops/listings/${l.id}/hide`, { method: 'POST', body: { note } });
+                        toast('Зар нуугдлаа.', 'good');
+                        await again();
+                      },
+                    }),
+                  'data-v="quiet" data-size="sm" data-a="hide"',
+                )
+              : null
         : null,
       rowAttrs: (l) => ({ 'data-listing': l.id }),
       noun: 'зар',
@@ -3611,51 +3816,6 @@ async function openSupplier(id) {
       listings.setRows([]);
     }
   }
-}
-
-function newForm() {
-  const form = el(`
-    <div class="card">
-      <div class="card-head"><h3>Гэрээ байгуулсан нийлүүлэгчийг бүртгэх</h3><span class="cap muted">Эзэмшигч нь Basu-д бүртгэлтэй байх ёстой — бүртгэмэгц өөрийн бүртгэлээр /supplier-д орно</span></div>
-      <div class="card-body">
-        <div class="fields">
-          <label class="field wide"><span>Нэр</span><input name="name" placeholder="Хэнтий · «Хэрлэн» хоршоо"></label>
-          <label class="field"><span>Утас</span><input name="phone" type="tel" placeholder="+976XXXXXXXX"></label>
-          <label class="field"><span>Эзэмшигчийн Basu бүртгэл</span><input name="owner" autocapitalize="none" spellcheck="false" placeholder="Утас эсвэл имэйл · хоосон бол дээрх утас"></label>
-          <label class="field"><span>ТТД</span><input name="tin" inputmode="numeric" placeholder="7–10 орон"></label>
-          <label class="field wide"><span>Авах цэг</span><input name="address" placeholder="Дүүрэг, зах, хаалга"></label>
-          <label class="field"><span>Өргөрөг</span><input name="lat" placeholder="47.9…"></label>
-          <label class="field"><span>Уртраг</span><input name="lon" placeholder="106.9…"></label>
-          <label class="field"><span>Банк</span><input name="bank_name" placeholder="Хаан банк"></label>
-          <label class="field"><span>Данс</span><input name="bank_account" inputmode="numeric" placeholder="5012345678"></label>
-          <label class="field"><span>Эзэмшигч</span><input name="bank_holder" placeholder="Гэрээний нэр"></label>
-        </div>
-        <div class="form-foot"><button class="btn" type="button" id="add">Бүртгээд код авах</button></div>
-      </div>
-    </div>`);
-  form.querySelector('#add').addEventListener('click', async () => {
-    const v = (name) => form.querySelector(`[name="${name}"]`).value.trim();
-    const body = {
-      name: v('name'),
-      phone: v('phone'),
-      owner: v('owner') || undefined,
-      tin: v('tin'),
-      address: v('address'),
-      bank_name: v('bank_name'),
-      bank_account: v('bank_account'),
-      bank_holder: v('bank_holder'),
-    };
-    if (v('lat')) body.lat = Number(v('lat'));
-    if (v('lon')) body.lon = Number(v('lon'));
-    try {
-      const { owner } = await ops('/v1/ops/suppliers', { method: 'POST', body });
-      toast(`Бүртгэгдлээ. Эзэмшигч: ${owner.name ?? owner.email ?? owner.phone} — өөрийн бүртгэлээр /supplier-д орно.`, 'good');
-      await refresh();
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
-  });
-  return form;
 }
 
 /* ── the money ── */
@@ -3729,40 +3889,43 @@ function settlementTable(rows, withFilters = true) {
     ] : [],
     actions: (t) => {
       if (t.state !== 'due' || !t.bank_verified || !can('desk.pay:approve')) return null;
-      const bank = `${t.bank_name} · ${t.bank_account} · ${t.bank_holder}`;
+      const who = t.kind === 'payout' ? t.supplier?.name ?? 'Нийлүүлэгч' : t.guest?.name ?? 'Зочин';
+      const line = `<b>${mnt(t.amount_mnt)}</b> → ${esc(who)}<br>${esc(t.bank_name ?? '')} · <span class="mono">${esc(t.bank_account ?? '')}</span> · ${esc(t.bank_holder ?? '')}<br><small class="muted">№${esc(t.order_code)} · ${t.kind === 'payout' ? 'олголт' : 'буцаалт'}</small>`;
       if (!t.approved_at) {
         // Two people, not one: releasing the money and sending it are different
         // hands, so the row only ever offers the half that is this member's.
-        const approve = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
-        approve.addEventListener('click', async () => {
-          if (!confirm(`${mnt(t.amount_mnt)} → ${bank}\nЭнэ олголтыг батлах уу? Шилжүүлэхийг өөр гишүүн хийнэ.`)) return;
-          approve.disabled = true;
-          try {
-            await ops(`/v1/ops/settlements/${t.id}/approve`, { method: 'POST', body: {} });
-            toast('Батлагдлаа. Одоо өөр гишүүн шилжүүлж тэмдэглэнэ.', 'good');
-            await refresh();
-          } catch (error) {
-            toast(error.message, 'bad');
-            approve.disabled = false;
-          }
-        });
-        return approve;
+        return button(
+          'Батлах',
+          () =>
+            confirmPopup({
+              title: t.kind === 'payout' ? 'Олголт батлах' : 'Буцаалт батлах',
+              text: `${line}<br><br>Батласны дараа шилжүүлэхийг өөр гишүүн хийнэ.`,
+              ok: 'Батлах',
+              onConfirm: async () => {
+                await ops(`/v1/ops/settlements/${t.id}/approve`, { method: 'POST', body: {} });
+                toast('Батлагдлаа. Одоо өөр гишүүн шилжүүлж тэмдэглэнэ.', 'good');
+                await refresh();
+              },
+            }),
+          'data-v="primary" data-size="sm" data-a="approve"',
+        );
       }
-      const done = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="paid">Шилжүүлсэн</button>');
-      done.addEventListener('click', async () => {
-        const reference = prompt(`${mnt(t.amount_mnt)} → ${bank}\nБанкны гүйлгээний дугаар (заавал биш):`, '');
-        if (reference === null) return;
-        done.disabled = true;
-        try {
-          await ops(`/v1/ops/settlements/${t.id}/paid`, { method: 'POST', body: { reference } });
-          toast('Тэмдэглэгдлээ, мэдэгдэл явлаа.');
-          await refresh();
-        } catch (error) {
-          toast(error.message, 'bad');
-          done.disabled = false;
-        }
-      });
-      return done;
+      return button(
+        'Шилжүүлсэн',
+        () =>
+          confirmPopup({
+            title: 'Шилжүүлсэн гэж тэмдэглэх',
+            text: `${line}<br><br>Basu-гийн банкаар шилжүүлсний дараа тэмдэглэнэ. ${t.kind === 'payout' ? 'Нийлүүлэгч' : 'Зочин'}д мэдэгдэл очно.`,
+            ok: 'Шилжүүлсэн',
+            reason: { label: 'Банкны гүйлгээний дугаар', type: 'text', placeholder: 'Заавал биш' },
+            onConfirm: async (reference) => {
+              await ops(`/v1/ops/settlements/${t.id}/paid`, { method: 'POST', body: { reference } });
+              toast('Тэмдэглэгдлээ, мэдэгдэл явлаа.', 'good');
+              await refresh();
+            },
+          }),
+        'data-v="primary" data-size="sm" data-a="paid"',
+      );
     },
     sort: { key: 'created_at', desc: true },
     rowAttrs: (t) => ({ 'data-kind': t.kind, 'data-settlement': t.id, 'data-paid': t.state === 'paid' }),
@@ -3847,7 +4010,7 @@ async function renderAudit(view) {
 
 /* ── the members ── */
 
-/** Asks for a seat, answered here: yes with a role, or no with a reason. */
+/** Asks for a seat, answered here — yes with a role, or no with a reason — and only drawn while there are some. */
 async function renderRequests(view) {
   let requests;
   try {
@@ -3858,102 +4021,160 @@ async function renderRequests(view) {
   }
   cache.requests = requests;
   badges();
+  if (!requests.length) return;
   const roles = await deskRoleList();
+  const roleName = (key) => roles.find((x) => x.key === key)?.name ?? key;
   const table = dataTable({
     columns: [
       { key: 'name', label: 'Хүсэгч', render: (r) => dtCell.two(r.name, r.contact ?? '') },
+      { key: 'role', label: 'Хүссэн эрх', value: (r) => roleName(r.role) },
       { key: 'note', label: 'Юунд хэрэгтэй', value: (r) => r.note ?? '', render: (r) => (r.note ? `<span class="dt-text">${esc(r.note)}</span>` : dtCell.none()), width: '32%' },
       { key: 'created_at', label: 'Хүссэн', render: (r) => dtCell.when(r.created_at) },
     ],
     search: false,
-    actions: (r) => {
-      const pick = el(`<select class="input dt-select" aria-label="Олгох эрх">${roles.map((x) => `<option value="${esc(x.key)}"${x.key === r.role ? ' selected' : ''} title="${esc(x.description ?? '')}">${esc(x.name)}</option>`).join('')}</select>`);
-      const ok = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Зөвшөөрөх</button>');
-      ok.addEventListener('click', async () => {
-        try {
-          const done = await ops(`/v1/ops/requests/${r.id}/approve`, { method: 'POST', body: { role: pick.value } });
-          toast(`${done.member.name}: ${roles.find((x) => x.key === done.member.role)?.name ?? done.member.role} эрх олголоо.`, 'good');
-          show('members');
-        } catch (error) {
-          toast(error.message, 'bad');
-        }
-      });
-      const no = el('<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="decline">Татгалзах</button>');
-      no.addEventListener('click', async () => {
-        const reason = prompt(`${r.name}-ийн хүсэлтийг татгалзах шалтгаан:`, '');
-        if (reason === null) return;
-        try {
-          await ops(`/v1/ops/requests/${r.id}/decline`, { method: 'POST', body: { reason: reason.trim() } });
-          toast('Татгалзлаа.');
-          show('members');
-        } catch (error) {
-          toast(error.message, 'bad');
-        }
-      });
-      return [pick, ok, no];
-    },
+    actions: (r) => [
+      button(
+        'Зөвшөөрөх',
+        () =>
+          popup({
+            title: 'Ops эрх олгох',
+            sub: `${esc(r.name)}${r.contact ? ` · <span class="mono">${esc(r.contact)}</span>` : ''}`,
+            width: 520,
+            fields: [
+              ...(r.note ? [{ type: 'static', label: 'Юунд хэрэгтэй', value: r.note }] : []),
+              { name: 'role', label: 'Олгох эрх', type: 'select', options: roles.map((x) => [x.key, x.description ? `${x.name} — ${x.description}` : x.name]), value: r.role, wide: true },
+            ],
+            submit: 'Зөвшөөрөх',
+            onSubmit: async (v) => {
+              const done = await ops(`/v1/ops/requests/${r.id}/approve`, { method: 'POST', body: { role: v.role } });
+              toast(`${done.member.name}: ${roleName(done.member.role)} эрх олголоо.`, 'good');
+              show('members');
+            },
+          }),
+        'data-v="primary" data-size="sm" data-a="approve"',
+      ),
+      button(
+        'Татгалзах',
+        () =>
+          confirmPopup({
+            title: 'Хүсэлтийг татгалзах',
+            text: `<b>${esc(r.name)}</b>-ийн ops эрхийн хүсэлтийг татгалзана. Шалтгааныг нь тэр харж, дахин хүсэж болно.`,
+            ok: 'Татгалзах',
+            danger: true,
+            reason: { label: 'Шалтгаан', placeholder: 'Заавал биш' },
+            onConfirm: async (reason) => {
+              await ops(`/v1/ops/requests/${r.id}/decline`, { method: 'POST', body: { reason } });
+              toast('Татгалзлаа.', 'good');
+              show('members');
+            },
+          }),
+        'data-v="quiet" data-size="sm" data-a="decline"',
+      ),
+    ],
     sort: { key: 'created_at', desc: true },
     rowAttrs: (r) => ({ 'data-request': r.id }),
     noun: 'хүсэлт',
-    empty: { title: 'Хүлээгдэж буй хүсэлт алга', text: 'Хүн dashboard-д нэвтэрч «Эрх хүсэх» дарахад энд гарна.' },
+    empty: { title: 'Хүлээгдэж буй хүсэлт алга', text: '' },
     rows: requests,
   });
   table.el.id = 'requests';
-  const section = el(`<section class="section"><h2 class="section-label">Эрхийн хүсэлт${requests.length ? ` · ${requests.length}` : ''}</h2></section>`);
+  const section = el(`<section class="section"><h2 class="section-label">Хариу хүлээж буй хүсэлт · ${requests.length}</h2></section>`);
   section.append(table.el);
   view.append(section);
 }
 
+/**
+ * Who is at the desk: the asks waiting for a yes, then every member with
+ * their role — changed, closed, opened again in a popup. People ask for
+ * themselves; adding somebody by their address is the rare case, at the top.
+ */
 async function renderMembers(view) {
-  view.append(head('Гишүүд', 'Хэн энэ хуудсанд орж, юу хийж болох вэ. Хүн өөрөө нэвтэрч эрх хүсдэг — та зөвшөөрнө.'));
+  const roleList = await deskRoleList();
+  const roleNames = new Map(roleList.map((r) => [r.key, r.name]));
+  const roleOptions = roleList.map((r) => [r.key, r.description ? `${r.name} — ${r.description}` : r.name]);
+  view.append(
+    headActs(
+      head('Гишүүд', 'Хэн энэ хуудсанд орж, юу хийж болох вэ. Хүн өөрөө нэвтэрч эрх хүсдэг — та зөвшөөрнө.'),
+      button(
+        `${NAV_ICON.plus}Имэйлээр нэмэх`,
+        () =>
+          popup({
+            title: 'Имэйлээр урьдчилан нэмэх',
+            sub: 'Ихэнхдээ хэрэггүй — хүн өөрөө нэвтэрч эрх хүсдэг. Имэйлийг нь мэдэж байвал энд нэмэхэд тэр хаягаар (Google эсвэл имэйл код) нэвтэрмэгц эрх нь нээгдэнэ.',
+            width: 560,
+            id: 'member-new',
+            fields: [
+              { name: 'name', label: 'Нэр', required: true },
+              { name: 'email', label: 'Имэйл', type: 'email', placeholder: 'нэр@gmail.com', required: true },
+              { name: 'role', label: 'Эрх', type: 'select', options: roleOptions, value: 'ops', wide: true },
+            ],
+            submit: 'Нэмэх',
+            onSubmit: async (v) => {
+              const added = await ops('/v1/ops/members', { method: 'POST', body: { email: v.email, name: v.name, role: v.role } });
+              toast(`${added.name} нэмэгдлээ. ${added.email} хаягаар нэвтэрмэгц эрх нь нээгдэнэ.`, 'good');
+              show('members');
+            },
+          }),
+        'id="add-member"',
+      ),
+    ),
+  );
   await renderRequests(view);
-  const roleNames = new Map((await deskRoleList()).map((r) => [r.key, r.name]));
+  if (tab !== 'members') return;
   const memberState = (m) => (!m.active ? ['off', 'хаасан'] : m.joined ? ['contracted', 'идэвхтэй'] : ['applied', 'ороогүй']);
   const table = dataTable({
     columns: [
-      { key: 'name', label: 'Нэр', render: (m) => `<b>${esc(m.name)}</b>` },
+      { key: 'name', label: 'Нэр', render: (m) => `<b>${esc(m.name)}</b>${m.id === me?.id ? ' <small class="muted">(та)</small>' : ''}` },
       {
         key: 'contact',
         label: 'Утас, имэйл',
         value: (m) => `${m.phone ?? ''} ${m.email ?? ''}`,
         render: (m) => dtCell.twoHtml(m.phone ? `<span class="mono">${esc(m.phone)}</span>` : esc(m.email ?? '—'), m.phone && m.email ? esc(m.email) : ''),
       },
-      {
-        key: 'role',
-        label: 'Эрх',
-        value: (m) => roleNames.get(m.role) ?? m.role,
-        render: (m) => {
-          // Your own role is another admin's to change.
-          if (m.id === me?.id) return esc(roleNames.get(m.role) ?? m.role);
-          const pick = el(`<select class="input dt-select" aria-label="${esc(m.name)}-ийн эрх">${[...roleNames.keys()].map((k) => `<option value="${esc(k)}"${k === m.role ? ' selected' : ''}>${esc(roleNames.get(k))}</option>`).join('')}</select>`);
-          pick.addEventListener('change', async () => {
-            try {
-              await ops(`/v1/ops/members/${m.id}/role`, { method: 'POST', body: { role: pick.value } });
-              toast(`${m.name}: ${roleNames.get(pick.value) ?? pick.value} эрхтэй боллоо.`, 'good');
-              m.role = pick.value;
-            } catch (error) {
-              pick.value = m.role;
-              toast(error.message, 'bad');
-            }
-          });
-          return pick;
-        },
-      },
+      { key: 'role', label: 'Эрх', value: (m) => roleNames.get(m.role) ?? m.role },
       { key: 'state', label: 'Төлөв', value: (m) => memberState(m)[1], render: (m) => dtCell.pill(...memberState(m)) },
     ],
     search: { placeholder: 'Нэр, утас, имэйл…' },
     actions: (m) => {
+      // Your own seat is another admin's to change.
       if (m.id === me?.id) return null;
-      const b = el(`<button class="btn" data-size="sm" type="button"${m.active ? ' data-v="quiet"' : ''}>${m.active ? 'Хаах' : 'Нээх'}</button>`);
-      b.addEventListener('click', async () => {
-        try {
-          await ops(`/v1/ops/members/${m.id}/active`, { method: 'POST', body: { active: !m.active } });
-          show('members');
-        } catch (error) {
-          toast(error.message, 'bad');
-        }
-      });
-      return b;
+      return [
+        button(
+          'Эрх солих',
+          () =>
+            popup({
+              title: 'Эрх солих',
+              sub: `${esc(m.name)} · ${esc(m.email ?? m.phone ?? '')}`,
+              width: 520,
+              fields: [{ name: 'role', label: 'Эрх', type: 'select', options: roleOptions, value: m.role, wide: true }],
+              onSubmit: async (v) => {
+                if (v.role === m.role) return true;
+                await ops(`/v1/ops/members/${m.id}/role`, { method: 'POST', body: { role: v.role } });
+                toast(`${m.name}: ${roleNames.get(v.role) ?? v.role} эрхтэй боллоо.`, 'good');
+                show('members');
+              },
+            }),
+          'data-v="quiet" data-size="sm" data-a="role"',
+        ),
+        button(
+          m.active ? 'Хаах' : 'Нээх',
+          () =>
+            confirmPopup({
+              title: m.active ? 'Гишүүнийг хаах' : 'Гишүүнийг нээх',
+              text: m.active
+                ? `<b>${esc(m.name)}</b> ops-ийн хэсэгт орохоо болино; нээлттэй нэвтрэлт нь хаагдана. Дараа нь дахин нээж болно.`
+                : `<b>${esc(m.name)}</b> ${esc(roleNames.get(m.role) ?? m.role)} эрхээрээ дахин орно.`,
+              ok: m.active ? 'Хаах' : 'Нээх',
+              danger: m.active,
+              onConfirm: async () => {
+                await ops(`/v1/ops/members/${m.id}/active`, { method: 'POST', body: { active: !m.active } });
+                toast(m.active ? `${m.name} хаагдлаа.` : `${m.name} нээгдлээ.`, 'good');
+                show('members');
+              },
+            }),
+          'data-v="quiet" data-size="sm" data-a="active"',
+        ),
+      ];
     },
     sort: { key: 'name' },
     rowAttrs: (m) => ({ 'data-member': m.id, 'data-off': !m.active }),
@@ -3961,7 +4182,7 @@ async function renderMembers(view) {
     empty: { title: 'Гишүүн алга', text: 'Хүн нэвтэрч эрх хүсэхэд дээр гарч ирнэ.' },
   });
   table.el.id = 'members';
-  const section = el('<section class="section"><h2 class="section-label">Гишүүд</h2></section>');
+  const section = el(`<section class="section">${cache.requests.length ? '<h2 class="section-label">Гишүүд</h2>' : ''}</section>`);
   section.append(table.el);
   view.append(section);
   try {
@@ -3970,27 +4191,6 @@ async function renderMembers(view) {
     toast(error.message, 'bad');
     table.setRows([]);
   }
-  const form = el(`
-    <section class="section"><h2 class="section-label">Имэйлээр урьдчилан нэмэх</h2><div class="card"><div class="card-body">
-      <p class="cap" style="margin:0 0 14px">Ихэнхдээ хэрэггүй — хүн өөрөө нэвтэрч эрх хүсдэг. Имэйлийг нь мэдэж байвал энд нэмэхэд тэр хаягаар (Google эсвэл имэйл код) нэвтэрмэгц эрх нь нээгдэнэ.</p>
-      <div class="fields">
-        <label class="field"><span>Нэр</span><input name="name" placeholder="Нэр"></label>
-        <label class="field"><span>Имэйл</span><input name="email" type="email" inputmode="email" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com"></label>
-        <label class="field"><span>Эрх</span><select name="role">${[...roleNames.keys()].map((k) => `<option value="${esc(k)}"${k === 'ops' ? ' selected' : ''}>${esc(roleNames.get(k))}</option>`).join('')}</select></label>
-      </div>
-      <div class="form-foot"><button class="btn" type="button" id="add-member">Нэмэх</button></div>
-    </div></div></section>`);
-  form.querySelector('#add-member').addEventListener('click', async () => {
-    const v = (n) => form.querySelector(`[name="${n}"]`).value.trim();
-    try {
-      const added = await ops('/v1/ops/members', { method: 'POST', body: { email: v('email'), name: v('name'), role: v('role') } });
-      toast(`${added.name} нэмэгдлээ. ${added.email} хаягаар нэвтэрмэгц эрх нь нээгдэнэ.`, 'good');
-      await show('members');
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
-  });
-  view.append(form);
   // What each role opens, before a role is handed to anybody: made and changed on the roles page.
   if (hasPage('roles')) {
     const go = el('<p class="cap" style="margin-top:20px" id="desk-roles">Үүрэг бүр ямар хуудас, үйлдэл нээхийг <a class="link" href="#desk/roles">«Үүрэг, эрх»</a> хуудсанд үүсгэж, засна.</p>');
@@ -4002,9 +4202,9 @@ async function renderMembers(view) {
     return;
   }
   try {
-    const table = await ops('/v1/access/roles?scope=desk');
+    const matrix = await ops('/v1/access/roles?scope=desk');
     if (tab !== 'members') return;
-    const roles = matrixTable(table);
+    const roles = matrixTable(matrix);
     roles.prepend(el('<h2 class="section-label">Эрх бүр юу хийдэг</h2>'));
     roles.id = 'desk-roles';
     view.append(roles);

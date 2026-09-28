@@ -853,6 +853,41 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 :root[data-modal-open]{overflow:hidden}
 .sheet[tabindex="-1"]:focus{outline:none}   /* the popup takes the focus so Esc and Tab work; the ring belongs to what is inside */
 
+/* A form or a question in a popup (api.js popup): the fields two to a row on
+   a wide screen, the answer's buttons at the right of the foot, an error said
+   over the fields rather than in a toast behind the dim. */
+.sheet.popup{background:var(--surface)}
+.popup > header h2{font-size:var(--t-title-3)}
+.popup > header .sub:empty{display:none}
+.popup > .body{padding:18px 20px 4px}
+.popup .fields{display:grid;grid-template-columns:1fr;gap:0 12px}
+@media (min-width:640px){
+  .popup .fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .popup .fields > [data-wide]{grid-column:1 / -1}
+}
+.popup .popup-error{margin:0 0 16px}
+.popup .popup-text{margin:0 0 16px;font-size:var(--t-body-lg);line-height:1.5;color:var(--ink-2)}
+.popup .popup-text b{color:var(--ink);font-weight:600}
+.popup .popup-static > div{font-size:var(--t-body-lg);color:var(--ink)}
+.popup .popup-checks{display:flex;flex-wrap:wrap;gap:4px 24px}
+.popup .popup-checks small{display:block;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}
+/* a list of boxes, each with a line under it: one to a row, hairlines between */
+.popup .popup-checks[data-list]{flex-direction:column;gap:0;border:1px solid var(--line);border-radius:var(--r-ctl)}
+.popup .popup-checks[data-list] .check{align-items:flex-start;padding:10px 14px;border-top:1px solid var(--line)}
+.popup .popup-checks[data-list] .check:first-child{border-top:0}
+.popup .popup-checks[data-list] .check input{margin-top:3px}
+/* a choice of icons: a grid of small tiles, the chosen one inked */
+.popup .popup-icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:6px}
+.popup .popup-icons label{position:relative;display:grid;place-items:center;height:40px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);cursor:pointer;color:var(--ink-2)}
+.popup .popup-icons input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.popup .popup-icons svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.popup .popup-icons label:has(input:checked){border-color:var(--ink);background:var(--ink);color:var(--surface)}
+.popup .popup-icons label:has(input:focus-visible){outline:2px solid var(--accent);outline-offset:2px}
+@media (hover:hover){.popup .popup-icons label:hover{border-color:var(--line-2);color:var(--ink)}}
+.popup > footer{flex-direction:row;justify-content:flex-end;align-items:center;gap:8px;background:var(--surface)}
+@media (max-width:719px){.popup > footer .btn{flex:1 1 0}}
+.field [aria-invalid]{border-color:var(--stop)}
+
 /* ── the ways in ──────────────────────────────────────────────────── */
 /* Google, a code by email, and the phone folded under them: one block
    (api.js signInDoors), the same on the web sheet and the supplier's door.
@@ -876,12 +911,6 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .ways .fold[data-alone]{margin-top:0;border-top:0}
 .ways .fold[data-alone] > summary{display:none}
 .ways .fold[data-alone] > .body{padding-top:0}
-
-/* The ways back into an account (api.js accountWays): two rows, and the
-   one form that opens under a row in place of its button. */
-.account-ways .account-form .btn[data-go]{width:100%}
-.account-ways .account-form [data-code]{margin:0 0 12px}
-.account-ways .account-form .cap{margin:-4px 0 14px}
 
 /* ── toast ────────────────────────────────────────────────────────── */
 /* Ink on the ground; bad is stop on its own text. Pages with a bottom bar

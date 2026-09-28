@@ -241,6 +241,23 @@ function clickText(dom: JSDOM, selector: string, label: string): void {
   (target as HTMLElement).click();
 }
 
+/**
+ * Answer the popup on top, as a person does: wait for it (and for the fields
+ * named, when a second step draws them), type into them, press its button.
+ */
+async function answerPopup(dom: JSDOM, values: Record<string, string> = {}): Promise<void> {
+  const top = () => [...dom.window.document.querySelectorAll('.sheet.popup[data-open]')].pop() as HTMLElement | undefined;
+  await until(dom, `a popup with ${Object.keys(values).join(', ') || 'its button'}`, () => {
+    const sheet = top();
+    return Boolean(sheet) && Object.keys(values).every((name) => Boolean(sheet!.querySelector(`[name="${name}"]`)));
+  });
+  const sheet = top()!;
+  for (const [name, value] of Object.entries(values)) {
+    (sheet.querySelector(`[name="${name}"]`) as HTMLInputElement | HTMLSelectElement).value = value;
+  }
+  (sheet.querySelector('[data-submit]') as HTMLElement).click();
+}
+
 beforeAll(async () => {
   clock = new DemoClock();
   clock.setTo('11:40');
@@ -1150,12 +1167,12 @@ describe('өвлийн идэш', () => {
     // Two people, not one: the row offers only «Батлах» until somebody has
     // released it, and only then the button that says the money moved.
     expect(line()!.querySelector('[data-a="paid"]')).toBeNull();
-    desk.window.confirm = () => true;
     (line()!.querySelector('[data-a="approve"]') as HTMLElement).click();
+    await answerPopup(desk);
     await until(desk, 'the line to be released', () => Boolean(line()?.querySelector('[data-a="paid"]')));
     expect(line()!.textContent).toContain('баталсан');
-    desk.window.prompt = () => 'KB-2026-001';
     (line()!.querySelector('[data-a="paid"]') as HTMLElement).click();
+    await answerPopup(desk, { reason: 'KB-2026-001' });
     await until(desk, 'the line to be paid', () => line()?.hasAttribute('data-paid') ?? false);
     expect(line()!.textContent).toContain('KB-2026-001');
 
@@ -1283,6 +1300,7 @@ describe('нийлүүлэгч болох', () => {
     // The proved phone travels with the application, so ops can ring.
     expect(row.textContent).toContain('+97688010011');
     (row.querySelector('[data-a="approve"]') as HTMLElement).click();
+    await answerPopup(desk);
     await until(desk, 'the row to move', (d) =>
       [...d.querySelectorAll('#all tr[data-state="contracted"]')].some((r) =>
         r.textContent?.includes('Түмэн-Өлзий'),
@@ -1425,10 +1443,11 @@ describe('нийлүүлэгч болох', () => {
     await opsTab(desk, 'system');
     await until(desk, 'the machine', (d) => d.querySelectorAll('#integrations [data-integration]').length === 4);
     expect(doc.querySelector('#integrations .kpi')?.textContent).toContain('Scheduler');
-    expect(doc.querySelector('#settings input[data-key="desk_banner"]')).not.toBeNull();
-    const banner = doc.querySelector('#settings input[data-key="desk_banner"]') as HTMLInputElement;
-    banner.value = 'Маргааш ажиллахгүй';
-    (doc.querySelector('#save-settings') as HTMLElement).click();
+    // Read on the page; changed in a popup.
+    expect(doc.querySelector('#settings [data-key="desk_banner"]')).not.toBeNull();
+    expect(doc.querySelector('#settings input')).toBeNull();
+    (doc.querySelector('#edit-settings') as HTMLElement).click();
+    await answerPopup(desk, { desk_banner: 'Маргааш ажиллахгүй' });
     await until(desk, 'the knob turned', (d) => d.querySelector('#settings')?.textContent?.includes('Демо') ?? false);
 
     // The front page carries the word to everyone at the desk.
@@ -1505,11 +1524,10 @@ describe('who sees what', () => {
     // A restaurant: a menu, and no stall.
     expect(tabs(dash)).toEqual(expect.arrayContaining(['dine.orders', 'dine.menu', 'dine.kitchen', 'team', 'log']));
     expect(tabs(dash).some((t) => t?.startsWith('idesh.'))).toBe(false);
-    (doc.querySelector('[name="contact"]') as HTMLInputElement).value = '88030013';
-    (doc.querySelector('[data-find]') as HTMLElement).click();
-    await until(dash, 'the person found', (d) => Boolean(d.querySelector('[data-add-go]')));
-    (doc.querySelector('[data-found] select') as HTMLSelectElement).value = 'accountant';
-    (doc.querySelector('[data-add-go]') as HTMLElement).click();
+    // Two steps of one popup: the person by what they sign in with, then the role.
+    (doc.querySelector('#team-add') as HTMLElement).click();
+    await answerPopup(dash, { contact: '88030013' });
+    await answerPopup(dash, { role: 'accountant' });
     await until(dash, 'the new member', (d) => d.querySelectorAll('tr[data-member]').length === 2);
     expect(doc.querySelector('[data-members]')?.textContent).toContain('Туяа');
 
@@ -1612,13 +1630,16 @@ describe('Basu decides who may do what', () => {
     await opsTab(desk, 'menus');
     await until(desk, 'the menu', (d) => d.querySelectorAll('#menu-board .menu-mod').length >= 6);
     const doc = desk.window.document;
-    (doc.querySelector('.menu-mod[data-module="platform"] .menu-mod-head [name="name"]') as HTMLInputElement).value = 'Үндсэн үйлчилгээ';
-    const shown = doc.querySelector('.menu-page[data-page="reviews"] [name="shown"]') as HTMLInputElement;
-    shown.checked = false;
-    shown.dispatchEvent(new desk.window.Event('change', { bubbles: true }));
-    (doc.querySelector('#save-menu') as HTMLElement).click();
+    // The page is read; each change is a popup, saved as it closes.
+    expect(doc.querySelector('#menu-board input')).toBeNull();
+    (doc.querySelector('.menu-mod[data-module="platform"] [data-edit-mod]') as HTMLElement).click();
+    await answerPopup(desk, { name: 'Үндсэн үйлчилгээ' });
     await until(desk, 'the sidebar renamed', (d) => d.querySelector('.nav-mod[data-group="platform"] .mod .t')?.textContent === 'Үндсэн үйлчилгээ');
-    expect(doc.querySelector('.tabs [data-tab="reviews"]')).toBeNull();
+    await until(desk, 'the menu again', (d) => Boolean(d.querySelector('.menu-page[data-page="reviews"] [data-edit-page]')));
+    (doc.querySelector('.menu-page[data-page="reviews"] [data-edit-page]') as HTMLElement).click();
+    await answerPopup(desk, { shown: '0' });
+    await until(desk, 'the page gone from the sidebar', (d) => !d.querySelector('.tabs [data-tab="reviews"]'));
+    expect(doc.querySelector('.menu-page[data-page="reviews"]')?.hasAttribute('data-off')).toBe(true);
     // Put it back for whoever comes next.
     await fetch(`${base}/v1/ops/menus/desk`, {
       method: 'PUT',
@@ -1644,9 +1665,8 @@ describe('Basu decides who may do what', () => {
     const row = [...desk.window.document.querySelectorAll('#orgs tr[data-org]')].find((r) => r.textContent?.includes('Эрхийн мах · тест'))!;
     (row.querySelector('[data-a="access"]') as HTMLElement).click();
     await until(desk, 'its people', (d) => d.querySelectorAll('[data-people] tr[data-member]').length === 2);
-    const select = desk.window.document.querySelector(`[data-people] tr[data-member="${found.guest_id}"] select`) as HTMLSelectElement;
-    select.value = 'accountant';
-    select.dispatchEvent(new desk.window.Event('change', { bubbles: true }));
+    (desk.window.document.querySelector(`[data-people] tr[data-member="${found.guest_id}"] [data-a="role"]`) as HTMLElement).click();
+    await answerPopup(desk, { role: 'accountant' });
     await until(desk, 'the role saved', (d) => (d.getElementById('toast')?.textContent ?? '').includes('Нягтлан'));
     const now = (await (await fetch(`${base}/v1/orgs/${made.id}`, { headers: as(owner) })).json()) as { members: Array<{ guest_id: string; role: string }> };
     expect(now.members.find((m) => m.guest_id === found.guest_id)?.role).toBe('accountant');

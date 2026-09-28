@@ -99,6 +99,7 @@ export function matrix(scope: Scope, layout: Layout, roles: Role[], only?: Set<s
       name: p.name,
       icon: p.icon,
       hidden: p.hidden,
+      sort: p.sort,
       link: p.href,
       kind: specs.get(p.key)?.kind ?? null,
       permission: `${scope}.${p.key}`,

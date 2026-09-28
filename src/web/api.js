@@ -586,108 +586,308 @@ export function accountWays({ token }) {
     $('[data-email-sub]').textContent = me.email ?? 'Холбоогүй. Нууц үгээ мартвал энэ хаягаар сэргээнэ.';
     $('[data-open="email"]').hidden = Boolean(me.email);
 
-    /** One small form under a row, in place of its button. */
-    const openForm = (row, html) => {
-      box.querySelector('.account-form')?.remove();
-      for (const b of box.querySelectorAll('[data-open]')) b.disabled = false;
-      const form = document.createElement('div');
-      form.className = 'card-body account-form';
-      form.innerHTML = html;
-      row.after(form);
-      row.querySelector('[data-open]').disabled = true;
-      form.querySelector('input')?.focus();
-      return form;
-    };
-
+    // An address: typed, a code sent to it, the code typed back — two steps of one popup.
     $('[data-open="email"]').addEventListener('click', () => {
-      const form = openForm(
-        $('[data-row="email"]'),
-        `<label class="field"><span>Имэйл хаяг</span><input name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com"></label>
-        ${me.has_password ? '<label class="field"><span>Одоогийн нууц үг</span><input name="current" type="password" autocomplete="current-password"></label>' : ''}
-        <div data-code hidden><input name="code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" aria-label="Имэйлд ирсэн код"></div>
-        <p class="cap" data-say>Хаяг руу 6 оронтой код илгээнэ.</p>
-        <button class="btn" data-v="primary" type="button" data-go>Код авах</button>`,
-      );
-      const field = (name) => form.querySelector(`[name="${name}"]`);
-      const go = form.querySelector('[data-go]');
       let sentTo = null;
-      const run = async () => {
-        if (go.hasAttribute('data-busy')) return;
-        go.setAttribute('data-busy', '');
-        try {
+      const first = [
+        { name: 'email', label: 'Имэйл хаяг', type: 'email', autocomplete: 'email', placeholder: 'нэр@gmail.com', required: true, wide: true },
+        ...(me.has_password ? [{ name: 'current', label: 'Одоогийн нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true }] : []),
+      ];
+      void popup({
+        title: 'Имэйл холбох',
+        sub: 'Нууц үгээ мартвал энэ хаягаар сэргээнэ. Хаяг руу 6 оронтой код илгээнэ.',
+        fields: first,
+        submit: 'Код авах',
+        width: 480,
+        onSubmit: async (v, { step }) => {
           if (!sentTo) {
-            const email = field('email').value.trim();
-            if (!email) return field('email').focus();
-            await api('/v1/me/email/code', { method: 'POST', token, body: { email, password: field('current')?.value || undefined } });
-            sentTo = email;
-            form.querySelector('[data-code]').hidden = false;
-            form.querySelector('[data-say]').textContent = `${email} хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Spam хавтсаа шалгаарай.`;
-            go.textContent = 'Баталгаажуулах';
-            field('code').focus();
-            return;
+            await api('/v1/me/email/code', { method: 'POST', token, body: { email: v.email, password: v.current || undefined } });
+            sentTo = v.email;
+            step({
+              sub: `<b>${popupEsc(sentTo)}</b> хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Spam хавтсаа шалгаарай.`,
+              fields: [{ name: 'code', label: 'Имэйлд ирсэн код', inputmode: 'numeric', autocomplete: 'one-time-code', placeholder: '······', required: true, wide: true }],
+              submit: 'Баталгаажуулах',
+            });
+            return false;
           }
-          const code = field('code').value.replace(/\D/g, '');
-          if (code.length !== 6) return field('code').focus();
+          const code = v.code.replace(/\D/g, '');
+          if (code.length !== 6) throw new Error('Код 6 оронтой.');
           await api('/v1/me/email', { method: 'POST', token, body: { email: sentTo, code } });
           toast('Имэйл холбогдлоо.', 'good');
           await draw();
-        } catch (error) {
-          toast(error.message, 'bad');
-        } finally {
-          go.removeAttribute('data-busy');
-        }
-      };
-      go.addEventListener('click', run);
-      for (const input of form.querySelectorAll('input')) input.addEventListener('keydown', (e) => e.key === 'Enter' && run());
-      field('code').addEventListener('input', () => field('code').value.replace(/\D/g, '').length === 6 && run());
-      // Another address after the code went is a new start.
-      field('email').addEventListener('input', () => {
-        if (sentTo && field('email').value.trim() !== sentTo) {
-          sentTo = null;
-          form.querySelector('[data-code]').hidden = true;
-          go.textContent = 'Код авах';
-        }
+        },
       });
     });
 
     $('[data-open="password"]').addEventListener('click', () => {
-      const form = openForm(
-        $('[data-row="password"]'),
-        `${me.has_password ? '<label class="field"><span>Одоогийн нууц үг</span><input name="current" type="password" autocomplete="current-password"></label>' : ''}
-        <label class="field"><span>Шинэ нууц үг</span><input name="next" type="password" autocomplete="new-password" placeholder="Дор хаяж 8 тэмдэгт"></label>
-        <p class="cap">Бусад төхөөрөмж дээрх нэвтрэлт хаагдана, энэ хэвээр үлдэнэ.</p>
-        <button class="btn" data-v="primary" type="button" data-go>Хадгалах</button>`,
-      );
-      const go = form.querySelector('[data-go]');
-      const run = async () => {
-        if (go.hasAttribute('data-busy')) return;
-        const next = form.querySelector('[name="next"]').value;
-        if (next.length < 8) {
-          toast('Нууц үг дор хаяж 8 тэмдэгт байх ёстой.', 'bad');
-          return form.querySelector('[name="next"]').focus();
-        }
-        go.setAttribute('data-busy', '');
-        try {
-          const { revoked } = await api('/v1/me/password', {
-            method: 'POST',
-            token,
-            body: { current: form.querySelector('[name="current"]')?.value ?? '', next },
-          });
+      void popup({
+        title: me.has_password ? 'Нууц үг солих' : 'Нууц үг тохируулах',
+        sub: 'Бусад төхөөрөмж дээрх нэвтрэлт хаагдана, энэ хэвээр үлдэнэ.',
+        width: 480,
+        fields: [
+          ...(me.has_password ? [{ name: 'current', label: 'Одоогийн нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true }] : []),
+          { name: 'next', label: 'Шинэ нууц үг', type: 'password', autocomplete: 'new-password', placeholder: 'Дор хаяж 8 тэмдэгт', required: true, wide: true },
+        ],
+        onSubmit: async (v) => {
+          if (v.next.length < 8) throw new Error('Нууц үг дор хаяж 8 тэмдэгт байх ёстой.');
+          const { revoked } = await api('/v1/me/password', { method: 'POST', token, body: { current: v.current ?? '', next: v.next } });
           toast(revoked ? `Нууц үг хадгалагдлаа. Өөр ${revoked} төхөөрөмжөөс гаргалаа.` : 'Нууц үг хадгалагдлаа.', 'good');
           await draw();
-        } catch (error) {
-          toast(error.message, 'bad');
-        } finally {
-          go.removeAttribute('data-busy');
-        }
-      };
-      go.addEventListener('click', run);
-      for (const input of form.querySelectorAll('input')) input.addEventListener('keydown', (e) => e.key === 'Enter' && run());
+        },
+      });
     });
   };
 
   box.ready = draw();
   return box;
+}
+
+/* ── popups ────────────────────────────────────────────────────────── */
+
+let popupSeq = 0;
+const popupEsc = (value) =>
+  String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+const POPUP_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+
+/** One field of a popup's form, as the design system draws a field. */
+function popupField(f, n) {
+  const id = `popup-${n}-${f.name ?? Math.random().toString(36).slice(2)}`;
+  const wide = f.wide || ['textarea', 'checks', 'icons', 'static', 'note'].includes(f.type) ? ' data-wide' : '';
+  const hint = f.hint ? `<small>${f.hint}</small>` : '';
+  const req = f.required ? ' required' : '';
+  if (f.type === 'note') return `<p class="popup-text"${wide}>${f.html ?? popupEsc(f.text)}</p>`;
+  if (f.type === 'static') return `<div class="field popup-static"${wide}><span>${popupEsc(f.label)}</span><div>${f.html ?? popupEsc(f.value)}</div></div>`;
+  if (f.type === 'checks') {
+    // [name, word, on, { disabled, hint }] — a box that is fixed stays drawn, greyed, and is not sent.
+    return `<div class="field"${wide}><span>${popupEsc(f.label)}</span><div class="popup-checks"${f.list ? ' data-list' : ''}>${f.options
+      .map(
+        ([name, word, on, more = {}]) =>
+          `<label class="check"><input type="checkbox" name="${popupEsc(name)}"${on ? ' checked' : ''}${more.disabled ? ' disabled' : ''}> <span>${popupEsc(word)}${
+            more.hint ? `<small>${popupEsc(more.hint)}</small>` : ''
+          }</span></label>`,
+      )
+      .join('')}</div>${hint}</div>`;
+  }
+  if (f.type === 'icons') {
+    // A choice of pictures: [key, svg, word], one of them chosen.
+    return `<div class="field"${wide} role="radiogroup" aria-label="${popupEsc(f.label)}"><span>${popupEsc(f.label)}</span><div class="popup-icons">${f.options
+      .map(
+        ([key, svg, word]) =>
+          `<label title="${popupEsc(word)}"><input type="radio" name="${popupEsc(f.name)}" value="${popupEsc(key)}"${key === f.value ? ' checked' : ''} aria-label="${popupEsc(word)}">${svg}</label>`,
+      )
+      .join('')}</div>${hint}</div>`;
+  }
+  if (f.type === 'select') {
+    return `<label class="field"${wide} for="${id}"><span>${popupEsc(f.label)}</span><select id="${id}" name="${popupEsc(f.name)}"${req}>${f.options
+      .map(([v, w]) => `<option value="${popupEsc(v)}"${String(v) === String(f.value ?? '') ? ' selected' : ''}>${popupEsc(w)}</option>`)
+      .join('')}</select>${hint}</label>`;
+  }
+  if (f.type === 'textarea') {
+    return `<label class="field"${wide} for="${id}"><span>${popupEsc(f.label)}</span><textarea id="${id}" name="${popupEsc(f.name)}" placeholder="${popupEsc(f.placeholder ?? '')}"${req}>${popupEsc(f.value ?? '')}</textarea>${hint}</label>`;
+  }
+  const attrs = [
+    `type="${f.type ?? 'text'}"`,
+    f.inputmode ? `inputmode="${f.inputmode}"` : '',
+    f.autocomplete ? `autocomplete="${f.autocomplete}"` : '',
+    f.type === 'email' || f.inputmode === 'email' ? 'autocapitalize="none" spellcheck="false"' : '',
+  ].filter(Boolean).join(' ');
+  return `<label class="field"${wide} for="${id}"><span>${popupEsc(f.label)}</span><input id="${id}" name="${popupEsc(f.name)}" ${attrs} value="${popupEsc(f.value ?? '')}" placeholder="${popupEsc(f.placeholder ?? '')}"${req}>${hint}</label>`;
+}
+
+/**
+ * A popup over the page: the one place a thing is added, changed, or said no
+ * to. On top its title and what it is about; in the middle the fields; at the
+ * foot «Болих» and the one button that does it. It closes on its cross, on
+ * Esc and on the dim around it, keeps the keyboard inside while it is open,
+ * and gives the focus back to whatever opened it. On a phone it is a sheet
+ * from the bottom.
+ *
+ * `fields` draw the form — { name, label, type: text | email | tel | number |
+ * date | textarea | select | checks | static | note, value, placeholder,
+ * options, required, hint, wide, inputmode, autocomplete }. `onSubmit(values,
+ * popup)` does the work: what it returns closes the popup and is what the
+ * promise resolves to; `false` keeps it open (a first step done, the second
+ * drawn with `popup.step(...)`); a thrown error is said inside the popup, over
+ * the fields, and the popup stays for another try. Closed without an answer,
+ * the promise resolves to null.
+ */
+export function popup({ title, sub = '', fields = [], submit = 'Хадгалах', cancel = 'Болих', danger = false, width = 560, onSubmit = async () => true, id = null }) {
+  return new Promise((resolve) => {
+    const n = ++popupSeq;
+    const opener = document.activeElement;
+    const scrim = document.createElement('div');
+    scrim.className = 'scrim';
+    const sheet = document.createElement('div');
+    sheet.className = 'sheet popup';
+    sheet.setAttribute('data-center', '');
+    sheet.setAttribute('role', 'dialog');
+    sheet.setAttribute('aria-modal', 'true');
+    sheet.setAttribute('aria-labelledby', `popup-title-${n}`);
+    sheet.tabIndex = -1;
+    sheet.style.setProperty('--sheet-w', `${width}px`);
+    if (id) sheet.id = id;
+    sheet.innerHTML = `
+      <header><div><h2 id="popup-title-${n}"></h2><div class="sub"></div></div><button class="x" type="button" aria-label="Хаах">${POPUP_X}</button></header>
+      <form class="body" novalidate>
+        <div class="callout popup-error" data-k="warn" role="alert" hidden><span></span></div>
+        <div class="fields"></div>
+      </form>
+      <footer><button class="btn" data-v="quiet" type="button" data-cancel></button><button class="btn" type="button" data-submit></button></footer>`;
+    const $ = (selector) => sheet.querySelector(selector);
+    const errorBox = $('.popup-error');
+    const go = $('[data-submit]');
+    const say = (message) => {
+      errorBox.hidden = !message;
+      errorBox.querySelector('span').textContent = message ?? '';
+    };
+
+    /** Draw a step: the words on top, the fields, the buttons. */
+    const step = (next) => {
+      if (next.title !== undefined) $('header h2').textContent = next.title;
+      if (next.sub !== undefined) {
+        $('header .sub').innerHTML = next.sub;
+        $('header .sub').hidden = !next.sub;
+      }
+      if (next.fields) $('.fields').innerHTML = next.fields.map((f) => popupField(f, n)).join('');
+      if (next.submit !== undefined) go.textContent = next.submit;
+      if (next.danger !== undefined) go.setAttribute('data-v', next.danger ? 'danger' : 'primary');
+      say(null);
+      const first = sheet.querySelector('.fields input:not([type="checkbox"]):not([type="radio"]), .fields select, .fields textarea');
+      (first ?? go).focus?.();
+    };
+    step({ title, sub, fields, submit, danger });
+    $('[data-cancel]').textContent = cancel;
+
+    const values = () => {
+      const out = {};
+      for (const input of sheet.querySelectorAll('.fields [name]:not(:disabled)')) {
+        if (input.type === 'radio') {
+          if (input.checked) out[input.name] = input.value;
+          continue;
+        }
+        // A password is what was typed, spaces and all.
+        out[input.name] = input.type === 'checkbox' ? input.checked : input.type === 'password' ? input.value : input.value.trim();
+      }
+      return out;
+    };
+
+    let closed = false;
+    const close = (answer) => {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener('keydown', onKey, true);
+      sheet.removeAttribute('id');
+      sheet.removeAttribute('data-open');
+      scrim.removeAttribute('data-open');
+      if (!document.querySelector('.sheet[data-open]')) document.documentElement.removeAttribute('data-modal-open');
+      setTimeout(() => {
+        sheet.remove();
+        scrim.remove();
+      }, 260);
+      if (opener?.isConnected) opener.focus?.();
+      resolve(answer);
+    };
+
+    const run = async () => {
+      if (go.hasAttribute('data-busy')) return;
+      // What must be there, is — said here, before anything is sent.
+      for (const input of sheet.querySelectorAll('.fields [required]')) {
+        const empty = input.type === 'checkbox' ? !input.checked : !input.value.trim();
+        input.toggleAttribute('aria-invalid', empty);
+        if (empty) {
+          const label = input.closest('.field')?.querySelector('span')?.textContent ?? '';
+          say(`${label} хоосон байна.`);
+          input.focus();
+          return;
+        }
+      }
+      go.setAttribute('data-busy', '');
+      say(null);
+      try {
+        const answer = await onSubmit(values(), { step, el: sheet });
+        if (answer === false) return;
+        close(answer ?? true);
+      } catch (error) {
+        say(error?.message ?? 'Алдаа гарлаа.');
+      } finally {
+        go.removeAttribute('data-busy');
+      }
+    };
+
+    const onKey = (e) => {
+      if (!sheet.hasAttribute('data-open')) return;
+      // Only the popup on top answers.
+      const popups = [...document.querySelectorAll('.sheet.popup[data-open]')];
+      if (popups[popups.length - 1] !== sheet) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close(null);
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const stops = [...sheet.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])')].filter(
+        (node) => node.getClientRects().length > 0,
+      );
+      if (!stops.length) return;
+      const [first, last] = [stops[0], stops[stops.length - 1]];
+      const inside = sheet.contains(document.activeElement);
+      if (e.shiftKey && (!inside || document.activeElement === first)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (!inside || document.activeElement === last)) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    go.addEventListener('click', run);
+    $('form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      void run();
+    });
+    // Enter in a one-line field answers, as a form does; in a textarea it is a new line.
+    $('form').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'checkbox' && e.target.type !== 'radio') {
+        e.preventDefault();
+        void run();
+      }
+    });
+    $('[data-cancel]').addEventListener('click', () => close(null));
+    $('header .x').addEventListener('click', () => close(null));
+    scrim.addEventListener('click', () => close(null));
+    document.addEventListener('keydown', onKey, true);
+    document.body.append(scrim, sheet);
+    document.documentElement.setAttribute('data-modal-open', '');
+    void sheet.offsetWidth; // drawn closed once, so opening is a movement rather than a jump
+    scrim.setAttribute('data-open', '');
+    sheet.setAttribute('data-open', '');
+    const first = sheet.querySelector('.fields input:not([type="checkbox"]):not([type="radio"]), .fields select, .fields textarea');
+    (first ?? sheet).focus();
+  });
+}
+
+/**
+ * «Are you sure?» as a popup: what is about to happen, a reason to keep when
+ * the record wants one, and the button that does it — in the stop colour
+ * when it cannot be undone. Resolves to what `onConfirm(reason)` returned,
+ * or null when the person said no.
+ */
+export function confirmPopup({ title, text = '', ok = 'Тийм', cancel = 'Болих', danger = false, reason = null, onConfirm = async () => true }) {
+  const fields = [];
+  if (text) fields.push({ type: 'note', html: text });
+  if (reason) {
+    fields.push({
+      name: 'reason',
+      type: reason.type ?? 'textarea',
+      label: reason.label,
+      placeholder: reason.placeholder ?? '',
+      required: Boolean(reason.required),
+      value: reason.value ?? '',
+      options: reason.options,
+      wide: true,
+    });
+  }
+  return popup({ title, fields, submit: ok, cancel, danger, width: 480, onSubmit: (values) => onConfirm(values.reason ?? '', values) });
 }
 
 /* ── toast ─────────────────────────────────────────────────────────── */
