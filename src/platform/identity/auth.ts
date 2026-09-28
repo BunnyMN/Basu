@@ -4,6 +4,7 @@ import type { PoolClient } from 'pg';
 import { addMinutes } from '../../domain/time.js';
 import { mode } from '../../mode.js';
 import type { Ctx } from '../../ports.js';
+import { renderLetter } from '../../letter.js';
 
 /**
  * Signing in: a phone and a one-time code, an email and a code, and the sessions they open.
@@ -220,12 +221,14 @@ export async function sendEmailCode(ctx: Ctx, rawEmail: string, purpose: CodePur
         '',
         letter.unasked,
       ].join('\n'),
-      html: `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.6;color:#181916">
-<p>${letter.lead}</p>
-<p style="font-family:ui-monospace,Menlo,monospace;font-size:28px;font-weight:600;letter-spacing:.12em;margin:8px 0 16px">${code}</p>
-<p style="color:#575A53">Код ${EMAIL_CODE_TTL_MINUTES} минут хүчинтэй. Хэнд ч бүү хэлээрэй — Basu-гийн ажилтан ч танаас код асуухгүй.</p>
-<p style="color:#696C64;font-size:13px">${letter.unasked}</p>
-</div>`,
+      html: renderLetter({
+        preheader: `${letter.lead} ${code} · ${EMAIL_CODE_TTL_MINUTES} минут хүчинтэй`,
+        title: letter.subject.replace(/^Basu /, '').replace(/^./, (c) => c.toUpperCase()),
+        paragraphs: [letter.lead],
+        code,
+        note: `Код ${EMAIL_CODE_TTL_MINUTES} минут хүчинтэй. Хэнд ч бүү хэлээрэй — Basu-гийн ажилтан ч танаас код асуухгүй.`,
+        small: letter.unasked,
+      }),
     });
   } catch (error) {
     throw new AuthError('EMAIL_FAILED', `the letter did not go out: ${(error as Error).message}`);

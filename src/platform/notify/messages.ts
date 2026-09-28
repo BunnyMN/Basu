@@ -2,6 +2,7 @@ import { getPool } from '../../db/pool.js';
 import { contactsFor } from '../identity/index.js';
 import type { Ctx } from '../../ports.js';
 import { pushTokensFor } from './devices.js';
+import { actionFor, renderLetter } from '../../letter.js';
 
 /**
  * Messages are written to a table first and sent afterwards.
@@ -84,8 +85,9 @@ export async function relay(ctx: Ctx, limit = 100): Promise<number> {
     template: string;
     title: string | null;
     body: string;
+    subject_id: string | null;
   }>(
-    `SELECT id, guest_id, channel, template, title, body
+    `SELECT id, guest_id, channel, template, title, body, subject_id
        FROM notify.message
       WHERE state = 'queued'
       ORDER BY created_at
@@ -134,6 +136,12 @@ export async function relay(ctx: Ctx, limit = 100): Promise<number> {
                 to: contact.email!,
                 subject: row.title ? `Basu · ${row.title}` : 'Basu',
                 text: body,
+                html: renderLetter({
+                  preheader: body,
+                  title: row.title ?? 'Basu',
+                  paragraphs: [body],
+                  action: actionFor(row.template, row.subject_id),
+                }),
               })
             : await ctx.notifier.send({
                 channel: attempt,
