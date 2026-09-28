@@ -987,7 +987,7 @@ describe('өвлийн идэш', () => {
     expect(d.querySelectorAll('.listing').length).toBeGreaterThan(0);
 
     (d.getElementById('sign-out') as HTMLButtonElement).click();
-    await until(dom, 'signed out', () => (d.getElementById('me') as HTMLElement).hidden);
+    await until(dom, 'signed out', () => (d.getElementById('me') as HTMLElement).hidden === true);
     expect(storage.getItem('basu.guest')).toBeNull();
     // Signed out, the stalls stay open to look at.
     expect(d.querySelectorAll('.listing').length).toBeGreaterThan(0);
