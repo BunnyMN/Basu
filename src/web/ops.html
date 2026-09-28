@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#F4F3F0">
 <title>Dashboard — Basu</title>
 <link rel="stylesheet" href="/app.css">
+<script src="/vendor/table-core.js"></script>
 <style>
 /* ── The desk ──────────────────────────────────────────────────────
    Two or three people, all day, at a computer. Tokens, type, buttons,
@@ -33,16 +34,6 @@ p{margin:0}
 .add-member{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .add-member .input{width:auto;flex:1 1 220px}
 .add-member [data-found]{flex-basis:100%;font-size:var(--t-body)}
-/* an ask for a seat: who, why, and the answer on one line under it */
-.request .main{flex:1;min-width:0}
-.request .who-contact{font-weight:400;font-size:var(--t-cap);color:var(--ink-2);margin-left:6px}
-.request .cap{margin:2px 0 0}
-.req-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:12px}
-.req-actions .input{width:auto;min-width:0;height:var(--h-sm);min-height:var(--h-sm);font-size:var(--t-cap)}
-.req-actions select.input{width:240px}
-.req-actions [name="reason"]{width:200px}
-.req-actions .btn{min-height:var(--h-sm);font-size:var(--t-cap)}
-.req-actions .gap{width:12px}
 .pair-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:0 16px;align-items:start}
 /* a business's people: on a phone the address folds under the name, and the table fits */
 .table.team td .sub{display:none}
@@ -197,11 +188,7 @@ p{margin:0}
   .page{padding:var(--s-5) var(--s-5) var(--s-8)}
 }
 
-/* toolbars, tables, KPI rows */
-.card > .tools{padding:14px 20px;border-bottom:1px solid var(--line)}
-.tools > .input{width:auto;min-width:0;flex:none}
-.tools > .input.search{flex:1 1 220px}
-.tools > [data-end]{margin-left:auto}
+/* tables that are not data tables (a few facts), KPI rows */
 .card > .table-wrap{border-radius:inherit}
 .card-foot{padding:12px 20px;border-top:1px solid var(--line)}
 .table:has(tr[data-link]) th:last-child{padding-right:32px}
@@ -233,11 +220,6 @@ p{margin:0}
 .row .drawer .table th:last-child,.row .drawer .table td:last-child{padding-right:0}
 .row .code{grid-column:1 / -1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;border-radius:var(--r-ctl);background:var(--ready-soft);border:1px solid var(--ready-line);color:var(--ready);font-size:var(--t-cap)}
 .row .code b{font-size:var(--t-title-3);font-weight:600;letter-spacing:.12em;color:inherit}
-.stall-line{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:var(--t-body)}
-.stall-line + .stall-line{border-top:1px solid var(--line)}
-.stall-line span{flex:1}
-.stall-line[data-off]{color:var(--ink-3)}
-.sess-list{margin-top:8px}
 .sess{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:var(--t-body)}
 .sess small{display:block;font-size:var(--t-cap);color:var(--ink-3)}
 @media (max-width:720px){
@@ -246,7 +228,6 @@ p{margin:0}
   /* a wide table scrolls inside its wrap instead of squeezing every cell */
   .table:has(th:nth-child(4)){min-width:640px}
   .table:has(th:nth-child(4)) td:first-child,.table:has(th:nth-child(4)) .sub{white-space:nowrap}
-  .tools > .input,.tools > .seg{flex:1 1 100%;width:100%}
 }
 
 /* the overflow menu: every action stays in the DOM, one is in view */
@@ -264,6 +245,8 @@ p{margin:0}
 .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px 20px;padding:20px;font-size:var(--t-body);line-height:1.45;color:var(--ink-2)}
 .facts .lab{display:block;margin-bottom:4px}
 .facts b{font-size:var(--t-row);font-weight:600;color:var(--ink)}
+.detail-actions{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 8px}
+.section-label .btn{margin-left:auto}
 a.tel{display:inline-flex;align-items:center;gap:4px;color:var(--ink);font-weight:500}
 a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .acts{display:flex;flex-direction:column;gap:10px}
@@ -292,6 +275,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 <script type="module">
 import { api, store, toast, mnt, money, KIND, HEADLINE, dayLabel, signInDoors, accountWays, authReturn } from '/api.js';
 import { NAV_ICON, deskFrame } from '/sidenav.js';
+import { dataTable, dtCell } from '/datatable.js';
 
 const root = document.getElementById('root');
 const el = (html) => {
@@ -775,32 +759,37 @@ async function renderOrgTeam(view) {
   const options = (chosen) => giving.map((r) => `<option value="${esc(r.key)}"${r.key === chosen ? ' selected' : ''}>${esc(r.name)}</option>`).join('');
   const section = el(`
     <section class="section">
-      <div class="card"><div class="table-wrap"><table class="table team"><thead><tr><th>Нэр</th><th>Утас, имэйл</th><th>Эрх</th><th></th></tr></thead><tbody data-members></tbody></table></div></div>
+      <div data-members></div>
       <div data-add></div>
     </section>`);
-  const body = section.querySelector('[data-members]');
-  for (const m of members) {
-    const mine = m.manageable;
-    const tr = el(`
-      <tr data-member="${esc(m.guest_id)}">
-        <td><b>${esc(m.name ?? '—')}</b>${m.you ? ' <span class="meta">(та)</span>' : ''}${m.contact ? `<span class="sub mono">${esc(m.contact)}</span>` : ''}</td>
-        <td class="mono">${m.contact ? esc(m.contact) : '—'}</td>
-        <td>${mine ? `<select class="input" data-size="sm" style="width:auto" aria-label="Эрх">${options(m.role)}</select>` : esc(m.role_name)}</td>
-        <td class="num"></td>
-      </tr>`);
-    const cell = tr.lastElementChild;
-    if (mine) {
-      tr.querySelector('select').addEventListener('change', async (e) => {
-        try {
-          await ops(`/v1/orgs/${org.id}/members/${m.guest_id}`, { method: 'PATCH', body: { role: e.target.value } });
-          toast(`${m.name ?? ''}: ${e.target.selectedOptions[0]?.textContent ?? ''}`, 'good');
-        } catch (error) {
-          toast(error.message, 'bad');
-          e.target.value = m.role;
-        }
-      });
-    }
-    if (mine || m.you) {
+  const team = dataTable({
+    columns: [
+      { key: 'name', label: 'Нэр', value: (m) => m.name ?? '', render: (m) => `<b>${esc(m.name ?? '—')}</b>${m.you ? ' <small class="muted">(та)</small>' : ''}` },
+      { key: 'contact', label: 'Утас, имэйл', render: (m) => dtCell.mono(m.contact) },
+      {
+        key: 'role',
+        label: 'Эрх',
+        value: (m) => m.role_name,
+        render: (m) => {
+          if (!m.manageable) return esc(m.role_name);
+          const pick = el(`<select class="input dt-select" aria-label="Эрх">${options(m.role)}</select>`);
+          pick.addEventListener('change', async () => {
+            try {
+              await ops(`/v1/orgs/${org.id}/members/${m.guest_id}`, { method: 'PATCH', body: { role: pick.value } });
+              toast(`${m.name ?? ''}: ${pick.selectedOptions[0]?.textContent ?? ''}`, 'good');
+              m.role = pick.value;
+            } catch (error) {
+              toast(error.message, 'bad');
+              pick.value = m.role;
+            }
+          });
+          return pick;
+        },
+      },
+    ],
+    search: members.length > 8 ? { placeholder: 'Нэр, утас, имэйл…' } : false,
+    actions: (m) => {
+      if (!m.manageable && !m.you) return null;
       const out = el(`<button class="btn" data-v="quiet" data-size="sm" type="button">${m.you ? 'Гарах' : 'Хасах'}</button>`);
       out.addEventListener('click', async () => {
         if (!confirm(m.you ? `«${org.name}»-оос гарах уу?` : `${m.name ?? 'Энэ хүн'}-ийг хасах уу?`)) return;
@@ -812,10 +801,15 @@ async function renderOrgTeam(view) {
           toast(error.message, 'bad');
         }
       });
-      cell.append(out);
-    }
-    body.append(tr);
-  }
+      return out;
+    },
+    rowAttrs: (m) => ({ 'data-member': m.guest_id }),
+    noun: 'хүн',
+    empty: { title: 'Хүн алга', text: '' },
+    rows: members,
+  });
+  team.el.setAttribute('data-members', '');
+  section.querySelector('[data-members]').replaceWith(team.el);
   if (giving.length) {
     const add = el(`
       <div class="card" style="margin-top:12px"><div class="card-body">
@@ -950,12 +944,21 @@ async function renderOrgLog(view) {
     view.append(el(`<p class="empty">${esc(error.message)}</p>`));
     return;
   }
-  const list = el('<div class="card"><ul class="log rows" data-rows id="org-log"></ul></div>');
-  if (!log.length) list.firstElementChild.append(el('<li class="empty">Бүртгэл алга.</li>'));
-  for (const e of log) {
-    list.firstElementChild.append(el(`<li><span class="who">${esc(e.by ?? 'систем')}</span><span>${(LOG_WORD[e.action] ?? (() => e.action))(e)}</span><span class="when meta">${when(e.at)} ${clockOf(e.at)}</span></li>`));
-  }
-  view.append(list);
+  const table = dataTable({
+    columns: [
+      { key: 'at', label: 'Хэзээ', render: (e) => dtCell.when(e.at) },
+      { key: 'by', label: 'Хэн', value: (e) => e.by ?? 'систем' },
+      { key: 'what', label: 'Юу болсон', value: (e) => (LOG_WORD[e.action] ?? (() => e.action))(e), render: (e) => `<b>${(LOG_WORD[e.action] ?? (() => esc(e.action)))(e)}</b>`, width: '50%' },
+    ],
+    search: log.length > 8 ? { placeholder: 'Хэн, юу…' } : false,
+    sort: { key: 'at', desc: true },
+    rowAttrs: () => ({ 'data-entry': '' }),
+    noun: 'бичлэг',
+    empty: { title: 'Бүртгэл алга', text: 'Хүн нэмж, эрх өөрчлөхөд энд үлдэнэ.' },
+    rows: log,
+  });
+  table.el.id = 'org-log';
+  view.append(table.el);
 }
 
 /** A restaurant's pages, until the restaurant side is joined up: what will be here, and why it is not yet. */
@@ -974,57 +977,93 @@ function renderDineSoon(view) {
 
 async function renderOrgsDesk(view) {
   view.append(head('Байгууллагууд', 'Ресторан, нийлүүлэгчийн бүртгэл. Батлахад бүртгүүлсэн хүн нь эзэн болж, ажилтнуудаа өөрөө нэмнэ.'));
-  let orgs;
+  const decides = can('desk.orgs:decide');
+  const table = dataTable({
+    columns: [
+      { key: 'name', label: 'Байгууллага', render: (o) => dtCell.two(o.name, o.about ?? '') },
+      { key: 'kind', label: 'Төрөл', value: (o) => kinds(o).join(', ') },
+      {
+        key: 'applicant',
+        label: 'Бүртгүүлсэн',
+        value: (o) => `${o.applicant ?? ''} ${o.phone ?? ''}`,
+        render: (o) => dtCell.twoHtml(esc(o.applicant ?? '—'), o.phone && o.phone !== o.applicant ? `<span class="mono">${esc(o.phone)}</span>` : ''),
+      },
+      { key: 'tin', label: 'ТТД', render: (o) => dtCell.mono(o.tin), phone: false },
+      { key: 'members', label: 'Хүн', align: 'end', numeric: true, render: (o) => dtCell.num(o.members) },
+      { key: 'created_at', label: 'Бүртгэгдсэн', render: (o) => dtCell.when(o.created_at), phone: false },
+      {
+        key: 'state',
+        label: 'Төлөв',
+        value: (o) => (ORG_STATE[o.state] ?? ['off', o.state])[1],
+        render: (o) => dtCell.pill(...(ORG_STATE[o.state] ?? ['off', o.state])),
+      },
+    ],
+    search: { placeholder: 'Нэр, хүн, утас, ТТД…' },
+    filters: [
+      {
+        key: 'state',
+        label: 'Төлөв',
+        options: [['all', 'Бүгд'], ['applied', 'Хүлээгдэж буй'], ['active', 'Идэвхтэй'], ['declined', 'Татгалзсан']],
+        test: (o, v) => v === 'all' || o.state === v,
+      },
+      {
+        key: 'kind',
+        label: 'Төрөл',
+        kind: 'select',
+        options: [['', 'Бүх төрөл'], ['restaurant', 'Ресторан'], ['supplier', 'Нийлүүлэгч']],
+        test: (o, v) => !v || Boolean(o[v]),
+      },
+    ],
+    actions: (o) => {
+      if (o.state === 'applied' && decides) {
+        const ok = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
+        ok.addEventListener('click', async () => {
+          try {
+            await ops(`/v1/ops/orgs/${o.id}/approve`, { method: 'POST' });
+            toast(`«${o.name}» батлагдлаа.`, 'good');
+            show('orgs');
+          } catch (error) {
+            toast(error.message, 'bad');
+          }
+        });
+        const no = el('<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="decline">Татгалзах</button>');
+        no.addEventListener('click', async () => {
+          const reason = prompt(`«${o.name}»-ийг татгалзах шалтгаан:`, '');
+          if (reason === null) return;
+          try {
+            await ops(`/v1/ops/orgs/${o.id}/decline`, { method: 'POST', body: { reason: reason.trim() } });
+            toast('Татгалзлаа.');
+            show('orgs');
+          } catch (error) {
+            toast(error.message, 'bad');
+          }
+        });
+        return [ok, no];
+      }
+      if (o.state === 'active') {
+        const access = el('<button class="btn" data-size="sm" type="button" data-a="access">Үүрэг, эрх</button>');
+        access.addEventListener('click', () => openOrgAccess(o.id));
+        return access;
+      }
+      return null;
+    },
+    sort: { key: 'created_at', desc: true },
+    rowAttrs: (o) => ({ 'data-org': o.id, 'data-state': o.state }),
+    noun: 'байгууллага',
+    empty: { title: 'Бүртгэл алга', text: 'Ресторан, нийлүүлэгч бүртгүүлэхэд энд гарна.' },
+    stateKey: 'basu.dt.orgs',
+  });
+  table.el.id = 'orgs';
+  view.append(table.el);
   try {
-    ({ orgs } = await ops('/v1/ops/orgs'));
+    const { orgs } = await ops('/v1/ops/orgs');
+    cache.orgs = orgs;
+    badges();
+    table.setRows(orgs);
   } catch (error) {
-    view.append(el(`<p class="empty">${esc(error.message)}</p>`));
-    return;
+    toast(error.message, 'bad');
+    table.setRows([]);
   }
-  cache.orgs = orgs;
-  badges();
-  const list = el('<div class="card" data-rows></div>');
-  if (!orgs.length) list.append(el('<div class="empty">Бүртгэл алга.</div>'));
-  for (const o of orgs) {
-    const [tone, word] = ORG_STATE[o.state] ?? ['off', o.state];
-    const row = el(`
-      <div class="row request">
-        <div class="main">
-          <div class="title">${esc(o.name)} <span class="who-contact">${kinds(o).join(' · ')}</span></div>
-          <p class="cap">${[o.applicant && `Бүртгүүлсэн: ${esc(o.applicant)}`, o.phone && `<span class="mono">${esc(o.phone)}</span>`, o.address && esc(o.address), o.tin && `ТТД ${esc(o.tin)}`, `${o.members} хүн`].filter(Boolean).join(' · ')}</p>
-          ${o.about ? `<p class="cap">${esc(o.about)}</p>` : ''}
-          ${o.state === 'applied' && can('desk.orgs:decide') ? `<div class="req-actions">
-            <button class="btn" data-v="primary" type="button" data-a="approve">Батлах</button>
-            <span class="gap" aria-hidden="true"></span>
-            <input class="input" name="reason" placeholder="Татгалзах шалтгаан" aria-label="Татгалзах шалтгаан">
-            <button class="btn" data-v="quiet" type="button" data-a="decline">Татгалзах</button>
-          </div>` : ''}
-        </div>
-        <div class="end"><span class="pill" data-s="${tone}">${word}</span><span class="meta" style="display:block;margin-top:6px">${when(o.created_at)}</span>
-          ${o.state === 'active' ? '<button class="btn" data-size="sm" type="button" data-a="access" style="margin-top:8px">Үүрэг, эрх</button>' : ''}</div>
-      </div>`);
-    row.querySelector('[data-a="access"]')?.addEventListener('click', () => openOrgAccess(o.id));
-    row.querySelector('[data-a="approve"]')?.addEventListener('click', async () => {
-      try {
-        await ops(`/v1/ops/orgs/${o.id}/approve`, { method: 'POST' });
-        toast(`«${o.name}» батлагдлаа.`, 'good');
-        show('orgs');
-      } catch (error) {
-        toast(error.message, 'bad');
-      }
-    });
-    row.querySelector('[data-a="decline"]')?.addEventListener('click', async () => {
-      try {
-        await ops(`/v1/ops/orgs/${o.id}/decline`, { method: 'POST', body: { reason: row.querySelector('[name="reason"]').value.trim() } });
-        toast('Татгалзлаа.');
-        show('orgs');
-      } catch (error) {
-        toast(error.message, 'bad');
-      }
-    });
-    list.append(row);
-  }
-  view.append(list);
 }
 
 /* ── who may do what: the desk's roles and menu ────────────────────── */
@@ -2062,53 +2101,63 @@ const PLATFORM_WORD = { ios: 'iPhone', android: 'Android', web: 'Вэб' };
 let guestQ = '';
 
 function renderGuests(view) {
-  view.append(head('Зочид', 'Утас эсвэл нэрээр ол. Түрийвч, сесс, хоёр талын захиалга, илгээсэн мэдэгдэл — нэг хуудсанд.'));
-  view.append(el(`
-    <div class="card">
-      <div class="tools">
-        <input class="input search" type="search" id="q" placeholder="Утас, имэйл эсвэл нэр…" value="${esc(guestQ)}" autocomplete="off">
-      </div>
-      <div id="guests" class="table-wrap"></div>
-    </div>`));
-  view.querySelector('#guests').append(busy());
-  let timer;
-  view.querySelector('#q').addEventListener('input', (e) => {
-    guestQ = e.target.value;
-    clearTimeout(timer);
-    timer = setTimeout(loadGuests, 250);
+  view.append(head('Зочид', 'Утас, имэйл эсвэл нэрээр ол. Мөр дээр дарж түрийвч, сесс, захиалга, мэдэгдлийг нь нэг хуудсанд үзнэ.'));
+  const table = dataTable({
+    columns: [
+      {
+        key: 'name',
+        label: 'Зочин',
+        value: (g) => g.name ?? '',
+        render: (g) => dtCell.two(g.name ?? (g.closed_at ? 'Хаагдсан бүртгэл' : 'Нэргүй зочин'), (g.ways ?? []).map((w) => WAY_WORD[w] ?? w).join(' · ')),
+      },
+      { key: 'phone', label: 'Утас', render: (g) => dtCell.mono(g.phone) },
+      { key: 'email', label: 'Имэйл', render: (g) => (g.email ? esc(g.email) : dtCell.none()) },
+      { key: 'joined_at', label: 'Бүртгүүлсэн', render: (g) => dtCell.when(g.joined_at) },
+      {
+        key: 'state',
+        label: 'Төлөв',
+        value: (g) => (g.closed_at ? 'хаагдсан' : 'идэвхтэй'),
+        render: (g) => (g.closed_at ? dtCell.pill('off', 'хаагдсан') : dtCell.pill('contracted', 'идэвхтэй')),
+      },
+    ],
+    search: { placeholder: 'Утас, имэйл эсвэл нэр…' },
+    onSearch: (q) => {
+      guestQ = q;
+      void loadGuests(table);
+    },
+    filters: [
+      {
+        key: 'state',
+        label: 'Төлөв',
+        options: [['all', 'Бүгд'], ['open', 'Идэвхтэй'], ['closed', 'Хаагдсан']],
+        test: (g, v) => v === 'all' || (v === 'closed') === Boolean(g.closed_at),
+      },
+    ],
+    sort: { key: 'joined_at', desc: true },
+    onRow: (g) => openGuest(g.id),
+    rowAttrs: (g) => ({ 'data-guest': g.id }),
+    noun: 'зочин',
+    empty: { title: 'Зочин олдсонгүй', text: 'Утасны дор хаяж 4 орон, имэйл эсвэл нэрийн хэсгийг бич.' },
+    stateKey: 'basu.dt.guests',
   });
-  void loadGuests();
+  table.el.id = 'guests';
+  view.append(table.el);
+  const q = table.el.querySelector('.dt-search input');
+  q.id = 'q';
+  q.value = guestQ;
+  void loadGuests(table);
 }
 
-async function loadGuests() {
-  const box = document.getElementById('guests');
-  if (!box) return;
+async function loadGuests(table) {
   let data;
   try {
     data = await ops(`/v1/ops/guests?${new URLSearchParams({ q: guestQ })}`);
   } catch (error) {
-    box.replaceChildren(el(`<div class="empty">${esc(error.message)}</div>`));
+    toast(error.message, 'bad');
+    table.setRows([]);
     return;
   }
-  if (!document.getElementById('guests')) return;
-  if (!data.guests.length) {
-    box.replaceChildren(el('<div class="empty"><b>Зочин олдсонгүй</b>Утасны дор хаяж 4 орон, имэйл эсвэл нэрийн хэсгийг бич.</div>'));
-    return;
-  }
-  const table = el('<table class="table"><thead><tr><th>Зочин</th><th>Холбоо барих</th><th>Бүртгүүлсэн</th><th>Төлөв</th></tr></thead><tbody></tbody></table>');
-  const body = table.querySelector('tbody');
-  for (const g of data.guests) {
-    const tr = el(`
-      <tr data-link data-guest="${g.id}">
-        <td><b>${esc(g.name ?? (g.closed_at ? 'Хаагдсан бүртгэл' : 'Нэргүй зочин'))}</b></td>
-        <td><span class="mono">${esc(g.phone ?? '')}</span>${g.email ? `<span class="sub">${esc(g.email)}</span>` : ''}${!g.phone && !g.email ? '—' : ''}</td>
-        <td><span class="mono">${when(g.joined_at)}</span></td>
-        <td>${g.closed_at ? `<span class="pill" data-s="off">хаагдсан ${when(g.closed_at)}</span>` : '<span class="pill" data-s="contracted">идэвхтэй</span>'}</td>
-      </tr>`);
-    tr.addEventListener('click', () => openGuest(g.id));
-    body.append(tr);
-  }
-  box.replaceChildren(table);
+  table.setRows(data.guests);
 }
 
 const WAY_WORD = { phone: 'утас', email: 'имэйл', google: 'Google', apple: 'Apple' };
@@ -2142,24 +2191,10 @@ async function openGuest(id) {
             <div><div class="lab">Нэвтэрсэн</div><b>${f.sessions.length} сесс</b><br>${f.devices.length} push утас</div>
           </div>
         </div>
-        <section class="section"><h2 class="section-label">Түрийвчийн хуулга</h2><div class="card"><div class="table-wrap">
-          <table class="table"${f.wallet.lines.length ? '' : ' data-empty'}><thead><tr><th>Огноо</th><th>Юу</th><th class="num">Дүн</th></tr></thead>
-          <tbody>${f.wallet.lines
-            .map((l) => `<tr><td>${stamp(l.at)}</td><td>${LINE_WORD[l.kind] ?? l.kind}<span class="sub">${esc(l.memo ?? '')}</span></td><td class="num">${money(l.amount_mnt, l.amount_mnt > 0 ? 'credit' : undefined)}</td></tr>`)
-            .join('') || '<tr><td colspan="3" class="empty">Гүйлгээ алга.</td></tr>'}</tbody></table></div></div></section>
-        <section class="section"><h2 class="section-label">Хоолны захиалга</h2><div class="card"><div class="table-wrap">
-          <table class="table"${f.dine_orders.length ? '' : ' data-empty'}><thead><tr><th>Захиалга</th><th>Ресторан</th><th>Цаг</th><th>Төлөв</th><th class="num">Дүн</th></tr></thead>
-          <tbody>${f.dine_orders
-            .map((o) => `<tr><td><b class="mono">№${esc(o.code)}</b><span class="sub">${o.party_size} хүн</span></td><td>${esc(o.restaurant.name)}</td><td>${stamp(o.slot_starts_at)}</td><td><span class="pill" data-s="${o.state}">${DINE_WORD[o.state] ?? o.state}</span></td><td class="num">${money(o.total_mnt)}</td></tr>`)
-            .join('') || '<tr><td colspan="5" class="empty">Хоолны захиалга алга.</td></tr>'}</tbody></table></div></div></section>
-        <section class="section"><h2 class="section-label">Идэшний захиалга</h2><div class="card"><div class="table-wrap">
-          <table class="table"${f.idesh_orders.length ? '' : ' data-empty'}><thead><tr><th>Захиалга</th><th>Нийлүүлэгч</th><th>Өдөр</th><th>Төлөв</th><th class="num">Дүн</th></tr></thead>
-          <tbody id="idesh-rows">${f.idesh_orders
-            .map((o) => `<tr data-link data-order="${o.id}"><td><b class="mono">№${esc(o.code)}</b><span class="sub">${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}</span></td><td>${esc(o.supplier.name)}</td><td><span class="mono">${dayLabel(o.receive_on)}</span></td><td><span class="pill" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span></td><td class="num">${money(o.total_mnt)}</td></tr>`)
-            .join('') || '<tr><td colspan="5" class="empty">Идэшний захиалга алга.</td></tr>'}</tbody></table></div></div></section>
-        <section class="section"><h2 class="section-label">Мэдэгдэл</h2><ul class="log" data-rows>${f.messages
-          .map((m) => `<li><span class="who">${m.channel === 'sms' ? 'SMS' : 'Push'}</span><span>${esc(m.title ?? '')}<small>${esc(m.body)}</small></span><span class="when meta">${when(m.created_at)} ${clockOf(m.created_at)}${m.state === 'failed' ? ' · алдсан' : m.state === 'queued' ? ' · дараалалд' : ''}</span></li>`)
-          .join('') || '<li class="empty">Мэдэгдэл алга.</li>'}</ul></section>
+        <section class="section"><h2 class="section-label">Түрийвчийн хуулга</h2><div data-t="wallet"></div></section>
+        <section class="section"><h2 class="section-label">Хоолны захиалга</h2><div data-t="dine"></div></section>
+        <section class="section"><h2 class="section-label">Идэшний захиалга</h2><div data-t="idesh"></div></section>
+        <section class="section"><h2 class="section-label">Мэдэгдэл</h2><div data-t="messages"></div></section>
       </div>
       <div class="card" id="acts">
         <div class="card-head"><h3>Сесс ба төхөөрөмж</h3></div>
@@ -2177,10 +2212,66 @@ async function openGuest(id) {
         </div>
       </div>
     </div>`);
-  page.querySelector('#idesh-rows').addEventListener('click', (e) => {
-    const tr = e.target.closest('tr[data-order]');
-    if (tr) openOrder(tr.dataset.order);
+  const put = (key, table) => page.querySelector(`[data-t="${key}"]`).replaceWith(table.el);
+  put('wallet', dataTable({
+    columns: [
+      { key: 'at', label: 'Огноо', render: (l) => dtCell.when(l.at) },
+      { key: 'kind', label: 'Юу', value: (l) => LINE_WORD[l.kind] ?? l.kind, render: (l) => dtCell.two(LINE_WORD[l.kind] ?? l.kind, l.memo ?? '') },
+      { key: 'amount_mnt', label: 'Дүн', align: 'end', numeric: true, render: (l) => money(l.amount_mnt, l.amount_mnt > 0 ? 'credit' : undefined) },
+    ],
+    search: false,
+    sort: { key: 'at', desc: true },
+    noun: 'гүйлгээ',
+    empty: { title: 'Гүйлгээ алга', text: '' },
+    rows: f.wallet.lines,
+  }));
+  put('dine', dataTable({
+    columns: [
+      { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(`<span class="mono">№${esc(o.code)}</span>`, `${o.party_size} хүн`) },
+      { key: 'restaurant', label: 'Ресторан', value: (o) => o.restaurant.name },
+      { key: 'slot_starts_at', label: 'Цаг', render: (o) => dtCell.when(o.slot_starts_at) },
+      { key: 'state', label: 'Төлөв', value: (o) => DINE_WORD[o.state] ?? o.state, render: (o) => dtCell.pill(o.state, DINE_WORD[o.state] ?? o.state) },
+      { key: 'total_mnt', label: 'Дүн', align: 'end', numeric: true, render: (o) => dtCell.money(o.total_mnt) },
+    ],
+    search: false,
+    sort: { key: 'slot_starts_at', desc: true },
+    onRow: (o) => openLunch(o.id),
+    rowAttrs: (o) => ({ 'data-lunch': o.id }),
+    noun: 'захиалга',
+    empty: { title: 'Хоолны захиалга алга', text: '' },
+    rows: f.dine_orders,
+  }));
+  const idesh = dataTable({
+    columns: [
+      { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(`<span class="mono">№${esc(o.code)}</span>`, esc(`${o.title} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}`)) },
+      { key: 'supplier', label: 'Нийлүүлэгч', value: (o) => o.supplier.name },
+      { key: 'receive_on', label: 'Өдөр', render: (o) => `<span class="mono">${dayLabel(o.receive_on)}</span>` },
+      { key: 'state', label: 'Төлөв', value: (o) => STATE_WORD[o.state] ?? o.state, render: (o) => dtCell.pill(o.state, STATE_WORD[o.state] ?? o.state) },
+      { key: 'total_mnt', label: 'Дүн', align: 'end', numeric: true, render: (o) => dtCell.money(o.total_mnt) },
+    ],
+    search: false,
+    sort: { key: 'receive_on', desc: true },
+    onRow: (o) => openOrder(o.id),
+    rowAttrs: (o) => ({ 'data-order': o.id }),
+    noun: 'захиалга',
+    empty: { title: 'Идэшний захиалга алга', text: '' },
+    rows: f.idesh_orders,
   });
+  idesh.el.id = 'idesh-rows';
+  put('idesh', idesh);
+  put('messages', dataTable({
+    columns: [
+      { key: 'created_at', label: 'Хэзээ', render: (m) => dtCell.when(m.created_at) },
+      { key: 'channel', label: 'Суваг', value: (m) => (m.channel === 'sms' ? 'SMS' : m.channel === 'email' ? 'Имэйл' : 'Push') },
+      { key: 'title', label: 'Мэдэгдэл', value: (m) => `${m.title ?? ''} ${m.body}`, render: (m) => `<span class="dt-two"><b>${esc(m.title ?? '')}</b><small class="dt-text">${esc(m.body)}</small></span>`, width: '50%' },
+      { key: 'state', label: 'Төлөв', value: (m) => MSG_WORD[m.state] ?? m.state, render: (m) => dtCell.pill(MSG_PILL[m.state] ?? 'off', MSG_WORD[m.state] ?? m.state) },
+    ],
+    search: false,
+    sort: { key: 'created_at', desc: true },
+    noun: 'мэдэгдэл',
+    empty: { title: 'Мэдэгдэл алга', text: '' },
+    rows: f.messages,
+  }));
   page.querySelector('#acts').addEventListener('click', async (e) => {
     const b = e.target.closest('button[data-a]');
     if (!b) return;
@@ -2225,88 +2316,158 @@ const stars = (n) => `<span class="stars" aria-label="${n} од">${Array.from({ 
 let venueCache = [];
 
 async function renderVenues(view) {
-  view.append(head('Ресторан', 'Гал тогоо бүр: захиалга хүлээж байгаа эсэх, өнөөдрийн захиалга, цэс, үнэлгээ.'));
-  view.append(el('<div class="rows" id="venues" data-rows></div>'));
-  view.querySelector('#venues').append(busy());
-  await loadVenues();
+  view.append(head('Ресторан', 'Гал тогоо бүр нээлттэй эсэх, өнөөдрийн захиалга, цэс, үнэлгээ. Мөр дээр дарж цэсийг нь үзнэ.'));
+  const manage = can('desk.venues:manage');
+  const table = dataTable({
+    columns: [
+      {
+        key: 'name',
+        label: 'Ресторан',
+        render: (r) =>
+          dtCell.twoHtml(
+            esc(r.name),
+            `${r.slot_minutes} мин цаг · ${r.auto_accept ? 'автоматаар батална' : 'гараар батална'}${r.merchant_tin ? '' : ' · <b class="ink-stop">ТТД алга</b>'}`,
+          ),
+      },
+      {
+        key: 'kitchen',
+        label: 'Гал тогоо',
+        value: (r) => (r.online ? 1 : 0),
+        numeric: true,
+        render: (r) =>
+          dtCell.twoHtml(
+            r.online ? dtCell.pill('contracted', 'нээлттэй') : dtCell.pill('declined', 'хаалттай'),
+            !r.org_id ? 'байгууллагагүй' : r.kitchen_seen_at ? `сүүлд ${when(r.kitchen_seen_at)} ${clockOf(r.kitchen_seen_at)}` : 'хэзээ ч нээгээгүй',
+          ),
+      },
+      {
+        key: 'today',
+        label: 'Өнөөдөр',
+        align: 'end',
+        numeric: true,
+        value: (r) => r.today.placed,
+        render: (r) => dtCell.twoHtml(dtCell.num(r.today.placed), `${r.today.live} идэвхтэй${r.today.held ? ` · <b class="ink-hold">${r.today.held} зогссон</b>` : ''}`),
+      },
+      { key: 'sales', label: 'Борлуулалт', align: 'end', numeric: true, value: (r) => r.today.sales_mnt, render: (r) => dtCell.money(r.today.sales_mnt) },
+      {
+        key: 'menu',
+        label: 'Цэс',
+        align: 'end',
+        numeric: true,
+        value: (r) => r.menu.active,
+        render: (r) => dtCell.twoHtml(`<span class="dt-num">${r.menu.active}/${r.menu.total}</span>`, r.menu.sold_out ? `${r.menu.sold_out} дууссан` : ''),
+        phone: false,
+      },
+      {
+        key: 'rating',
+        label: 'Үнэлгээ',
+        numeric: true,
+        value: (r) => r.rating?.stars ?? null,
+        render: (r) =>
+          r.rating
+            ? dtCell.twoHtml(`${stars(Math.round(r.rating.stars))} <span class="dt-num">${r.rating.stars}</span>`, `${r.rating.count} үнэлгээ${r.rating.on_time_share === null ? '' : ` · цагтаа ${Math.round(r.rating.on_time_share * 100)}%`}`)
+            : dtCell.none(),
+      },
+      { key: 'active', label: 'Төлөв', value: (r) => (r.active ? 'идэвхтэй' : 'зогссон'), render: (r) => (r.active ? dtCell.pill('contracted', 'идэвхтэй') : dtCell.pill('off', 'зогссон')) },
+    ],
+    search: { placeholder: 'Рестораны нэр…' },
+    filters: [
+      {
+        key: 'kitchen',
+        label: 'Гал тогоо',
+        options: [['all', 'Бүгд'], ['open', 'Нээлттэй'], ['closed', 'Хаалттай']],
+        test: (r, v) => v === 'all' || (v === 'open') === Boolean(r.online),
+      },
+    ],
+    actions: manage
+      ? (r) => {
+          const b = el(`<button class="btn${r.active ? ' ink-stop' : ''}" data-size="sm" data-v="quiet" type="button" data-a="active">${r.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>`);
+          b.addEventListener('click', async () => {
+            const note = prompt(r.active ? 'Зогсоох шалтгаан:' : 'Идэвхжүүлэх тэмдэглэл:', '');
+            if (note === null) return;
+            try {
+              await ops(`/v1/ops/dine/restaurants/${r.id}/active`, { method: 'POST', body: { active: !r.active, note } });
+              await loadVenues(table);
+            } catch (error) {
+              toast(error.message, 'bad');
+            }
+          });
+          return b;
+        }
+      : null,
+    sort: { key: 'name' },
+    onRow: (r) => openVenue(r),
+    rowAttrs: (r) => ({ 'data-venue': r.id, 'data-state': r.active ? 'on' : 'off' }),
+    noun: 'ресторан',
+    empty: { title: 'Ресторан алга', text: 'Хоолны талд ресторан бүртгэгдээгүй.' },
+    stateKey: 'basu.dt.venues',
+  });
+  table.el.id = 'venues';
+  view.append(table.el, el('<p class="cap" style="margin-top:12px">Рестораны ажилтнууд гал тогоог өөрсдийн бүртгэлээр /kds-д нэвтэрч нээнэ — код, таблет холболт гэж байхгүй.</p>'));
+  await loadVenues(table);
 }
 
-async function loadVenues() {
-  const box = document.getElementById('venues');
-  if (!box) return;
+async function loadVenues(table) {
   try {
     ({ restaurants: venueCache } = await ops('/v1/ops/dine/restaurants'));
+    table.setRows(venueCache);
   } catch (error) {
-    box.replaceChildren(el(`<div class="card empty">${esc(error.message)}</div>`));
-    return;
+    toast(error.message, 'bad');
+    table.setRows([]);
   }
-  if (!document.getElementById('venues')) return;
-  box.replaceChildren(...(venueCache.length ? venueCache.map(renderVenue) : [el('<div class="card empty"><b>Ресторан алга</b>Хоолны талд ресторан бүртгэгдээгүй.</div>')]));
 }
 
-function renderVenue(r) {
-  const card = el(`
-    <div class="card row" data-venue="${r.id}" data-state="${r.active ? 'on' : 'off'}">
-      <div class="name">${esc(r.name)}
-        ${r.active ? '' : ' <span class="pill" data-s="off">зогссон</span>'}
-        <span class="pill" data-s="${r.online ? 'contracted' : 'declined'}">${r.online ? 'гал тогоо нээлттэй' : 'гал тогоо хаалттай'}</span>
-        <small>${r.rating ? `${stars(Math.round(r.rating.stars))} ${r.rating.stars} · ${r.rating.count} үнэлгээ${r.rating.on_time_share === null ? '' : ` · цагтаа ${Math.round(r.rating.on_time_share * 100)}%`}` : 'үнэлгээ алга'} · ${r.slot_minutes} мин цаг · ${r.auto_accept ? 'автоматаар батална' : 'гараар батална'}${r.merchant_tin ? '' : ' · <b class="ink-stop">е-баримтын ТТД алга</b>'}</small>
-      </div>
-      <div class="right"><div class="btns">
-        <button class="btn" data-size="sm" type="button" data-a="menu">Цэс</button>
-        ${can('desk.venues:manage') ? `<details class="more"><summary class="btn" data-size="sm" data-icon aria-label="Бусад үйлдэл"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></summary><div class="menu">
-          <button class="btn${r.active ? ' ink-stop' : ''}" data-size="sm" data-v="quiet" type="button" data-a="active">${r.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>
-        </div></details>` : ''}
-      </div></div>
-      <div class="about">Өнөөдөр <b>${r.today.placed}</b> захиалга · <b>${r.today.live}</b> идэвхтэй${r.today.held ? ` · <b class="ink-hold">${r.today.held} түр зогсоосон</b>` : ''} · <b>${money(r.today.sales_mnt)}</b> · цэс ${r.menu.active}/${r.menu.total}${r.menu.sold_out ? ` (${r.menu.sold_out} дууссан)` : ''}
-        <div class="sess-list"><span class="muted">${
-          !r.org_id ? 'Байгууллагатай холбогдоогүй — гал тогоог нь хэн ч нээж чадахгүй.'
-            : r.kitchen_seen_at ? `Гал тогоо сүүлд ${when(r.kitchen_seen_at)} ${clockOf(r.kitchen_seen_at)}-д нээгдсэн.`
-              : 'Гал тогоо хэзээ ч нээгдээгүй.'
-        } Ажилтнууд өөрсдийн бүртгэлээр /kds-д нэвтэрнэ.</span></div>
-      </div>
-    </div>`);
-  card.addEventListener('click', async (e) => {
-    const b = e.target.closest('button[data-a]');
-    if (!b) return;
-    try {
-      if (b.dataset.a === 'active') {
-        const note = prompt(r.active ? 'Зогсоох шалтгаан:' : 'Идэвхжүүлэх тэмдэглэл:', '');
-        if (note === null) return;
-        await ops(`/v1/ops/dine/restaurants/${r.id}/active`, { method: 'POST', body: { active: !r.active, note } });
-      } else if (b.dataset.a === 'menu') {
-        const open = card.querySelector('.drawer');
-        if (open) return open.remove();
-        return card.append(await menuDrawer(r));
-      }
-      await loadVenues();
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
+/** One restaurant: its menu, each dish with the switch that takes it off. */
+async function openVenue(r) {
+  const view = document.getElementById('view');
+  view.replaceChildren();
+  const back = el(`<button class="back link" type="button" id="back">${CHEV}Ресторан</button>`);
+  back.addEventListener('click', () => show('venues'));
+  view.append(back, head(esc(r.name), `Цэс — ${r.menu.active}/${r.menu.total} хоол цэсэнд${r.menu.sold_out ? `, ${r.menu.sold_out} нь өнөөдөр дууссан` : ''}.`));
+  const manage = can('desk.venues:manage');
+  const table = dataTable({
+    columns: [
+      { key: 'name', label: 'Хоол', render: (m) => `<b>${esc(m.name)}</b>` },
+      { key: 'station', label: 'Цех' },
+      { key: 'price_mnt', label: 'Үнэ', align: 'end', numeric: true, render: (m) => dtCell.money(m.price_mnt) },
+      { key: 'prep_minutes', label: 'Бэлтгэх, мин', align: 'end', numeric: true, render: (m) => dtCell.num(m.prep_minutes) },
+      {
+        key: 'state',
+        label: 'Төлөв',
+        value: (m) => (m.active ? (m.sold_out_until ? 'дууссан' : 'цэсэнд') : 'нуусан'),
+        render: (m) => (m.active ? (m.sold_out_until ? dtCell.pill('off', 'дууссан') : dtCell.pill('contracted', 'цэсэнд')) : dtCell.pill('declined', 'нуусан')),
+      },
+    ],
+    search: { placeholder: 'Хоолны нэр, цех…' },
+    actions: manage
+      ? (m) => {
+          const b = el(`<button class="btn" data-size="sm" data-v="quiet" type="button" data-item="${m.id}">${m.active ? 'Нуух' : 'Харуулах'}</button>`);
+          b.addEventListener('click', async () => {
+            const note = prompt(m.active ? 'Нуух шалтгаан:' : 'Цэсэнд буцаах тэмдэглэл:', '');
+            if (note === null) return;
+            try {
+              await ops(`/v1/ops/dine/menu/${m.id}/active`, { method: 'POST', body: { active: !m.active, note } });
+              table.setRows((await ops(`/v1/ops/dine/restaurants/${r.id}/menu`)).items);
+            } catch (error) {
+              toast(error.message, 'bad');
+            }
+          });
+          return b;
+        }
+      : null,
+    sort: { key: 'name' },
+    rowAttrs: (m) => ({ 'data-item': m.id, 'data-off': !m.active }),
+    noun: 'хоол',
+    empty: { title: 'Цэс хоосон', text: 'Энэ ресторанд хоол бүртгэгдээгүй.' },
   });
-  return card;
-}
-
-async function menuDrawer(r) {
-  const { items } = await ops(`/v1/ops/dine/restaurants/${r.id}/menu`);
-  const d = el(`<div class="drawer table-wrap"><table class="table"${items.length ? '' : ' data-empty'}><thead><tr><th>Хоол</th><th>Цех</th><th class="num">Үнэ</th><th class="num">Бэлтгэх, мин</th><th>Төлөв</th><th></th></tr></thead><tbody>${items
-    .map((m) => `<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td>${esc(m.station)}</td><td class="num">${money(m.price_mnt)}</td><td class="num">${m.prep_minutes}</td><td>${m.active ? (m.sold_out_until ? '<span class="pill" data-s="off">дууссан</span>' : '<span class="pill" data-s="contracted">цэсэнд</span>') : '<span class="pill" data-s="declined">нуусан</span>'}</td><td class="num">${can('desk.venues:manage') ? `<button class="btn" data-size="sm" data-v="quiet" type="button" data-item="${m.id}" data-on="${m.active}">${m.active ? 'Нуух' : 'Харуулах'}</button>` : ''}</td></tr>`)
-    .join('') || '<tr><td colspan="6" class="empty">Цэс хоосон.</td></tr>'}</tbody></table></div>`);
-  d.addEventListener('click', async (e) => {
-    const b = e.target.closest('button[data-item]');
-    if (!b) return;
-    e.stopPropagation();
-    const active = b.dataset.on !== 'true';
-    const note = prompt(active ? 'Цэсэнд буцаах тэмдэглэл:' : 'Нуух шалтгаан:', '');
-    if (note === null) return;
-    try {
-      await ops(`/v1/ops/dine/menu/${b.dataset.item}/active`, { method: 'POST', body: { active, note } });
-      d.replaceWith(await menuDrawer(r));
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
-  });
-  return d;
+  table.el.id = 'menu';
+  view.append(table.el);
+  try {
+    table.setRows((await ops(`/v1/ops/dine/restaurants/${r.id}/menu`)).items);
+  } catch (error) {
+    toast(error.message, 'bad');
+    table.setRows([]);
+  }
 }
 
 /* ── lunch: the orders ── */
@@ -2314,77 +2475,80 @@ async function menuDrawer(r) {
 let lunchFilter = { scope: 'live', restaurant: '', day: '', q: '' };
 
 async function renderLunches(view) {
-  view.append(head('Хоолны захиалга', 'Өнөөдрийн болон өмнөх захиалгууд. Дарж дэлгэрэнгүйг үзнэ.'));
+  view.append(head('Хоолны захиалга', 'Өнөөдрийн болон өмнөх захиалгууд. Мөр дээр дарж дэлгэрэнгүйг үзнэ.'));
   if (!venueCache.length) {
     try {
       ({ restaurants: venueCache } = await ops('/v1/ops/dine/restaurants'));
     } catch { /* the list still works without the filter */ }
   }
   if (tab !== 'lunches') return;
-  view.append(el(`
-    <div class="card">
-      <div class="tools">
-        <input class="input search" type="search" id="q" placeholder="Код, утас, зочин, ресторан…" value="${esc(lunchFilter.q)}" autocomplete="off">
-        <select class="input" id="restaurant"><option value="">Бүх ресторан</option>${venueCache.map((r) => `<option value="${r.id}"${lunchFilter.restaurant === r.id ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select>
-        <input class="input" type="date" id="day" value="${esc(lunchFilter.day)}" title="Хоолны өдөр">
-        <div class="seg">${[['live', 'Идэвхтэй'], ['done', 'Дууссан'], ['all', 'Бүгд']].map(([k, l]) => `<button type="button" data-scope="${k}"${lunchFilter.scope === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>
-      </div>
-      <div id="lunches" class="table-wrap"></div>
-    </div>`));
-  view.querySelector('#lunches').append(busy());
-  let timer;
-  view.querySelector('#q').addEventListener('input', (e) => {
-    lunchFilter.q = e.target.value;
-    clearTimeout(timer);
-    timer = setTimeout(loadLunches, 250);
+  const day = el(`<input class="input dt-date" type="date" id="day" value="${esc(lunchFilter.day)}" title="Хоолны өдөр" aria-label="Хоолны өдөр">`);
+  const table = dataTable({
+    columns: [
+      { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(`<span class="mono">№${esc(o.code)}</span>`, `${o.party_size} хүн`) },
+      { key: 'restaurant', label: 'Ресторан', value: (o) => o.restaurant.name },
+      {
+        key: 'guest',
+        label: 'Зочин',
+        value: (o) => `${o.guest ?? ''} ${o.guest_phone ?? ''}`,
+        render: (o) => dtCell.twoHtml(esc(o.guest ?? 'зочин'), o.guest_phone ? `<span class="mono">${esc(o.guest_phone)}</span>` : ''),
+      },
+      { key: 'slot_starts_at', label: 'Цаг', render: (o) => dtCell.when(o.slot_starts_at) },
+      {
+        key: 'fire_at',
+        label: 'Гал',
+        render: (o) => `${o.fire_at ? `<span class="mono">${clockOf(o.fire_at)}</span>` : dtCell.none()}${o.late ? ` ${dtCell.pill('declined', 'хоцорсон')}` : ''}`,
+      },
+      { key: 'state', label: 'Төлөв', value: (o) => DINE_WORD[o.state] ?? o.state, render: (o) => dtCell.pill(o.state, DINE_WORD[o.state] ?? o.state) },
+      { key: 'total_mnt', label: 'Дүн', align: 'end', numeric: true, render: (o) => dtCell.money(o.total_mnt) },
+    ],
+    search: { placeholder: 'Код, утас, зочин, ресторан…' },
+    onSearch: (q) => {
+      lunchFilter.q = q;
+      void loadLunches(table);
+    },
+    filters: [
+      { key: 'scope', label: 'Хамрах хүрээ', options: [['live', 'Идэвхтэй'], ['done', 'Дууссан'], ['all', 'Бүгд']], initial: lunchFilter.scope },
+      {
+        key: 'restaurant',
+        label: 'Ресторан',
+        kind: 'select',
+        options: [['', 'Бүх ресторан'], ...venueCache.map((r) => [r.id, r.name])],
+        initial: lunchFilter.restaurant,
+      },
+    ],
+    onFilter: (f) => {
+      lunchFilter.scope = f.scope;
+      lunchFilter.restaurant = f.restaurant;
+      void loadLunches(table);
+    },
+    tools: [day],
+    sort: { key: 'slot_starts_at', desc: true },
+    onRow: (o) => openLunch(o.id),
+    rowAttrs: (o) => ({ 'data-lunch': o.id }),
+    noun: 'захиалга',
+    empty: { title: 'Захиалга алга', text: 'Шүүлтэд тохирох хоолны захиалга байхгүй.' },
   });
-  view.querySelector('#restaurant').addEventListener('change', (e) => ((lunchFilter.restaurant = e.target.value), loadLunches()));
-  view.querySelector('#day').addEventListener('change', (e) => ((lunchFilter.day = e.target.value), loadLunches()));
-  view.querySelector('.seg').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-scope]');
-    if (!b) return;
-    lunchFilter.scope = b.dataset.scope;
-    for (const c of view.querySelectorAll('.seg button')) c.toggleAttribute('data-on', c === b);
-    void loadLunches();
+  table.el.id = 'lunches';
+  table.el.querySelector('.dt-search input').value = lunchFilter.q;
+  day.addEventListener('change', () => {
+    lunchFilter.day = day.value;
+    void loadLunches(table);
   });
-  void loadLunches();
+  view.append(table.el);
+  void loadLunches(table);
 }
 
-async function loadLunches() {
-  const box = document.getElementById('lunches');
-  if (!box) return;
+async function loadLunches(table) {
   const qs = new URLSearchParams({ scope: lunchFilter.scope, q: lunchFilter.q });
   if (lunchFilter.restaurant) qs.set('restaurant', lunchFilter.restaurant);
   if (lunchFilter.day) qs.set('day', lunchFilter.day);
-  let data;
   try {
-    data = await ops(`/v1/ops/dine/orders?${qs}`);
+    table.setRows((await ops(`/v1/ops/dine/orders?${qs}`)).orders);
   } catch (error) {
-    box.replaceChildren(el(`<div class="empty">${esc(error.message)}</div>`));
-    return;
+    toast(error.message, 'bad');
+    table.setRows([]);
   }
-  if (!document.getElementById('lunches')) return;
-  if (!data.orders.length) {
-    box.replaceChildren(el('<div class="empty"><b>Захиалга алга</b>Шүүлтэд тохирох хоолны захиалга байхгүй.</div>'));
-    return;
-  }
-  const table = el('<table class="table"><thead><tr><th>Захиалга</th><th>Ресторан</th><th>Зочин</th><th>Цаг</th><th>Гал</th><th>Төлөв</th><th class="num">Дүн</th></tr></thead><tbody></tbody></table>');
-  const body = table.querySelector('tbody');
-  for (const o of data.orders) {
-    const tr = el(`
-      <tr data-link data-lunch="${o.id}">
-        <td><b class="mono">№${esc(o.code)}</b><span class="sub">${o.party_size} хүн</span></td>
-        <td>${esc(o.restaurant.name)}</td>
-        <td>${esc(o.guest ?? 'зочин')}<span class="sub mono">${esc(o.guest_phone ?? '')}</span></td>
-        <td>${stamp(o.slot_starts_at)}</td>
-        <td>${o.fire_at ? `<span class="mono">${clockOf(o.fire_at)}</span>` : '—'}${o.late ? ' <span class="pill" data-s="declined">хоцорсон</span>' : ''}</td>
-        <td><span class="pill" data-s="${o.state}">${DINE_WORD[o.state] ?? o.state}</span></td>
-        <td class="num">${money(o.total_mnt)}</td>
-      </tr>`);
-    tr.addEventListener('click', () => openLunch(o.id));
-    body.append(tr);
-  }
-  box.replaceChildren(table);
 }
 
 async function openLunch(id) {
@@ -2455,42 +2619,67 @@ async function openLunch(id) {
 let reviewVenue = '';
 
 async function renderReviews(view) {
-  view.append(head('Үнэлгээ', 'Зочдын одоор өгсөн үнэлгээ ба сэтгэгдэл, сүүлийнх нь эхэндээ.'));
+  view.append(head('Үнэлгээ', 'Зочдын одоор өгсөн үнэлгээ ба сэтгэгдэл. Мөр дээр дарж захиалгыг нь үзнэ.'));
   if (!venueCache.length) {
     try {
       ({ restaurants: venueCache } = await ops('/v1/ops/dine/restaurants'));
     } catch { /* fine without the filter */ }
   }
   if (tab !== 'reviews') return;
-  view.append(el(`<div class="card"><div class="tools"><select class="input" id="restaurant"><option value="">Бүх ресторан</option>${venueCache.map((r) => `<option value="${r.id}"${reviewVenue === r.id ? ' selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div><div id="reviews" class="table-wrap"></div></div>`));
-  view.querySelector('#reviews').append(busy());
-  view.querySelector('#restaurant').addEventListener('change', (e) => ((reviewVenue = e.target.value), loadReviews()));
-  void loadReviews();
+  const table = dataTable({
+    columns: [
+      { key: 'at', label: 'Огноо', render: (v) => dtCell.when(v.at) },
+      { key: 'restaurant', label: 'Ресторан', value: (v) => v.restaurant.name },
+      { key: 'order_code', label: 'Захиалга', render: (v) => `<span class="mono">№${esc(v.order_code)}</span>`, phone: false },
+      { key: 'guest', label: 'Зочин', value: (v) => v.guest ?? 'зочин' },
+      {
+        key: 'stars',
+        label: 'Од',
+        numeric: true,
+        render: (v) => `${stars(v.stars)}${v.on_time === null ? '' : v.on_time ? ' <small class="muted">цагтаа</small>' : ' <small class="ink-stop">хоцорсон</small>'}`,
+      },
+      { key: 'comment', label: 'Сэтгэгдэл', value: (v) => v.comment ?? '', render: (v) => (v.comment ? `<span class="dt-text">${esc(v.comment)}</span>` : dtCell.none()), width: '34%' },
+    ],
+    search: { placeholder: 'Ресторан, зочин, сэтгэгдэл…' },
+    filters: [
+      {
+        key: 'restaurant',
+        label: 'Ресторан',
+        kind: 'select',
+        options: [['', 'Бүх ресторан'], ...venueCache.map((r) => [r.id, r.name])],
+        initial: reviewVenue,
+      },
+      {
+        key: 'stars',
+        label: 'Од',
+        options: [['all', 'Бүгд'], ['low', '1–2 од'], ['high', '4–5 од']],
+        test: (v, k) => k === 'all' || (k === 'low' ? v.stars <= 2 : v.stars >= 4),
+      },
+    ],
+    onFilter: (f) => {
+      reviewVenue = f.restaurant;
+      void loadReviews(table);
+    },
+    sort: { key: 'at', desc: true },
+    onRow: (v) => openLunch(v.order_id),
+    rowAttrs: (v) => ({ 'data-lunch': v.order_id }),
+    noun: 'үнэлгээ',
+    empty: { title: 'Үнэлгээ алга', text: 'Хооллосон зочид үнэлгээ өгөөгүй байна.' },
+    stateKey: 'basu.dt.reviews',
+  });
+  table.el.id = 'reviews';
+  reviewVenue = table.filters().restaurant ?? '';
+  view.append(table.el);
+  void loadReviews(table);
 }
 
-async function loadReviews() {
-  const box = document.getElementById('reviews');
-  if (!box) return;
-  let data;
+async function loadReviews(table) {
   try {
-    data = await ops(`/v1/ops/dine/reviews?${new URLSearchParams(reviewVenue ? { restaurant: reviewVenue } : {})}`);
+    table.setRows((await ops(`/v1/ops/dine/reviews?${new URLSearchParams(reviewVenue ? { restaurant: reviewVenue } : {})}`)).reviews);
   } catch (error) {
-    box.replaceChildren(el(`<div class="empty">${esc(error.message)}</div>`));
-    return;
+    toast(error.message, 'bad');
+    table.setRows([]);
   }
-  if (!document.getElementById('reviews')) return;
-  if (!data.reviews.length) {
-    box.replaceChildren(el('<div class="empty"><b>Үнэлгээ алга</b>Хооллосон зочид үнэлгээ өгөөгүй байна.</div>'));
-    return;
-  }
-  const table = el('<table class="table"><thead><tr><th>Огноо</th><th>Ресторан</th><th>Захиалга</th><th>Зочин</th><th>Од</th><th>Сэтгэгдэл</th></tr></thead><tbody></tbody></table>');
-  const body = table.querySelector('tbody');
-  for (const v of data.reviews) {
-    const tr = el(`<tr data-link data-lunch="${v.order_id}"><td><span class="mono">${when(v.at)}</span></td><td>${esc(v.restaurant.name)}</td><td><span class="mono">№${esc(v.order_code)}</span></td><td>${esc(v.guest ?? 'зочин')}</td><td>${stars(v.stars)}${v.on_time === null ? '' : v.on_time ? ' <span class="sub">цагтаа</span>' : ' <span class="sub ink-stop">хоцорсон</span>'}</td><td>${esc(v.comment ?? '')}</td></tr>`);
-    tr.addEventListener('click', () => openLunch(v.order_id));
-    body.append(tr);
-  }
-  box.replaceChildren(table);
 }
 
 /* ── the books ── */
@@ -2558,11 +2747,24 @@ async function moneyChecks() {
       <div class="card kpi" data-word${ok(c.receipts.failed === 0) || (c.receipts.gap === 0 ? ' data-tone="good"' : ' data-tone="warn"')}><div class="lab">Е-баримт</div><b>${c.receipts.gap === 0 ? 'бүрэн' : `${c.receipts.gap} дутуу`}</b><span>гарсан ${c.receipts.issued} · дараалалд ${c.receipts.queued} · амжилтгүй ${c.receipts.failed}</span></div>
     </div>
     ${canMoney() ? '<div class="run-row"><button class="btn" type="button" id="run">Шалгалт одоо ажиллуулах</button><span class="cap">Ledger, е-баримтын нэгтгэл ба дараалал. Ердийн үедээ 23:30-д автоматаар.</span></div>' : ''}
-    <section class="section"><h2 class="section-label">Данс бүрээр</h2><div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Данс</th><th>Төрөл</th><th class="num">Үлдэгдэл</th><th class="num">Бичилт</th><th>Сүүлд</th></tr></thead><tbody>
-      <tr><td><b>Зочдын түрийвч</b><span class="sub">${m.wallets.count} данс нэг мөрөнд</span></td><td><span class="mono">guest</span></td><td class="num">${money(m.wallets.balance_mnt)}</td><td class="num">—</td><td>—</td></tr>
-      ${m.accounts.map((a) => `<tr><td><b>${esc(a.name)}</b><span class="sub mono">${esc(a.label ?? '')}</span></td><td><span class="mono">${esc(a.kind)}</span></td><td class="num">${money(a.balance_mnt)}</td><td class="num">${a.entries}</td><td>${a.last_at ? stamp(a.last_at) : '—'}</td></tr>`).join('')}
-    </tbody></table></div></div></section>
+    <section class="section"><h2 class="section-label">Данс бүрээр</h2><div data-accounts></div></section>
   </div>`);
+  const accounts = dataTable({
+    columns: [
+      { key: 'name', label: 'Данс', render: (a) => dtCell.twoHtml(esc(a.name), a.sub) },
+      { key: 'kind', label: 'Төрөл', render: (a) => dtCell.mono(a.kind) },
+      { key: 'balance_mnt', label: 'Үлдэгдэл', align: 'end', numeric: true, render: (a) => dtCell.money(a.balance_mnt) },
+      { key: 'entries', label: 'Бичилт', align: 'end', numeric: true, render: (a) => (a.entries === null ? dtCell.none() : dtCell.num(a.entries)) },
+      { key: 'last_at', label: 'Сүүлд', render: (a) => dtCell.when(a.last_at) },
+    ],
+    search: false,
+    noun: 'данс',
+    rows: [
+      { name: 'Зочдын түрийвч', sub: `${m.wallets.count} данс нэг мөрөнд`, kind: 'guest', balance_mnt: m.wallets.balance_mnt, entries: null, last_at: null },
+      ...m.accounts.map((a) => ({ ...a, sub: a.label ? `<span class="mono">${esc(a.label)}</span>` : '' })),
+    ],
+  });
+  page.querySelector('[data-accounts]').replaceWith(accounts.el);
   page.querySelector('#run')?.addEventListener('click', async (e) => {
     e.target.disabled = true;
     try {
@@ -2577,84 +2779,148 @@ async function moneyChecks() {
   return page;
 }
 
-function moneyTools(fields, onChange) {
-  const t = el(`<div class="tools">${fields}</div>`);
-  t.addEventListener('change', onChange);
-  return t;
+/** The dates a list of money covers, and the CSV of it — the toolbar the three lists share. */
+function moneyRange(csvPath, name) {
+  const from = el(`<input class="input dt-date" type="date" id="from" value="${esc(moneyFilter.from)}" title="Эхлэх өдөр" aria-label="Эхлэх өдөр">`);
+  const to = el(`<input class="input dt-date" type="date" id="to" value="${esc(moneyFilter.to)}" title="Дуусах өдөр" aria-label="Дуусах өдөр">`);
+  for (const input of [from, to]) {
+    input.addEventListener('change', () => {
+      moneyFilter[input.id] = input.value;
+      void drawMoney();
+    });
+  }
+  const tools = [from, to];
+  if (csvPath && canMoney()) {
+    const csv = el('<button class="btn" data-size="sm" type="button" id="csv">CSV татах</button>');
+    csv.addEventListener('click', () => download(csvPath(), `basu-${name}-${moneyFilter.from || 'all'}-${moneyFilter.to || 'all'}.csv`).catch((error) => toast(error.message, 'bad')));
+    tools.push(csv);
+  }
+  return tools;
 }
 
-async function moneyTransfers() {
+const moneyQuery = (extra = {}) => {
   const qs = new URLSearchParams();
-  if (moneyFilter.kind) qs.set('kind', moneyFilter.kind);
+  for (const [k, v] of Object.entries(extra)) if (v) qs.set(k, v);
   if (moneyFilter.from) qs.set('from', moneyFilter.from);
   if (moneyFilter.to) qs.set('to', moneyFilter.to);
+  return qs;
+};
+
+async function moneyTransfers() {
+  const qs = moneyQuery({ kind: moneyFilter.kind });
   const { transfers } = await ops(`/v1/ops/money/transfers?${qs}`);
-  const page = el('<div class="card"></div>');
-  page.append(moneyTools(`
-      <select class="input" id="kind"><option value="">Бүх төрөл</option>${Object.entries(KIND_WORD).map(([k, l]) => `<option value="${k}"${moneyFilter.kind === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
-      <input class="input" type="date" id="from" value="${esc(moneyFilter.from)}" title="Эхлэх өдөр"> <input class="input" type="date" id="to" value="${esc(moneyFilter.to)}" title="Дуусах өдөр">
-      ${canMoney() ? '<button class="btn" data-size="sm" type="button" id="csv" data-end>CSV татах</button>' : ''}`,
-    (e) => {
-      if (e.target.id in moneyFilter) moneyFilter[e.target.id] = e.target.value;
+  const table = dataTable({
+    columns: [
+      { key: 'at', label: 'Огноо', render: (t) => dtCell.when(t.at) },
+      {
+        key: 'kind',
+        label: 'Төрөл',
+        value: (t) => KIND_WORD[t.kind] ?? t.kind,
+        render: (t) => dtCell.pill(t.kind === 'refund' ? 'declined' : t.kind === 'topup' ? 'contracted' : 'PAID', KIND_WORD[t.kind] ?? t.kind),
+      },
+      { key: 'route', label: 'Хаанаас → хаашаа', value: (t) => `${t.from.name} ${t.to.name}`, render: (t) => `${esc(t.from.name)} <span class="muted">→</span> ${esc(t.to.name)}` },
+      { key: 'memo', label: 'Тайлбар', value: (t) => `${t.memo ?? ''} ${t.id}`, render: (t) => dtCell.twoHtml(esc(t.memo ?? '—'), `<span class="mono">${esc(t.id.slice(0, 8))}</span>`), phone: false },
+      { key: 'amount_mnt', label: 'Дүн', align: 'end', numeric: true, render: (t) => dtCell.money(t.amount_mnt) },
+    ],
+    search: { placeholder: 'Данс, тайлбар, дугаар…' },
+    filters: [
+      { key: 'kind', label: 'Төрөл', kind: 'select', options: [['', 'Бүх төрөл'], ...Object.entries(KIND_WORD)], initial: moneyFilter.kind },
+    ],
+    onFilter: (f) => {
+      moneyFilter.kind = f.kind;
       void drawMoney();
-    }));
-  page.querySelector('#csv')?.addEventListener('click', () => download(`/v1/ops/money/transfers.csv?${qs}`, `basu-transfers-${moneyFilter.from || 'all'}-${moneyFilter.to || 'all'}.csv`).catch((error) => toast(error.message, 'bad')));
-  page.append(el(`<div class="table-wrap"><table class="table"${transfers.length ? '' : ' data-empty'}><thead><tr><th>Огноо</th><th>Төрөл</th><th>Хаанаас → хаашаа</th><th>Тайлбар</th><th class="num">Дүн</th></tr></thead><tbody id="transfers">${transfers
-    .map((t) => `<tr><td>${stamp(t.at)}</td><td><span class="pill" data-s="${t.kind === 'refund' ? 'declined' : t.kind === 'topup' ? 'contracted' : 'PAID'}">${KIND_WORD[t.kind] ?? t.kind}</span></td><td>${esc(t.from.name)} <span class="muted">→</span> ${esc(t.to.name)}</td><td>${esc(t.memo ?? '')}<span class="sub mono">${esc(t.id.slice(0, 8))}</span></td><td class="num">${money(t.amount_mnt)}</td></tr>`)
-    .join('') || '<tr><td colspan="5" class="empty">Гүйлгээ алга.</td></tr>'}</tbody></table></div>`));
-  return page;
+    },
+    tools: moneyRange(() => `/v1/ops/money/transfers.csv?${qs}`, 'transfers'),
+    sort: { key: 'at', desc: true },
+    noun: 'гүйлгээ',
+    empty: { title: 'Гүйлгээ алга', text: 'Энэ хугацаанд мөнгө хөдлөөгүй.' },
+    rows: transfers,
+  });
+  table.el.id = 'transfers';
+  return table.el;
 }
 
 async function moneyTopups() {
-  const qs = new URLSearchParams();
-  if (moneyFilter.topupState) qs.set('state', moneyFilter.topupState);
-  if (moneyFilter.from) qs.set('from', moneyFilter.from);
-  if (moneyFilter.to) qs.set('to', moneyFilter.to);
+  const qs = moneyQuery({ state: moneyFilter.topupState });
   const { topups } = await ops(`/v1/ops/money/topups?${qs}`);
-  const page = el('<div class="card"></div>');
-  page.append(moneyTools(`
-      <select class="input" id="topupState"><option value="">Бүх төлөв</option>${Object.entries(TOPUP_WORD).map(([k, l]) => `<option value="${k}"${moneyFilter.topupState === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
-      <input class="input" type="date" id="from" value="${esc(moneyFilter.from)}"> <input class="input" type="date" id="to" value="${esc(moneyFilter.to)}">
-      ${canMoney() ? '<button class="btn" data-size="sm" type="button" id="csv" data-end>CSV татах</button>' : ''}`,
-    (e) => {
-      if (e.target.id in moneyFilter) moneyFilter[e.target.id] = e.target.value;
+  const table = dataTable({
+    columns: [
+      { key: 'created_at', label: 'Эхэлсэн', render: (t) => dtCell.when(t.created_at) },
+      {
+        key: 'guest',
+        label: 'Зочин',
+        value: (t) => `${t.guest ?? ''} ${t.guest_phone ?? ''}`,
+        render: (t) => dtCell.twoHtml(esc(t.guest ?? 'зочин'), t.guest_phone ? `<span class="mono">${esc(t.guest_phone)}</span>` : ''),
+      },
+      { key: 'provider', label: 'Суваг', value: (t) => `${t.provider} ${t.provider_ref ?? ''}`, render: (t) => dtCell.twoHtml(esc(t.provider), t.provider_ref ? `<span class="mono">${esc(t.provider_ref)}</span>` : ''), phone: false },
+      { key: 'state', label: 'Төлөв', value: (t) => TOPUP_WORD[t.state] ?? t.state, render: (t) => dtCell.pill(TOPUP_PILL[t.state] ?? 'off', TOPUP_WORD[t.state] ?? t.state) },
+      { key: 'settled_at', label: 'Орсон', render: (t) => dtCell.when(t.settled_at) },
+      { key: 'amount_mnt', label: 'Дүн', align: 'end', numeric: true, render: (t) => dtCell.money(t.amount_mnt) },
+    ],
+    search: { placeholder: 'Зочин, утас, лавлах дугаар…' },
+    filters: [
+      { key: 'state', label: 'Төлөв', kind: 'select', options: [['', 'Бүх төлөв'], ...Object.entries(TOPUP_WORD)], initial: moneyFilter.topupState },
+    ],
+    onFilter: (f) => {
+      moneyFilter.topupState = f.state;
       void drawMoney();
-    }));
-  page.querySelector('#csv')?.addEventListener('click', () => download(`/v1/ops/money/topups.csv?${qs}`, `basu-topups-${moneyFilter.from || 'all'}-${moneyFilter.to || 'all'}.csv`).catch((error) => toast(error.message, 'bad')));
-  page.append(el(`<div class="table-wrap"><table class="table"${topups.length ? '' : ' data-empty'}><thead><tr><th>Эхэлсэн</th><th>Зочин</th><th>Суваг</th><th>Төлөв</th><th>Орсон</th><th class="num">Дүн</th></tr></thead><tbody id="topups">${topups
-    .map((t) => `<tr><td>${stamp(t.created_at)}</td><td>${esc(t.guest ?? 'зочин')}<span class="sub mono">${esc(t.guest_phone ?? '')}</span></td><td>${esc(t.provider)}<span class="sub mono">${esc(t.provider_ref ?? '')}</span></td><td><span class="pill" data-s="${TOPUP_PILL[t.state] ?? 'off'}">${TOPUP_WORD[t.state] ?? t.state}</span></td><td>${t.settled_at ? stamp(t.settled_at) : '—'}</td><td class="num">${money(t.amount_mnt)}</td></tr>`)
-    .join('') || '<tr><td colspan="6" class="empty">Цэнэглэлт алга.</td></tr>'}</tbody></table></div>`));
-  return page;
+    },
+    tools: moneyRange(() => `/v1/ops/money/topups.csv?${qs}`, 'topups'),
+    sort: { key: 'created_at', desc: true },
+    noun: 'цэнэглэлт',
+    empty: { title: 'Цэнэглэлт алга', text: 'Энэ хугацаанд түрийвч цэнэглээгүй.' },
+    rows: topups,
+  });
+  table.el.id = 'topups';
+  return table.el;
 }
 
 async function moneyReceipts() {
-  const qs = new URLSearchParams();
-  if (moneyFilter.receiptState) qs.set('state', moneyFilter.receiptState);
+  const qs = moneyQuery({ state: moneyFilter.receiptState });
   const { receipts } = await ops(`/v1/ops/money/receipts?${qs}`);
-  const page = el('<div class="card"></div>');
-  page.append(moneyTools(
-    `<select class="input" id="receiptState"><option value="">Бүх төлөв</option>${Object.entries(RECEIPT_WORD).map(([k, l]) => `<option value="${k}"${moneyFilter.receiptState === k ? ' selected' : ''}>${l}</option>`).join('')}</select>`,
-    (e) => {
-      if (e.target.id in moneyFilter) moneyFilter[e.target.id] = e.target.value;
+  const table = dataTable({
+    columns: [
+      { key: 'created_at', label: 'Огноо', render: (r) => dtCell.when(r.created_at) },
+      { key: 'order_code', label: 'Захиалга', render: (r) => dtCell.twoHtml(`<span class="mono">№${esc(r.order_code ?? '')}</span>`, r.kind === 'RETURN' ? 'буцаалт' : 'борлуулалт') },
+      { key: 'merchant_tin', label: 'ТТД', render: (r) => dtCell.mono(r.merchant_tin), phone: false },
+      {
+        key: 'state',
+        label: 'Төлөв',
+        value: (r) => RECEIPT_WORD[r.state] ?? r.state,
+        render: (r) => dtCell.twoHtml(dtCell.pill(RECEIPT_PILL[r.state] ?? 'off', RECEIPT_WORD[r.state] ?? r.state), r.state === 'failed' ? `${r.attempts} оролдлого · ${esc(r.last_error ?? '')}` : ''),
+      },
+      { key: 'bill_id', label: 'Баримт', render: (r) => (r.bill_id ? dtCell.twoHtml(`<span class="mono">${esc(r.bill_id)}</span>`, `<span class="mono">сугалаа ${esc(r.lottery ?? '')}</span>`) : dtCell.none()), phone: false },
+      { key: 'amount_mnt', label: 'Дүн', align: 'end', numeric: true, render: (r) => dtCell.money(r.amount_mnt) },
+    ],
+    search: { placeholder: 'Захиалга, ТТД, баримт…' },
+    filters: [
+      { key: 'state', label: 'Төлөв', kind: 'select', options: [['', 'Бүх төлөв'], ...Object.entries(RECEIPT_WORD)], initial: moneyFilter.receiptState },
+    ],
+    onFilter: (f) => {
+      moneyFilter.receiptState = f.state;
       void drawMoney();
     },
-  ));
-  const table = el(`<div class="table-wrap"><table class="table"${receipts.length ? '' : ' data-empty'}><thead><tr><th>Огноо</th><th>Захиалга</th><th>ТТД</th><th>Төлөв</th><th>Баримт</th><th class="num">Дүн</th><th></th></tr></thead><tbody id="receipts">${receipts
-    .map((r) => `<tr><td>${stamp(r.created_at)}</td><td><b class="mono">№${esc(r.order_code ?? '')}</b><span class="sub">${r.kind === 'RETURN' ? 'буцаалт' : 'борлуулалт'}</span></td><td><span class="mono">${esc(r.merchant_tin ?? '—')}</span></td><td><span class="pill" data-s="${RECEIPT_PILL[r.state] ?? 'off'}">${RECEIPT_WORD[r.state] ?? r.state}</span>${r.state === 'failed' ? `<span class="sub">${r.attempts} оролдлого · ${esc(r.last_error ?? '')}</span>` : ''}</td><td>${r.bill_id ? `<span class="mono">${esc(r.bill_id)}</span><span class="sub mono">сугалаа ${esc(r.lottery ?? '')}</span>` : '—'}</td><td class="num">${money(r.amount_mnt)}</td><td class="num">${r.state === 'failed' && canMoney() ? `<button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${r.id}">Дахин</button>` : ''}</td></tr>`)
-    .join('') || '<tr><td colspan="7" class="empty">Е-баримт алга.</td></tr>'}</tbody></table></div>`);
-  table.addEventListener('click', async (e) => {
-    const b = e.target.closest('button[data-retry]');
-    if (!b) return;
-    try {
-      await ops(`/v1/ops/money/receipts/${b.dataset.retry}/retry`, { method: 'POST', body: {} });
-      toast('Дараалалд буцаалаа.', 'good');
-      await drawMoney();
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
+    actions: (r) => {
+      if (r.state !== 'failed' || !canMoney()) return null;
+      const retry = el(`<button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${r.id}">Дахин</button>`);
+      retry.addEventListener('click', async () => {
+        try {
+          await ops(`/v1/ops/money/receipts/${r.id}/retry`, { method: 'POST', body: {} });
+          toast('Дараалалд буцаалаа.', 'good');
+          await drawMoney();
+        } catch (error) {
+          toast(error.message, 'bad');
+        }
+      });
+      return retry;
+    },
+    sort: { key: 'created_at', desc: true },
+    noun: 'баримт',
+    empty: { title: 'Е-баримт алга', text: 'Шүүлтэд тохирох баримт байхгүй.' },
+    rows: receipts,
   });
-  page.append(table);
-  return page;
+  table.el.id = 'receipts';
+  return table.el;
 }
 
 /* ── what we told people ── */
@@ -2693,76 +2959,106 @@ async function drawNotify() {
     const page = await (notifyView === 'volume' ? notifyVolume() : notifyLog());
     if (!document.getElementById('notify')) return;
     box.replaceChildren(page);
-    if (notifyView === 'log') await loadMessages();
   } catch (error) {
     box.replaceChildren(el(`<div class="card empty">${esc(error.message)}</div>`));
   }
 }
 
 async function notifyLog() {
-  const page = el(`<div class="card">
-    <div class="tools">
-      <input class="input search" type="search" id="q" placeholder="Утас эсвэл нэр…" value="${esc(msgFilter.q)}" autocomplete="off">
-      <select class="input" id="channel"><option value="">SMS ба push</option><option value="sms"${msgFilter.channel === 'sms' ? ' selected' : ''}>SMS</option><option value="push"${msgFilter.channel === 'push' ? ' selected' : ''}>Push</option></select>
-      <select class="input" id="state"><option value="">Бүх төлөв</option>${Object.entries(MSG_WORD).map(([k, l]) => `<option value="${k}"${msgFilter.state === k ? ' selected' : ''}>${l}</option>`).join('')}</select>
-    </div>
-    <div id="messages"></div>
-  </div>`);
-  page.querySelector('#messages').append(busy());
-  let timer;
-  page.querySelector('#q').addEventListener('input', (e) => {
-    msgFilter.q = e.target.value;
-    clearTimeout(timer);
-    timer = setTimeout(loadMessages, 250);
+  const table = dataTable({
+    columns: [
+      { key: 'created_at', label: 'Хэзээ', render: (m) => dtCell.when(m.created_at) },
+      {
+        key: 'guest',
+        label: 'Хэнд',
+        value: (m) => `${m.guest ?? ''} ${m.guest_phone ?? ''}`,
+        render: (m) => dtCell.twoHtml(esc(m.guest ?? 'зочин'), m.guest_phone ? `<span class="mono">${esc(m.guest_phone)}</span>` : ''),
+      },
+      { key: 'channel', label: 'Суваг', value: (m) => (m.channel === 'sms' ? 'SMS' : m.channel === 'email' ? 'Имэйл' : 'Push') },
+      {
+        key: 'message',
+        label: 'Мэдэгдэл',
+        value: (m) => `${TEMPLATE_WORD[m.template] ?? m.title ?? m.template} ${m.body}`,
+        render: (m) => `<span class="dt-two"><b>${esc(TEMPLATE_WORD[m.template] ?? m.title ?? m.template)}</b><small class="dt-text">${esc(m.body)}</small></span>`,
+        width: '40%',
+      },
+      {
+        key: 'state',
+        label: 'Төлөв',
+        value: (m) => MSG_WORD[m.state] ?? m.state,
+        render: (m) => `${dtCell.pill(MSG_PILL[m.state] ?? 'off', MSG_WORD[m.state] ?? m.state)}${m.read_at ? ' <small class="muted">уншсан</small>' : ''}`,
+      },
+    ],
+    search: { placeholder: 'Утас эсвэл нэр…' },
+    onSearch: (q) => {
+      msgFilter.q = q;
+      void loadMessages(table);
+    },
+    filters: [
+      { key: 'channel', label: 'Суваг', kind: 'select', options: [['', 'Бүх суваг'], ['sms', 'SMS'], ['push', 'Push'], ['email', 'Имэйл']], initial: msgFilter.channel },
+      { key: 'state', label: 'Төлөв', kind: 'select', options: [['', 'Бүх төлөв'], ...Object.entries(MSG_WORD)], initial: msgFilter.state },
+    ],
+    onFilter: (f) => {
+      msgFilter.channel = f.channel;
+      msgFilter.state = f.state;
+      void loadMessages(table);
+    },
+    actions: (m) => {
+      if (m.state !== 'failed' || !can('desk.notify:retry')) return null;
+      const retry = el(`<button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${m.id}">Дахин</button>`);
+      retry.addEventListener('click', async () => {
+        try {
+          await ops(`/v1/ops/notify/messages/${m.id}/retry`, { method: 'POST', body: {} });
+          toast('Дараалалд буцаалаа. Дараагийн тойрогт илгээгдэнэ.', 'good');
+          await loadMessages(table);
+        } catch (error) {
+          toast(error.message, 'bad');
+        }
+      });
+      return retry;
+    },
+    sort: { key: 'created_at', desc: true },
+    rowAttrs: (m) => ({ 'data-message': m.id }),
+    noun: 'мэдэгдэл',
+    empty: { title: 'Мэдэгдэл алга', text: 'Шүүлтэд тохирох мэдэгдэл байхгүй.' },
   });
-  page.querySelector('#channel').addEventListener('change', (e) => ((msgFilter.channel = e.target.value), loadMessages()));
-  page.querySelector('#state').addEventListener('change', (e) => ((msgFilter.state = e.target.value), loadMessages()));
-  return page;
+  table.el.id = 'messages';
+  table.el.querySelector('.dt-search input').value = msgFilter.q;
+  void loadMessages(table);
+  return table.el;
 }
 
-async function loadMessages() {
-  const box = document.getElementById('messages');
-  if (!box) return;
+async function loadMessages(table) {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(msgFilter)) if (v) qs.set(k, v);
-  let data;
   try {
-    data = await ops(`/v1/ops/notify/messages?${qs}`);
+    table.setRows((await ops(`/v1/ops/notify/messages?${qs}`)).messages);
   } catch (error) {
-    box.replaceChildren(el(`<div class="empty">${esc(error.message)}</div>`));
-    return;
+    toast(error.message, 'bad');
+    table.setRows([]);
   }
-  if (!document.getElementById('messages')) return;
-  if (!data.messages.length) {
-    box.replaceChildren(el('<div class="empty"><b>Мэдэгдэл алга</b>Шүүлтэд тохирох мэдэгдэл байхгүй.</div>'));
-    return;
-  }
-  const list = el('<ul class="log"></ul>');
-  for (const m of data.messages) {
-    list.append(el(`<li data-message="${m.id}"><span class="who">${m.channel === 'sms' ? 'SMS' : 'Push'}<small>${esc(m.guest ?? 'зочин')}<br><span class="mono">${esc(m.guest_phone ?? '')}</span></small></span>
-      <div>${esc(TEMPLATE_WORD[m.template] ?? m.title ?? m.template)}<small>${esc(m.body)}</small></div>
-      <span class="when meta">${when(m.created_at)} ${clockOf(m.created_at)}<br><span class="pill" data-s="${MSG_PILL[m.state] ?? 'off'}">${MSG_WORD[m.state] ?? m.state}</span>${m.read_at ? ' <span class="cap">уншсан</span>' : ''}${m.state === 'failed' && can('desk.notify:retry') ? ` <button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${m.id}">Дахин</button>` : ''}</span></li>`));
-  }
-  list.addEventListener('click', async (e) => {
-    const b = e.target.closest('button[data-retry]');
-    if (!b) return;
-    try {
-      await ops(`/v1/ops/notify/messages/${b.dataset.retry}/retry`, { method: 'POST', body: {} });
-      toast('Дараалалд буцаалаа. Дараагийн тойрогт илгээгдэнэ.', 'good');
-      await loadMessages();
-    } catch (error) {
-      toast(error.message, 'bad');
-    }
-  });
-  box.replaceChildren(list);
 }
 
 async function notifyVolume() {
   const v = await ops('/v1/ops/notify/volume');
-  return el(`<div class="card"><div class="table-wrap"><table class="table"${v.months.length ? '' : ' data-empty'}><thead><tr><th>Сар</th><th class="num">SMS илгээсэн</th><th class="num">SMS амжилтгүй</th><th class="num">Push илгээсэн</th><th class="num">Push амжилтгүй</th><th class="num">Зардал</th></tr></thead><tbody>${v.months
-    .map((m) => `<tr><td><b class="mono">${esc(m.month)}</b></td><td class="num">${m.sms.sent}</td><td class="num">${m.sms.failed}</td><td class="num">${m.push.sent}</td><td class="num">${m.push.failed}</td><td class="num">${money(m.cost_mnt)}</td></tr>`)
-    .join('') || '<tr><td colspan="6" class="empty">Одоогоор мэдэгдэл илгээгээгүй.</td></tr>'}</tbody></table></div>
-    <div class="card-foot"><span class="cap">Нэгж үнэ: SMS ${mnt(v.unit.sms_mnt)} · push ${mnt(v.unit.push_mnt)}. «Систем» хэсгээс өөрчилнө.</span></div></div>`);
+  const wrap = el(`<div><div data-volume></div><p class="cap" style="margin-top:12px">Нэгж үнэ: SMS ${mnt(v.unit.sms_mnt)} · push ${mnt(v.unit.push_mnt)}. «Систем» хэсгээс өөрчилнө.</p></div>`);
+  const table = dataTable({
+    columns: [
+      { key: 'month', label: 'Сар', render: (m) => `<b class="mono">${esc(m.month)}</b>` },
+      { key: 'sms_sent', label: 'SMS илгээсэн', align: 'end', numeric: true, value: (m) => m.sms.sent, render: (m) => dtCell.num(m.sms.sent) },
+      { key: 'sms_failed', label: 'SMS амжилтгүй', align: 'end', numeric: true, value: (m) => m.sms.failed, render: (m) => dtCell.num(m.sms.failed) },
+      { key: 'push_sent', label: 'Push илгээсэн', align: 'end', numeric: true, value: (m) => m.push.sent, render: (m) => dtCell.num(m.push.sent) },
+      { key: 'push_failed', label: 'Push амжилтгүй', align: 'end', numeric: true, value: (m) => m.push.failed, render: (m) => dtCell.num(m.push.failed) },
+      { key: 'cost_mnt', label: 'Зардал', align: 'end', numeric: true, render: (m) => dtCell.money(m.cost_mnt) },
+    ],
+    search: false,
+    sort: { key: 'month', desc: true },
+    noun: 'сар',
+    empty: { title: 'Мэдэгдэл алга', text: 'Одоогоор мэдэгдэл илгээгээгүй.' },
+    rows: v.months,
+  });
+  wrap.querySelector('[data-volume]').replaceWith(table.el);
+  return wrap;
 }
 
 /* ── the machine ── */
@@ -2869,19 +3165,43 @@ async function renderStats(view) {
   };
   view.querySelector('.page-head').append(periodSeg(draw));
   draw();
-  view.append(
-    kpis,
-    el(`<section class="section"><h2 class="section-label">Нийлүүлэгч бүрээр</h2><div class="card"><div class="table-wrap">
-          <table class="table"${st.suppliers.length ? '' : ' data-empty'}><thead><tr><th>Нийлүүлэгч</th><th class="num">Төлсөн</th><th class="num">Өгсөн</th><th class="num">Цуцалсан</th><th class="num">Өөрийн буруу</th><th class="num">Ирээгүй зочин</th><th class="num">Бэлэн болтол, цаг</th><th class="num">Борлуулалт</th><th class="num">Шимтгэл</th></tr></thead>
-          <tbody>${st.suppliers
-            .map((r) => `<tr${r.active ? '' : ' data-off'}><td>${esc(r.name)}${r.active ? '' : ' <span class="pill" data-s="off">түр зогссон</span>'}</td><td class="num">${r.paid}</td><td class="num">${r.handed}</td><td class="num">${r.cancelled}</td><td class="num">${r.supplier_fault}</td><td class="num">${r.no_shows}</td><td class="num">${r.ready_hours ?? '—'}</td><td class="num">${money(r.sales_mnt)}</td><td class="num">${money(r.commission_mnt)}</td></tr>`)
-            .join('') || '<tr><td colspan="9" class="empty">Гэрээт нийлүүлэгч алга.</td></tr>'}</tbody></table></div></div></section>`),
-    el(`<section class="section"><h2 class="section-label">Махны төрлөөр · хүлээлгэн өгсөн</h2><div class="card"><div class="table-wrap">
-          <table class="table"${st.by_kind.length ? '' : ' data-empty'}><thead><tr><th>Төрөл</th><th class="num">Хэмжээ</th><th class="num">Захиалга</th><th class="num">Борлуулалт</th></tr></thead>
-          <tbody>${st.by_kind
-            .map((k) => `<tr><td>${KIND[k.kind] ?? k.kind}</td><td class="num">${k.qty} ${k.unit === 'kg' ? 'кг' : 'толгой'}</td><td class="num">${k.orders}</td><td class="num">${money(k.sales_mnt)}</td></tr>`)
-            .join('') || '<tr><td colspan="4" class="empty">Одоогоор алга.</td></tr>'}</tbody></table></div></div></section>`),
-  );
+  const perSupplier = dataTable({
+    columns: [
+      { key: 'name', label: 'Нийлүүлэгч', render: (r) => `<b>${esc(r.name)}</b>${r.active ? '' : ` ${dtCell.pill('off', 'түр зогссон')}`}` },
+      { key: 'paid', label: 'Төлсөн', align: 'end', numeric: true, render: (r) => dtCell.num(r.paid) },
+      { key: 'handed', label: 'Өгсөн', align: 'end', numeric: true, render: (r) => dtCell.num(r.handed) },
+      { key: 'cancelled', label: 'Цуцалсан', align: 'end', numeric: true, render: (r) => dtCell.num(r.cancelled) },
+      { key: 'supplier_fault', label: 'Өөрийн буруу', align: 'end', numeric: true, render: (r) => dtCell.num(r.supplier_fault), phone: false },
+      { key: 'no_shows', label: 'Ирээгүй зочин', align: 'end', numeric: true, render: (r) => dtCell.num(r.no_shows), phone: false },
+      { key: 'ready_hours', label: 'Бэлэн болтол, цаг', align: 'end', numeric: true, render: (r) => dtCell.num(r.ready_hours), phone: false },
+      { key: 'sales_mnt', label: 'Борлуулалт', align: 'end', numeric: true, render: (r) => dtCell.money(r.sales_mnt) },
+      { key: 'commission_mnt', label: 'Шимтгэл', align: 'end', numeric: true, render: (r) => dtCell.money(r.commission_mnt) },
+    ],
+    search: false,
+    sort: { key: 'sales_mnt', desc: true },
+    rowAttrs: (r) => ({ 'data-off': !r.active }),
+    noun: 'нийлүүлэгч',
+    empty: { title: 'Гэрээт нийлүүлэгч алга', text: '' },
+    rows: st.suppliers,
+  });
+  const perKind = dataTable({
+    columns: [
+      { key: 'kind', label: 'Төрөл', value: (k) => KIND[k.kind] ?? k.kind },
+      { key: 'qty', label: 'Хэмжээ', align: 'end', numeric: true, render: (k) => `<span class="dt-num">${k.qty}</span> <small class="muted">${k.unit === 'kg' ? 'кг' : 'толгой'}</small>` },
+      { key: 'orders', label: 'Захиалга', align: 'end', numeric: true, render: (k) => dtCell.num(k.orders) },
+      { key: 'sales_mnt', label: 'Борлуулалт', align: 'end', numeric: true, render: (k) => dtCell.money(k.sales_mnt) },
+    ],
+    search: false,
+    sort: { key: 'sales_mnt', desc: true },
+    noun: 'төрөл',
+    empty: { title: 'Одоогоор алга', text: 'Хүлээлгэн өгсөн захиалга гарахад энд гарна.' },
+    rows: st.by_kind,
+  });
+  const bySupplier = el('<section class="section"><h2 class="section-label">Нийлүүлэгч бүрээр</h2></section>');
+  bySupplier.append(perSupplier.el);
+  const byKind = el('<section class="section"><h2 class="section-label">Махны төрлөөр · хүлээлгэн өгсөн</h2></section>');
+  byKind.append(perKind.el);
+  view.append(kpis, bySupplier, byKind);
 }
 
 /* ── every order ── */
@@ -2890,70 +3210,73 @@ let orderFilter = { scope: 'live', supplier: '', day: '', q: '' };
 
 function renderOrders(view) {
   const suppliers = cache.suppliers.filter((s) => s.state === 'contracted');
-  view.append(head('Захиалгууд', 'Бүх нийлүүлэгчийн захиалга нэг цонхонд.'));
-  view.append(el(`
-    <div class="card">
-      <div class="tools">
-        <input class="input search" type="search" id="q" placeholder="Код, утас, зочин, нийлүүлэгч, мах…" value="${esc(orderFilter.q)}" autocomplete="off">
-        <select class="input" id="supplier"><option value="">Бүх нийлүүлэгч</option>${suppliers.map((s) => `<option value="${s.id}"${orderFilter.supplier === s.id ? ' selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
-        <input class="input" type="date" id="day" value="${esc(orderFilter.day)}" title="Авах, хүргэх өдөр">
-        <div class="seg">${[['live', 'Идэвхтэй'], ['done', 'Дууссан'], ['all', 'Бүгд']].map(([k, l]) => `<button type="button" data-scope="${k}"${orderFilter.scope === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>
-      </div>
-      <div id="orders" class="table-wrap"></div>
-    </div>`));
-  view.querySelector('#orders').append(busy());
-  let timer;
-  view.querySelector('#q').addEventListener('input', (e) => {
-    orderFilter.q = e.target.value;
-    clearTimeout(timer);
-    timer = setTimeout(loadOrders, 250);
+  view.append(head('Захиалгууд', 'Бүх нийлүүлэгчийн захиалга нэг хүснэгтэд. Мөр дээр дарж мөнгө, явц, үйлдлийг нь үзнэ.'));
+  const day = el(`<input class="input dt-date" type="date" id="day" value="${esc(orderFilter.day)}" title="Авах, хүргэх өдөр" aria-label="Авах, хүргэх өдөр">`);
+  const table = dataTable({
+    columns: [
+      { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(`<span class="mono">№${esc(o.code)}</span>`, esc(`${o.title} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}`)) },
+      { key: 'supplier', label: 'Нийлүүлэгч', value: (o) => o.supplier.name },
+      {
+        key: 'guest',
+        label: 'Зочин',
+        value: (o) => `${o.guest ?? ''} ${o.guest_phone ?? ''}`,
+        render: (o) => dtCell.twoHtml(esc(o.guest ?? 'зочин'), o.guest_phone ? `<span class="mono">${esc(o.guest_phone)}</span>` : ''),
+      },
+      {
+        key: 'receive_on',
+        label: 'Өдөр',
+        render: (o) => dtCell.twoHtml(`<span class="mono">${dayLabel(o.receive_on)}</span>`, o.receive === 'delivery' ? 'хүргэлт' : 'өөрөө авна'),
+      },
+      { key: 'state', label: 'Төлөв', value: (o) => STATE_WORD[o.state] ?? o.state, render: (o) => dtCell.pill(o.state, STATE_WORD[o.state] ?? o.state) },
+      { key: 'total_mnt', label: 'Дүн', align: 'end', numeric: true, render: (o) => dtCell.money(o.total_mnt) },
+    ],
+    search: { placeholder: 'Код, утас, зочин, нийлүүлэгч, мах…' },
+    onSearch: (q) => {
+      orderFilter.q = q;
+      void loadOrders(table);
+    },
+    filters: [
+      { key: 'scope', label: 'Хамрах хүрээ', options: [['live', 'Идэвхтэй'], ['done', 'Дууссан'], ['all', 'Бүгд']], initial: orderFilter.scope },
+      {
+        key: 'supplier',
+        label: 'Нийлүүлэгч',
+        kind: 'select',
+        options: [['', 'Бүх нийлүүлэгч'], ...suppliers.map((s) => [s.id, s.name])],
+        initial: orderFilter.supplier,
+      },
+    ],
+    onFilter: (f) => {
+      orderFilter.scope = f.scope;
+      orderFilter.supplier = f.supplier;
+      void loadOrders(table);
+    },
+    tools: [day],
+    sort: { key: 'receive_on', desc: false },
+    onRow: (o) => openOrder(o.id),
+    rowAttrs: (o) => ({ 'data-order': o.id }),
+    noun: 'захиалга',
+    empty: { title: 'Захиалга алга', text: 'Шүүлтэд тохирох захиалга байхгүй.' },
   });
-  view.querySelector('#supplier').addEventListener('change', (e) => ((orderFilter.supplier = e.target.value), loadOrders()));
-  view.querySelector('#day').addEventListener('change', (e) => ((orderFilter.day = e.target.value), loadOrders()));
-  view.querySelector('.seg').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-scope]');
-    if (!b) return;
-    orderFilter.scope = b.dataset.scope;
-    for (const c of view.querySelectorAll('.seg button')) c.toggleAttribute('data-on', c === b);
-    void loadOrders();
+  table.el.id = 'orders';
+  table.el.querySelector('.dt-search input').value = orderFilter.q;
+  day.addEventListener('change', () => {
+    orderFilter.day = day.value;
+    void loadOrders(table);
   });
-  void loadOrders();
+  view.append(table.el);
+  void loadOrders(table);
 }
 
-async function loadOrders() {
-  const box = document.getElementById('orders');
-  if (!box) return;
+async function loadOrders(table) {
   const qs = new URLSearchParams({ scope: orderFilter.scope, q: orderFilter.q });
   if (orderFilter.supplier) qs.set('supplier', orderFilter.supplier);
   if (orderFilter.day) qs.set('day', orderFilter.day);
-  let data;
   try {
-    data = await ops(`/v1/ops/orders?${qs}`);
+    table.setRows((await ops(`/v1/ops/orders?${qs}`)).orders);
   } catch (error) {
-    box.replaceChildren(el(`<div class="empty">${esc(error.message)}</div>`));
-    return;
+    toast(error.message, 'bad');
+    table.setRows([]);
   }
-  if (!document.getElementById('orders')) return;
-  if (!data.orders.length) {
-    box.replaceChildren(el('<div class="empty"><b>Захиалга алга</b>Шүүлтэд тохирох захиалга байхгүй.</div>'));
-    return;
-  }
-  const table = el(`<table class="table"><thead><tr><th>Захиалга</th><th>Нийлүүлэгч</th><th>Зочин</th><th>Өдөр</th><th>Төлөв</th><th class="num">Дүн</th></tr></thead><tbody></tbody></table>`);
-  const body = table.querySelector('tbody');
-  for (const o of data.orders) {
-    const tr = el(`
-      <tr data-link data-order="${o.id}">
-        <td><b class="mono">№${o.code}</b><span class="sub">${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}</span></td>
-        <td>${esc(o.supplier.name)}</td>
-        <td>${esc(o.guest ?? 'зочин')}<span class="sub mono">${esc(o.guest_phone ?? '')}</span></td>
-        <td><span class="mono">${dayLabel(o.receive_on)}</span><span class="sub">${o.receive === 'delivery' ? 'хүргэлт' : 'өөрөө авна'}</span></td>
-        <td><span class="pill" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span></td>
-        <td class="num">${money(o.total_mnt)}</td>
-      </tr>`);
-    tr.addEventListener('click', () => openOrder(o.id));
-    body.append(tr);
-  }
-  box.replaceChildren(table);
 }
 
 /** One order, its money, its story — and the three things ops may do to it. */
@@ -2985,7 +3308,7 @@ async function openOrder(id) {
             ${o.cancel_reason ? `<div><div class="lab">Цуцлалт</div><b>${REASON[o.cancel_reason] ?? o.cancel_reason}</b><br>буцаалт ${mnt(o.refund_mnt ?? 0)}${o.forfeit_mnt ? ` · суутгал ${mnt(o.forfeit_mnt)}` : ''}</div>` : ''}
           </div>
         </div>
-        <section class="section"><h2 class="section-label">Мөнгө</h2><div class="rows" id="money" data-rows>${d.settlements.length ? '' : '<div class="card empty">Тооцоо үүсээгүй — хүлээлгэн өгснөөс хойш нэг хоногт үүснэ.</div>'}</div></section>
+        <section class="section"><h2 class="section-label">Мөнгө</h2><div id="money"></div></section>
         <section class="section"><h2 class="section-label">Явц</h2><div class="card card-body"><ol class="story stepper" data-stepper>${d.events
           .map((e) => step(e.type, EVENT_WORD[e.type] ?? e.type, `${actorWord(e.actor)}${e.payload?.reason ? ` · ${REASON[e.payload.reason] ?? e.payload.reason}` : ''}${e.payload?.state ? ` · ${STATE_WORD[e.payload.state] ?? ''}` : ''}`, e.at))
           .join('')}</ol></div></section>
@@ -3005,7 +3328,9 @@ async function openOrder(id) {
         </div>
       </div>
     </div>`);
-  for (const t of d.settlements) page.querySelector('#money').append(renderSettlement(t));
+  const moneyBox = page.querySelector('#money');
+  if (d.settlements.length) moneyBox.append(settlementTable(d.settlements, false).el);
+  else moneyBox.append(el('<div class="card empty">Тооцоо үүсээгүй — хүлээлгэн өгснөөс хойш нэг хоногт үүснэ.</div>'));
   const acts = page.querySelector('#acts');
   const reason = acts.querySelector('#reason');
   reason?.addEventListener('change', () => (acts.querySelector('[data-a="cancel"]').disabled = !reason.value));
@@ -3032,128 +3357,195 @@ async function openOrder(id) {
 
 /* ── suppliers ── */
 
+/** A supplier's word and tone: an application, under contract (or paused), or declined. */
+const supplierState = (s) => (s.state === 'contracted' ? (s.active ? ['contracted', 'гэрээт'] : ['off', 'түр зогссон']) : [s.state, STATE[s.state] ?? s.state]);
+
 function renderSuppliers(view) {
   const applied = cache.suppliers.filter((s) => s.state === 'applied');
   const rest = cache.suppliers.filter((s) => s.state !== 'applied');
-  view.append(head('Нийлүүлэгчид', `${applied.length} хүсэлт · ${rest.filter((s) => s.state === 'contracted').length} гэрээт`));
-  view.append(
-    el(`<section class="section" id="applied"><h2 class="section-label">Хүсэлт</h2><div class="rows" data-rows></div></section>`),
-    el(`<section class="section" id="all"><h2 class="section-label">Нийлүүлэгчид</h2><div class="rows" data-rows></div></section>`),
-    el(`<section class="section" id="new"><h2 class="section-label">Шинэ нийлүүлэгч, гэрээтэй</h2></section>`),
-  );
-  const pending = view.querySelector('#applied .rows');
-  if (!applied.length) pending.append(el('<div class="card empty">Хүлээгдэж буй хүсэлт алга.</div>'));
-  for (const s of applied) pending.append(renderRow(s));
-  const list = view.querySelector('#all .rows');
-  if (!rest.length) list.append(el('<div class="card empty">Нийлүүлэгч алга.</div>'));
-  for (const s of rest) list.append(renderRow(s));
-  if (can('desk.suppliers:manage')) view.querySelector('#new').append(newForm());
-  else view.querySelector('#new').remove();
-}
+  const runs = can('desk.suppliers:manage');
+  view.append(head('Нийлүүлэгчид', `${applied.length} хүсэлт хүлээгдэж байна · ${rest.filter((s) => s.state === 'contracted').length} гэрээт. Мөр дээр дарж нөхцөл, данс, зарыг нь үзнэ.`));
 
-function renderRow(s) {
-  const status = s.state === 'contracted' ? (s.active ? 'contracted' : 'off') : s.state;
-  const row = el(`
-    <div class="card row" data-state="${s.state}" data-supplier="${s.id}">
-      <div class="name">${esc(s.name)}<small><span class="mono">${esc(s.phone)}</span>${s.merchant_tin ? ` · ТТД <span class="mono">${esc(s.merchant_tin)}</span>` : ' · ТТД алга'} · ${esc(s.pickup_address)}<br>${
-        s.state === 'applied'
-          ? `хүсэлт ${when(s.applied_at)}`
-          : s.state === 'contracted'
-            ? `гэрээ ${when(s.contracted_at)} · ${s.listings} зар`
-            : `татгалзсан ${when(s.decided_at)}: ${esc(s.decline_reason)}`
-      }</small></div>
-      <div class="right"><span class="pill" data-s="${status}">${s.state === 'contracted' && !s.active ? 'түр зогссон' : STATE[s.state]}</span><div class="btns"></div></div>
-      ${s.about ? `<div class="about">${esc(s.about)}</div>` : ''}
-      ${
-        s.state !== 'declined'
-          ? `<div class="about">Шимтгэл <b>${s.commission_pct}%</b> · Данс: ${
-              s.bank_account ? `<b>${esc(s.bank_name)} <span class="mono">${esc(s.bank_account)}</span></b> · ${esc(s.bank_holder)}${s.bank_verified ? '' : ' <span class="pill" data-s="warn">баталгаажаагүй</span>'}` : '<b>алга</b>'
-            }</div>`
-          : ''
-      }
-    </div>`);
-  const buttons = row.querySelector('.btns');
-  const act = async (path, body, done) => {
+  const act = async (path, body, said) => {
     try {
-      const answer = await ops(path, { method: 'POST', body: body ?? {} });
-      done?.(answer);
+      await ops(path, { method: 'POST', body: body ?? {} });
+      if (said) toast(said, 'good');
       await refresh();
     } catch (error) {
       toast(error.message, 'bad');
     }
   };
-  const small = (label, attrs = '') => el(`<button class="btn" data-size="sm" type="button" ${attrs}>${label}</button>`);
-  // One action in view, the rest behind ⋯ — every button stays in the DOM.
-  const folded = more();
-  const menu = folded.querySelector('.menu');
-  const fold = (button) => {
-    button.dataset.v = 'quiet';
-    menu.append(button);
-  };
 
-  // Each button only for a seat that may press it: ops runs the suppliers, finance the contract's money.
+  const asked = dataTable({
+    columns: [
+      { key: 'name', label: 'Хүсэлт гаргагч', render: (s) => dtCell.two(s.name, s.about ?? '') },
+      { key: 'phone', label: 'Утас', render: (s) => dtCell.mono(s.phone) },
+      { key: 'merchant_tin', label: 'ТТД', render: (s) => dtCell.mono(s.merchant_tin), phone: false },
+      { key: 'pickup_address', label: 'Авах цэг', phone: false },
+      { key: 'applied_at', label: 'Ирсэн', render: (s) => dtCell.when(s.applied_at) },
+    ],
+    search: false,
+    actions: runs
+      ? (s) => {
+          const ok = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
+          ok.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/approve`, null, 'Батлагдлаа. Эзэн нь өөрийн бүртгэлээр /supplier-д нэвтэрнэ — SMS очно.'));
+          const no = el('<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="decline">Татгалзах</button>');
+          no.addEventListener('click', () => {
+            const reason = prompt('Шалтгаан (нийлүүлэгчид SMS-ээр очно):', '');
+            if (reason !== null) void act(`/v1/ops/suppliers/${s.id}/decline`, { reason });
+          });
+          return [ok, no];
+        }
+      : null,
+    sort: { key: 'applied_at', desc: true },
+    onRow: (s) => openSupplier(s.id),
+    rowAttrs: (s) => ({ 'data-supplier': s.id, 'data-state': s.state }),
+    noun: 'хүсэлт',
+    empty: { title: 'Хүлээгдэж буй хүсэлт алга', text: 'Нийлүүлэгч болох хүсэлт ирэхэд энд гарна.' },
+    rows: applied,
+  });
+  asked.el.id = 'applied';
+
+  const add = runs ? el(`<button class="btn" data-v="primary" data-size="sm" type="button" id="add-supplier">${NAV_ICON.plus}Бүртгэх</button>`) : null;
+  const all = dataTable({
+    columns: [
+      { key: 'name', label: 'Нийлүүлэгч', render: (s) => dtCell.two(s.name, s.pickup_address) },
+      { key: 'phone', label: 'Утас', render: (s) => dtCell.mono(s.phone) },
+      { key: 'merchant_tin', label: 'ТТД', render: (s) => (s.merchant_tin ? dtCell.mono(s.merchant_tin) : '<span class="ink-stop">алга</span>'), phone: false },
+      { key: 'commission_pct', label: 'Шимтгэл', align: 'end', numeric: true, render: (s) => (s.state === 'declined' ? dtCell.none() : `<span class="dt-num">${s.commission_pct}%</span>`) },
+      {
+        key: 'bank',
+        label: 'Данс',
+        value: (s) => (s.bank_account ? (s.bank_verified ? 2 : 1) : 0),
+        numeric: true,
+        render: (s) =>
+          s.bank_account
+            ? dtCell.twoHtml(`${esc(s.bank_name)} <span class="mono">${esc(s.bank_account)}</span>`, s.bank_verified ? esc(s.bank_holder ?? '') : dtCell.pill('warn', 'баталгаажаагүй'))
+            : dtCell.none(),
+        phone: false,
+      },
+      { key: 'listings', label: 'Зар', align: 'end', numeric: true, render: (s) => (s.state === 'contracted' ? dtCell.num(s.listings) : dtCell.none()) },
+      { key: 'contracted_at', label: 'Гэрээ', render: (s) => (s.state === 'declined' ? `<small class="muted">татгалзсан</small>` : dtCell.when(s.contracted_at)), phone: false },
+      { key: 'state', label: 'Төлөв', value: (s) => supplierState(s)[1], render: (s) => dtCell.pill(...supplierState(s)) },
+    ],
+    search: { placeholder: 'Нэр, утас, ТТД, хаяг…' },
+    filters: [
+      {
+        key: 'state',
+        label: 'Төлөв',
+        options: [['all', 'Бүгд'], ['on', 'Гэрээт'], ['off', 'Түр зогссон'], ['declined', 'Татгалзсан']],
+        test: (s, v) => v === 'all' || (v === 'on' ? s.state === 'contracted' && s.active : v === 'off' ? s.state === 'contracted' && !s.active : s.state === v),
+      },
+    ],
+    tools: [add],
+    sort: { key: 'name' },
+    onRow: (s) => openSupplier(s.id),
+    rowAttrs: (s) => ({ 'data-supplier': s.id, 'data-state': s.state }),
+    noun: 'нийлүүлэгч',
+    empty: { title: 'Нийлүүлэгч алга', text: 'Гэрээ байгуулсан нийлүүлэгч бүртгэгдээгүй.' },
+    stateKey: 'basu.dt.suppliers',
+    rows: rest,
+  });
+  all.el.id = 'all';
+
+  view.append(
+    el('<section class="section"><h2 class="section-label">Хүсэлт</h2><div data-applied></div></section>'),
+    el('<section class="section"><h2 class="section-label">Нийлүүлэгчид</h2><div data-all></div></section>'),
+  );
+  view.querySelector('[data-applied]').replaceWith(asked.el);
+  view.querySelector('[data-all]').replaceWith(all.el);
+  if (runs) {
+    const section = el('<section class="section" id="new" hidden><h2 class="section-label">Шинэ нийлүүлэгч, гэрээтэй</h2></section>');
+    section.append(newForm());
+    view.append(section);
+    add.addEventListener('click', () => {
+      section.hidden = !section.hidden;
+      if (!section.hidden) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+}
+
+/** One supplier, whole: who, the contract's terms, the money's account, the listings — and what ops may do. */
+async function openSupplier(id) {
+  const view = document.getElementById('view');
+  const s = cache.suppliers.find((x) => x.id === id);
+  if (!s) return show('suppliers');
   const runs = can('desk.suppliers:manage');
   const signs = can('desk.suppliers:terms');
+  const again = async (said) => {
+    if (said) toast(said, 'good');
+    try {
+      cache.suppliers = (await ops('/v1/ops/suppliers')).suppliers;
+      badges();
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+    await openSupplier(id);
+  };
+  const act = async (path, body, said) => {
+    try {
+      await ops(path, { method: 'POST', body: body ?? {} });
+      await again(said);
+    } catch (error) {
+      toast(error.message, 'bad');
+    }
+  };
+  view.replaceChildren();
+  const back = el(`<button class="back link" type="button" id="back">${CHEV}Нийлүүлэгчид</button>`);
+  back.addEventListener('click', () => show('suppliers'));
+  const [tone, word] = supplierState(s);
+  view.append(back, head(`${esc(s.name)} ${dtCell.pill(tone, word)}`, `${tel(s.phone)} · ${esc(s.pickup_address)}`));
+
+  const buttons = el('<div class="detail-actions"></div>');
   if (s.state === 'applied' && runs) {
-    const ok = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
-    ok.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/approve`, null, () => toast('Батлагдлаа. Эзэн нь өөрийн бүртгэлээр /supplier-д нэвтэрнэ — SMS очно.', 'good')));
-    const no = el('<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="decline">Татгалзах</button>');
+    const ok = el('<button class="btn" data-v="primary" type="button" data-a="approve">Батлах</button>');
+    ok.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/approve`, null, 'Батлагдлаа. Эзэн нь өөрийн бүртгэлээр /supplier-д нэвтэрнэ — SMS очно.'));
+    const no = el('<button class="btn" type="button" data-a="decline">Татгалзах</button>');
     no.addEventListener('click', () => {
       const reason = prompt('Шалтгаан (нийлүүлэгчид SMS-ээр очно):', '');
-      if (reason === null) return;
-      act(`/v1/ops/suppliers/${s.id}/decline`, { reason });
+      if (reason !== null) void act(`/v1/ops/suppliers/${s.id}/decline`, { reason });
     });
     buttons.append(ok, no);
   }
   if (s.state === 'contracted' && s.bank_account && !s.bank_verified && signs) {
     // A changed account pays out nothing until somebody holds it up against the contract.
-    const check = el('<button class="btn" data-size="sm" type="button" data-a="bank-verify">Данс баталгаажуулах</button>');
+    const check = el('<button class="btn" data-v="primary" type="button" data-a="bank-verify">Данс баталгаажуулах</button>');
     check.addEventListener('click', () => {
       if (!confirm(`${s.name}: ${s.bank_name} ${s.bank_account} (${s.bank_holder}) гэрээний данстай таарч байна уу?`)) return;
-      act(`/v1/ops/suppliers/${s.id}/bank-verify`, { note: 'гэрээтэй тулгасан' });
+      void act(`/v1/ops/suppliers/${s.id}/bank-verify`, { note: 'гэрээтэй тулгасан' }, 'Данс баталгаажлаа.');
     });
     buttons.append(check);
   }
-  if (s.state === 'contracted') {
-    // Their listings, to look at and, if need be, hide.
-    const stall = small('Зарууд', 'data-a="listings"');
-    stall.addEventListener('click', async () => {
-      if (row.querySelector('.stall')) return row.querySelector('.stall').remove();
-      const { listings } = await ops(`/v1/ops/suppliers/${s.id}/listings`);
-      const box = el('<div class="drawer stall"></div>');
-      if (!listings.length) box.append(el('<span class="muted">Зар алга.</span>'));
-      for (const l of listings) {
-        const line = el(`<div class="stall-line"${l.active ? '' : ' data-off'}><span>${esc(l.title)} · ${money(l.price_mnt)}/${l.unit === 'kg' ? 'кг' : 'толгой'} · <span class="mono">${l.sold}/${l.quantity}</span>${l.active ? '' : ' · нуусан'}</span></div>`);
-        if (l.active && runs) {
-          const hide = el('<button class="btn" data-v="quiet" data-size="sm" type="button">Нуух</button>');
-          hide.addEventListener('click', () => {
-            const note = prompt('Нуух шалтгаан (бүртгэлд үлдэнэ):', '');
-            if (note === null) return;
-            act(`/v1/ops/listings/${l.id}/hide`, { note });
-          });
-          line.append(hide);
-        }
-        box.append(line);
-      }
-      row.append(box);
-    });
-    buttons.append(stall);
+  if (s.state === 'contracted' && runs) {
     // Off the market, or back on it — with the reason kept.
-    const toggle = el(`<button class="btn${s.active ? ' ink-stop' : ''}" data-size="sm" type="button" data-a="active">${s.active ? 'Түр зогсоох' : 'Идэвхжүүлэх'}</button>`);
+    const toggle = el(`<button class="btn${s.active ? ' ink-stop' : ''}" type="button" data-a="active">${s.active ? 'Түр зогсоох' : 'Идэвхжүүлэх'}</button>`);
     toggle.addEventListener('click', () => {
       const note = prompt(s.active ? 'Түр зогсоох шалтгаан (бүртгэлд үлдэнэ):' : 'Идэвхжүүлэх тэмдэглэл:', '');
-      if (note === null) return;
-      act(`/v1/ops/suppliers/${s.id}/active`, { active: !s.active, note });
+      if (note !== null) void act(`/v1/ops/suppliers/${s.id}/active`, { active: !s.active, note });
     });
-    if (runs) fold(toggle);
+    buttons.append(toggle);
   }
+  if (buttons.childElementCount) view.append(buttons);
+
+  const terms = el(`
+    <section class="section"><h2 class="section-label">Гэрээ, данс</h2>
+      <div class="card"><div class="facts">
+        <div><span class="lab">Шимтгэл</span><b>${s.state === 'declined' ? '—' : `${s.commission_pct}%`}</b></div>
+        <div><span class="lab">ТТД</span><b class="mono">${esc(s.merchant_tin ?? '—')}</b></div>
+        <div><span class="lab">Банк</span><b>${esc(s.bank_name ?? '—')}</b></div>
+        <div><span class="lab">Данс</span><b class="mono">${esc(s.bank_account ?? '—')}</b>${s.bank_account ? (s.bank_verified ? ' <span class="pill" data-s="verified">баталгаажсан</span>' : ' <span class="pill" data-s="warn">баталгаажаагүй</span>') : ''}</div>
+        <div><span class="lab">Эзэмшигч</span><b>${esc(s.bank_holder ?? '—')}</b></div>
+        <div><span class="lab">${s.state === 'applied' ? 'Хүсэлт' : s.state === 'declined' ? 'Татгалзсан' : 'Гэрээ'}</span><b>${when(s.state === 'applied' ? s.applied_at : s.state === 'declined' ? s.decided_at : s.contracted_at)}</b>${s.state === 'declined' && s.decline_reason ? `<small class="muted"> · ${esc(s.decline_reason)}</small>` : ''}</div>
+      </div></div>
+    </section>`);
   if (s.state !== 'declined' && signs) {
     // The contract's terms: written in once it is signed, corrected here.
-    const terms = small('Нөхцөл', 'data-a="terms"');
-    terms.addEventListener('click', () => {
-      if (row.querySelector('.terms')) return row.querySelector('.terms').remove();
+    const edit = el('<button class="btn" data-size="sm" type="button" data-a="terms">Засах</button>');
+    terms.querySelector('.section-label').append(edit);
+    edit.addEventListener('click', () => {
+      if (terms.querySelector('.terms')) return terms.querySelector('.terms').remove();
       const form = el(`
-        <div class="drawer terms">
+        <div class="card terms" style="margin-top:12px"><div class="card-body">
           <div class="fields">
             <label class="field"><span>Шимтгэл, %</span><input name="commission_pct" inputmode="decimal" value="${s.commission_pct}"></label>
             <label class="field"><span>ТТД</span><input name="tin" inputmode="numeric" value="${esc(s.merchant_tin ?? '')}" placeholder="7–14 орон"></label>
@@ -3165,7 +3557,7 @@ function renderRow(s) {
             <button class="btn" data-v="quiet" type="button" data-a="close">Болих</button>
             <button class="btn" data-v="primary" type="button" data-a="save">Хадгалах</button>
           </div>
-        </div>`);
+        </div></div>`);
       form.querySelector('[data-a="close"]').addEventListener('click', () => form.remove());
       form.querySelector('[data-a="save"]').addEventListener('click', async () => {
         const v = (name) => form.querySelector(`[name="${name}"]`).value.trim();
@@ -3173,18 +3565,52 @@ function renderRow(s) {
         if (v('commission_pct') !== '') body.commission_pct = Number(v('commission_pct'));
         try {
           await ops(`/v1/ops/suppliers/${s.id}`, { method: 'PATCH', body });
-          toast('Хадгалагдлаа.');
-          await refresh();
+          await again('Хадгалагдлаа.');
         } catch (error) {
           toast(error.message, 'bad');
         }
       });
-      row.append(form);
+      terms.append(form);
     });
-    fold(terms);
   }
-  if (menu.childElementCount) buttons.append(folded);
-  return row;
+  view.append(terms);
+  if (s.about) view.append(el(`<section class="section"><h2 class="section-label">Тухай</h2><div class="card"><div class="card-body">${esc(s.about)}</div></div></section>`));
+
+  if (s.state === 'contracted') {
+    const listings = dataTable({
+      columns: [
+        { key: 'title', label: 'Зар', render: (l) => `<b>${esc(l.title)}</b>` },
+        { key: 'price_mnt', label: 'Үнэ', align: 'end', numeric: true, render: (l) => `${dtCell.money(l.price_mnt)}<small class="muted">/${l.unit === 'kg' ? 'кг' : 'толгой'}</small>` },
+        { key: 'sold', label: 'Зарагдсан', align: 'end', numeric: true, render: (l) => `<span class="dt-num">${l.sold}/${l.quantity}</span>` },
+        { key: 'active', label: 'Төлөв', value: (l) => (l.active ? 'зарагдаж байна' : 'нуусан'), render: (l) => (l.active ? dtCell.pill('contracted', 'зарагдаж байна') : dtCell.pill('off', 'нуусан')) },
+      ],
+      search: false,
+      actions: runs
+        ? (l) => {
+            if (!l.active) return null;
+            const hide = el('<button class="btn" data-v="quiet" data-size="sm" type="button">Нуух</button>');
+            hide.addEventListener('click', () => {
+              const note = prompt('Нуух шалтгаан (бүртгэлд үлдэнэ):', '');
+              if (note !== null) void act(`/v1/ops/listings/${l.id}/hide`, { note }, 'Зар нуугдлаа.');
+            });
+            return hide;
+          }
+        : null,
+      rowAttrs: (l) => ({ 'data-listing': l.id }),
+      noun: 'зар',
+      empty: { title: 'Зар алга', text: 'Нийлүүлэгч одоогоор зар тавиагүй.' },
+    });
+    listings.el.id = 'listings';
+    const section = el('<section class="section"><h2 class="section-label">Зарууд</h2></section>');
+    section.append(listings.el);
+    view.append(section);
+    try {
+      listings.setRows((await ops(`/v1/ops/suppliers/${s.id}/listings`)).listings);
+    } catch (error) {
+      toast(error.message, 'bad');
+      listings.setRows([]);
+    }
+  }
 }
 
 function newForm() {
@@ -3234,109 +3660,188 @@ function newForm() {
 
 /* ── the money ── */
 
+/** Where a payout or a refund stands, in the word and tone the desk reads it by. */
+const settlementState = (t) =>
+  t.state === 'paid'
+    ? ['paid', 'шилжүүлсэн']
+    : t.state === 'needs_account'
+      ? ['needs_account', 'данс хүлээж байна']
+      : !t.bank_verified
+        ? ['warn', 'данс баталгаажаагүй']
+        : t.approved_at
+          ? ['due', 'шилжүүлэх']
+          : ['hold', 'батлах хүлээж байна'];
+
+/**
+ * Payouts and refunds as one table: who, for which order, to which account,
+ * where it stands — and on a row that is due, the one half of the two-person
+ * release this member may press. The whole list on «Олголт», one order's on its page.
+ */
+function settlementTable(rows, withFilters = true) {
+  return dataTable({
+    columns: [
+      {
+        key: 'who',
+        label: 'Хэнд',
+        value: (t) => (t.kind === 'payout' ? t.supplier?.name ?? '' : t.guest?.name ?? 'Зочин'),
+        render: (t) => dtCell.two(t.kind === 'payout' ? t.supplier?.name ?? '' : t.guest?.name ?? 'Зочин', t.kind === 'payout' ? 'олголт · нийлүүлэгч' : 'буцаалт · зочин'),
+      },
+      { key: 'order_code', label: 'Захиалга', render: (t) => dtCell.twoHtml(`<span class="mono">№${esc(t.order_code)}</span>`, esc(t.memo ?? '')) },
+      {
+        key: 'bank',
+        label: 'Данс',
+        value: (t) => `${t.bank_name ?? ''} ${t.bank_account ?? ''} ${t.bank_holder ?? ''}`,
+        render: (t) => (t.bank_account ? dtCell.twoHtml(`${esc(t.bank_name)} <span class="mono">${esc(t.bank_account)}</span>`, esc(t.bank_holder ?? '')) : '<span class="muted">данс алга</span>'),
+        phone: false,
+      },
+      {
+        key: 'state',
+        label: 'Төлөв',
+        value: (t) => settlementState(t)[1],
+        render: (t) =>
+          dtCell.twoHtml(
+            dtCell.pill(...settlementState(t)),
+            t.state === 'paid'
+              ? `${when(t.paid_at)}${t.reference ? ` · <span class="mono">${esc(t.reference)}</span>` : ''}`
+              : t.approved_by
+                ? `${esc(t.approved_by.replace('ops:', ''))} баталсан`
+                : '',
+          ),
+      },
+      { key: 'created_at', label: 'Үүссэн', render: (t) => dtCell.when(t.created_at), phone: false },
+      { key: 'amount_mnt', label: 'Дүн', align: 'end', numeric: true, render: (t) => dtCell.money(t.amount_mnt) },
+    ],
+    search: withFilters ? { placeholder: 'Нэр, захиалга, данс…' } : false,
+    filters: withFilters ? [
+      {
+        key: 'state',
+        label: 'Төлөв',
+        options: [['open', 'Хийх'], ['needs_account', 'Данс хүлээж буй'], ['paid', 'Шилжүүлсэн'], ['all', 'Бүгд']],
+        test: (t, v) => v === 'all' || (v === 'open' ? t.state === 'due' : t.state === v),
+      },
+      {
+        key: 'kind',
+        label: 'Төрөл',
+        kind: 'select',
+        options: [['', 'Олголт ба буцаалт'], ['payout', 'Олголт'], ['refund', 'Буцаалт']],
+        test: (t, v) => !v || t.kind === v,
+      },
+    ] : [],
+    actions: (t) => {
+      if (t.state !== 'due' || !t.bank_verified || !can('desk.pay:approve')) return null;
+      const bank = `${t.bank_name} · ${t.bank_account} · ${t.bank_holder}`;
+      if (!t.approved_at) {
+        // Two people, not one: releasing the money and sending it are different
+        // hands, so the row only ever offers the half that is this member's.
+        const approve = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
+        approve.addEventListener('click', async () => {
+          if (!confirm(`${mnt(t.amount_mnt)} → ${bank}\nЭнэ олголтыг батлах уу? Шилжүүлэхийг өөр гишүүн хийнэ.`)) return;
+          approve.disabled = true;
+          try {
+            await ops(`/v1/ops/settlements/${t.id}/approve`, { method: 'POST', body: {} });
+            toast('Батлагдлаа. Одоо өөр гишүүн шилжүүлж тэмдэглэнэ.', 'good');
+            await refresh();
+          } catch (error) {
+            toast(error.message, 'bad');
+            approve.disabled = false;
+          }
+        });
+        return approve;
+      }
+      const done = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="paid">Шилжүүлсэн</button>');
+      done.addEventListener('click', async () => {
+        const reference = prompt(`${mnt(t.amount_mnt)} → ${bank}\nБанкны гүйлгээний дугаар (заавал биш):`, '');
+        if (reference === null) return;
+        done.disabled = true;
+        try {
+          await ops(`/v1/ops/settlements/${t.id}/paid`, { method: 'POST', body: { reference } });
+          toast('Тэмдэглэгдлээ, мэдэгдэл явлаа.');
+          await refresh();
+        } catch (error) {
+          toast(error.message, 'bad');
+          done.disabled = false;
+        }
+      });
+      return done;
+    },
+    sort: { key: 'created_at', desc: true },
+    rowAttrs: (t) => ({ 'data-kind': t.kind, 'data-settlement': t.id, 'data-paid': t.state === 'paid' }),
+    noun: 'мөр',
+    empty: { title: 'Шилжүүлэх зүйл алга', text: 'Хүлээлгэн өгсөн захиалгын олголт, цуцлагдсан захиалгын буцаалт энд гарна.' },
+    stateKey: withFilters ? 'basu.dt.pay' : null,
+    rows,
+  });
+}
+
 function renderPay(view) {
   const due = cache.settlements.filter((t) => t.state === 'due');
   const waiting = cache.settlements.filter((t) => t.state === 'needs_account');
   const paid = cache.settlements.filter((t) => t.state === 'paid');
-  view.append(head('Олголт, буцаалт', 'Basu-гийн банкаар гараар шилжүүлж, энд «Шилжүүлсэн» гэж тэмдэглэнэ.'));
+  view.append(head('Олголт, буцаалт', 'Basu-гийн банкаар гараар шилжүүлж, энд «Шилжүүлсэн» гэж тэмдэглэнэ. Нэг хүн батлаж, өөр хүн шилжүүлнэ.'));
   view.append(el(`<div class="kpis kpi-band">
     <div class="card kpi"><div class="lab">Шилжүүлэх ёстой</div><b>${money(due.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${due.length} мөр, данс бэлэн</span></div>
     <div class="card kpi"><div class="lab">Данс хүлээж байна</div><b>${money(waiting.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${waiting.length} буцаалт — зочин дансаа оруулаагүй</span></div>
     <div class="card kpi"><div class="lab">Шилжүүлсэн (30 хоног)</div><b>${money(paid.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${paid.length} мөр</span></div>
   </div>`));
-  const section = el('<section id="pay" class="section"><div class="rows" data-rows></div></section>');
-  const rows = section.querySelector('.rows');
-  if (!cache.settlements.length) rows.append(el('<div class="card empty"><b>Шилжүүлэх зүйл алга</b>Хүлээлгэн өгсөн захиалгын олголт, цуцлагдсан захиалгын буцаалт энд гарна.</div>'));
-  for (const t of cache.settlements) rows.append(renderSettlement(t));
+  const table = settlementTable(cache.settlements);
+  table.el.id = 'pay';
+  const section = el('<section class="section"></section>');
+  section.append(table.el);
   view.append(section);
-}
-
-/**
- * One thing to pay: who, how much, to which account, and the button that
- * says it was done. A refund without an account yet is shown but cannot be
- * paid — the guest has not said where.
- */
-function renderSettlement(t) {
-  const who = t.kind === 'payout' ? esc(t.supplier?.name ?? '') : `${esc(t.guest?.name ?? 'Зочин')} (зочин)`;
-  const bank = t.bank_account ? `${esc(t.bank_name)} · ${esc(t.bank_account)} · ${esc(t.bank_holder)}` : 'данс алга';
-  const bankHtml = t.bank_account ? `${esc(t.bank_name)} · <span class="mono">${esc(t.bank_account)}</span> · ${esc(t.bank_holder)}` : 'данс алга';
-  const status = t.state === 'paid' ? ['paid', 'шилжүүлсэн'] : t.state === 'needs_account' ? ['needs_account', 'данс хүлээж байна'] : !t.bank_verified ? ['warn', 'данс баталгаажаагүй'] : t.approved_at ? ['due', 'шилжүүлэх'] : ['hold', 'батлах хүлээж байна'];
-  const releasedBy = t.approved_by ? esc(t.approved_by.replace('ops:', '')) : null;
-  const row = el(`
-    <div class="card row" data-kind="${t.kind}" data-settlement="${t.id}"${t.state === 'paid' ? ' data-paid' : ''}>
-      <div class="name">${esc(t.memo)} · ${who}<small><span class="mono">№${esc(t.order_code)}</span> · ${bankHtml}<br>${
-        t.state === 'paid'
-          ? `шилжүүлсэн ${when(t.paid_at)}${t.reference ? ` · гүйлгээ <span class="mono">${esc(t.reference)}</span>` : ''}`
-          : t.state === 'needs_account'
-            ? 'зочин аппаар дансаа оруулмагц шилжүүлж болно'
-            : releasedBy
-              ? `<b>${releasedBy}</b> баталсан ${when(t.approved_at)} — өөр гишүүн шилжүүлнэ`
-              : `үүссэн ${when(t.created_at)}`
-      }</small></div>
-      <div class="right"><span class="amount">${money(t.amount_mnt)}</span><span class="pill" data-s="${status[0]}">${status[1]}</span><div class="btns"></div></div>
-    </div>`);
-  if (t.state === 'due' && t.bank_verified && !t.approved_at && can('desk.pay:approve')) {
-    // Two people, not one: releasing the money and sending it are different
-    // hands, so the row only ever offers the half that is this member's.
-    const approve = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
-    approve.addEventListener('click', async () => {
-      if (!confirm(`${mnt(t.amount_mnt)} → ${bank}\nЭнэ олголтыг батлах уу? Шилжүүлэхийг өөр гишүүн хийнэ.`)) return;
-      approve.disabled = true;
-      try {
-        await ops(`/v1/ops/settlements/${t.id}/approve`, { method: 'POST', body: {} });
-        toast('Батлагдлаа. Одоо өөр гишүүн шилжүүлж тэмдэглэнэ.', 'good');
-        await refresh();
-      } catch (error) {
-        toast(error.message, 'bad');
-        approve.disabled = false;
-      }
-    });
-    row.querySelector('.btns').append(approve);
-  }
-  if (t.state === 'due' && t.bank_verified && t.approved_at && can('desk.pay:approve')) {
-    const paid = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="paid">Шилжүүлсэн</button>');
-    paid.addEventListener('click', async () => {
-      const reference = prompt(`${mnt(t.amount_mnt)} → ${bank}\nБанкны гүйлгээний дугаар (заавал биш):`, '');
-      if (reference === null) return;
-      paid.disabled = true;
-      try {
-        await ops(`/v1/ops/settlements/${t.id}/paid`, { method: 'POST', body: { reference } });
-        toast('Тэмдэглэгдлээ, мэдэгдэл явлаа.');
-        await refresh();
-      } catch (error) {
-        toast(error.message, 'bad');
-        paid.disabled = false;
-      }
-    });
-    row.querySelector('.btns').append(paid);
-  }
-  return row;
 }
 
 /* ── the record ── */
 
 const ACTION = {
-  'order.cancel': 'Захиалга цуцалсан', 'order.hand': 'Хүлээлгэн өгсөн гэж тэмдэглэсэн', 'order.resend': 'Мэдэгдэл дахин илгээсэн',
+  'order.cancel': 'Захиалга цуцалсан', 'order.hand': 'Хүлээлгэн өгсөн гэж тэмдэглэсэн', 'order.resend': 'Мэдэгдэл дахин илгээсэн', 'order.no_show': 'Ирээгүй гэж тэмдэглэсэн',
   'supplier.suspend': 'Нийлүүлэгчийг түр зогсоосон', 'supplier.activate': 'Нийлүүлэгчийг идэвхжүүлсэн', 'supplier.terms': 'Гэрээний нөхцөл өөрчилсөн',
-  'supplier.bank_verify': 'Данс баталгаажуулсан', 'listing.hide': 'Зар нуусан', 'member.upsert': 'Гишүүн нэмсэн', 'member.role': 'Гишүүний эрх өөрчилсөн', 'member.approve': 'Ops эрх олгосон', 'org.approve': 'Байгууллага баталсан', 'org.decline': 'Байгууллага татгалзсан', 'member.decline': 'Эрхийн хүсэлт татгалзсан', 'member.activate': 'Гишүүн нээсэн', 'member.deactivate': 'Гишүүн хаасан',
+  'supplier.bank_verify': 'Данс баталгаажуулсан', 'listing.hide': 'Зар нуусан',
+  'settlement.approve': 'Олголт баталсан', 'settlement.paid': 'Олголт шилжүүлсэн гэж тэмдэглэсэн',
+  'ledger.checks': 'Мөнгөний шалгалт ажиллуулсан', 'ledger.export': 'Мөнгөний CSV татсан', 'receipt.retry': 'Е-баримт дахин илгээсэн', 'message.retry': 'Мэдэгдэл дахин илгээсэн',
+  'guest.close': 'Зочны бүртгэл хаасан', 'guest.session_revoke': 'Зочны нэвтрэлт хаасан',
+  'restaurant.activate': 'Ресторан идэвхжүүлсэн', 'restaurant.suspend': 'Ресторан зогсоосон', 'menu.show': 'Хоол цэсэнд буцаасан', 'menu.hide': 'Хоол цэснээс нуусан',
+  'member.upsert': 'Гишүүн нэмсэн', 'member.role': 'Гишүүний эрх өөрчилсөн', 'member.approve': 'Ops эрх олгосон', 'member.decline': 'Эрхийн хүсэлт татгалзсан',
+  'member.activate': 'Гишүүн нээсэн', 'member.deactivate': 'Гишүүн хаасан',
+  'org.approve': 'Байгууллага баталсан', 'org.decline': 'Байгууллага татгалзсан', 'org.member_role': 'Байгууллагын хүний эрх өөрчилсөн', 'org.roles': 'Байгууллагын эрхүүд өөрчилсөн',
+  'role.create': 'Эрх үүсгэсэн', 'role.update': 'Эрх өөрчилсөн', 'role.delete': 'Эрх устгасан',
+  'menu.save': 'Цэс өөрчилсөн', 'menu.module': 'Модуль нэмсэн', 'menu.module_remove': 'Модуль устгасан', 'menu.link': 'Холбоос нэмсэн', 'menu.link_remove': 'Холбоос устгасан',
+  'setting.change': 'Тохиргоо өөрчилсөн',
+};
+
+/** What an action was done to, in the words of the desk's own sections. */
+const TARGET_WORD = {
+  order: 'Идэш', listing: 'Идэш', supplier: 'Нийлүүлэгч', settlement: 'Мөнгө', ledger: 'Мөнгө', receipt: 'Мөнгө', guest: 'Зочин',
+  member: 'Гишүүд', org: 'Байгууллага', role: 'Эрх, цэс', menu: 'Эрх, цэс', restaurant: 'Хоол', device: 'Хоол', menu_item: 'Хоол',
+  message: 'Мэдэгдэл', setting: 'Систем',
 };
 
 async function renderAudit(view) {
-  view.append(head('Бүртгэл', 'Ops-ийн хийсэн үйлдэл бүр — хэн, хэзээ, юуг, ямар тэмдэглэлтэй.'));
-  view.append(el('<ul class="log" id="audit" data-rows><li class="empty">…</li></ul>'));
-  let data;
+  view.append(head('Үйлдлийн түүх', 'Ширээнд хийсэн үйлдэл бүр — хэн, хэзээ, юуг, ямар тэмдэглэлтэй.'));
+  const areas = [...new Set(Object.values(TARGET_WORD))];
+  const table = dataTable({
+    columns: [
+      { key: 'at', label: 'Хэзээ', render: (a) => dtCell.when(a.at) },
+      { key: 'who', label: 'Хэн', value: (a) => a.who.replace('ops:', '') },
+      { key: 'action', label: 'Үйлдэл', value: (a) => ACTION[a.action] ?? a.action, render: (a) => `<b>${ACTION[a.action] ?? esc(a.action)}</b>` },
+      { key: 'area', label: 'Хэсэг', value: (a) => TARGET_WORD[a.target_kind] ?? a.target_kind },
+      { key: 'note', label: 'Тэмдэглэл', value: (a) => a.note ?? '', render: (a) => (a.note ? `<span class="dt-text">${esc(a.note)}</span>` : dtCell.none()), width: '36%' },
+    ],
+    search: { placeholder: 'Хэн, үйлдэл, тэмдэглэл…' },
+    filters: [
+      { key: 'area', label: 'Хэсэг', kind: 'select', options: [['', 'Бүх хэсэг'], ...areas.map((a) => [a, a])], test: (a, v) => !v || (TARGET_WORD[a.target_kind] ?? a.target_kind) === v },
+    ],
+    sort: { key: 'at', desc: true },
+    noun: 'үйлдэл',
+    empty: { title: 'Үйлдэл алга', text: 'Одоогоор ширээнд юу ч хийгээгүй.' },
+    stateKey: 'basu.dt.audit',
+  });
+  table.el.id = 'audit';
+  view.append(table.el);
   try {
-    data = await ops('/v1/ops/audit?limit=200');
+    table.setRows((await ops('/v1/ops/audit?limit=500')).audit);
   } catch (error) {
-    view.querySelector('#audit').replaceChildren(el(`<li class="empty">${esc(error.message)}</li>`));
-    return;
-  }
-  const box = view.querySelector('#audit');
-  if (!box) return;
-  box.replaceChildren();
-  if (!data.audit.length) box.append(el('<li class="empty">Одоогоор юу ч хийгээгүй.</li>'));
-  for (const a of data.audit) {
-    box.append(el(`<li><span class="who">${esc(a.who.replace('ops:', ''))}</span><div>${ACTION[a.action] ?? esc(a.action)}${a.note ? `<small>${esc(a.note)}</small>` : ''}</div><span class="when meta">${when(a.at)} ${clockOf(a.at)}</span></li>`));
+    toast(error.message, 'bad');
+    table.setRows([]);
   }
 }
 
@@ -3354,85 +3859,91 @@ async function renderRequests(view) {
   cache.requests = requests;
   badges();
   const roles = await deskRoleList();
-  const section = el(`<section class="section"><h2 class="section-label">Эрхийн хүсэлт${requests.length ? ` · ${requests.length}` : ''}</h2><div class="card" data-rows id="requests"></div></section>`);
-  const list = section.querySelector('#requests');
-  if (!requests.length) list.append(el('<div class="empty">Хүлээгдэж буй хүсэлт алга. Хүн dashboard-д нэвтэрч «Эрх хүсэх» дарахад энд гарна.</div>'));
-  for (const r of requests) {
-    const row = el(`
-      <div class="row request" data-request="${r.id}">
-        <div class="main">
-          <div class="title">${esc(r.name)}${r.contact ? ` <span class="who-contact">${esc(r.contact)}</span>` : ''}</div>
-          ${r.note ? `<p class="cap">${esc(r.note)}</p>` : ''}
-          <div class="req-actions">
-            <select class="input" aria-label="Олгох эрх">${roles.map((x) => roleOption(x, r.role)).join('')}</select>
-            <button class="btn" data-v="primary" type="button" data-a="approve">Зөвшөөрөх</button>
-            <span class="gap" aria-hidden="true"></span>
-            <input class="input" name="reason" placeholder="Татгалзах шалтгаан" aria-label="Татгалзах шалтгаан">
-            <button class="btn" data-v="quiet" type="button" data-a="decline">Татгалзах</button>
-          </div>
-        </div>
-        <div class="end"><span class="meta">${when(r.created_at)} ${clockOf(r.created_at)}</span></div>
-      </div>`);
-    row.querySelector('[data-a="approve"]').addEventListener('click', async () => {
-      try {
-        const done = await ops(`/v1/ops/requests/${r.id}/approve`, { method: 'POST', body: { role: row.querySelector('select').value } });
-        toast(`${done.member.name}: ${roles.find((x) => x.key === done.member.role)?.name ?? done.member.role} эрх олголоо.`, 'good');
-        show('members');
-      } catch (error) {
-        toast(error.message, 'bad');
-      }
-    });
-    row.querySelector('[data-a="decline"]').addEventListener('click', async () => {
-      try {
-        await ops(`/v1/ops/requests/${r.id}/decline`, { method: 'POST', body: { reason: row.querySelector('[name="reason"]').value.trim() } });
-        toast('Татгалзлаа.');
-        show('members');
-      } catch (error) {
-        toast(error.message, 'bad');
-      }
-    });
-    list.append(row);
-  }
+  const table = dataTable({
+    columns: [
+      { key: 'name', label: 'Хүсэгч', render: (r) => dtCell.two(r.name, r.contact ?? '') },
+      { key: 'note', label: 'Юунд хэрэгтэй', value: (r) => r.note ?? '', render: (r) => (r.note ? `<span class="dt-text">${esc(r.note)}</span>` : dtCell.none()), width: '32%' },
+      { key: 'created_at', label: 'Хүссэн', render: (r) => dtCell.when(r.created_at) },
+    ],
+    search: false,
+    actions: (r) => {
+      const pick = el(`<select class="input dt-select" aria-label="Олгох эрх">${roles.map((x) => `<option value="${esc(x.key)}"${x.key === r.role ? ' selected' : ''} title="${esc(x.description ?? '')}">${esc(x.name)}</option>`).join('')}</select>`);
+      const ok = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Зөвшөөрөх</button>');
+      ok.addEventListener('click', async () => {
+        try {
+          const done = await ops(`/v1/ops/requests/${r.id}/approve`, { method: 'POST', body: { role: pick.value } });
+          toast(`${done.member.name}: ${roles.find((x) => x.key === done.member.role)?.name ?? done.member.role} эрх олголоо.`, 'good');
+          show('members');
+        } catch (error) {
+          toast(error.message, 'bad');
+        }
+      });
+      const no = el('<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="decline">Татгалзах</button>');
+      no.addEventListener('click', async () => {
+        const reason = prompt(`${r.name}-ийн хүсэлтийг татгалзах шалтгаан:`, '');
+        if (reason === null) return;
+        try {
+          await ops(`/v1/ops/requests/${r.id}/decline`, { method: 'POST', body: { reason: reason.trim() } });
+          toast('Татгалзлаа.');
+          show('members');
+        } catch (error) {
+          toast(error.message, 'bad');
+        }
+      });
+      return [pick, ok, no];
+    },
+    sort: { key: 'created_at', desc: true },
+    rowAttrs: (r) => ({ 'data-request': r.id }),
+    noun: 'хүсэлт',
+    empty: { title: 'Хүлээгдэж буй хүсэлт алга', text: 'Хүн dashboard-д нэвтэрч «Эрх хүсэх» дарахад энд гарна.' },
+    rows: requests,
+  });
+  table.el.id = 'requests';
+  const section = el(`<section class="section"><h2 class="section-label">Эрхийн хүсэлт${requests.length ? ` · ${requests.length}` : ''}</h2></section>`);
+  section.append(table.el);
   view.append(section);
 }
 
 async function renderMembers(view) {
   view.append(head('Гишүүд', 'Хэн энэ хуудсанд орж, юу хийж болох вэ. Хүн өөрөө нэвтэрч эрх хүсдэг — та зөвшөөрнө.'));
   await renderRequests(view);
-  view.append(el('<section class="section"><h2 class="section-label">Гишүүд</h2><div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Нэр</th><th>Утас, имэйл</th><th>Эрх</th><th>Төлөв</th><th></th></tr></thead><tbody id="members"><tr><td colspan="5" class="empty">…</td></tr></tbody></table></div></div></section>'));
-  let data;
-  try {
-    data = await ops('/v1/ops/members');
-  } catch (error) {
-    view.querySelector('#members').replaceChildren(el(`<tr><td colspan="5" class="empty">${esc(error.message)}</td></tr>`));
-    return;
-  }
-  const body = view.querySelector('#members');
-  if (!body) return;
   const roleNames = new Map((await deskRoleList()).map((r) => [r.key, r.name]));
-  body.replaceChildren();
-  if (!data.members.length) body.append(el('<tr><td colspan="5" class="empty">Гишүүн алга. Хүн нэвтэрч эрх хүсэхэд дээр гарч ирнэ.</td></tr>'));
-  for (const m of data.members) {
-    const address = [m.phone ? `<span class="mono">${esc(m.phone)}</span>` : '', m.email ? `<span>${esc(m.email)}</span>` : ''].filter(Boolean).join('<br>');
-    // Named but not in yet: the address has not signed in.
-    const state = !m.active ? ['off', 'хаасан'] : m.joined ? ['contracted', 'идэвхтэй'] : ['applied', 'ороогүй'];
-    const tr = el(`<tr${m.active ? '' : ' data-off'}><td><b>${esc(m.name)}</b></td><td>${address}</td><td data-role>${esc(roleNames.get(m.role) ?? m.role)}</td><td><span class="pill" data-s="${state[0]}">${state[1]}</span></td><td class="num"></td></tr>`);
-    if (m.id !== me?.id) {
-      // Anybody else's role is a choice here, from the desk's roles; your own is another admin's to change.
-      const pick = el(`<select class="input" data-size="sm" aria-label="${esc(m.name)}-ийн эрх">${[...roleNames.keys()].map((k) => `<option value="${esc(k)}"${k === m.role ? ' selected' : ''}>${esc(roleNames.get(k))}</option>`).join('')}</select>`);
-      pick.addEventListener('change', async () => {
-        try {
-          await ops(`/v1/ops/members/${m.id}/role`, { method: 'POST', body: { role: pick.value } });
-          toast(`${m.name}: ${roleNames.get(pick.value) ?? pick.value} эрхтэй боллоо.`, 'good');
-          m.role = pick.value;
-        } catch (error) {
-          pick.value = m.role;
-          toast(error.message, 'bad');
-        }
-      });
-      tr.querySelector('[data-role]').replaceChildren(pick);
-    }
-    if (m.id !== me?.id) {
+  const memberState = (m) => (!m.active ? ['off', 'хаасан'] : m.joined ? ['contracted', 'идэвхтэй'] : ['applied', 'ороогүй']);
+  const table = dataTable({
+    columns: [
+      { key: 'name', label: 'Нэр', render: (m) => `<b>${esc(m.name)}</b>` },
+      {
+        key: 'contact',
+        label: 'Утас, имэйл',
+        value: (m) => `${m.phone ?? ''} ${m.email ?? ''}`,
+        render: (m) => dtCell.twoHtml(m.phone ? `<span class="mono">${esc(m.phone)}</span>` : esc(m.email ?? '—'), m.phone && m.email ? esc(m.email) : ''),
+      },
+      {
+        key: 'role',
+        label: 'Эрх',
+        value: (m) => roleNames.get(m.role) ?? m.role,
+        render: (m) => {
+          // Your own role is another admin's to change.
+          if (m.id === me?.id) return esc(roleNames.get(m.role) ?? m.role);
+          const pick = el(`<select class="input dt-select" aria-label="${esc(m.name)}-ийн эрх">${[...roleNames.keys()].map((k) => `<option value="${esc(k)}"${k === m.role ? ' selected' : ''}>${esc(roleNames.get(k))}</option>`).join('')}</select>`);
+          pick.addEventListener('change', async () => {
+            try {
+              await ops(`/v1/ops/members/${m.id}/role`, { method: 'POST', body: { role: pick.value } });
+              toast(`${m.name}: ${roleNames.get(pick.value) ?? pick.value} эрхтэй боллоо.`, 'good');
+              m.role = pick.value;
+            } catch (error) {
+              pick.value = m.role;
+              toast(error.message, 'bad');
+            }
+          });
+          return pick;
+        },
+      },
+      { key: 'state', label: 'Төлөв', value: (m) => memberState(m)[1], render: (m) => dtCell.pill(...memberState(m)) },
+    ],
+    search: { placeholder: 'Нэр, утас, имэйл…' },
+    actions: (m) => {
+      if (m.id === me?.id) return null;
       const b = el(`<button class="btn" data-size="sm" type="button"${m.active ? ' data-v="quiet"' : ''}>${m.active ? 'Хаах' : 'Нээх'}</button>`);
       b.addEventListener('click', async () => {
         try {
@@ -3442,9 +3953,22 @@ async function renderMembers(view) {
           toast(error.message, 'bad');
         }
       });
-      tr.lastElementChild.append(b);
-    }
-    body.append(tr);
+      return b;
+    },
+    sort: { key: 'name' },
+    rowAttrs: (m) => ({ 'data-member': m.id, 'data-off': !m.active }),
+    noun: 'гишүүн',
+    empty: { title: 'Гишүүн алга', text: 'Хүн нэвтэрч эрх хүсэхэд дээр гарч ирнэ.' },
+  });
+  table.el.id = 'members';
+  const section = el('<section class="section"><h2 class="section-label">Гишүүд</h2></section>');
+  section.append(table.el);
+  view.append(section);
+  try {
+    table.setRows((await ops('/v1/ops/members')).members);
+  } catch (error) {
+    toast(error.message, 'bad');
+    table.setRows([]);
   }
   const form = el(`
     <section class="section"><h2 class="section-label">Имэйлээр урьдчилан нэмэх</h2><div class="card"><div class="card-body">

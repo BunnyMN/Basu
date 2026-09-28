@@ -1,0 +1,399 @@
+/* The dashboard's data tables.
+
+   One way to show a list of anything on the desk: a toolbar (search, the
+   filters that matter for that list, how many rows), a table whose headers
+   sort, and pages of 25 at a time. What rows there are, how they sort, what
+   a search finds and which page is showing is TanStack Table's (table-core
+   v8, vendored at /vendor/table-core.js as the global `TableCore`); how it
+   looks is ours — the design system's type, hairlines and pills, and on a
+   phone every row folds into a card with its column names beside the
+   values.
+
+   Kept free of imports, and every top-level name starts with dt or DT, so
+   the page tests can inline it beside api.js and sidenav.js without a clash. */
+
+const DT_SIZES = [25, 50, 100];
+
+const DT_ARROW = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 10 4-4 4 4M8 14l4 4 4-4"/></svg>';
+const DT_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 14 5-5 5 5"/></svg>';
+const DT_DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>';
+const DT_PREV = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>';
+const DT_NEXT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+
+function dtEsc(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function dtEl(html) {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+}
+
+/** A value as the search reads it: lowercase, and nothing for nothing. */
+const dtText = (value) => (value === null || value === undefined ? '' : String(value).toLowerCase());
+
+function dtRemembered(key) {
+  if (!key) return {};
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? '{}') ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function dtRemember(key, value) {
+  if (!key) return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* a private window keeps nothing; the table works the same */
+  }
+}
+
+/**
+ * The cells a list is made of, so every table says the same thing the same
+ * way. Each returns HTML; what goes in is escaped here.
+ */
+export const dtCell = {
+  /** A name, and one quiet line under it. */
+  two: (title, sub) => `<span class="dt-two"><b>${dtEsc(title)}</b>${sub ? `<small>${dtEsc(sub)}</small>` : ''}</span>`,
+  /** The same, when the lines are already HTML. */
+  twoHtml: (title, sub) => `<span class="dt-two"><b>${title}</b>${sub ? `<small>${sub}</small>` : ''}</span>`,
+  /** A state: its word, in the tone the design system gives that state. */
+  pill: (state, word) => `<span class="pill" data-s="${dtEsc(state)}">${dtEsc(word)}</span>`,
+  /** Tugriks, whole, with the sign after. */
+  money: (mnt) =>
+    mnt === null || mnt === undefined ? '<span class="dt-none">—</span>' : `<span class="dt-num">${Number(mnt).toLocaleString('en-US')}<span class="cur">₮</span></span>`,
+  /** A count, or a figure. */
+  num: (n) => (n === null || n === undefined ? '<span class="dt-none">—</span>' : `<span class="dt-num">${Number(n).toLocaleString('en-US')}</span>`),
+  /** Anything in the mono face: a phone, a code, a TIN. */
+  mono: (text) => (text ? `<span class="mono">${dtEsc(text)}</span>` : '<span class="dt-none">—</span>'),
+  /** A date and its time, as one short run: «9-р сарын 28 · 14:05». */
+  when: (iso) => {
+    if (!iso) return '<span class="dt-none">—</span>';
+    const d = new Date(iso);
+    const day = `${d.getMonth() + 1}-р сарын ${d.getDate()}`;
+    const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return `<span class="dt-when">${day}<small>${time}</small></span>`;
+  },
+  /** Nothing to say. */
+  none: () => '<span class="dt-none">—</span>',
+};
+
+/**
+ * A table of `rows`, drawn from `columns`:
+ *
+ *   { key, label, value?(row), render?(row), sort?: false, align?: 'end',
+ *     width?, phone?: false, sortValue?(row) }
+ *
+ * `value` is what the column sorts and searches by (the row's `key` field
+ * when not given); `render` is what the cell shows, HTML or a node. Options:
+ *
+ *   search: { placeholder, text?(row) } | false — what a search reads; or
+ *           `onSearch(q)` to ask the server instead and `setRows` the answer
+ *   filters: [{ key, label, options: [[value, word]], test?(row, value), initial?, kind?: 'seg' | 'select' }]
+ *            — a filter without `test` is the server's: a change calls
+ *            `onFilter(values)`, and the page fetches and `setRows` again
+ *   sort: { key, desc }         the order it opens in
+ *   onRow(row, event)           a click on the row
+ *   actions(row) → node(s)      the last cell: buttons that are not the row's click
+ *   rowAttrs(row) → {attr: v}   extra attributes on the <tr> (hooks for tests and pages)
+ *   tools: [node]               buttons at the end of the toolbar: CSV, «Нэмэх»
+ *   empty: { title, text }      what an empty list says
+ *   noun: 'захиалга'            what one row is, for the count
+ *   stateKey                    where the sort and page size are remembered
+ *   pageSize                    25 unless said
+ *
+ * Returns `{ el, setRows(rows), rows() }`. Rows can arrive later: until the
+ * first `setRows` the table shows the shape of what is coming.
+ */
+export function dataTable(options) {
+  const {
+    columns,
+    search = { placeholder: 'Хайх…' },
+    filters = [],
+    onRow = null,
+    actions = null,
+    rowAttrs = null,
+    tools = [],
+    empty = { title: 'Алга', text: '' },
+    noun = 'мөр',
+    stateKey = null,
+    onSearch = null,
+    onFilter = null,
+  } = options;
+  const remembered = dtRemembered(stateKey);
+  let all = options.rows ?? null;
+  const chosen = Object.fromEntries(filters.map((f) => [f.key, remembered.filters?.[f.key] ?? f.initial ?? f.options[0]?.[0]]));
+
+  const root = dtEl(`
+    <section class="dt">
+      <div class="dt-bar">
+        ${search ? `<label class="dt-search"><input type="search" placeholder="${dtEsc(search.placeholder ?? 'Хайх…')}" aria-label="${dtEsc(search.placeholder ?? 'Хайх')}" autocomplete="off" spellcheck="false"></label>` : ''}
+        <div class="dt-filters"></div>
+        <div class="dt-tools"></div>
+        <span class="dt-count" aria-live="polite"></span>
+      </div>
+      <div class="dt-wrap"><table class="dt-table"><thead></thead><tbody></tbody></table></div>
+      <div class="dt-foot" hidden>
+        <span class="dt-range"></span>
+        <label class="dt-size"><span>Хуудсанд</span><select aria-label="Хуудсанд хэдэн мөр">${DT_SIZES.map((n) => `<option value="${n}">${n}</option>`).join('')}</select></label>
+        <div class="dt-pages"></div>
+      </div>
+    </section>`);
+  const $ = (selector) => root.querySelector(selector);
+  for (const tool of tools) if (tool) $('.dt-tools').append(tool);
+  // A short list with nothing to search, filter or press says how many rows in its table's own heading, not in a bar of its own.
+  if (!search && !filters.length && !tools.filter(Boolean).length) $('.dt-bar').hidden = true;
+
+  /* ── the model: TanStack's ── */
+
+  const sortingFns = {
+    // Mongolian names sort as Mongolian; a missing value goes last whichever way.
+    mn: (a, b, id) => String(a.getValue(id) ?? '').localeCompare(String(b.getValue(id) ?? ''), 'mn', { numeric: true }),
+  };
+  const defs = columns.map((c) => ({
+    id: c.key,
+    header: c.label,
+    accessorFn: c.sortValue ?? c.value ?? ((row) => row[c.key]),
+    enableSorting: c.sort !== false,
+    sortingFn: c.numeric ? 'basic' : 'mn',
+    sortUndefined: 'last',
+    meta: c,
+  }));
+  const haystack = new WeakMap();
+  const hay = (row) => {
+    if (!haystack.has(row)) {
+      const parts = search && search.text ? [search.text(row)] : columns.map((c) => (c.value ? c.value(row) : row[c.key]));
+      haystack.set(row, parts.flat().map(dtText).join(' '));
+    }
+    return haystack.get(row);
+  };
+  const visibleRows = () => (all ?? []).filter((row) => filters.every((f) => !f.test || f.test(row, chosen[f.key])));
+
+  const table = TableCore.createTable({
+    data: [],
+    columns: defs,
+    state: {},
+    onStateChange: () => {},
+    renderFallbackValue: null,
+    sortingFns,
+    getCoreRowModel: TableCore.getCoreRowModel(),
+    getSortedRowModel: TableCore.getSortedRowModel(),
+    getFilteredRowModel: TableCore.getFilteredRowModel(),
+    getPaginationRowModel: TableCore.getPaginationRowModel(),
+    getColumnCanGlobalFilter: () => true,
+    globalFilterFn: (row, _column, q) => !q || hay(row.original).includes(q),
+    autoResetPageIndex: false,
+  });
+  let state = {
+    ...table.initialState,
+    sorting: remembered.sort ?? (options.sort ? [{ id: options.sort.key, desc: Boolean(options.sort.desc) }] : []),
+    pagination: { pageIndex: 0, pageSize: remembered.size ?? options.pageSize ?? DT_SIZES[0] },
+    globalFilter: '',
+  };
+  const sync = () =>
+    table.setOptions((prev) => ({
+      ...prev,
+      data: visibleRows(),
+      state,
+      onStateChange: (updater) => {
+        state = typeof updater === 'function' ? updater(state) : updater;
+        dtRemember(stateKey, { sort: state.sorting, size: state.pagination.pageSize, filters: chosen });
+        sync();
+        draw();
+      },
+    }));
+
+  /* ── the toolbar ── */
+
+  for (const f of filters) {
+    if (f.kind === 'select') {
+      const select = dtEl(`<select class="input dt-select" aria-label="${dtEsc(f.label)}">${f.options.map(([v, w]) => `<option value="${dtEsc(v)}">${dtEsc(w)}</option>`).join('')}</select>`);
+      select.value = chosen[f.key];
+      select.addEventListener('change', () => refilter(f.key, select.value));
+      $('.dt-filters').append(select);
+    } else {
+      const seg = dtEl(`<div class="seg dt-seg" role="group" aria-label="${dtEsc(f.label)}"></div>`);
+      for (const [v, w] of f.options) {
+        const b = dtEl(`<button type="button" data-v="${dtEsc(v)}"${v === chosen[f.key] ? ' data-on' : ''}>${dtEsc(w)}</button>`);
+        b.addEventListener('click', () => {
+          for (const other of seg.children) other.toggleAttribute('data-on', other === b);
+          refilter(f.key, v);
+        });
+        seg.append(b);
+      }
+      $('.dt-filters').append(seg);
+    }
+  }
+  function refilter(key, value) {
+    chosen[key] = value;
+    state = { ...state, pagination: { ...state.pagination, pageIndex: 0 } };
+    dtRemember(stateKey, { sort: state.sorting, size: state.pagination.pageSize, filters: chosen });
+    if (!filters.find((f) => f.key === key)?.test) onFilter?.({ ...chosen });
+    sync();
+    draw();
+  }
+
+  const input = $('.dt-search input');
+  if (input) {
+    let timer = null;
+    input.addEventListener('input', () => {
+      clearTimeout(timer);
+      if (onSearch) {
+        timer = setTimeout(() => onSearch(input.value.trim()), 250);
+        return;
+      }
+      table.setGlobalFilter(input.value.trim().toLowerCase());
+      table.setPageIndex(0);
+    });
+  }
+  const sizer = $('.dt-size select');
+  sizer.value = String(state.pagination.pageSize);
+  sizer.addEventListener('change', () => table.setPageSize(Number(sizer.value)));
+
+  /* ── the table ── */
+
+  function drawHead() {
+    const tr = document.createElement('tr');
+    for (const header of table.getHeaderGroups()[0].headers) {
+      const c = header.column.columnDef.meta;
+      const th = document.createElement('th');
+      th.scope = 'col';
+      if (c.align === 'end') th.dataset.align = 'end';
+      if (c.width) th.style.width = c.width;
+      if (c.phone === false) th.dataset.phone = 'off';
+      const sorted = header.column.getIsSorted();
+      if (header.column.getCanSort()) {
+        th.setAttribute('aria-sort', sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none');
+        const b = dtEl(`<button type="button" class="dt-sort"${sorted ? ` data-sorted="${sorted}"` : ''}><span>${dtEsc(c.label)}</span>${sorted === 'asc' ? DT_UP : sorted === 'desc' ? DT_DOWN : DT_ARROW}</button>`);
+        b.addEventListener('click', header.column.getToggleSortingHandler());
+        th.append(b);
+      } else {
+        th.textContent = c.label;
+      }
+      tr.append(th);
+    }
+    if (actions) tr.append(dtEl('<th class="dt-act" scope="col"><span class="sr-only">Үйлдэл</span></th>'));
+    $('thead').replaceChildren(tr);
+  }
+
+  function drawBody() {
+    const tbody = $('tbody');
+    tbody.replaceChildren();
+    if (all === null) {
+      // The shape of what is coming, while it loads.
+      for (let i = 0; i < 4; i++) {
+        tbody.append(dtEl(`<tr class="dt-skel">${columns.map(() => '<td><span class="skel"></span></td>').join('')}${actions ? '<td></td>' : ''}</tr>`));
+      }
+      return;
+    }
+    const rows = table.getRowModel().rows;
+    if (!rows.length) {
+      const nothing = all.length === 0;
+      tbody.append(
+        dtEl(`<tr class="dt-empty"><td colspan="${columns.length + (actions ? 1 : 0)}"><b>${dtEsc(nothing ? empty.title : 'Олдсонгүй')}</b><span>${dtEsc(
+          nothing ? empty.text ?? '' : 'Хайлт, шүүлтүүрээ өөрчилж үзнэ үү.',
+        )}</span></td></tr>`),
+      );
+      return;
+    }
+    for (const row of rows) {
+      const r = row.original;
+      const tr = document.createElement('tr');
+      tr.className = 'dt-row';
+      for (const [k, v] of Object.entries(rowAttrs?.(r) ?? {})) if (v !== null && v !== undefined && v !== false) tr.setAttribute(k, v === true ? '' : String(v));
+      if (onRow) {
+        tr.dataset.link = '';
+        tr.tabIndex = 0;
+        const go = (event) => {
+          if (event.target.closest('button,a,select,input,textarea,label,details')) return;
+          onRow(r, event);
+        };
+        tr.addEventListener('click', go);
+        tr.addEventListener('keydown', (e) => e.key === 'Enter' && go(e));
+      }
+      for (const cell of row.getVisibleCells()) {
+        const c = cell.column.columnDef.meta;
+        const td = document.createElement('td');
+        td.dataset.label = c.label;
+        if (c.align === 'end') td.dataset.align = 'end';
+        if (c.phone === false) td.dataset.phone = 'off';
+        const shown = c.render ? c.render(r) : cell.getValue();
+        if (shown instanceof Node) td.append(shown);
+        else if (c.render) td.innerHTML = shown ?? '';
+        else td.textContent = shown ?? '—';
+        tr.append(td);
+      }
+      if (actions) {
+        const td = document.createElement('td');
+        td.className = 'dt-act';
+        const made = actions(r);
+        for (const node of [made].flat()) if (node) td.append(node);
+        tr.append(td);
+      }
+      tbody.append(tr);
+    }
+  }
+
+  function drawFoot() {
+    const total = table.getFilteredRowModel().rows.length;
+    const { pageIndex, pageSize } = table.getState().pagination;
+    const from = total ? pageIndex * pageSize + 1 : 0;
+    const to = Math.min(total, (pageIndex + 1) * pageSize);
+    const whole = all?.length ?? 0;
+    $('.dt-count').textContent =
+      all === null ? '' : total === whole ? `${whole.toLocaleString('en-US')} ${noun}` : `${total.toLocaleString('en-US')} / ${whole.toLocaleString('en-US')} ${noun}`;
+    const foot = $('.dt-foot');
+    foot.hidden = total <= DT_SIZES[0];
+    if (foot.hidden) return;
+    $('.dt-range').textContent = `${from}–${to} / ${total.toLocaleString('en-US')}`;
+    const pages = $('.dt-pages');
+    pages.replaceChildren();
+    const count = table.getPageCount();
+    const button = (label, index, attrs = '') => {
+      const b = dtEl(`<button type="button" class="dt-page"${attrs}>${label}</button>`);
+      b.addEventListener('click', () => table.setPageIndex(index));
+      return b;
+    };
+    pages.append(button(DT_PREV, pageIndex - 1, `${table.getCanPreviousPage() ? '' : ' disabled'} aria-label="Өмнөх"`));
+    // The first, the last, and two either side of here; gaps as dots.
+    const shown = new Set([0, count - 1, pageIndex - 1, pageIndex, pageIndex + 1].filter((i) => i >= 0 && i < count));
+    let last = -1;
+    for (const i of [...shown].sort((a, b) => a - b)) {
+      if (i - last > 1) pages.append(dtEl('<span class="dt-gap">…</span>'));
+      pages.append(button(String(i + 1), i, i === pageIndex ? ' aria-current="page"' : ''));
+      last = i;
+    }
+    pages.append(button(DT_NEXT, pageIndex + 1, `${table.getCanNextPage() ? '' : ' disabled'} aria-label="Дараах"`));
+  }
+
+  function draw() {
+    drawHead();
+    drawBody();
+    drawFoot();
+  }
+
+  sync();
+  draw();
+
+  return {
+    el: root,
+    /** New rows — a fresh answer from the server; the sort, search and filters stay. */
+    setRows(rows) {
+      all = rows ?? [];
+      const pages = Math.max(1, Math.ceil(visibleRows().length / state.pagination.pageSize));
+      if (state.pagination.pageIndex >= pages) state = { ...state, pagination: { ...state.pagination, pageIndex: 0 } };
+      sync();
+      draw();
+    },
+    rows: () => all ?? [],
+    /** What each filter is set to — for a page that asks the server with them. */
+    filters: () => ({ ...chosen }),
+  };
+}

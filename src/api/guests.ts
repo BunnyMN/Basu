@@ -23,7 +23,7 @@ const shapeCard = (g: NonNullable<Awaited<ReturnType<typeof guestCard>>>) => ({
 });
 
 export async function guestSearch(q: string) {
-  return { guests: (await findGuests(q)).map(shapeCard) };
+  return { guests: (await findGuests(q, 200)).map(shapeCard) };
 }
 
 export async function guestFile(guestId: string) {

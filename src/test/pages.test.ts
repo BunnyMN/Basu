@@ -88,12 +88,16 @@ async function openPage(
     : '';
   const mapLib = strip(await readFile(join(WEB, 'mapStyle.js'), 'utf8'));
   const sideNav = strip(await readFile(join(WEB, 'sidenav.js'), 'utf8'));
+  // The dashboard's tables: TanStack's table-core as the global the page's
+  // <script src> would have made, and our rendering of it inlined like the rest.
+  const tables = html.includes("from '/datatable.js'") ? strip(await readFile(join(WEB, 'datatable.js'), 'utf8')) : '';
+  if (tables) window.eval(await readFile(join(WEB, 'vendor', 'table-core.js'), 'utf8'));
   const inline = /<script type="module">([\s\S]*?)<\/script>/.exec(html)?.[1] ?? '';
   const page = inline.replace(/^\s*import[\s\S]*?from\s*'\/[\w.]+';?$/gm, '');
 
   stubMapLibre(window);
   window.eval(
-    `(async () => { ${shared}\n${site}\n${mapLib}\n${sideNav}\n${page} })().catch(e => { window.__err = e; });`,
+    `(async () => { ${shared}\n${site}\n${mapLib}\n${sideNav}\n${tables}\n${page} })().catch(e => { window.__err = e; });`,
   );
   open.push(dom);
   return dom;
@@ -1107,12 +1111,15 @@ describe('өвлийн идэш', () => {
     );
     clickText(desk, '.pair button', 'Нэвтрэх');
     await opsTab(desk, 'pay');
+    // Everything, not only what is left to do: the row stays in view once paid.
+    await until(desk, 'the list', (d) => Boolean(d.querySelector('#pay .dt-seg')));
+    clickText(desk, '#pay .dt-seg button', 'Бүгд');
     const line = () =>
-      [...desk.window.document.querySelectorAll('#pay .row')].find((r) => r.textContent?.includes(`№${code}`));
+      [...desk.window.document.querySelectorAll('#pay tr[data-settlement]')].find((r) => r.textContent?.includes(`№${code}`));
     await until(desk, 'the refund to pay', () => Boolean(line()));
-    expect(line()!.textContent).toContain('Буцаалт');
+    expect(line()!.textContent).toContain('буцаалт');
     expect(line()!.textContent).toContain('5012345678');
-    expect(line()!.querySelector('.amount')?.textContent).toBe(total);
+    expect(line()!.querySelector('[data-label="Дүн"]')?.textContent).toBe(total);
     // Two people, not one: the row offers only «Батлах» until somebody has
     // released it, and only then the button that says the money moved.
     expect(line()!.querySelector('[data-a="paid"]')).toBeNull();
@@ -1241,16 +1248,16 @@ describe('нийлүүлэгч болох', () => {
     clickText(desk, '.pair button', 'Нэвтрэх');
     await opsTab(desk, 'suppliers');
     await until(desk, 'the applications', (d) =>
-      [...d.querySelectorAll('#applied .row')].some((r) => r.textContent?.includes('Түмэн-Өлзий')),
+      [...d.querySelectorAll('#applied tr[data-supplier]')].some((r) => r.textContent?.includes('Түмэн-Өлзий')),
     );
-    const row = [...desk.window.document.querySelectorAll('#applied .row')].find((r) =>
+    const row = [...desk.window.document.querySelectorAll('#applied tr[data-supplier]')].find((r) =>
       r.textContent?.includes('Түмэн-Өлзий'),
     )!;
     // The proved phone travels with the application, so ops can ring.
     expect(row.textContent).toContain('+97688010011');
     (row.querySelector('[data-a="approve"]') as HTMLElement).click();
     await until(desk, 'the row to move', (d) =>
-      [...d.querySelectorAll('#all .row[data-state="contracted"]')].some((r) =>
+      [...d.querySelectorAll('#all tr[data-state="contracted"]')].some((r) =>
         r.textContent?.includes('Түмэн-Өлзий'),
       ),
     );
@@ -1272,8 +1279,8 @@ describe('нийлүүлэгч болох', () => {
     );
     clickText(desk, '.pair button', 'Нэвтрэх');
     await opsTab(desk, 'suppliers');
-    await until(desk, 'the applications', (d) => d.querySelectorAll('#applied .row').length > 0);
-    expect(desk.window.document.querySelector('#applied .row')?.textContent).toContain('Завхан');
+    await until(desk, 'the applications', (d) => d.querySelectorAll('#applied tr[data-supplier]').length > 0);
+    expect(desk.window.document.querySelector('#applied tr[data-supplier]')?.textContent).toContain('Завхан');
   });
 
   it('opens on the whole house: what needs somebody, what is held, what the day brought', async () => {
@@ -1296,7 +1303,7 @@ describe('нийлүүлэгч болох', () => {
     expect(doc.querySelector('#cross')?.textContent).toContain('Борлуулалт');
     // The alert's button goes to the section that answers it.
     (doc.querySelector('#alerts button[data-go="suppliers"]') as HTMLElement).click();
-    await until(desk, 'the applications', (d) => d.querySelectorAll('#applied .row').length > 0);
+    await until(desk, 'the applications', (d) => d.querySelectorAll('#applied tr[data-supplier]').length > 0);
   });
 
   it('finds a guest by phone and opens their file: wallet, lunches, meat, messages', async () => {
@@ -1337,14 +1344,14 @@ describe('нийлүүлэгч болох', () => {
     await until(desk, 'the kitchens', (d) => d.querySelectorAll('#venues [data-venue]').length > 0);
     const doc = desk.window.document;
     const venue = doc.querySelector('#venues [data-venue]')!;
-    expect(venue.textContent).toContain('Өнөөдөр');
+    expect(doc.querySelector('#venues thead')?.textContent).toContain('Өнөөдөр');
     // No codes to hand out: the people who work there sign in as themselves.
-    expect(venue.querySelector('button[data-a="tablet"]')).toBeNull();
-    expect(venue.textContent).toContain('өөрсдийн бүртгэлээр');
-    // The menu unfolds under the kitchen, with the switch for each dish.
-    (venue.querySelector('button[data-a="menu"]') as HTMLElement).click();
-    await until(desk, 'the menu', (d) => d.querySelectorAll('#venues .drawer tbody tr').length > 0);
-    expect(doc.querySelector('#venues .drawer button[data-item]')?.textContent).toBe('Нуух');
+    expect(doc.querySelector('#venues button[data-a="tablet"]')).toBeNull();
+    expect(text(desk)).toContain('өөрсдийн бүртгэлээр');
+    // A row opens the kitchen's menu, with the switch for each dish.
+    (venue as HTMLElement).click();
+    await until(desk, 'the menu', (d) => d.querySelectorAll('#menu tbody tr[data-item]').length > 0);
+    expect(doc.querySelector('#menu button[data-item]')?.textContent).toBe('Нуух');
 
     await opsTab(desk, 'lunches');
     await until(desk, 'the lunches', (d) => d.querySelectorAll('#lunches tr[data-lunch]').length > 0);
@@ -1384,9 +1391,9 @@ describe('нийлүүлэгч болох', () => {
     );
     clickText(desk, '.pair button', 'Нэвтрэх');
     await opsTab(desk, 'notify');
-    await until(desk, 'the log', (d) => d.querySelectorAll('#messages li[data-message]').length > 0);
+    await until(desk, 'the log', (d) => d.querySelectorAll('#messages tr[data-message]').length > 0);
     const doc = desk.window.document;
-    expect(doc.querySelector('#messages li[data-message]')?.textContent).toMatch(/SMS|Push/);
+    expect(doc.querySelector('#messages tr[data-message]')?.textContent).toMatch(/SMS|Push/);
 
     await opsTab(desk, 'system');
     await until(desk, 'the machine', (d) => d.querySelectorAll('#integrations [data-integration]').length === 4);
@@ -1480,8 +1487,8 @@ describe('who sees what', () => {
     expect(doc.querySelector('[data-members]')?.textContent).toContain('Туяа');
 
     (doc.querySelector('.tabs [data-tab="log"]') as HTMLElement).click();
-    await until(dash, 'the record', (d) => d.querySelectorAll('#org-log li').length >= 3);
-    expect(doc.querySelector('#org-log li')?.textContent).toContain('Туяа нэмэгдсэн · Нягтлан');
+    await until(dash, 'the record', (d) => d.querySelectorAll('#org-log tr[data-entry]').length >= 3);
+    expect(doc.querySelector('#org-log tr[data-entry]')?.textContent).toContain('Туяа нэмэгдсэн · Нягтлан');
   });
 
   it('gives an accountant the orders and the money on the supplier’s screen, and no counter or stall', async () => {
@@ -1606,8 +1613,8 @@ describe('Basu decides who may do what', () => {
 
     const desk = await theDesk();
     await opsTab(desk, 'orgs');
-    await until(desk, 'the business', (d) => [...d.querySelectorAll('.row.request')].some((r) => r.textContent?.includes('Эрхийн мах · тест')));
-    const row = [...desk.window.document.querySelectorAll('.row.request')].find((r) => r.textContent?.includes('Эрхийн мах · тест'))!;
+    await until(desk, 'the business', (d) => [...d.querySelectorAll('#orgs tr[data-org]')].some((r) => r.textContent?.includes('Эрхийн мах · тест')));
+    const row = [...desk.window.document.querySelectorAll('#orgs tr[data-org]')].find((r) => r.textContent?.includes('Эрхийн мах · тест'))!;
     (row.querySelector('[data-a="access"]') as HTMLElement).click();
     await until(desk, 'its people', (d) => d.querySelectorAll('[data-people] tr[data-member]').length === 2);
     const select = desk.window.document.querySelector(`[data-people] tr[data-member="${found.guest_id}"] select`) as HTMLSelectElement;
