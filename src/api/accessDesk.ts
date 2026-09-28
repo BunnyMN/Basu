@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest, RouteShorthandOptions } from 'fastify';
 import { recordAudit } from '../idesh/index.js';
-import { listMembers, pendingRequests } from '../ops/index.js';
+import { listMembers } from '../ops/index.js';
 import {
   AccessError,
   ICONS,
@@ -64,13 +64,12 @@ function refusal(reply: FastifyReply, error: unknown): FastifyReply {
   return reply.status(status).send({ error: { code: error.code, message_mn: mn, message_en: error.message } });
 }
 
-/** How many hold, or wait for, each role: members and open asks at the desk; members at every business. */
+/** How many hold each role: the desk's active members, or the members of every business. */
 async function usage(scope: Scope): Promise<Map<string, number>> {
   const counts = new Map<string, number>();
   const add = (key: string | null | undefined) => key && counts.set(key, (counts.get(key) ?? 0) + 1);
   if (scope === 'org') return roleCounts();
   for (const m of await listMembers()) if (m.active) add(m.role);
-  for (const r of await pendingRequests()) add(r.role);
   return counts;
 }
 

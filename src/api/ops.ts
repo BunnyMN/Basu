@@ -44,25 +44,19 @@ import { revokeSession } from '../platform/identity/index.js';
 import { mode } from '../mode.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import {
-  RequestError,
   MemberError,
   deskRoleExists,
-  approveRequest,
-  declineRequest,
   linkByProof,
   listMembers,
   memberForAccount,
-  pendingRequests,
-  requestAccess,
-  requestOf,
+  seatAccount,
+  seatsOfAccounts,
   setMemberActive,
   setMemberRole,
-  upsertMember,
-  type AccessRequest,
   type Member,
   type Role,
 } from '../ops/index.js';
-import { accountByContact, contactsFor, profileOf, resolveGuest } from '../platform/identity/index.js';
+import { accountByContact, contactsFor, findGuests, guestCard, profileOf, resolveGuest } from '../platform/identity/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import { approveOrg, declineOrg, listOrgs, membersOf, orgById } from '../platform/org/index.js';
 import { orgRefusal, shapeOrg } from './orgs.js';
@@ -268,26 +262,13 @@ export async function registerOpsRoutes(
 
   /* ── the front room: anybody signed in ── */
 
-  const shapeRequest = (r: AccessRequest) => ({
-    id: r.id,
-    name: r.name,
-    contact: r.contact,
-    role: r.role,
-    note: r.note,
-    state: r.state,
-    created_at: r.createdAt.toISOString(),
-    decided_at: r.decidedAt?.toISOString() ?? null,
-    decline_reason: r.declineReason,
-  });
-
   /**
-   * Who is signed in, whether they sit at the desk, and what they asked for.
-   * The dashboard's first question: a member gets the desk, anybody else
-   * their profile and the way to ask for a seat.
+   * Who is signed in, and whether they sit at the desk. Nobody asks for a
+   * seat: an admin gives one, to an account chosen from Basu's users.
    */
   app.get('/v1/ops/whoami', { preHandler: requireAccount, config: limit }, async (request) => {
     const guestId = request.guestId!;
-    const [profile, member, asked] = await Promise.all([profileOf(guestId), seatOf(guestId), requestOf(guestId)]);
+    const [profile, member] = await Promise.all([profileOf(guestId), seatOf(guestId)]);
     return {
       account: {
         id: guestId,
@@ -296,44 +277,8 @@ export async function registerOpsRoutes(
         phone: profile?.phone ?? null,
       },
       member: member?.active ? { id: member.id, name: member.name, role: member.role, phone: member.phone, email: member.email } : null,
-      request: asked ? shapeRequest(asked) : null,
     };
   });
-
-  const requestRefusal = (reply: FastifyReply, error: unknown) => {
-    if (!(error instanceof RequestError)) return sendError(reply, error);
-    const words = {
-      ALREADY_MEMBER: [409, 'Та аль хэдийн гишүүн байна.'],
-      NOT_PENDING: [409, 'Энэ хүсэлтэд аль хэдийн хариулсан байна.'],
-      BAD_REQUEST: [400, 'Нэр, эрхээ шалгана уу.'],
-    } as const;
-    const [status, mn] = words[error.code];
-    return reply.status(status).send({ error: { code: error.code, message_mn: mn, message_en: error.message } });
-  };
-
-  /** Ask for a seat, or change the ask while it waits. */
-  app.post<{ Body: { name?: string; role?: string; note?: string } }>(
-    '/v1/ops/requests',
-    { preHandler: requireAccount, config: limit },
-    async (request, reply) => {
-      const guestId = request.guestId!;
-      const body = request.body ?? {};
-      const contact = (await contactsFor([guestId])).get(guestId);
-      try {
-        const asked = await requestAccess({
-          guestId,
-          name: body.name ?? '',
-          contact: contact?.email ?? contact?.phone ?? null,
-          role: (body.role ?? 'ops') as Role,
-          note: body.note ?? null,
-          now: ctx.clock.now(),
-        });
-        return reply.status(201).send(shapeRequest(asked));
-      } catch (error) {
-        return requestRefusal(reply, error);
-      }
-    },
-  );
 
   /* ── businesses: the desk says yes or no ── */
 
@@ -398,45 +343,6 @@ export async function registerOpsRoutes(
 
   /* ── the members, admin only ── */
 
-  app.get('/v1/ops/requests', desk('desk.members'), async () => ({ requests: (await pendingRequests()).map(shapeRequest) }));
-
-  /** Tell the person how it went — in the app, and by email where they have one. */
-  const tellRequester = (guestId: string, id: string, title: string, body: string) =>
-    enqueue(ctx, { guestId, template: 'ops.request', title, body, channel: 'push', subject: 'ops_request', subjectId: id, dedupeKey: `ops_request:${id}` });
-
-  app.post<{ Params: { id: string }; Body: { role?: string } }>('/v1/ops/requests/:id/approve', desk('desk.members:manage'), async (request, reply) => {
-    const role = request.body?.role ? (request.body.role as Role) : null;
-    try {
-      const waiting = (await pendingRequests()).find((r) => r.id === request.params.id);
-      if (waiting && !(await mayGive(request, role ?? waiting.role))) return beyond(reply);
-      const contact = waiting ? (await contactsFor([waiting.guestId])).get(waiting.guestId) : undefined;
-      const { request: decided, member } = await approveRequest({
-        id: request.params.id,
-        role,
-        by: who(request),
-        now: ctx.clock.now(),
-        email: contact?.email ?? null,
-        phone: contact?.phone ?? null,
-      });
-      await recordAudit({ who: who(request), action: 'member.approve', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
-      await tellRequester(decided.guestId, decided.id, 'Ops эрх олголоо', `Таны Basu ops-ийн хүсэлт батлагдлаа (${member.role}). basu.burzai.cloud/dashboard-д нэвтэрнэ үү.`);
-      return reply.send({ request: shapeRequest(decided), member: shapeMember(member) });
-    } catch (error) {
-      return requestRefusal(reply, error);
-    }
-  });
-
-  app.post<{ Params: { id: string }; Body: { reason?: string } }>('/v1/ops/requests/:id/decline', desk('desk.members:manage'), async (request, reply) => {
-    try {
-      const decided = await declineRequest({ id: request.params.id, reason: request.body?.reason ?? null, by: who(request), now: ctx.clock.now() });
-      await recordAudit({ who: who(request), action: 'member.decline', targetKind: 'member', targetId: decided.id, note: `${decided.name}${decided.declineReason ? ` · ${decided.declineReason}` : ''}` });
-      await tellRequester(decided.guestId, decided.id, 'Ops эрхийн хүсэлт', `Таны Basu ops-ийн хүсэлтийг батлах боломжгүй байлаа.${decided.declineReason ? ` Шалтгаан: ${decided.declineReason}.` : ''}`);
-      return reply.send({ request: shapeRequest(decided) });
-    } catch (error) {
-      return requestRefusal(reply, error);
-    }
-  });
-
   const shapeMember = (m: Member) => ({
     id: m.id,
     phone: m.phone,
@@ -452,28 +358,55 @@ export async function registerOpsRoutes(
   app.get('/v1/ops/members', desk('desk.members'), async () => ({ members: (await listMembers()).map(shapeMember) }));
 
   /**
-   * A seat for an email address, before its person has asked: the address
-   * proves itself — Google, Apple or a code to that inbox — and the account
-   * that proves it sits down. A phone number proves nothing when anybody can
-   * type it, so a person who signs in by phone asks for their seat instead.
+   * Basu's users, for choosing whom to seat: found by name, phone or email,
+   * the newest first, each with the seat it holds already. Only for whoever
+   * may seat people — the list is the desk's, not the public's.
    */
-  app.post<{ Body: { email?: string; name?: string; role?: string } }>('/v1/ops/members', desk('desk.members:manage'), async (request, reply) => {
+  app.get<{ Querystring: { q?: string } }>('/v1/ops/people', desk('desk.members:manage'), async (request) => {
+    const found = (await findGuests(String(request.query.q ?? '').slice(0, 100), 30)).filter((g) => !g.closedAt);
+    const seats = await seatsOfAccounts(found.map((g) => g.id));
+    return {
+      people: found.map((g) => {
+        const seat = seats.get(g.id);
+        return { id: g.id, name: g.name, phone: g.phone, email: g.email, member: seat ? { id: seat.id, role: seat.role, active: seat.active } : null };
+      }),
+    };
+  });
+
+  /** Tell the person their seat is there — in the app, and by email where they have one. */
+  const tellSeated = (guestId: string, member: Member, roleName: string) =>
+    enqueue(ctx, {
+      guestId,
+      template: 'ops.seat',
+      title: 'Basu ops эрх олголоо',
+      body: `Танд Basu ops-ийн «${roleName}» эрх олголоо. basu.burzai.cloud/dashboard-д нэвтэрнэ үү.`,
+      channel: 'push',
+      subject: 'ops_member',
+      subjectId: member.id,
+      dedupeKey: `ops_seat:${member.id}:${ctx.clock.now().getTime()}`,
+    });
+
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  /**
+   * A seat for somebody already on Basu: the admin chooses the account from
+   * Basu's users and gives it a role, and it sits at once. Nobody applies
+   * for the desk, and nobody's address is typed in.
+   */
+  app.post<{ Body: { guest_id?: string; role?: string } }>('/v1/ops/members', desk('desk.members:manage'), async (request, reply) => {
     const body = request.body ?? {};
-    if (!body.email?.trim()) return badRequest(reply, 'Имэйл хаягаа оруулна уу.', 'email is required');
-    if (!(await mayGive(request, body.role ?? 'ops'))) return beyond(reply);
-    try {
-      const member = await upsertMember({ email: body.email, name: body.name ?? '', role: (body.role ?? 'ops') as Role });
-      await recordAudit({
-        who: who(request),
-        action: 'member.upsert',
-        targetKind: 'member',
-        targetId: member.id,
-        note: `${member.name} · ${member.role} · ${member.email ?? ''}`,
-      });
-      return reply.status(201).send(shapeMember(member));
-    } catch (error) {
-      return badRequest(reply, 'Имэйл, нэр, эрхээ шалгана уу.', (error as Error).message);
+    const role = String(body.role ?? '');
+    if (!body.guest_id || !UUID.test(body.guest_id)) return badRequest(reply, 'Хэрэглэгчээ сонгоно уу.', 'guest_id is required');
+    if (!(await deskRoleExists(role))) return badRequest(reply, 'Эрх буруу байна.', `no such role: ${role}`);
+    if (!(await mayGive(request, role))) return beyond(reply);
+    const card = await guestCard(body.guest_id);
+    if (!card || card.closedAt) {
+      return reply.status(404).send({ error: { code: 'NOT_FOUND', message_mn: 'Ийм хэрэглэгч олдсонгүй.', message_en: 'no such open account' } });
     }
+    const member = await seatAccount({ guestId: card.id, name: card.name ?? '', email: card.email, phone: card.phone, role });
+    await recordAudit({ who: who(request), action: 'member.grant', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
+    await tellSeated(card.id, member, (await roleOf('desk', member.role))?.name ?? member.role);
+    return reply.status(201).send(shapeMember(member));
   });
 
   /** Another role for somebody already at the desk — never your own, and never the last admin's. */

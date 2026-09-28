@@ -65,11 +65,14 @@ export const NAV_ICON = {
  * switcher's and the foot's; `actions` are extra lines at the bottom of the
  * switcher (register a business), reported through `onAction(key)`.
  *
+ * `home` is where the wordmark and the «Нүүр» button lead — Basu's front
+ * page — or null where there is no such page to go to (inside the app).
+ *
  * Returns the root to mount, the element pages draw into, and three handles:
  * `select(key)` marks the open page, `badge(key, n, hot)` sets a count, and
  * `title(text)` names the page in the phone's bar.
  */
-export function deskFrame({ workspaces, current, account, brand = 'Dashboard', onPage, onWorkspace, onSignOut, actions = [], onAction = () => {} }) {
+export function deskFrame({ workspaces, current, account, brand = 'Dashboard', home = '/', onPage, onWorkspace, onSignOut, actions = [], onAction = () => {} }) {
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const icon = (name) => NAV_ICON[name] ?? NAV_ICON.overview;
   /** Two letters that stand for a name: the first of its first two words. */
@@ -140,7 +143,11 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', o
         <div class="deskbar-t"><b data-title></b><span>${esc(current.name)}</span></div>
       </header>
       <aside class="side sidebar" id="sidebar" aria-label="Хажуугийн цэс">
-        <div class="brand"><b>Basu</b><span>${esc(brand)}</span><button class="nav-close" type="button" aria-label="Цэс хаах">${NAV_ICON.close}</button></div>
+        <div class="brand">${
+          home
+            ? `<a class="brand-home" href="${esc(home)}" title="Basu-гийн нүүр хуудас"><b>Basu</b><span>${esc(brand)}</span></a><a class="go-home" href="${esc(home)}" id="go-home">${NAV_ICON.home}<span>Нүүр</span></a>`
+            : `<b>Basu</b><span>${esc(brand)}</span>`
+        }<button class="nav-close" type="button" aria-label="Цэс хаах">${NAV_ICON.close}</button></div>
         <div class="ws">
           <button class="ws-btn" type="button" aria-haspopup="menu" aria-expanded="false"${workspaces.length > 1 || actions.length ? '' : ' disabled'}>
             ${mark(current)}

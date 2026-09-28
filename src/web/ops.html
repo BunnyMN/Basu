@@ -398,24 +398,23 @@ function enterDesk(t) {
 
 /* ── a person's own corner ─────────────────────────────────────────── */
 
-let frontPoll;
-/** What the switcher asked the corner to open when it gets there: the business form, or the ask for a seat. */
+/** What the switcher asked the corner to open when it gets there: the business form. */
 let wanted = null;
 
 const ORG_STATE = { applied: ['applied', 'хүлээгдэж байна'], active: ['contracted', 'идэвхтэй'], declined: ['off', 'татгалзсан'], suspended: ['off', 'түр хаасан'] };
 const kinds = (o) => [o.restaurant && 'Ресторан', o.supplier && 'Нийлүүлэгч'].filter(Boolean);
 
 /**
- * The corner's front page: the businesses this person is part of, the way
- * to register one, and their seat at Basu's desk — asked for, waiting, said
- * no to, or held. While an ask waits the page keeps asking, so the yes opens
- * the desk without anybody reloading anything.
+ * The corner's front page: the businesses this person is part of and the
+ * way to register one — and, for somebody who sits at Basu's desk, the way
+ * there. Nobody asks for the desk from here: an admin gives a seat, to an
+ * account chosen from Basu's users.
  */
 function renderMeHome(view) {
   const account = access.account ?? {};
   view.append(
     headActs(
-      head(account.name ? `Сайн байна уу, ${esc(account.name)}` : 'Тавтай морил', 'Таны байгууллагууд, Basu-гийн ops эрх нэг дор.'),
+      head(account.name ? `Сайн байна уу, ${esc(account.name)}` : 'Тавтай морил', 'Таны ажилладаг байгууллагууд нэг дор.'),
       button(`${NAV_ICON.plus}Байгууллага бүртгүүлэх`, () => orgPopup(), 'data-v="primary" id="org-new"'),
     ),
   );
@@ -446,92 +445,24 @@ function renderMeHome(view) {
     list.append(row);
   }
   view.append(section);
-  view.append(deskSection());
+  if (deskSeat()) view.append(deskSection());
 
   if (wanted === 'new-org') void orgPopup();
-  if (wanted === 'ask-desk') view.querySelector('#ask-open')?.click();
   wanted = null;
 }
 
-/** Asking for a seat at Basu's desk, or changing the ask: a name, the role wanted, and why. */
-async function deskAskPopup(asked) {
-  const roles = await deskRoleList();
-  return popup({
-    title: asked ? 'Хүсэлтээ өөрчлөх' : 'Ops эрх хүсэх',
-    sub: 'Basu-гийн ажилтан бол ops-ийн хэсэгт орох эрх хүснэ үү — админ зөвшөөрөхөд шууд нээгдэнэ.',
-    width: 520,
-    fields: [
-      { name: 'name', label: 'Таны нэр', autocomplete: 'name', value: asked?.name ?? access.account?.name ?? '', required: true, wide: true },
-      { name: 'role', label: 'Хүсэх эрх', type: 'select', options: roles.map((r) => [r.key, r.description ? `${r.name} — ${r.description}` : r.name]), value: asked?.role ?? 'ops', wide: true },
-      { name: 'note', label: 'Та хэн бэ, юунд хэрэгтэй вэ', type: 'textarea', placeholder: 'Заавал биш', value: asked?.note ?? '' },
-    ],
-    submit: asked ? 'Шинэчлэх' : 'Хүсэлт илгээх',
-    onSubmit: async (v) => {
-      await ops('/v1/ops/requests', { method: 'POST', body: { name: v.name, role: v.role, note: v.note } });
-      toast('Хүсэлт илгээгдлээ.', 'good');
-      await reload('me');
-    },
-  });
-}
-
-/** Basu's own desk, from the corner: the seat held, or the ask for one. */
+/** Basu's own desk, from the corner of somebody who sits there: the seat, and the way in. */
 function deskSection() {
   const seat = deskSeat();
-  const request = access.desk_request;
   const box = el(`
-    <section class="section"><h2 class="section-label">Basu-гийн ops эрх</h2>
+    <section class="section"><h2 class="section-label">Basu ops</h2>
       <div class="card"><div class="card-body" id="front">
-        <p class="cap" style="margin:0 0 14px">Basu-гийн ажилтан бол ops-ийн хэсэгт орох эрх хүснэ үү — админ зөвшөөрөхөд шууд нээгдэнэ.</p>
-        <div data-state></div>
+        <p class="cap" style="margin:0 0 14px"></p>
         <div class="form-foot" style="justify-content:flex-start;margin:0" data-act></div>
       </div></div>
     </section>`);
-  const state = box.querySelector('[data-state]');
-  const act = box.querySelector('[data-act]');
-  if (seat) {
-    box.querySelector('.cap').textContent = `Та Basu ops-ийн гишүүн — ${seat.role_label}.`;
-    act.append(button('Ops ширээ нээх', () => open(seat)));
-    return box;
-  }
-
-  if (request?.state === 'pending') {
-    const waiting = el(`
-      <div class="callout" data-k="ok" style="margin-bottom:16px">
-        <b>Хүсэлт хүлээгдэж байна</b>
-        <span>Хүссэн эрх: <span data-asked>${esc(request.role)}</span> · ${when(request.created_at)} ${clockOf(request.created_at)}. Админ зөвшөөрмөгц энэ хуудас өөрөө нээгдэнэ.</span>
-      </div>`);
-    void deskRoleList().then((roles) => {
-      waiting.querySelector('[data-asked]').textContent = roles.find((r) => r.key === request.role)?.name ?? request.role;
-    });
-    state.append(waiting);
-    act.append(button('Хүсэлтээ өөрчлөх', () => deskAskPopup(request), 'id="ask-open"'));
-    // Keep asking while it waits: the yes opens the desk on its own.
-    frontPoll = setInterval(async () => {
-      if (document.hidden) return;
-      try {
-        const now = await ops('/v1/access');
-        if (now.workspaces.some((w) => w.kind === 'desk') || now.desk_request?.state !== 'pending') {
-          clearInterval(frontPoll);
-          access = now;
-          const seated = now.workspaces.find((w) => w.kind === 'desk');
-          if (seated) open(seated);
-          else show(tab);
-        }
-      } catch {
-        clearInterval(frontPoll);
-      }
-    }, 10_000);
-    return box;
-  }
-  if (request?.state === 'declined') {
-    state.append(el(`
-      <div class="callout" data-k="warn" style="margin-bottom:16px">
-        <b>Хүсэлтийг татгалзсан</b>
-        <span>${request.decline_reason ? `Шалтгаан: ${esc(request.decline_reason)}. ` : ''}Дахин хүсэж болно.</span>
-      </div>`));
-  }
-  // Most people here run a business; asking for Basu's own desk is the rarer thing, one tap away.
-  act.append(button(request?.state === 'declined' ? 'Дахин хүсэх' : 'Ops эрх хүсэх', () => deskAskPopup(null), 'id="ask-open"'));
+  box.querySelector('.cap').textContent = `Та Basu ops-ийн гишүүн — ${seat.role_label}.`;
+  box.querySelector('[data-act]').append(button('Ops ширээ нээх', () => open(seat)));
   return box;
 }
 
@@ -1067,7 +998,7 @@ let accessScope = localStorage.getItem('basu.ops.access') === 'org' ? 'org' : 'd
 /** The role the roles page opens on next: the one just made or saved. */
 let rolePick = null;
 
-/** The desk's roles, for the pickers that seat somebody or ask for a seat: asked once a page, and again after the roles change. */
+/** The desk's roles, for the pickers that seat somebody: asked once a page, and again after the roles change. */
 let deskRoles = null;
 async function deskRoleList() {
   deskRoles ??= ops('/v1/access/roles?scope=desk').then((t) => t.roles).catch(() => []);
@@ -1903,7 +1834,7 @@ let nav = null;
 let tab = null;
 /** The desk seat, when the place open is the desk. */
 let me = null;
-let cache = { suppliers: [], settlements: [], requests: [], orgs: [] };
+let cache = { suppliers: [], settlements: [], orgs: [] };
 
 /** Whether the place open now lets this person do that. The server asks again; this only decides what to draw. */
 const can = (permission) => Boolean(ws?.permissions?.includes(permission));
@@ -1944,7 +1875,6 @@ function choose(hash) {
 /** Open a place — the frame is built afresh for it — on the page asked for, or the one last open there. */
 function open(w, page) {
   if (!w) return;
-  clearInterval(frontPoll);
   ws = w;
   localStorage.setItem('basu.dash.ws', w.id);
   me = w.kind === 'desk' ? { id: w.seat?.id, name: w.seat?.name, role: w.role } : null;
@@ -1957,10 +1887,7 @@ function open(w, page) {
 
 function frame() {
   const actions = [];
-  if (access.account) {
-    actions.push({ key: 'new-org', label: 'Байгууллага бүртгүүлэх', icon: 'plus' });
-    if (!deskSeat()) actions.push({ key: 'ask-desk', label: 'Basu ops эрх хүсэх', icon: 'key' });
-  }
+  if (access.account) actions.push({ key: 'new-org', label: 'Байгууллага бүртгүүлэх', icon: 'plus' });
   nav = deskFrame({
     workspaces: access.workspaces,
     current: ws,
@@ -1991,7 +1918,6 @@ async function reload(id) {
 }
 
 function signOut() {
-  clearInterval(frontPoll);
   store.opsToken = null;
   access = ws = nav = me = null;
   showToken();
@@ -2001,13 +1927,12 @@ function signOut() {
 async function refresh() {
   if (ws?.kind === 'desk') {
     try {
-      const [suppliers, settlements, requests, orgs] = await Promise.all([
+      const [suppliers, settlements, orgs] = await Promise.all([
         (can('desk.suppliers') || can('desk.orders')) ? ops('/v1/ops/suppliers').then((r) => r.suppliers) : [],
         can('desk.pay') ? ops('/v1/ops/settlements').then((r) => r.settlements) : [],
-        can('desk.members') ? ops('/v1/ops/requests').then((r) => r.requests) : [],
         can('desk.orgs') ? ops('/v1/ops/orgs').then((r) => r.orgs) : [],
       ]);
-      cache = { suppliers, settlements, requests, orgs };
+      cache = { suppliers, settlements, orgs };
     } catch (error) {
       // The seat went while the page was open: ask again where this person works rather than throw them out.
       if (error.status === 401) return reload();
@@ -2020,7 +1945,7 @@ async function refresh() {
   show(tab);
 }
 
-/** What waits, in the sidebar: applications to answer, money to send, people and businesses asking in. */
+/** What waits, in the sidebar: applications to answer, money to send, businesses asking in. */
 function badges() {
   if (ws?.kind !== 'desk' || !nav) return;
   const applied = cache.suppliers.filter((s) => s.state === 'applied').length;
@@ -2028,7 +1953,6 @@ function badges() {
   const waitingOrgs = cache.orgs.filter((o) => o.state === 'applied').length;
   nav.badge('suppliers', applied, applied > 0);
   nav.badge('pay', due, due > 0);
-  nav.badge('members', cache.requests.length, cache.requests.length > 0);
   nav.badge('orgs', waitingOrgs, waitingOrgs > 0);
 }
 
@@ -2038,7 +1962,6 @@ function show(key) {
   localStorage.setItem(lastPageKey(ws), key);
   history.replaceState(null, '', `#${ws.id}/${key}`);
   nav.select(key);
-  clearInterval(frontPoll);
   const view = nav.view;
   view.replaceChildren();
   window.scrollTo(0, 0);
@@ -3963,7 +3886,7 @@ const ACTION = {
   'ledger.checks': 'Мөнгөний шалгалт ажиллуулсан', 'ledger.export': 'Мөнгөний CSV татсан', 'receipt.retry': 'Е-баримт дахин илгээсэн', 'message.retry': 'Мэдэгдэл дахин илгээсэн',
   'guest.close': 'Зочны бүртгэл хаасан', 'guest.session_revoke': 'Зочны нэвтрэлт хаасан',
   'restaurant.activate': 'Ресторан идэвхжүүлсэн', 'restaurant.suspend': 'Ресторан зогсоосон', 'menu.show': 'Хоол цэсэнд буцаасан', 'menu.hide': 'Хоол цэснээс нуусан',
-  'member.upsert': 'Гишүүн нэмсэн', 'member.role': 'Гишүүний эрх өөрчилсөн', 'member.approve': 'Ops эрх олгосон', 'member.decline': 'Эрхийн хүсэлт татгалзсан',
+  'member.upsert': 'Гишүүн нэмсэн', 'member.grant': 'Ops эрх олгосон', 'member.role': 'Гишүүний эрх өөрчилсөн', 'member.approve': 'Ops эрх олгосон', 'member.decline': 'Эрхийн хүсэлт татгалзсан',
   'member.activate': 'Гишүүн нээсэн', 'member.deactivate': 'Гишүүн хаасан',
   'org.approve': 'Байгууллага баталсан', 'org.decline': 'Байгууллага татгалзсан', 'org.member_role': 'Байгууллагын хүний эрх өөрчилсөн', 'org.roles': 'Байгууллагын эрхүүд өөрчилсөн',
   'role.create': 'Эрх үүсгэсэн', 'role.update': 'Эрх өөрчилсөн', 'role.delete': 'Эрх устгасан',
@@ -4010,83 +3933,11 @@ async function renderAudit(view) {
 
 /* ── the members ── */
 
-/** Asks for a seat, answered here — yes with a role, or no with a reason — and only drawn while there are some. */
-async function renderRequests(view) {
-  let requests;
-  try {
-    ({ requests } = await ops('/v1/ops/requests'));
-  } catch (error) {
-    toast(error.message, 'bad');
-    return;
-  }
-  cache.requests = requests;
-  badges();
-  if (!requests.length) return;
-  const roles = await deskRoleList();
-  const roleName = (key) => roles.find((x) => x.key === key)?.name ?? key;
-  const table = dataTable({
-    columns: [
-      { key: 'name', label: 'Хүсэгч', render: (r) => dtCell.two(r.name, r.contact ?? '') },
-      { key: 'role', label: 'Хүссэн эрх', value: (r) => roleName(r.role) },
-      { key: 'note', label: 'Юунд хэрэгтэй', value: (r) => r.note ?? '', render: (r) => (r.note ? `<span class="dt-text">${esc(r.note)}</span>` : dtCell.none()), width: '32%' },
-      { key: 'created_at', label: 'Хүссэн', render: (r) => dtCell.when(r.created_at) },
-    ],
-    search: false,
-    actions: (r) => [
-      button(
-        'Зөвшөөрөх',
-        () =>
-          popup({
-            title: 'Ops эрх олгох',
-            sub: `${esc(r.name)}${r.contact ? ` · <span class="mono">${esc(r.contact)}</span>` : ''}`,
-            width: 520,
-            fields: [
-              ...(r.note ? [{ type: 'static', label: 'Юунд хэрэгтэй', value: r.note }] : []),
-              { name: 'role', label: 'Олгох эрх', type: 'select', options: roles.map((x) => [x.key, x.description ? `${x.name} — ${x.description}` : x.name]), value: r.role, wide: true },
-            ],
-            submit: 'Зөвшөөрөх',
-            onSubmit: async (v) => {
-              const done = await ops(`/v1/ops/requests/${r.id}/approve`, { method: 'POST', body: { role: v.role } });
-              toast(`${done.member.name}: ${roleName(done.member.role)} эрх олголоо.`, 'good');
-              show('members');
-            },
-          }),
-        'data-v="primary" data-size="sm" data-a="approve"',
-      ),
-      button(
-        'Татгалзах',
-        () =>
-          confirmPopup({
-            title: 'Хүсэлтийг татгалзах',
-            text: `<b>${esc(r.name)}</b>-ийн ops эрхийн хүсэлтийг татгалзана. Шалтгааныг нь тэр харж, дахин хүсэж болно.`,
-            ok: 'Татгалзах',
-            danger: true,
-            reason: { label: 'Шалтгаан', placeholder: 'Заавал биш' },
-            onConfirm: async (reason) => {
-              await ops(`/v1/ops/requests/${r.id}/decline`, { method: 'POST', body: { reason } });
-              toast('Татгалзлаа.', 'good');
-              show('members');
-            },
-          }),
-        'data-v="quiet" data-size="sm" data-a="decline"',
-      ),
-    ],
-    sort: { key: 'created_at', desc: true },
-    rowAttrs: (r) => ({ 'data-request': r.id }),
-    noun: 'хүсэлт',
-    empty: { title: 'Хүлээгдэж буй хүсэлт алга', text: '' },
-    rows: requests,
-  });
-  table.el.id = 'requests';
-  const section = el(`<section class="section"><h2 class="section-label">Хариу хүлээж буй хүсэлт · ${requests.length}</h2></section>`);
-  section.append(table.el);
-  view.append(section);
-}
-
 /**
- * Who is at the desk: the asks waiting for a yes, then every member with
- * their role — changed, closed, opened again in a popup. People ask for
- * themselves; adding somebody by their address is the rare case, at the top.
+ * Who is at the desk: every member with their role — changed, closed,
+ * opened again in a popup. A member is added by choosing them from Basu's
+ * users — somebody who has signed in to Basu already — and giving a role;
+ * nobody applies for the desk, and nobody's address is typed in.
  */
 async function renderMembers(view) {
   const roleList = await deskRoleList();
@@ -4094,33 +3945,46 @@ async function renderMembers(view) {
   const roleOptions = roleList.map((r) => [r.key, r.description ? `${r.name} — ${r.description}` : r.name]);
   view.append(
     headActs(
-      head('Гишүүд', 'Хэн энэ хуудсанд орж, юу хийж болох вэ. Хүн өөрөө нэвтэрч эрх хүсдэг — та зөвшөөрнө.'),
+      head('Гишүүд', 'Хэн энэ хуудсанд орж, юу хийж болох вэ. Basu-д бүртгэлтэй хэрэглэгчдээс сонгож эрх олгоно.'),
       button(
-        `${NAV_ICON.plus}Имэйлээр нэмэх`,
+        `${NAV_ICON.plus}Гишүүн нэмэх`,
         () =>
           popup({
-            title: 'Имэйлээр урьдчилан нэмэх',
-            sub: 'Ихэнхдээ хэрэггүй — хүн өөрөө нэвтэрч эрх хүсдэг. Имэйлийг нь мэдэж байвал энд нэмэхэд тэр хаягаар (Google эсвэл имэйл код) нэвтэрмэгц эрх нь нээгдэнэ.',
-            width: 560,
+            title: 'Гишүүн нэмэх',
+            sub: 'Basu-д бүртгэлтэй хэрэглэгчдээс сонгоод эрх олгоно. Тэр dashboard-аа нээхэд ops хэсэг нь шууд нээгдэнэ.',
+            width: 600,
             id: 'member-new',
             fields: [
-              { name: 'name', label: 'Нэр', required: true },
-              { name: 'email', label: 'Имэйл', type: 'email', placeholder: 'нэр@gmail.com', required: true },
-              { name: 'role', label: 'Эрх', type: 'select', options: roleOptions, value: 'ops', wide: true },
+              {
+                type: 'pick',
+                name: 'guest_id',
+                label: 'Хэрэглэгч',
+                placeholder: 'Нэр, утас, имэйлээр хайх…',
+                empty: 'Ийм хэрэглэгч олдсонгүй. Хүн эхлээд Basu-д нэвтэрсэн байх ёстой.',
+                search: async (q) =>
+                  (await ops(`/v1/ops/people?q=${encodeURIComponent(q)}`)).people.map((p) => ({
+                    value: p.id,
+                    title: p.name || p.email || p.phone || 'Нэргүй',
+                    sub: [p.phone, p.email].filter(Boolean).join(' · '),
+                    note: p.member ? (p.member.active ? `Гишүүн · ${roleNames.get(p.member.role) ?? p.member.role}` : 'Хаасан гишүүн') : '',
+                    // Somebody at the desk already has a seat to change in the table, not a second one.
+                    disabled: Boolean(p.member?.active),
+                  })),
+              },
+              { name: 'role', label: 'Олгох эрх', type: 'select', options: roleOptions, value: 'ops', wide: true },
             ],
-            submit: 'Нэмэх',
+            submit: 'Эрх олгох',
             onSubmit: async (v) => {
-              const added = await ops('/v1/ops/members', { method: 'POST', body: { email: v.email, name: v.name, role: v.role } });
-              toast(`${added.name} нэмэгдлээ. ${added.email} хаягаар нэвтэрмэгц эрх нь нээгдэнэ.`, 'good');
+              if (!v.guest_id) throw new Error('Хэрэглэгчээ жагсаалтаас сонгоно уу.');
+              const added = await ops('/v1/ops/members', { method: 'POST', body: { guest_id: v.guest_id, role: v.role } });
+              toast(`${added.name}: ${roleNames.get(added.role) ?? added.role} эрх олголоо.`, 'good');
               show('members');
             },
           }),
-        'id="add-member"',
+        'data-v="primary" id="add-member"',
       ),
     ),
   );
-  await renderRequests(view);
-  if (tab !== 'members') return;
   const memberState = (m) => (!m.active ? ['off', 'хаасан'] : m.joined ? ['contracted', 'идэвхтэй'] : ['applied', 'ороогүй']);
   const table = dataTable({
     columns: [
@@ -4179,10 +4043,10 @@ async function renderMembers(view) {
     sort: { key: 'name' },
     rowAttrs: (m) => ({ 'data-member': m.id, 'data-off': !m.active }),
     noun: 'гишүүн',
-    empty: { title: 'Гишүүн алга', text: 'Хүн нэвтэрч эрх хүсэхэд дээр гарч ирнэ.' },
+    empty: { title: 'Гишүүн алга', text: '«Гишүүн нэмэх» товчоор хэрэглэгчдээс сонгож нэмнэ.' },
   });
   table.el.id = 'members';
-  const section = el(`<section class="section">${cache.requests.length ? '<h2 class="section-label">Гишүүд</h2>' : ''}</section>`);
+  const section = el('<section class="section"></section>');
   section.append(table.el);
   view.append(section);
   try {
@@ -4222,7 +4086,6 @@ async function renderMembers(view) {
  */
 async function boot() {
   root.replaceChildren();
-  clearInterval(frontPoll);
   if (!token()) {
     // Back from Google with a session: in, whoever it is.
     const back = authReturn?.token;

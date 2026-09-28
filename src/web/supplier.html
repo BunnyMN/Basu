@@ -1058,6 +1058,8 @@ async function openDesk(tabs) {
     current,
     account,
     brand: 'Нийлүүлэгч',
+    // Inside the app its own launcher is home; the corner button already goes there.
+    home: shell.present ? null : '/',
     onPage: (item) => {
       if (item.key.startsWith('idesh.')) return void show(item.key.slice(6));
       toDashboard(`#${current.id}/${item.key}`);

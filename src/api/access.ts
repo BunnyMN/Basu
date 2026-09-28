@@ -1,6 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { supplierOfOrg } from '../idesh/index.js';
-import { requestOf } from '../ops/index.js';
 import {
   PAGES,
   TOP,
@@ -17,7 +16,7 @@ import {
 import { profileOf } from '../platform/identity/index.js';
 import { orgById, roleIn, seatsOf, type OrgState } from '../platform/org/index.js';
 import type { Ctx } from '../ports.js';
-import { unauthorized } from './errors.js';
+import { forbidden, unauthorized } from './errors.js';
 import { limits } from './hardening.js';
 import { deskSeatFor } from './ops.js';
 
@@ -140,9 +139,9 @@ export async function registerAccessRoutes(app: FastifyInstance, ctx: Ctx): Prom
         menu: buildMenu('desk', await layoutOf('desk'), seat.grants),
       });
     }
-    if (!guestId) return { account: null, workspaces, desk_request: null };
+    if (!guestId) return { account: null, workspaces };
 
-    const [profile, seats, asked, orgLayout] = await Promise.all([profileOf(guestId), seatsOf(guestId), requestOf(guestId), layoutOf('org')]);
+    const [profile, seats, orgLayout] = await Promise.all([profileOf(guestId), seatsOf(guestId), layoutOf('org')]);
     for (const { org, role, roleKey, grants } of seats) {
       const active = org.state === 'active';
       const supplier = org.supplier && active ? await supplierOfOrg(org.id) : null;
@@ -176,32 +175,22 @@ export async function registerAccessRoutes(app: FastifyInstance, ctx: Ctx): Prom
     return {
       account: { id: guestId, name, email: profile?.email ?? null, phone: profile?.phone ?? null },
       workspaces,
-      desk_request: asked
-        ? {
-            id: asked.id,
-            name: asked.name,
-            role: asked.role,
-            note: asked.note,
-            state: asked.state,
-            created_at: asked.createdAt.toISOString(),
-            decline_reason: asked.declineReason,
-          }
-        : null,
     };
   });
 
   /**
-   * Who may do what, laid out as a table. The rules are no secret — an owner
-   * should read them before handing somebody a role, and anybody asking for
-   * a seat at the desk should see what each seat opens — so anybody signed in
-   * may ask. With `org`, a business's table has only its own roles and the
-   * pages that run at a business of its kind, and says which role the asker
-   * holds there.
+   * Who may do what, laid out as a table. A business's rules are no secret
+   * to the people in it — an owner should read them before handing somebody
+   * a role — so with `org` anybody there may ask, and the table has only
+   * that business's roles, the pages that run at a business of its kind, and
+   * which role the asker holds. The desk's own table is for the desk: its
+   * seats are given by an admin, and the public has nothing to choose from.
    */
   app.get<{ Querystring: { scope?: string; org?: string } }>('/v1/access/roles', limit, async (request, reply) => {
     const { guestId, seat } = await deskSeatFor(ctx, bearer(request));
     if (!guestId && !seat) return unauthorized(reply);
     if (request.query.scope === 'desk') {
+      if (!seat) return forbidden(reply, "the desk's roles are the desk's");
       const layout = await layoutOf('desk');
       const shown = new Set(layout.pages.filter((p) => !p.hidden).flatMap((p) => [`desk.${p.key}`]));
       const table = matrix('desk', { ...layout, pages: layout.pages.filter((p) => shown.has(`desk.${p.key}`)) }, await rolesOf('desk'));

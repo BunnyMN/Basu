@@ -139,9 +139,10 @@ describe('the desk cannot lock itself out', () => {
     expect((await call('POST', '/v1/ops/roles/desk', clerk, { name: 'Мөнгөтэй', permissions: ['desk.money'] })).statusCode).toBe(403);
     expect((await call('POST', '/v1/ops/roles/desk', clerk, { name: 'Гишүүд', permissions: ['desk.members'] })).statusCode).toBe(201);
     // Nor seat anybody in a role that opens more than theirs — an admin least of all.
-    expect((await call('POST', '/v1/ops/members', clerk, { email: 'friend@basu.mn', name: 'Найз', role: 'admin' })).statusCode).toBe(403);
-    expect((await call('POST', '/v1/ops/members', clerk, { email: 'friend@basu.mn', name: 'Найз', role: 'finance' })).statusCode).toBe(403);
-    expect((await call('POST', '/v1/ops/members', clerk, { email: 'friend@basu.mn', name: 'Найз', role: hr })).statusCode).toBe(201);
+    const friend = (await call('GET', '/v1/ops/whoami', await person('+97699130004', 'Найз'))).json().account.id as string;
+    expect((await call('POST', '/v1/ops/members', clerk, { guest_id: friend, role: 'admin' })).statusCode).toBe(403);
+    expect((await call('POST', '/v1/ops/members', clerk, { guest_id: friend, role: 'finance' })).statusCode).toBe(403);
+    expect((await call('POST', '/v1/ops/members', clerk, { guest_id: friend, role: hr })).statusCode).toBe(201);
   });
 });
 

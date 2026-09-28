@@ -13,11 +13,12 @@ import { buildServer } from './server.js';
 /**
  * Who sits at the desk, and as what.
  *
- * A seat is a role an account holds. The person signs in however they like
- * and asks; an admin says yes with a role, changes it, or switches the seat
- * off. An email address may be named ahead of time, because the address
- * proves itself; a phone number proves nothing when anybody can type it and
- * choose a password for it. There are no codes to hand out.
+ * A seat is a role an account holds. Nobody applies for Basu's desk: an
+ * admin finds the person among the accounts already on Basu and gives them
+ * a role, changes it, or switches the seat off. The environment may name the
+ * first members by email, because an address proves itself; a phone number
+ * proves nothing when anybody can type it and choose a password for it.
+ * There are no codes to hand out, and no addresses for an admin to type.
  */
 
 let app: FastifyInstance;
@@ -58,9 +59,21 @@ async function byEmail(address: string): Promise<string> {
   return verified.json().token as string;
 }
 
-const addMember = (payload: Record<string, string>) =>
-  app.inject({ method: 'POST', url: '/v1/ops/members', headers: desk(), payload });
+/** Signed up with a phone and a password, the way most people are — with a name. */
+async function byPhone(phone: string, name: string): Promise<{ token: string; id: string }> {
+  const made = await app.inject({ method: 'POST', url: '/v1/auth/register', payload: { phone, password: 'миний нууц үг', name } });
+  expect(made.statusCode, made.body).toBe(201);
+  const token = made.json().token as string;
+  const id = (await app.inject({ method: 'GET', url: '/v1/ops/whoami', headers: bearer(token) })).json().account.id as string;
+  return { token, id };
+}
+
+const seat = (payload: Record<string, string>, token?: string) =>
+  app.inject({ method: 'POST', url: '/v1/ops/members', headers: token ? bearer(token) : desk(), payload });
+const people = (q: string, token?: string) =>
+  app.inject({ method: 'GET', url: `/v1/ops/people?q=${encodeURIComponent(q)}`, headers: token ? bearer(token) : desk() });
 const me = (token: string) => app.inject({ method: 'GET', url: '/v1/ops/me', headers: bearer(token) });
+const accountId = async (token: string) => (await app.inject({ method: 'GET', url: '/v1/ops/whoami', headers: bearer(token) })).json().account.id as string;
 
 describe('a seat is an account that proved the address', () => {
   it('will not seat somebody who registered a member’s number before its owner came', async () => {
@@ -71,37 +84,22 @@ describe('a seat is an account that proved the address', () => {
     expect((await me(squatter.json().token)).statusCode).toBe(401);
   });
 
-  it('names a member ahead of time only by email', async () => {
-    const byPhone = await addMember({ phone: '+97699778899', name: 'Санхүү', role: 'finance' });
-    expect(byPhone.statusCode).toBe(400);
-    expect(byPhone.json().error.message_mn).toBe('Имэйл хаягаа оруулна уу.');
+  it('seats nobody by an address typed in', async () => {
+    const typed = await seat({ email: 'bat@gmail.com', name: 'Бат', role: 'ops' });
+    expect(typed.statusCode).toBe(400);
+    expect(typed.json().error.message_mn).toBe('Хэрэглэгчээ сонгоно уу.');
   });
 
-  it('seats a member named by email the first time that address signs in', async () => {
-    const added = await addMember({ email: 'Bat@Gmail.com', name: 'Бат', role: 'ops' });
-    expect(added.statusCode, added.body).toBe(201);
-    expect(added.json()).toMatchObject({ email: 'bat@gmail.com', phone: null, joined: false });
+  it('seats the account an admin chose, at once, and off is off', async () => {
+    const person = await byPhone('+97699112233', 'Ганхүлэг');
+    const given = await seat({ guest_id: person.id, role: 'admin' });
+    expect(given.statusCode, given.body).toBe(201);
+    expect(given.json()).toMatchObject({ name: 'Ганхүлэг', role: 'admin', phone: '+97699112233', joined: true, active: true });
+    const sitting = await me(person.token);
+    expect(sitting.json().member).toMatchObject({ name: 'Ганхүлэг', role: 'admin', phone: '+97699112233' });
 
-    const token = await byEmail('bat@gmail.com');
-    const seat = await me(token);
-    expect(seat.statusCode, seat.body).toBe(200);
-    expect(seat.json().member).toMatchObject({ name: 'Бат', role: 'ops', email: 'bat@gmail.com' });
-
-    const listed = (await app.inject({ method: 'GET', url: '/v1/ops/members', headers: desk() })).json().members;
-    expect(listed.find((m: { email: string }) => m.email === 'bat@gmail.com')).toMatchObject({ joined: true });
-    // Somebody else's address is somebody else.
-    expect((await me(await byEmail('dorj@gmail.com'))).statusCode).toBe(401);
-  });
-
-  it('seats a person who signed up by phone once they ask and an admin says yes, and off is off', async () => {
-    const byPhone = (await app.inject({ method: 'POST', url: '/v1/auth/register', payload: { phone: '+97699112233', password: 'миний нууц үг' } })).json().token as string;
-    const { id } = (await app.inject({ method: 'POST', url: '/v1/ops/requests', headers: bearer(byPhone), payload: { name: 'Ганхүлэг', role: 'admin' } })).json();
-    await app.inject({ method: 'POST', url: `/v1/ops/requests/${id}/approve`, headers: desk(), payload: {} });
-    const seat = await me(byPhone);
-    expect(seat.json().member).toMatchObject({ name: 'Ганхүлэг', role: 'admin', phone: '+97699112233' });
-
-    await app.inject({ method: 'POST', url: `/v1/ops/members/${seat.json().member.id}/active`, headers: desk(), payload: { active: false } });
-    expect((await me(byPhone)).statusCode).toBe(401);
+    await app.inject({ method: 'POST', url: `/v1/ops/members/${sitting.json().member.id}/active`, headers: desk(), payload: { active: false } });
+    expect((await me(person.token)).statusCode).toBe(401);
   });
 
   it('takes a member named by email from the environment, which by itself seats nobody', async () => {
@@ -111,9 +109,12 @@ describe('a seat is an account that proved the address', () => {
     expect((await me(await byEmail('owner@gmail.com'))).json().member).toMatchObject({ name: 'Эзэн', role: 'admin' });
   });
 
-  it('has no codes to hand out or redeem', async () => {
+  it('has no codes to hand out or redeem, and no asking', async () => {
     expect((await app.inject({ method: 'POST', url: '/v1/ops/invites', headers: desk(), payload: { role: 'admin' } })).statusCode).toBe(404);
     expect((await app.inject({ method: 'POST', url: '/v1/auth/claim', payload: { code: '12345 67890', phone: '+97699112233', password: 'x' } })).statusCode).toBe(404);
+    const person = await byPhone('+97699112233', 'Ганхүлэг');
+    expect((await app.inject({ method: 'POST', url: '/v1/ops/requests', headers: bearer(person.token), payload: { name: 'Ганхүлэг', role: 'admin' } })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/requests', headers: desk() })).statusCode).toBe(404);
   });
 });
 
@@ -155,78 +156,86 @@ describe('changing a member’s role', () => {
   });
 });
 
-describe('asking for a seat from the dashboard', () => {
-  const whoami = (token: string) => app.inject({ method: 'GET', url: '/v1/ops/whoami', headers: bearer(token) });
-  const ask = (token: string, payload: Record<string, string>) =>
-    app.inject({ method: 'POST', url: '/v1/ops/requests', headers: bearer(token), payload });
+describe('choosing a person from Basu’s users', () => {
+  it('finds people by name, phone or email, the newest first, and marks who sits at the desk', async () => {
+    const bold = await byPhone('+97699110001', 'Болд');
+    await byPhone('+97699110002', 'Сараа');
+    const mail = await byEmail('bat@gmail.com');
 
-  it('lets anybody signed in ask, and an admin say yes — no address typed by anybody', async () => {
+    const named = (await people('болд')).json().people;
+    expect(named.map((p: { name: string }) => p.name)).toEqual(['Болд']);
+    expect(named[0]).toMatchObject({ id: bold.id, phone: '+97699110001', member: null });
+    expect((await people('99110002')).json().people.map((p: { name: string }) => p.name)).toEqual(['Сараа']);
+    expect((await people('bat@')).json().people.map((p: { id: string }) => p.id)).toEqual([await accountId(mail)]);
+    // Nothing typed: the newest accounts, to choose from at once.
+    expect((await people('')).json().people[0].id).toBe(await accountId(mail));
+
+    await seat({ guest_id: bold.id, role: 'finance' });
+    expect((await people('Болд')).json().people[0].member).toMatchObject({ role: 'finance', active: true });
+  });
+
+  it('tells the person their seat is there, by email where they have no app, and records who gave it', async () => {
     const token = await byEmail('bold@gmail.com');
-    const first = (await whoami(token)).json();
-    expect(first).toMatchObject({ account: { email: 'bold@gmail.com' }, member: null, request: null });
+    const given = await seat({ guest_id: await accountId(token), role: 'viewer' });
+    expect(given.statusCode, given.body).toBe(201);
+    expect(given.json()).toMatchObject({ email: 'bold@gmail.com', role: 'viewer', joined: true });
+    expect((await me(token)).json().member).toMatchObject({ role: 'viewer', email: 'bold@gmail.com' });
 
-    const asked = await ask(token, { name: 'Болд', role: 'finance', note: 'Санхүүгийн ажилтан' });
-    expect(asked.statusCode, asked.body).toBe(201);
-    expect((await whoami(token)).json().request).toMatchObject({ state: 'pending', role: 'finance', contact: 'bold@gmail.com' });
-    // Asking is not sitting.
-    expect((await me(token)).statusCode).toBe(401);
-
-    const waiting = (await app.inject({ method: 'GET', url: '/v1/ops/requests', headers: desk() })).json().requests;
-    expect(waiting).toHaveLength(1);
-    // The admin gives a smaller role than asked for.
-    const yes = await app.inject({ method: 'POST', url: `/v1/ops/requests/${waiting[0].id}/approve`, headers: desk(), payload: { role: 'viewer' } });
-    expect(yes.statusCode, yes.body).toBe(200);
-
-    expect((await whoami(token)).json()).toMatchObject({ member: { name: 'Болд', role: 'viewer', email: 'bold@gmail.com' }, request: { state: 'approved' } });
-    expect((await me(token)).statusCode).toBe(200);
-    // Told so, by email here — the account has no app.
     await relay(ctx);
-    expect(mailer.to('bold@gmail.com')?.subject).toContain('Ops эрх олголоо');
-    expect((await app.inject({ method: 'GET', url: '/v1/ops/requests', headers: desk() })).json().requests).toEqual([]);
+    const mail = mailer.to('bold@gmail.com');
+    expect(mail?.subject).toContain('Basu ops эрх олголоо');
+    expect(mail?.text ?? JSON.stringify(mail)).toContain('Зөвхөн харах');
+    const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() })).json();
+    expect(JSON.stringify(audit)).toContain('member.grant');
   });
 
-  it('says no with a reason, and lets them ask again', async () => {
-    const token = await byEmail('bold@gmail.com');
-    const { id } = (await ask(token, { name: 'Болд', role: 'admin' })).json();
-    const no = await app.inject({ method: 'POST', url: `/v1/ops/requests/${id}/decline`, headers: desk(), payload: { reason: 'Админ эрх хэрэггүй' } });
-    expect(no.statusCode, no.body).toBe(200);
-    expect((await whoami(token)).json().request).toMatchObject({ state: 'declined', decline_reason: 'Админ эрх хэрэггүй' });
-    expect((await me(token)).statusCode).toBe(401);
-    // Once answered, not again.
-    expect((await app.inject({ method: 'POST', url: `/v1/ops/requests/${id}/approve`, headers: desk(), payload: {} })).statusCode).toBe(409);
-
-    expect((await ask(token, { name: 'Болд', role: 'ops' })).statusCode).toBe(201);
-    expect((await whoami(token)).json().request).toMatchObject({ state: 'pending', role: 'ops' });
-  });
-
-  it('keeps the answering to admins, and the asking to people not already seated', async () => {
-    const asker = await byEmail('bold@gmail.com');
-    const { id } = (await ask(asker, { name: 'Болд', role: 'ops' })).json();
-    // Asking again while waiting changes the ask; it does not queue a second one.
-    await ask(asker, { name: 'Болд', role: 'finance' });
-    expect((await app.inject({ method: 'GET', url: '/v1/ops/requests', headers: desk() })).json().requests).toHaveLength(1);
-
-    // A viewer sits at the desk but cannot seat anybody.
+  it('keeps the choosing to whoever may seat people', async () => {
+    const person = await byPhone('+97699110001', 'Болд');
     await syncMembersFromEnv('viewer@gmail.com:Харагч:viewer');
     const viewer = await byEmail('viewer@gmail.com');
-    expect((await app.inject({ method: 'POST', url: `/v1/ops/requests/${id}/approve`, headers: bearer(viewer), payload: {} })).statusCode).toBe(403);
-    expect((await app.inject({ method: 'POST', url: `/v1/ops/requests/${id}/approve`, headers: bearer(asker), payload: {} })).statusCode).toBe(401);
-    // And somebody seated has nothing to ask for.
-    expect((await ask(viewer, { name: 'Харагч', role: 'admin' })).statusCode).toBe(409);
-    // Nobody signed in asks nothing.
-    expect((await app.inject({ method: 'POST', url: '/v1/ops/requests', payload: { name: 'X', role: 'admin' } })).statusCode).toBe(401);
+    // A viewer sits at the desk but seats nobody, and does not browse Basu's users.
+    expect((await people('', viewer)).statusCode).toBe(403);
+    expect((await seat({ guest_id: person.id, role: 'ops' }, viewer)).statusCode).toBe(403);
+    // Somebody with no seat is not at the desk at all.
+    expect((await people('', person.token)).statusCode).toBe(401);
+    expect((await seat({ guest_id: person.id, role: 'ops' }, person.token)).statusCode).toBe(401);
+    // Nor are the people for anybody signed in to find by guessing.
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/people?q=Болд' })).statusCode).toBe(401);
   });
 
-  it('switches a member who was switched off back on, in the same seat', async () => {
+  it('says what is wrong with a choice: nobody chosen, an account that is not there, a role that is not', async () => {
+    const person = await byPhone('+97699110001', 'Болд');
+    expect((await seat({ role: 'ops' })).statusCode).toBe(400);
+    expect((await seat({ guest_id: 'not-an-id', role: 'ops' })).statusCode).toBe(400);
+    expect((await seat({ guest_id: '00000000-0000-0000-0000-000000000000', role: 'ops' })).statusCode).toBe(404);
+    const wrong = await seat({ guest_id: person.id, role: 'owner' });
+    expect(wrong.statusCode).toBe(400);
+    expect(wrong.json().error.message_mn).toBe('Эрх буруу байна.');
+  });
+
+  it('switches a member who was switched off back on, in the same seat, with the role given now', async () => {
     const token = await byEmail('bold@gmail.com');
-    const { id } = (await ask(token, { name: 'Болд', role: 'ops' })).json();
-    await app.inject({ method: 'POST', url: `/v1/ops/requests/${id}/approve`, headers: desk(), payload: {} });
-    const seat = (await me(token)).json().member.id;
-    await app.inject({ method: 'POST', url: `/v1/ops/members/${seat}/active`, headers: desk(), payload: { active: false } });
+    const id = await accountId(token);
+    const first = (await seat({ guest_id: id, role: 'ops' })).json();
+    await app.inject({ method: 'POST', url: `/v1/ops/members/${first.id}/active`, headers: desk(), payload: { active: false } });
     expect((await me(token)).statusCode).toBe(401);
 
-    const again = (await ask(token, { name: 'Болд', role: 'finance' })).json();
-    await app.inject({ method: 'POST', url: `/v1/ops/requests/${again.id}/approve`, headers: desk(), payload: {} });
-    expect((await me(token)).json().member).toMatchObject({ id: seat, role: 'finance' });
+    const again = (await seat({ guest_id: id, role: 'finance' })).json();
+    expect(again).toMatchObject({ id: first.id, role: 'finance', active: true });
+    expect((await me(token)).json().member).toMatchObject({ id: first.id, role: 'finance' });
+  });
+
+  it('gives the seat the environment named by the account’s number, not a second one', async () => {
+    // A number typed in a password sign-up proves nothing, so the seat the environment named waits…
+    const person = await byPhone('+97699778899', 'Санхүүч');
+    await syncMembersFromEnv('+97699778899:Санхүү:viewer');
+    expect((await me(person.token)).statusCode).toBe(401);
+
+    // …until an admin chooses that account: then it is that seat, with the role given now.
+    const given = (await seat({ guest_id: person.id, role: 'finance' })).json();
+    expect(given).toMatchObject({ name: 'Санхүү', phone: '+97699778899', role: 'finance', joined: true });
+    expect((await me(person.token)).json().member).toMatchObject({ id: given.id, role: 'finance' });
+    const listed = (await app.inject({ method: 'GET', url: '/v1/ops/members', headers: desk() })).json().members;
+    expect(listed.filter((m: { phone: string | null }) => m.phone === '+97699778899')).toHaveLength(1);
   });
 });

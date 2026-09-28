@@ -652,7 +652,7 @@ const POPUP_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12
 /** One field of a popup's form, as the design system draws a field. */
 function popupField(f, n) {
   const id = `popup-${n}-${f.name ?? Math.random().toString(36).slice(2)}`;
-  const wide = f.wide || ['textarea', 'checks', 'icons', 'static', 'note'].includes(f.type) ? ' data-wide' : '';
+  const wide = f.wide || ['textarea', 'checks', 'icons', 'static', 'note', 'pick'].includes(f.type) ? ' data-wide' : '';
   const hint = f.hint ? `<small>${f.hint}</small>` : '';
   const req = f.required ? ' required' : '';
   if (f.type === 'note') return `<p class="popup-text"${wide}>${f.html ?? popupEsc(f.text)}</p>`;
@@ -677,6 +677,12 @@ function popupField(f, n) {
       )
       .join('')}</div>${hint}</div>`;
   }
+  if (f.type === 'pick') {
+    // One row chosen from a list that answers a search — a person among Basu's users. `mountPick` wires it.
+    return `<div class="field popup-pick"${wide} data-pick="${popupEsc(f.name)}"><span>${popupEsc(f.label)}</span><input type="search" class="input search" id="${id}" placeholder="${popupEsc(
+      f.placeholder ?? 'Хайх…',
+    )}" autocomplete="off" spellcheck="false" aria-label="${popupEsc(f.label)}"><div class="popup-pick-list" role="radiogroup" aria-label="${popupEsc(f.label)}" aria-busy="true"></div>${hint}</div>`;
+  }
   if (f.type === 'select') {
     return `<label class="field"${wide} for="${id}"><span>${popupEsc(f.label)}</span><select id="${id}" name="${popupEsc(f.name)}"${req}>${f.options
       .map(([v, w]) => `<option value="${popupEsc(v)}"${String(v) === String(f.value ?? '') ? ' selected' : ''}>${popupEsc(w)}</option>`)
@@ -695,6 +701,61 @@ function popupField(f, n) {
 }
 
 /**
+ * A pick field at work: it asks `search(q)` for rows ({ value, title, sub,
+ * note, disabled }) when it opens and again as the person types, and draws
+ * them as a list with one to choose. The one chosen stays in the list
+ * whatever is typed next, so the form still carries it. Enter searches at
+ * once; it does not answer the popup.
+ */
+function mountPick(box, f) {
+  if (!box) return;
+  const input = box.querySelector('input[type="search"]');
+  const list = box.querySelector('.popup-pick-list');
+  const known = new Map();
+  let chosen = null;
+  let seq = 0;
+  let timer = null;
+  const row = (r) =>
+    `<label class="popup-pick-row"${r.disabled ? ' data-off' : ''}><input type="radio" name="${popupEsc(f.name)}" value="${popupEsc(r.value)}"${
+      chosen && String(chosen.value) === String(r.value) ? ' checked' : ''
+    }${r.disabled ? ' disabled' : ''}><span class="who"><b>${popupEsc(r.title)}</b>${r.sub ? `<small>${popupEsc(r.sub)}</small>` : ''}</span>${
+      r.note ? `<span class="note">${popupEsc(r.note)}</span>` : ''
+    }</label>`;
+  const draw = (rows) => {
+    for (const r of rows) known.set(String(r.value), r);
+    const shown = chosen && !rows.some((r) => String(r.value) === String(chosen.value)) ? [chosen, ...rows] : rows;
+    list.innerHTML = shown.length ? shown.map(row).join('') : `<p class="popup-pick-empty">${popupEsc(f.empty ?? 'Олдсонгүй.')}</p>`;
+  };
+  const load = async () => {
+    const mine = ++seq;
+    list.setAttribute('aria-busy', 'true');
+    try {
+      const rows = await f.search(input.value.trim());
+      if (mine === seq) draw(rows);
+    } catch (error) {
+      if (mine === seq) list.innerHTML = `<p class="popup-pick-empty">${popupEsc(error?.message ?? 'Алдаа гарлаа.')}</p>`;
+    } finally {
+      if (mine === seq) list.removeAttribute('aria-busy');
+    }
+  };
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(load, 200);
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    e.stopPropagation();
+    clearTimeout(timer);
+    void load();
+  });
+  list.addEventListener('change', (e) => {
+    if (e.target.name === f.name) chosen = known.get(e.target.value) ?? null;
+  });
+  void load();
+}
+
+/**
  * A popup over the page: the one place a thing is added, changed, or said no
  * to. On top its title and what it is about; in the middle the fields; at the
  * foot «Болих» and the one button that does it. It closes on its cross, on
@@ -703,8 +764,9 @@ function popupField(f, n) {
  * from the bottom.
  *
  * `fields` draw the form — { name, label, type: text | email | tel | number |
- * date | textarea | select | checks | static | note, value, placeholder,
- * options, required, hint, wide, inputmode, autocomplete }. `onSubmit(values,
+ * date | textarea | select | checks | icons | pick | static | note, value,
+ * placeholder, options, required, hint, wide, inputmode, autocomplete }; a
+ * pick also takes `search(q)` and `empty` (see `mountPick`). `onSubmit(values,
  * popup)` does the work: what it returns closes the popup and is what the
  * promise resolves to; `false` keeps it open (a first step done, the second
  * drawn with `popup.step(...)`); a thrown error is said inside the popup, over
@@ -748,7 +810,10 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
         $('header .sub').innerHTML = next.sub;
         $('header .sub').hidden = !next.sub;
       }
-      if (next.fields) $('.fields').innerHTML = next.fields.map((f) => popupField(f, n)).join('');
+      if (next.fields) {
+        $('.fields').innerHTML = next.fields.map((f) => popupField(f, n)).join('');
+        for (const f of next.fields) if (f.type === 'pick') mountPick([...sheet.querySelectorAll('[data-pick]')].find((box) => box.dataset.pick === f.name), f);
+      }
       if (next.submit !== undefined) go.textContent = next.submit;
       if (next.danger !== undefined) go.setAttribute('data-v', next.danger ? 'danger' : 'primary');
       say(null);

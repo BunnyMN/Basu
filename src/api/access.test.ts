@@ -242,10 +242,8 @@ describe('the table of roles', () => {
     expect(staff.permissions).not.toContain('org.dine.menu');
     expect(table.modules.map((m: { name: string }) => m.name)).toEqual(['Үндсэн', 'Идэш', 'Байгууллага']);
 
-    const deskTable = (await call('GET', '/v1/access/roles?scope=desk', owner)).json();
-    expect(deskTable.roles.map((r: { key: string }) => r.key)).toEqual(['admin', 'ops', 'finance', 'viewer']);
-    expect(deskTable.roles[0]).toMatchObject({ locked: true, permissions: null });
-    expect(deskTable.yours).toBeNull();
+    // The desk's own table is the desk's: an owner of a business has no seat there to choose.
+    expect((await call('GET', '/v1/access/roles?scope=desk', owner)).statusCode).toBe(403);
   });
 });
 
@@ -281,6 +279,12 @@ describe('the desk', () => {
     expect((await call('GET', '/v1/ops/money', viewer)).statusCode).toBe(200);
     expect((await call('POST', '/v1/ops/money/checks', viewer)).statusCode).toBe(403);
     expect((await call('PUT', '/v1/ops/system/settings/desk_banner', viewer, { value: 'x' })).statusCode).toBe(403);
+
+    // The desk's table of roles is for the people who sit there.
+    const deskTable = (await call('GET', '/v1/access/roles?scope=desk', worker)).json();
+    expect(deskTable.roles.map((r: { key: string }) => r.key)).toEqual(['admin', 'ops', 'finance', 'viewer']);
+    expect(deskTable.roles[0]).toMatchObject({ locked: true, permissions: null });
+    expect(deskTable.yours).toBe('ops');
   });
 
   it('opens the demo’s shared secret as one admin with no account behind it', async () => {

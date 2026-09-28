@@ -689,6 +689,13 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .sidebar .brand b{font-size:1.125rem;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
 .sidebar .brand span{font-size:var(--t-cap);font-weight:500;letter-spacing:0;color:var(--ink-3)}
 .sidebar .nav-close{display:none}
+/* the way out of the dashboard to Basu's front page: the wordmark, and a labelled button beside it */
+.sidebar .brand-home{display:flex;align-items:baseline;gap:8px;min-width:0;color:inherit;text-decoration:none}
+.sidebar .go-home{margin-left:auto;align-self:center;display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px 0 9px;border:1px solid var(--line);border-radius:var(--r-pill);background:var(--surface);color:var(--ink-2);text-decoration:none;white-space:nowrap}
+.sidebar .go-home span{font-size:var(--t-cap);font-weight:500;letter-spacing:0;color:inherit}
+.sidebar .go-home svg{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+@media (hover:hover){.sidebar .go-home:hover{background:var(--surface-2);border-color:var(--line-2);color:var(--ink)}}
+.sidebar .go-home:active{background:var(--surface-2)}
 
 /* the place: who the person is working as here, and the way to the others */
 .ws{position:relative;margin:0 0 12px}
@@ -782,6 +789,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
   .sidebar[data-open]{transform:none;box-shadow:var(--shadow-float)}
   .sidebar .brand{align-items:center;padding-bottom:12px}
   .sidebar .nav-close{display:inline-grid;place-items:center;width:36px;height:36px;margin-left:auto;padding:0;border:0;border-radius:var(--r-sm);background:none;color:var(--ink-3)}
+  .sidebar .go-home + .nav-close{margin-left:0}
   .sidebar .nav-close svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
   .nav-scrim:not([hidden]){display:block;position:fixed;inset:0;z-index:var(--z-scrim);background:var(--scrim)}
   :root[data-nav-open]{overflow:hidden}
@@ -877,6 +885,23 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .popup .popup-checks[data-list] .check:first-child{border-top:0}
 .popup .popup-checks[data-list] .check input{margin-top:3px}
 /* a choice of icons: a grid of small tiles, the chosen one inked */
+/* a pick: one person (or thing) chosen from a list that answers a search */
+/* inside a .field the plain input rule is the stronger one; the search look is said again here */
+.popup .popup-pick input.search{margin-bottom:8px;padding-left:38px;background:var(--surface-2) var(--icon-search) no-repeat 12px center / 16px}
+.popup .popup-pick input.search::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
+.popup .popup-pick-list{display:flex;flex-direction:column;max-height:min(320px,42dvh);overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--line);border-radius:var(--r-ctl);background:var(--surface)}
+.popup .popup-pick-list[aria-busy="true"]{opacity:.6}
+.popup .popup-pick-row{display:flex;align-items:center;gap:12px;min-height:52px;padding:8px 14px;border-top:1px solid var(--line);cursor:pointer}
+.popup .popup-pick-row:first-child{border-top:0}
+.popup .popup-pick-row .who{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.popup .popup-pick-row b{font-size:var(--t-body);font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+.popup .popup-pick-row small{font-family:var(--mono);font-size:var(--t-meta);color:var(--ink-3);overflow-wrap:anywhere}
+.popup .popup-pick-row .note{flex:none;font-size:var(--t-cap);color:var(--ink-3)}
+.popup .popup-pick-row:has(input:checked){background:var(--accent-soft)}
+.popup .popup-pick-row[data-off]{cursor:default}
+.popup .popup-pick-row[data-off] b{color:var(--ink-3)}
+@media (hover:hover){.popup .popup-pick-row:not([data-off]):not(:has(input:checked)):hover{background:var(--surface-2)}}
+.popup .popup-pick-empty{margin:0;padding:14px;font-size:var(--t-cap);line-height:1.5;color:var(--ink-3)}
 .popup .popup-icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:6px}
 .popup .popup-icons label{position:relative;display:grid;place-items:center;height:40px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);cursor:pointer;color:var(--ink-2)}
 .popup .popup-icons input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}

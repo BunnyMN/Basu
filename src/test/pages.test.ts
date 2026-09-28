@@ -1550,14 +1550,10 @@ describe('who sees what', () => {
 
   it('keeps the desk’s own pages to the roles that hold them', async () => {
     const desk = await deskToken();
-    // A seat is asked for by the person and given, with a role, by an admin.
+    // A seat is given, with a role, by an admin who chose the account from Basu's users.
     const finance = await account('+97688030031', 'Санхүү');
-    const asked = (await (await fetch(`${base}/v1/ops/requests`, {
-      method: 'POST',
-      headers: as(finance),
-      body: JSON.stringify({ name: 'Санхүү', role: 'finance' }),
-    })).json()) as { id: string };
-    await fetch(`${base}/v1/ops/requests/${asked.id}/approve`, { method: 'POST', headers: as(desk), body: JSON.stringify({ role: 'finance' }) });
+    const { account: chosen } = (await (await fetch(`${base}/v1/ops/whoami`, { headers: as(finance) })).json()) as { account: { id: string } };
+    await fetch(`${base}/v1/ops/members`, { method: 'POST', headers: as(desk), body: JSON.stringify({ guest_id: chosen.id, role: 'finance' }) });
     storage.setItem('basu.ops', finance);
     storage.removeItem('basu.dash.ws');
     storage.removeItem('basu.ops.tab');
@@ -1566,6 +1562,53 @@ describe('who sees what', () => {
     const seen = tabs(dash);
     expect(seen).toEqual(expect.arrayContaining(['overview', 'money', 'pay', 'audit']));
     for (const hidden of ['venues', 'lunches', 'notify', 'system', 'members']) expect(seen).not.toContain(hidden);
+    storage.removeItem('basu.ops');
+  });
+
+  it('shows a person nothing to ask of Basu’s desk: their corner has their businesses, and the way home', async () => {
+    storage.setItem('basu.ops', await account('+97688030041', 'Энгийн хүн'));
+    storage.removeItem('basu.dash.ws');
+    const dash = await openPage('ops.html');
+    await until(dash, 'the corner', (d) => Boolean(d.querySelector('#org-list')));
+    const doc = dash.window.document;
+    expect(doc.querySelector('#view')?.textContent).not.toMatch(/ops эрх|Ops эрх|ops-ийн хэсэг/);
+    expect(doc.querySelector('#ask-open')).toBeNull();
+    expect([...doc.querySelectorAll('.ws-act')].map((b) => (b as HTMLElement).dataset['act'])).toEqual(['new-org']);
+    // Out of the dashboard, to Basu's front page, in one press.
+    expect(doc.querySelector('#go-home')?.getAttribute('href')).toBe('/');
+    expect(doc.querySelector('.brand-home')?.getAttribute('href')).toBe('/');
+    storage.removeItem('basu.ops');
+  });
+
+  it('seats somebody an admin chose from Basu’s users, and the desk opens for them', async () => {
+    const chosen = await account('+97688030051', 'Сонгосон ажилтан');
+    storage.setItem('basu.ops', await deskToken());
+    storage.removeItem('basu.dash.ws');
+    const desk = await openPage('ops.html');
+    await opsTab(desk, 'members');
+    const doc = desk.window.document;
+    await until(desk, 'the members page', (d) => Boolean(d.querySelector('#add-member')));
+    (doc.querySelector('#add-member') as HTMLElement).click();
+    await until(desk, 'Basu’s users to choose from', (d) => d.querySelectorAll('#member-new .popup-pick-row').length > 0);
+    const search = doc.querySelector('#member-new .popup-pick input[type="search"]') as HTMLInputElement;
+    search.value = 'Сонгосон';
+    search.dispatchEvent(new desk.window.Event('input', { bubbles: true }));
+    await until(desk, 'the one looked for', (d) => {
+      const rows = [...d.querySelectorAll('#member-new .popup-pick-row')];
+      return rows.length === 1 && Boolean(rows[0]!.textContent?.includes('Сонгосон ажилтан'));
+    });
+    (doc.querySelector('#member-new .popup-pick-row input') as HTMLInputElement).click();
+    (doc.querySelector('#member-new [name="role"]') as HTMLSelectElement).value = 'viewer';
+    (doc.querySelector('#member-new [data-submit]') as HTMLElement).click();
+    await until(desk, 'the new member in the table', (d) => [...d.querySelectorAll('#members tr[data-member]')].some((r) => r.textContent?.includes('Сонгосон ажилтан')));
+
+    // The person opens the dashboard and the desk is there, in the role given.
+    storage.setItem('basu.ops', chosen);
+    storage.removeItem('basu.dash.ws');
+    storage.removeItem('basu.ops.tab');
+    const theirs = await openPage('ops.html');
+    await until(theirs, 'the desk', (d) => Boolean(d.querySelector('.tabs [data-tab="overview"]')));
+    expect(theirs.window.document.querySelector('.ws-btn')?.textContent).toContain('Зөвхөн харах');
     storage.removeItem('basu.ops');
   });
 });

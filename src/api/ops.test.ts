@@ -615,9 +615,12 @@ describe('the desk’s members', () => {
     expect((await listMembers()).map((m) => [m.name, m.role])).toEqual([['Аа', 'admin'], ['Бб', 'finance']]);
 
     const admin = await signIn('+97699000021');
-    const added = await app.inject({ method: 'POST', url: '/v1/ops/members', headers: auth(admin), payload: { email: 'VV@example.mn', name: 'Вв', role: 'viewer' } });
+    // Somebody already on Basu, chosen from its users.
+    const vv = await signIn('+97699000023');
+    const vvId = (await app.inject({ method: 'GET', url: '/v1/ops/whoami', headers: auth(vv) })).json().account.id as string;
+    const added = await app.inject({ method: 'POST', url: '/v1/ops/members', headers: auth(admin), payload: { guest_id: vvId, role: 'viewer' } });
     expect(added.statusCode, added.body).toBe(201);
-    expect(added.json()).toMatchObject({ email: 'vv@example.mn', role: 'viewer', active: true });
+    expect(added.json()).toMatchObject({ phone: '+97699000023', role: 'viewer', active: true, joined: true });
     const closed = await app.inject({ method: 'POST', url: `/v1/ops/members/${added.json().id}/active`, headers: auth(admin), payload: { active: false } });
     expect(closed.json()).toEqual({ id: added.json().id, active: false });
     // Switched off, the phone the environment named is off too.

@@ -6,11 +6,12 @@ import { ensureRoles, roleOf } from '../platform/access/index.js';
  *
  * A member is a name and a role, named by a phone number, an email address,
  * or both. What makes a session ops is that its account is linked to an
- * active member — and an account is linked only by proof: an admin saying
- * yes to the seat that account asked for, a phone number an SMS code
- * reached, or an address Google, Apple or a code in the inbox vouched for.
- * Knowing the number an admin typed is not enough; with passwords, anybody
- * can type anybody's.
+ * active member — and an account is linked only by proof: an admin choosing
+ * that very account from Basu's users, a phone number an SMS code reached,
+ * or an address Google, Apple or a code in the inbox vouched for. Knowing
+ * the number an admin typed is not enough; with passwords, anybody can type
+ * anybody's. Nobody asks for a seat: the desk is Basu's staff, and an admin
+ * seats them.
  *
  * One person may come in through a few accounts — the number they signed up
  * with, the Google account they use at work — and each is the same seat.
@@ -106,6 +107,62 @@ export async function linkByProof(
     [input.guestId, found.id, found.how],
   );
   return memberForAccount(input.guestId, db);
+}
+
+/** The seat each of these accounts sits in, if any — to mark, in a list of people, who is at the desk already. */
+export async function seatsOfAccounts(guestIds: readonly string[], db: Db = getPool()): Promise<Map<string, Member>> {
+  if (!guestIds.length) return new Map();
+  const { rows } = await db.query<Row & { guest_id: string }>(
+    `SELECT link.guest_id, ${COLUMNS} FROM ops.member m JOIN ops.member_account link ON link.member_id = m.id WHERE link.guest_id = ANY($1)`,
+    [guestIds],
+  );
+  return new Map(rows.map((r) => [r.guest_id, shape(r)]));
+}
+
+/**
+ * A seat for an account an admin chose from Basu's users, with the role
+ * given. The choice is the proof, so the account sits at once. An account
+ * that sat before — and was switched off — sits again in the same seat; a
+ * member the desk already named by the account's email or phone (from the
+ * environment, say) becomes this account's seat rather than a second one.
+ */
+export async function seatAccount(
+  input: { guestId: string; name: string; email: string | null; phone: string | null; role: Role },
+  db: Db = getPool(),
+): Promise<Member> {
+  if (!(await deskRoleExists(input.role, db))) throw new Error(`no such role: ${input.role}`);
+  const email = input.email?.trim().toLowerCase() || null;
+  const phone = input.phone || null;
+  await tx(async (client) => {
+    const linked = await client.query<{ member_id: string }>('SELECT member_id FROM ops.member_account WHERE guest_id = $1 FOR UPDATE', [input.guestId]);
+    const named = linked.rows[0]
+      ? linked.rows
+      : (
+          await client.query<{ member_id: string }>(
+            `SELECT id AS member_id FROM ops.member
+              WHERE ($1::text IS NOT NULL AND lower(email) = $1) OR ($2::text IS NOT NULL AND phone = $2)
+              ORDER BY (lower(email) = $1) DESC NULLS LAST, created_at
+              LIMIT 1
+              FOR UPDATE`,
+            [email, phone],
+          )
+        ).rows;
+    let memberId = named[0]?.member_id;
+    if (memberId) {
+      await client.query('UPDATE ops.member SET role = $2, active = true, updated_at = now() WHERE id = $1', [memberId, input.role]);
+    } else {
+      const made = await client.query<{ id: string }>(
+        'INSERT INTO ops.member (name, role, email, phone) VALUES ($1, $2, $3, $4) RETURNING id',
+        [input.name.trim() || email || phone || 'Нэргүй', input.role, email, phone],
+      );
+      memberId = made.rows[0]!.id;
+    }
+    await client.query(
+      `INSERT INTO ops.member_account (guest_id, member_id, how) VALUES ($1, $2, 'chosen') ON CONFLICT (guest_id) DO NOTHING`,
+      [input.guestId, memberId],
+    );
+  });
+  return (await memberForAccount(input.guestId, db))!;
 }
 
 const PHONE = /^\+976\d{8}$/;
