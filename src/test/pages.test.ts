@@ -1438,13 +1438,13 @@ describe('Basu decides who may do what', () => {
   }
   const deskToken = async () => ((await (await fetch(`${base}/dev/ops-token`)).json()) as { token: string }).token;
 
-  it('makes a role module by module, then page by page, an action bringing its page along', async () => {
+  it('makes a role in a popup, module by module and then page by page, an action bringing its page along', async () => {
     const desk = await theDesk();
     await opsTab(desk, 'roles');
-    await until(desk, 'the roles', (d) => d.querySelectorAll('#roles-list .role-row').length >= 4);
+    await until(desk, 'the roles', (d) => d.querySelectorAll('#roles-table tr[data-role]').length >= 4);
     const doc = desk.window.document;
-    (doc.querySelector('#roles-list [data-role="+"]') as HTMLElement).click();
-    await until(desk, 'an empty role', (d) => (d.querySelector('#role-edit [name="name"]') as HTMLInputElement | null)?.value === '');
+    (doc.querySelector('#role-new') as HTMLElement).click();
+    await until(desk, 'an empty role in the popup', (d) => (d.querySelector('#role-edit[role="dialog"] [name="name"]') as HTMLInputElement | null)?.value === '');
     const name = doc.querySelector('#role-edit [name="name"]') as HTMLInputElement;
     name.value = 'Туслах · тест';
     name.dispatchEvent(new desk.window.Event('input', { bubbles: true }));
@@ -1468,9 +1468,12 @@ describe('Basu decides who may do what', () => {
     expect(level('platform')).toBe('some');
     expect((doc.querySelector('#role-edit input[value="desk.orders"]') as HTMLInputElement).checked).toBe(true);
     (doc.querySelector('#role-edit [data-save]') as HTMLElement).click();
-    await until(desk, 'the new role chosen', (d) =>
-      Boolean([...d.querySelectorAll('#roles-list .role-row[data-on]')].find((r) => r.textContent?.includes('Туслах · тест'))),
-    );
+
+    // The popup closes and the table has the role; opening it shows what was saved.
+    const row = () => [...doc.querySelectorAll('#roles-table tr[data-role]')].find((r) => r.textContent?.includes('Туслах · тест')) as HTMLElement | undefined;
+    await until(desk, 'the new role in the table', () => Boolean(row()) && !doc.querySelector('#role-edit'));
+    row()!.click();
+    await until(desk, 'the role in the popup', (d) => (d.querySelector('#role-edit [name="name"]') as HTMLInputElement | null)?.value === 'Туслах · тест');
     expect(ticked()).toEqual(['desk.guests', 'desk.notify', 'desk.orders', 'desk.orders:manage']);
 
     // A copy starts from the same pages, under a name of its own.

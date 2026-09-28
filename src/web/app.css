@@ -839,6 +839,19 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
   body:has(> .clockbar) .sheet[data-dock]{top:var(--clock-h)}
   .scrim[data-dock]{display:none}
 }
+/* A popup: the same sheet, lifted to the middle of a wide screen; on a phone it stays a sheet from the bottom. */
+@media (min-width:720px){
+  .sheet[data-center]{
+    top:50%;left:50%;right:auto;bottom:auto;width:min(var(--sheet-w,640px),calc(100vw - 48px));max-height:min(88dvh,920px);overflow:hidden;
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-float);
+    opacity:0;pointer-events:none;transform:translate(-50%,-48%) scale(.98);
+    transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease);
+  }
+  .sheet[data-center][data-open]{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  .sheet[data-center] > footer{padding-bottom:12px}
+}
+:root[data-modal-open]{overflow:hidden}
+.sheet[tabindex="-1"]:focus{outline:none}   /* the popup takes the focus so Esc and Tab work; the ring belongs to what is inside */
 
 /* ── the ways in ──────────────────────────────────────────────────── */
 /* Google, a code by email, and the phone folded under them: one block
