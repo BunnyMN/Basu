@@ -1,27 +1,17 @@
 import { getPool } from '../db/pool.js';
 import { periodsOf } from '../domain/time.js';
 import { contactsFor, displayNamesFor } from '../platform/identity/index.js';
+import { KITCHEN_STALE_SECONDS } from './kitchen.js';
 import { restaurantRatings, type Rating } from './reviews.js';
 
 /**
  * Lunch, as the desk reads it.
  *
- * Read models for the ops desk: every restaurant with its tablets and its
+ * Read models for the ops desk: every restaurant with its kitchen and its
  * day, every order with who it is for, one order's whole story, a menu with
  * the items that are switched off, and what people said. Writes stay in
- * `orders.ts`, `devices.ts` and the two small toggles below.
+ * `orders.ts`, `kitchen.ts` and the two small toggles below.
  */
-
-export interface DeskDevice {
-  id: string;
-  label: string | null;
-  pairedAt: Date | null;
-  lastSeenAt: Date | null;
-  /** Still waiting to be typed into a tablet. */
-  pairingCode: string | null;
-  pairingExpiresAt: Date | null;
-  online: boolean;
-}
 
 export interface DeskRestaurant {
   id: string;
@@ -31,7 +21,10 @@ export interface DeskRestaurant {
   slotMinutes: number;
   travelMinutes: number;
   merchantTin: string | null;
-  devices: DeskDevice[];
+  /** The business whose people run it; null for one not yet given to a business. */
+  orgId: string | null;
+  /** When somebody at the restaurant last had the kitchen's orders open. */
+  kitchenSeenAt: Date | null;
   online: boolean;
   menu: { total: number; active: number; soldOut: number };
   today: { placed: number; live: number; held: number; salesMnt: number };
@@ -43,9 +36,10 @@ const LIVE = `('PLACED','ACCEPTED','SCHEDULED','ARMED','HELD','FIRED','COOKING',
 export async function restaurantsForDesk(now: Date): Promise<DeskRestaurant[]> {
   const db = getPool();
   const { today, end } = periodsOf(now);
-  const [{ rows }, { rows: devices }, ratings] = await Promise.all([
+  const [{ rows }, ratings] = await Promise.all([
     db.query<Record<string, string | number | boolean | null>>(
       `SELECT r.id, r.name, r.active, r.auto_accept, r.slot_minutes, r.travel_minutes, r.ebarimt_merchant_tin,
+              r.org_id, r.kitchen_seen_at,
               (SELECT count(*)::int FROM dine.menu_item m WHERE m.restaurant_id = r.id) AS menu_total,
               (SELECT count(*)::int FROM dine.menu_item m WHERE m.restaurant_id = r.id AND m.active) AS menu_active,
               (SELECT count(*)::int FROM dine.menu_item m WHERE m.restaurant_id = r.id AND m.active AND m.sold_out_until IS NOT NULL) AS menu_sold_out,
@@ -58,40 +52,11 @@ export async function restaurantsForDesk(now: Date): Promise<DeskRestaurant[]> {
         ORDER BY r.active DESC, r.name`,
       [today, end],
     ),
-    db.query<{
-      id: string;
-      restaurant_id: string;
-      label: string | null;
-      paired_at: Date | null;
-      last_seen_at: Date | null;
-      pairing_code: string | null;
-      pairing_expires_at: Date | null;
-    }>(
-      `SELECT id, restaurant_id, label, paired_at, last_seen_at, pairing_code, pairing_expires_at
-         FROM dine.kds_device
-        WHERE revoked_at IS NULL AND (paired_at IS NOT NULL OR pairing_expires_at > $1)
-        ORDER BY paired_at DESC NULLS FIRST, created_at DESC`,
-      [now],
-    ),
     restaurantRatings(db),
   ]);
-  const fresh = new Date(now.getTime() - 90 * 1000);
-  const byRestaurant = new Map<string, DeskDevice[]>();
-  for (const d of devices) {
-    const list = byRestaurant.get(d.restaurant_id) ?? [];
-    list.push({
-      id: d.id,
-      label: d.label,
-      pairedAt: d.paired_at,
-      lastSeenAt: d.last_seen_at,
-      pairingCode: d.paired_at ? null : d.pairing_code,
-      pairingExpiresAt: d.paired_at ? null : d.pairing_expires_at,
-      online: d.last_seen_at !== null && d.last_seen_at > fresh,
-    });
-    byRestaurant.set(d.restaurant_id, list);
-  }
+  const fresh = new Date(now.getTime() - KITCHEN_STALE_SECONDS * 1000);
   return rows.map((r) => {
-    const own = byRestaurant.get(String(r['id'])) ?? [];
+    const seen = r['kitchen_seen_at'] as unknown as Date | null;
     return {
       id: String(r['id']),
       name: String(r['name']),
@@ -100,8 +65,9 @@ export async function restaurantsForDesk(now: Date): Promise<DeskRestaurant[]> {
       slotMinutes: Number(r['slot_minutes']),
       travelMinutes: Number(r['travel_minutes']),
       merchantTin: r['ebarimt_merchant_tin'] === null ? null : String(r['ebarimt_merchant_tin']),
-      devices: own,
-      online: own.some((d) => d.online),
+      orgId: r['org_id'] === null ? null : String(r['org_id']),
+      kitchenSeenAt: seen,
+      online: seen !== null && seen > fresh,
       menu: { total: Number(r['menu_total']), active: Number(r['menu_active']), soldOut: Number(r['menu_sold_out']) },
       today: { placed: Number(r['placed']), live: Number(r['live']), held: Number(r['held']), salesMnt: Number(r['sales']) },
       rating: ratings.get(String(r['id'])) ?? null,

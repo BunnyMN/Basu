@@ -4,7 +4,7 @@ import { closePool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
-import { createListing, createSupplierCode, registerSupplier, type Listing } from '../idesh/index.js';
+import { createListing, registerSupplier, type Listing } from '../idesh/index.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
 
@@ -61,11 +61,9 @@ async function topUp(token: string, amountMnt: number): Promise<void> {
   expect(settled.statusCode, settled.body).toBe(200);
 }
 
-async function pairScreen(supplier: string): Promise<string> {
-  const code = await createSupplierCode(ctx, supplier, 'Дэлгэц');
-  const paired = await app.inject({ method: 'POST', url: '/v1/supplier/pair', payload: { pairing_code: code } });
-  expect(paired.statusCode, paired.body).toBe(200);
-  return paired.json().token as string;
+/** Whoever is at the supplier's counter: its owner, signed in as themselves. */
+async function atCounter(supplier: string): Promise<string> {
+  return signIn(supplier === supplierId ? '+97688010001' : '+97688010002');
 }
 
 async function placeAndPay(
@@ -256,7 +254,7 @@ describe('ordering', () => {
 
     // The guest rang, they talked: the supplier cancels from their screen —
     // and must say why, because the reason decides the money.
-    const screen = await pairScreen(supplierId);
+    const screen = await atCounter(supplierId);
     const unsaid = await app.inject({
       method: 'POST',
       url: `/v1/supplier/orders/${id}/cancel`,
@@ -318,7 +316,7 @@ describe('the supplier’s screen', () => {
       address_phone: '+97699112233',
     });
 
-    const screen = await pairScreen(supplierId);
+    const screen = await atCounter(supplierId);
     const board = await app.inject({ method: 'GET', url: '/v1/supplier/board', headers: auth(screen) });
     expect(board.statusCode).toBe(200);
     expect(board.json().supplier.name).toBe('Архангай · Дорж');
@@ -332,7 +330,7 @@ describe('the supplier’s screen', () => {
     });
     expect(board.json().listings).toHaveLength(1);
 
-    const rival = await pairScreen(rivalId);
+    const rival = await atCounter(rivalId);
     const rivalBoard = await app.inject({ method: 'GET', url: '/v1/supplier/board', headers: auth(rival) });
     const lanes = rivalBoard.json().lanes;
     expect(lanes.paid.length + lanes.preparing.length + lanes.ready.length + lanes.dispatched.length).toBe(0);
@@ -350,7 +348,7 @@ describe('the supplier’s screen', () => {
     const token = await signIn();
     await topUp(token, 500_000);
     const { id } = await placeAndPay(token);
-    const screen = await pairScreen(supplierId);
+    const screen = await atCounter(supplierId);
 
     const act = (action: string) =>
       app.inject({ method: 'POST', url: `/v1/supplier/orders/${id}/${action}`, headers: auth(screen), payload: {} });
@@ -372,7 +370,7 @@ describe('the supplier’s screen', () => {
   });
 
   it('lets the supplier run their own stall', async () => {
-    const screen = await pairScreen(supplierId);
+    const screen = await atCounter(supplierId);
 
     const created = await app.inject({
       method: 'POST',
@@ -426,7 +424,7 @@ describe('the supplier’s screen', () => {
     expect(open.json().listings.map((l: { id: string }) => l.id)).toEqual([sheep.id]);
 
     // The rival cannot touch it.
-    const rival = await pairScreen(rivalId);
+    const rival = await atCounter(rivalId);
     const meddle = await app.inject({
       method: 'PATCH',
       url: `/v1/supplier/listings/${sheep.id}`,
@@ -445,40 +443,9 @@ describe('the supplier’s screen', () => {
     expect(bad.statusCode).toBe(400);
   });
 
-  it('turns a stale screen away', async () => {
+  it('turns away a session that is no longer anybody', async () => {
     const response = await app.inject({ method: 'GET', url: '/v1/supplier/board', headers: auth('nope') });
     expect(response.statusCode).toBe(401);
-  });
-});
-
-describe('the demo surface', () => {
-  it('hands the walkthrough a screen without a code, and every board at once', async () => {
-    const token = await signIn();
-    await topUp(token, 500_000);
-    await placeAndPay(token);
-
-    const suppliers = await app.inject({ method: 'GET', url: '/dev/suppliers' });
-    expect(suppliers.json().suppliers.map((s: { name: string }) => s.name)).toEqual([
-      'Архангай · Дорж',
-      'Хэнтий · Хэрлэн',
-    ]);
-
-    const handed = await app.inject({
-      method: 'POST',
-      url: '/dev/supplier-token',
-      payload: { supplier_id: supplierId },
-    });
-    expect(handed.statusCode).toBe(200);
-    const board = await app.inject({
-      method: 'GET',
-      url: '/v1/supplier/board',
-      headers: auth(handed.json().token),
-    });
-    expect(board.json().lanes.paid).toHaveLength(1);
-
-    const all = await app.inject({ method: 'GET', url: '/dev/supplier/board' });
-    expect(all.json().supplier).toBeNull();
-    expect(all.json().lanes.paid).toHaveLength(1);
   });
 });
 

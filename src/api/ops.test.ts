@@ -100,13 +100,13 @@ describe('the ops desk', () => {
     }
   });
 
-  it('walks an application from the form to a paired screen', async () => {
+  it('walks an application from the form to the owner’s own screen', async () => {
     const guest = await signIn();
     const id = await applied(guest);
 
     // The applicant sees it waiting; a guest sees nothing of it.
     const waiting = await app.inject({ method: 'GET', url: '/v1/supplier/application', headers: auth(guest) });
-    expect(waiting.json().application).toMatchObject({ id, state: 'applied', pairing_code: null });
+    expect(waiting.json().application).toMatchObject({ id, state: 'applied' });
     expect((await app.inject({ method: 'GET', url: '/v1/idesh/listings', headers: auth(guest) })).json().listings).toEqual([]);
 
     // Ops sees it first in the list, with the phone that was proved.
@@ -120,17 +120,13 @@ describe('the ops desk', () => {
       payload: {},
     });
     expect(yes.statusCode, yes.body).toBe(200);
-    const code = yes.json().pairing_code as string;
-    expect(code).toMatch(/^\d{8}$/);
+    expect(yes.json()).toEqual({ state: 'contracted' });
 
-    // The applicant now sees the code — and can pair with it.
+    // The applicant is the owner now, and works the supplier as themselves — no code.
     const done = await app.inject({ method: 'GET', url: '/v1/supplier/application', headers: auth(guest) });
-    expect(done.json().application).toMatchObject({ state: 'contracted', pairing_code: code });
-    const paired = await app.inject({ method: 'POST', url: '/v1/supplier/pair', payload: { pairing_code: code } });
-    expect(paired.statusCode, paired.body).toBe(200);
-    expect(paired.json().supplier_id).toBe(id);
-
-    const board = await app.inject({ method: 'GET', url: '/v1/supplier/board', headers: auth(paired.json().token) });
+    expect(done.json().application).toMatchObject({ state: 'contracted' });
+    const board = await app.inject({ method: 'GET', url: '/v1/supplier/board', headers: auth(guest) });
+    expect(board.statusCode, board.body).toBe(200);
     expect(board.json().supplier.name).toBe('Завхан · Бат-Эрдэнэ');
   });
 
@@ -148,7 +144,7 @@ describe('the ops desk', () => {
     expect(mine.json().application).toMatchObject({ state: 'declined', decline_reason: 'ТТД баталгаажаагүй' });
   });
 
-  it('lets ops register a contracted supplier straight in, and mint a fresh code later', async () => {
+  it('lets ops register a contracted supplier straight in, for an owner who has an account', async () => {
     // The owner is somebody who has signed in to Basu; nobody else can hold the business.
     const nobody = await app.inject({
       method: 'POST',
@@ -166,16 +162,11 @@ describe('the ops desk', () => {
       payload: { name: 'Хэнтий · Хэрлэн', phone: '+97688010002', tin: '6502345678', address: 'Эмээлт' },
     });
     expect(made.statusCode, made.body).toBe(201);
-    expect(made.json().pairing_code).toMatch(/^\d{8}$/);
-
-    const again = await app.inject({
-      method: 'POST',
-      url: `/v1/ops/suppliers/${made.json().id}/code`,
-      headers: auth(opsToken()!),
-      payload: {},
-    });
-    expect(again.json().pairing_code).toMatch(/^\d{8}$/);
-    expect(again.json().pairing_code).not.toBe(made.json().pairing_code);
+    expect(made.json()).toMatchObject({ owner: { phone: '+97688010002' } });
+    expect(made.json().pairing_code).toBeUndefined();
+    // The owner works it as themselves, from the start.
+    const owner = await signIn('+97688010002');
+    expect((await app.inject({ method: 'GET', url: '/v1/supplier/board', headers: auth(owner) })).statusCode).toBe(200);
 
     const bad = await app.inject({
       method: 'POST',

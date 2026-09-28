@@ -650,7 +650,7 @@ async function loadVenues() {
   $('badge').querySelector('span').textContent =
     open > 0
       ? `${open}/${restaurants.length} ресторан захиалга авч байна`
-      : 'Нэг ч гал тогоо холбогдоогүй';
+      : 'Нэг ч гал тогоо нээлттэй биш';
 
   // A map of grey pins with no explanation is a dead end. A kitchen goes dark
   // ninety seconds after its tablet stops checking in — the guard working, but
@@ -659,7 +659,7 @@ async function loadVenues() {
   if (open === 0 && !existing) {
     $('map').append(
       el(`<div class="note" data-k="warn">
-            <b>Одоогоор нэг ч гал тогоо холбогдоогүй</b>
+            <b>Одоогоор нэг ч гал тогоо нээлттэй биш</b>
             <span>Ресторанууд <a href="/kds">гал тогооны дэлгэцээ</a> нээмэгц энд захиалга авч эхэлнэ.</span>
           </div>`),
     );
@@ -729,7 +729,7 @@ async function openVenue(venue) {
   if (!venue.accepting_orders) {
     $('sheet-body').replaceChildren(
       el(`<div class="note" data-k="warn"><b>Одоогоор захиалга авахгүй байна</b>
-            <span>Гал тогооны дэлгэц холбогдоогүй тул хоол хийх хүн байхгүй.</span></div>`),
+            <span>Гал тогоо одоо хаалттай тул хоол хийх хүн байхгүй.</span></div>`),
     );
     return;
   }

@@ -71,8 +71,8 @@ enum AppCatalogue {
   )
 
   /// The supplier's own side of the second app, for the few guests who are
-  /// one: the same page a paired tablet shows, opened with the phone's own
-  /// sign-in. Not in `shipped` — it is on the launcher only for them.
+  /// one: the same page the counter's tablet shows, opened with the phone's
+  /// own sign-in — every screen there is a person signed in as themselves. Not in `shipped` — it is on the launcher only for them.
   static let supplier = LauncherApp(
     id: "supplier", name: "Нийлүүлэгч", tag: "миний зар", icon: .raster("supplier-tile"), path: "/supplier",
   )

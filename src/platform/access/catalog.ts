@@ -72,7 +72,7 @@ export const PAGES: Record<Scope, PageSpec[]> = {
     { key: 'guests', module: 'platform', name: 'Зочид', icon: 'guests', actions: { sessions: 'Алдсан утсыг бүртгэлээс гаргах', close: 'Зочны бүртгэл хаах' } },
     { key: 'money', module: 'platform', name: 'Мөнгө', icon: 'money', actions: { manage: 'Тулгалт хийх, CSV татах, баримт дахин илгээх' } },
     { key: 'notify', module: 'platform', name: 'Мэдэгдэл', icon: 'notify', actions: { retry: 'Мэдэгдэл дахин илгээх' } },
-    { key: 'venues', module: 'dine', name: 'Ресторан', icon: 'venues', actions: { manage: 'Таблет холбох, цэснээс нуух, ресторан зогсоох' } },
+    { key: 'venues', module: 'dine', name: 'Ресторан', icon: 'venues', actions: { manage: 'Цэснээс нуух, ресторан зогсоох' } },
     { key: 'lunches', module: 'dine', name: 'Захиалга', icon: 'lunches', actions: { manage: 'Зочны өмнөөс цуцлах, ирээгүй гэж тэмдэглэх' } },
     { key: 'reviews', module: 'dine', name: 'Үнэлгээ', icon: 'reviews' },
     { key: 'stats', module: 'idesh', name: 'Тоон үзүүлэлт', icon: 'stats' },
@@ -239,15 +239,6 @@ export const BUILTIN_ROLES: RoleSeed[] = [
     sort: 30,
   },
 ];
-
-/**
- * What a screen paired to a supplier's counter may do: the day's work, the
- * stall and the money, as a manager would — never the bank, which takes a
- * person's password. A screen is not a person, so no role holds it.
- */
-export const SCREEN_PERMISSIONS: readonly string[] = org(
-  'idesh.today', 'idesh.orders', 'idesh.orders:act', 'idesh.stall', 'idesh.stall:edit', 'idesh.money', 'idesh.profile', 'idesh.profile:edit',
-);
 
 /** A supplier from before there were businesses, run by the one person whose it is: every supplier page. */
 export const LONE_OWNER_PERMISSIONS: readonly string[] = PAGES.org

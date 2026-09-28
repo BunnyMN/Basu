@@ -37,9 +37,8 @@ export async function dineOverview(now: Date): Promise<DineOverview> {
        (SELECT count(*)::int FROM dine.dining_order WHERE state = 'HELD') AS held,
        (SELECT count(*)::int FROM dine.fire_job WHERE state = 'pending' AND run_at < $4::timestamptz - interval '2 minutes') AS late,
        (SELECT count(*)::int FROM dine.restaurant WHERE active) AS active,
-       (SELECT count(*)::int FROM dine.restaurant r WHERE r.active AND NOT EXISTS (
-          SELECT 1 FROM dine.kds_device d
-           WHERE d.restaurant_id = r.id AND d.revoked_at IS NULL AND d.last_seen_at > $4::timestamptz - interval '90 seconds')) AS offline,
+       (SELECT count(*)::int FROM dine.restaurant r WHERE r.active
+           AND (r.kitchen_seen_at IS NULL OR r.kitchen_seen_at <= $4::timestamptz - interval '90 seconds')) AS offline,
        count(*) FILTER (WHERE state <> 'DRAFT' AND created_at >= $1 AND created_at < $3)::int AS placed_today,
        count(*) FILTER (WHERE state <> 'DRAFT' AND created_at >= $2 AND created_at < $3)::int AS placed_week,
        count(*) FILTER (WHERE state <> 'DRAFT')::int AS placed_season,

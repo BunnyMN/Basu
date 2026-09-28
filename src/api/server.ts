@@ -16,12 +16,7 @@ import {
   signInWithPassword,
 } from '../platform/identity/index.js';
 import { receiptsFor, wireConfigFromEnv } from '../platform/ledger/index.js';
-import {
-  createPairingCode,
-  isRestaurantOnline,
-  pairDevice,
-  resolveDevice,
-} from '../services/devices.js';
+import { isRestaurantOnline, kitchenOf, seeKitchen } from '../services/kitchen.js';
 import {
   acceptOrder,
   cancelOrder,
@@ -44,6 +39,7 @@ import {
   restaurantRatings,
 } from '../services/reviews.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
+import { need } from './guards.js';
 import { errorHandler, limits, securityHeaders, tooManyRequests } from './hardening.js';
 import { registerMapRoutes } from './tiles.js';
 import { registerDishRoutes } from './dishes.js';
@@ -70,7 +66,8 @@ import { FakeMailer, type Ctx } from '../ports.js';
 declare module 'fastify' {
   interface FastifyRequest {
     guestId?: string;
-    device?: { deviceId: string; restaurantId: string };
+    /** The person running a kitchen this request acts for: the restaurant, and the string their actions are recorded under. */
+    kitchen?: { restaurantId: string; restaurantName: string; orgId: string; actor: string };
   }
 }
 
@@ -134,13 +131,27 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     return undefined;
   };
 
-  const requireDevice = async (request: FastifyRequest, reply: FastifyReply) => {
+  /**
+   * A person at a restaurant, signed in as themselves, with what their role
+   * there allows — at the business the page names (`x-basu-org`), or their
+   * first restaurant. Every call says the kitchen is watching.
+   */
+  const requireKitchen = async (request: FastifyRequest, reply: FastifyReply) => {
     const token = bearer(request);
-    const device = token ? await resolveDevice(ctx, token) : null;
-    if (!device) return unauthorized(reply);
-    request.device = device;
+    const guestId = token ? await resolveGuest(ctx, token) : null;
+    if (!guestId) return unauthorized(reply);
+    const sent = request.headers['x-basu-org'];
+    const asked = typeof sent === 'string' && /^[0-9a-f-]{36}$/i.test(sent) ? sent.toLowerCase() : null;
+    const seat = await kitchenOf(guestId, asked);
+    if (!seat) return forbidden(reply, 'not at a restaurant');
+    request.guestId = guestId;
+    request.kitchen = { restaurantId: seat.restaurantId, restaurantName: seat.restaurantName, orgId: seat.orgId, actor: `kitchen:${guestId}` };
+    request.grants = seat.grants;
+    await seeKitchen(seat.restaurantId, ctx.clock.now());
     return undefined;
   };
+  /** A kitchen route: somebody at the restaurant whose role holds the permission. */
+  const inKitchen = (permission: string) => ({ preHandler: [requireKitchen, need(permission)] });
 
   // Who you are, what you have, what you were told. Mounted after the guard
   // exists because every one of them needs it. See src/api/platform.ts.
@@ -168,7 +179,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     return (rows[0]?.n ?? 0) > 0;
   };
 
-  /** …and a tablet only its own restaurant's tickets. */
+  /** …and a kitchen only its own restaurant's tickets. */
   const ownedByRestaurant = async (orderId: string, restaurantId: string): Promise<boolean> => {
     const { rows } = await db.query<{ n: number }>(
       'SELECT count(*)::int AS n FROM dine.dining_order WHERE id = $1 AND restaurant_id = $2',
@@ -669,41 +680,19 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
 
   /* ── the kitchen ────────────────────────────────────────────────── */
 
-  app.post<{ Body: { pairing_code?: string } }>('/v1/kds/pair', async (request, reply) => {
-    const code = request.body?.pairing_code;
-    if (!code) return badRequest(reply, 'Холбох код оруулна уу.', 'pairing_code is required');
-    try {
-      const session = await pairDevice(ctx, code);
-      return reply.send({
-        token: session.token,
-        device_id: session.deviceId,
-        restaurant_id: session.restaurantId,
-      });
-    } catch (error) {
-      return sendError(reply, error);
-    }
-  });
-
   /**
-   * The three columns the tablet draws, in one call.
+   * The three columns the kitchen screen draws, in one call.
    *
-   * Deliberately a poll rather than a socket for v1: a tablet that reloads gets
+   * Deliberately a poll rather than a socket for v1: a screen that reloads gets
    * the truth, and there is no replay window to get wrong. The websocket
    * gateway can subscribe to the same outbox topic later without changing this.
-   *
-   * `restaurantId` of null means every kitchen, which only the demo asks for —
-   * see the note on /dev/kds/tickets.
    */
-  const board = async (restaurantId: string | null) => {
+  const board = async (restaurantId: string) => {
     // Which kitchen this is. A chef needs to see at a glance that they are on
     // the right board — an unnamed empty board looks the same whether nothing
-    // has been ordered or the tablet is watching somebody else's kitchen.
-    const named = restaurantId
-      ? await db.query<{ name: string }>('SELECT name FROM dine.restaurant WHERE id = $1', [
-          restaurantId,
-        ])
-      : null;
-    const watching = named?.rows[0]?.name ?? null;
+    // has been ordered or the screen is signed in at somebody else's kitchen.
+    const named = await db.query<{ name: string }>('SELECT name FROM dine.restaurant WHERE id = $1', [restaurantId]);
+    const watching = named.rows[0]?.name ?? null;
 
     const { rows } = await db.query(
       `SELECT o.id, o.code, o.state, o.party_size, o.slot_starts_at, o.fire_at,
@@ -721,7 +710,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
          LEFT JOIN dine.menu_item mi ON mi.id = l.menu_item_id
          LEFT JOIN dine.table_hold h ON h.order_id = o.id AND h.released_at IS NULL
          LEFT JOIN dine.dining_table t ON t.id = h.table_id
-        WHERE ($1::uuid IS NULL OR o.restaurant_id = $1::uuid)
+        WHERE o.restaurant_id = $1::uuid
           AND o.state IN ('PLACED','ACCEPTED','SCHEDULED','ARMED','HELD','FIRED','COOKING','READY')
         GROUP BY o.id, t.code, r.name
         ORDER BY COALESCE(o.fire_at, o.slot_starts_at)`,
@@ -779,14 +768,16 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     return { now: hhmm(now), watching, lanes };
   };
 
-  app.get('/v1/kds/tickets', { preHandler: requireDevice }, async (request) =>
-    board(request.device!.restaurantId),
-  );
+  app.get('/v1/kds/tickets', inKitchen('org.dine.orders'), async (request) => ({
+    ...(await board(request.kitchen!.restaurantId)),
+    org_id: request.kitchen!.orgId,
+    may_act: request.grants!.has('org.dine.orders:act'),
+  }));
 
   /**
-   * Every tablet action shares the same three steps: check the ticket is this
-   * restaurant's, run it, translate any failure. Written once so a new button
-   * cannot accidentally skip the ownership check.
+   * Every kitchen action shares the same three steps: check the ticket is
+   * this restaurant's, run it, translate any failure. Written once so a new
+   * button cannot accidentally skip the ownership check — or the role.
    */
   const kdsAction = <T,>(
     path: string,
@@ -794,9 +785,9 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
   ) => {
     app.post<{ Params: { id: string }; Body: T }>(
       path,
-      { preHandler: requireDevice },
+      inKitchen('org.dine.orders:act'),
       async (request, reply) => {
-        if (!(await ownedByRestaurant(request.params.id, request.device!.restaurantId))) {
+        if (!(await ownedByRestaurant(request.params.id, request.kitchen!.restaurantId))) {
           return forbidden(reply, 'that ticket belongs to another restaurant');
         }
         try {
@@ -811,39 +802,39 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
   };
 
   kdsAction<undefined>('/v1/kds/tickets/:id/accept', async (orderId, _body, request) => {
-    await acceptOrder(ctx, orderId, `kds:${request.device!.deviceId}`);
+    await acceptOrder(ctx, orderId, request.kitchen!.actor);
     return { state: 'SCHEDULED' };
   });
 
-  kdsAction<{ reason?: string }>('/v1/kds/tickets/:id/reject', async (orderId, body) => {
-    await rejectOrder(ctx, orderId, body?.reason ?? 'no reason given');
+  kdsAction<{ reason?: string }>('/v1/kds/tickets/:id/reject', async (orderId, body, request) => {
+    await rejectOrder(ctx, orderId, body?.reason ?? 'no reason given', request.kitchen!.actor);
     return { state: 'REFUNDED' };
   });
 
   kdsAction<undefined>('/v1/kds/tickets/:id/fire-now', async (orderId, _body, request) => {
-    await fireNow(ctx, orderId, `kds:${request.device!.deviceId}`);
+    await fireNow(ctx, orderId, request.kitchen!.actor);
     return { state: 'FIRED' };
   });
 
-  kdsAction<{ minutes?: number }>('/v1/kds/tickets/:id/hold', async (orderId, body) => {
-    await holdFor(ctx, orderId, body?.minutes ?? 5);
+  kdsAction<{ minutes?: number }>('/v1/kds/tickets/:id/hold', async (orderId, body, request) => {
+    await holdFor(ctx, orderId, body?.minutes ?? 5, request.kitchen!.actor);
     return { ok: true };
   });
 
   kdsAction<undefined>('/v1/kds/tickets/:id/ready', async (orderId, _body, request) => {
-    await markReady(ctx, orderId, `kds:${request.device!.deviceId}`);
+    await markReady(ctx, orderId, request.kitchen!.actor);
     return { state: 'READY' };
   });
 
   kdsAction<undefined>('/v1/kds/tickets/:id/served', async (orderId, _body, request) => {
-    await markServed(ctx, orderId, `kds:${request.device!.deviceId}`);
+    await markServed(ctx, orderId, request.kitchen!.actor);
     return { state: 'SERVED' };
   });
 
   /** 86 — the dish is gone. Pulled from the menu immediately. */
   app.post<{ Params: { itemId: string }; Body: { until?: string } }>(
     '/v1/kds/menu/:itemId/86',
-    { preHandler: requireDevice },
+    inKitchen('org.dine.orders:act'),
     async (request, reply) => {
       const until = request.body?.until
         ? new Date(request.body.until)
@@ -851,7 +842,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
       const { rowCount } = await db.query(
         `UPDATE dine.menu_item SET sold_out_until = $3
           WHERE id = $1 AND restaurant_id = $2`,
-        [request.params.itemId, request.device!.restaurantId, until],
+        [request.params.itemId, request.kitchen!.restaurantId, until],
       );
       if (!rowCount) return forbidden(reply, 'that item belongs to another restaurant');
       return reply.send({ sold_out_until: until.toISOString() });
@@ -860,11 +851,11 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
 
   app.post<{ Params: { code: string } }>(
     '/v1/checkin/:code',
-    { preHandler: requireDevice },
+    inKitchen('org.dine.orders:act'),
     async (request, reply) => {
       const { rows } = await db.query<{ id: string }>(
         'SELECT id FROM dine.dining_order WHERE code = $1 AND restaurant_id = $2',
-        [request.params.code, request.device!.restaurantId],
+        [request.params.code, request.kitchen!.restaurantId],
       );
       const order = rows[0];
       if (!order) return sendError(reply, new OrderError('NOT_FOUND', 'no such order here'));
@@ -887,10 +878,8 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
          (SELECT count(*)::int FROM dine.dining_order WHERE state = 'HELD') AS held,
          (SELECT count(*)::int FROM dine.fire_job
            WHERE state = 'pending' AND run_at < $1::timestamptz - interval '2 minutes') AS late,
-         (SELECT count(*)::int FROM dine.restaurant r WHERE r.active AND NOT EXISTS (
-            SELECT 1 FROM dine.kds_device d
-             WHERE d.restaurant_id = r.id AND d.revoked_at IS NULL
-               AND d.last_seen_at > $1::timestamptz - interval '90 seconds')) AS offline,
+         (SELECT count(*)::int FROM dine.restaurant r WHERE r.active
+             AND (r.kitchen_seen_at IS NULL OR r.kitchen_seen_at <= $1::timestamptz - interval '90 seconds')) AS offline,
          (SELECT count(*)::int FROM dine.dining_order WHERE state IN ('FIRED','COOKING')) AS cooking`,
       [ctx.clock.now()],
     );
@@ -903,7 +892,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
 
   /* ── development only ───────────────────────────────────────────── */
 
-  if (options.dev) await mountDevRoutes(app, ctx, board);
+  if (options.dev) await mountDevRoutes(app, ctx);
 
   return app;
 }
@@ -950,12 +939,7 @@ async function mountPages(app: FastifyInstance): Promise<void> {
  * at the right hour or waiting around. Being able to jump to 12:14 and step
  * forward a minute at a time is what makes the whole thing demonstrable.
  */
-async function mountDevRoutes(
-  app: FastifyInstance,
-  ctx: Ctx,
-  /** The same board `/v1/kds/tickets` serves, but for every kitchen at once. */
-  board: (restaurantId: string | null) => Promise<unknown>,
-): Promise<void> {
+async function mountDevRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> {
   const clock = ctx.clock as { setTo?: (v: string) => void; advanceMinutes?: (m: number) => void };
 
   app.get('/dev/clock', async () => ({
@@ -1005,94 +989,25 @@ async function mountDevRoutes(
     return { to: letter.to, subject: letter.subject, text: letter.text };
   });
 
-  /** The pairing codes the seed just printed, so the tablet can self-pair. */
-  app.get('/dev/pairing-codes', async () => {
-    const { rows } = await getPool().query(
-      `SELECT d.pairing_code AS code, r.name, r.id AS restaurant_id
-         FROM dine.kds_device d JOIN dine.restaurant r ON r.id = d.restaurant_id
-        WHERE d.paired_at IS NULL AND d.pairing_code IS NOT NULL
-        ORDER BY r.name`,
-    );
-    return { devices: rows };
-  });
-
   /**
-   * Every kitchen's board on one screen.
-   *
-   * A tablet sees its own restaurant and nothing else — that isolation is the
-   * point of the token and `/v1/kds/tickets` keeps it. But a walkthrough moves
-   * between ten venues, and orders placed at nine of them would be invisible on
-   * a screen paired to the tenth. So the demo gets a view across all of them,
-   * with each ticket labelled by kitchen.
-   *
-   * It lives under /dev for the same reason the clock control does: this whole
-   * surface exists only in demo mode, and none of it is reachable in production.
+   * The restaurants a walkthrough may open the kitchen of, and the number of
+   * somebody who works there — signed in through `/dev/login` like any
+   * person, they see that kitchen as its cook would.
    */
-  app.get('/dev/kds/tickets', async () => board(null));
-
-  /** The same tablet actions, without needing that restaurant's own token. */
-  app.post<{ Params: { id: string; action: string }; Body: { minutes?: number; reason?: string } }>(
-    '/dev/kds/tickets/:id/:action',
-    async (request, reply) => {
-      const { id, action } = request.params;
-      const body = request.body ?? {};
-      try {
-        switch (action) {
-          case 'accept':
-            await acceptOrder(ctx, id, 'kds:demo');
-            break;
-          case 'reject':
-            await rejectOrder(ctx, id, body.reason ?? 'demo');
-            break;
-          case 'fire-now':
-            await fireNow(ctx, id, 'kds:demo');
-            break;
-          case 'hold':
-            await holdFor(ctx, id, body.minutes ?? 5);
-            break;
-          case 'ready':
-            await markReady(ctx, id, 'kds:demo');
-            break;
-          case 'served':
-            await markServed(ctx, id, 'kds:demo');
-            break;
-          default:
-            return badRequest(reply, 'Ийм үйлдэл алга.', `unknown action ${action}`);
-        }
-        return reply.send({ ok: true });
-      } catch (error) {
-        return sendError(reply, error);
-      }
-    },
-  );
-
-  /** Every restaurant, and whether a tablet is currently watching it. */
-  app.get('/dev/venues', async () => {
-    const { rows } = await getPool().query(
-      `SELECT r.id, r.name,
-              EXISTS (SELECT 1 FROM dine.kds_device d
-                       WHERE d.restaurant_id = r.id AND d.revoked_at IS NULL
-                         AND d.paired_at IS NOT NULL) AS watched
-         FROM dine.restaurant r WHERE r.active ORDER BY r.name`,
+  app.get('/dev/kitchens', async () => {
+    const { membersOf } = await import('../platform/org/index.js');
+    const { contactsFor } = await import('../platform/identity/index.js');
+    const { rows } = await getPool().query<{ id: string; name: string; org_id: string }>(
+      'SELECT id, name, org_id FROM dine.restaurant WHERE active AND org_id IS NOT NULL ORDER BY name',
     );
-    return { venues: rows };
-  });
-
-  /**
-   * Hand this browser a tablet for a restaurant, no code typing.
-   *
-   * The real flow is a manager reading an eight-digit code off a screen, and
-   * that is what the tests exercise. But the demo clock jumps hours, codes
-   * expire, and someone walking through the product should not be locked out
-   * of the kitchen because they pressed "12:21 гал" first.
-   */
-  app.post<{ Body: { restaurant_id?: string } }>('/dev/kds-token', async (request, reply) => {
-    const restaurantId = request.body?.restaurant_id;
-    if (!restaurantId) return badRequest(reply, 'Ресторан заана уу.', 'restaurant_id required');
-    const { createPairingCode, pairDevice } = await import('../services/devices.js');
-    const code = await createPairingCode(ctx, restaurantId, 'Демо таблет', 60);
-    const session = await pairDevice(ctx, code);
-    return reply.send({ token: session.token, restaurant_id: session.restaurantId });
+    const kitchens = [];
+    for (const r of rows) {
+      const people = await membersOf(r.org_id);
+      const contacts = await contactsFor(people.map((p) => p.guestId));
+      const phone = people.map((p) => contacts.get(p.guestId)?.phone).find(Boolean) ?? null;
+      kitchens.push({ id: r.id, name: r.name, org_id: r.org_id, phone });
+    }
+    return { kitchens };
   });
 
   /** Run one scheduler pass on demand, so a page can step time forward. */

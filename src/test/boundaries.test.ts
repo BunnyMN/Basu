@@ -34,7 +34,7 @@ const MOVED = [
   'notification', 'restaurant', 'station', 'station_reservation', 'menu_item',
   'slot', 'dining_table', 'trust_profile', 'dining_order', 'order_line',
   'table_hold', 'arrival_signal', 'fire_job', 'order_event', 'order_review',
-  'dish_review', 'kds_device',
+  'dish_review',
 ];
 
 function sources(): string[] {

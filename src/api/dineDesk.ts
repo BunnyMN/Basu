@@ -1,7 +1,6 @@
 import type { FastifyInstance, FastifyRequest, RouteShorthandOptions } from 'fastify';
 import { IdeshError, recordAudit } from '../idesh/index.js';
 import type { Ctx } from '../ports.js';
-import { createPairingCode, revokeDevice } from '../services/devices.js';
 import { cancelOrder, markNoShow } from '../services/orders.js';
 import {
   dineOrderFile,
@@ -19,7 +18,7 @@ import { badRequest, sendError } from './errors.js';
 /**
  * The lunch side of the desk.
  *
- * Restaurants and their tablets, the day's orders, one order's story, the
+ * Restaurants and their kitchens, the day's orders, one order's story, the
  * menu with what is switched off, and what people said. Every change is
  * recorded under the member who made it, like everything else at the desk.
  */
@@ -64,15 +63,8 @@ export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, deskAny
       travel_minutes: r.travelMinutes,
       merchant_tin: r.merchantTin,
       online: r.online,
-      devices: r.devices.map((d) => ({
-        id: d.id,
-        label: d.label,
-        paired_at: iso(d.pairedAt),
-        last_seen_at: iso(d.lastSeenAt),
-        pairing_code: d.pairingCode,
-        pairing_expires_at: iso(d.pairingExpiresAt),
-        online: d.online,
-      })),
+      kitchen_seen_at: iso(r.kitchenSeenAt),
+      org_id: r.orgId,
       menu: { total: r.menu.total, active: r.menu.active, sold_out: r.menu.soldOut },
       today: { placed: r.today.placed, live: r.today.live, held: r.today.held, sales_mnt: r.today.salesMnt },
       rating: r.rating ? { stars: r.rating.stars, count: r.rating.count, on_time_share: r.rating.onTimeShare } : null,
@@ -90,20 +82,6 @@ export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, deskAny
       return reply.send({ id: request.params.id, active });
     },
   );
-
-  /** A code for a new tablet, good for ten minutes. */
-  app.post<{ Params: { id: string }; Body: { label?: string } }>('/v1/ops/dine/restaurants/:id/devices', desk('desk.venues:manage'), async (request, reply) => {
-    const label = request.body?.label?.trim() || 'Гал тогооны таблет';
-    const code = await createPairingCode(ctx, request.params.id, label);
-    await recordAudit({ who: who(request), action: 'device.pair_code', targetKind: 'restaurant', targetId: request.params.id, note: label });
-    return reply.status(201).send({ pairing_code: code, expires_in_minutes: 10 });
-  });
-
-  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/dine/devices/:id/revoke', desk('desk.venues:manage'), async (request, reply) => {
-    await revokeDevice(request.params.id, ctx.clock.now());
-    await recordAudit({ who: who(request), action: 'device.revoke', targetKind: 'device', targetId: request.params.id, note: request.body?.note ?? null });
-    return reply.send({ id: request.params.id, revoked: true });
-  });
 
   app.get<{ Params: { id: string } }>('/v1/ops/dine/restaurants/:id/menu', desk('desk.venues'), async (request) => ({
     items: (await menuForDesk(request.params.id)).map((m) => ({

@@ -4,7 +4,7 @@ import { closePool, getPool } from '../db/pool.js';
 import { at, PILOT_MENU } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
-import { createPairingCode } from '../services/devices.js';
+import { addMember, removeMember } from '../platform/org/index.js';
 import { tick } from '../scheduler/runner.js';
 import {
   FakeNotifier,
@@ -12,10 +12,10 @@ import {
   FakeTaxProvider,
   type Ctx,
 } from '../ports.js';
-import { seedRestaurant, truncateAll, type SeededRestaurant } from '../test/seed.js';
+import { seedCook, seedRestaurant, truncateAll, type SeededRestaurant } from '../test/seed.js';
 
 /**
- * The HTTP surface, driven the way a phone and a tablet drive it.
+ * The HTTP surface, driven the way a guest's phone and a kitchen's screen drive it.
  *
  * The isolation tests here matter most. Cross-tenant leaks are the kind of bug
  * that is invisible in manual testing — everything works when you only have one
@@ -48,15 +48,16 @@ async function signIn(phone = '+97699001122'): Promise<string> {
   return verified.json().token as string;
 }
 
-async function pairTablet(restaurantId: string): Promise<string> {
-  const code = await createPairingCode(ctx, restaurantId, 'Гал тогоо');
-  const paired = await app.inject({
-    method: 'POST',
-    url: '/v1/kds/pair',
-    payload: { pairing_code: code },
-  });
-  expect(paired.statusCode).toBe(200);
-  return paired.json().token as string;
+/**
+ * A cook at the restaurant's kitchen: a person who works there, signed in as
+ * themselves, with the board open — which is what makes the kitchen count as
+ * watching.
+ */
+async function atKitchen(restaurantId: string): Promise<string> {
+  const { token } = await seedCook(ctx, restaurantId);
+  const board = await app.inject({ method: 'GET', url: '/v1/kds/tickets', headers: auth(token) });
+  expect(board.statusCode, board.body).toBe(200);
+  return token;
 }
 
 const auth = (token: string) => ({ authorization: `Bearer ${token}` });
@@ -195,7 +196,7 @@ describe('signing in', () => {
 describe('ordering over HTTP', () => {
   it('turns a browse into a paid order', async () => {
     const guest = await signIn();
-    await pairTablet(venue.restaurantId); // the kitchen has to be watching
+    await atKitchen(venue.restaurantId); // the kitchen has to be watching
 
     const restaurants = await app.inject({ method: 'GET', url: '/v1/restaurants' });
     expect(restaurants.json().restaurants[0].accepting_orders).toBe(true);
@@ -230,7 +231,7 @@ describe('ordering over HTTP', () => {
     expect(view.json().table).toMatch(/^T\d$/);
   });
 
-  it('turns away an order for a restaurant with no tablet watching', async () => {
+  it('turns away an order for a restaurant with nobody in its kitchen', async () => {
     // Production behaviour: demo mode ignores this, because a walkthrough that
     // needs a second tab open before the first one works is a puzzle.
     const before = process.env['BASU_MODE'];
@@ -256,7 +257,7 @@ describe('ordering over HTTP', () => {
 
   it('explains a full slot in Mongolian rather than failing opaquely', async () => {
     const guest = await signIn();
-    await pairTablet(venue.restaurantId);
+    await atKitchen(venue.restaurantId);
     for (let i = 0; i < 3; i++) {
       await placeAndPay(guest, venue.restaurantId, venue.menuIds['tsuivan']!);
     }
@@ -281,7 +282,7 @@ describe('ordering over HTTP', () => {
 
   it('creates one order however many times a flaky phone retries', async () => {
     const guest = await signIn();
-    await pairTablet(venue.restaurantId);
+    await atKitchen(venue.restaurantId);
 
     const payload = {
       restaurant_id: venue.restaurantId,
@@ -308,7 +309,7 @@ describe('ordering over HTTP', () => {
   });
 
   it('lets a client retry a failed call with the same idempotency key', async () => {
-    await pairTablet(venue.restaurantId);
+    await atKitchen(venue.restaurantId);
     const payload = {
       restaurant_id: venue.restaurantId,
       slot_starts_at: at('12:30').toISOString(),
@@ -341,7 +342,7 @@ describe('ordering over HTTP', () => {
 
   it('answers “what of mine is happening” with the live orders and nothing else', async () => {
     const guest = await signIn();
-    await pairTablet(venue.restaurantId);
+    await atKitchen(venue.restaurantId);
     const order = await placeAndPay(guest, venue.restaurantId, venue.menuIds['tsuivan']!);
 
     const listed = await app.inject({ method: 'GET', url: '/v1/orders', headers: auth(guest) });
@@ -367,13 +368,13 @@ describe('ordering over HTTP', () => {
 
   it('stops accepting a cancellation once the food is on the stove', async () => {
     const guest = await signIn();
-    const tablet = await pairTablet(venue.restaurantId);
+    const cook = await atKitchen(venue.restaurantId);
     const order = await placeAndPay(guest, venue.restaurantId, venue.menuIds['tsuivan']!);
 
     await app.inject({
       method: 'POST',
       url: `/v1/kds/tickets/${order.id}/accept`,
-      headers: auth(tablet),
+      headers: auth(cook),
     });
 
     clock.set(at('12:22'));
@@ -403,13 +404,13 @@ describe('ordering over HTTP', () => {
 describe('the kitchen display', () => {
   it('sorts live tickets into the three columns the chef reads', async () => {
     const guest = await signIn();
-    const tablet = await pairTablet(venue.restaurantId);
+    const cook = await atKitchen(venue.restaurantId);
     const order = await placeAndPay(guest, venue.restaurantId, venue.menuIds['tsuivan']!);
 
     const incoming = await app.inject({
       method: 'GET',
       url: '/v1/kds/tickets',
-      headers: auth(tablet),
+      headers: auth(cook),
     });
     expect(incoming.json().lanes.incoming).toHaveLength(1);
     expect(incoming.json().lanes.incoming[0]).toMatchObject({
@@ -421,7 +422,7 @@ describe('the kitchen display', () => {
     await app.inject({
       method: 'POST',
       url: `/v1/kds/tickets/${order.id}/accept`,
-      headers: auth(tablet),
+      headers: auth(cook),
     });
 
     clock.set(at('12:22'));
@@ -430,19 +431,19 @@ describe('the kitchen display', () => {
     const cooking = await app.inject({
       method: 'GET',
       url: '/v1/kds/tickets',
-      headers: auth(tablet),
+      headers: auth(cook),
     });
     expect(cooking.json().lanes.cooking).toHaveLength(1);
 
     await app.inject({
       method: 'POST',
       url: `/v1/kds/tickets/${order.id}/ready`,
-      headers: auth(tablet),
+      headers: auth(cook),
     });
     const ready = await app.inject({
       method: 'GET',
       url: '/v1/kds/tickets',
-      headers: auth(tablet),
+      headers: auth(cook),
     });
     expect(ready.json().lanes.ready).toHaveLength(1);
     expect(ready.json().lanes.cooking).toHaveLength(0);
@@ -450,20 +451,20 @@ describe('the kitchen display', () => {
 
   it('lets the chef fire early and keeps the credit for it', async () => {
     const guest = await signIn();
-    const tablet = await pairTablet(venue.restaurantId);
+    const cook = await atKitchen(venue.restaurantId);
     const order = await placeAndPay(guest, venue.restaurantId, venue.menuIds['tsuivan']!);
 
     await app.inject({
       method: 'POST',
       url: `/v1/kds/tickets/${order.id}/accept`,
-      headers: auth(tablet),
+      headers: auth(cook),
     });
 
     clock.set(at('12:18'));
     const fired = await app.inject({
       method: 'POST',
       url: `/v1/kds/tickets/${order.id}/fire-now`,
-      headers: auth(tablet),
+      headers: auth(cook),
     });
     expect(fired.statusCode).toBe(200);
 
@@ -474,17 +475,17 @@ describe('the kitchen display', () => {
       'SELECT fired_by FROM dine.dining_order WHERE id = $1',
       [order.id],
     );
-    expect(rows[0]!.fired_by).toMatch(/^kds:/);
+    expect(rows[0]!.fired_by).toMatch(/^kitchen:/);
   });
 
   it('pulls an 86d dish out of the menu immediately', async () => {
-    const tablet = await pairTablet(venue.restaurantId);
+    const cook = await atKitchen(venue.restaurantId);
     const itemId = venue.menuIds['khuushuur']!;
 
     await app.inject({
       method: 'POST',
       url: `/v1/kds/menu/${itemId}/86`,
-      headers: auth(tablet),
+      headers: auth(cook),
       payload: {},
     });
 
@@ -515,7 +516,7 @@ describe('nobody sees what is not theirs', () => {
 
   it('never puts one guest’s order in another guest’s list', async () => {
     const alice = await signIn('+97699001111');
-    await pairTablet(venue.restaurantId);
+    await atKitchen(venue.restaurantId);
     await placeAndPay(alice, venue.restaurantId, venue.menuIds['tsuivan']!);
 
     const mallory = await signIn('+97699002222');
@@ -526,7 +527,7 @@ describe('nobody sees what is not theirs', () => {
 
   it('will not let one guest read another guest’s order', async () => {
     const alice = await signIn('+97699001111');
-    await pairTablet(venue.restaurantId);
+    await atKitchen(venue.restaurantId);
     const order = await placeAndPay(alice, venue.restaurantId, venue.menuIds['tsuivan']!);
 
     const mallory = await signIn('+97699002222');
@@ -554,16 +555,16 @@ describe('nobody sees what is not theirs', () => {
 
   it('will not let one restaurant see or touch another’s tickets', async () => {
     const guest = await signIn();
-    const ourTablet = await pairTablet(venue.restaurantId);
+    const ourCook = await atKitchen(venue.restaurantId);
     const order = await placeAndPay(guest, venue.restaurantId, venue.menuIds['tsuivan']!);
 
     const rival = await seedRestaurant();
-    const rivalTablet = await pairTablet(rival.restaurantId);
+    const rivalCook = await atKitchen(rival.restaurantId);
 
     const theirBoard = await app.inject({
       method: 'GET',
       url: '/v1/kds/tickets',
-      headers: auth(rivalTablet),
+      headers: auth(rivalCook),
     });
     expect(theirBoard.json().lanes.incoming).toHaveLength(0);
 
@@ -571,29 +572,29 @@ describe('nobody sees what is not theirs', () => {
       const attempt = await app.inject({
         method: 'POST',
         url: `/v1/kds/tickets/${order.id}/${action}`,
-        headers: auth(rivalTablet),
+        headers: auth(rivalCook),
         payload: {},
       });
       expect(attempt.statusCode, action).toBe(403);
     }
 
-    // Our own tablet is unaffected.
+    // Our own kitchen is unaffected.
     const ours = await app.inject({
       method: 'GET',
       url: '/v1/kds/tickets',
-      headers: auth(ourTablet),
+      headers: auth(ourCook),
     });
     expect(ours.json().lanes.incoming).toHaveLength(1);
   });
 
-  it('will not let a tablet 86 another restaurant’s menu', async () => {
+  it('will not let one kitchen 86 another restaurant’s menu', async () => {
     const rival = await seedRestaurant();
-    const rivalTablet = await pairTablet(rival.restaurantId);
+    const rivalCook = await atKitchen(rival.restaurantId);
 
     const attempt = await app.inject({
       method: 'POST',
       url: `/v1/kds/menu/${venue.menuIds['khuushuur']}/86`,
-      headers: auth(rivalTablet),
+      headers: auth(rivalCook),
       payload: {},
     });
     expect(attempt.statusCode).toBe(403);
@@ -605,74 +606,57 @@ describe('nobody sees what is not theirs', () => {
     expect(rows[0]!.sold_out_until).toBeNull();
   });
 
-  it('refuses a guest token where a device token is required, and the reverse', async () => {
+  it('opens the kitchen only to people who work at the restaurant', async () => {
     const guest = await signIn();
-    const tablet = await pairTablet(venue.restaurantId);
-
-    const asGuest = await app.inject({
-      method: 'GET',
-      url: '/v1/kds/tickets',
-      headers: auth(guest),
-    });
-    expect(asGuest.statusCode).toBe(401);
-
-    const asTablet = await app.inject({
-      method: 'GET',
-      url: '/v1/orders/00000000-0000-0000-0000-000000000000',
-      headers: auth(tablet),
-    });
-    expect(asTablet.statusCode).toBe(401);
+    expect((await app.inject({ method: 'GET', url: '/v1/kds/tickets' })).statusCode).toBe(401);
+    const asGuest = await app.inject({ method: 'GET', url: '/v1/kds/tickets', headers: auth(guest) });
+    expect(asGuest.statusCode).toBe(403);
   });
 
-  it('stops a revoked tablet dead', async () => {
-    const tablet = await pairTablet(venue.restaurantId);
-    expect(
-      (await app.inject({ method: 'GET', url: '/v1/kds/tickets', headers: auth(tablet) }))
-        .statusCode,
-    ).toBe(200);
+  it('lets a role that only watches see the board and press nothing', async () => {
+    const cook = await seedCook(ctx, venue.restaurantId);
+    const books = await signIn('+97699004455');
+    const booksId = (await app.inject({ method: 'GET', url: '/v1/me', headers: auth(books) })).json().id as string;
+    await addMember({ orgId: cook.orgId, guestId: booksId, role: 'accountant', by: cook.guestId, now: clock.now() });
+    const guest = await signIn();
+    const order = await placeAndPay(guest, venue.restaurantId, venue.menuIds['tsuivan']!);
 
-    await pool().query(`UPDATE dine.kds_device SET revoked_at = now(), token_hash = NULL`);
-
-    expect(
-      (await app.inject({ method: 'GET', url: '/v1/kds/tickets', headers: auth(tablet) }))
-        .statusCode,
-    ).toBe(401);
+    const board = await app.inject({ method: 'GET', url: '/v1/kds/tickets', headers: auth(books) });
+    expect(board.statusCode).toBe(200);
+    expect(board.json()).toMatchObject({ may_act: false, lanes: { incoming: [expect.objectContaining({ id: order.id })] } });
+    const accept = await app.inject({ method: 'POST', url: `/v1/kds/tickets/${order.id}/accept`, headers: auth(books) });
+    expect(accept.statusCode).toBe(403);
+    expect((await app.inject({ method: 'GET', url: '/v1/kds/tickets', headers: auth(cook.token) })).json().may_act).toBe(true);
   });
 
-  it('burns a pairing code after one use', async () => {
-    const code = await createPairingCode(ctx, venue.restaurantId, 'Таблет');
-    const first = await app.inject({
-      method: 'POST',
-      url: '/v1/kds/pair',
-      payload: { pairing_code: code },
-    });
-    expect(first.statusCode).toBe(200);
+  it('shuts the kitchen to somebody taken off the restaurant', async () => {
+    const cook = await seedCook(ctx, venue.restaurantId);
+    const staff = await signIn('+97699004466');
+    const staffId = (await app.inject({ method: 'GET', url: '/v1/me', headers: auth(staff) })).json().id as string;
+    await addMember({ orgId: cook.orgId, guestId: staffId, role: 'staff', by: cook.guestId, now: clock.now() });
+    expect((await app.inject({ method: 'GET', url: '/v1/kds/tickets', headers: auth(staff) })).statusCode).toBe(200);
 
-    const second = await app.inject({
-      method: 'POST',
-      url: '/v1/kds/pair',
-      payload: { pairing_code: code },
-    });
-    expect(second.statusCode).toBe(400);
+    await removeMember({ orgId: cook.orgId, guestId: staffId, by: cook.guestId, now: clock.now() });
+    expect((await app.inject({ method: 'GET', url: '/v1/kds/tickets', headers: auth(staff) })).statusCode).toBe(403);
   });
 });
 
 describe('the lunchtime watch', () => {
   it('reports the three numbers ops actually looks at', async () => {
     const guest = await signIn();
-    const tablet = await pairTablet(venue.restaurantId);
+    const cook = await atKitchen(venue.restaurantId);
     const order = await placeAndPay(guest, venue.restaurantId, venue.menuIds['tsuivan']!);
     await app.inject({
       method: 'POST',
       url: `/v1/kds/tickets/${order.id}/accept`,
-      headers: auth(tablet),
+      headers: auth(cook),
     });
 
     clock.set(at('12:22'));
     await tick(ctx, { spacingMs: 0 });
-    // A real tablet is polling its board every few seconds; that poll is what
+    // A real cook is polling its board every few seconds; that poll is what
     // records the heartbeat, so make one before asking whether it is alive.
-    await app.inject({ method: 'GET', url: '/v1/kds/tickets', headers: auth(tablet) });
+    await app.inject({ method: 'GET', url: '/v1/kds/tickets', headers: auth(cook) });
 
     const health = await app.inject({ method: 'GET', url: '/v1/ops/health' });
     expect(health.json()).toEqual({ held: 0, late: 0, offline: 0, cooking: 1 });
@@ -802,32 +786,32 @@ function mvtLayerNames(buffer: Buffer): string[] {
 
 describe('reviews', () => {
   /** Carry an order all the way to served, which is the only reviewable state. */
-  async function anEatenOrder(guest: string, tablet: string) {
+  async function anEatenOrder(guest: string, cook: string) {
     const order = await placeAndPay(guest, venue.restaurantId, venue.menuIds['tsuivan']!);
     await app.inject({
       method: 'POST',
       url: `/v1/kds/tickets/${order.id}/accept`,
-      headers: auth(tablet),
+      headers: auth(cook),
     });
     clock.set(at('12:22'));
     await tick(ctx, { spacingMs: 0 });
     await app.inject({
       method: 'POST',
       url: `/v1/kds/tickets/${order.id}/ready`,
-      headers: auth(tablet),
+      headers: auth(cook),
     });
     await app.inject({
       method: 'POST',
       url: `/v1/kds/tickets/${order.id}/served`,
-      headers: auth(tablet),
+      headers: auth(cook),
     });
     return order;
   }
 
   it('takes stars, a comment and the timing answer, and shows them back', async () => {
     const guest = await signIn();
-    const tablet = await pairTablet(venue.restaurantId);
-    const order = await anEatenOrder(guest, tablet);
+    const cook = await atKitchen(venue.restaurantId);
+    const order = await anEatenOrder(guest, cook);
 
     const detail = await app.inject({
       method: 'GET',
@@ -866,8 +850,8 @@ describe('reviews', () => {
 
   it('lets a guest change their mind without leaving two reviews', async () => {
     const guest = await signIn();
-    const tablet = await pairTablet(venue.restaurantId);
-    const order = await anEatenOrder(guest, tablet);
+    const cook = await atKitchen(venue.restaurantId);
+    const order = await anEatenOrder(guest, cook);
 
     for (const stars of [2, 4]) {
       await app.inject({
@@ -887,7 +871,7 @@ describe('reviews', () => {
 
   it('will not take a review for food that has not been served', async () => {
     const guest = await signIn();
-    await pairTablet(venue.restaurantId);
+    await atKitchen(venue.restaurantId);
     const order = await placeAndPay(guest, venue.restaurantId, venue.menuIds['tsuivan']!);
 
     const response = await app.inject({
@@ -901,8 +885,8 @@ describe('reviews', () => {
 
   it('will not let one guest review another guest’s meal', async () => {
     const alice = await signIn('+97699003333');
-    const tablet = await pairTablet(venue.restaurantId);
-    const order = await anEatenOrder(alice, tablet);
+    const cook = await atKitchen(venue.restaurantId);
+    const order = await anEatenOrder(alice, cook);
 
     const mallory = await signIn('+97699004444');
     const response = await app.inject({
@@ -923,8 +907,8 @@ describe('reviews', () => {
 
   it('ignores stars for a dish that was not on the ticket', async () => {
     const guest = await signIn();
-    const tablet = await pairTablet(venue.restaurantId);
-    const order = await anEatenOrder(guest, tablet);
+    const cook = await atKitchen(venue.restaurantId);
+    const order = await anEatenOrder(guest, cook);
 
     const left = await app.inject({
       method: 'POST',
@@ -951,8 +935,8 @@ describe('reviews', () => {
 
   it('rejects a rating outside one to five', async () => {
     const guest = await signIn();
-    const tablet = await pairTablet(venue.restaurantId);
-    const order = await anEatenOrder(guest, tablet);
+    const cook = await atKitchen(venue.restaurantId);
+    const order = await anEatenOrder(guest, cook);
 
     for (const stars of [0, 6, 2.5]) {
       const response = await app.inject({
@@ -968,8 +952,8 @@ describe('reviews', () => {
   it('never puts a phone number next to a comment', async () => {
     const phone = '+97699005555';
     const guest = await signIn(phone);
-    const tablet = await pairTablet(venue.restaurantId);
-    const order = await anEatenOrder(guest, tablet);
+    const cook = await atKitchen(venue.restaurantId);
+    const order = await anEatenOrder(guest, cook);
     await app.inject({
       method: 'POST',
       url: `/v1/orders/${order.id}/review`,
@@ -989,8 +973,8 @@ describe('reviews', () => {
 
   it('shows a restaurant’s rating on the list a guest browses', async () => {
     const guest = await signIn();
-    const tablet = await pairTablet(venue.restaurantId);
-    const order = await anEatenOrder(guest, tablet);
+    const cook = await atKitchen(venue.restaurantId);
+    const order = await anEatenOrder(guest, cook);
     await app.inject({
       method: 'POST',
       url: `/v1/orders/${order.id}/review`,

@@ -6,7 +6,7 @@ import '../env.js';
  * The unit tests prove the arithmetic, the simulator proves it survives a rush,
  * and the lifecycle test proves the pieces are wired together. This one proves
  * the thing you can actually open in a browser works — same routes, same
- * tokens, same order of operations a phone and a tablet perform.
+ * tokens, same order of operations a guest's phone and a cook's screen perform.
  *
  *   npm run api        # in one terminal
  *   npm run smoke      # in another
@@ -80,34 +80,24 @@ async function main(): Promise<void> {
   check('зочин нэвтэрлээ', login.status === 200 && Boolean(login.body.token));
   const guest = login.body.token;
 
-  const codes = await call<{ devices: Array<{ code: string; name: string; restaurant_id: string }> }>(
-    '/dev/pairing-codes',
-  );
-  const device0 = codes.body.devices[0];
-  check('холбох код бэлэн', Boolean(device0), codes.body);
-  if (!device0) return;
+  // A kitchen is a person who works at the restaurant, signed in as
+  // themselves. Two of them, so the isolation checks at the end have a second
+  // kitchen to be excluded from.
+  const kitchens = await call<{ kitchens: Array<{ id: string; name: string; phone: string | null }> }>('/dev/kitchens');
+  const [kitchen0, rivalKitchen] = kitchens.body.kitchens.filter((k) => k.phone);
+  check('рестораны ажилтан бэлэн', Boolean(kitchen0), kitchens.body);
+  if (!kitchen0) return;
 
-  const paired = await call<{ token: string }>('/v1/kds/pair', {
-    method: 'POST',
-    body: { pairing_code: device0.code },
-  });
-  check('таблет холбогдлоо', paired.status === 200, paired.body);
-  const tablet = paired.body.token;
+  const cook = await call<{ token: string }>('/dev/login', { method: 'POST', body: { phone: kitchen0.phone, device: 'Гал тогоо' } });
+  check('тогооч өөрийн бүртгэлээр нэвтэрлээ', cook.status === 200, cook.body);
+  const tablet = cook.body.token;
+  const opened = await call('/v1/kds/tickets', { token: tablet });
+  check('гал тогоо нээгдлээ', opened.status === 200, opened.body);
 
-  // The seed already opens one venue for service. Take a tablet for it too, so
-  // the isolation checks at the end have a second kitchen to be excluded from —
-  // and so they do not depend on a pairing code surviving the clock jumps below.
-  const venues = await call<{ venues: Array<{ id: string; name: string; watched: boolean }> }>(
-    '/dev/venues',
-  );
-  const seeded = venues.body.venues.find((v) => v.watched && v.id !== device0.restaurant_id);
-  const rivalPaired = seeded
-    ? await call<{ token: string }>('/dev/kds-token', {
-        method: 'POST',
-        body: { restaurant_id: seeded.id },
-      })
+  const rivalPaired = rivalKitchen
+    ? await call<{ token: string }>('/dev/login', { method: 'POST', body: { phone: rivalKitchen.phone, device: 'Гал тогоо' } })
     : null;
-  check('хоёр дахь таблет холбогдлоо', rivalPaired?.status === 200, rivalPaired?.body);
+  check('өөр рестораны тогооч нэвтэрлээ', rivalPaired?.status === 200, rivalPaired?.body);
 
   /* ── browsing ──────────────────────────────────────────────────── */
   console.log('\nЗочин цэс үзэв');
@@ -119,9 +109,9 @@ async function main(): Promise<void> {
     `${listed.body.restaurants.length} ресторан, ${open.length} нь захиалга авна`,
     listed.body.restaurants.length >= 3 && open.length > 0,
   );
-  // Prefer the venue whose tablet we hold, so the kitchen checks below have a
+  // Prefer the venue whose cook we are, so the kitchen checks below have a
   // board to look at; anything open will do if that one is not taking orders.
-  const venue = open.find((r) => r.id === device0.restaurant_id) ?? open[0]!;
+  const venue = open.find((r) => r.id === kitchen0.id) ?? open[0]!;
 
   const menu = await call<{
     items: Array<{
@@ -387,11 +377,13 @@ async function idesh(guest: string): Promise<void> {
   const live = await call<{ orders: Array<{ id: string }> }>('/v1/idesh', { token: guest });
   check('нүүрний жагсаалтад орлоо', live.body.orders.some((o) => o.id === id));
 
-  /* the supplier */
-  const screen = await call<{ token: string }>('/dev/supplier-token', {
-    method: 'POST', body: { supplier_id: stall.supplier.id },
+  /* the supplier: its owner, signed in as themselves */
+  const owners = await call<{ suppliers: Array<{ id: string; phone: string | null }> }>('/dev/suppliers');
+  const owner = owners.body.suppliers.find((s) => s.id === stall.supplier.id);
+  const screen = await call<{ token: string }>('/dev/login', {
+    method: 'POST', body: { phone: owner?.phone, device: 'Нийлүүлэгч' },
   });
-  check('нийлүүлэгчийн дэлгэц холбогдлоо', screen.status === 200, screen.body);
+  check('нийлүүлэгчийн эзэн өөрийн бүртгэлээр нэвтэрлээ', screen.status === 200 && Boolean(owner?.phone), screen.body);
   const supplier = screen.body.token;
 
   const board = await call<{ lanes: { paid: Array<{ id: string }> } }>('/v1/supplier/board', { token: supplier });
@@ -415,11 +407,10 @@ async function idesh(guest: string): Promise<void> {
   check('нийлүүлэгч өөрийн тооцоог харна', money.status === 200 && typeof money.body.commission_pct === 'number', money.body);
 
   /* isolation */
-  const suppliers = await call<{ suppliers: Array<{ id: string }> }>('/dev/suppliers');
-  const rival = suppliers.body.suppliers.find((s) => s.id !== stall.supplier.id);
+  const rival = owners.body.suppliers.find((s) => s.id !== stall.supplier.id && s.phone);
   if (rival) {
-    const rivalScreen = await call<{ token: string }>('/dev/supplier-token', {
-      method: 'POST', body: { supplier_id: rival.id },
+    const rivalScreen = await call<{ token: string }>('/dev/login', {
+      method: 'POST', body: { phone: rival.phone, device: 'Нийлүүлэгч' },
     });
     const meddle = await call(`/v1/supplier/orders/${id}/hand`, {
       method: 'POST', token: rivalScreen.body.token, body: {},
@@ -447,22 +438,18 @@ async function idesh(guest: string): Promise<void> {
   const locked = await call('/v1/ops/suppliers');
   check('нууц үггүй ops хаалттай', locked.status === 401);
 
-  const approved = await call<{ pairing_code: string }>(`/v1/ops/suppliers/${asked.body.id}/approve`, {
+  const approved = await call<{ state: string }>(`/v1/ops/suppliers/${asked.body.id}/approve`, {
     method: 'POST', token: ops.body.token, body: {},
   });
-  check('ops батлав, код гарлаа', approved.status === 200 && /^\d{8}$/.test(approved.body.pairing_code ?? ''), approved.body);
+  check('ops батлав', approved.status === 200 && approved.body.state === 'contracted', approved.body);
 
-  const mine = await call<{ application: { state: string; pairing_code: string | null } }>(
+  const mine = await call<{ application: { state: string } }>(
     '/v1/supplier/application', { token: applicant.body.token },
   );
-  check('хүсэлт гаргагч батлагдсанаа кодтойгоо харна',
-    mine.body.application?.state === 'contracted' && mine.body.application?.pairing_code === approved.body.pairing_code,
-    mine.body);
+  check('хүсэлт гаргагч батлагдсанаа харна', mine.body.application?.state === 'contracted', mine.body);
 
-  const screenPaired = await call<{ token: string }>('/v1/supplier/pair', {
-    method: 'POST', body: { pairing_code: approved.body.pairing_code },
-  });
-  check('тэр кодоор дэлгэц холбогдлоо', screenPaired.status === 200, screenPaired.body);
+  const ownBoard = await call('/v1/supplier/board', { token: applicant.body.token });
+  check('эзэн өөрийн бүртгэлээр нийлүүлэгчийн хэсэгт орлоо — код хэрэггүй', ownBoard.status === 200, ownBoard.body);
 }
 
 function hhmm(iso: string | null): string {

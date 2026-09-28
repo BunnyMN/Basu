@@ -13,7 +13,7 @@
    the same person at a desk. Colour, type, buttons, chips, cards, rows and
    fields all come from /app.css; what is left here is where things sit. */
 
-/* ── the doors: sign in, pair, apply ── */
+/* ── the doors: sign in, apply ── */
 .door{max-width:420px;margin:32px auto;padding:0 var(--gutter) calc(24px + var(--safe-b))}
 .door .card{padding:24px 20px}
 .door .brand{display:block;margin-bottom:16px}
@@ -25,7 +25,6 @@
 .door .links p{margin:0;text-align:center}
 .door-foot{display:flex;justify-content:center;align-items:center;gap:8px;margin-top:8px;font-size:var(--t-cap);font-weight:500;color:var(--ink-3)}
 .door-foot a{display:inline-flex;align-items:center;min-height:var(--target);color:var(--ink-2)}
-.pair input.code{margin-bottom:12px}
 /* the walkthrough's shortcuts: one folded «Демо горим» group, fenced off from the real door */
 .demo{margin-top:20px;padding:0 14px}
 .demo > summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:var(--target);cursor:pointer;-webkit-user-select:none;user-select:none}
@@ -183,25 +182,17 @@ const esc = (value) => {
 };
 
 /**
- * Which stall this screen is showing.
- *
- * A real screen is paired to one supplier and sees that one — the token says
- * so and the API enforces it. A walkthrough moves between four suppliers, so
- * the demo can watch every one at once, read-only on the stall.
- */
-const ALL = 'all-suppliers';
-/**
  * The business the dashboard opened this page for — `/supplier?org=…` — so
  * a person who works at two suppliers works at the one they chose there.
  */
 const ORG = new URLSearchParams(location.search).get('org');
-const watchingAll = () => !ORG && store.supplierToken === ALL;
 /**
- * A paired screen's token, or a person's own sign-in — made on this page, by
- * the app, or on the dashboard. Opened from the dashboard, the dashboard's
- * session is the person; otherwise a screen paired here comes first.
+ * The person's own sign-in — made on this page, by the app, or on the
+ * dashboard. Opened from the dashboard, the dashboard's session is the
+ * person. A tablet on the counter is somebody who works there, signed in as
+ * themselves, doing what their role allows.
  */
-const token = () => (ORG ? store.opsToken || store.guestToken : store.supplierToken || store.guestToken || store.opsToken);
+const token = () => (ORG ? store.opsToken || store.guestToken : store.guestToken || store.opsToken);
 /** The supplier's own routes: the token, and which business when the dashboard said. */
 const sup = (path, options = {}) => api(path, { ...options, token: token(), headers: ORG ? { 'x-basu-org': ORG } : {} });
 
@@ -234,7 +225,6 @@ desk?.addEventListener?.('change', () => {
 /** Sign out of the session this page is using — and, having come from the dashboard, go back there. */
 function signOut() {
   const used = token();
-  if (store.supplierToken === used || watchingAll()) store.supplierToken = null;
   if (store.guestToken === used) store.guestToken = null;
   if (store.opsToken === used) store.opsToken = null;
   seat = null;
@@ -252,8 +242,6 @@ const ICON = {
   money: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M15.5 15h2"/></svg>',
   profile: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1-3.5 3.6-5 7-5s6 1.5 7 5"/></svg>',
   out: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 4H5v16h8"/><path d="M10 12h10M17 8l3 4-3 4"/></svg>',
-  swap: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h14l-4-4M20 16H6l4 4"/></svg>',
-  right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>',
   phone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>',
 };
@@ -280,25 +268,33 @@ function signInCard() {
         <h2>Нийлүүлэгчийн хэсэг</h2>
         <p>Нэвтэрч ороод нийлүүлэгч болох хүсэлтээ илгээнэ үү. Гэрээт нийлүүлэгч бол гэрээний утас, нууц үгээрээ нэвтэрнэ.</p>
         <div data-doors></div>
-        <div class="links">
-          <button class="link" type="button" id="back">Таблет дээр кодоор холбох${ICON.right}</button>
-        </div>
       </div>
       ${DOOR_FOOT}
     </div>`);
   const doors = signInDoors({ device: 'Нийлүүлэгчийн дэлгэц', returnTo: '/supplier', onToken: () => boot() });
   card.querySelector('[data-doors]').replaceWith(doors);
-  // The demo has no inbox to read a code from; a walkthrough skips straight in.
-  api('/dev/clock')
-    .then(() => {
+  // The demo has no inbox to read a code from; a walkthrough skips straight
+  // in — as a seeded supplier's owner, or as whoever the typed number is.
+  api('/dev/suppliers')
+    .then(({ suppliers }) => {
       const demo = el('<button class="btn" type="button" id="demo">Демо: кодгүй нэвтрэх</button>');
       const group = demoGroup();
-      group.querySelector('.body').append(demo);
+      const owners = el('<div class="venues" data-rows></div>');
+      for (const s of suppliers.filter((x) => x.phone)) {
+        const row = el(`<button class="row" type="button" data-dense><span class="main"><span class="title" data-weight="normal">${esc(s.name)}</span></span><span class="end"><span class="tag mn">${esc(s.phone)}</span></span></button>`);
+        row.addEventListener('click', async () => {
+          const { token } = await api('/dev/login', { method: 'POST', body: { phone: s.phone, device: 'Нийлүүлэгч' } });
+          store.guestToken = token;
+          boot();
+        });
+        owners.append(row);
+      }
+      group.querySelector('.body').append(owners, demo);
       demo.addEventListener('click', async () => {
         // A number typed is the person who typed it; none typed is somebody
         // new, so a walkthrough reaches the form rather than the seed's own
         // waiting application.
-        const typed = doors.querySelector('[name="phone"]').value.replace(/\s+/g, '');
+        const typed = doors.querySelector('[name="login"]')?.value.replace(/\s+/g, '') ?? '';
         const fresh = `+97688${String(Date.now() % 1_000_000).padStart(6, '0')}`;
         const { token } = await api('/dev/login', {
           method: 'POST',
@@ -310,99 +306,12 @@ function signInCard() {
       card.querySelector('#signin').append(group);
     })
     .catch(() => {});
-  card.querySelector('#back').addEventListener('click', showPairing);
   return card;
 }
 
-/** The front door: a person first, a pairing code for a tablet behind it. */
+/** The front door: a person, signed in as themselves. */
 function showLanding() {
   root.replaceChildren(signInCard());
-}
-
-/** A tablet on the counter: paired once with an eight-digit code from Basu. */
-async function showPairing() {
-  const [{ devices }, { suppliers }] = await Promise.all([
-    api('/dev/supplier-codes').catch(() => ({ devices: [] })),
-    api('/dev/suppliers').catch(() => ({ suppliers: [] })),
-  ]);
-  root.replaceChildren();
-
-  const card = el(`
-    <div class="door pair">
-      <div class="card">
-        <div class="brand wordmark" data-size="sm">Basu</div>
-        <h2>Дэлгэцээ холбоно уу</h2>
-        <p>Basu-гаас авсан 8 оронтой кодоо оруулна уу. Нэг удаа холбоход хангалттай.</p>
-        <input class="code" inputmode="numeric" maxlength="8" placeholder="········" aria-label="Холбох код">
-        <button class="btn" data-v="primary" data-size="lg" type="button">Холбох</button>
-        <div class="links"><a id="become" class="link" role="button" tabindex="0">${ICON.left}Нэвтрэх</a></div>
-      </div>
-      ${DOOR_FOOT}
-    </div>`);
-
-  const input = card.querySelector('input');
-  const submit = async () => {
-    try {
-      const { token } = await api('/v1/supplier/pair', {
-        method: 'POST',
-        body: { pairing_code: input.value.trim() },
-      });
-      store.supplierToken = token;
-      boot();
-    } catch (error) {
-      toast(error.message, 'bad');
-      input.select();
-    }
-  };
-  card.querySelector('button').addEventListener('click', submit);
-  input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
-  card.querySelector('#become').addEventListener('click', () => showLanding());
-
-  if (devices.length || suppliers.length) {
-    const demo = demoGroup();
-    const body = demo.querySelector('.body');
-    if (devices.length) {
-      input.value = devices[0].code;
-      const hint = el('<div class="hint">Холбоогүй нийлүүлэгчийн кодууд:<br></div>');
-      for (const device of devices) hint.append(el(`<span><code>${device.code}</code> ${esc(device.name)}<br></span>`));
-      body.append(hint);
-    }
-    if (suppliers.length) {
-      const list = el('<div class="venues" data-rows></div>');
-      const all = el(`
-        <button class="row" type="button" data-watched data-dense>
-          <span class="main"><span class="title" data-weight="normal">Бүх нийлүүлэгч</span></span>
-          <span class="end"><span class="tag count" data-tone="neutral">${suppliers.length}</span></span>
-        </button>`);
-      all.addEventListener('click', () => {
-        store.supplierToken = ALL;
-        boot();
-      });
-      list.append(all);
-      for (const s of suppliers) {
-        const button = el(`
-          <button class="row" type="button"${s.watched ? ' data-watched' : ''} data-dense>
-            <span class="main"><span class="title" data-weight="normal">${esc(s.name)}</span></span>
-            <span class="end"><span class="tag chip" data-size="sm"${s.watched ? ' data-s="on"' : ''}>${s.watched ? 'холбогдсон' : 'холбогдоогүй'}</span></span>
-          </button>`);
-        button.addEventListener('click', async () => {
-          try {
-            const { token } = await api('/dev/supplier-token', { method: 'POST', body: { supplier_id: s.id } });
-            store.supplierToken = token;
-            boot();
-          } catch (error) {
-            toast(error.message, 'bad');
-          }
-        });
-        list.append(button);
-      }
-      body.append(list);
-    }
-    card.querySelector('.card').append(demo);
-  }
-
-  root.append(card);
-  input.focus();
 }
 
 /* ── becoming a supplier ─────────────────────────────────────────── */
@@ -414,11 +323,11 @@ async function showPairing() {
  * An account made by email, Google or Apple has none, so the form asks for
  * it — and ops rings it before saying yes, which is the proof it is theirs.
  * Ops answers from the desk and the answer arrives here, and by email or
- * message, with the code, when it is yes.
+ * message.
  */
 async function showApply() {
   root.replaceChildren();
-  const person = ORG || !store.supplierToken ? token() : store.guestToken || store.opsToken;
+  const person = token();
   if (!person) {
     root.append(signInCard());
     return;
@@ -471,7 +380,6 @@ function applyForm(needsPhone = false) {
           <label class="field"><span>Данс эзэмшигчийн нэр</span><input name="bank_holder" placeholder="Гэрээнд гарын үсэг зурах нэр"></label>
         </div>
         <div class="foot"><button class="btn" data-v="primary" data-size="lg" type="button" id="submit">Хүсэлт илгээх</button></div>
-        <div class="links"><button class="link" type="button" id="back">Таблет дээр кодоор холбох${ICON.right}</button></div>
       </div>
       ${DOOR_FOOT}
     </div>`);
@@ -498,7 +406,6 @@ function applyForm(needsPhone = false) {
       toast(error.message, 'bad');
     }
   });
-  card.querySelector('#back').addEventListener('click', showPairing);
   return card;
 }
 
@@ -523,28 +430,15 @@ function statusCard(a, needsPhone = false) {
       ${DOOR_FOOT}
     </div>`);
   const inner = card.querySelector('.card');
-  if (a.state === 'contracted' && a.pairing_code) {
-    inner.append(el(`<div class="code codebox"><span class="lab">Таблет холбох код</span><b>${a.pairing_code}</b></div>`));
-    const pair = el('<button class="btn" data-v="primary" data-size="lg" type="button" id="pair-now">Энэ кодоор холбох</button>');
-    pair.addEventListener('click', async () => {
-      try {
-        const { token } = await api('/v1/supplier/pair', { method: 'POST', body: { pairing_code: a.pairing_code } });
-        store.supplierToken = token;
-        boot();
-      } catch (error) {
-        toast(error.message, 'bad');
-      }
-    });
-    inner.append(pair);
-  } else if (a.state === 'contracted' && a.paired) {
-    inner.append(el('<p>Дэлгэц аль хэдийн холбогдсон. Код шинээр хэрэгтэй бол Basu-д хэлнэ үү.</p>'));
+  if (a.state === 'contracted') {
+    const open = el('<button class="btn" data-v="primary" data-size="lg" type="button" id="open">Нийлүүлэгчийн хэсэг рүү орох</button>');
+    open.addEventListener('click', () => boot());
+    inner.append(open, el('<p class="cap">Ажилтнуудаа «Ажилтнууд» хэсгээс нэмж, эрх өгнө — тэд өөрсдийн бүртгэлээр нэвтэрнэ.</p>'));
   } else if (a.state === 'declined') {
     const again = el('<button class="btn" data-size="lg" type="button" id="again">Дахин хүсэлт гаргах</button>');
     again.addEventListener('click', () => root.replaceChildren(applyForm(needsPhone)));
     inner.append(again);
   }
-  inner.append(el(`<div class="links"><button class="link" type="button" id="back">Таблет дээр кодоор холбох${ICON.right}</button></div>`));
-  inner.querySelector('#back').addEventListener('click', showPairing);
   return card;
 }
 
@@ -576,7 +470,7 @@ function renderBoard(data) {
   const board = document.getElementById('board');
   if (!board) return;
   for (const n of document.querySelectorAll('.supplier-name')) {
-    n.textContent = watchingAll() ? 'Бүх нийлүүлэгч' : (data.supplier?.name ?? 'Нийлүүлэгч');
+    n.textContent = data.supplier?.name ?? 'Нийлүүлэгч';
   }
   const conn = document.getElementById('conn');
   if (conn) delete conn.dataset.stale;
@@ -618,7 +512,6 @@ function renderTicket(ticket, lane) {
       </div>
       <div class="body">
         <div class="what">${esc(ticket.title)} ×${ticket.qty}${ticket.unit === 'kg' ? ' кг' : ''}</div>
-        ${watchingAll() ? `<div class="sub">${esc(ticket.supplier.name)}</div>` : ''}
         <div class="who"><span class="k">Зочин</span><span class="v">${
           ticket.guest
             ? `<span>${esc(ticket.guest)}</span>${ticket.guest_phone ? tel(ticket.guest_phone) : ''}`
@@ -648,13 +541,11 @@ function renderTicket(ticket, lane) {
   const send = async (action, body, button) => {
     if (button) button.disabled = true;
     try {
-      await (watchingAll()
-        ? api(`/dev/supplier/orders/${ticket.id}/${action}`, { method: 'POST', body })
-        : sup(`/v1/supplier/orders/${ticket.id}/${action}`, { method: 'POST', body }));
+      await sup(`/v1/supplier/orders/${ticket.id}/${action}`, { method: 'POST', body });
       await refreshBoard();
       await onActed?.();
     } catch (error) {
-      if (error.status === 401 && !watchingAll()) {
+      if (error.status === 401) {
         signOut();
         return;
       }
@@ -724,7 +615,7 @@ function renderTicket(ticket, lane) {
   };
 
   // An accountant reads the order; the buttons are for whoever does the work.
-  if (!watchingAll() && !may('org.idesh.orders:act')) return node;
+  if (!may('org.idesh.orders:act')) return node;
   if (lane === 'paid') {
     add('Бэлтгэж эхлэх', 'prepare', 'primary');
     cancelWith(['guest_asked', 'cannot_fulfil', 'vet']);
@@ -755,12 +646,9 @@ const FORFEIT_PCT = 10;
 
 async function refreshBoard() {
   try {
-    const data = watchingAll()
-      ? await api('/dev/supplier/board')
-      : await sup('/v1/supplier/board');
-    renderBoard(data);
+    renderBoard(await sup('/v1/supplier/board'));
   } catch (error) {
-    if (error.status === 401 && !watchingAll()) {
+    if (error.status === 401) {
       signOut();
       return;
     }
@@ -1020,12 +908,11 @@ let tab = location.hash.slice(1) || 'today';
 let deskNav = null;
 
 /**
- * The tabs this seat opens: all five for an owner, a manager or a screen on
- * the counter; the day, the orders and the stall for staff; the orders and
- * the money for an accountant. A demo watching every supplier at once gets
- * only today's work — the rest is one supplier's own.
+ * The tabs this person's role opens: all five for an owner or a manager;
+ * the day, the orders and the stall for staff; the orders and the money for
+ * an accountant — or whatever Basu has made those roles since.
  */
-const tabsFor = () => (watchingAll() ? TABS.slice(0, 1) : TABS.filter((t) => may(t.needs)));
+const tabsFor = () => TABS.filter((t) => may(t.needs));
 
 /** The page's one h1: large on a phone, beside its lead on a desk. */
 function pageHead(title, sub, subId) {
@@ -1037,7 +924,7 @@ function pageHead(title, sub, subId) {
 /**
  * Signing out is two taps: the first turns the button into the question for
  * four seconds, the second answers it — a stray tap on a counter tablet must
- * not drop the pairing. `buttons` are every way out on the frame.
+ * not sign the counter out. `buttons` are every way out on the frame.
  */
 function twoTaps(buttons, word, leave, now = false) {
   let armed = null;
@@ -1083,23 +970,21 @@ function openModule() {
   deskNav = null;
   // On a phone the page follows the phone's light or dark, as every guest page does.
   document.documentElement.removeAttribute('data-theme');
-  const all = watchingAll();
-  const name = all ? 'Бүх нийлүүлэгч' : seat?.supplier?.name ?? '…';
-  const out = all ? 'Солих' : 'Гарах';
+  const name = seat?.supplier?.name ?? '…';
+  const out = 'Гарах';
   const frame = el(`
     <div class="shell">
       <header class="bar topbar">
         <span class="conn" id="conn">Холбогдсон</span>
         <div class="title"><b class="supplier-name" id="supplier">${esc(name)}</b></div>
-        <div class="act"><button class="btn out" type="button" data-v="quiet" data-icon id="out" aria-label="${out}">${all ? ICON.swap : ICON.out}<span class="t sr-only">${out}</span></button></div>
+        <div class="act"><button class="btn out" type="button" data-v="quiet" data-icon id="out" aria-label="${out}">${ICON.out}<span class="t sr-only">${out}</span></button></div>
       </header>
       <nav class="tabs tabbar" aria-label="Хэсгүүд">
         ${tabs.map((t) => `<button type="button" data-tab="${t.key}">${t.icon}<span class="t">${t.label}</span></button>`).join('')}
       </nav>
       <main class="view" id="view"></main>
     </div>`);
-  const leave = () => (all ? ((store.supplierToken = null), boot()) : signOut());
-  frame.querySelector('#out').addEventListener('click', twoTaps([frame.querySelector('#out')], out, leave, all));
+  frame.querySelector('#out').addEventListener('click', twoTaps([frame.querySelector('#out')], out, signOut));
   frame.querySelector('.tabs').addEventListener('click', (e) => {
     const button = e.target.closest('button[data-tab]');
     if (button) show(button.dataset.tab);
@@ -1112,17 +997,16 @@ function openModule() {
 /**
  * At a desk the supplier's pages sit in the dashboard's own frame: the
  * business as the place, and beside its supplier tabs the dashboard's pages
- * for it — its people, its details, who may do what — one click away. A
- * screen on the counter, or a demo watching everybody, has its tabs alone.
+ * for it — its people, its details, who may do what — one click away.
+ * Inside the Basu app it has its tabs alone.
  */
 async function openDesk(tabs) {
-  const all = watchingAll();
-  const name = all ? 'Бүх нийлүүлэгч' : seat?.supplier?.name ?? 'Нийлүүлэгч';
+  const name = seat?.supplier?.name ?? 'Нийлүүлэгч';
   let workspaces = null;
   let current = null;
   let account = null;
   // Inside the Basu app — an iPad on its side is a desk too — the dashboard is not one of its pages.
-  if (!all && seat && !seat.screen && !shell.present) {
+  if (seat && !shell.present) {
     try {
       const access = await api('/v1/access', { token: token() });
       account = access.account;
@@ -1134,16 +1018,15 @@ async function openDesk(tabs) {
   }
   if (!current) {
     current = {
-      id: 'screen',
+      id: 'supplier',
       kind: 'org',
       name,
-      sub: all ? 'Демо · бүх нийлүүлэгч' : seat?.screen ? 'Нийлүүлэгчийн дэлгэц' : 'Нийлүүлэгч',
+      sub: 'Нийлүүлэгч',
       menu: [{ key: 'main', label: null, items: tabs.map((t) => ({ key: `idesh.${t.key}`, label: t.label, icon: t.nav })) }],
     };
     workspaces = [current];
-    if (!account) account = { name: all ? 'Демо' : seat?.screen ? 'Холбосон дэлгэц' : name, email: all ? 'Бүх нийлүүлэгч' : name };
+    if (!account) account = { name, email: name };
   }
-  const leave = () => (all ? ((store.supplierToken = null), boot()) : signOut());
   const frame = deskFrame({
     workspaces,
     current,
@@ -1156,7 +1039,7 @@ async function openDesk(tabs) {
     onWorkspace: (w) => toDashboard(`#${w.id}`),
     onSignOut: () => ask(),
   });
-  const ask = twoTaps([frame.root.querySelector('#out')], all ? 'Солих' : 'Гарах', leave, all);
+  const ask = twoTaps([frame.root.querySelector('#out')], 'Гарах', signOut);
   deskNav = frame;
   // At a desk it is the dashboard's frame, and the dashboard is light: one look from page to page.
   document.documentElement.setAttribute('data-theme', 'light');
@@ -1170,7 +1053,7 @@ async function openDesk(tabs) {
  * dashboard's too, rather than a second sign-in for the one person.
  */
 function toDashboard(hash) {
-  if (!store.opsToken && token() && !seat?.screen) store.opsToken = token();
+  if (!store.opsToken && token()) store.opsToken = token();
   location.href = `/dashboard${hash}`;
 }
 
@@ -1201,13 +1084,12 @@ function dayLong(day) {
 /* today: the numbers, then the work */
 
 function renderToday(view) {
-  const all = watchingAll();
   view.append(
-    el(pageHead(all ? 'Бүх нийлүүлэгчийн ажил' : 'Өнөөдөр', '…', 'today-line')),
+    el(pageHead('Өнөөдөр', '…', 'today-line')),
     el('<div class="stats kpis kpi-band" id="home" hidden></div>'),
     el('<div id="board"></div>'),
   );
-  if (!all) void renderHome();
+  void renderHome();
   void refreshBoard().then(() => {
     const line = document.getElementById('today-line');
     if (line && today) line.textContent = dayLong(today);
@@ -1499,26 +1381,22 @@ async function renderProfile(view) {
     }
   });
   view.append(form);
-  // The person's own account — a paired screen has none. Most owners came in
-  // by phone, and an address is their only way back from a forgotten password.
-  if (seat && !seat.screen) view.append(accountWays({ token: token() }));
+  // The person's own account. Most owners came in by phone, and an address is
+  // their only way back from a forgotten password.
+  if (seat) view.append(accountWays({ token: token() }));
 }
 
 /* ── boot ────────────────────────────────────────────────────────── */
 
 /**
- * Three ways this page is opened: by a screen paired with a code, by a
- * person signed in with their phone — from the app's tile, or a browser on
- * a computer — and by somebody who is neither yet.
+ * Two ways this page is opened: by a person signed in — from the app's
+ * tile, a tablet on the counter, or a browser on a computer — and by
+ * somebody who is not yet.
  */
 async function boot() {
   root.replaceChildren();
   applyDesk();
   seat = null;
-  if (watchingAll()) {
-    openModule();
-    return;
-  }
   if (!token()) {
     showLanding();
     return;
@@ -1537,13 +1415,7 @@ async function boot() {
       return;
     }
   }
-  // Not a seat at a contracted supplier. A screen whose pairing was taken back
-  // starts again; a person is either still applying or not signed in at all.
-  if (!ORG && store.supplierToken) {
-    store.supplierToken = null;
-    boot();
-    return;
-  }
+  // Not a seat at a contracted supplier: still applying, or not signed in at all.
   showApply();
 }
 

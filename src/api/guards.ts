@@ -5,7 +5,7 @@ import { forbidden } from './errors.js';
 /**
  * The one check every business and desk route makes after it knows who is
  * calling: does this seat hold the permission. Who is calling — a desk
- * member, a person at a business, a paired screen — is the route's own
+ * member or a person at a business — is the route's own
  * guard's to settle; it leaves what that seat may do in `request.grants`,
  * and this reads it. A route that forgot to settle it opens to nobody.
  *

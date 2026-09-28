@@ -14,7 +14,6 @@ import {
   declineSupplier,
   listSuppliers,
   openListings,
-  pairSupplier,
   registerSupplier,
   supplierOf,
 } from './index.js';
@@ -61,7 +60,7 @@ describe('asking to become a supplier', () => {
   it('records the application on the phone the guest proved, not one they typed', async () => {
     const id = await apply();
     const mine = await applicationOf(ctx, guestId);
-    expect(mine).toMatchObject({ id, state: 'applied', pairingCode: null, paired: false });
+    expect(mine).toMatchObject({ id, state: 'applied' });
 
     const [row] = await listSuppliers();
     expect(row).toMatchObject({ id, state: 'applied', phone: PHONE, merchantTin: '6505678901' });
@@ -117,38 +116,36 @@ describe('an account made without a phone', () => {
     expect((await listSuppliers()).find((s) => s.id === id)).toMatchObject({ phone: PHONE });
   });
 
-  it('hears the yes by email, code and all', async () => {
+  it('hears the yes by email, with the way in: their own account', async () => {
     const mailer = new FakeMailer();
     const withMail: Ctx = { ...ctx, mailer };
     const byEmail = await seedPerson({ email: 'dorj@example.mn' });
     const id = await applySupplier(withMail, { guestId: byEmail, ...input(), phone: '99112233' });
-    const { pairingCode } = await approveSupplier(withMail, id);
+    await approveSupplier(withMail, id);
     await relay(withMail);
-    expect(mailer.to('dorj@example.mn')?.text).toContain(pairingCode);
+    const letter = mailer.to('dorj@example.mn')?.text ?? '';
+    expect(letter).toContain('өөрийн бүртгэлээр нэвтэрч');
+    expect(letter).not.toMatch(/\d{8}/);
     expect(notifier.of('supplier.approved')).toEqual([]);
   });
 });
 
 describe('ops decides', () => {
-  it('yes: the applicant becomes a supplier, gets a code by SMS, and the code opens a screen', async () => {
+  it('yes: the applicant becomes the supplier’s owner, told by SMS, and works it as themselves', async () => {
     const id = await apply();
-    const { pairingCode } = await approveSupplier(ctx, id);
-    expect(pairingCode).toMatch(/^\d{8}$/);
+    await approveSupplier(ctx, id);
 
     const mine = await applicationOf(ctx, guestId);
-    expect(mine).toMatchObject({ state: 'contracted', pairingCode, paired: false });
+    expect(mine).toMatchObject({ state: 'contracted' });
 
     await relay(ctx);
     const sms = notifier.of('supplier.approved').at(-1);
     expect(sms?.channel).toBe('sms');
     expect(sms?.to).toBe(PHONE);
-    expect(sms?.body).toContain(pairingCode);
+    expect(sms?.body).toContain('өөрийн бүртгэлээр нэвтэрч');
 
-    // The code good for a day, not ten minutes: it went out by SMS.
-    clock.advanceMinutes(20 * 60);
-    const session = await pairSupplier(ctx, pairingCode);
-    expect(session.supplierId).toBe(id);
-    expect((await applicationOf(ctx, guestId))?.paired).toBe(true);
+    // No code: the applicant's own account is the supplier's owner.
+    expect(await supplierOf(guestId)).toMatchObject({ id, role: 'owner' });
 
     // Now what they list is on offer.
     await createListing(

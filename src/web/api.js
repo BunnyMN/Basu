@@ -9,17 +9,12 @@ export const store = {
   set guestToken(v) {
     v ? localStorage.setItem('basu.guest', v) : localStorage.removeItem('basu.guest');
   },
-  get deviceToken() {
-    return localStorage.getItem('basu.device');
+  /** The kitchen screen's own session: the person running it, apart from any guest on the same browser. */
+  get kitchenToken() {
+    return localStorage.getItem('basu.kitchen');
   },
-  set deviceToken(v) {
-    v ? localStorage.setItem('basu.device', v) : localStorage.removeItem('basu.device');
-  },
-  get supplierToken() {
-    return localStorage.getItem('basu.supplier');
-  },
-  set supplierToken(v) {
-    v ? localStorage.setItem('basu.supplier', v) : localStorage.removeItem('basu.supplier');
+  set kitchenToken(v) {
+    v ? localStorage.setItem('basu.kitchen', v) : localStorage.removeItem('basu.kitchen');
   },
   get opsToken() {
     return localStorage.getItem('basu.ops');
@@ -154,10 +149,10 @@ export const authReturn = (() => {
   if (!token && !refused) return null;
   history.replaceState(null, '', location.pathname + location.search);
   if (token) {
-    // A page that keeps a session of its own — the desk, `data-session="desk"`
-    // on its root — decides where this one goes; everywhere else it is the
-    // guest's.
-    if (document.documentElement.dataset.session !== 'desk') store.guestToken = token;
+    // A page that keeps a session of its own — the desk and the kitchen,
+    // `data-session` on its root — decides where this one goes; everywhere
+    // else it is the guest's.
+    if (!document.documentElement.dataset.session) store.guestToken = token;
     return { token };
   }
   setTimeout(() => toast(GOOGLE_REFUSALS[refused] ?? GOOGLE_REFUSALS.SOCIAL_REFUSED, 'bad'), 0);

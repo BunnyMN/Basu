@@ -120,7 +120,7 @@ struct ShellTests {
     #expect(bands[0].apps.map(\.name) == ["Хоол", "Идэш", "Нийлүүлэгч"])
     let allLive = bands[0].apps.allSatisfy { $0.isLive }
     #expect(allLive)
-    // The same page the paired tablet shows, opened by the phone's own sign-in.
+    // The same page the counter's tablet shows, opened by the phone's own sign-in.
     let opens: Destination? = .app(id: "supplier", path: "/supplier")
     #expect(bands[0].apps[2].destination == opens)
     // For everybody else the grid is exactly what it was.

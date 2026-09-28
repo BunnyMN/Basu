@@ -86,11 +86,6 @@ export {
   setSupplierActive,
   bankWouldChange,
   verifySupplierBank,
-  createSupplierCode,
-  pairSupplier,
-  resolveSupplierDevice,
-  revokeSupplierDevice,
-  unpairedCodes,
   type SupplierInput,
   type SupplierPatch,
   type ProfileEdit,
@@ -99,8 +94,6 @@ export {
   type Application,
   type SupplierState,
   type SupplierRow,
-  type SupplierSession,
-  type SupplierDevice,
 } from './suppliers.js';
 
 export {

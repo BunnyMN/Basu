@@ -6,10 +6,10 @@ import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
 import { opsToken } from './ops.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
-import { seedGuest, seedOrder, seedRestaurant, truncateAll, type SeededRestaurant } from '../test/seed.js';
+import { seedCook, seedGuest, seedOrder, seedRestaurant, truncateAll, type SeededRestaurant } from '../test/seed.js';
 
 /**
- * The lunch side of the desk, over HTTP: the restaurants and their tablets,
+ * The lunch side of the desk, over HTTP: the restaurants and their kitchens,
  * the day's orders and what can be done to one, the menu, and what people said.
  */
 
@@ -74,34 +74,26 @@ afterAll(async () => {
 });
 
 describe('the restaurants at the desk', () => {
-  it('lists each kitchen with its tablets, its day, and a code for a new tablet', async () => {
+  it('lists each kitchen with its business, whether anybody has it open, and its day', async () => {
     await aPaidLunch();
     const before = (await app.inject({ method: 'GET', url: '/v1/ops/dine/restaurants', headers: desk() })).json().restaurants;
     expect(before).toEqual([
-      expect.objectContaining({ id: seeded.restaurantId, active: true, online: false, devices: [], today: expect.objectContaining({ placed: 1, live: 1, held: 0 }) }),
+      expect.objectContaining({ id: seeded.restaurantId, active: true, online: false, org_id: null, kitchen_seen_at: null, today: expect.objectContaining({ placed: 1, live: 1, held: 0 }) }),
     ]);
     expect(before[0].menu.total).toBeGreaterThan(0);
 
-    const code = await app.inject({ method: 'POST', url: `/v1/ops/dine/restaurants/${seeded.restaurantId}/devices`, headers: desk(), payload: { label: 'Хойд гал тогоо' } });
-    expect(code.statusCode).toBe(201);
-    expect(code.json().pairing_code).toMatch(/^\d{8}$/);
-    const waiting = (await app.inject({ method: 'GET', url: '/v1/ops/dine/restaurants', headers: desk() })).json().restaurants[0];
-    expect(waiting.devices).toEqual([expect.objectContaining({ label: 'Хойд гал тогоо', paired_at: null, pairing_code: code.json().pairing_code })]);
+    // A cook signs in to the kitchen as themselves: it is open, and it is theirs.
+    const cook = await seedCook(ctx, seeded.restaurantId);
+    expect((await app.inject({ method: 'GET', url: '/v1/kds/tickets', headers: auth(cook.token) })).statusCode).toBe(200);
+    const open = (await app.inject({ method: 'GET', url: '/v1/ops/dine/restaurants', headers: desk() })).json().restaurants[0];
+    expect(open).toMatchObject({ online: true, org_id: cook.orgId });
+    expect(open.kitchen_seen_at).not.toBeNull();
 
-    const paired = await app.inject({ method: 'POST', url: '/v1/kds/pair', payload: { pairing_code: code.json().pairing_code } });
-    expect(paired.statusCode).toBe(200);
-    const withTablet = (await app.inject({ method: 'GET', url: '/v1/ops/dine/restaurants', headers: desk() })).json().restaurants[0];
-    expect(withTablet.devices[0]).toMatchObject({ label: 'Хойд гал тогоо', pairing_code: null });
-    expect(withTablet.devices[0].paired_at).not.toBeNull();
-
-    const gone = await app.inject({ method: 'POST', url: `/v1/ops/dine/devices/${withTablet.devices[0].id}/revoke`, headers: desk(), payload: { note: 'таблет солигдсон' } });
-    expect(gone.json()).toEqual({ id: withTablet.devices[0].id, revoked: true });
-    expect((await app.inject({ method: 'GET', url: '/v1/ops/dine/restaurants', headers: desk() })).json().restaurants[0].devices).toEqual([]);
-    // The tablet's token no longer opens the kitchen display.
-    expect((await app.inject({ method: 'GET', url: '/v1/kds/tickets', headers: auth(paired.json().token) })).statusCode).toBe(401);
-
-    // Nobody without a seat at the desk hands out codes.
-    expect((await app.inject({ method: 'POST', url: `/v1/ops/dine/restaurants/${seeded.restaurantId}/devices`, payload: {} })).statusCode).toBe(401);
+    // A minute and a half later with nobody at the board, it is closed again.
+    clock.advanceMinutes(2);
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/dine/restaurants', headers: desk() })).json().restaurants[0].online).toBe(false);
+    // There are no codes to hand out.
+    expect((await app.inject({ method: 'POST', url: `/v1/ops/dine/restaurants/${seeded.restaurantId}/devices`, headers: desk(), payload: {} })).statusCode).toBe(404);
   });
 
   it('takes a kitchen off the app and a dish off the menu, with the reason kept', async () => {

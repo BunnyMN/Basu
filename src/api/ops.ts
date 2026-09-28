@@ -6,7 +6,6 @@ import {
   approveSettlement,
   approveSupplier,
   cancelIdesh,
-  createSupplierCode,
   declineSupplier,
   hideListing,
   IdeshError,
@@ -203,7 +202,6 @@ const shape = (s: SupplierRow) => ({
   bank_holder: s.bankHolder,
   bank_verified: s.bankVerified,
   bank_changed_at: s.bankChangedAt?.toISOString() ?? null,
-  watched: s.watched,
   listings: s.listings,
 });
 
@@ -567,8 +565,7 @@ export async function registerOpsRoutes(
         bankAccount: body.bank_account,
         bankHolder: body.bank_holder,
       });
-      const code = await createSupplierCode(ctx, id, 'Нийлүүлэгчийн дэлгэц', 24 * 60);
-      return reply.status(201).send({ id, pairing_code: code, expires_in_minutes: 24 * 60 });
+      return reply.status(201).send({ id, owner: { id: owner.guestId, name: owner.name, phone: owner.phone, email: owner.email } });
     } catch (error) {
       return sendError(reply, error);
     }
@@ -576,8 +573,8 @@ export async function registerOpsRoutes(
 
   app.post<{ Params: { id: string } }>('/v1/ops/suppliers/:id/approve', desk('desk.suppliers:manage'), async (request, reply) => {
     try {
-      const { pairingCode } = await approveSupplier(ctx, request.params.id);
-      return reply.send({ state: 'contracted', pairing_code: pairingCode });
+      await approveSupplier(ctx, request.params.id);
+      return reply.send({ state: 'contracted' });
     } catch (error) {
       return sendError(reply, error);
     }
@@ -891,15 +888,6 @@ export async function registerOpsRoutes(
   );
 
   /** A fresh code — a lost phone, a code that expired unread. */
-  app.post<{ Params: { id: string } }>('/v1/ops/suppliers/:id/code', desk('desk.suppliers:manage'), async (request, reply) => {
-    const known = (await listSuppliers()).find((s) => s.id === request.params.id);
-    if (!known || known.state !== 'contracted') {
-      return sendError(reply, new IdeshError('NOT_FOUND', 'no contracted supplier under that id'));
-    }
-    const code = await createSupplierCode(ctx, request.params.id, 'Нийлүүлэгчийн дэлгэц', 24 * 60);
-    return reply.send({ pairing_code: code, expires_in_minutes: 24 * 60 });
-  });
-
   if (!opts.dev) return;
 
   /** The demo's ops secret, so a walkthrough can approve somebody. */

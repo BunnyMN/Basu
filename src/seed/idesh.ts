@@ -2,8 +2,6 @@ import type { Db } from '../db/pool.js';
 import {
   applySupplier,
   createListing,
-  createSupplierCode,
-  pairSupplier,
   registerSupplier,
   type Kind,
   type Unit,
@@ -105,9 +103,6 @@ export const LISTINGS: SeedListing[] = [
   { supplier: 3, kind: 'sheep', unit: 'whole', title: 'Хонь, бүтэн', note: 'Нядалж бэлдсэн гулууз.', price: 480_000, approxKg: 36, quantity: 10, origin: 'Улаанбаатар, Эмээлт', readyIn: 2, delivers: true, fee: 10_000 },
 ];
 
-/** The demo clock jumps hours; pairing codes have to outlive that. */
-const PAIRING_TTL_MINUTES = 8 * 60;
-
 /** The would-be supplier in the seed. Sign in as them to see the application. */
 export const APPLICANT_PHONE = '+97688010009';
 
@@ -126,9 +121,9 @@ export async function seedIdesh(
   ctx: Ctx,
   db: Db,
   today: string,
-): Promise<{ codes: Array<{ name: string; code: string }>; paired: string; listings: number }> {
+): Promise<{ owners: Array<{ name: string; phone: string }>; listings: number }> {
   const ids: string[] = [];
-  const codes: Array<{ name: string; code: string }> = [];
+  const owners: Array<{ name: string; phone: string }> = [];
 
   for (const s of SUPPLIERS) {
     // Every owner is somebody with an account, as on the real server.
@@ -146,10 +141,7 @@ export async function seedIdesh(
       db,
     );
     ids.push(id);
-    codes.push({
-      name: s.name,
-      code: await createSupplierCode(ctx, id, 'Нийлүүлэгчийн дэлгэц', PAIRING_TTL_MINUTES),
-    });
+    owners.push({ name: s.name, phone: s.phone });
   }
 
   const now = ctx.clock.now();
@@ -175,10 +167,6 @@ export async function seedIdesh(
     );
   }
 
-  // One supplier's screen is on from the start, like the first kitchen's.
-  const first = codes[0]!;
-  await pairSupplier(ctx, first.code);
-
   // And one person asking to become one, so the ops page has a decision to
   // make rather than an empty list to show the shape of.
   const applicant = await startSession(ctx, APPLICANT_PHONE, 'Нийлүүлэгчийн дэлгэц');
@@ -190,5 +178,5 @@ export async function seedIdesh(
     about: 'Завханы хонь, ямаа. 10-р сарын дундаас 30 толгой. Хүргэлт хийнэ.',
   });
 
-  return { codes: codes.slice(1), paired: first.name, listings: LISTINGS.length };
+  return { owners, listings: LISTINGS.length };
 }

@@ -1,6 +1,11 @@
 import { getPool, type Db } from '../db/pool.js';
 import { PILOT_KITCHEN, PILOT_MENU } from '../domain/fixtures.js';
 import type { OrderState } from '../domain/types.js';
+import { ensureRoles } from '../platform/access/index.js';
+import { startSession } from '../platform/identity/index.js';
+import { orgForExisting } from '../platform/org/index.js';
+import type { Ctx } from '../ports.js';
+import { setRestaurantOrg } from '../services/kitchen.js';
 
 let seq = 0;
 
@@ -26,8 +31,8 @@ export async function truncateAll(db: Db = getPool()): Promise<void> {
              dine.order_event, dine.fire_job, dine.arrival_signal, dine.table_hold,
              dine.order_line, dine.station_reservation, dine.dish_review, dine.order_review,
              dine.dining_order, dine.slot, dine.dining_table, dine.menu_item, dine.station,
-             dine.trust_profile, dine.kds_device, dine.restaurant,
-             ops.member, ops.member_account, ops.access_request, org.membership_log, org.membership, org.organization, access.role, access.org_role, access.module, access.page, ops.tick, ops.setting, idesh.audit, idesh.settlement, idesh.order_event, idesh.idesh_order, idesh.listing, idesh.supplier_device,
+             dine.trust_profile, dine.restaurant,
+             ops.member, ops.member_account, ops.access_request, org.membership_log, org.membership, org.organization, access.role, access.org_role, access.module, access.page, ops.tick, ops.setting, idesh.audit, idesh.settlement, idesh.order_event, idesh.idesh_order, idesh.listing,
              idesh.supplier,
              identity.profile, identity.guest_session, identity.guest, identity.otp_challenge, identity.oauth_state
     RESTART IDENTITY CASCADE
@@ -35,6 +40,22 @@ export async function truncateAll(db: Db = getPool()): Promise<void> {
   // The house accounts are reference data the migration created; only the
   // guests' wallets are test residue.
   await db.query(`DELETE FROM ledger.account WHERE kind = 'guest'`);
+}
+
+let cooks = 0;
+
+/**
+ * Somebody who runs this restaurant's kitchen: a person with an account, the
+ * owner of the business the restaurant belongs to — signed in, as a cook at
+ * the pass would be. There is no other way into a kitchen.
+ */
+export async function seedCook(ctx: Ctx, restaurantId: string): Promise<{ token: string; guestId: string; orgId: string }> {
+  await ensureRoles();
+  const phone = `+9769800${String(++cooks % 10_000).padStart(4, '0')}`;
+  const { token, guestId } = await startSession(ctx, phone, 'Гал тогоо');
+  const org = await orgForExisting({ name: 'Гал тогоо', restaurant: true, supplier: false, ownerId: guestId, now: ctx.clock.now() });
+  await setRestaurantOrg(restaurantId, org.id);
+  return { token, guestId, orgId: org.id };
 }
 
 export async function seedRestaurant(db: Db = getPool()): Promise<SeededRestaurant> {

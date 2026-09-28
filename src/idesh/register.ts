@@ -1,10 +1,8 @@
 import '../env.js';
 import { parseArgs } from 'node:util';
 import { closePool } from '../db/pool.js';
-import { buildClock } from '../mode.js';
-import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { accountByContact } from '../platform/identity/index.js';
-import { createSupplierCode, registerSupplier } from './index.js';
+import { registerSupplier } from './index.js';
 
 /**
  * Register a supplier, once the contract is signed.
@@ -18,13 +16,10 @@ import { createSupplierCode, registerSupplier } from './index.js';
  * in to Basu first; the business is then theirs, and everybody who works
  * there comes in by the roles they give.
  *
- * Prints the supplier's id and an eight-digit pairing code good for a day —
- * long enough to read it over the phone. There is no self-signup on purpose:
- * «баталгаатай» means «has a contract with us», and a form cannot sign one.
- * Listings are the supplier's own business, from their screen.
+ * Prints the supplier's id. «Баталгаатай» means «has a contract with us»;
+ * the owner then signs in to /supplier as themselves, puts up the listings,
+ * and gives the people who work there their roles.
  */
-
-const CODE_TTL_MINUTES = 24 * 60;
 
 const { values } = parseArgs({
   options: {
@@ -35,7 +30,6 @@ const { values } = parseArgs({
     address: { type: 'string' },
     lat: { type: 'string' },
     lon: { type: 'string' },
-    label: { type: 'string', default: 'Нийлүүлэгчийн дэлгэц' },
   },
 });
 
@@ -52,13 +46,6 @@ if (!/^\+976\d{8}$/.test(values.phone!)) {
   process.exit(1);
 }
 
-const ctx: Ctx = {
-  clock: buildClock(),
-  payments: new FakePaymentProvider(),
-  tax: new FakeTaxProvider(),
-  notifier: new FakeNotifier(),
-};
-
 try {
   const owner = await accountByContact(values.owner ?? values.phone!);
   if (!owner) {
@@ -73,12 +60,11 @@ try {
     lat: values.lat ? Number(values.lat) : null,
     lon: values.lon ? Number(values.lon) : null,
   });
-  const code = await createSupplierCode(ctx, id, values.label!, CODE_TTL_MINUTES);
 
   console.log(`\nНийлүүлэгч бүртгэгдлээ: ${values.name}`);
-  console.log(`  id:         ${id}`);
-  console.log(`  холбох код: ${code}   (24 цаг хүчинтэй)`);
-  console.log(`\nНийлүүлэгч /supplier хуудсанд энэ кодыг оруулаад зараа тавина.\n`);
+  console.log(`  id:       ${id}`);
+  console.log(`  эзэмшигч: ${owner.name ?? owner.email ?? owner.phone}`);
+  console.log(`\nЭзэмшигч /supplier хуудсанд өөрийн бүртгэлээр нэвтэрч зараа тавина.\n`);
 } catch (error) {
   console.error((error as Error).message);
   process.exitCode = 1;

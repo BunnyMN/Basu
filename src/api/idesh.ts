@@ -6,7 +6,6 @@ import {
   cancelIdesh,
   createIdesh,
   createListing,
-  createSupplierCode,
   dayOf,
   detailFor,
   IdeshError,
@@ -21,12 +20,9 @@ import {
   openListings,
   ownedByGuest,
   ownedBySupplier,
-  pairSupplier,
   payIdesh,
-  resolveSupplierDevice,
   startPreparing,
   UNITS,
-  unpairedCodes,
   updateListing,
   type IdeshDetail,
   type IdeshSummary,
@@ -55,10 +51,9 @@ import {
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import { confirmPassword, contactsFor, resolveGuest } from '../platform/identity/index.js';
 import { enqueue } from '../platform/notify/index.js';
-import { LONE_OWNER_PERMISSIONS, SCREEN_PERMISSIONS, grants, headRoles, type Grants } from '../platform/access/index.js';
+import { LONE_OWNER_PERMISSIONS, grants, headRoles, type Grants } from '../platform/access/index.js';
 import { accessIn, membersOf } from '../platform/org/index.js';
 import type { Ctx } from '../ports.js';
-import { limits } from './hardening.js';
 import { shapeOrder, shapeSettlement, shapeSummary } from './shapes.js';
 import { holds, need, needAny } from './guards.js';
 
@@ -76,11 +71,8 @@ import { holds, need, needAny } from './guards.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
-    /**
-     * Who is acting at a supplier, and with which role — a paired screen acts
-     * as a manager. `person` is the account when it is a person, not a screen.
-     */
-    supplierDevice?: { deviceId: string; supplierId: string; role: SupplierRole; person?: string; orgId?: string | null };
+    /** The person at a supplier this request acts as: who, where, as what, and the string their actions are recorded under. */
+    supplierSeat?: { actor: string; supplierId: string; role: SupplierRole; person: string; orgId: string | null };
   }
 }
 
@@ -212,12 +204,6 @@ export async function registerIdeshRoutes(
   const guarded = { preHandler: opts.requireGuest };
 
   /**
-   * Two ways onto the supplier's side: a screen paired by code, or the
-   * person whose phone the supplier is, signed in like any guest. Both land
-   * on the same routes and the same ownership checks; the actor string tells
-   * them apart in the order's events.
-   */
-  /**
    * What a person may do at a supplier: what their role opens at its
    * business, as Basu wrote the role. A supplier from before there were
    * businesses is its one owner's, every supplier page.
@@ -228,16 +214,10 @@ export async function registerIdeshRoutes(
   };
 
   const requireSupplier = async (request: FastifyRequest, reply: FastifyReply) => {
+    // A person, signed in as themselves — at the counter, on a phone or at a
+    // desk alike. What they may do is their role at the business.
     const token = bearer(request);
     if (!token) return unauthorized(reply);
-    const device = await resolveSupplierDevice(ctx, token);
-    if (device) {
-      // A screen on the counter does the day's work, as a manager would —
-      // never the bank, which takes a person's password.
-      request.supplierDevice = { ...device, role: 'screen' };
-      request.grants = grants(SCREEN_PERMISSIONS);
-      return undefined;
-    }
     const guestId = await resolveGuest(ctx, token);
     if (!guestId) return unauthorized(reply);
     const asked = orgOf(request);
@@ -249,7 +229,7 @@ export async function registerIdeshRoutes(
     const held = await supplierGrants(guestId, mine.orgId);
     if (!held) return asked ? forbidden(reply, 'not a member of that supplier') : unauthorized(reply);
     const actor = mine.role === 'owner' ? `owner:${guestId}` : `member:${guestId}`;
-    request.supplierDevice = { deviceId: actor, supplierId: mine.id, role: mine.role, person: guestId, orgId: mine.orgId };
+    request.supplierSeat = { actor, supplierId: mine.id, role: mine.role, person: guestId, orgId: mine.orgId };
     request.grants = held;
     return undefined;
   };
@@ -458,8 +438,6 @@ export async function registerIdeshRoutes(
             applied_at: application.appliedAt?.toISOString() ?? null,
             decided_at: application.decidedAt?.toISOString() ?? null,
             decline_reason: application.declineReason,
-            pairing_code: application.pairingCode,
-            paired: application.paired,
           }
         : null,
     };
@@ -467,28 +445,13 @@ export async function registerIdeshRoutes(
 
   /* ── the supplier ──────────────────────────────────────────────── */
 
-  app.post<{ Body: { pairing_code?: string } }>('/v1/supplier/pair', { config: { rateLimit: limits().pair } }, async (request, reply) => {
-    const code = request.body?.pairing_code;
-    if (!code) return badRequest(reply, 'Холбох код оруулна уу.', 'pairing_code is required');
-    try {
-      const session = await pairSupplier(ctx, code);
-      return reply.send({
-        token: session.token,
-        device_id: session.deviceId,
-        supplier_id: session.supplierId,
-      });
-    } catch (error) {
-      return sendError(reply, error);
-    }
-  });
-
   /**
    * The screen, in one call: the orders with a job still to do, and the
-   * stall itself. A poll rather than a socket, for the tablet's reasons.
+   * stall itself. A poll rather than a socket, for the kitchen screen's reasons.
    */
-  const screen = async (supplierId: string | null) => {
+  const screen = async (supplierId: string) => {
     const board = await boardFor(supplierId);
-    const listings = supplierId ? (await listingsOf(supplierId)).map(shapeListing) : [];
+    const listings = (await listingsOf(supplierId)).map(shapeListing);
     const lane = (tickets: typeof board.lanes.paid) =>
       tickets.map((t) => ({
         ...shapeSummary(t),
@@ -517,24 +480,23 @@ export async function registerIdeshRoutes(
   };
 
   /**
-   * Who this seat is at the supplier and what it may do — a person with a
-   * role, or a screen on the counter. What the supplier's page asks before
-   * it draws a tab or a button; the routes behind them ask again.
+   * Who this person is at the supplier and what their role lets them do.
+   * What the supplier's page asks before it draws a tab or a button; the
+   * routes behind them ask again.
    */
   app.get('/v1/supplier/seat', { preHandler: requireSupplier }, async (request) => {
-    const seat = request.supplierDevice!;
+    const seat = request.supplierSeat!;
     const row = await supplierById(seat.supplierId);
     return {
       supplier: { id: seat.supplierId, name: row?.name ?? null },
       org_id: seat.orgId ?? null,
       role: seat.role,
-      screen: !seat.person,
       permissions: request.grants!.list(),
     };
   });
 
   app.get('/v1/supplier/board', asSupplierMay('org.idesh.today'), async (request) => {
-    const board = await screen(request.supplierDevice!.supplierId);
+    const board = await screen(request.supplierSeat!.supplierId);
     if (holds(request, 'org.idesh.money')) return board;
     // What the supplier keeps of each order is the money; the staff at the counter see the order.
     const blind = (tickets: typeof board.lanes.paid) => tickets.map((t) => ({ ...t, payout_mnt: null }));
@@ -568,7 +530,7 @@ export async function registerIdeshRoutes(
 
   /** The numbers the supplier opens the app to. The money in them only for a seat that holds the money. */
   app.get('/v1/supplier/home', asSupplierMayAny('org.idesh.today', 'org.idesh.orders'), async (request) => {
-    const home = await homeOf(request.supplierDevice!.supplierId, ctx.clock.now());
+    const home = await homeOf(request.supplierSeat!.supplierId, ctx.clock.now());
     return {
       today: home.today,
       lanes: home.lanes,
@@ -595,12 +557,12 @@ export async function registerIdeshRoutes(
   app.get<{ Querystring: { scope?: string; q?: string } }>('/v1/supplier/orders', asSupplierMay('org.idesh.orders'), async (request) => {
     const raw = request.query.scope;
     const scope: OrderScope = raw === 'live' || raw === 'done' ? raw : 'all';
-    const orders = await ordersOf(request.supplierDevice!.supplierId, { scope, q: request.query.q ?? '' });
+    const orders = await ordersOf(request.supplierSeat!.supplierId, { scope, q: request.query.q ?? '' });
     return { scope, orders: orders.map((o) => orderFor(request, o)) };
   });
 
   app.get<{ Params: { id: string } }>('/v1/supplier/orders/:id', asSupplierMay('org.idesh.orders'), async (request, reply) => {
-    const found = await orderForSupplier(request.supplierDevice!.supplierId, request.params.id);
+    const found = await orderForSupplier(request.supplierSeat!.supplierId, request.params.id);
     if (!found) return sendError(reply, new IdeshError('NOT_FOUND', 'no such order of yours'));
     return reply.send({
       order: orderFor(request, found.order),
@@ -634,7 +596,7 @@ export async function registerIdeshRoutes(
   };
 
   app.get('/v1/supplier/profile', asSupplierMay('org.idesh.profile'), async (request, reply) => {
-    const row = await supplierById(request.supplierDevice!.supplierId);
+    const row = await supplierById(request.supplierSeat!.supplierId);
     if (!row) return sendError(reply, new IdeshError('NOT_FOUND', 'no such supplier'));
     return reply.send(profileFor(request, row));
   });
@@ -649,7 +611,7 @@ export async function registerIdeshRoutes(
     Body: { name?: string; address?: string; about?: string | null; lat?: number | null; lon?: number | null; bank_name?: string; bank_account?: string; bank_holder?: string; password?: string };
   }>('/v1/supplier/profile', asSupplierMay('org.idesh.profile:edit'), async (request, reply) => {
     const body = request.body ?? {};
-    const supplierId = request.supplierDevice!.supplierId;
+    const supplierId = request.supplierSeat!.supplierId;
     try {
       const bank = { bankName: body.bank_name, bankAccount: body.bank_account, bankHolder: body.bank_holder };
       const changing = (bank.bankName !== undefined || bank.bankAccount !== undefined || bank.bankHolder !== undefined) && (await bankWouldChange(supplierId, bank));
@@ -657,7 +619,7 @@ export async function registerIdeshRoutes(
         // Where the money goes is an owner's alone to change, and the owner
         // pressing the button proves it is them with their own password —
         // whichever owner they are, and never a screen on the counter.
-        const person = request.supplierDevice!.person;
+        const person = request.supplierSeat!.person;
         if (!holds(request, 'org.idesh.profile:bank') || !person) {
           return forbidden(reply, 'only an owner changes where the money goes');
         }
@@ -682,7 +644,7 @@ export async function registerIdeshRoutes(
       if (bankChanged && row) {
         // Every owner hears of it — the one who registered the business and
         // any it has now — so a change nobody meant is caught by somebody.
-        const orgId = request.supplierDevice!.orgId;
+        const orgId = request.supplierSeat!.orgId;
         const heads = await headRoles();
         const owners = new Set<string>(orgId ? (await membersOf(orgId)).filter((m) => heads.includes(m.role)).map((m) => m.guestId) : []);
         const registered = await ownerOf(supplierId);
@@ -709,7 +671,7 @@ export async function registerIdeshRoutes(
 
   /** The supplier's money: their rate, what they are owed, what was sent. */
   app.get('/v1/supplier/money', asSupplierMay('org.idesh.money'), async (request) => {
-    const supplierId = request.supplierDevice!.supplierId;
+    const supplierId = request.supplierSeat!.supplierId;
     const me = (await listSuppliers()).find((s) => s.id === supplierId);
     return {
       commission_pct: me?.commissionPct ?? null,
@@ -762,15 +724,15 @@ export async function registerIdeshRoutes(
     '/v1/supplier/orders/:id/:action',
     asSupplierMay('org.idesh.orders:act'),
     async (request, reply) => {
-      const device = request.supplierDevice!;
-      if (!(await ownedBySupplier(request.params.id, device.supplierId))) {
+      const seat = request.supplierSeat!;
+      if (!(await ownedBySupplier(request.params.id, seat.supplierId))) {
         return forbidden(reply, 'that order belongs to another supplier');
       }
       try {
         const result = await act(
           request.params.action,
           request.params.id,
-          `supplier:${device.deviceId}`,
+          `supplier:${seat.actor}`,
           request.body,
         );
         if (!result) return badRequest(reply, 'Ийм үйлдэл алга.', `unknown action ${request.params.action}`);
@@ -782,7 +744,7 @@ export async function registerIdeshRoutes(
   );
 
   app.get('/v1/supplier/listings', asSupplierMay('org.idesh.stall'), async (request) => ({
-    listings: (await listingsOf(request.supplierDevice!.supplierId)).map(shapeListing),
+    listings: (await listingsOf(request.supplierSeat!.supplierId)).map(shapeListing),
   }));
 
   app.post<{ Body: Record<string, unknown> }>(
@@ -793,7 +755,7 @@ export async function registerIdeshRoutes(
       if (typeof input === 'string') return badRequest(reply, 'Зарын мэдээлэл дутуу байна.', input);
       try {
         const listing = await createListing(
-          request.supplierDevice!.supplierId,
+          request.supplierSeat!.supplierId,
           input,
           ctx.clock.now(),
         );
@@ -810,7 +772,7 @@ export async function registerIdeshRoutes(
     async (request, reply) => {
       try {
         const listing = await updateListing(
-          request.supplierDevice!.supplierId,
+          request.supplierSeat!.supplierId,
           request.params.id,
           readPatch(request.body ?? {}),
           ctx.clock.now(),
@@ -826,49 +788,16 @@ export async function registerIdeshRoutes(
 
   if (!opts.dev) return;
 
-  /** The codes the seed minted, so the supplier screen can self-pair. */
-  app.get('/dev/supplier-codes', async () => ({
-    devices: (await unpairedCodes()).map((d) => ({
-      code: d.code,
-      name: d.name,
-      supplier_id: d.supplierId,
-    })),
-  }));
-
-  /** The screens a walkthrough may open: contracted suppliers only. An
-      applicant has no screen yet — that is what the ops page decides. */
-  app.get('/dev/suppliers', async () => ({
-    suppliers: (await listSuppliers())
-      .filter((s) => s.state === 'contracted')
-      .map((s) => ({ id: s.id, name: s.name, watched: s.watched })),
-  }));
-
-  /** Hand this browser a screen for a supplier, no code typing. */
-  app.post<{ Body: { supplier_id?: string } }>('/dev/supplier-token', async (request, reply) => {
-    const supplierId = request.body?.supplier_id;
-    if (!supplierId) return badRequest(reply, 'Нийлүүлэгч заана уу.', 'supplier_id required');
-    try {
-      const code = await createSupplierCode(ctx, supplierId, 'Демо дэлгэц', 60);
-      const session = await pairSupplier(ctx, code);
-      return reply.send({ token: session.token, supplier_id: session.supplierId });
-    } catch (error) {
-      return sendError(reply, error);
-    }
+  /**
+   * The contracted suppliers a walkthrough may open, and the number each
+   * owner signs in with — through `/dev/login`, like any person.
+   */
+  app.get('/dev/suppliers', async () => {
+    const contracted = (await listSuppliers()).filter((s) => s.state === 'contracted');
+    const owners = await Promise.all(contracted.map((s) => ownerOf(s.id)));
+    const contacts = await contactsFor(owners.filter((o): o is string => Boolean(o)));
+    return {
+      suppliers: contracted.map((s, i) => ({ id: s.id, name: s.name, phone: contacts.get(owners[i] ?? '')?.phone ?? null })),
+    };
   });
-
-  /** Every supplier's board at once, for the walkthrough. */
-  app.get('/dev/supplier/board', async () => screen(null));
-
-  app.post<{ Params: { id: string; action: string }; Body: { reason?: string } }>(
-    '/dev/supplier/orders/:id/:action',
-    async (request, reply) => {
-      try {
-        const result = await act(request.params.action, request.params.id, 'supplier:demo', request.body);
-        if (!result) return badRequest(reply, 'Ийм үйлдэл алга.', `unknown action ${request.params.action}`);
-        return reply.send(result);
-      } catch (error) {
-        return sendError(reply, error);
-      }
-    },
-  );
 }

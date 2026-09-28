@@ -1946,7 +1946,7 @@ async function renderOverview(view) {
     el(`<div class="card kpi"${w.drift === 0 ? '' : ' data-tone="bad"'}><div class="lab">Basu-гийн данс</div><b>${money(w.revenue_mnt)}</b><span>${drift}</span></div>`),
     el(`<div class="card kpi"><div class="lab">Идэвхтэй захиалга</div><b>${v.dine.live + v.idesh.live}</b><span>хоол ${v.dine.live} · идэш ${v.idesh.live}${v.dine.held ? ` · түр зогсоосон ${v.dine.held}` : ''}</span></div>`),
     el(`<div class="card kpi"><div class="lab">Зочид</div><b>${v.guests.total}</b><span>нээлттэй сесс ${v.guests.sessions_open} · push утас ${v.notify.devices}</span></div>`),
-    el(`<div class="card kpi"${v.dine.restaurants.offline ? ' data-tone="warn"' : ''}><div class="lab">Ресторан</div><b>${v.dine.restaurants.active}</b><span>${v.dine.restaurants.offline ? `дэлгэц холбогдоогүй ${v.dine.restaurants.offline}` : 'бүх дэлгэц холбоотой'}</span></div>`),
+    el(`<div class="card kpi"${v.dine.restaurants.offline ? ' data-tone="warn"' : ''}><div class="lab">Ресторан</div><b>${v.dine.restaurants.active}</b><span>${v.dine.restaurants.offline ? `гал тогоо хаалттай ${v.dine.restaurants.offline}` : 'бүх гал тогоо нээлттэй'}</span></div>`),
     el(`<div class="card kpi"${v.notify.stuck ? ' data-tone="bad"' : ''}><div class="lab">Мэдэгдлийн дараалал</div><b>${v.notify.queued}</b><span>${v.notify.stuck ? `гацсан ${v.notify.stuck}` : 'илгээгдэхийг хүлээж буй'}${w.topups.pending ? ` · цэнэглэлт хүлээгдэж буй ${w.topups.pending}` : ''}</span></div>`),
   );
 
@@ -2153,6 +2153,7 @@ const DINE_EVENT = {
 const dineActor = (a) => {
   if (!a) return '';
   if (a.startsWith('guest:')) return 'зочин';
+  if (a.startsWith('kitchen')) return 'гал тогоо';
   if (a.startsWith('kds:')) return 'гал тогооны дэлгэц';
   if (a.startsWith('ops:')) return `ops · ${a.slice(4)}`;
   return { 'system:planner': 'төлөвлөгч', 'system:scheduler': 'хуваарьлагч' }[a] ?? a;
@@ -2161,7 +2162,7 @@ const stars = (n) => `<span class="stars" aria-label="${n} од">${Array.from({ 
 let venueCache = [];
 
 async function renderVenues(view) {
-  view.append(head('Ресторан', 'Гал тогоо бүр: таблет холбоотой эсэх, өнөөдрийн захиалга, цэс, үнэлгээ.'));
+  view.append(head('Ресторан', 'Гал тогоо бүр: захиалга хүлээж байгаа эсэх, өнөөдрийн захиалга, цэс, үнэлгээ.'));
   view.append(el('<div class="rows" id="venues" data-rows></div>'));
   view.querySelector('#venues').append(busy());
   await loadVenues();
@@ -2185,35 +2186,28 @@ function renderVenue(r) {
     <div class="card row" data-venue="${r.id}" data-state="${r.active ? 'on' : 'off'}">
       <div class="name">${esc(r.name)}
         ${r.active ? '' : ' <span class="pill" data-s="off">зогссон</span>'}
-        <span class="pill" data-s="${r.online ? 'contracted' : 'declined'}">${r.online ? 'дэлгэц холбоотой' : 'дэлгэц холбогдоогүй'}</span>
+        <span class="pill" data-s="${r.online ? 'contracted' : 'declined'}">${r.online ? 'гал тогоо нээлттэй' : 'гал тогоо хаалттай'}</span>
         <small>${r.rating ? `${stars(Math.round(r.rating.stars))} ${r.rating.stars} · ${r.rating.count} үнэлгээ${r.rating.on_time_share === null ? '' : ` · цагтаа ${Math.round(r.rating.on_time_share * 100)}%`}` : 'үнэлгээ алга'} · ${r.slot_minutes} мин цаг · ${r.auto_accept ? 'автоматаар батална' : 'гараар батална'}${r.merchant_tin ? '' : ' · <b class="ink-stop">е-баримтын ТТД алга</b>'}</small>
       </div>
       <div class="right"><div class="btns">
         <button class="btn" data-size="sm" type="button" data-a="menu">Цэс</button>
         ${can('desk.venues:manage') ? `<details class="more"><summary class="btn" data-size="sm" data-icon aria-label="Бусад үйлдэл"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></summary><div class="menu">
-          <button class="btn" data-size="sm" data-v="quiet" type="button" data-a="tablet">Шинэ таблет</button>
           <button class="btn${r.active ? ' ink-stop' : ''}" data-size="sm" data-v="quiet" type="button" data-a="active">${r.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>
         </div></details>` : ''}
       </div></div>
       <div class="about">Өнөөдөр <b>${r.today.placed}</b> захиалга · <b>${r.today.live}</b> идэвхтэй${r.today.held ? ` · <b class="ink-hold">${r.today.held} түр зогсоосон</b>` : ''} · <b>${money(r.today.sales_mnt)}</b> · цэс ${r.menu.active}/${r.menu.total}${r.menu.sold_out ? ` (${r.menu.sold_out} дууссан)` : ''}
-        <div class="sess-list">${r.devices.length ? r.devices.map((d) => `
-          <div class="sess"><span>${d.pairing_code ? `Код <b class="mono">${d.pairing_code}</b> · ${esc(d.label ?? '')} · ${clockOf(d.pairing_expires_at)} хүртэл` : `${esc(d.label ?? 'Таблет')} · ${d.online ? '<span class="pill" data-s="contracted">онлайн</span>' : `сүүлд ${d.last_seen_at ? `${when(d.last_seen_at)} ${clockOf(d.last_seen_at)}` : 'хэзээ ч үгүй'}`}`}</span>
-          ${can('desk.venues:manage') ? `<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-device="${d.id}">Салгах</button>` : ''}</div>`).join('') : '<span class="muted">Таблет холбогдоогүй.</span>'}</div>
+        <div class="sess-list"><span class="muted">${
+          !r.org_id ? 'Байгууллагатай холбогдоогүй — гал тогоог нь хэн ч нээж чадахгүй.'
+            : r.kitchen_seen_at ? `Гал тогоо сүүлд ${when(r.kitchen_seen_at)} ${clockOf(r.kitchen_seen_at)}-д нээгдсэн.`
+              : 'Гал тогоо хэзээ ч нээгдээгүй.'
+        } Ажилтнууд өөрсдийн бүртгэлээр /kds-д нэвтэрнэ.</span></div>
       </div>
     </div>`);
   card.addEventListener('click', async (e) => {
     const b = e.target.closest('button[data-a]');
     if (!b) return;
     try {
-      if (b.dataset.a === 'tablet') {
-        const label = prompt('Таблетын нэр (жишээ нь «Хойд гал тогоо»):', 'Гал тогооны таблет');
-        if (label === null) return;
-        const { pairing_code } = await ops(`/v1/ops/dine/restaurants/${r.id}/devices`, { method: 'POST', body: { label } });
-        toast(`Код ${pairing_code} — 10 минутын дотор таблет дээр оруулна.`, 'good');
-      } else if (b.dataset.a === 'revoke') {
-        if (!confirm('Энэ таблетыг салгах уу? Дэлгэц дахин холбох код шаардана.')) return;
-        await ops(`/v1/ops/dine/devices/${b.dataset.device}/revoke`, { method: 'POST', body: {} });
-      } else if (b.dataset.a === 'active') {
+      if (b.dataset.a === 'active') {
         const note = prompt(r.active ? 'Зогсоох шалтгаан:' : 'Идэвхжүүлэх тэмдэглэл:', '');
         if (note === null) return;
         await ops(`/v1/ops/dine/restaurants/${r.id}/active`, { method: 'POST', body: { active: !r.active, note } });
@@ -3002,7 +2996,7 @@ function renderRow(s) {
         s.state === 'applied'
           ? `хүсэлт ${when(s.applied_at)}`
           : s.state === 'contracted'
-            ? `гэрээ ${when(s.contracted_at)} · ${s.listings} зар · ${s.watched ? 'дэлгэц холбогдсон' : 'дэлгэц холбогдоогүй'}`
+            ? `гэрээ ${when(s.contracted_at)} · ${s.listings} зар`
             : `татгалзсан ${when(s.decided_at)}: ${esc(s.decline_reason)}`
       }</small></div>
       <div class="right"><span class="pill" data-s="${status}">${s.state === 'contracted' && !s.active ? 'түр зогссон' : STATE[s.state]}</span><div class="btns"></div></div>
@@ -3025,14 +3019,6 @@ function renderRow(s) {
       toast(error.message, 'bad');
     }
   };
-  const showCode = (answer) => {
-    // The code is on its way by SMS; it is also here, in case the SMS is not.
-    const code = answer?.pairing_code;
-    if (code) {
-      toast(`Батлагдлаа. Код ${code} — SMS-ээр илгээгдэнэ.`);
-      sessionStorage.setItem(`ops.code.${s.id}`, code);
-    }
-  };
   const small = (label, attrs = '') => el(`<button class="btn" data-size="sm" type="button" ${attrs}>${label}</button>`);
   // One action in view, the rest behind ⋯ — every button stays in the DOM.
   const folded = more();
@@ -3047,7 +3033,7 @@ function renderRow(s) {
   const signs = can('desk.suppliers:terms');
   if (s.state === 'applied' && runs) {
     const ok = el('<button class="btn" data-v="primary" data-size="sm" type="button" data-a="approve">Батлах</button>');
-    ok.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/approve`, null, showCode));
+    ok.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/approve`, null, () => toast('Батлагдлаа. Эзэн нь өөрийн бүртгэлээр /supplier-д нэвтэрнэ — SMS очно.', 'good')));
     const no = el('<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="decline">Татгалзах</button>');
     no.addEventListener('click', () => {
       const reason = prompt('Шалтгаан (нийлүүлэгчид SMS-ээр очно):', '');
@@ -3066,11 +3052,6 @@ function renderRow(s) {
     buttons.append(check);
   }
   if (s.state === 'contracted') {
-    if (runs) {
-      const code = small('Шинэ код', 'data-a="code"');
-      code.addEventListener('click', () => act(`/v1/ops/suppliers/${s.id}/code`, null, showCode));
-      fold(code);
-    }
     // Their listings, to look at and, if need be, hide.
     const stall = small('Зарууд', 'data-a="listings"');
     stall.addEventListener('click', async () => {
@@ -3140,18 +3121,13 @@ function renderRow(s) {
     fold(terms);
   }
   if (menu.childElementCount) buttons.append(folded);
-
-  const remembered = sessionStorage.getItem(`ops.code.${s.id}`);
-  if (remembered && s.state === 'contracted' && !s.watched) {
-    row.append(el(`<div class="code">Дэлгэц холбох код<b class="mono">${remembered}</b> · 24 цаг</div>`));
-  }
   return row;
 }
 
 function newForm() {
   const form = el(`
     <div class="card">
-      <div class="card-head"><h3>Гэрээ байгуулсан нийлүүлэгчийг бүртгэх</h3><span class="cap muted">Бүртгэмэгц дэлгэц холбох код SMS-ээр очно</span></div>
+      <div class="card-head"><h3>Гэрээ байгуулсан нийлүүлэгчийг бүртгэх</h3><span class="cap muted">Эзэмшигч нь Basu-д бүртгэлтэй байх ёстой — бүртгэмэгц өөрийн бүртгэлээр /supplier-д орно</span></div>
       <div class="card-body">
         <div class="fields">
           <label class="field wide"><span>Нэр</span><input name="name" placeholder="Хэнтий · «Хэрлэн» хоршоо"></label>
@@ -3183,9 +3159,8 @@ function newForm() {
     if (v('lat')) body.lat = Number(v('lat'));
     if (v('lon')) body.lon = Number(v('lon'));
     try {
-      const { id, pairing_code } = await ops('/v1/ops/suppliers', { method: 'POST', body });
-      sessionStorage.setItem(`ops.code.${id}`, pairing_code);
-      toast(`Бүртгэгдлээ. Код ${pairing_code}`);
+      const { owner } = await ops('/v1/ops/suppliers', { method: 'POST', body });
+      toast(`Бүртгэгдлээ. Эзэмшигч: ${owner.name ?? owner.email ?? owner.phone} — өөрийн бүртгэлээр /supplier-д орно.`, 'good');
       await refresh();
     } catch (error) {
       toast(error.message, 'bad');

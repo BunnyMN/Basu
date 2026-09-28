@@ -81,11 +81,11 @@ describe('a server with no demo in it', () => {
 });
 
 describe('rate limits', () => {
-  it('shut the pairing door after too many tries from one address, in the API’s own words', async () => {
-    const { max } = limits().pair;
+  it('shut a code door after too many tries from one address, in the API’s own words', async () => {
+    const { max } = limits().otp;
     let last;
     for (let i = 0; i <= max; i++) {
-      last = await app.inject({ method: 'POST', url: '/v1/supplier/pair', payload: { pairing_code: '00000000' } });
+      last = await app.inject({ method: 'POST', url: '/v1/auth/password/code', payload: { login: '99000000' } });
     }
     expect(last!.statusCode).toBe(429);
     expect(last!.json()).toMatchObject({ error: { code: 'RATE_LIMITED' } });

@@ -329,7 +329,7 @@ export async function payOrder(ctx: Ctx, orderId: string): Promise<void> {
 
 /* ── the restaurant answers ────────────────────────────────────────── */
 
-export async function acceptOrder(ctx: Ctx, orderId: string, actor = 'kds:tablet'): Promise<void> {
+export async function acceptOrder(ctx: Ctx, orderId: string, actor = 'kitchen'): Promise<void> {
   const moved = await tx(async (client) => {
     const ok = await transition(client, orderId, ['PLACED'], 'ACCEPTED');
     if (ok) await appendEvent(client, orderId, 'ACCEPTED', actor);
@@ -346,11 +346,11 @@ export async function acceptOrder(ctx: Ctx, orderId: string, actor = 'kds:tablet
   await planAndSchedule(ctx, orderId);
 }
 
-export async function rejectOrder(ctx: Ctx, orderId: string, reason: string): Promise<void> {
+export async function rejectOrder(ctx: Ctx, orderId: string, reason: string, actor = 'kitchen'): Promise<void> {
   await tx(async (client) => {
     const ok = await transition(client, orderId, ['PLACED', 'ACCEPTED'], 'REJECTED');
     if (!ok) throw new OrderError('WRONG_STATE', 'order is no longer rejectable');
-    await appendEvent(client, orderId, 'REJECTED', 'kds:tablet', { reason });
+    await appendEvent(client, orderId, 'REJECTED', actor, { reason });
   });
   await refund(ctx, orderId, 'restaurant rejected');
 }
@@ -414,7 +414,7 @@ export async function checkIn(ctx: Ctx, orderId: string): Promise<void> {
 /* ── the kitchen ───────────────────────────────────────────────────── */
 
 /** «Одоо тавь». Always available — the chef knows things the model does not. */
-export async function fireNow(ctx: Ctx, orderId: string, actor = 'kds:tablet'): Promise<void> {
+export async function fireNow(ctx: Ctx, orderId: string, actor = 'kitchen'): Promise<void> {
   const now = ctx.clock.now();
   await tx(async (client) => {
     const ok = await transition(
@@ -435,7 +435,7 @@ export async function fireNow(ctx: Ctx, orderId: string, actor = 'kds:tablet'): 
 }
 
 /** «+5 минут» — the kitchen is buried and wants the ticket to wait. */
-export async function holdFor(ctx: Ctx, orderId: string, minutes = 5): Promise<void> {
+export async function holdFor(ctx: Ctx, orderId: string, minutes = 5, actor = 'kitchen'): Promise<void> {
   const now = ctx.clock.now();
   await tx(async (client) => {
     const { rows } = await client.query<{ fire_at: Date | null }>(
@@ -456,11 +456,11 @@ export async function holdFor(ctx: Ctx, orderId: string, minutes = 5): Promise<v
         WHERE order_id = $1 AND state = 'pending'`,
       [orderId, next],
     );
-    await appendEvent(client, orderId, 'HELD_BY_KITCHEN', 'kds:tablet', { minutes });
+    await appendEvent(client, orderId, 'HELD_BY_KITCHEN', actor, { minutes });
   });
 }
 
-export async function markReady(ctx: Ctx, orderId: string, actor = 'kds:tablet'): Promise<void> {
+export async function markReady(ctx: Ctx, orderId: string, actor = 'kitchen'): Promise<void> {
   const now = ctx.clock.now();
   await tx(async (client) => {
     const ok = await transition(client, orderId, ['FIRED', 'COOKING'], 'READY', {
@@ -473,7 +473,7 @@ export async function markReady(ctx: Ctx, orderId: string, actor = 'kds:tablet')
   });
 }
 
-export async function markServed(ctx: Ctx, orderId: string, actor = 'kds:tablet'): Promise<void> {
+export async function markServed(ctx: Ctx, orderId: string, actor = 'kitchen'): Promise<void> {
   const now = ctx.clock.now();
   await tx(async (client) => {
     const ok = await transition(client, orderId, ['READY'], 'SERVED', { served_at: now });

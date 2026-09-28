@@ -249,10 +249,10 @@ beforeAll(async () => {
   const address = app.server.address();
   base = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : 0}`;
 
-  // The seed opens one venue for service and hands back its name; take a
-  // tablet for that same one, which is what a kitchen does before opening.
-  pairedVenue = seeded.paired;
-  storage.setItem('basu.device', await tabletFor(pairedVenue));
+  // One venue's cook signs in to its kitchen, which is what a kitchen does
+  // before opening; the guest tests order from that same venue.
+  pairedVenue = seeded.kitchens[0]!.name;
+  storage.setItem('basu.kitchen', await cookFor(pairedVenue));
 });
 
 afterEach(async () => {
@@ -495,22 +495,24 @@ describe('the guest app', () => {
   });
 
   it('says what to do when no kitchen is watching at all', async () => {
-    // Every tablet has gone quiet — the guard is working, but a map of grey
+    // Every kitchen has gone quiet — the guard is working, but a map of grey
     // pins with no explanation is a dead end for whoever is looking.
-    await getPool().query(`UPDATE dine.kds_device SET last_seen_at = now() - interval '1 day'`);
+    const seen = await getPool().query<{ id: string; kitchen_seen_at: Date | null }>('SELECT id, kitchen_seen_at FROM dine.restaurant');
+    await getPool().query(`UPDATE dine.restaurant SET kitchen_seen_at = now() - interval '1 day'`);
     try {
       await inProduction(async () => {
         const dom = await openPage('dine.html');
         await until(dom, 'the explanation', (d) => Boolean(d.querySelector('#map .note')));
-        expect(text(dom)).toContain('нэг ч гал тогоо холбогдоогүй');
+        expect(text(dom)).toContain('нэг ч гал тогоо нээлттэй биш');
         expect(dom.window.document.querySelector('.note a')?.getAttribute('href')).toBe('/kds');
         // The pins are still drawn — the map is not the thing that failed.
         expect(pins(dom).length).toBe(seeded.venues);
         expect(pins(dom).every((f) => !f.properties['open'])).toBe(true);
       });
     } finally {
-      await getPool().query(`UPDATE dine.kds_device SET last_seen_at = now()
-                              WHERE paired_at IS NOT NULL AND revoked_at IS NULL`);
+      for (const r of seen.rows) {
+        await getPool().query('UPDATE dine.restaurant SET kitchen_seen_at = $2 WHERE id = $1', [r.id, r.kitchen_seen_at]);
+      }
     }
   });
 });
@@ -660,86 +662,63 @@ describe('the kitchen display', () => {
     expect(cooking.getAttribute('data-lane')).toBe('cooking');
   });
 
-  it('lets a demo tablet pick its kitchen when codes have expired', async () => {
-    storage.removeItem('basu.device');
+  it('lets a walkthrough sign in as a restaurant’s cook', async () => {
+    storage.removeItem('basu.kitchen');
     const kds = await openPage('kds.html');
-    await until(kds, 'the pairing form', (d) => d.querySelectorAll('.venues button').length > 0);
-
-    // One of them is already watched — the seed opens a venue for service.
-    expect(text(kds)).toContain('захиалга авч байна');
+    await until(kds, 'the door', (d) => d.querySelectorAll('.venues button').length > 0);
 
     clickText(kds, '.venues button', pairedVenue);
     await until(kds, 'the board', (d) => d.querySelectorAll('.lane').length === 3);
-    expect(text(kds)).toContain('Ирж явна');
+    expect(kds.window.document.querySelector('#venue')?.textContent).toBe(pairedVenue);
   });
 
-  it('walks a fresh tablet through pairing', async () => {
-    // A tablet out of its box: nothing stored, so it must ask to be paired.
-    storage.removeItem('basu.device');
-    const kds = await openPage('kds.html');
-
-    await until(kds, 'the pairing form', (d) => Boolean(d.querySelector('.pair input')));
-    expect(text(kds)).toContain('Таблетаа холбоно уу');
-    // The demo codes are offered, so nobody has to copy one out of a terminal.
-    const input = kds.window.document.querySelector('.pair input') as HTMLInputElement;
-    expect(input.value).toMatch(/^\d{8}$/);
-
-    clickText(kds, '.pair button', 'Холбох');
-    await until(kds, 'the board', (d) => d.querySelectorAll('.lane').length === 3);
-    expect(text(kds)).toContain('Ирж явна');
+  it('asks a screen nobody has signed in to for a person, not a code', async () => {
+    const before = storage.getItem('basu.kitchen');
+    storage.removeItem('basu.kitchen');
+    try {
+      const kds = await openPage('kds.html');
+      await until(kds, 'the door', (d) => Boolean(d.querySelector('.door .ways')));
+      expect(text(kds)).toContain('Өөрийн бүртгэлээр нэвтэрнэ үү');
+      expect(kds.window.document.querySelector('input.code[maxlength="8"]')).toBeNull();
+    } finally {
+      if (before) storage.setItem('basu.kitchen', before);
+    }
   });
 
-  it('names the kitchen it is watching, and lets the chef change it', async () => {
-    // These pages share one store, the way one browser origin does, and the
-    // pairing tests move the token about. Start from a tablet we chose.
-    storage.setItem('basu.device', await tabletFor(pairedVenue));
-
+  it('names the kitchen it is watching, and signs out in two taps', async () => {
+    storage.setItem('basu.kitchen', await cookFor(pairedVenue));
     const kds = await openPage('kds.html');
     await until(kds, 'the board', (d) => d.querySelectorAll('.lane').length === 3);
 
     // An unnamed empty board looks the same whether nothing has been ordered
-    // or the tablet is watching somebody else's kitchen.
+    // or the screen is signed in at somebody else's kitchen.
     expect(kds.window.document.querySelector('#venue')?.textContent).toBe(pairedVenue);
 
-    // A tablet paired to the wrong kitchen must have a way back that is not
-    // "clear your browser storage".
-    (kds.window.document.querySelector('#swap') as HTMLElement).click();
-    await until(kds, 'the pairing screen', (d) => Boolean(d.querySelector('.pair')));
-    expect(text(kds)).toContain('Таблетаа холбоно уу');
-
-    // …and picking the all-kitchens view from there works.
-    clickText(kds, '.venues button', 'Бүх гал тогоо');
-    await until(kds, 'the merged board', (d) => d.querySelectorAll('.lane').length === 3);
-    expect(kds.window.document.querySelector('#venue')?.textContent).toBe('Бүх гал тогоо');
+    // One stray tap asks; the second leaves.
+    const out = kds.window.document.querySelector('#out') as HTMLElement;
+    out.click();
+    expect(out.textContent).toBe('Гарах уу?');
+    out.click();
+    await until(kds, 'the door', (d) => Boolean(d.querySelector('.door .ways')));
 
     // Put the storage back the way the other tests expect to find it.
-    storage.setItem('basu.device', await tabletFor(pairedVenue));
+    storage.setItem('basu.kitchen', await cookFor(pairedVenue));
   });
 
-  it('shows every kitchen at once when asked to', async () => {
-    // The isolation is real and tested elsewhere; this is the demo view that
-    // exists because a walkthrough moves between ten venues and orders placed
-    // at nine of them would otherwise be invisible.
-    const before = storage.getItem('basu.device');
-    storage.setItem('basu.device', 'all-kitchens');
-    try {
-      const kds = await openPage('kds.html');
-      await until(kds, 'the merged board', (d) => d.querySelectorAll('.lane').length === 3);
-      expect(kds.window.document.querySelector('#venue')?.textContent).toBe('Бүх гал тогоо');
-    } finally {
-      if (before) storage.setItem('basu.device', before);
-    }
-  });
-
-  it('sends a revoked tablet back to the pairing screen', async () => {
+  it('sends a signed-out cook back to the door', async () => {
     const kds = await openPage('kds.html');
     await until(kds, 'the board', (d) => d.querySelectorAll('.lane').length === 3);
 
-    // The manager revoked this tablet — it must stop showing tickets at once.
-    await getPool().query(`UPDATE dine.kds_device SET revoked_at = now(), token_hash = NULL`);
+    // Signed out everywhere — the screen must stop showing tickets at once.
+    const phone = seeded.kitchens.find((k) => k.name === pairedVenue)!.phone;
+    await getPool().query(
+      `UPDATE identity.guest_session SET revoked_at = now()
+        WHERE guest_id IN (SELECT id FROM identity.guest WHERE phone_e164 = $1)`,
+      [phone],
+    );
 
-    await until(kds, 'the pairing screen', (d) => Boolean(d.querySelector('.pair')), 12_000);
-    expect(text(kds)).toContain('Таблетаа холбоно уу');
+    await until(kds, 'the door', (d) => Boolean(d.querySelector('.door .ways')), 12_000);
+    storage.setItem('basu.kitchen', await cookFor(pairedVenue));
   });
 });
 
@@ -988,10 +967,7 @@ describe('өвлийн идэш', () => {
     const total = guest.window.document.querySelector('.panel .mono')?.textContent;
 
     /* the supplier: why, then how much, then confirm */
-    storage.removeItem('basu.supplier');
-    const screen = await openPage('supplier.html');
-    await pairingCard(screen);
-    clickText(screen, '.venues button', 'Бүх нийлүүлэгч');
+    const screen = await supplierScreenFor(code!);
     const ticket = () =>
       [...screen.window.document.querySelectorAll('.ticket')].find((t) => t.textContent?.includes(`№${code}`));
     await until(screen, 'our order', () => Boolean(ticket()));
@@ -1068,14 +1044,8 @@ describe('өвлийн идэш', () => {
     await buyOne(guest);
     const code = guest.window.document.querySelector('.handcode b')?.textContent;
 
-    storage.removeItem('basu.supplier');
-    const screen = await openPage('supplier.html');
-    await pairingCard(screen);
-    expect(screen.window.document.querySelector('.pair h2')?.textContent).toBe('Дэлгэцээ холбоно уу');
-    // The demo codes are offered, so nobody copies one out of a terminal.
-    expect((screen.window.document.querySelector('.pair input') as HTMLInputElement).value).toMatch(/^\d{8}$/);
-
-    clickText(screen, '.venues button', 'Бүх нийлүүлэгч');
+    // The supplier's owner, signed in as themselves — no code, no tablet of Basu's.
+    const screen = await supplierScreenFor(code!);
     await until(screen, 'the work', (d) => Boolean(d.querySelector('#board[data-ready]')));
     await until(screen, 'our order', (d) =>
       [...d.querySelectorAll('.ticket')].some((t) => t.textContent?.includes(`№${code}`)),
@@ -1087,9 +1057,8 @@ describe('өвлийн идэш', () => {
     expect(ticket().getAttribute('data-lane')).toBe('paid');
     expect(ticket().textContent).toContain('Өөрөө ирж авна');
 
-    // Every supplier's board is on this screen, so the button has to be the
-    // one on *our* ticket — the first «Бэлтгэж эхлэх» on the page may belong
-    // to an order another test just paid for.
+    // The button has to be the one on *our* ticket — the first «Бэлтгэж
+    // эхлэх» on the page may belong to an order another test just paid for.
     const start = [...ticket().querySelectorAll('button')].find((b) =>
       b.textContent?.includes('Бэлтгэж эхлэх'),
     ) as HTMLElement;
@@ -1105,10 +1074,7 @@ describe('өвлийн идэш', () => {
   });
 
   it('lets a supplier run their own stall from their screen', async () => {
-    storage.removeItem('basu.supplier');
-    const screen = await openPage('supplier.html');
-    await pairingCard(screen);
-    clickText(screen, '.venues button', seeded.supplierPaired);
+    const screen = await ownerScreen(seeded.suppliers[0]!.phone);
     // The stall has its own tab now, beside today's work.
     await until(screen, 'the module', (d) => Boolean(d.querySelector('.tabs button[data-tab="stall"]')));
     (screen.window.document.querySelector('.tabs button[data-tab="stall"]') as HTMLElement).click();
@@ -1147,10 +1113,9 @@ describe('өвлийн идэш', () => {
 });
 
 describe('нийлүүлэгч болох', () => {
-  it('takes an application on the supplier page, approves it on the ops page, and pairs', async () => {
+  it('takes an application on the supplier page, approves it on the ops page, and the applicant runs it', async () => {
     // A person of this test's own, signed in the demo way with their number.
     await ownGuest('+97688010011');
-    storage.removeItem('basu.supplier');
     const page = await openPage('supplier.html');
     // Signed in already, the door opens straight onto the application form.
     await until(page, 'the application form', (d) => Boolean(d.querySelector('#apply')));
@@ -1199,7 +1164,7 @@ describe('нийлүүлэгч болох', () => {
       ),
     );
 
-    /* back on the applicant's page, the yes has arrived with a code */
+    /* back on the applicant's page, the yes has arrived */
     const again = await openPage('supplier.html');
     // Approved, the same phone now opens the supplier's own module — no
     // code to type: the phone is the proof.
@@ -1270,7 +1235,7 @@ describe('нийлүүлэгч болох', () => {
     expect(doc.querySelectorAll('.section table tbody tr').length).toBeGreaterThan(0);
   });
 
-  it('shows every kitchen with its tablets, then the day’s lunches and one lunch’s story', async () => {
+  it('shows every kitchen and whether it is open, then the day’s lunches and one lunch’s story', async () => {
     storage.removeItem('basu.ops');
     const desk = await openPage('ops.html');
     await until(desk, 'the secret prefilled', (d) =>
@@ -1282,7 +1247,9 @@ describe('нийлүүлэгч болох', () => {
     const doc = desk.window.document;
     const venue = doc.querySelector('#venues [data-venue]')!;
     expect(venue.textContent).toContain('Өнөөдөр');
-    expect(venue.querySelector('button[data-a="tablet"]')).not.toBeNull();
+    // No codes to hand out: the people who work there sign in as themselves.
+    expect(venue.querySelector('button[data-a="tablet"]')).toBeNull();
+    expect(venue.textContent).toContain('өөрсдийн бүртгэлээр');
     // The menu unfolds under the kitchen, with the switch for each dish.
     (venue.querySelector('button[data-a="menu"]') as HTMLElement).click();
     await until(desk, 'the menu', (d) => d.querySelectorAll('#venues .drawer tbody tr').length > 0);
@@ -1430,7 +1397,6 @@ describe('who sees what', () => {
     const owner = await account('+97688030021', 'Болд');
     const accountant = await account('+97688030024', 'Номин');
     const orgId = await business(owner, 'Туул мах · тест', { supplier: true }, [['+97688030024', 'accountant']]);
-    storage.removeItem('basu.supplier');
     storage.setItem('basu.ops', accountant);
     const screen = await openPage('supplier.html', `?org=${orgId}`);
     await until(screen, 'the module', (d) => d.querySelectorAll('.tabbar button[data-tab]').length > 0);
@@ -1567,15 +1533,27 @@ describe('Basu decides who may do what', () => {
  * carry every other test's lunch.
  */
 /**
- * The supplier page opens on the phone sign-in — a person's door. A tablet
- * goes one step further, to the pairing card with its code.
+ * A supplier's own screen, as its owner opens it from the dashboard: their
+ * own session, and `?org=` naming the business. The guest pages in the same
+ * test keep theirs.
  */
-async function pairingCard(dom: JSDOM): Promise<void> {
-  // Whichever card the door showed — sign-in, the application form, or the
-  // application's status — carries the way through to the pairing code.
-  await until(dom, 'the front door', (d) => Boolean(d.querySelector('.door #back')));
-  (dom.window.document.querySelector('.door #back') as HTMLElement).click();
-  await until(dom, 'the pairing form', (d) => d.querySelectorAll('.venues button').length > 0);
+async function ownerScreen(phone: string): Promise<JSDOM> {
+  const token = await devLogin(phone, 'Нийлүүлэгч');
+  const seat = (await (await fetch(`${base}/v1/supplier/seat`, { headers: { authorization: `Bearer ${token}` } })).json()) as { org_id: string };
+  storage.setItem('basu.ops', token);
+  return openPage('supplier.html', `?org=${seat.org_id}`);
+}
+
+/** The screen of whoever sold the order with this code. */
+async function supplierScreenFor(code: string): Promise<JSDOM> {
+  const { rows } = await getPool().query<{ phone: string }>(
+    `SELECT g.phone_e164 AS phone FROM idesh.idesh_order o
+       JOIN idesh.supplier s ON s.id = o.supplier_id
+       JOIN identity.guest g ON g.id = s.owner_guest_id
+      WHERE o.code = $1`,
+    [code],
+  );
+  return ownerScreen(rows[0]!.phone);
 }
 
 /** The desk opens on the numbers; a test goes to the section it is about. */
@@ -1597,19 +1575,20 @@ async function ownGuest(phone: string): Promise<void> {
   storage.setItem('basu.guest', token);
 }
 
-/** A tablet token for a named restaurant, the way the demo hands one out. */
-async function tabletFor(name: string): Promise<string> {
-  const { rows } = await getPool().query<{ id: string }>(
-    'SELECT id FROM dine.restaurant WHERE name = $1',
-    [name],
-  );
-  const response = await fetch(`${base}/dev/kds-token`, {
+/** A session for this number, the walkthrough's way. */
+async function devLogin(phone: string, device: string): Promise<string> {
+  const response = await fetch(`${base}/dev/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ restaurant_id: rows[0]!.id }),
+    body: JSON.stringify({ phone, device }),
   });
   const { token } = (await response.json()) as { token: string };
   return token;
+}
+
+/** The seeded cook of that venue, signed in. */
+async function cookFor(name: string): Promise<string> {
+  return devLogin(seeded.kitchens.find((k) => k.name === name)!.phone, 'Гал тогоо');
 }
 
 /**

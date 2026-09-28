@@ -53,7 +53,7 @@ export async function overviewAt(now: Date) {
   if (wallet.receipts.failed > 0) alerts.push({ level: 'warn', text: `${wallet.receipts.failed} е-баримт гаргаж чадсангүй. PosAPI-г шалга.`, tab: 'money' });
   if (wallet.topups.stuck > 0) alerts.push({ level: 'warn', text: `${wallet.topups.stuck} цэнэглэлт хагас цагаас дээш хүлээгдэж байна. QPay callback ирэхгүй байж магадгүй.`, tab: 'money' });
   if (dine.held > 0) alerts.push({ level: 'warn', text: `Хоолны ${dine.held} захиалга түр зогсоосон байна.` });
-  if (dine.restaurants.offline > 0) alerts.push({ level: 'warn', text: `${dine.restaurants.offline} рестораны гал тогооны дэлгэц холбогдоогүй.` });
+  if (dine.restaurants.offline > 0) alerts.push({ level: 'warn', text: `${dine.restaurants.offline} рестораны гал тогоо хаалттай — захиалга авахгүй.` });
   if (due > 0) alerts.push({ level: 'warn', text: `Шилжүүлэх ${due} мөнгө хүлээж байна.`, tab: 'pay' });
   if (applied > 0) alerts.push({ level: 'info', text: `${applied} нийлүүлэгчийн өргөдөл хариу хүлээж байна.`, tab: 'suppliers' });
   if (needsAccount > 0) alerts.push({ level: 'info', text: `${needsAccount} буцаалт зочны дансыг хүлээж байна.`, tab: 'pay' });

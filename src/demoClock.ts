@@ -12,10 +12,9 @@ import type { Clock } from './domain/time.js';
  * In production this is never constructed: `src/entry/*` uses `systemClock`.
  */
 /**
- * Where the demo day starts. Shared, because the seed mints pairing codes with
- * a ten-minute life and the API jumps the clock at boot — mint them against
- * one time and check them against another and they are stale before anyone
- * types them.
+ * Where the demo day starts. Shared, because the seed writes today's lunch
+ * slots and the API jumps the clock at boot — seed against one time and run
+ * against another and the day is over before anyone orders.
  */
 export const DEMO_START = '11:40';
 

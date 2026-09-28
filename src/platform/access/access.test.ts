@@ -3,7 +3,6 @@ import {
   BUILTIN_ROLES,
   MODULES,
   PAGES,
-  SCREEN_PERMISSIONS,
   TOP,
   buildMenu,
   grantsOf,
@@ -57,7 +56,6 @@ describe('the catalogue', () => {
 
   it('gives every built-in role only permissions the code honours', () => {
     for (const r of BUILTIN_ROLES) expect(r.permissions.filter((p) => !known(p))).toEqual([]);
-    expect(SCREEN_PERMISSIONS.every(known)).toBe(true);
   });
 });
 

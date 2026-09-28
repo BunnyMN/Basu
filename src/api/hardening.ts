@@ -77,13 +77,12 @@ export interface Limit {
   timeWindow: string;
 }
 
-export function limits(): { global: Limit; otp: Limit; verify: Limit; pair: Limit; ops: Limit } {
+export function limits(): { global: Limit; otp: Limit; verify: Limit; ops: Limit } {
   const strict = mode() === 'production';
   return {
     global: { max: strict ? 600 : 3000, timeWindow: '1 minute' },
     otp: { max: strict ? 10 : 120, timeWindow: '1 minute' },
     verify: { max: strict ? 30 : 240, timeWindow: '1 minute' },
-    pair: { max: strict ? 5 : 60, timeWindow: '1 minute' },
     ops: { max: strict ? 120 : 600, timeWindow: '1 minute' },
   };
 }

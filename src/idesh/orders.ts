@@ -939,23 +939,14 @@ export interface Board {
   };
 }
 
-/**
- * The supplier's screen, in one call. `supplierId` of null means every
- * supplier at once, which only the demo asks for — the same reason /kds has
- * a «Бүх гал тогоо» view.
- */
-export async function boardFor(supplierId: string | null, db: Db = getPool()): Promise<Board> {
-  const named = supplierId
-    ? await db.query<{ id: string; name: string }>(
-        'SELECT id, name FROM idesh.supplier WHERE id = $1',
-        [supplierId],
-      )
-    : null;
-  const supplier = named?.rows[0] ?? null;
+/** The supplier's screen, in one call: the orders with a job still to do. */
+export async function boardFor(supplierId: string, db: Db = getPool()): Promise<Board> {
+  const named = await db.query<{ id: string; name: string }>('SELECT id, name FROM idesh.supplier WHERE id = $1', [supplierId]);
+  const supplier = named.rows[0] ?? null;
 
   const { rows } = await db.query<OrderRow>(
     `${ORDER_SELECT}
-      WHERE ($1::uuid IS NULL OR o.supplier_id = $1::uuid)
+      WHERE o.supplier_id = $1::uuid
         AND o.state = ANY($2::text[])
       ORDER BY o.receive_on, o.paid_at`,
     [supplierId, BOARD_STATES],

@@ -11,7 +11,6 @@ export {
   MODULES,
   PAGES,
   SCOPES,
-  SCREEN_PERMISSIONS,
   TOP,
   act,
   known,

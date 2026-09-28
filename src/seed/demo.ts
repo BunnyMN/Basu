@@ -1,7 +1,8 @@
 import '../env.js';
 import { closePool, getPool } from '../db/pool.js';
 import { DEMO_START, DemoClock } from '../demoClock.js';
-import { createPairingCode, pairDevice } from '../services/devices.js';
+import { setRestaurantOrg } from '../services/kitchen.js';
+import { orgForExisting } from '../platform/org/index.js';
 import { startSession, updateProfile } from '../platform/identity/index.js';
 import { settleTopup, startTopup } from '../platform/ledger/index.js';
 import { enqueue } from '../platform/notify/index.js';
@@ -25,8 +26,8 @@ const SERVICE = ['11:30', '11:45', '12:00', '12:15', '12:30', '12:45', '13:00', 
 /** Deliberately low. The simulator showed 5 per slot buries a two-lane grill. */
 const MAX_ORDERS_PER_SLOT = 3;
 
-/** The demo clock jumps hours; pairing codes have to outlive that. */
-const PAIRING_TTL_MINUTES = 8 * 60;
+/** The number the cook at the n-th venue signs in with — `/kds`, «Демо» — as any person would. */
+const cookPhone = (n: number) => `+9769800${String(n).padStart(4, '0')}`;
 
 function todayAt(hhmm: string): Date {
   const [h, m] = hhmm.split(':').map(Number);
@@ -40,20 +41,18 @@ function todayAt(hhmm: string): Date {
 }
 
 export async function seedDemo(): Promise<{
-  pairingCodes: Array<{ name: string; code: string }>;
-  paired: string;
+  /** Each venue's cook: signed in with this number, they run its kitchen. */
+  kitchens: Array<{ name: string; phone: string }>;
   venues: number;
   dishes: number;
   reviews: number;
   walletMnt: number;
-  /** The second vertical: its suppliers' codes, and how many listings. */
-  supplierCodes: Array<{ name: string; code: string }>;
-  supplierPaired: string;
+  /** The second vertical: its suppliers' owners, and how many listings. */
+  suppliers: Array<{ name: string; phone: string }>;
   listings: number;
 }> {
   const db = getPool();
-  // Same instant the API boots to, so the pairing codes below are still live
-  // when someone types one into a tablet.
+  // Same instant the API boots to, so the lunch below is today's lunch there.
   const clock = new DemoClock();
   clock.setTo(DEMO_START);
   const ctx: Ctx = {
@@ -71,8 +70,8 @@ export async function seedDemo(): Promise<{
              dine.order_event, dine.fire_job, dine.arrival_signal, dine.table_hold,
              dine.order_line, dine.station_reservation, dine.dish_review, dine.order_review,
              dine.dining_order, dine.slot, dine.dining_table, dine.menu_item, dine.station,
-             dine.trust_profile, dine.kds_device, dine.restaurant,
-             idesh.order_event, idesh.idesh_order, idesh.listing, idesh.supplier_device,
+             dine.trust_profile, dine.restaurant,
+             idesh.order_event, idesh.idesh_order, idesh.listing,
              idesh.supplier, org.membership_log, org.membership, org.organization, access.org_role,
              identity.profile, identity.guest_session, identity.guest, identity.otp_challenge
     RESTART IDENTITY CASCADE
@@ -81,7 +80,7 @@ export async function seedDemo(): Promise<{
   // guests' wallets are test residue.
   await db.query(`DELETE FROM ledger.account WHERE kind = 'guest'`);
 
-  const pairingCodes: Array<{ name: string; code: string }> = [];
+  const kitchens: Array<{ name: string; phone: string }> = [];
   const venueIds = new Map<string, string>();
   let dishes = 0;
 
@@ -150,21 +149,15 @@ export async function seedDemo(): Promise<{
       );
     }
 
-    const code = await createPairingCode(
-      ctx,
-      restaurantId,
-      'Гал тогооны таблет',
-      PAIRING_TTL_MINUTES,
-    );
-    pairingCodes.push({ name: venue.name, code });
+    // A restaurant is a business; its cook is a person with an account and a
+    // role there, who runs the kitchen signed in as themselves.
+    const phone = cookPhone(kitchens.length + 1);
+    const { guestId: cook } = await startSession(ctx, phone, 'Гал тогоо');
+    await updateProfile(cook, { displayName: `${venue.name} · тогооч` }, ctx.clock.now());
+    const org = await orgForExisting({ name: venue.name, restaurant: true, supplier: false, lat: venue.lat, lon: venue.lon, tin: venue.tin, ownerId: cook, now: ctx.clock.now() });
+    await setRestaurantOrg(restaurantId, org.id);
+    kitchens.push({ name: venue.name, phone });
   }
-
-  // One venue has its tablet on from the start, so the kitchen screen has
-  // something to show. In demo mode the rest take orders anyway: the
-  // is-anyone-watching guard is production behaviour, and here it only turns
-  // a walkthrough into a puzzle.
-  const first = pairingCodes[0]!;
-  await pairDevice(ctx, first.code);
 
   // Yesterday's lunches and what people thought of them. A map of ten venues
   // all reading "үнэлгээ алга" shows the shape of the feature and none of
@@ -181,14 +174,12 @@ export async function seedDemo(): Promise<{
   const idesh = await seedIdesh(ctx, db, dayOf(ctx.clock.now()));
 
   return {
-    pairingCodes: pairingCodes.slice(1),
-    paired: first.name,
+    kitchens,
     venues: VENUES.length,
     dishes,
     reviews: history.reviews,
     walletMnt: wallet,
-    supplierCodes: idesh.codes,
-    supplierPaired: idesh.paired,
+    suppliers: idesh.owners,
     listings: idesh.listings,
   };
 }
@@ -226,24 +217,20 @@ const isEntrypoint = (() => {
 
 if (isEntrypoint) {
   try {
-    const { pairingCodes, paired, venues, dishes, reviews, walletMnt, supplierCodes, supplierPaired, listings } =
-      await seedDemo();
+    const { kitchens, venues, dishes, reviews, walletMnt, suppliers, listings } = await seedDemo();
     const base = process.env['BASU_URL'] ?? `http://localhost:${process.env['PORT'] ?? 3000}`;
 
     console.log(
       `Демо өгөгдөл бэлэн — ${venues} ресторан, ${dishes} хоол, ${reviews} үнэлгээ.\n`,
     );
-    console.log(`  ${paired} — таблет холбогдсон.`);
-    console.log(`  Демо зочин ${DEMO_PHONE} — түрийвчинд ${walletMnt.toLocaleString('mn-MN')}₮.`);
-    console.log('  Бусад нь демо горимд бас захиалга авна.\n');
-    console.log('Өөр ресторанны таблет холбох код:');
-    for (const { name, code } of pairingCodes) {
-      console.log(`  ${name.padEnd(24)} ${code}`);
+    console.log(`  Демо зочин ${DEMO_PHONE} — түрийвчинд ${walletMnt.toLocaleString('mn-MN')}₮.\n`);
+    console.log('Гал тогоо — тогооч өөрийн дугаараар нэвтэрнэ (/kds → «Демо»):');
+    for (const { name, phone } of kitchens) {
+      console.log(`  ${name.padEnd(24)} ${phone}`);
     }
-    console.log(`\nӨвлийн идэш — ${listings} зар. ${supplierPaired} — дэлгэц холбогдсон.`);
-    console.log('Бусад нийлүүлэгчийн дэлгэц холбох код:');
-    for (const { name, code } of supplierCodes) {
-      console.log(`  ${name.padEnd(32)} ${code}`);
+    console.log(`\nӨвлийн идэш — ${listings} зар. Нийлүүлэгчийн эзэн өөрийн дугаараар нэвтэрнэ (/supplier → «Демо»):`);
+    for (const { name, phone } of suppliers) {
+      console.log(`  ${name.padEnd(32)} ${phone}`);
     }
     console.log(`\n  Зочин:        ${base}/`);
     console.log(`  Тогооч:       ${base}/kds`);

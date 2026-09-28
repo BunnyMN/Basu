@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="mn">
+<html lang="mn" data-session="kitchen">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -109,36 +109,31 @@
 .ticket .btns .btn{width:100%}
 .ticket .btns .btn[data-size="lg"]{min-height:56px}
 
-/* ── pairing: one card in the middle of the ground ── */
-.pair{width:min(420px,calc(100% - 2 * var(--gutter)));margin:var(--s-8) auto;padding:var(--s-6);text-align:center}
-.pair > p{margin:6px 0 var(--s-5);color:var(--ink-2)}
-.pair input.code{margin-bottom:var(--s-3)}
-.pair .hint{margin-top:var(--s-5);text-align:left;font-size:var(--t-cap);line-height:1.5;color:var(--ink-2)}
-.pair .hint ul{list-style:none;margin:var(--s-2) 0 0;padding:0}
-.pair .hint li{display:flex;align-items:center;gap:12px;min-height:32px;border-top:1px solid var(--line)}
-.pair .hint code{font-size:var(--t-body);color:var(--ink)}
-.pair .dev{margin:var(--s-5) calc(-1 * var(--s-6)) calc(-1 * var(--s-6));padding-bottom:var(--s-2);border-top:1px solid var(--line);text-align:left}
-.pair .dev > summary{
+/* ── the door: one card in the middle of the ground ── */
+.door{width:min(420px,calc(100% - 2 * var(--gutter)));margin:var(--s-8) auto;padding:var(--s-6)}
+.door > h2{margin-bottom:6px}
+.door > p{margin:0 0 var(--s-5);color:var(--ink-2)}
+.door .dev{margin:var(--s-5) calc(-1 * var(--s-6)) calc(-1 * var(--s-6));padding-bottom:var(--s-2);border-top:1px solid var(--line)}
+.door .dev > summary{
   display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:var(--target);padding:0 var(--s-6);
   list-style:none;cursor:pointer;font-size:var(--t-body);font-weight:500;color:var(--ink-2);
 }
-.pair .dev > summary::-webkit-details-marker{display:none}
-.pair .dev > summary::after{
+.door .dev > summary::-webkit-details-marker{display:none}
+.door .dev > summary::after{
   content:"";width:16px;height:16px;flex:none;background:var(--ink-3);transform:rotate(90deg);transition:transform var(--dur);
   -webkit-mask:var(--mask-chev) center/contain no-repeat;mask:var(--mask-chev) center/contain no-repeat;
 }
-.pair .dev[open] > summary::after{transform:rotate(-90deg)}
-.pair .or{display:block;text-align:center;margin:var(--s-1) 0 var(--s-3)}
-.pair .venues[data-rows]{border:0;border-radius:0;box-shadow:none;background:none;overflow:visible;border-top:1px solid var(--line)}
-.pair .venues > .row{padding-left:var(--s-6);padding-right:var(--s-6)}
-.pair .venues .tag:not(.chip){font-size:var(--t-cap);color:var(--ink-3)}
+.door .dev[open] > summary::after{transform:rotate(-90deg)}
+.door .venues[data-rows]{border:0;border-radius:0;box-shadow:none;background:none;overflow:visible;border-top:1px solid var(--line)}
+.door .venues > .row{padding-left:var(--s-6);padding-right:var(--s-6)}
+.door .venues .tag{font-size:var(--t-cap);color:var(--ink-3)}
 </style>
 </head>
 <body>
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mountClock, hhmm } from '/api.js';
+import { api, store, toast, mountClock, hhmm, signInDoors, authReturn } from '/api.js';
 
 const root = document.getElementById('root');
 const esc = (value) => {
@@ -152,91 +147,56 @@ const el = (html) => {
   return t.content.firstElementChild;
 };
 
-/* ── pairing ─────────────────────────────────────────────────────── */
+/**
+ * Who is at this screen: a person who works at a restaurant, signed in as
+ * themselves — the cook on the tablet by the pass, the manager on a phone.
+ * What they may do is their role there; the dashboard's `/kds?org=…` picks
+ * the restaurant for somebody who works at two. The session is the
+ * kitchen's own (`data-session` on the root), apart from any guest signed in
+ * on the same browser.
+ */
+const ORG = new URLSearchParams(location.search).get('org');
+if (authReturn?.token) store.kitchenToken = authReturn.token;
+const token = () => store.kitchenToken;
+const kitchen = (path, options = {}) => api(path, { ...options, token: token(), headers: ORG ? { 'x-basu-org': ORG } : {} });
 
-async function showPairing() {
-  const [{ devices }, { venues }] = await Promise.all([
-    api('/dev/pairing-codes').catch(() => ({ devices: [] })),
-    api('/dev/venues').catch(() => ({ venues: [] })),
-  ]);
+/* ── the door ────────────────────────────────────────────────────── */
+
+async function showDoor() {
   root.replaceChildren();
-
   const card = el(`
-    <div class="pair card">
-      <h2>Таблетаа холбоно уу</h2>
-      <p>Менежерээс авсан 8 оронтой кодоо оруулна уу.</p>
-      <input class="code" inputmode="numeric" maxlength="8" placeholder="········" aria-label="Холбох код">
-      <button class="btn" data-v="primary" data-size="lg" type="button">Холбох</button>
+    <div class="door card">
+      <h2>Гал тогоо</h2>
+      <p>Өөрийн бүртгэлээр нэвтэрнэ үү. Рестораны эзэн эсвэл менежер танд эрх өгсөн байх ёстой.</p>
+      <div data-doors></div>
     </div>`);
+  card.querySelector('[data-doors]').replaceWith(
+    signInDoors({
+      device: 'Гал тогоо',
+      returnTo: `/kds${location.search}`,
+      keep: false,
+      onToken: (t) => {
+        store.kitchenToken = t;
+        boot();
+      },
+    }),
+  );
 
-  const input = card.querySelector('input');
-  const submit = async () => {
-    try {
-      const { token } = await api('/v1/kds/pair', {
-        method: 'POST',
-        body: { pairing_code: input.value.trim() },
-      });
-      store.deviceToken = token;
-      boot();
-    } catch (error) {
-      toast(error.message, 'bad');
-      input.select();
-    }
-  };
-  card.querySelector('button').addEventListener('click', submit);
-  input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
-
-  if (devices.length) {
-    input.value = devices[0].code;
-    // A list, one row per code: el() keeps only the first element of what it
-    // is given, so a bare "<code> name<br>" used to lose the name.
-    const hint = el('<div class="hint">Холбоогүй ресторанны кодууд:<ul></ul></div>');
-    const list = hint.querySelector('ul');
-    for (const device of devices) {
-      list.append(el(`<li><code>${device.code}</code>${esc(device.name)}</li>`));
-    }
-    card.append(hint);
-  }
-
-  // The demo clock moves in hours and pairing codes expire in minutes, so
-  // typing one is not always possible. Picking a kitchen always is — but it
-  // is a developer's door, so it sits folded under the real one.
-  if (venues.length) {
-    const dev = el(`
-      <details class="dev">
-        <summary>Хөгжүүлэгчийн горим</summary>
-        <div class="or eyebrow">эсвэл демо горимоор</div>
-      </details>`);
+  // A developer's machine: sign in as a seeded restaurant's cook, folded under the real door.
+  const { kitchens } = await api('/dev/kitchens').catch(() => ({ kitchens: [] }));
+  if (kitchens.length) {
+    const dev = el('<details class="dev"><summary>Демо горим</summary></details>');
     const list = el('<div class="venues" data-rows></div>');
-
-    // First, because it is what a walkthrough actually needs: orders placed at
-    // any of the ten venues land on one screen instead of nine of them being
-    // invisible.
-    const all = el(`
-      <button type="button" class="row" data-watched>
-        <span class="main"><span class="title" data-weight="normal">Бүх гал тогоо</span></span>
-        <span class="end"><span class="tag">${venues.length} ресторан</span></span>
-      </button>`);
-    all.addEventListener('click', () => {
-      store.deviceToken = ALL;
-      boot();
-    });
-    list.append(all);
-    for (const venue of venues) {
+    for (const k of kitchens.filter((k) => k.phone)) {
       const button = el(`
-        <button type="button" class="row"${venue.watched ? ' data-watched' : ''}>
-          <span class="main"><span class="title" data-weight="normal">${esc(venue.name)}</span></span>
-          <span class="end"><span class="tag chip" data-inline${venue.watched ? ' data-tone="ready"' : ''}>${
-            venue.watched ? 'захиалга авч байна' : 'хаалттай'
-          }</span></span>
+        <button type="button" class="row">
+          <span class="main"><span class="title" data-weight="normal">${esc(k.name)}</span></span>
+          <span class="end"><span class="tag mn">${esc(k.phone)}</span></span>
         </button>`);
       button.addEventListener('click', async () => {
         try {
-          const { token } = await api('/dev/kds-token', {
-            method: 'POST',
-            body: { restaurant_id: venue.id },
-          });
-          store.deviceToken = token;
+          const { token: t } = await api('/dev/login', { method: 'POST', body: { phone: k.phone, device: 'Гал тогоо' } });
+          store.kitchenToken = t;
           boot();
         } catch (error) {
           toast(error.message, 'bad');
@@ -247,13 +207,23 @@ async function showPairing() {
     dev.append(list);
     card.append(dev);
   }
-
-  if (!devices.length && !venues.length) {
-    card.append(el('<div class="hint">Ресторан алга. <code>npm run seed</code> ажиллуулна уу.</div>'));
-  }
-
   root.append(card);
-  input.focus();
+}
+
+/** Signed in, but not at a restaurant whose kitchen this person may open. */
+function showNotHere() {
+  root.replaceChildren(el(`
+    <div class="door card">
+      <h2>Гал тогоо нээх эрхгүй</h2>
+      <p>Энэ бүртгэл аль ч рестораны ажилтан биш байна. Рестораны эзэн эсвэл менежер dashboard-ын «Ажилтнууд» хэсгээс танд эрх өгнө.</p>
+      <button class="btn" data-size="lg" type="button" id="other">Өөр бүртгэлээр нэвтрэх</button>
+    </div>`));
+  root.querySelector('#other').addEventListener('click', signOut);
+}
+
+function signOut() {
+  store.kitchenToken = null;
+  boot();
 }
 
 /* ── the board ───────────────────────────────────────────────────── */
@@ -264,38 +234,30 @@ const LANES = [
   { key: 'ready', title: 'Бэлэн' },
 ];
 
-/**
- * Which board this screen is showing.
- *
- * A real tablet is paired to one restaurant and sees that one — the token says
- * so and the API enforces it. A walkthrough moves between ten venues, and
- * orders placed at nine of them would be invisible on a screen paired to the
- * tenth, so the demo can watch every kitchen at once.
- */
-const ALL = 'all-kitchens';
-const watchingAll = () => store.deviceToken === ALL;
-
 let lastSeen = 0;
 // The board's clock at the last successful refresh: what a stale screen shows
 // so nobody mistakes an old board for a quiet one.
 let lastNow = '—';
 // On a narrow screen the three lanes take turns; the choice survives a poll.
 let shownLane = 'incoming';
+// Whether this person's role lets them press anything, or only watch.
+let mayAct = false;
 
 function renderBoard(data) {
   const scroll = window.scrollY;
+  mayAct = Boolean(data.may_act);
 
   const frame = el(`
     <div>
       <header class="topbar kds">
         <div class="who">
           <span class="eyebrow">Гал тогоо</span>
-          <h1 id="venue">${watchingAll() ? 'Бүх гал тогоо' : esc(data.watching ?? 'Гал тогоо')}</h1>
+          <h1 id="venue">${esc(data.watching ?? 'Гал тогоо')}</h1>
         </div>
         <span class="conn" id="conn" role="status">холбогдсон</span>
         <div class="act">
           <span class="clock mn">${data.now}</span>
-          <button class="btn" type="button" id="swap">Солих</button>
+          <button class="btn" type="button" id="out">Гарах</button>
         </div>
         <div class="lanes seg" data-fill></div>
       </header>
@@ -334,9 +296,20 @@ function renderBoard(data) {
   }
   board.dataset.show = shownLane;
 
-  frame.querySelector('#swap').addEventListener('click', () => {
-    store.deviceToken = null;
-    showPairing();
+  // Two taps: a stray elbow on the pass must not sign the kitchen out mid-service.
+  const out = frame.querySelector('#out');
+  let armed = null;
+  out.addEventListener('click', () => {
+    if (armed) {
+      clearTimeout(armed);
+      signOut();
+      return;
+    }
+    out.textContent = 'Гарах уу?';
+    armed = setTimeout(() => {
+      armed = null;
+      out.textContent = 'Гарах';
+    }, 4000);
   });
 
   root.replaceChildren(frame);
@@ -380,7 +353,6 @@ function renderTicket(ticket, lane) {
         ${ticket.needs_attention ? '<div class="why">Багтаамж дүүрсэн — гараар шийд</div>' : ''}
       </div>
       <div class="body">
-        ${watchingAll() && ticket.restaurant ? `<div class="where">${esc(ticket.restaurant)}</div>` : ''}
         <div class="meta">${ticket.due_at} · ${ticket.party_size} хүн${
           ticket.guest ? ` · ${esc(ticket.guest)}` : ''
         }${ticket.seated ? ' <span class="chip" data-tone="ready">СУУСАН</span>' : ''}</div>
@@ -390,6 +362,9 @@ function renderTicket(ticket, lane) {
         <div class="btns"></div>
       </div>
     </article>`);
+
+  // A role that only watches the kitchen gets the board without the buttons.
+  if (!mayAct) return node;
 
   const buttons = node.querySelector('.btns');
   const add = (label, action, variant) => {
@@ -404,19 +379,13 @@ function renderTicket(ticket, lane) {
       if (button.dataset.busy) return;
       button.dataset.busy = '1';
       try {
-        await api(
-          watchingAll()
-            ? `/dev/kds/tickets/${ticket.id}/${action}`
-            : `/v1/kds/tickets/${ticket.id}/${action}`,
-          { method: 'POST', token: watchingAll() ? undefined : store.deviceToken, body: {} },
-        );
+        await kitchen(`/v1/kds/tickets/${ticket.id}/${action}`, { method: 'POST', body: {} });
         await refreshBoard();
       } catch (error) {
-        // A revoked or stale tablet must go back to pairing, not sit there
-        // showing "please sign in" over buttons that no longer do anything.
-        if (error.status === 401 && !watchingAll()) {
-          store.deviceToken = null;
-          showPairing();
+        // Signed out elsewhere, or the role taken away: back to the door,
+        // not buttons that no longer do anything.
+        if (error.status === 401 || error.status === 403) {
+          boot();
           return;
         }
         toast(error.message, 'bad');
@@ -442,19 +411,22 @@ function renderTicket(ticket, lane) {
   return node;
 }
 
+/** Whether the board is up: the poll only asks when there is one to redraw. */
+const onBoard = () => Boolean(document.querySelector('.board'));
+
 async function refreshBoard() {
   try {
-    const data = watchingAll()
-      ? await api('/dev/kds/tickets')
-      : await api('/v1/kds/tickets', { token: store.deviceToken });
-    renderBoard(data);
+    renderBoard(await kitchen('/v1/kds/tickets'));
   } catch (error) {
-    if (error.status === 401 && !watchingAll()) {
-      store.deviceToken = null;
-      showPairing();
+    if (error.status === 401) {
+      signOut();
       return;
     }
-    // A tablet that cannot reach us keeps showing the last board it had, and
+    if (error.status === 403) {
+      showNotHere();
+      return;
+    }
+    // A screen that cannot reach us keeps showing the last board it had, and
     // says so — a blank screen mid-service is worse than a stale one.
     const conn = document.getElementById('conn');
     if (conn) {
@@ -472,15 +444,15 @@ async function refreshBoard() {
 /* ── boot ────────────────────────────────────────────────────────── */
 
 function boot() {
-  if (!store.deviceToken) {
-    showPairing();
+  if (!token()) {
+    void showDoor();
     return;
   }
-  refreshBoard();
+  void refreshBoard();
 }
 
 mountClock(() => {
-  if (store.deviceToken) refreshBoard();
+  if (onBoard()) void refreshBoard();
 });
 
 boot();
@@ -488,7 +460,7 @@ boot();
 // The board is the kitchen's only view of what is coming, so it polls — and
 // stops when the page goes away rather than asking on behalf of nobody.
 const poll = setInterval(() => {
-  if (!document.hidden && store.deviceToken) void refreshBoard();
+  if (!document.hidden && onBoard()) void refreshBoard();
 }, 3000);
 addEventListener('pagehide', () => clearInterval(poll));
 void hhmm;

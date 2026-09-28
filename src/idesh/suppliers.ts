@@ -1,7 +1,5 @@
-import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { getPool, tx, type Db } from '../db/pool.js';
-import { addMinutes } from '../domain/time.js';
-import { AuthError, contactsFor, requirePhone } from '../platform/identity/index.js';
+import { contactsFor, requirePhone } from '../platform/identity/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import { orgForExisting, orgsOf, type OrgRole } from '../platform/org/index.js';
 import type { Ctx } from '../ports.js';
@@ -9,24 +7,18 @@ import { IdeshError } from './errors.js';
 import { seal, unseal } from '../secret.js';
 
 /**
- * Suppliers, how one becomes one, and the screens they hold.
+ * Suppliers, and how one becomes one.
  *
  * A supplier is somebody Basu has a contract with — `contracted_at` is what
  * the guest's screen calls «баталгаатай». Two ways in: ops writes the row
- * (by script, or from the ops page), or a person applies from the supplier
- * page with a phone they have proved and ops says yes. Either way the row
- * carries a state, and nothing an unapproved row lists reaches a guest.
+ * (by script, or from the ops page) for a person who already has an
+ * account, or a person applies from the supplier page and ops says yes.
+ * Either way the row carries a state, and nothing an unapproved row lists
+ * reaches a guest.
  *
- * The device half is the kitchen tablet's mechanism in its own table:
- * identity does not know what a supplier is, and dine's table names a
- * restaurant.
+ * Who works there, and at what, is the business's roles — every screen on
+ * the counter is a person signed in with their own account.
  */
-
-const PAIRING_TTL_MINUTES = 10;
-/** A code that goes out by SMS has to survive a day of not being read. */
-const APPROVAL_CODE_TTL_MINUTES = 24 * 60;
-
-const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 
 export type SupplierState = 'applied' | 'contracted' | 'declined';
 
@@ -315,13 +307,10 @@ export interface Application {
   decidedAt: Date | null;
   declineReason: string | null;
   /** A code minted for this supplier that nobody has typed yet. */
-  pairingCode: string | null;
-  /** Whether a screen is already paired — the code has done its job. */
-  paired: boolean;
 }
 
 /** What the applicant sees on the supplier page: the latest thing they asked. */
-export async function applicationOf(ctx: Ctx, guestId: string): Promise<Application | null> {
+export async function applicationOf(_ctx: Ctx, guestId: string): Promise<Application | null> {
   const { rows } = await getPool().query<{
     id: string;
     name: string;
@@ -329,24 +318,15 @@ export async function applicationOf(ctx: Ctx, guestId: string): Promise<Applicat
     applied_at: Date | null;
     decided_at: Date | null;
     decline_reason: string | null;
-    pairing_code: string | null;
-    paired: boolean;
   }>(
-    `SELECT s.id, s.name, s.state, s.applied_at, s.decided_at, s.decline_reason,
-            (SELECT d.pairing_code FROM idesh.supplier_device d
-              WHERE d.supplier_id = s.id AND d.paired_at IS NULL
-                AND d.pairing_code IS NOT NULL AND d.pairing_expires_at > $2
-              ORDER BY d.created_at DESC LIMIT 1) AS pairing_code,
-            EXISTS (SELECT 1 FROM idesh.supplier_device d
-                     WHERE d.supplier_id = s.id AND d.paired_at IS NOT NULL
-                       AND d.revoked_at IS NULL) AS paired
+    `SELECT s.id, s.name, s.state, s.applied_at, s.decided_at, s.decline_reason
        FROM idesh.supplier s
       WHERE s.owner_guest_id = $1
       -- The one that still matters: an open or contracted row over a declined
       -- one, then the newest. Two rows can share an instant on the demo clock.
       ORDER BY (s.state = 'declined') ASC, s.applied_at DESC NULLS LAST
       LIMIT 1`,
-    [guestId, ctx.clock.now()],
+    [guestId],
   );
   const r = rows[0];
   if (!r) return null;
@@ -357,19 +337,17 @@ export async function applicationOf(ctx: Ctx, guestId: string): Promise<Applicat
     appliedAt: r.applied_at,
     decidedAt: r.decided_at,
     declineReason: r.decline_reason,
-    pairingCode: r.pairing_code,
-    paired: r.paired,
   };
 }
 
 /* ── ops decides ───────────────────────────────────────────────────── */
 
 /**
- * Yes. The row becomes a supplier, a code good for a day is minted, and the
- * applicant is told by SMS — the same message a script would have read out
- * over the phone.
+ * Yes. The row becomes a supplier, the applicant its owner, and they are
+ * told by SMS: they sign in to /supplier as themselves, and bring in the
+ * people who work there by giving them roles.
  */
-export async function approveSupplier(ctx: Ctx, supplierId: string): Promise<{ pairingCode: string }> {
+export async function approveSupplier(ctx: Ctx, supplierId: string): Promise<void> {
   const now = ctx.clock.now();
   const approved = await tx(async (client) => {
     const { rows } = await client.query<{ owner_guest_id: string | null; name: string }>(
@@ -385,13 +363,6 @@ export async function approveSupplier(ctx: Ctx, supplierId: string): Promise<{ p
   if (!approved) throw new IdeshError('NOT_PENDING', 'no application is waiting under that id');
   await giveOrganisation(supplierId);
 
-  const pairingCode = await createSupplierCode(
-    ctx,
-    supplierId,
-    'Нийлүүлэгчийн дэлгэц',
-    APPROVAL_CODE_TTL_MINUTES,
-  );
-
   if (approved.owner_guest_id) {
     await enqueue(ctx, {
       guestId: approved.owner_guest_id,
@@ -400,11 +371,10 @@ export async function approveSupplier(ctx: Ctx, supplierId: string): Promise<{ p
       template: 'supplier.approved',
       channel: 'sms',
       title: 'Нийлүүлэгчээр батлагдлаа',
-      body: `Basu: «${approved.name}» нийлүүлэгчээр батлагдлаа. Дэлгэц холбох код: ${pairingCode} (24 цаг). /supplier хуудсанд оруулаад зараа тавина уу.`,
-      dedupeKey: `supplier:${supplierId}:approved:${pairingCode}`,
+      body: `Basu: «${approved.name}» нийлүүлэгчээр батлагдлаа. basu.burzai.cloud/supplier-д өөрийн бүртгэлээр нэвтэрч зараа тавина уу. Ажилтнуудаа «Ажилтнууд» хэсгээс эрх өгч нэмнэ.`,
+      dedupeKey: `supplier:${supplierId}:approved`,
     });
   }
-  return { pairingCode };
 }
 
 /** No, and why. The row stays as the record; the person may ask again. */
@@ -457,8 +427,6 @@ export interface SupplierRow {
   /** Checked against the contract by finance; a changed account is not, until they do. */
   bankVerified: boolean;
   bankChangedAt: Date | null;
-  /** Whether a screen is currently paired — «холбогдсон» on the demo list. */
-  watched: boolean;
   listings: number;
 }
 
@@ -484,15 +452,11 @@ export async function listSuppliers(db: Db = getPool()): Promise<SupplierRow[]> 
     bank_holder: string | null;
     bank_verified_at: Date | null;
     bank_changed_at: Date | null;
-    watched: boolean;
     listings: number;
   }>(
     `SELECT s.id, s.name, s.phone, s.ebarimt_merchant_tin, s.pickup_address, s.about,
             s.lat, s.lon, s.state, s.active, s.applied_at, s.contracted_at, s.decline_reason,
             s.commission_pct, s.bank_name, s.bank_account, s.bank_holder, s.bank_verified_at, s.bank_changed_at,
-            EXISTS (SELECT 1 FROM idesh.supplier_device d
-                     WHERE d.supplier_id = s.id AND d.revoked_at IS NULL
-                       AND d.paired_at IS NOT NULL) AS watched,
             (SELECT count(*)::int FROM idesh.listing l WHERE l.supplier_id = s.id AND l.active) AS listings
        FROM idesh.supplier s
       ORDER BY (s.state = 'applied') DESC, s.applied_at DESC NULLS LAST, s.name`,
@@ -517,7 +481,6 @@ export async function listSuppliers(db: Db = getPool()): Promise<SupplierRow[]> 
     bankHolder: unseal(r.bank_holder),
     bankVerified: r.bank_verified_at !== null,
     bankChangedAt: r.bank_changed_at,
-    watched: r.watched,
     listings: r.listings,
   }));
 }
@@ -650,94 +613,4 @@ export async function updateSupplier(supplierId: string, patch: SupplierPatch, d
     ],
   );
   if (!rowCount) throw new IdeshError('NOT_FOUND', 'no such supplier');
-}
-
-/* ── the supplier's screen ─────────────────────────────────────────── */
-
-/**
- * Ops mints this; the supplier types it once. `ttlMinutes` is a parameter for
- * the same reason as the tablet's: the demo clock jumps hours.
- */
-export async function createSupplierCode(
-  ctx: Ctx,
-  supplierId: string,
-  label: string,
-  ttlMinutes = PAIRING_TTL_MINUTES,
-): Promise<string> {
-  const now = ctx.clock.now();
-  const code = String(randomInt(0, 100_000_000)).padStart(8, '0');
-  await getPool().query(
-    `INSERT INTO idesh.supplier_device (supplier_id, label, pairing_code, pairing_expires_at)
-     VALUES ($1, $2, $3, $4)`,
-    [supplierId, label, code, addMinutes(now, ttlMinutes)],
-  );
-  return code;
-}
-
-export interface SupplierSession {
-  token: string;
-  deviceId: string;
-  supplierId: string;
-}
-
-/** Only a contracted supplier's code opens a screen; an applicant's does not exist yet. */
-export async function pairSupplier(ctx: Ctx, pairingCode: string): Promise<SupplierSession> {
-  const now = ctx.clock.now();
-  const token = randomBytes(32).toString('base64url');
-
-  const { rows } = await getPool().query<{ id: string; supplier_id: string }>(
-    `UPDATE idesh.supplier_device d
-        SET token_hash = $2, paired_at = $3, pairing_code = NULL, last_seen_at = $3
-       FROM idesh.supplier s
-      WHERE d.pairing_code = $1
-        AND d.paired_at IS NULL
-        AND d.pairing_expires_at > $3
-        AND s.id = d.supplier_id AND s.state = 'contracted'
-      RETURNING d.id, d.supplier_id`,
-    [pairingCode, sha256(token), now],
-  );
-  const device = rows[0];
-  if (!device) throw new AuthError('INVALID_CODE', 'that pairing code is not usable');
-
-  return { token, deviceId: device.id, supplierId: device.supplier_id };
-}
-
-export interface SupplierDevice {
-  deviceId: string;
-  supplierId: string;
-}
-
-/** Resolving the token is the heartbeat, as with the tablet. */
-export async function resolveSupplierDevice(
-  ctx: Ctx,
-  token: string,
-): Promise<SupplierDevice | null> {
-  const { rows } = await getPool().query<{ id: string; supplier_id: string }>(
-    `UPDATE idesh.supplier_device SET last_seen_at = $2
-      WHERE token_hash = $1 AND revoked_at IS NULL
-      RETURNING id, supplier_id`,
-    [sha256(token), ctx.clock.now()],
-  );
-  const device = rows[0];
-  return device ? { deviceId: device.id, supplierId: device.supplier_id } : null;
-}
-
-export async function revokeSupplierDevice(deviceId: string, at: Date): Promise<void> {
-  await getPool().query(
-    'UPDATE idesh.supplier_device SET revoked_at = $2, token_hash = NULL WHERE id = $1',
-    [deviceId, at],
-  );
-}
-
-/** The codes minted and not yet typed, for contracted suppliers. Demo only. */
-export async function unpairedCodes(
-  db: Db = getPool(),
-): Promise<Array<{ code: string; name: string; supplierId: string }>> {
-  const { rows } = await db.query<{ code: string; name: string; supplier_id: string }>(
-    `SELECT d.pairing_code AS code, s.name, s.id AS supplier_id
-       FROM idesh.supplier_device d JOIN idesh.supplier s ON s.id = d.supplier_id
-      WHERE d.paired_at IS NULL AND d.pairing_code IS NOT NULL AND s.state = 'contracted'
-      ORDER BY s.name`,
-  );
-  return rows.map((r) => ({ code: r.code, name: r.name, supplierId: r.supplier_id }));
 }

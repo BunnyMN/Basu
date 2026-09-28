@@ -6,7 +6,7 @@ import { mode } from '../../mode.js';
 import type { Ctx } from '../../ports.js';
 
 /**
- * Phone plus a one-time code, and a paired tablet.
+ * Signing in: a phone and a one-time code, an email and a code, and the sessions they open.
  *
  * No passwords anywhere: a guest orders lunch, they should not have to invent
  * a credential to do it. What is stored are hashes — a leaked table must not
@@ -450,7 +450,7 @@ async function mintSession(
  * Who is asking, and a note that they were here.
  *
  * Resolving a token also records the heartbeat — the same trick the kitchen
- * tablets use. Any authenticated call is proof the session is alive, so
+ * screen uses. Any authenticated call is proof the session is alive, so
  * liveness needs no separate ping and cannot drift out of step with real use.
  * It is what makes the session list on the profile screen worth reading.
  */

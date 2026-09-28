@@ -445,7 +445,7 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
 .field > .affix{font-size:inherit;font-weight:400;line-height:inherit;color:inherit;margin-bottom:0}   /* it is a wrapper, not the label */
 .affix > input{padding-right:52px}
 .affix > i{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-style:normal;font-size:var(--t-body);color:var(--ink-3);pointer-events:none}
-/* codes: pairing, OTP, hand-over — one big tracked input, not eight boxes */
+/* codes: sign-in, hand-over — one big tracked input, not eight boxes */
 input.code{width:100%;
   min-height:64px;font-size:2rem;font-weight:600;letter-spacing:.32em;text-indent:.32em;text-align:center;
   background:var(--surface-2);border:1px solid var(--line-2);border-radius:var(--r-md);
@@ -988,8 +988,8 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .story[data-stepper] li[data-k="ready"]::after{background:var(--ready);border-color:var(--ready)}
 
 /* ── code block ───────────────────────────────────────────────────── */
-/* The hand-over code, a pairing code on a status card: solid, high contrast,
-   never a dashed placeholder. */
+/* The hand-over code on a status card: solid, high contrast, never a dashed
+   placeholder. */
 .codebox{display:block;padding:16px;border-radius:var(--r-md);background:var(--surface-2);border:1px solid var(--line);text-align:center;margin:0}
 .codebox .eyebrow,.codebox .lab{display:block;margin:0 0 8px}
 .codebox b{display:block;font-family:var(--mono);font-size:2rem;font-weight:600;letter-spacing:.12em;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;margin:0}

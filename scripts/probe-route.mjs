@@ -89,16 +89,24 @@ await page.waitForFunction(() => document.querySelector('.status'), { timeout: 2
 const code = await page.evaluate(() => document.querySelector('#sheet-name')?.textContent);
 step('order placed', true, code);
 
-// The kitchen takes it, which is when the route is supposed to appear.
+// The kitchen takes it, which is when the route is supposed to appear: a
+// cook signs in as themselves and accepts the ticket on their own board.
 const orderId = await page.evaluate(async () => {
-  const board = await (await fetch('/dev/kds/tickets')).json();
-  const all = [...board.lanes.incoming, ...board.lanes.cooking, ...board.lanes.ready];
-  return all[0]?.id ?? null;
+  const { kitchens } = await (await fetch('/dev/kitchens')).json();
+  for (const k of kitchens.filter((x) => x.phone)) {
+    const { token } = await (
+      await fetch('/dev/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone: k.phone }) })
+    ).json();
+    const auth = { authorization: `Bearer ${token}` };
+    const board = await (await fetch('/v1/kds/tickets', { headers: auth })).json();
+    const ticket = board.lanes?.incoming?.[0];
+    if (ticket) {
+      await fetch(`/v1/kds/tickets/${ticket.id}/accept`, { method: 'POST', headers: auth });
+      return ticket.id;
+    }
+  }
+  return null;
 });
-await page.evaluate(
-  (id) => fetch(`/dev/kds/tickets/${id}/accept`, { method: 'POST' }),
-  orderId,
-);
 await new Promise((r) => setTimeout(r, 6000));
 
 const drawn = await page.evaluate(() => {

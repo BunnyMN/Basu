@@ -26,7 +26,7 @@ try {
   check('X-Frame-Options: DENY', h.get('x-frame-options') === 'DENY');
   check('Referrer-Policy', Boolean(h.get('referrer-policy')));
 
-  for (const path of ['/dev/ops-token', '/dev/clock', '/dev/suppliers', '/dev/supplier-codes']) {
+  for (const path of ['/dev/ops-token', '/dev/clock', '/dev/suppliers', '/dev/kitchens']) {
     const r = await head(path);
     check(`демо зам хаалттай ${path}`, r.status === 404, `HTTP ${r.status}`);
   }
