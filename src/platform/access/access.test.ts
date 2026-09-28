@@ -139,7 +139,7 @@ describe('the menu', () => {
     const finance = grantsOf(builtin('desk', 'finance'));
     const menu = buildMenu('desk', layoutOf('desk'), finance);
     expect(menu.map((g) => g.label)).toEqual([null, 'Платформ', 'Идэш', 'Байгууллага', 'Удирдлага']);
-    expect(pagesOf(menu)).toEqual(['overview', 'guests', 'money', 'stats', 'orders', 'suppliers', 'pay', 'orgs', 'audit']);
+    expect(pagesOf(menu)).toEqual(['overview', 'guests', 'money', 'stats', 'orders', 'suppliers', 'pay', 'promotions', 'orgs', 'audit']);
     expect(menu.find((g) => g.key === 'idesh')?.icon).toBe('stall');
   });
 

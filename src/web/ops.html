@@ -1852,7 +1852,7 @@ const remembered = (w) => {
 const DESK_PAGES = {
   overview: renderOverview, guests: renderGuests, money: renderMoney, notify: renderNotify, system: renderSystem,
   venues: renderVenues, lunches: renderLunches, reviews: renderReviews,
-  stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay,
+  stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, promotions: renderPromotions,
   orgs: renderOrgsDesk, members: renderMembers, roles: renderRoles, menus: renderMenus, audit: renderAudit,
 };
 const ORG_PAGES = { home: renderOrgHome, team: renderOrgTeam, profile: renderOrgProfile, roles: renderOrgRoles, log: renderOrgLog };
@@ -3859,6 +3859,108 @@ function settlementTable(rows, withFilters = true) {
   });
 }
 
+/* ── listings put first, paid to Basu ── */
+
+/** Where one purchase stands, as the desk reads it, and the tone of its pill. */
+const PROMO_STANDING = {
+  live: ['active', 'Идэвхтэй'],
+  pending: ['pending', 'Төлбөр хүлээж буй'],
+  over: ['CLOSED', 'Дууссан'],
+  ended: ['declined', 'Зогсоосон'],
+  cancelled: ['CANCELLED', 'Төлөгдөөгүй'],
+};
+
+/**
+ * Every tier a supplier bought: what, for how long, for how much, who paid,
+ * and whether it holds now. The price and the days are the system page's
+ * settings; the one thing done here is taking a promotion off, with a reason.
+ */
+async function renderPromotions(view) {
+  const manages = can('desk.promotions:manage');
+  view.append(
+    head('Онцлох зар', 'Нийлүүлэгчийн Basu-д төлж онцолсон зарууд. Үнэ, хоногийг «Систем» хуудасны тохиргооноос өөрчилнө.'),
+  );
+  const band = el('<div class="kpis kpi-band" id="promo-kpis"></div>');
+  view.append(el('<section class="section"></section>'));
+  view.lastElementChild.append(band);
+  const table = dataTable({
+    columns: [
+      { key: 'created_at', label: 'Хэзээ', render: (p) => dtCell.when(p.created_at) },
+      { key: 'listing', label: 'Зар', value: (p) => `${p.listing_title} ${p.supplier_name}`, render: (p) => dtCell.two(p.listing_title, p.supplier_name) },
+      {
+        key: 'tier',
+        label: 'Зэрэглэл',
+        value: (p) => p.name,
+        render: (p) => dtCell.twoHtml(`<span class="pill" data-tone="${p.tier === 'vip' ? 'hi' : 'accent'}" data-strong>${p.tier === 'vip' ? '★ VIP' : 'Онцгой'}</span>`, `${p.days} хоног`),
+      },
+      { key: 'price_mnt', label: 'Үнэ', render: (p) => dtCell.money(p.price_mnt) },
+      { key: 'buyer', label: 'Төлсөн', value: (p) => `${p.buyer ?? ''} ${p.buyer_contact ?? ''}`, render: (p) => dtCell.two(p.buyer ?? 'Нэргүй', p.buyer_contact ?? '') },
+      { key: 'ends_at', label: 'Хүртэл', render: (p) => (p.ends_at ? dtCell.when(p.ends_at) : dtCell.none()) },
+      {
+        key: 'standing',
+        label: 'Төлөв',
+        value: (p) => PROMO_STANDING[p.standing]?.[1] ?? p.standing,
+        render: (p) => {
+          const [tone, word] = PROMO_STANDING[p.standing] ?? [p.standing, p.standing];
+          return `${dtCell.pill(tone, word)}${p.ended_note ? `<small class="dt-text">${esc(p.ended_note)}</small>` : ''}`;
+        },
+      },
+    ],
+    search: { placeholder: 'Зар, нийлүүлэгч, худалдан авагч…' },
+    filters: [
+      {
+        key: 'standing',
+        label: 'Төлөв',
+        kind: 'seg',
+        options: [['', 'Бүгд'], ['live', 'Идэвхтэй'], ['pending', 'Төлбөр хүлээж буй'], ['over', 'Дууссан']],
+        test: (p, v) => !v || p.standing === v,
+      },
+      { key: 'tier', label: 'Зэрэглэл', kind: 'select', options: [['', 'Бүх зэрэглэл'], ['vip', 'VIP'], ['featured', 'Онцгой']], test: (p, v) => !v || p.tier === v },
+    ],
+    actions: (p) => {
+      if (!manages || !['live', 'pending'].includes(p.standing)) return null;
+      return button(
+        p.standing === 'pending' ? 'Цуцлах' : 'Зогсоох',
+        () =>
+          confirmPopup({
+            title: p.standing === 'pending' ? 'Нэхэмжлэхийг цуцлах' : 'Онцлолтыг зогсоох',
+            text: `<b>${esc(p.listing_title)}</b> (${esc(p.supplier_name)}) — ${p.tier === 'vip' ? 'VIP' : 'Онцгой'}. ${
+              p.standing === 'pending' ? 'Төлөгдөөгүй нэхэмжлэх цуцлагдана.' : 'Зар шууд энгийн болно. Мөнгө буцаах бол санхүү гараар шийднэ.'
+            }`,
+            ok: p.standing === 'pending' ? 'Цуцлах' : 'Зогсоох',
+            danger: true,
+            reason: { label: 'Шалтгаан', placeholder: 'Жишээ нь: зар дүрэм зөрчсөн', required: true },
+            onConfirm: async (note) => {
+              await ops(`/v1/ops/promotions/${p.id}/end`, { method: 'POST', body: { note } });
+              toast('Онцлолт зогслоо.', 'good');
+              show('promotions');
+            },
+          }),
+        'data-size="sm" data-a="end"',
+      );
+    },
+    rowAttrs: (p) => ({ 'data-promotion': p.id }),
+    sort: { key: 'created_at', desc: true },
+    noun: 'онцлолт',
+    empty: { title: 'Онцлох зар алга', text: 'Нийлүүлэгч зараа онцлоход энд гарна.' },
+    stateKey: 'basu.dt.promotions',
+  });
+  table.el.id = 'promotions';
+  view.append(table.el);
+  try {
+    const { summary, promotions } = await ops('/v1/ops/promotions');
+    band.replaceChildren(
+      el(`<div class="card kpi"><div class="lab">Одоо онцлогдсон</div><b>${summary.live}</b><span>үүнээс VIP ${summary.live_vip}</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Сүүлийн 30 хоногийн орлого</div><b>${money(summary.revenue_30d_mnt)}</b><span>онцлох зарын төлбөр</span></div>`),
+      el(`<div class="card kpi"${summary.pending ? ' data-tone="warn"' : ''}><div class="lab">Төлбөр хүлээж буй</div><b>${summary.pending}</b><span>нэхэмжлэх гарсан, төлөгдөөгүй</span></div>`),
+    );
+    table.setRows(promotions);
+  } catch (error) {
+    toast(error.message, 'bad');
+    table.setRows([]);
+  }
+}
+
 function renderPay(view) {
   const due = cache.settlements.filter((t) => t.state === 'due');
   const waiting = cache.settlements.filter((t) => t.state === 'needs_account');
@@ -3892,13 +3994,14 @@ const ACTION = {
   'role.create': 'Эрх үүсгэсэн', 'role.update': 'Эрх өөрчилсөн', 'role.delete': 'Эрх устгасан',
   'menu.save': 'Цэс өөрчилсөн', 'menu.module': 'Модуль нэмсэн', 'menu.module_remove': 'Модуль устгасан', 'menu.link': 'Холбоос нэмсэн', 'menu.link_remove': 'Холбоос устгасан',
   'setting.change': 'Тохиргоо өөрчилсөн',
+  'promotion.end': 'Онцлолт зогсоосон',
 };
 
 /** What an action was done to, in the words of the desk's own sections. */
 const TARGET_WORD = {
   order: 'Идэш', listing: 'Идэш', supplier: 'Нийлүүлэгч', settlement: 'Мөнгө', ledger: 'Мөнгө', receipt: 'Мөнгө', guest: 'Зочин',
   member: 'Гишүүд', org: 'Байгууллага', role: 'Эрх, цэс', menu: 'Эрх, цэс', restaurant: 'Хоол', device: 'Хоол', menu_item: 'Хоол',
-  message: 'Мэдэгдэл', setting: 'Систем',
+  message: 'Мэдэгдэл', setting: 'Систем', promotion: 'Онцлох зар',
 };
 
 async function renderAudit(view) {

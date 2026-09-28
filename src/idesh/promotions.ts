@@ -198,3 +198,49 @@ async function activate(ctx: Ctx, id: string, transferId: string | null): Promis
     );
   });
 }
+
+/* ── the desk ─────────────────────────────────────────────────────── */
+
+export interface DeskPromotion extends Promotion {
+  supplierName: string;
+  endedBy: string | null;
+  endedNote: string | null;
+}
+
+/** Every purchase, newest first, for the desk: who bought what, and what came of it. */
+export async function promotionsForDesk(opts: { limit?: number } = {}, db: Db = getPool()): Promise<DeskPromotion[]> {
+  const { rows } = await db.query<Row & { supplier_name: string; ended_by: string | null; ended_note: string | null }>(
+    `SELECT p.id, p.listing_id, l.title, p.supplier_id, p.tier, p.days, p.price_mnt, p.state,
+            p.bought_by, p.topup_id, p.starts_at, p.ends_at, p.paid_at, p.created_at,
+            s.name AS supplier_name, p.ended_by, p.ended_note
+       FROM idesh.promotion p
+       JOIN idesh.listing l ON l.id = p.listing_id
+       JOIN idesh.supplier s ON s.id = p.supplier_id
+      ORDER BY p.created_at DESC
+      LIMIT $1`,
+    [Math.min(Math.max(opts.limit ?? 500, 1), 2000)],
+  );
+  return rows.map((r) => ({ ...shape(r), supplierName: r.supplier_name, endedBy: r.ended_by, endedNote: r.ended_note }));
+}
+
+/**
+ * The desk takes a promotion off: an unpaid invoice is cancelled, a paid
+ * tier stops now. The reason is kept on the row and in the desk's record;
+ * any money back is a person's decision, made by hand.
+ */
+export async function endPromotion(input: { id: string; at: Date; by: string; note: string }, db: Db = getPool()): Promise<Promotion> {
+  const { rows } = await db.query<{ id: string }>(
+    `UPDATE idesh.promotion
+        SET state = 'cancelled', ended_by = $3, ended_note = $4,
+            ends_at = CASE WHEN ends_at IS NULL THEN NULL ELSE LEAST(ends_at, $2) END
+      WHERE id = $1 AND (state = 'pending' OR (state = 'active' AND ends_at > $2))
+      RETURNING id`,
+    [input.id, input.at, input.by, input.note],
+  );
+  if (!rows[0]) {
+    const found = await promotion(input.id, db);
+    if (!found) throw new IdeshError('NOT_FOUND', 'no such promotion');
+    throw new IdeshError('WRONG_STATE', 'the promotion has already ended');
+  }
+  return (await promotion(input.id, db))!;
+}

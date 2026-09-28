@@ -38,6 +38,7 @@ import { overviewAt } from './overview.js';
 import { closeGuest, guestFile, guestSearch } from './guests.js';
 import { registerDineDesk } from './dineDesk.js';
 import { registerMoneyDesk } from './moneyDesk.js';
+import { registerPromotionsDesk } from './promotionsDesk.js';
 import { registerSystemDesk } from './systemDesk.js';
 import { registerAccessDesk } from './accessDesk.js';
 import { revokeSession } from '../platform/identity/index.js';
@@ -625,6 +626,7 @@ export async function registerOpsRoutes(
 
   registerDineDesk(app, ctx, { desk, deskAny, who });
   registerMoneyDesk(app, ctx, { desk, who });
+  registerPromotionsDesk(app, ctx, { desk, who });
   registerSystemDesk(app, ctx, { desk, who });
   registerAccessDesk(app, ctx, { desk, deskAny, who });
 
