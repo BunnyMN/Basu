@@ -12,7 +12,7 @@
 <style>
 /* The market, for a browser: every stall on one screen as a card with its
    picture and its price, a filter by animal, and a stall's own page with the
-   order beside it. Signed in only — the server holds to that too. */
+   order beside it. Open to anybody; paying asks who you are. */
 
 .sh-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:20px 40px}
 .sh-trust{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
@@ -119,10 +119,10 @@
 </main>
 
 <script type="module">
-import { mnt, KIND, dayLabel } from '/api.js';
-import { mountFrame, requireSignIn, authed, esc, el, say } from '/site.js';
+import { api, store, mnt, KIND, dayLabel } from '/api.js';
+import { mountFrame, authed, loginUrl, esc, el, say } from '/site.js';
 
-const token = requireSignIn();
+// Open to anybody: the stalls are shown to all, and only paying asks who you are.
 void mountFrame('shop');
 const page = document.getElementById('page');
 
@@ -252,7 +252,15 @@ const earliest = (l) => (l.ready_from > market.today ? l.ready_from : market.tod
 
 function drawStall(l) {
   document.title = `${l.title} — Basu`;
-  const form = { qty: l.min_qty, receive: 'pickup', receiveOn: earliest(l), address: '', phone: '' };
+  // A form filled before signing in comes back filled after it.
+  const kept = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem(`basu.shop.${l.id}`) ?? 'null');
+    } catch {
+      return null;
+    }
+  })();
+  const form = { qty: l.min_qty, receive: 'pickup', receiveOn: earliest(l), address: '', phone: '', ...(kept ?? {}) };
   const step = l.unit === 'whole' ? 1 : 5;
   const total = () => l.price_mnt * form.qty + (form.receive === 'delivery' ? l.delivery_fee_mnt : 0);
   const gone = l.remaining === 0;
@@ -386,7 +394,7 @@ function drawStall(l) {
               <div class="total"><span>Нийт төлөх</span><span class="s-money">${mnt(total())}</span></div>
             </div>
             <div class="sd-actions">
-              <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="button" id="pay">Төлөх · ${mnt(total())}</button>
+              <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="button" id="pay">${store.guestToken ? `Төлөх · ${mnt(total())}` : 'Нэвтэрч төлөх →'}</button>
               <button class="s-btn s-btn-line s-btn-block" type="button" id="edit">Засах</button>
             </div>
             <p class="s-error" id="pay-error" role="alert"></p>
@@ -395,6 +403,16 @@ function drawStall(l) {
     );
     buy.querySelector('#edit').addEventListener('click', paintForm);
     buy.querySelector('#pay').addEventListener('click', async (event) => {
+      // Somebody browsing without an account signs in here, and comes back to this order.
+      if (!store.guestToken) {
+        try {
+          sessionStorage.setItem(`basu.shop.${l.id}`, JSON.stringify(form));
+        } catch {
+          // Without storage the form is filled again, that is all.
+        }
+        location.href = loginUrl(`/shop/${l.id}`);
+        return;
+      }
       const button = event.currentTarget;
       if (button.hasAttribute('data-busy')) return;
       button.setAttribute('data-busy', '');
@@ -413,6 +431,11 @@ function drawStall(l) {
           },
         });
         await authed(`/v1/idesh/${order.id}/pay`, { method: 'POST' });
+        try {
+          sessionStorage.removeItem(`basu.shop.${l.id}`);
+        } catch {
+          // nothing kept
+        }
         location.href = `/orders/${order.id}?new=1`;
       } catch (error) {
         button.removeAttribute('data-busy');
@@ -427,33 +450,29 @@ function drawStall(l) {
 /* ── which page this is ────────────────────────────────────────────── */
 
 async function load() {
-  market = await authed('/v1/idesh/listings');
+  market = await api('/v1/idesh/listings');
 }
 
 const stallId = location.pathname.match(/^\/shop\/([0-9a-f-]{36})$/)?.[1];
-if (token) {
-  if (stallId) {
-    try {
-      const [{ listing, today }] = await Promise.all([authed(`/v1/idesh/listings/${stallId}`), load()]);
-      market.today = today;
-      drawStall(listing);
-    } catch (error) {
-      if (error.status !== 401) {
-        page.replaceChildren(
-          el(`<a class="s-crumb" href="/shop">${MARK.back}Бүх зар</a>`),
-          el('<div class="s-empty"><b>Зар олдсонгүй</b>Устгагдсан эсвэл нуугдсан байж магадгүй.<br><a class="s-btn s-btn-dark" href="/shop">Бүх зар</a></div>'),
-        );
-      }
-    }
-  } else {
-    drawMarket();
-    try {
-      await load();
-      paintKinds();
-      paintGrid();
-    } catch (error) {
-      if (error.status !== 401) say(error.message, 'bad');
-    }
+if (stallId) {
+  try {
+    const [{ listing, today }] = await Promise.all([api(`/v1/idesh/listings/${stallId}`), load()]);
+    market.today = today;
+    drawStall(listing);
+  } catch {
+    page.replaceChildren(
+      el(`<a class="s-crumb" href="/shop">${MARK.back}Бүх зар</a>`),
+      el('<div class="s-empty"><b>Зар олдсонгүй</b>Устгагдсан эсвэл нуугдсан байж магадгүй.<br><a class="s-btn s-btn-dark" href="/shop">Бүх зар</a></div>'),
+    );
+  }
+} else {
+  drawMarket();
+  try {
+    await load();
+    paintKinds();
+    paintGrid();
+  } catch (error) {
+    say(error.message, 'bad');
   }
 }
 </script>

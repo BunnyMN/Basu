@@ -781,19 +781,14 @@ describe('the front page', () => {
     expect(text('kg')).toBe('60 кг');
   });
 
-  it('keeps the stalls from somebody not signed in', async () => {
+  it('shows the stalls to anybody, signed in or not', async () => {
     storage.removeItem('basu.guest');
-    const asked: string[] = [];
-    const dom = await openPage('index.html', '', (path) => {
-      asked.push(path);
-      return undefined;
-    });
+    const dom = await openPage('index.html');
     const d = dom.window.document;
-    await until(dom, 'the sums', () => d.getElementById('kg')?.textContent === '112 кг');
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    expect(asked.filter((path) => path.startsWith('/v1/idesh/listings'))).toEqual([]);
-    expect((d.getElementById('board') as HTMLElement).hidden).toBe(true);
-    expect([...d.querySelectorAll('.animal .ktag')].map((t) => t.textContent)).toEqual(['', '', '', '']);
+    await until(dom, 'the stall board', () => !(d.getElementById('board') as HTMLElement).hidden);
+    expect(d.querySelectorAll('.stall').length).toBeGreaterThan(0);
+    // The count on each animal a stall sells.
+    expect([...d.querySelectorAll('.animal .ktag')].some((t) => /^\d+ зар$/.test(t.textContent ?? ''))).toBe(true);
   });
 
   it('shows what is on sale from the stalls, and nothing it made up', async () => {
@@ -881,16 +876,20 @@ describe('the website', () => {
     expect(home.window.document.querySelector(`[data-order="${made.id}"]`)?.getAttribute('href')).toBe(`/orders/${made.id}`);
   });
 
-  it('keeps the market from somebody not signed in, and asks for no listing', async () => {
+  it('shows the market to anybody, and asks who you are only to pay', async () => {
     storage.removeItem('basu.guest');
-    const asked: string[] = [];
-    const dom = await openPage('shop.html', '', (path) => {
-      asked.push(path);
-      return undefined;
-    });
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    expect(asked.filter((path) => path.startsWith('/v1/idesh'))).toEqual([]);
-    expect(dom.window.document.querySelectorAll('.sh-card')).toHaveLength(0);
+    const market = await openPage('shop.html');
+    const d = market.window.document;
+    await until(market, 'the cards', () => d.querySelectorAll('.sh-card').length >= seeded.listings);
+    await until(market, 'the way in', () => Boolean(d.querySelector('#s-account a[href^="/login"]')));
+
+    const id = [...d.querySelectorAll('.sh-card')].find((c) => !c.hasAttribute('data-gone'))!.getAttribute('data-id')!;
+    const stall = await openPage('shop.html', `/${id}`);
+    const s = stall.window.document;
+    await until(stall, 'the order form', () => Boolean(s.getElementById('next')));
+    (s.getElementById('next') as HTMLButtonElement).click();
+    await until(stall, 'the review', () => Boolean(s.getElementById('pay')));
+    expect(s.getElementById('pay')?.textContent).toBe('Нэвтэрч төлөх →');
   });
 
   it('shows the market as cards, filters it, and orders from a stall', async () => {
