@@ -120,6 +120,27 @@ final class Platform {
     }
   }
 
+  /**
+   Out on this phone, and on the server too.
+
+   The phone forgets its token at once, so the way in is on screen without
+   waiting for the network; the session it named is ended behind that, with
+   the token kept in hand for the one call. Left alone it stayed on the
+   server for sixty days, and every sign-out and sign-in added one more row
+   to «Нэвтэрсэн төхөөрөмж».
+   */
+  func signOut() {
+    let token = session.token
+    session.signOut()
+    sessions = []
+    guard let token else { return }
+    let api = self.api
+    Task {
+      guard let mine = try? await api.sessions(token: token).first(where: \.current) else { return }
+      try? await api.revokeSession(mine.id, token: token)
+    }
+  }
+
   @discardableResult
   func signOutOtherDevices() async -> Int {
     guard let token = session.token else { return 0 }

@@ -15,6 +15,17 @@ struct DemoAPI {
     let token: String
   }
 
+  /// The demo guest's session, for asking what only somebody signed in may
+  /// see — the idesh stalls, since ab9fefb.
+  func guestToken(device: String? = nil) async throws -> String {
+    var body: [String: Any] = ["phone": "+97699001122"]
+    if let device { body["device"] = device }
+    guard let token = try await post("/dev/login", body)["token"] as? String else {
+      throw XCTSkip("The demo server did not sign the demo guest in.")
+    }
+    return token
+  }
+
   /// Skips the calling test when nothing is listening.
   func requireServer() async throws {
     var request = URLRequest(url: base.appendingPathComponent("/health"))
@@ -35,9 +46,7 @@ struct DemoAPI {
   /// tests that need one skip rather than fail — the app is not wrong at
   /// two in the afternoon, the demo day is.
   func runningOrder(onTheWall: Bool = false) async throws -> Running {
-    guard let token = try await post("/dev/login", ["phone": "+97699001122"])["token"] as? String else {
-      throw XCTSkip("The demo server did not sign the demo guest in.")
-    }
+    let token = try await guestToken()
     let live = try await list("/v1/orders", token: token, key: "orders")
     let running = ["PLACED", "ACCEPTED", "SCHEDULED", "ARMED", "HELD", "RESLOTTED", "FIRED", "COOKING", "READY"]
     let soonest = Date().addingTimeInterval(20 * 60)

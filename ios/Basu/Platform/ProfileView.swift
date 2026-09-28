@@ -46,7 +46,7 @@ struct ProfileView: View {
         fields
         settings
         notifications
-        devices
+        DevicesSection(confirmingOthers: $signingOutOthers)
         help
         signOut
         closeAccount
@@ -67,7 +67,7 @@ struct ProfileView: View {
       }
     }
     .confirmationDialog(
-      "Бусад төхөөрөмжөөс гарах уу?",
+      "Бусад бүх төхөөрөмжөөс гарах уу?",
       isPresented: $signingOutOthers,
       titleVisibility: .visible,
     ) {
@@ -430,61 +430,6 @@ struct ProfileView: View {
     .sensoryFeedback(.selection, trigger: isOn)
   }
 
-  // MARK: - where you are signed in
-
-  /**
-   Not a feature until a phone is lost, and then the only one that matters.
-
-   It is here so that day needs nobody's help: no email, no support queue, no
-   waiting sixty days for a token to expire on its own.
-   */
-  @ViewBuilder private var devices: some View {
-    if !platform.sessions.isEmpty {
-      VStack(alignment: .leading, spacing: 11) {
-        SectionLabel("Нэвтэрсэн төхөөрөмж")
-        VStack(spacing: 0) {
-          ForEach(Array(platform.sessions.enumerated()), id: \.element.id) { index, device in
-            if index > 0 { Hairline() }
-            deviceRow(device)
-          }
-        }
-        .glassCard()
-
-        if platform.sessions.count > 1 {
-          Button("Бусад бүхнээс гарах") { signingOutOthers = true }
-            .font(.sans(13, .medium))
-            .foregroundStyle(Color.accent)
-            .accessibilityIdentifier("profile.revokeothers")
-        }
-      }
-    }
-  }
-
-  private func deviceRow(_ device: DeviceSession) -> some View {
-    HStack(spacing: 12) {
-      VStack(alignment: .leading, spacing: 3) {
-        Text(device.name)
-          .font(.sans(15, device.current ? .semibold : .regular))
-          .foregroundStyle(Color.ink)
-          .fixedSize(horizontal: false, vertical: true)
-        Text(device.current
-          ? "Энэ утас"
-          : "Сүүлд \(Format.when(device.lastSeenAt ?? device.createdAt))")
-          .font(.mono(11))
-          .foregroundStyle(Color.ink3)
-      }
-      Spacer(minLength: 8)
-      if !device.current {
-        Button("Гаргах") { Task { await platform.signOutDevice(device) } }
-          .font(.sans(13, .medium))
-          .foregroundStyle(Color.stop)
-      }
-    }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 14)
-    .accessibilityIdentifier("profile.device")
-  }
-
   // MARK: - the footer everything else lives in
 
   /// The terms and the privacy policy are the pages the server serves
@@ -579,7 +524,7 @@ struct ProfileView: View {
 
   private var signOut: some View {
     Button {
-      session.signOut()
+      platform.signOut()
       Task {
         await model.refreshLive()
         await platform.refresh()

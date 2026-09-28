@@ -86,8 +86,11 @@ final class IdeshFlowTests: XCTestCase {
 
   // MARK: what the server says is possible right now
 
+  /// Asked as the demo guest: a stranger is refused the stalls (401).
   private func requireStalls() async throws {
-    let (data, _) = try await URLSession.shared.data(from: base.appendingPathComponent("/v1/idesh/listings"))
+    var request = URLRequest(url: base.appendingPathComponent("/v1/idesh/listings"))
+    request.setValue("Bearer \(try await server.guestToken())", forHTTPHeaderField: "authorization")
+    let (data, _) = try await URLSession.shared.data(for: request)
     let json = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
     guard let listings = json["listings"] as? [[String: Any]], !listings.isEmpty else {
       throw XCTSkip("No stalls are listed; run `npm run seed`.")

@@ -258,7 +258,7 @@ struct SignInSheet: View {
         }
       }
       WideButton(title: "Гарах", kind: .danger) {
-        session.signOut()
+        platform.signOut()
         Task { await model.refreshLive() }
         dismiss()
       }

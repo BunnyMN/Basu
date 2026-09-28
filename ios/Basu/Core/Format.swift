@@ -89,6 +89,18 @@ enum Format {
 
   /// The time if it happened today, the date if it did not. What a list of
   /// things that happened needs, and nothing more.
+  /// When a device was last seen, the way somebody would say it: «саяхан»,
+  /// «өнөөдөр 11:40», «өчигдөр 18:05», or the day.
+  static func seen(_ date: Date, now: Date = .now) -> String {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "Asia/Ulaanbaatar") ?? .current
+    if now.timeIntervalSince(date) < 5 * 60 { return "саяхан" }
+    if calendar.isDate(date, inSameDayAs: now) { return "өнөөдөр \(hhmm(date))" }
+    if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
+       calendar.isDate(date, inSameDayAs: yesterday) { return "өчигдөр \(hhmm(date))" }
+    return day.string(from: date)
+  }
+
   static func when(_ date: Date) -> String {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(identifier: "Asia/Ulaanbaatar") ?? .current
