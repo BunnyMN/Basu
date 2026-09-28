@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="mn" data-theme="light" data-site>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
+<title>Нэвтрэх — Basu</title>
+<meta name="description" content="Basu-д нэвтэрч өвлийн идшээ захиалаарай.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="/brand/favicon.png">
+<link rel="preload" as="image" href="/brand/meat/hero-square.webp">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/site.css">
+<style>
+/* The door. Half the screen is the meat, on black, and says what Basu is;
+   the other half asks one thing at a time — an address, then the code that
+   went to it — and nothing else. On a phone the picture becomes a band. */
+
+.l{flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-height:100vh}
+.l-art{position:relative;overflow:hidden;background:#0E0E0D;color:#fff}
+.l-art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:46% 50%}
+.l-art::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(14,14,13,.55) 0%,rgba(14,14,13,0) 28%,rgba(14,14,13,0) 52%,rgba(14,14,13,.85) 100%)}
+.l-art .s-word{position:absolute;z-index:1;top:32px;left:40px;color:#fff;font-size:1.5rem}
+.l-say{position:absolute;z-index:1;left:40px;right:40px;bottom:44px}
+.l-say b{display:block;font-size:clamp(2.2rem,3.6vw,3.25rem);font-weight:600;line-height:1.02;letter-spacing:-.035em}
+.l-say span{display:block;margin-top:14px;max-width:26em;font-size:1rem;line-height:1.6;color:rgba(255,255,255,.72)}
+
+.l-pane{display:flex;flex-direction:column;padding:28px clamp(24px,5vw,72px) 32px}
+.l-top{display:flex;justify-content:space-between;align-items:center;min-height:40px}
+.l-top .s-word{visibility:hidden}
+.l-home{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-size:.875rem;font-weight:500;color:var(--ink-2);text-decoration:none}
+.l-home svg{width:16px;height:16px}
+@media (hover:hover){.l-home:hover{color:var(--ink)}}
+.l-body{flex:1;display:flex;flex-direction:column;justify-content:center;width:100%;max-width:400px;margin:0 auto;padding:40px 0}
+.l-body h1{margin:0;font-size:2rem;line-height:1.1;letter-spacing:-.03em}
+.l-lead{margin:10px 0 28px;font-size:1rem;line-height:1.6;color:var(--ink-2)}
+.l-lead b{color:var(--ink);overflow-wrap:anywhere}
+.l-google svg{width:20px;height:20px}
+.l-or{display:flex;align-items:center;gap:14px;margin:22px 0;font-size:.8125rem;color:var(--ink-3)}
+.l-or::before,.l-or::after{content:"";flex:1;height:1px;background:var(--line)}
+.l-alt{display:flex;justify-content:center;gap:20px;margin:22px 0 0;font-size:.9375rem}
+.l-step[hidden]{display:none}
+.l-back{display:inline-flex;align-items:center;gap:6px;margin:0 0 22px;padding:0;border:0;background:none;font:inherit;font-size:.875rem;font-weight:500;color:var(--ink-2);cursor:pointer}
+.l-back svg{width:16px;height:16px}
+@media (hover:hover){.l-back:hover{color:var(--ink)}}
+.l-legal{margin:36px 0 0;font-size:.8125rem;line-height:1.6;color:var(--ink-3)}
+.l-legal a{color:var(--ink-2);text-decoration:underline;text-underline-offset:.2em}
+
+/* six boxes for the code: one real input over them, so paste and the
+   phone's «from Messages» both land whole */
+.l-otp{position:relative;display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:0 0 14px}
+.l-otp i{display:grid;place-items:center;aspect-ratio:1/1.12;border:1px solid var(--line-2);border-radius:14px;font-family:var(--mono);font-size:1.5rem;font-weight:600;font-style:normal;color:var(--ink);transition:border-color var(--dur),box-shadow var(--dur)}
+.l-otp i[data-on]{border-color:var(--ink);box-shadow:0 0 0 3px rgba(22,21,20,.10)}
+.l-otp input{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;color:transparent;caret-color:transparent;font-size:16px;outline:none;letter-spacing:40px}
+.l-otp input::selection{background:transparent}
+.l-again{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.875rem;color:var(--ink-3)}
+
+.l-eye{position:relative}
+.l-eye .s-input{padding-right:52px}
+.l-eye button{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;border-radius:10px;background:none;color:var(--ink-3);cursor:pointer}
+.l-eye button svg{width:20px;height:20px}
+.l-demo{margin:28px 0 0;padding:14px;border:1px dashed var(--line-2);border-radius:14px}
+.l-demo p{margin:0 0 10px;font-size:.8125rem;color:var(--ink-3)}
+
+@media (max-width:900px){
+  .l{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  .l-art{height:34vh;min-height:220px}
+  .l-art .s-word{top:20px;left:24px}
+  .l-say{left:24px;right:24px;bottom:24px}
+  .l-say b{font-size:1.9rem}
+  .l-say span{display:none}
+  .l-pane{padding:16px 24px 28px}
+  .l-body{justify-content:flex-start;padding:24px 0}
+  .l-body h1{font-size:1.75rem}
+}
+</style>
+</head>
+<body>
+<main class="l">
+  <aside class="l-art" aria-hidden="true">
+    <img src="/brand/meat/hero-square.webp" alt="" width="1100" height="1100">
+    <a class="s-word" href="/" tabindex="-1">Basu</a>
+    <div class="l-say"><b>Шинэ мах.<br>Эцсийн үнэ.</b><span>Хонь, ямаа, үхэр, адууны махыг гэрээт нийлүүлэгчээс. Мал таны захиалгаар нядлагдана.</span></div>
+  </aside>
+
+  <section class="l-pane">
+    <div class="l-top"><a class="l-home" href="/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Нүүр хуудас</a></div>
+
+    <div class="l-body">
+      <!-- 1 · the way in -->
+      <div class="l-step" data-step="start" hidden>
+        <h1>Basu-д нэвтрэх</h1>
+        <p class="l-lead">Өвлийн идшээ захиалж, захиалгаа хянана. Анх удаа бол бүртгэл автоматаар үүснэ.</p>
+        <a class="s-btn s-btn-line s-btn-lg s-btn-block l-google" id="google" hidden><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Google-ээр үргэлжлүүлэх</a>
+        <div class="l-or" id="or" hidden>эсвэл</div>
+        <form id="email-form" novalidate hidden>
+          <label class="s-field"><span>Имэйл хаяг</span><input class="s-input" name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com"></label>
+          <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="submit">Үргэлжлүүлэх</button>
+          <p class="s-error" id="email-error" role="alert"></p>
+        </form>
+        <div class="l-alt"><button class="s-link" type="button" data-go="password">Нууц үгээр нэвтрэх</button></div>
+      </div>
+
+      <!-- 2 · the code that went to the address -->
+      <div class="l-step" data-step="code" hidden>
+        <button class="l-back" type="button" data-go="start"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Буцах</button>
+        <h1>Имэйлээ шалгана уу</h1>
+        <p class="l-lead"><b id="sent-to"></b> хаяг руу 6 оронтой код илгээлээ. 10 минут хүчинтэй.</p>
+        <div class="l-otp" id="otp"><i></i><i></i><i></i><i></i><i></i><i></i><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-label="Имэйлд ирсэн 6 оронтой код"></div>
+        <p class="s-error" id="code-error" role="alert"></p>
+        <div class="l-again"><span>Ирээгүй юу? Spam хавтсаа шалгаарай.</span><button class="s-link" type="button" id="resend">Код дахин авах</button></div>
+      </div>
+
+      <!-- 3 · a password -->
+      <div class="l-step" data-step="password" hidden>
+        <button class="l-back" type="button" data-go="start" id="pw-back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Буцах</button>
+        <h1>Нууц үгээр нэвтрэх</h1>
+        <p class="l-lead">Бүртгэлтэй имэйл эсвэл утасны дугаар, нууц үгээ оруулна уу.</p>
+        <form id="pw-form" novalidate>
+          <label class="s-field"><span>Имэйл эсвэл утасны дугаар</span><input class="s-input" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com · 8811 2233"></label>
+          <label class="s-field"><span>Нууц үг</span><span class="l-eye"><input class="s-input" name="password" type="password" autocomplete="current-password" placeholder="Нууц үг"><button type="button" data-eye aria-label="Нууц үгийг харах"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
+          <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="submit">Нэвтрэх</button>
+          <p class="s-error" id="pw-error" role="alert"></p>
+        </form>
+        <div class="l-alt"><button class="s-link" type="button" data-go="forgot" id="to-forgot">Нууц үгээ мартсан уу?</button><button class="s-link" type="button" data-go="signup" id="to-signup" hidden>Бүртгүүлэх</button></div>
+      </div>
+
+      <!-- 4 · a forgotten password, replaced by a code to the address on the account -->
+      <div class="l-step" data-step="forgot" hidden>
+        <button class="l-back" type="button" data-go="password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Буцах</button>
+        <h1>Нууц үг сэргээх</h1>
+        <p class="l-lead" id="forgot-lead">Бүртгэлтэй имэйл эсвэл утасны дугаараа бичнэ үү. Бүртгэлийн имэйл рүү тань код илгээнэ.</p>
+        <form id="forgot-form" novalidate>
+          <label class="s-field" data-f="login"><span>Имэйл эсвэл утасны дугаар</span><input class="s-input" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com · 8811 2233"></label>
+          <label class="s-field" data-f="code" hidden><span>Имэйлд ирсэн код</span><input class="s-input" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 оронтой код"></label>
+          <label class="s-field" data-f="password" hidden><span>Шинэ нууц үг <small>— дор хаяж 8 тэмдэгт</small></span><input class="s-input" name="password" type="password" autocomplete="new-password" placeholder="Шинэ нууц үг"></label>
+          <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="submit" id="forgot-go">Код авах</button>
+          <p class="s-error" id="forgot-error" role="alert"></p>
+        </form>
+      </div>
+
+      <!-- 5 · a new account by phone, only where email is not set up -->
+      <div class="l-step" data-step="signup" hidden>
+        <button class="l-back" type="button" data-go="password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Буцах</button>
+        <h1>Бүртгүүлэх</h1>
+        <p class="l-lead">Утасны дугаар, өөрийн сонгосон нууц үгээр бүртгэл үүснэ.</p>
+        <form id="signup-form" novalidate>
+          <label class="s-field"><span>Нэр</span><input class="s-input" name="name" autocomplete="name" placeholder="Таны нэр"></label>
+          <label class="s-field"><span>Утасны дугаар</span><input class="s-input" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="8811 2233"></label>
+          <label class="s-field"><span>Нууц үг <small>— дор хаяж 8 тэмдэгт</small></span><input class="s-input" name="password" type="password" autocomplete="new-password" placeholder="Нууц үг сонгох"></label>
+          <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="submit">Бүртгүүлэх</button>
+          <p class="s-error" id="signup-error" role="alert"></p>
+        </form>
+      </div>
+
+      <div class="l-demo" id="demo" hidden>
+        <p>Туршилтын сервер: имэйл, код шаардахгүй.</p>
+        <button class="s-btn s-btn-line s-btn-block" type="button" id="demo-go">Демо: кодгүй нэвтрэх</button>
+      </div>
+
+      <p class="l-legal">Үргэлжлүүлснээр та Basu-гийн <a href="/terms">Үйлчилгээний нөхцөл</a>, <a href="/privacy">Нууцлалын бодлого</a>-ыг зөвшөөрнө.</p>
+    </div>
+  </section>
+</main>
+
+<script type="module">
+import { api, store, authReturn, authMethods } from '/api.js';
+import { safeNext } from '/site.js';
+
+const $ = (id) => document.getElementById(id);
+const DEVICE = 'Вэб';
+
+/**
+ * Where the person was going. Google leaves the site and comes back to
+ * /login with the session in the fragment, so the destination waits in
+ * this tab's storage for the round trip.
+ */
+const asked = new URLSearchParams(location.search).get('next');
+if (asked) sessionStorage.setItem('basu.next', asked);
+const next = safeNext(asked ?? sessionStorage.getItem('basu.next'));
+const arrive = () => {
+  sessionStorage.removeItem('basu.next');
+  location.replace(next);
+};
+
+/* ── one step on screen at a time ──────────────────────────────────── */
+
+let methods = { password: true, email: false, google: false };
+function go(step) {
+  for (const box of document.querySelectorAll('.l-step')) box.hidden = box.dataset.step !== step;
+  for (const error of document.querySelectorAll('.s-error')) error.textContent = '';
+  // Without an email door, the password is where one starts: nothing to go back to.
+  $('pw-back').hidden = step === 'password' && !methods.email && !methods.google;
+  const first = document.querySelector(`.l-step[data-step="${step}"] input:not([hidden])`);
+  requestAnimationFrame(() => first?.focus());
+}
+for (const button of document.querySelectorAll('[data-go]')) {
+  button.addEventListener('click', () => go(button.dataset.go));
+}
+
+const busy = async (button, work, errorBox) => {
+  if (button.hasAttribute('data-busy')) return;
+  button.setAttribute('data-busy', '');
+  errorBox.textContent = '';
+  try {
+    await work();
+  } catch (error) {
+    errorBox.textContent = error.message;
+  } finally {
+    button.removeAttribute('data-busy');
+  }
+};
+const signedIn = (token) => {
+  store.guestToken = token;
+  arrive();
+};
+
+/* ── a code by email ───────────────────────────────────────────────── */
+
+let sentTo = null;
+async function sendCode(address) {
+  await api('/v1/auth/email/start', { method: 'POST', body: { email: address } });
+  sentTo = address;
+  $('sent-to').textContent = address;
+}
+$('email-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const field = event.target.elements.email;
+  const address = field.value.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+    $('email-error').textContent = 'Имэйл хаягаа зөв бичнэ үү.';
+    field.focus();
+    return;
+  }
+  void busy(event.submitter ?? event.target.querySelector('button'), async () => {
+    await sendCode(address);
+    $('code').value = '';
+    paintCells();
+    go('code');
+  }, $('email-error'));
+});
+
+const cells = [...$('otp').querySelectorAll('i')];
+function paintCells() {
+  const digits = $('code').value;
+  cells.forEach((cell, i) => {
+    cell.textContent = digits[i] ?? '';
+    cell.toggleAttribute('data-on', document.activeElement === $('code') && i === Math.min(digits.length, 5));
+  });
+}
+async function checkCode() {
+  const typed = $('code').value;
+  if (typed.length !== 6) return;
+  $('code').disabled = true;
+  $('code-error').textContent = '';
+  try {
+    const { token } = await api('/v1/auth/email/verify', { method: 'POST', body: { email: sentTo, code: typed, device: DEVICE } });
+    signedIn(token);
+  } catch (error) {
+    $('code-error').textContent = error.message;
+    $('code').value = '';
+    $('code').disabled = false;
+    $('code').focus();
+    paintCells();
+  }
+}
+$('code').addEventListener('input', () => {
+  $('code').value = $('code').value.replace(/\D/g, '').slice(0, 6);
+  paintCells();
+  void checkCode();
+});
+$('code').addEventListener('focus', paintCells);
+$('code').addEventListener('blur', paintCells);
+$('resend').addEventListener('click', () =>
+  void busy($('resend'), async () => {
+    await sendCode(sentTo);
+    $('code-error').textContent = '';
+    $('resend').textContent = 'Дахин илгээлээ';
+    setTimeout(() => ($('resend').textContent = 'Код дахин авах'), 4000);
+  }, $('code-error')),
+);
+
+/* ── a password ────────────────────────────────────────────────────── */
+
+for (const eye of document.querySelectorAll('[data-eye]')) {
+  eye.addEventListener('click', () => {
+    const input = eye.previousElementSibling;
+    input.type = input.type === 'password' ? 'text' : 'password';
+    eye.setAttribute('aria-label', input.type === 'password' ? 'Нууц үгийг харах' : 'Нууц үгийг нуух');
+  });
+}
+$('pw-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const { login, password } = event.target.elements;
+  if (!login.value.trim()) return login.focus();
+  if (!password.value) return password.focus();
+  void busy(event.target.querySelector('[type="submit"]'), async () => {
+    const { token } = await api('/v1/auth/login', {
+      method: 'POST',
+      body: { login: login.value.trim(), password: password.value, device: DEVICE },
+    });
+    signedIn(token);
+  }, $('pw-error'));
+});
+
+/* ── a forgotten password ──────────────────────────────────────────── */
+
+let resetFor = null;
+$('forgot-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const form = event.target;
+  const { login, code, password } = form.elements;
+  const button = $('forgot-go');
+  if (!resetFor) {
+    if (!login.value.trim()) return login.focus();
+    void busy(button, async () => {
+      const { to } = await api('/v1/auth/password/code', { method: 'POST', body: { login: login.value.trim(), purpose: 'reset' } });
+      resetFor = login.value.trim();
+      $('forgot-lead').textContent = `${to} хаяг руу код илгээлээ. Кодоо болон шинэ нууц үгээ оруулна уу.`;
+      form.querySelector('[data-f="login"]').hidden = true;
+      form.querySelector('[data-f="code"]').hidden = false;
+      form.querySelector('[data-f="password"]').hidden = false;
+      button.textContent = 'Нууц үгээ шинэчлэх';
+      code.focus();
+    }, $('forgot-error'));
+    return;
+  }
+  if (code.value.replace(/\D/g, '').length !== 6) return code.focus();
+  if (password.value.length < 8) {
+    $('forgot-error').textContent = 'Нууц үг дор хаяж 8 тэмдэгт байх ёстой.';
+    return password.focus();
+  }
+  void busy(button, async () => {
+    const { token } = await api('/v1/auth/password', {
+      method: 'POST',
+      body: { login: resetFor, code: code.value.replace(/\D/g, ''), password: password.value, device: DEVICE },
+    });
+    signedIn(token);
+  }, $('forgot-error'));
+});
+
+/* ── a new account by phone, where there is no email ───────────────── */
+
+$('signup-form').addEventListener('submit', (event) => {
+  event.preventDefault();
+  const { name, phone, password } = event.target.elements;
+  if (!phone.value.trim()) return phone.focus();
+  if (password.value.length < 8) {
+    $('signup-error').textContent = 'Нууц үг дор хаяж 8 тэмдэгт байх ёстой.';
+    return password.focus();
+  }
+  void busy(event.target.querySelector('[type="submit"]'), async () => {
+    const { token } = await api('/v1/auth/register', {
+      method: 'POST',
+      body: { phone: phone.value.replace(/\s+/g, ''), password: password.value, name: name.value.trim() || undefined, device: DEVICE },
+    });
+    signedIn(token);
+  }, $('signup-error'));
+});
+
+/* ── last, once every form answers: who this is, and which doors are open ─
+   A form submitted before its listener is on would go to the address bar,
+   password and all, so nothing above waits on the network. */
+
+// Back from Google with a session, or already signed in: straight on.
+if (authReturn?.token || store.guestToken) {
+  const token = authReturn?.token ?? store.guestToken;
+  try {
+    await api('/v1/me', { token });
+    arrive();
+  } catch {
+    store.guestToken = null;
+  }
+}
+
+methods = await authMethods();
+if (methods.google) {
+  $('google').hidden = false;
+  $('google').href = `/v1/auth/google/start?return=${encodeURIComponent('/login')}`;
+}
+$('email-form').hidden = !methods.email;
+$('or').hidden = !(methods.google && methods.email);
+$('to-forgot').hidden = !methods.email;
+$('to-signup').hidden = methods.email;
+if (!methods.email && !methods.google) go('password');
+else go('start');
+if (authReturn?.refused) $('email-error').textContent = 'Google-ээр нэвтэрч чадсангүй. Дахин оролдоно уу.';
+
+document.documentElement.dataset.ready = '';
+
+/* ── the demo's own way in: a server with a demo clock has no inbox ─ */
+
+api('/dev/clock')
+  .then(() => {
+    $('demo').hidden = false;
+    $('demo-go').addEventListener('click', async () => {
+      const { token } = await api('/dev/login', { method: 'POST', body: {} });
+      signedIn(token);
+    });
+  })
+  .catch(() => {});
+</script>
+</body>
+</html>

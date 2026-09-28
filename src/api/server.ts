@@ -918,6 +918,14 @@ async function mountPages(app: FastifyInstance): Promise<void> {
   // `/` is the Basu home screen; the dine-in pre-order app is one icon on it.
   // The launcher: what a guest has running, and the apps. «/» is the front page for everybody.
   app.get('/app', (_request, reply) => reply.sendFile('app.html'));
+  // The website: its own pages for somebody in a browser. The app's pages
+  // (/app, /idesh, /dine) are the phone shell's, and send a browser here.
+  app.get('/login', (_request, reply) => reply.sendFile('login.html'));
+  app.get('/shop', (_request, reply) => reply.sendFile('shop.html'));
+  app.get('/shop/:id', (_request, reply) => reply.sendFile('shop.html'));
+  app.get('/orders', (_request, reply) => reply.sendFile('orders.html'));
+  app.get('/orders/:id', (_request, reply) => reply.sendFile('orders.html'));
+  app.get('/account', (_request, reply) => reply.sendFile('account.html'));
   app.get('/favicon.ico', (_request, reply) => reply.type('image/png').sendFile('brand/favicon.png'));
   app.get('/dine', (_request, reply) => reply.sendFile('dine.html'));
   app.get('/kds', (_request, reply) => reply.sendFile('kds.html'));

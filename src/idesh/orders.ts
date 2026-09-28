@@ -847,6 +847,22 @@ export async function liveFor(guestId: string, db: Db = getPool()): Promise<Ides
   return rows.map(summary);
 }
 
+/**
+ * Every order of this guest's that was ever paid for, newest first: what the
+ * website's «Миний захиалга» lists, finished ones included. A draft that was
+ * never paid is not an order anybody made, so it is left out.
+ */
+export async function allFor(guestId: string, db: Db = getPool()): Promise<IdeshSummary[]> {
+  const { rows } = await db.query<OrderRow>(
+    `${ORDER_SELECT}
+      WHERE o.guest_id = $1 AND o.state <> 'DRAFT'
+      ORDER BY o.created_at DESC
+      LIMIT 200`,
+    [guestId],
+  );
+  return rows.map(summary);
+}
+
 export async function detailFor(
   guestId: string,
   orderId: string,

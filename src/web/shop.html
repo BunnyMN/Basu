@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="mn" data-theme="light" data-site>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
+<title>Өвлийн идэш — Basu</title>
+<meta name="description" content="Хонь, ямаа, үхэр, адууны махыг гэрээт нийлүүлэгчээс эцсийн үнээр захиална.">
+<link rel="icon" href="/brand/favicon.png">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/site.css">
+<style>
+/* The market, for a browser: every stall on one screen as a card with its
+   picture and its price, a filter by animal, and a stall's own page with the
+   order beside it. Signed in only — the server holds to that too. */
+
+.sh-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:20px 40px}
+.sh-trust{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
+.sh-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px 24px;padding:0 0 22px;border-bottom:1px solid var(--line);margin-bottom:28px}
+.sh-kinds{display:flex;flex-wrap:wrap;gap:8px}
+.sh-kinds button{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 16px;border:1px solid var(--line);border-radius:999px;background:#fff;font:inherit;font-size:.9375rem;font-weight:500;color:var(--ink-2);cursor:pointer}
+.sh-kinds button small{font-family:var(--mono);font-size:.75rem;color:var(--ink-3)}
+.sh-kinds button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.sh-kinds button[aria-pressed="true"] small{color:rgba(255,255,255,.6)}
+@media (hover:hover){.sh-kinds button:not([aria-pressed="true"]):hover{border-color:var(--line-2);color:var(--ink)}}
+.sh-tools{display:flex;flex-wrap:wrap;align-items:center;gap:14px}
+.sh-check{display:inline-flex;align-items:center;gap:8px;font-size:.9375rem;color:var(--ink-2);cursor:pointer}
+.sh-check input{width:18px;height:18px;accent-color:var(--ink)}
+.sh-sort{min-height:40px;padding:0 36px 0 14px;border:1px solid var(--line);border-radius:999px;background:#fff var(--chev) no-repeat right 12px center/16px;font:inherit;font-size:.9375rem;color:var(--ink);appearance:none;cursor:pointer}
+.sh-count{font-size:.875rem;color:var(--ink-3)}
+
+.sh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:28px 22px}
+.sh-card{display:flex;flex-direction:column;color:inherit;text-decoration:none}
+.sh-card .ph{position:relative;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:var(--surface-2)}
+.sh-card .ph img{width:100%;height:100%;object-fit:cover;transition:transform 700ms var(--ease)}
+@media (hover:hover){.sh-card:hover .ph img{transform:scale(1.04)}}
+.sh-card .tags{position:absolute;left:10px;top:10px;right:10px;display:flex;justify-content:space-between;gap:6px}
+.sh-card .tags .s-pill{background:rgba(255,255,255,.94);border-color:transparent;color:var(--ink)}
+.sh-card[data-gone] .ph::after{content:"Дууссан";position:absolute;inset:0;display:grid;place-items:center;background:rgba(255,255,255,.72);font-weight:600;color:var(--ink)}
+.sh-card .bd{padding:14px 2px 0}
+.sh-card b{display:block;font-size:1.0625rem;font-weight:600;line-height:1.35}
+.sh-card .who{display:block;margin-top:3px;font-size:.875rem;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sh-card .meta{display:block;margin-top:6px;font-size:.8125rem;color:var(--ink-3)}
+.sh-card .price{display:block;margin-top:10px;font-size:1.25rem}
+.sh-card .price small{font-family:var(--sans);font-size:.8125rem;font-weight:500;color:var(--ink-3)}
+.sh-skel .ph{aspect-ratio:4/3}
+.sh-skel .l1{height:18px;margin-top:14px;width:70%}
+.sh-skel .l2{height:14px;margin-top:8px;width:45%}
+
+/* a stall's own page */
+.sd{display:grid;grid-template-columns:minmax(0,7fr) minmax(340px,5fr);gap:40px;align-items:start;margin-top:24px}
+@media (max-width:960px){.sd{grid-template-columns:1fr}}
+.sd-media{border-radius:20px;overflow:hidden;background:var(--surface-2)}
+.sd-media img{width:100%;aspect-ratio:16/10;object-fit:cover}
+.sd-title{margin:18px 0 0}
+.sd-title h1{margin:0;font-size:clamp(1.8rem,3vw,2.5rem);line-height:1.1;letter-spacing:-.03em}
+.sd-info{margin-top:4px}
+.sd-who{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:12px;font-size:1rem;color:var(--ink-2)}
+.sd-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:26px 0 0;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.sd-facts div{padding:16px 18px}
+.sd-facts div + div{border-left:1px solid var(--line)}
+.sd-facts span{display:block;font-size:.8125rem;color:var(--ink-3)}
+.sd-facts b{display:block;margin-top:4px;font-size:1.0625rem;font-weight:600}
+.sd-facts b small{display:block}
+@media (max-width:620px){.sd-facts{grid-template-columns:1fr 1fr}.sd-facts div:nth-child(3){border-left:0}.sd-facts div:nth-child(n+3){border-top:1px solid var(--line)}}
+.sd-note{margin:22px 0 0;font-size:1rem;line-height:1.7;color:var(--ink-2);white-space:pre-line}
+.sd-list{margin:26px 0 0;padding:0;list-style:none;border-top:1px solid var(--line)}
+.sd-list li{display:grid;grid-template-columns:28px 1fr;gap:12px;padding:16px 0;border-bottom:1px solid var(--line)}
+.sd-list svg{width:22px;height:22px;color:var(--ink)}
+.sd-list b{display:block;font-weight:600}
+.sd-list span{display:block;margin-top:2px;font-size:.9375rem;line-height:1.55;color:var(--ink-2)}
+
+.sd-buy{position:sticky;top:92px;padding:24px}
+.sd-buy h2{margin:0 0 4px;font-size:1.25rem;letter-spacing:-.015em}
+.sd-buy .sub{margin:0 0 20px;font-size:.9375rem;color:var(--ink-2)}
+.sd-q{margin:0 0 20px}
+.sd-q > span{display:block;margin-bottom:10px;font-size:.875rem;font-weight:600}
+.sd-qty{display:flex;align-items:center;gap:6px;width:max-content;border:1px solid var(--line-2);border-radius:999px;padding:4px}
+.sd-qty button{width:40px;height:40px;border:0;border-radius:50%;background:none;font-size:1.25rem;line-height:1;color:var(--ink);cursor:pointer}
+.sd-qty button:disabled{opacity:.3;cursor:default}
+@media (hover:hover){.sd-qty button:not(:disabled):hover{background:var(--surface-2)}}
+.sd-qty output{min-width:88px;text-align:center;font-family:var(--mono);font-weight:600}
+.sd-qty output small{font-family:var(--sans);font-weight:500;color:var(--ink-3)}
+.sd-ways{display:grid;gap:10px}
+.sd-way{display:grid;grid-template-columns:22px 1fr auto;gap:12px;align-items:start;padding:14px;border:1px solid var(--line-2);border-radius:14px;background:#fff;font:inherit;text-align:left;cursor:pointer}
+.sd-way:disabled{opacity:.5;cursor:default}
+.sd-way i{width:20px;height:20px;margin-top:1px;border:1.5px solid var(--line-2);border-radius:50%}
+.sd-way[aria-checked="true"]{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.sd-way[aria-checked="true"] i{border:6px solid var(--ink)}
+.sd-way b{display:block;font-weight:600}
+.sd-way small{display:block;margin-top:2px;font-size:.8125rem;line-height:1.45;color:var(--ink-2)}
+.sd-way em{font-style:normal;font-size:.875rem;font-weight:600;white-space:nowrap}
+.sd-sum{margin:6px 0 0;padding:16px 0 0;border-top:1px solid var(--line)}
+.sd-sum div{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:.9375rem;color:var(--ink-2)}
+.sd-sum div.total{margin-top:6px;padding-top:12px;border-top:1px solid var(--line);font-size:1.0625rem;font-weight:600;color:var(--ink)}
+.sd-sum div.total .s-money{font-size:1.375rem}
+.sd-fine{margin:14px 0 0;font-size:.8125rem;line-height:1.55;color:var(--ink-3)}
+.sd-fine a{color:var(--ink-2);text-decoration:underline;text-underline-offset:.2em}
+.sd-review dl{margin:0 0 6px}
+.sd-review dl div{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:.9375rem}
+.sd-review dt{color:var(--ink-3)}
+.sd-review dd{margin:0;font-weight:500;overflow-wrap:anywhere}
+.sd-review dd small{display:block;font-weight:400;color:var(--ink-2)}
+.sd-actions{display:grid;gap:10px;margin-top:18px}
+.sd-gone{padding:18px;border-radius:14px;background:var(--surface-2);color:var(--ink-2)}
+</style>
+</head>
+<body>
+<main class="s-main">
+  <div class="s-wrap" id="page"></div>
+</main>
+
+<script type="module">
+import { mnt, KIND, dayLabel } from '/api.js';
+import { mountFrame, requireSignIn, authed, esc, el, say } from '/site.js';
+
+const token = requireSignIn();
+void mountFrame('shop');
+const page = document.getElementById('page');
+
+const PHOTO = (kind) => `/brand/meat/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}.webp`;
+const unitWord = (l) => (l.unit === 'whole' ? 'толгой' : 'кг');
+const MARK = {
+  shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>',
+  tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg>',
+  undo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v5h5"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg>',
+  truck: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
+  truckSm: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
+};
+
+let market = { today: null, listings: [] };
+
+/* ── the market ────────────────────────────────────────────────────── */
+
+const view = { kind: 'all', sort: 'suggested', delivers: false };
+
+function drawMarket() {
+  page.replaceChildren(
+    el(`<section class="s-head sh-head">
+          <div><h1>Өвлийн идэш</h1><p>Гэрээт нийлүүлэгчээс, таны захиалгаар нядална. Зар дээрх үнэ эцсийнх.</p></div>
+          <ul class="sh-trust">
+            <li class="s-pill">${MARK.shield}Гэрээт нийлүүлэгч</li>
+            <li class="s-pill">${MARK.tag}Үнэ эцсийн</li>
+            <li class="s-pill">${MARK.undo}Нядлахаас өмнө бүтэн буцаалт</li>
+          </ul>
+        </section>`),
+    el(`<div class="sh-bar">
+          <div class="sh-kinds" id="kinds" role="group" aria-label="Малын төрөл"></div>
+          <div class="sh-tools">
+            <label class="sh-check"><input type="checkbox" id="delivers"${view.delivers ? ' checked' : ''}>Хүргэлттэй</label>
+            <select class="sh-sort" id="sort" aria-label="Эрэмбэ">
+              <option value="suggested">Санал болгох</option>
+              <option value="soon">Эрт бэлэн болох</option>
+              <option value="cheap">Үнэ: багаас их</option>
+              <option value="dear">Үнэ: ихээс бага</option>
+            </select>
+          </div>
+        </div>`),
+    el('<div class="sh-grid" id="grid" aria-live="polite"></div>'),
+  );
+  document.getElementById('sort').value = view.sort;
+  document.getElementById('sort').addEventListener('change', (e) => {
+    view.sort = e.target.value;
+    paintGrid();
+  });
+  document.getElementById('delivers').addEventListener('change', (e) => {
+    view.delivers = e.target.checked;
+    paintGrid();
+  });
+  const grid = document.getElementById('grid');
+  for (let i = 0; i < 6; i++) {
+    grid.append(el('<div class="sh-skel" aria-hidden="true"><span class="s-skel ph"></span><span class="s-skel l1"></span><span class="s-skel l2"></span></div>'));
+  }
+}
+
+function paintKinds() {
+  const box = document.getElementById('kinds');
+  const count = (k) => market.listings.filter((l) => k === 'all' || l.kind === k).length;
+  box.replaceChildren();
+  for (const [key, label] of [['all', 'Бүгд'], ...Object.entries(KIND)]) {
+    if (key !== 'all' && !count(key)) continue;
+    const button = el(`<button type="button" data-kind="${key}" aria-pressed="${view.kind === key}">${label}<small>${count(key)}</small></button>`);
+    button.addEventListener('click', () => {
+      view.kind = key;
+      paintKinds();
+      paintGrid();
+    });
+    box.append(button);
+  }
+}
+
+function shown() {
+  const list = market.listings.filter((l) => (view.kind === 'all' || l.kind === view.kind) && (!view.delivers || l.delivers));
+  const open = (l) => (l.remaining > 0 ? 0 : 1);
+  if (view.sort === 'cheap') list.sort((a, b) => open(a) - open(b) || a.price_mnt - b.price_mnt);
+  else if (view.sort === 'dear') list.sort((a, b) => open(a) - open(b) || b.price_mnt - a.price_mnt);
+  else if (view.sort === 'soon') list.sort((a, b) => open(a) - open(b) || a.ready_from.localeCompare(b.ready_from));
+  else list.sort((a, b) => open(a) - open(b));
+  return list;
+}
+
+function paintGrid() {
+  const grid = document.getElementById('grid');
+  grid.replaceChildren();
+  const list = shown();
+  if (!list.length) {
+    grid.append(
+      el(market.listings.length
+        ? `<div class="s-empty" style="grid-column:1/-1"><b>Энэ шүүлтүүрт зар алга</b>Өөр төрөл сонгоод үзээрэй.</div>`
+        : `<div class="s-empty" style="grid-column:1/-1"><b>Одоогоор зар алга</b>Өвлийн идшийн зарууд удахгүй гарна. Нийлүүлэгчид яг одоо бүртгүүлж байна.</div>`),
+    );
+    return;
+  }
+  for (const l of list) {
+    const gone = l.remaining === 0;
+    grid.append(
+      el(`<a class="sh-card" href="/shop/${l.id}" data-id="${l.id}" data-kind="${l.kind}"${gone ? ' data-gone' : ''}>
+            <span class="ph"><img src="${PHOTO(l.kind)}" alt="" loading="lazy" width="960" height="720">
+              <span class="tags">${l.supplier.contracted ? `<span class="s-pill">${MARK.check}Гэрээт</span>` : '<span></span>'}${
+                l.delivers ? `<span class="s-pill">${MARK.truckSm}Хүргэлттэй</span>` : ''
+              }</span></span>
+            <span class="bd">
+              <b>${esc(l.title)}</b>
+              <span class="who">${esc(l.supplier.name)} · ${esc(l.origin)}</span>
+              <span class="meta">${dayLabel(l.ready_from)}-нөөс бэлэн · ${gone ? 'дууссан' : `${l.remaining} ${unitWord(l)} үлдсэн`}</span>
+              <span class="price s-money">${mnt(l.price_mnt)}<small> / ${unitWord(l)}</small></span>
+            </span>
+          </a>`),
+    );
+  }
+}
+
+/* ── a stall ───────────────────────────────────────────────────────── */
+
+const earliest = (l) => (l.ready_from > market.today ? l.ready_from : market.today);
+
+function drawStall(l) {
+  document.title = `${l.title} — Basu`;
+  const form = { qty: l.min_qty, receive: 'pickup', receiveOn: earliest(l), address: '', phone: '' };
+  const step = l.unit === 'whole' ? 1 : 5;
+  const total = () => l.price_mnt * form.qty + (form.receive === 'delivery' ? l.delivery_fee_mnt : 0);
+  const gone = l.remaining === 0;
+
+  page.replaceChildren(
+    el(`<a class="s-crumb" href="/shop">${MARK.back}Бүх зар</a>`),
+    el(`<div class="sd-title">
+          <h1>${esc(l.title)}</h1>
+          <div class="sd-who">${l.supplier.contracted ? `<span class="s-pill" data-tone="ready">${MARK.check}Гэрээт нийлүүлэгч</span>` : ''}<span>${esc(l.supplier.name)} · ${esc(l.origin)}</span></div>
+        </div>`),
+    el(`<div class="sd">
+          <div>
+            <div class="sd-media"><img src="${PHOTO(l.kind)}" alt="${esc(KIND[l.kind] ?? '')}" width="960" height="720"></div>
+            <div class="sd-info">
+              <div class="sd-facts">
+                <div><span>Үнэ</span><b class="s-money">${mnt(l.price_mnt)}<small style="font-family:var(--sans);font-weight:500;color:var(--ink-3)"> / ${unitWord(l)}</small></b></div>
+                <div><span>${l.unit === 'whole' ? 'Ойролцоо жин' : 'Доод захиалга'}</span><b>${l.unit === 'whole' ? `~${l.approx_kg} кг` : `${l.min_qty} кг`}</b></div>
+                <div><span>Бэлэн болох</span><b>${dayLabel(l.ready_from)}</b></div>
+                <div><span>Үлдсэн</span><b>${l.remaining} ${unitWord(l)}</b></div>
+              </div>
+              ${l.note ? `<p class="sd-note">${esc(l.note)}</p>` : ''}
+              <ul class="sd-list">
+                <li>${MARK.pin}<div><b>Авах цэг</b><span>${esc(l.supplier.pickup_address)}</span></div></li>
+                <li>${MARK.truck}<div><b>${l.delivers ? 'Хүргэлттэй' : 'Хүргэлтгүй'}</b><span>${
+                  l.delivers ? `Нийлүүлэгч таны хаяг руу хүргэнэ · ${mnt(l.delivery_fee_mnt)}` : 'Энэ нийлүүлэгчээс өөрөө очиж авна.'
+                }</span></div></li>
+                <li>${MARK.tag}<div><b>Үнэ эцсийн</b><span>Мал нядалсны дараа жин нь зөрсөн ч нэмж төлөхгүй, зөрүү ч буцаагдахгүй.</span></div></li>
+                <li>${MARK.undo}<div><b>Цуцлах, буцаалт</b><span>Нядлахаас өмнө цуцлагдвал мөнгө бүтнээрээ буцна. Нядалсны дараа таны хүсэлтээр бол 10% суутгана.</span></div></li>
+              </ul>
+            </div>
+          </div>
+          <aside class="sd-buy s-card" id="buy"></aside>
+        </div>`),
+  );
+
+  const buy = document.getElementById('buy');
+
+  function paintForm() {
+    if (gone) {
+      buy.replaceChildren(el('<div class="sd-gone"><b>Энэ зар дууссан</b><br>Нийлүүлэгч дахин нэмбэл энд гарна.</div>'));
+      return;
+    }
+    buy.replaceChildren(
+      el(`<div>
+            <h2>Захиалах</h2>
+            <p class="sub">${esc(l.supplier.name)}</p>
+            <div class="sd-q">
+              <span>${l.unit === 'whole' ? 'Хэдэн толгой' : 'Хэдэн кг'}</span>
+              <div class="sd-qty">
+                <button type="button" data-d="-1" aria-label="Хасах">−</button>
+                <output id="qty"></output>
+                <button type="button" data-d="1" aria-label="Нэмэх">+</button>
+              </div>
+              <p class="s-help">${l.unit === 'whole' ? `Нэг толгой ойролцоогоор ${l.approx_kg} кг.` : `Доод тал нь ${l.min_qty} кг, ${step} кг-аар нэмэгдэнэ.`}</p>
+            </div>
+            <div class="sd-q">
+              <span>Хэрхэн авах</span>
+              <div class="sd-ways" role="radiogroup" aria-label="Хэрхэн авах">
+                <button class="sd-way" type="button" role="radio" data-r="pickup"><i></i><span><b>Өөрөө очиж авна</b><small>${esc(l.supplier.pickup_address)}</small></span><em>Үнэгүй</em></button>
+                <button class="sd-way" type="button" role="radio" data-r="delivery"${l.delivers ? '' : ' disabled'}><i></i><span><b>Хүргүүлнэ</b><small>${l.delivers ? 'Хаяг руу тань хүргэнэ' : 'Энэ нийлүүлэгч хүргэдэггүй'}</small></span><em>${l.delivers ? `+${mnt(l.delivery_fee_mnt)}` : ''}</em></button>
+              </div>
+            </div>
+            <label class="s-field"><span id="when-label">Очиж авах өдөр</span><input class="s-input" type="date" id="when" min="${earliest(l)}" value="${form.receiveOn}"></label>
+            <div id="where" hidden>
+              <label class="s-field"><span>Хүргэх хаяг</span><textarea class="s-input" id="address" placeholder="Дүүрэг, хороо, байр, орц, тоот">${esc(form.address)}</textarea></label>
+              <label class="s-field"><span>Хүргэгчийн залгах утас</span><input class="s-input" id="phone" type="tel" inputmode="tel" placeholder="8811 2233" value="${esc(form.phone)}"></label>
+            </div>
+            <div class="sd-sum" id="sum"></div>
+            <div class="sd-actions"><button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="button" id="next">Үргэлжлүүлэх</button></div>
+            <p class="s-error" id="form-error" role="alert"></p>
+            <p class="sd-fine">Мах бэлэн болсон өдөр нийлүүлэгч утсаар холбогдож цагаа тохирно.</p>
+          </div>`),
+    );
+    const paint = () => {
+      buy.querySelector('#qty').innerHTML = `${form.qty}<small> ${unitWord(l)}</small>`;
+      buy.querySelector('[data-d="-1"]').disabled = form.qty - step < l.min_qty;
+      buy.querySelector('[data-d="1"]').disabled = form.qty + step > l.remaining;
+      for (const way of buy.querySelectorAll('.sd-way')) way.setAttribute('aria-checked', String(way.dataset.r === form.receive));
+      buy.querySelector('#where').hidden = form.receive !== 'delivery';
+      buy.querySelector('#when-label').textContent = form.receive === 'delivery' ? 'Хүргүүлэх өдөр' : 'Очиж авах өдөр';
+      buy.querySelector('#sum').innerHTML = `
+        <div><span>${form.qty} ${unitWord(l)} × ${mnt(l.price_mnt)}</span><span class="s-money">${mnt(l.price_mnt * form.qty)}</span></div>
+        ${form.receive === 'delivery' ? `<div><span>Хүргэлт</span><span class="s-money">${mnt(l.delivery_fee_mnt)}</span></div>` : ''}
+        <div class="total"><span>Нийт</span><span class="s-money">${mnt(total())}</span></div>`;
+    };
+    buy.querySelector('.sd-qty').addEventListener('click', (event) => {
+      const b = event.target.closest('button');
+      if (!b || b.disabled) return;
+      form.qty = Math.min(l.remaining, Math.max(l.min_qty, form.qty + Number(b.dataset.d) * step));
+      paint();
+    });
+    buy.querySelector('.sd-ways').addEventListener('click', (event) => {
+      const b = event.target.closest('.sd-way');
+      if (!b || b.disabled) return;
+      form.receive = b.dataset.r;
+      paint();
+    });
+    buy.querySelector('#when').addEventListener('change', (e) => (form.receiveOn = e.target.value));
+    buy.querySelector('#address').addEventListener('input', (e) => (form.address = e.target.value));
+    buy.querySelector('#phone').addEventListener('input', (e) => (form.phone = e.target.value));
+    buy.querySelector('#next').addEventListener('click', () => {
+      const problem = !form.receiveOn || form.receiveOn < earliest(l)
+        ? `Өдрөө сонгоно уу — хамгийн эрт ${dayLabel(earliest(l))}.`
+        : form.receive === 'delivery' && !form.address.trim()
+          ? 'Хүргэх хаягаа бичнэ үү.'
+          : form.receive === 'delivery' && form.phone.replace(/\D/g, '').length < 8
+            ? 'Хүргэгчийн залгах утсаа оруулна уу.'
+            : null;
+      buy.querySelector('#form-error').textContent = problem ?? '';
+      if (!problem) paintReview();
+    });
+    paint();
+  }
+
+  /** Before any money moves, the whole order once. */
+  function paintReview() {
+    const delivery = form.receive === 'delivery';
+    buy.replaceChildren(
+      el(`<div class="sd-review">
+            <h2>Захиалгаа шалгана уу</h2>
+            <p class="sub">Төлөхөөс өмнө нэг харна уу.</p>
+            <dl>
+              <div><dt>Зар</dt><dd>${esc(l.title)}<small>${esc(l.supplier.name)}</small></dd></div>
+              <div><dt>Хэмжээ</dt><dd>${form.qty} ${unitWord(l)}</dd></div>
+              <div><dt>Авах арга</dt><dd>${delivery ? 'Хүргүүлнэ' : 'Өөрөө очиж авна'}<small>${esc(delivery ? `${form.address} · ${form.phone}` : l.supplier.pickup_address)}</small></dd></div>
+              <div><dt>Өдөр</dt><dd>${dayLabel(form.receiveOn)}</dd></div>
+            </dl>
+            <div class="sd-sum">
+              <div><span>${form.qty} ${unitWord(l)} × ${mnt(l.price_mnt)}</span><span class="s-money">${mnt(l.price_mnt * form.qty)}</span></div>
+              ${delivery ? `<div><span>Хүргэлт</span><span class="s-money">${mnt(l.delivery_fee_mnt)}</span></div>` : ''}
+              <div class="total"><span>Нийт төлөх</span><span class="s-money">${mnt(total())}</span></div>
+            </div>
+            <div class="sd-actions">
+              <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="button" id="pay">Төлөх · ${mnt(total())}</button>
+              <button class="s-btn s-btn-line s-btn-block" type="button" id="edit">Засах</button>
+            </div>
+            <p class="s-error" id="pay-error" role="alert"></p>
+            <p class="sd-fine">Төлснөөр <a href="/terms" target="_blank" rel="noopener">үйлчилгээний нөхцөл</a>-ийг зөвшөөрнө. Төлсний дараа нийлүүлэгчийн утас гарна.</p>
+          </div>`),
+    );
+    buy.querySelector('#edit').addEventListener('click', paintForm);
+    buy.querySelector('#pay').addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      if (button.hasAttribute('data-busy')) return;
+      button.setAttribute('data-busy', '');
+      buy.querySelector('#pay-error').textContent = '';
+      try {
+        const order = await authed('/v1/idesh', {
+          method: 'POST',
+          // One key per tap of «Төлөх»: a retry buys one sheep, a new tap is a new intention.
+          idempotencyKey: `idesh-${l.id}-${Date.now().toString(36)}`,
+          body: {
+            listing_id: l.id,
+            qty: form.qty,
+            receive: form.receive,
+            receive_on: form.receiveOn,
+            ...(delivery ? { address: form.address.trim(), address_phone: form.phone.replace(/\s+/g, '') } : {}),
+          },
+        });
+        await authed(`/v1/idesh/${order.id}/pay`, { method: 'POST' });
+        location.href = `/orders/${order.id}?new=1`;
+      } catch (error) {
+        button.removeAttribute('data-busy');
+        buy.querySelector('#pay-error').textContent = error.message;
+      }
+    });
+  }
+
+  paintForm();
+}
+
+/* ── which page this is ────────────────────────────────────────────── */
+
+async function load() {
+  market = await authed('/v1/idesh/listings');
+}
+
+const stallId = location.pathname.match(/^\/shop\/([0-9a-f-]{36})$/)?.[1];
+if (token) {
+  if (stallId) {
+    try {
+      const [{ listing, today }] = await Promise.all([authed(`/v1/idesh/listings/${stallId}`), load()]);
+      market.today = today;
+      drawStall(listing);
+    } catch (error) {
+      if (error.status !== 401) {
+        page.replaceChildren(
+          el(`<a class="s-crumb" href="/shop">${MARK.back}Бүх зар</a>`),
+          el('<div class="s-empty"><b>Зар олдсонгүй</b>Устгагдсан эсвэл нуугдсан байж магадгүй.<br><a class="s-btn s-btn-dark" href="/shop">Бүх зар</a></div>'),
+        );
+      }
+    }
+  } else {
+    drawMarket();
+    try {
+      await load();
+      paintKinds();
+      paintGrid();
+    } catch (error) {
+      if (error.status !== 401) say(error.message, 'bad');
+    }
+  }
+}
+</script>
+</body>
+</html>

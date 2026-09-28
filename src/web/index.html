@@ -18,6 +18,7 @@
 <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
 <link rel="preload" as="image" href="/brand/meat/hero.webp">
 <link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/site.css">
 <style>
 /* The front page. Clean and quiet: white paper, black type, and photographs
    of the meat itself — the colour on the page is the meat's. Everything it says is true today — the
@@ -85,7 +86,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 .bar .right{margin-left:auto;display:flex;gap:8px}
 .bar .go{min-height:40px;padding:0 18px;font-size:.9375rem}
 @media (max-width:900px){.bar nav{display:none}}
-@media (max-width:420px){.bar #mine{display:none}}
+@media (max-width:480px){.bar #bar-shop{display:none}}
 
 /* ── the opening: the meat, on black ─────────────────────────────── */
 .hero{position:relative;background:var(--dark);color:#fff;overflow:hidden;isolation:isolate}
@@ -302,8 +303,8 @@ section.band{padding:clamp(72px,9vw,120px) 0}
       <a href="#faq">Асуулт</a>
     </nav>
     <div class="right">
-      <a class="go go-line" href="/app" id="mine" hidden>Миний Basu</a>
-      <a class="go go-dark" href="/idesh">Зар үзэх</a>
+      <span id="account"></span>
+      <a class="go go-dark" href="/shop" id="bar-shop">Зар үзэх</a>
     </div>
   </div>
 </header>
@@ -317,7 +318,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
         <h1>Шинэ мах.<br>Эцсийн үнэ.</h1>
         <p class="lead">Хонь, ямаа, үхэр, адууны махыг гэрээт нийлүүлэгчээс толгойгоор нь эсвэл кг-аар захиална. Мал таны захиалгаар нядлагдаж, сонгосон өдөр тань бэлэн болно.</p>
         <div class="btns">
-          <a class="go go-light" href="/idesh">Зар үзэх →</a>
+          <a class="go go-light" href="/shop">Зар үзэх →</a>
           <a class="go go-glass" href="https://apps.apple.com/app/id6810541939" data-store>
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.62c.03 3.03 2.66 4.04 2.69 4.05-.02.07-.42 1.44-1.39 2.85-.84 1.22-1.71 2.44-3.08 2.46-1.35.03-1.78-.8-3.32-.8-1.54 0-2.02.78-3.3.83-1.32.05-2.33-1.32-3.18-2.53-1.73-2.5-3.05-7.06-1.28-10.14.88-1.53 2.45-2.5 4.15-2.52 1.3-.03 2.52.87 3.31.87.79 0 2.28-1.08 3.84-.92.65.03 2.48.26 3.66 1.99-.1.06-2.18 1.27-2.16 3.79M13.85 3.2c.7-.85 1.17-2.03 1.04-3.2-1.01.04-2.23.67-2.95 1.52-.65.75-1.22 1.95-1.07 3.1 1.13.09 2.28-.57 2.98-1.42"/></svg>
             <span class="two"><small>iPhone-д</small>App Store</span>
@@ -353,14 +354,14 @@ section.band{padding:clamp(72px,9vw,120px) 0}
         <p class="reveal">Нийлүүлэгч бүр малаа өөрөө зарлана: бүтэн толгойгоор нь, эсвэл кг-аар. Зар бүр дээр мал аль нутгийнх, ойролцоогоор хэдэн кг мах гарах, хэзээ бэлэн болох нь бичээстэй.</p>
       </div>
       <div class="animals">
-        <a class="animal reveal" href="/idesh" data-kind="sheep"><div class="ph"><img src="/brand/meat/sheep.webp" alt="Хонины гуя" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Хонь</b><small>Толгойгоор · кг-аар</small></a>
-        <a class="animal reveal" href="/idesh" data-kind="goat"><div class="ph"><img src="/brand/meat/goat.webp" alt="Жижиглэсэн улаан мах" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Ямаа</b><small>Толгойгоор · кг-аар</small></a>
-        <a class="animal reveal" href="/idesh" data-kind="beef"><div class="ph"><img src="/brand/meat/beef.webp" alt="Үхрийн цул мах" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Үхэр</b><small>Толгойгоор · кг-аар</small></a>
-        <a class="animal reveal" href="/idesh" data-kind="horse"><div class="ph"><img src="/brand/meat/horse.webp" alt="Давс цацсан туранхай улаан мах" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Адуу</b><small>Толгойгоор · кг-аар</small></a>
+        <a class="animal reveal" href="/shop" data-kind="sheep"><div class="ph"><img src="/brand/meat/sheep.webp" alt="Хонины гуя" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Хонь</b><small>Толгойгоор · кг-аар</small></a>
+        <a class="animal reveal" href="/shop" data-kind="goat"><div class="ph"><img src="/brand/meat/goat.webp" alt="Жижиглэсэн улаан мах" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Ямаа</b><small>Толгойгоор · кг-аар</small></a>
+        <a class="animal reveal" href="/shop" data-kind="beef"><div class="ph"><img src="/brand/meat/beef.webp" alt="Үхрийн цул мах" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Үхэр</b><small>Толгойгоор · кг-аар</small></a>
+        <a class="animal reveal" href="/shop" data-kind="horse"><div class="ph"><img src="/brand/meat/horse.webp" alt="Давс цацсан туранхай улаан мах" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Адуу</b><small>Толгойгоор · кг-аар</small></a>
       </div>
 
       <div class="board" id="board" hidden aria-live="polite">
-        <div class="board-head"><b id="board-title">Одоо зартай</b><a class="onward" href="/idesh">Бүх зар</a></div>
+        <div class="board-head"><b id="board-title">Одоо зартай</b><a class="onward" href="/shop">Бүх зар</a></div>
         <div class="board-list" id="board-list"></div>
         <div class="board-empty" id="board-empty" hidden>
           <i aria-hidden="true"></i>
@@ -432,7 +433,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
           <p class="said" id="said">6 хонь, эсвэл 7 ямаа орчим</p>
           <p class="week" id="week">Үхэр, адууны махыг кг-аар нь авбал 112 кг. Долоо хоногт 6.5 кг орчим.</p>
           <div class="flock" id="flock" aria-hidden="true"></div>
-          <a class="go go-dark" href="/idesh">Зар үзэх →</a>
+          <a class="go go-dark" href="/shop">Зар үзэх →</a>
         </div>
       </div>
       <p class="calc-fine">Тооцоо: нэг хүн сард бага иддэг бол 5, дунд зэрэг бол 7, их иддэг бол 10 кг мах иднэ; нэг хонь 20 орчим, нэг ямаа 15 орчим кг цэвэр мах гардаг гэж үзэв. Мал бүр өөр тул ойролцоо тоо.</p>
@@ -492,7 +493,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.62c.03 3.03 2.66 4.04 2.69 4.05-.02.07-.42 1.44-1.39 2.85-.84 1.22-1.71 2.44-3.08 2.46-1.35.03-1.78-.8-3.32-.8-1.54 0-2.02.78-3.3.83-1.32.05-2.33-1.32-3.18-2.53-1.73-2.5-3.05-7.06-1.28-10.14.88-1.53 2.45-2.5 4.15-2.52 1.3-.03 2.52.87 3.31.87.79 0 2.28-1.08 3.84-.92.65.03 2.48.26 3.66 1.99-.1.06-2.18 1.27-2.16 3.79M13.85 3.2c.7-.85 1.17-2.03 1.04-3.2-1.01.04-2.23.67-2.95 1.52-.65.75-1.22 1.95-1.07 3.1 1.13.09 2.28-.57 2.98-1.42"/></svg>
             <span class="two"><small>iPhone-д</small>App Store</span>
           </a>
-          <a class="go go-dark" href="/app" data-web hidden style="margin-top:12px">Вэбээр нээх →</a>
+          <a class="go go-dark" href="/shop" data-web hidden style="margin-top:12px">Вэбээр нээх →</a>
         </div>
       </div>
     </div>
@@ -553,9 +554,9 @@ section.band{padding:clamp(72px,9vw,120px) 0}
         <p class="who">Улаанбаатар · <a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a><br>© <span id="year">2026</span> Basu</p>
       </div>
       <nav class="links" aria-label="Холбоос">
-        <a href="/idesh">Өвлийн идэш</a>
-        <a href="/app">Апп вэбээр</a>
-        <a href="/dine">Хоол</a>
+        <a href="/shop">Өвлийн идэш</a>
+        <a href="/orders">Миний захиалга</a>
+        <a href="#dine">Хоол</a>
         <a href="/dashboard">Бизнест</a>
         <a href="/supplier">Нийлүүлэгч</a>
         <a href="/terms">Үйлчилгээний нөхцөл</a>
@@ -571,16 +572,12 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 
 <script type="module">
 import { api, store, mnt } from '/api.js';
+import { accountSlot, esc } from '/site.js';
 
 const $ = (id) => document.getElementById(id);
-const esc = (value) => {
-  const node = document.createElement('span');
-  node.textContent = value ?? '';
-  return node.innerHTML;
-};
 
-// Somebody who already uses Basu goes straight to their own things.
-if (store.guestToken) $('mine').hidden = false;
+// The account in the corner: «Нэвтрэх» for nobody, a name and a menu for somebody.
+void accountSlot($('account'));
 $('year').textContent = String(new Date().getFullYear());
 
 // On Android there is no app yet: every App Store button becomes the web.
@@ -667,7 +664,7 @@ drawCalc();
  * front page that invents listings is lying to the first person who taps one.
  *
  * The stalls are for people signed in, so a stranger sees neither the board
- * nor the counts — «Зар үзэх» takes them to the door on /idesh.
+ * nor the counts — «Зар үзэх» takes them to the door on /login.
  */
 const STALL_PHOTO = {
   sheep: '/brand/meat/sheep.webp',
@@ -690,7 +687,7 @@ if (store.guestToken) {
       for (const l of shown) {
         const a = document.createElement('a');
         a.className = 'stall';
-        a.href = '/idesh';
+        a.href = `/shop/${l.id}`;
         const where = [l.supplier?.name, l.origin].filter(Boolean).join(' · ');
         a.innerHTML = `<img src="${STALL_PHOTO[l.kind] ?? STALL_PHOTO.sheep}" alt="" loading="lazy">
           <span><b>${esc(l.title)}</b><small>${esc(where)}</small></span>

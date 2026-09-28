@@ -2,6 +2,14 @@
 <html lang="mn">
 <head>
 <meta charset="utf-8">
+<script>
+/* This page is the phone app's. A browser gets the website's market,
+   or the order it was sent to, before anything here is drawn. */
+if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.basu)) {
+  var order = new URLSearchParams(location.search).get('order');
+  location.replace(order ? '/orders/' + encodeURIComponent(order) : '/shop');
+}
+</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F3F0">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0E0D">

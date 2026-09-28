@@ -2,6 +2,13 @@
 <html lang="mn">
 <head>
 <meta charset="utf-8">
+<script>
+/* Ordering ahead at a restaurant is the phone app's for now; a browser
+   gets the front page's word on it. */
+if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.basu)) {
+  location.replace('/#dine');
+}
+</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F3F0">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E0E0D">

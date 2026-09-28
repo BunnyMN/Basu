@@ -106,6 +106,7 @@ export {
   markHanded,
   housekeeping,
   liveFor,
+  allFor,
   detailFor,
   boardFor,
   homeOf,

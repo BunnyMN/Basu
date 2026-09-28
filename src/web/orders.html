@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="mn" data-theme="light" data-site>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
+<title>Миний захиалга — Basu</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/brand/favicon.png">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/site.css">
+<style>
+/* A person's orders, on the website: every one they paid for, then one of
+   them in full — where it stands, the code for the handover, who to ring,
+   and, when one was cancelled, where the money goes. */
+
+.so-tabs{display:flex;gap:8px;margin:0 0 20px}
+.so-tabs button{min-height:40px;padding:0 16px;border:1px solid var(--line);border-radius:999px;background:#fff;font:inherit;font-size:.9375rem;font-weight:500;color:var(--ink-2);cursor:pointer}
+.so-tabs button small{margin-left:6px;font-family:var(--mono);font-size:.75rem;color:var(--ink-3)}
+.so-tabs button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.so-tabs button[aria-pressed="true"] small{color:rgba(255,255,255,.6)}
+.so-list{border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.so-row{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:18px;align-items:center;padding:16px 20px;color:inherit;text-decoration:none;background:#fff}
+.so-row + .so-row{border-top:1px solid var(--line)}
+@media (hover:hover){.so-row:hover{background:var(--surface-2)}}
+.so-row img{width:72px;height:54px;border-radius:10px;object-fit:cover}
+.so-row b{display:block;font-weight:600;line-height:1.35}
+.so-row small{display:block;margin-top:3px;font-size:.875rem;color:var(--ink-2)}
+.so-row .end{text-align:right}
+.so-row .end .s-money{display:block;font-size:1.0625rem}
+.so-row .end .s-pill{margin-top:6px}
+@media (max-width:620px){.so-row{grid-template-columns:56px minmax(0,1fr);}.so-row img{width:56px;height:44px}.so-row .end{grid-column:2;text-align:left}}
+
+/* one order */
+.od{display:grid;grid-template-columns:minmax(0,7fr) minmax(320px,5fr);gap:32px;align-items:start;margin-top:20px}
+@media (max-width:960px){.od{grid-template-columns:1fr}}
+.od-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
+.od-head h1{margin:0;font-size:clamp(1.8rem,3vw,2.3rem);letter-spacing:-.03em}
+.od-sub{margin:8px 0 0;font-size:1rem;color:var(--ink-2)}
+.od-new{display:flex;gap:14px;align-items:flex-start;margin:22px 0 0;padding:18px 20px;border-radius:16px;background:var(--ready-soft);color:var(--ready)}
+.od-new svg{flex:none;width:24px;height:24px}
+.od-new b{display:block;font-size:1.0625rem}
+.od-new span{display:block;margin-top:2px;color:var(--ink-2)}
+.od-state{margin-top:24px;padding:26px}
+.od-state .big{font-size:1.5rem;font-weight:600;letter-spacing:-.02em}
+.od-state .cap{margin:6px 0 0;line-height:1.6;color:var(--ink-2)}
+.od-steps{list-style:none;margin:24px 0 0;padding:0}
+.od-steps li{position:relative;display:grid;grid-template-columns:28px 1fr auto;gap:14px;padding:0 0 22px}
+.od-steps li:last-child{padding-bottom:0}
+.od-steps li::before{content:"";position:absolute;left:13px;top:28px;bottom:2px;width:2px;background:var(--line)}
+.od-steps li:last-child::before{display:none}
+.od-steps li[data-done]::before{background:var(--ink)}
+.od-steps i{position:relative;z-index:1;width:28px;height:28px;border-radius:50%;border:2px solid var(--line-2);background:#fff;display:grid;place-items:center}
+.od-steps li[data-done] i{border-color:var(--ink);background:var(--ink);color:#fff}
+.od-steps li[data-next] i{border-color:var(--ink)}
+.od-steps li[data-next] i::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--ink)}
+.od-steps i svg{width:14px;height:14px}
+.od-steps b{display:block;font-weight:600;line-height:1.3;color:var(--ink-3)}
+.od-steps li[data-done] b,.od-steps li[data-next] b{color:var(--ink)}
+.od-steps span{display:block;margin-top:2px;font-size:.875rem;color:var(--ink-2)}
+.od-steps time{font-family:var(--mono);font-size:.8125rem;color:var(--ink-3)}
+.od-code{padding:24px;text-align:center}
+.od-code span{display:block;font-size:.875rem;color:var(--ink-2)}
+.od-code b{display:block;margin:8px 0;font-family:var(--mono);font-size:2.75rem;letter-spacing:.14em;line-height:1}
+.od-code small{display:block;font-size:.8125rem;line-height:1.5;color:var(--ink-3)}
+.od-side{display:grid;gap:16px}
+.od-box{padding:22px}
+.od-box h2{margin:0 0 12px;font-size:1rem;font-weight:600}
+.od-box dl{margin:0}
+.od-box dl div{display:grid;grid-template-columns:120px 1fr;gap:12px;padding:9px 0;border-top:1px solid var(--line);font-size:.9375rem}
+.od-box dl div:first-child{border-top:0}
+.od-box dt{color:var(--ink-3)}
+.od-box dd{margin:0;font-weight:500;overflow-wrap:anywhere}
+.od-box dd small{display:block;font-weight:400;color:var(--ink-2)}
+.od-box .s-btn{margin-top:14px}
+.od-note{margin:12px 0 0;font-size:.875rem;line-height:1.55;color:var(--ink-2)}
+.od-refund{margin-top:16px;padding:24px}
+.od-refund h2{margin:0;font-size:1.125rem}
+.od-refund p{margin:6px 0 18px;color:var(--ink-2);line-height:1.55}
+</style>
+</head>
+<body>
+<main class="s-main">
+  <div class="s-wrap" id="page"></div>
+</main>
+
+<script type="module">
+import { mnt, dayLabel, IDESH_HEADLINE } from '/api.js';
+import { mountFrame, requireSignIn, authed, esc, el, say } from '/site.js';
+
+const token = requireSignIn();
+void mountFrame('orders');
+const page = document.getElementById('page');
+
+const PHOTO = (kind) => `/brand/meat/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}.webp`;
+const unitWord = (o) => (o.unit === 'whole' ? 'толгой' : 'кг');
+const LIVE = ['PAID', 'PREPARING', 'READY', 'DISPATCHED'];
+const TONE = { PAID: 'route', PREPARING: 'dark', READY: 'ready', DISPATCHED: 'route', HANDED: 'ready', CLOSED: '', CANCELLED: 'stop', REFUNDED: '' };
+const pill = (state) => `<span class="s-pill" data-state="${state}"${TONE[state] ? ` data-tone="${TONE[state]}"` : ''}>${IDESH_HEADLINE[state]?.[0] ?? state}</span>`;
+const MARK = {
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
+  done: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16 10"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 12l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/></svg>',
+};
+
+/* ── every order ───────────────────────────────────────────────────── */
+
+async function drawList() {
+  page.replaceChildren(
+    el('<section class="s-head"><h1>Миний захиалга</h1><p>Төлсөн захиалга бүр энд. Нэгийг нь дарж явцыг нь харна.</p></section>'),
+    el('<div class="so-tabs" id="tabs" role="group" aria-label="Захиалга"></div>'),
+    el('<div id="list"><span class="s-skel" style="height:220px"></span></div>'),
+  );
+  const { orders } = await authed('/v1/idesh?scope=all');
+  const groups = { live: orders.filter((o) => LIVE.includes(o.state)), done: orders.filter((o) => !LIVE.includes(o.state)) };
+  let tab = groups.live.length || !groups.done.length ? 'live' : 'done';
+  const tabs = document.getElementById('tabs');
+  const paint = () => {
+    tabs.replaceChildren();
+    for (const [key, label] of [['live', 'Идэвхтэй'], ['done', 'Дууссан']]) {
+      const b = el(`<button type="button" data-tab="${key}" aria-pressed="${tab === key}">${label}<small>${groups[key].length}</small></button>`);
+      b.addEventListener('click', () => {
+        tab = key;
+        paint();
+      });
+      tabs.append(b);
+    }
+    const list = document.getElementById('list');
+    const rows = groups[tab];
+    if (!rows.length) {
+      list.replaceChildren(
+        el(tab === 'live'
+          ? '<div class="s-empty s-card"><b>Идэвхтэй захиалга алга</b>Өвлийн идшээ захиалахад энд гарна.<br><a class="s-btn s-btn-dark" href="/shop">Зах руу</a></div>'
+          : '<div class="s-empty s-card"><b>Дууссан захиалга алга</b>Хүлээж авсан, цуцлагдсан захиалга энд гарна.</div>'),
+      );
+      return;
+    }
+    const box = el('<div class="so-list"></div>');
+    for (const o of rows) {
+      box.append(
+        el(`<a class="so-row" href="/orders/${o.id}" data-order="${o.id}">
+              <img src="${PHOTO(o.kind)}" alt="" loading="lazy" width="72" height="54">
+              <span><b>${esc(o.title)} × ${o.qty} ${unitWord(o)}</b><small>№${esc(o.code)} · ${esc(o.supplier.name)} · ${o.receive === 'delivery' ? 'хүргэлт' : 'очиж авна'} ${dayLabel(o.receive_on)}</small></span>
+              <span class="end"><span class="s-money">${mnt(o.total_mnt)}</span>${pill(o.state)}</span>
+            </a>`),
+      );
+    }
+    list.replaceChildren(box);
+  };
+  paint();
+}
+
+/* ── one order ─────────────────────────────────────────────────────── */
+
+const STEPS = [
+  ['paid', 'Төлсөн', () => 'Төлбөр хүлээн авсан', () => 'Төлбөр хүлээгдэж байна'],
+  ['preparing', 'Бэлтгэж байна', () => 'Нийлүүлэгч эхэлсэн', () => 'Нийлүүлэгч мал нядалж, махыг бэлтгэнэ'],
+  ['ready', 'Бэлэн', () => 'Мах бэлэн болсон', (o) => `${dayLabel(o.receive_on)}-нд бэлэн болно`],
+  ['dispatched', 'Замд', () => 'Хүргэлтэнд гарсан', () => 'Хүргэгч ирэхийн өмнө танд залгана'],
+  ['handed', 'Хүлээлгэн өгсөн', () => 'Мах гарт орсон', () => 'Кодоо хэлээд махаа авна'],
+];
+const FACE = {
+  PAID: ['Захиалга баталгаажлаа', (o) => (o.receive === 'delivery' ? `Нийлүүлэгч ${dayLabel(o.receive_on)}-нд хаягаар тань хүргэнэ.` : `Нийлүүлэгч ${dayLabel(o.receive_on)}-нд махыг авах цэг дээр бэлэн байлгана.`)],
+  PREPARING: ['Мах бэлтгэгдэж байна', () => 'Нийлүүлэгч малыг нядалж, махыг бэлтгэж байна. Бэлэн болмогц мэдэгдэнэ.'],
+  READY: ['Мах бэлэн боллоо', (o) => (o.receive === 'delivery' ? 'Удахгүй замд гарна. Хүргэгч ирэхийн өмнө танд залгана.' : `Авах цэг дээр очоод ${esc(o.code)} кодоо хэлээд авна уу.`)],
+  DISPATCHED: ['Мах замд гарлаа', (o) => `Хүргэгч хаягаар тань очиж, ирэхдээ залгана. ${esc(o.code)} кодоо хэлээд хүлээн авна уу.`],
+  HANDED: ['Хүлээлгэн өгсөн', () => 'Мах гарт орлоо. Сайхан өвөлжөөрэй.'],
+  CLOSED: ['Захиалга дууссан', () => 'Энэ захиалга хаагдсан.'],
+  CANCELLED: ['Цуцлагдсан', (o) => (o.refund_mnt ? `Захиалга цуцлагдлаа.${o.forfeit_mnt ? ` Мал нядалсны дараа тул ${mnt(o.forfeit_mnt)} суутгав.` : ''} ${mnt(o.refund_mnt)} таны банкны данс руу буцна.` : 'Захиалга цуцлагдлаа.')],
+  REFUNDED: ['Мөнгө буцаасан', (o) => `${mnt(o.refund?.amount_mnt ?? o.refund_mnt ?? 0)} данс руу тань шилжүүлсэн.`],
+};
+const clockOf = (iso) => {
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+const BANKS = ['Хаан банк', 'Голомт банк', 'Худалдаа хөгжлийн банк', 'Хас банк', 'Төрийн банк', 'Капитрон банк', 'Ариг банк', 'Богд банк', 'М банк'];
+
+let drawn = null;
+async function drawOrder(id, fresh) {
+  const o = await authed(`/v1/idesh/${id}`);
+  const signature = `${o.state}|${o.refund?.state ?? ''}|${o.receipt ? 1 : 0}`;
+  if (drawn === signature) return o;
+  drawn = signature;
+  document.title = `№${o.code} — Basu`;
+  const delivery = o.receive === 'delivery';
+  const live = LIVE.includes(o.state);
+  const [word, cap] = FACE[o.state] ?? [o.state, () => ''];
+
+  const at = { paid: o.paid_at, preparing: o.preparing_at, ready: o.ready_at, dispatched: o.dispatched_at, handed: o.handed_at };
+  let nextFound = false;
+  const steps = o.state === 'CANCELLED' || o.state === 'REFUNDED' ? '' : `<ol class="od-steps">${STEPS.filter(([k]) => delivery || k !== 'dispatched')
+    .map(([k, label, done, ahead]) => {
+      const when = at[k];
+      const isNext = !when && !nextFound && o.state !== 'CLOSED';
+      if (isNext) nextFound = true;
+      return `<li${when ? ' data-done' : ''}${isNext ? ' data-next' : ''}><i>${when ? MARK.check : ''}</i><div><b>${label}</b><span>${when ? done(o) : ahead(o)}</span></div>${when ? `<time>${clockOf(when)}</time>` : '<span></span>'}</li>`;
+    })
+    .join('')}</ol>`;
+
+  page.replaceChildren(
+    el(`<a class="s-crumb" href="/orders">${MARK.back}Миний захиалга</a>`),
+    el(`<div class="s-head" style="padding-bottom:0">
+          <div class="od-head"><h1>Захиалга №${esc(o.code)}</h1>${pill(o.state)}</div>
+          <p class="od-sub">${esc(o.title)} × ${o.qty} ${unitWord(o)} · ${esc(o.supplier.name)}</p>
+        </div>`),
+  );
+  if (fresh && o.state === 'PAID') {
+    page.append(el(`<div class="od-new" role="status">${MARK.done}<div><b>Төлбөр амжилттай</b><span>Захиалга нийлүүлэгчид очлоо. Явцыг эндээс, мэдэгдлээр харна.</span></div></div>`));
+  }
+  const main = el('<div class="od"><div id="od-main"></div><div class="od-side" id="od-side"></div></div>');
+  page.append(main);
+  const left = main.querySelector('#od-main');
+  const side = main.querySelector('#od-side');
+
+  left.append(el(`<div class="s-card od-state"><div class="big">${word}</div><p class="cap">${cap(o)}</p>${steps}</div>`));
+  if (o.refund) left.append(refundBox(o));
+
+  if (live) {
+    side.append(
+      el(`<div class="s-card od-code"><span>${delivery ? 'Хүргэгчид энэ кодыг хэлнэ' : 'Мах авахдаа энэ кодыг хэлнэ'}</span><b>${esc(o.code)}</b><small>Кодоо сонссон нийлүүлэгч махыг өгнө. Өөр хүн очих бол кодыг хэлээд явуулж болно.</small></div>`),
+    );
+  }
+  side.append(
+    el(`<div class="s-card od-box">
+          <h2>Захиалга</h2>
+          <dl>
+            <div><dt>${delivery ? 'Хүргэх өдөр' : 'Очиж авах өдөр'}</dt><dd>${dayLabel(o.receive_on)}</dd></div>
+            <div><dt>${delivery ? 'Хүргэх хаяг' : 'Авах цэг'}</dt><dd>${esc(delivery ? o.address : o.pickup_address)}${delivery && o.address_phone ? `<small>Залгах утас: ${esc(o.address_phone)}</small>` : ''}</dd></div>
+            <div><dt>Төлсөн</dt><dd class="s-money">${mnt(o.total_mnt)}${o.delivery_fee_mnt ? `<small style="font-family:var(--sans)">Хүргэлт ${mnt(o.delivery_fee_mnt)} орсон</small>` : ''}</dd></div>
+            ${o.receipt ? `<div><dt>Е-баримт</dt><dd>Сугалаа ${esc(o.receipt.lottery ?? '')}</dd></div>` : ''}
+          </dl>
+        </div>`),
+    el(`<div class="s-card od-box">
+          <h2>Нийлүүлэгч</h2>
+          <dl><div><dt>Нэр</dt><dd>${esc(o.supplier.name)}<small>Basu шалгаж, гэрээ байгуулсан</small></dd></div></dl>
+          ${o.supplier_phone ? `<a class="s-btn s-btn-dark s-btn-block" href="tel:${esc(o.supplier_phone)}">${MARK.phone}${esc(o.supplier_phone)}</a>` : ''}
+          ${live ? '<p class="od-note">Өөрчлөх, цуцлах бол нийлүүлэгчтэй ярина уу — цуцлахыг тэр хийнэ.</p>' : ''}
+        </div>`),
+  );
+  return o;
+}
+
+/** A cancelled order asks one thing of its guest: the bank account the money goes to. */
+function refundBox(o) {
+  const r = o.refund;
+  if (r.state !== 'needs_account') {
+    return el(`<div class="s-card od-refund"><h2>${r.state === 'paid' ? 'Буцаалт шилжүүлсэн' : 'Буцаалт'}</h2>
+      <p><span class="s-money">${mnt(r.amount_mnt)}</span> · ${esc(r.bank_name ?? '')} ${esc(r.bank_account ?? '')} · ${esc(r.bank_holder ?? '')}<br>${r.state === 'paid' ? 'Данс руу тань шилжүүлсэн.' : 'Basu ажлын өдөрт шилжүүлж, SMS илгээнэ.'}</p></div>`);
+  }
+  const box = el(`<form class="s-card od-refund" novalidate>
+      <h2>Буцаалт авах данс</h2>
+      <p><span class="s-money">${mnt(r.amount_mnt)}</span> аль банкны ямар данс руу шилжүүлэхийг бичнэ үү. Basu шилжүүлмэгц SMS ирнэ.</p>
+      <label class="s-field"><span>Банк</span><input class="s-input" name="bank" list="banks" placeholder="Хаан банк" autocomplete="off"><datalist id="banks">${BANKS.map((b) => `<option value="${b}">`).join('')}</datalist></label>
+      <label class="s-field"><span>Дансны дугаар</span><input class="s-input" name="account" inputmode="numeric" placeholder="5012345678"></label>
+      <label class="s-field"><span>Данс эзэмшигчийн нэр</span><input class="s-input" name="holder" placeholder="Банкинд бүртгэлтэй нэр"></label>
+      <label class="s-field"><span>Нууц үг <small>— мөнгө тань руу очиж байгаа тул баталгаажуулна</small></span><input class="s-input" name="password" type="password" autocomplete="current-password"></label>
+      <button class="s-btn s-btn-dark s-btn-lg" type="submit">Данс илгээх</button>
+      <p class="s-error" role="alert"></p>
+    </form>`);
+  box.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const { bank, account, holder, password } = box.elements;
+    const error = box.querySelector('.s-error');
+    const problem = !bank.value.trim() ? 'Банкаа сонгоно уу.' : !/^\d{6,20}$/.test(account.value.replace(/\s+/g, '')) ? 'Дансны дугаар 6–20 оронтой тоо.' : holder.value.trim().length < 2 ? 'Данс эзэмшигчийн нэрээ бичнэ үү.' : !password.value ? 'Нууц үгээ оруулна уу.' : null;
+    error.textContent = problem ?? '';
+    if (problem) return;
+    const button = box.querySelector('[type="submit"]');
+    button.setAttribute('data-busy', '');
+    try {
+      await authed(`/v1/idesh/${o.id}/refund-account`, {
+        method: 'POST',
+        body: { bank_name: bank.value, bank_account: account.value, bank_holder: holder.value, password: password.value },
+      });
+      say('Данс бүртгэгдлээ. Шилжүүлмэгц SMS ирнэ.');
+      drawn = null;
+      await drawOrder(o.id);
+    } catch (e) {
+      error.textContent = e.code === 'BAD_PASSWORD' ? 'Нууц үг буруу байна.' : e.message;
+      button.removeAttribute('data-busy');
+    }
+  });
+  return box;
+}
+
+/* ── which page this is ────────────────────────────────────────────── */
+
+const orderId = location.pathname.match(/^\/orders\/([0-9a-f-]{36})$/)?.[1];
+if (token) {
+  try {
+    if (orderId) {
+      const fresh = new URLSearchParams(location.search).has('new');
+      if (fresh) history.replaceState(null, '', location.pathname);
+      const o = await drawOrder(orderId, fresh);
+      // Still going: look again now and then, so a supplier starting shows here.
+      if (LIVE.includes(o.state)) {
+        const poll = setInterval(() => {
+          if (document.hidden) return;
+          drawOrder(orderId).catch(() => clearInterval(poll));
+        }, 20000);
+        addEventListener('pagehide', () => clearInterval(poll));
+      }
+    } else {
+      await drawList();
+    }
+  } catch (error) {
+    if (error.status === 404) {
+      page.replaceChildren(el('<div class="s-empty"><b>Захиалга олдсонгүй</b><br><a class="s-btn s-btn-dark" href="/orders">Миний захиалга</a></div>'));
+    } else if (error.status !== 401) {
+      say(error.message, 'bad');
+    }
+  }
+}
+</script>
+</body>
+</html>

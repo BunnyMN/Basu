@@ -14,6 +14,7 @@ import {
   listingsOf,
   listSuppliers,
   liveFor,
+  allFor,
   markDispatched,
   markHanded,
   markReady,
@@ -266,8 +267,9 @@ export async function registerIdeshRoutes(
   /* ── the guest ─────────────────────────────────────────────────── */
 
   /** Everything of this guest's still going on — what the launcher draws. */
-  app.get('/v1/idesh', guarded, async (request) => ({
-    orders: (await liveFor(request.guestId!)).map(shapeSummary),
+  app.get<{ Querystring: { scope?: string } }>('/v1/idesh', guarded, async (request) => ({
+    // `scope=all` is the website's order history; without it, what is still going on.
+    orders: (request.query.scope === 'all' ? await allFor(request.guestId!) : await liveFor(request.guestId!)).map(shapeSummary),
   }));
 
   app.post<{

@@ -188,6 +188,26 @@ describe('ordering', () => {
     expect(wallet.json().lines[0].memo).toContain('Идэш');
   });
 
+  it('keeps every paid order in the history, finished ones too, and never a draft', async () => {
+    const token = await signIn('+97699001133');
+    await topUp(token, 1_000_000);
+    const { id } = await placeAndPay(token);
+    // Made but never paid: not an order anybody placed.
+    const draft = await app.inject({
+      method: 'POST',
+      url: '/v1/idesh',
+      headers: { ...auth(token), 'idempotency-key': 'draft-only' },
+      payload: { listing_id: sheep.id, qty: 1, receive: 'pickup', receive_on: '2026-09-12' },
+    });
+    expect(draft.statusCode, draft.body).toBe(201);
+
+    const all = await app.inject({ method: 'GET', url: '/v1/idesh?scope=all', headers: auth(token) });
+    expect(all.json().orders.map((o: { id: string }) => o.id)).toEqual([id]);
+    // Somebody else's history is theirs.
+    const other = await app.inject({ method: 'GET', url: '/v1/idesh?scope=all', headers: auth(await signIn('+97699001144')) });
+    expect(other.json().orders).toEqual([]);
+  });
+
   it('answers a retried request with the same order, not a second one', async () => {
     const token = await signIn();
     await topUp(token, 500_000);

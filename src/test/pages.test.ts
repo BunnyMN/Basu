@@ -82,6 +82,10 @@ async function openPage(
   // code the browser loads, minus the plumbing.
   const strip = (source: string) => source.replace(/\bexport\s+/g, '');
   const shared = strip(await readFile(join(WEB, 'api.js'), 'utf8'));
+  // The website's pages share site.js on top of api.js; the app's pages do not.
+  const site = html.includes("from '/site.js'")
+    ? strip((await readFile(join(WEB, 'site.js'), 'utf8')).replace(/^\s*import[\s\S]*?from\s*'\/[\w.]+';?$/gm, ''))
+    : '';
   const mapLib = strip(await readFile(join(WEB, 'mapStyle.js'), 'utf8'));
   const sideNav = strip(await readFile(join(WEB, 'sidenav.js'), 'utf8'));
   const inline = /<script type="module">([\s\S]*?)<\/script>/.exec(html)?.[1] ?? '';
@@ -89,7 +93,7 @@ async function openPage(
 
   stubMapLibre(window);
   window.eval(
-    `(async () => { ${shared}\n${mapLib}\n${sideNav}\n${page} })().catch(e => { window.__err = e; });`,
+    `(async () => { ${shared}\n${site}\n${mapLib}\n${sideNav}\n${page} })().catch(e => { window.__err = e; });`,
   );
   open.push(dom);
   return dom;
@@ -781,7 +785,7 @@ describe('the front page', () => {
     expect(stalls.length).toBeGreaterThan(0);
     expect(stalls.length).toBeLessThanOrEqual(6);
     for (const stall of stalls) {
-      expect(stall.getAttribute('href')).toBe('/idesh');
+      expect(stall.getAttribute('href')).toMatch(/^\/shop\/[0-9a-f-]{36}$/);
       expect(stall.querySelector('.money')?.textContent).toMatch(/₮ \/ (толгой|кг)$/);
     }
     expect((d.getElementById('board-empty') as HTMLElement).hidden).toBe(true);
@@ -799,6 +803,93 @@ describe('the front page', () => {
     expect(d.querySelectorAll('.stall')).toHaveLength(0);
     expect((d.getElementById('board-empty') as HTMLElement).hidden).toBe(false);
     expect(d.getElementById('board-empty')?.textContent).toContain('Анхны зарууд удахгүй');
+  });
+});
+
+describe('the website', () => {
+  it('signs in by password on its own door, and keeps the session', async () => {
+    const phone = '+97699005001';
+    await fetch(`${base}/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ phone, password: GUEST_PASSWORD }),
+    });
+    storage.removeItem('basu.guest');
+    const dom = await openPage('login.html', '?next=/orders');
+    const d = dom.window.document;
+    await until(dom, 'the door', () => d.documentElement.hasAttribute('data-ready'));
+    (d.querySelector('[data-go="password"]') as HTMLButtonElement).click();
+    expect((d.querySelector('.l-step[data-step="password"]') as HTMLElement).hidden).toBe(false);
+
+    const form = d.getElementById('pw-form') as HTMLFormElement;
+    (form.elements.namedItem('login') as HTMLInputElement).value = phone;
+    (form.elements.namedItem('password') as HTMLInputElement).value = 'буруу нууц үг';
+    form.dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
+    await until(dom, 'the refusal', () => (d.getElementById('pw-error')?.textContent ?? '').length > 0);
+    expect(storage.getItem('basu.guest')).toBeNull();
+
+    (form.elements.namedItem('password') as HTMLInputElement).value = GUEST_PASSWORD;
+    form.dispatchEvent(new dom.window.Event('submit', { cancelable: true }));
+    await until(dom, 'a session', () => Boolean(storage.getItem('basu.guest')));
+  });
+
+  it('keeps the market from somebody not signed in, and asks for no listing', async () => {
+    storage.removeItem('basu.guest');
+    const asked: string[] = [];
+    const dom = await openPage('shop.html', '', (path) => {
+      asked.push(path);
+      return undefined;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(asked.filter((path) => path.startsWith('/v1/idesh'))).toEqual([]);
+    expect(dom.window.document.querySelectorAll('.sh-card')).toHaveLength(0);
+  });
+
+  it('shows the market as cards, filters it, and orders from a stall', async () => {
+    await ownGuest('+97699005002');
+    const token = storage.getItem('basu.guest')!;
+    const shop = await openPage('shop.html');
+    const d = shop.window.document;
+    await until(shop, 'the cards', () => d.querySelectorAll('.sh-card').length >= seeded.listings);
+    // The account is in the corner, by name or number.
+    await until(shop, 'the account', () => Boolean(d.querySelector('.s-acct')));
+    expect(d.querySelector('.s-acct')?.textContent).toContain('+97699005002');
+
+    (d.querySelector('#kinds [data-kind="beef"]') as HTMLButtonElement).click();
+    const beef = [...d.querySelectorAll('.sh-card')];
+    expect(beef.length).toBeGreaterThan(0);
+    expect(beef.every((c) => c.getAttribute('data-kind') === 'beef')).toBe(true);
+
+    const whole = (await (await fetch(`${base}/v1/idesh/listings`, { headers: { authorization: `Bearer ${token}` } })).json()).listings
+      .find((l: { unit: string; remaining: number }) => l.unit === 'whole' && l.remaining > 0);
+    const stall = await openPage('shop.html', `/${whole.id}`);
+    const s = stall.window.document;
+    await until(stall, 'the order form', () => Boolean(s.getElementById('next')));
+    expect(s.querySelector('.sd-title h1')?.textContent).toBe(whole.title);
+    // A delivery needs an address before it goes further.
+    (s.querySelector('.sd-way[data-r="delivery"]') as HTMLButtonElement | null)?.click();
+    if (whole.delivers) {
+      (s.getElementById('next') as HTMLButtonElement).click();
+      expect(s.getElementById('form-error')?.textContent).toContain('хаяг');
+      (s.querySelector('.sd-way[data-r="pickup"]') as HTMLButtonElement).click();
+    }
+    (s.getElementById('next') as HTMLButtonElement).click();
+    await until(stall, 'the review', () => Boolean(s.getElementById('pay')));
+    (s.getElementById('pay') as HTMLButtonElement).click();
+
+    let orders: Array<{ id: string; code: string; title: string; state: string }> = [];
+    for (let i = 0; i < 80 && !orders.length; i++) {
+      orders = (await (await fetch(`${base}/v1/idesh?scope=all`, { headers: { authorization: `Bearer ${token}` } })).json()).orders;
+      if (!orders.length) await new Promise((resolve) => setTimeout(resolve, 60));
+    }
+    expect(orders[0]).toMatchObject({ title: whole.title, state: 'PAID' });
+
+    // …and it is on «Миний захиалга», and on its own page with the code.
+    const list = await openPage('orders.html');
+    await until(list, 'the order row', () => Boolean(list.window.document.querySelector(`[data-order="${orders[0]!.id}"]`)));
+    expect(list.window.document.querySelector(`[data-order="${orders[0]!.id}"]`)?.textContent).toContain(`№${orders[0]!.code}`);
+    const one = await openPage('orders.html', `/${orders[0]!.id}`);
+    await until(one, 'the handover code', () => one.window.document.querySelector('.od-code b')?.textContent === orders[0]!.code);
   });
 });
 

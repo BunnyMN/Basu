@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="mn" data-theme="light" data-site>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#FFFFFF">
+<title>Бүртгэл — Basu</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="/brand/favicon.png">
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/site.css">
+<style>
+/* The account, on the website: the name others see, how the person gets
+   back in, where they are signed in, and the way out. */
+
+.sa{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;max-width:760px}
+.sa-card{padding:26px}
+.sa-card h2{margin:0 0 4px;font-size:1.125rem;letter-spacing:-.01em}
+.sa-card > p{margin:0 0 18px;color:var(--ink-2);line-height:1.55}
+.s-field > .sa-name{display:flex;gap:10px;align-items:flex-start;margin:0;font-size:inherit;font-weight:400}
+.sa-name .s-input{flex:1}
+.sa-facts{margin:18px 0 0;border-top:1px solid var(--line)}
+.sa-facts div{display:grid;grid-template-columns:160px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);font-size:.9375rem}
+.sa-facts dt{color:var(--ink-3)}
+.sa-facts dd{margin:0;font-weight:500;overflow-wrap:anywhere}
+.sa-ways .section{margin:0}
+.sa-ways .section-label{display:none}
+.sa-sessions{margin:0;padding:0;list-style:none;border-top:1px solid var(--line)}
+.sa-sessions li{display:flex;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid var(--line)}
+.sa-sessions b{display:block;font-weight:600}
+.sa-sessions small{display:block;margin-top:2px;font-size:.8125rem;color:var(--ink-3)}
+.sa-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+@media (max-width:560px){.sa-facts div{grid-template-columns:1fr;gap:2px}.sa-name{flex-direction:column}.sa-name .s-btn{width:100%}}
+</style>
+</head>
+<body>
+<main class="s-main">
+  <div class="s-wrap">
+    <section class="s-head"><h1>Бүртгэл</h1><p>Таны нэр, нэвтрэх арга, нэвтэрсэн төхөөрөмжүүд.</p></section>
+    <div class="sa" id="sa"><span class="s-skel" style="height:260px"></span></div>
+  </div>
+</main>
+
+<script type="module">
+import { store, accountWays } from '/api.js';
+import { mountFrame, requireSignIn, authed, esc, el, say, signOut } from '/site.js';
+
+const token = requireSignIn();
+void mountFrame('account');
+const box = document.getElementById('sa');
+
+const since = (iso) => {
+  const d = new Date(iso);
+  return `${d.getFullYear()} оны ${d.getMonth() + 1}-р сарын ${d.getDate()}`;
+};
+const seen = (iso) => {
+  if (!iso) return 'Одоохондоо';
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+};
+
+async function draw() {
+  const me = await authed('/v1/me');
+  const profile = el(`
+    <form class="s-card sa-card" novalidate>
+      <h2>Профайл</h2>
+      <p>Нийлүүлэгч захиалгад тань энэ нэрийг харна.</p>
+      <label class="s-field" style="margin:0"><span>Нэр</span>
+        <span class="sa-name"><input class="s-input" name="name" autocomplete="name" placeholder="Таны нэр" value="${esc(me.display_name ?? '')}"><button class="s-btn s-btn-dark" type="submit">Хадгалах</button></span></label>
+      <dl class="sa-facts">
+        <div><dt>Имэйл</dt><dd>${esc(me.email ?? '—')}</dd></div>
+        <div><dt>Утас</dt><dd>${esc(me.phone ?? '—')}</dd></div>
+        <div><dt>Бүртгүүлсэн</dt><dd>${since(me.member_since)}</dd></div>
+      </dl>
+    </form>`);
+  profile.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const button = profile.querySelector('[type="submit"]');
+    button.setAttribute('data-busy', '');
+    try {
+      await authed('/v1/me', { method: 'PATCH', body: { display_name: profile.elements.name.value.trim() || null } });
+      say('Нэр хадгалагдлаа.');
+    } catch (error) {
+      say(error.message, 'bad');
+    } finally {
+      button.removeAttribute('data-busy');
+    }
+  });
+
+  const ways = el('<div class="s-card sa-card sa-ways"><h2>Нэвтрэх арга</h2><p>Нууц үгээ мартвал имэйлээр сэргээнэ.</p></div>');
+  ways.append(accountWays({ token: store.guestToken }));
+
+  const devices = el('<div class="s-card sa-card"><h2>Нэвтэрсэн төхөөрөмж</h2><p>Танихгүй төхөөрөмж байвал бусдаас нь гараарай.</p><ul class="sa-sessions" id="sessions"></ul><div class="sa-row"><button class="s-btn s-btn-line" type="button" id="others">Бусад бүх төхөөрөмжөөс гарах</button><button class="s-btn s-btn-dark" type="button" id="out">Гарах</button></div></div>');
+  box.replaceChildren(profile, ways, devices);
+
+  const paintSessions = async () => {
+    const { sessions } = await authed('/v1/me/sessions');
+    const list = devices.querySelector('#sessions');
+    list.replaceChildren(
+      ...sessions.map((s) =>
+        el(`<li><div><b>${esc(s.label || 'Төхөөрөмж')}</b><small>Сүүлд: ${seen(s.last_seen_at ?? s.created_at)}</small></div>${s.current ? '<span class="s-pill" data-tone="ready">Энэ төхөөрөмж</span>' : ''}</li>`),
+      ),
+    );
+    devices.querySelector('#others').disabled = sessions.filter((s) => !s.current).length === 0;
+  };
+  await paintSessions();
+  devices.querySelector('#others').addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    button.setAttribute('data-busy', '');
+    try {
+      const { revoked } = await authed('/v1/me/sessions/revoke', { method: 'POST' });
+      say(revoked ? `${revoked} төхөөрөмжөөс гаргалаа.` : 'Өөр төхөөрөмж алга.');
+      await paintSessions();
+    } catch (error) {
+      say(error.message, 'bad');
+    } finally {
+      button.removeAttribute('data-busy');
+    }
+  });
+  devices.querySelector('#out').addEventListener('click', () => void signOut());
+}
+
+if (token) {
+  try {
+    await draw();
+  } catch (error) {
+    if (error.status !== 401) say(error.message, 'bad');
+  }
+}
+</script>
+</body>
+</html>
