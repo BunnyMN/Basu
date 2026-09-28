@@ -509,8 +509,8 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .pill[data-s="ARMED"],.pill[data-s="applied"],.pill[data-s="due"],.pill[data-s="hold"],.pill[data-s="needs_account"],.pill[data-s="pending"],.pill[data-tone="hold"]{
   --tone:var(--hold);--tone-soft:var(--hold-soft);--tone-line:var(--hold-line);--tone-ink:var(--hold)}
 /* honey: committed, on the fire — warm, and never mistaken for the green of «done» */
-.chip[data-s="FIRED"],.chip[data-s="COOKING"],.chip[data-s="PREPARING"],
-.pill[data-s="FIRED"],.pill[data-s="COOKING"],.pill[data-s="PREPARING"]{
+.chip[data-s="FIRED"],.chip[data-s="COOKING"],.chip[data-s="PREPARING"],.chip[data-tone="hi"],
+.pill[data-s="FIRED"],.pill[data-s="COOKING"],.pill[data-s="PREPARING"],.pill[data-tone="hi"]{
   --tone:var(--hi);--tone-soft:var(--hi-soft);--tone-line:var(--hi-line);--tone-ink:var(--hi-ink)}
 /* the brand, where a chip means «Basu's own» */
 .chip[data-tone="accent"],.pill[data-tone="accent"]{

@@ -107,6 +107,9 @@ textarea.s-input{min-height:96px;padding:14px 16px;resize:vertical;line-height:1
 .s-pill[data-tone="dark"]{background:var(--deep);border-color:var(--deep);color:#fff}
 .s-pill[data-tone="brand"]{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink)}
 .s-pill[data-tone="hi"]{background:var(--hi-soft);border-color:var(--hi-line);color:var(--hi-ink)}
+/* the paid tiers: VIP in honey, Онцгой in pine, both solid so they read at a glance */
+.s-pill[data-tone="vip"]{background:var(--hi);border-color:var(--hi);color:#2B1F05}
+.s-pill[data-tone="pine"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .s-money{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap}
 .s-empty{padding:56px 24px;text-align:center;color:var(--ink-2)}
 .s-empty b{display:block;margin-bottom:6px;font-size:1.125rem;color:var(--ink)}

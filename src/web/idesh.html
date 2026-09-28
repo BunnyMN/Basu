@@ -95,6 +95,10 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 .listing .price .money{font-size:var(--t-title-3)}
 .listing .price small{display:block;font-size:var(--t-cap);color:var(--ink-2);margin-top:2px;white-space:normal}
 .listing[data-gone] .title{color:var(--ink-2)}
+/* a tier the supplier paid for: a warm or a pine wash on the row, and its mark before the name */
+.listing[data-tier="vip"]{background:color-mix(in srgb,var(--hi-soft) 70%,var(--surface))}
+.listing[data-tier="featured"]{background:color-mix(in srgb,var(--accent-soft) 55%,var(--surface))}
+.listing .tier{font-style:normal;margin-right:4px;vertical-align:1px}
 .listing[data-gone] .money{color:var(--ink-3)}
 .listing[data-gone] .art img{filter:grayscale(1)}
 
@@ -542,10 +546,10 @@ function paintListings() {
     const low = !gone_ && l.remaining <= Math.max(2, Math.ceil(l.quantity * 0.15));
     const item = el(`
       <li>
-        <button class="listing row" type="button" data-kind="${l.kind}" data-id="${l.id}"${gone_ ? ' data-gone' : ''} data-chev>
+        <button class="listing row" type="button" data-kind="${l.kind}" data-id="${l.id}"${l.tier ? ` data-tier="${l.tier}"` : ''}${gone_ ? ' data-gone' : ''} data-chev>
           <span class="art lead"><img src="${PHOTO(l.kind)}" alt="" loading="lazy" width="64" height="64"></span>
           <span class="who main">
-            <span class="name title">${escapeHtml(l.title)}</span>
+            <span class="name title">${l.tier ? `<i class="tier chip" data-size="sm" data-tone="${l.tier === 'vip' ? 'hi' : 'accent'}" data-strong>${l.tier === 'vip' ? '★ VIP' : 'Онцгой'}</i> ` : ''}${escapeHtml(l.title)}</span>
             <span class="from">${
               l.supplier.contracted ? `<i class="verified badge">${MARK.check}Гэрээт</i>` : ''
             }${escapeHtml(l.supplier.name)}</span>

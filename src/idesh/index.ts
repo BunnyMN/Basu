@@ -66,7 +66,19 @@ export {
   type Listing,
   type ListingInput,
   type ListingPatch,
+  TIERS,
+  type Tier,
 } from './listings.js';
+
+export {
+  startPromotion,
+  settlePromotion,
+  promotionsOf,
+  TIER_WORD,
+  type Plan,
+  type Promotion,
+  type Started,
+} from './promotions.js';
 
 export {
   registerSupplier,

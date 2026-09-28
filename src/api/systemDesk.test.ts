@@ -105,7 +105,15 @@ describe('the machine', () => {
     ]);
     expect(cold.database.migrations).toBeGreaterThan(20);
     expect(cold.rules).toEqual({ commission_pct: 2, forfeit_pct: 10, no_show_days: 3 });
-    expect(cold.settings.map((s: { key: string; value: unknown }) => [s.key, s.value])).toEqual([['sms_unit_mnt', 0], ['push_unit_mnt', 0], ['desk_banner', '']]);
+    expect(cold.settings.map((s: { key: string; value: unknown }) => [s.key, s.value])).toEqual([
+      ['sms_unit_mnt', 0],
+      ['push_unit_mnt', 0],
+      ['promo_featured_mnt', 20_000],
+      ['promo_featured_days', 7],
+      ['promo_vip_mnt', 50_000],
+      ['promo_vip_days', 7],
+      ['desk_banner', ''],
+    ]);
 
     await app.inject({ method: 'POST', url: '/dev/tick' });
     const warm = (await app.inject({ method: 'GET', url: '/v1/ops/system', headers: desk() })).json();

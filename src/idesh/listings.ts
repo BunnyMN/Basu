@@ -35,7 +35,15 @@ export interface Listing {
   delivers: boolean;
   deliveryFeeMnt: number;
   active: boolean;
+  /** The tier a supplier has paid for, while it holds; null for an ordinary listing. */
+  tier: Tier | null;
+  /** When that tier stops holding. */
+  tierUntil: Date | null;
 }
+
+/** What a supplier can pay for, highest last. */
+export type Tier = 'featured' | 'vip';
+export const TIERS: readonly Tier[] = ['featured', 'vip'];
 
 interface ListingRow {
   id: string;
@@ -57,15 +65,31 @@ interface ListingRow {
   delivers: boolean;
   delivery_fee_mnt: number;
   active: boolean;
+  tier: Tier | null;
+  tier_until: Date | null;
 }
 
+/**
+ * A listing, and the tier it holds at `$1`: the highest paid promotion whose
+ * time covers that moment, and the latest it runs to. Every query below puts
+ * the moment first, so the clock is the caller's — the demo's, or a test's.
+ */
 const SELECT = `
   SELECT l.id, l.supplier_id, s.name AS supplier, s.state = 'contracted' AS contracted,
          s.pickup_address, l.kind, l.unit, l.title, l.note, l.price_mnt, l.approx_kg,
          l.min_qty, l.quantity, l.sold, l.origin, to_char(l.ready_from, 'YYYY-MM-DD') AS ready_from,
-         l.delivers, l.delivery_fee_mnt, l.active
+         l.delivers, l.delivery_fee_mnt, l.active, p.tier, p.ends_at AS tier_until
     FROM idesh.listing l
-    JOIN idesh.supplier s ON s.id = l.supplier_id`;
+    JOIN idesh.supplier s ON s.id = l.supplier_id
+    LEFT JOIN LATERAL (
+      SELECT tier, ends_at FROM idesh.promotion
+       WHERE listing_id = l.id AND state = 'active' AND starts_at <= $1 AND ends_at > $1
+       ORDER BY (tier = 'vip') DESC, ends_at DESC
+       LIMIT 1
+    ) p ON true`;
+
+/** VIP first, featured next, the rest after: the order a guest is shown. */
+const TIER_FIRST = `CASE p.tier WHEN 'vip' THEN 0 WHEN 'featured' THEN 1 ELSE 2 END`;
 
 function shape(r: ListingRow): Listing {
   return {
@@ -91,6 +115,8 @@ function shape(r: ListingRow): Listing {
     delivers: r.delivers,
     deliveryFeeMnt: r.delivery_fee_mnt,
     active: r.active,
+    tier: r.tier,
+    tierUntil: r.tier ? r.tier_until : null,
   };
 }
 
@@ -99,26 +125,27 @@ function shape(r: ListingRow): Listing {
  * has sold out stays on the page marked so, rather than vanishing — a page
  * that shrinks as people buy from it looks broken, not popular.
  */
-export async function openListings(db: Db = getPool()): Promise<Listing[]> {
+export async function openListings(at: Date = new Date(), db: Db = getPool()): Promise<Listing[]> {
   const { rows } = await db.query<ListingRow>(
     `${SELECT}
       WHERE l.active AND s.active AND s.state = 'contracted'
-      ORDER BY l.ready_from, l.kind, l.price_mnt`,
+      ORDER BY ${TIER_FIRST}, l.ready_from, l.kind, l.price_mnt`,
+    [at],
   );
   return rows.map(shape);
 }
 
-export async function listingById(id: string, db: Db = getPool()): Promise<Listing | null> {
-  const { rows } = await db.query<ListingRow>(`${SELECT} WHERE l.id = $1`, [id]);
+export async function listingById(id: string, at: Date = new Date(), db: Db = getPool()): Promise<Listing | null> {
+  const { rows } = await db.query<ListingRow>(`${SELECT} WHERE l.id = $2`, [at, id]);
   const row = rows[0];
   return row ? shape(row) : null;
 }
 
 /** The supplier's own stall, sold-out and paused ones included. */
-export async function listingsOf(supplierId: string, db: Db = getPool()): Promise<Listing[]> {
+export async function listingsOf(supplierId: string, at: Date = new Date(), db: Db = getPool()): Promise<Listing[]> {
   const { rows } = await db.query<ListingRow>(
-    `${SELECT} WHERE l.supplier_id = $1 ORDER BY l.active DESC, l.ready_from, l.created_at`,
-    [supplierId],
+    `${SELECT} WHERE l.supplier_id = $2 ORDER BY l.active DESC, l.ready_from, l.created_at`,
+    [at, supplierId],
   );
   return rows.map(shape);
 }
@@ -187,7 +214,7 @@ export async function createListing(
       at,
     ],
   );
-  return (await listingById(rows[0]!.id, db))!;
+  return (await listingById(rows[0]!.id, at, db))!;
 }
 
 export interface ListingPatch {
@@ -269,5 +296,5 @@ export async function updateListing(
     throw error;
   }
   if (!updated.rows[0]) throw new IdeshError('NOT_FOUND', 'no such listing here');
-  return (await listingById(listingId, db))!;
+  return (await listingById(listingId, at, db))!;
 }

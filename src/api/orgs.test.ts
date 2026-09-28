@@ -167,7 +167,12 @@ describe('the people who work there', () => {
     };
     // Staff: the board, and the listings.
     expect((await call('GET', '/v1/supplier/board', staff)).statusCode).toBe(200);
-    expect((await call('POST', '/v1/supplier/listings', staff, listing)).statusCode).toBe(201);
+    const made = await call('POST', '/v1/supplier/listings', staff, listing);
+    expect(made.statusCode).toBe(201);
+    // …but paying Basu to put one first is the owner's or a manager's to do.
+    expect((await call('POST', `/v1/supplier/listings/${made.json().listing.id}/promote`, staff, { tier: 'vip' })).statusCode).toBe(403);
+    expect((await call('POST', `/v1/supplier/listings/${made.json().listing.id}/promote`, accountant, { tier: 'vip' })).statusCode).toBe(403);
+    expect((await call('POST', `/v1/supplier/listings/${made.json().listing.id}/promote`, owner, { tier: 'vip' })).statusCode).toBe(201);
     // …not the money, not the details.
     expect((await call('GET', '/v1/supplier/money', staff)).statusCode).toBe(403);
     expect((await call('PATCH', '/v1/supplier/profile', staff, { about: 'шинэ' })).statusCode).toBe(403);

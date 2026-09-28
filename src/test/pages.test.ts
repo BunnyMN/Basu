@@ -1246,6 +1246,43 @@ describe('өвлийн идэш', () => {
   });
 });
 
+describe('a listing put first', () => {
+  it('is bought from the stall in a popup, paid, and shown first with its mark everywhere', async () => {
+    const screen = await ownerScreen(seeded.suppliers[1]!.phone);
+    const d = screen.window.document;
+    await until(screen, 'the module', (doc) => Boolean(doc.querySelector('.tabs button[data-tab="stall"]')));
+    (d.querySelector('.tabs button[data-tab="stall"]') as HTMLElement).click();
+    await until(screen, 'the stall', (doc) => Boolean(doc.querySelector('.stall .row[data-listing] [data-a="promote"]')));
+    const row = [...d.querySelectorAll('.stall .row[data-listing]')].find((r) => r.querySelector('[data-a="promote"]')) as HTMLElement;
+    const id = row.getAttribute('data-listing')!;
+    const title = row.querySelector('.name')!.textContent!.trim();
+    (row.querySelector('[data-a="promote"]') as HTMLButtonElement).click();
+
+    // The two tiers at the desk's price; VIP is the one picked to start with.
+    await until(screen, 'the tiers', (doc) => doc.querySelectorAll('.promo-opt').length === 2);
+    expect([...d.querySelectorAll('.promo-opt .price')].map((p) => p.textContent)).toEqual(['20,000₮', '50,000₮']);
+    expect((d.querySelector('.promo-opt[data-tier="vip"] input') as HTMLInputElement).checked).toBe(true);
+    (d.querySelector('.popup [data-submit]') as HTMLButtonElement).click();
+
+    // The invoice, then «Төлсөн»: the demo's payments say yes at once.
+    await until(screen, 'the invoice', (doc) => doc.querySelector('.popup h2')?.textContent === 'QPay-ээр төлөх');
+    expect(d.querySelector('.promo-pay .amount')?.textContent).toBe('50,000₮');
+    (d.querySelector('.popup [data-submit]') as HTMLButtonElement).click();
+    await until(screen, 'the mark on the row', (doc) =>
+      Boolean(doc.querySelector(`.stall .row[data-listing="${id}"] .tier`)?.textContent?.startsWith('VIP')),
+    );
+
+    // Guests see it first, with its mark, in the app's list.
+    await ownGuest('+97699004015');
+    const guest = await openPage('idesh.html');
+    await until(guest, 'the stalls', (doc) => doc.querySelectorAll('.listing').length > 0);
+    const first = guest.window.document.querySelector('.listing') as HTMLElement;
+    expect(first.getAttribute('data-id')).toBe(id);
+    expect(first.getAttribute('data-tier')).toBe('vip');
+    expect(first.querySelector('.name')?.textContent).toContain(title.split(' ')[0]!);
+  });
+});
+
 describe('нийлүүлэгч болох', () => {
   it('takes an application on the supplier page, approves it on the ops page, and the applicant runs it', async () => {
     // A person of this test's own, signed in the demo way with their number.

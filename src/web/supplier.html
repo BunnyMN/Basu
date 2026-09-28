@@ -160,13 +160,25 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;
 .profile .hint b{font-weight:500;color:var(--ink)}
 .profile .callout{margin:0 0 16px}
 .profile #save{margin-top:8px}
+/* putting a listing first: its mark in the row, and the two tiers to choose from */
+.stall .row .tier{margin-left:6px}
+.promo-opts{display:grid;gap:10px}
+.promo-opt{display:grid;grid-template-columns:20px minmax(0,1fr) auto;gap:4px 12px;align-items:start;padding:14px;border:1px solid var(--line-2);border-radius:var(--r-md);background:var(--surface);cursor:pointer}
+.promo-opt:has(input:checked){border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:color-mix(in srgb,var(--accent-soft) 45%,var(--surface))}
+.promo-opt[data-tier="vip"]:has(input:checked){border-color:var(--hi);box-shadow:0 0 0 1px var(--hi);background:color-mix(in srgb,var(--hi-soft) 60%,var(--surface))}
+.promo-opt input{margin:2px 0 0}
+.promo-opt b{display:flex;align-items:center;gap:8px;font-size:var(--t-row)}
+.promo-opt small{grid-column:2 / -1;font-size:var(--t-cap);line-height:1.45;color:var(--ink-2)}
+.promo-opt .price{font-family:var(--mono);font-weight:600;white-space:nowrap}
+.promo-pay{display:grid;gap:10px;justify-items:start}
+.promo-pay .amount{font-family:var(--mono);font-size:1.75rem;font-weight:600}
 </style>
 </head>
 <body>
 <div id="root"></div>
 
 <script type="module">
-import { api, store, shell, toast, mnt, money, KIND, dayLabel, signInDoors, accountWays } from '/api.js';
+import { api, store, shell, toast, mnt, money, KIND, dayLabel, signInDoors, accountWays, popup } from '/api.js';
 import { NAV_ICON, deskFrame } from '/sidenav.js';
 
 const root = document.getElementById('root');
@@ -705,18 +717,22 @@ function renderRow(l) {
   const row = el(`
     <div class="card row"${l.active ? '' : ' data-off'} data-listing="${l.id}">
       <span class="main">
-        <span class="name title">${esc(l.title)}${l.active ? '' : ' <span class="chip" data-size="sm">зогссон</span>'}</span>
+        <span class="name title">${esc(l.title)}${l.active ? '' : ' <span class="chip" data-size="sm">зогссон</span>'}${
+          l.tier ? ` <span class="chip tier" data-size="sm" data-tone="${l.tier === 'vip' ? 'hi' : 'accent'}" data-strong>${l.tier === 'vip' ? 'VIP' : 'Онцгой'} · ${dayLabel(l.tier_until.slice(0, 10))} хүртэл</span>` : ''
+        }</span>
         <span class="sub">${KIND[l.kind]} · ${l.unit === 'whole' ? `бүтэн, ~${l.approx_kg} кг` : `кг-аар, доод ${l.min_qty} кг`} · ${esc(l.origin)} · ${dayLabel(l.ready_from)}-нөөс${l.delivers ? ` · хүргэлт ${mnt(l.delivery_fee_mnt)}` : ''}</span>
       </span>
       <span class="nums">
         <span class="num">${money(l.price_mnt)}<small>үнэ</small></span>
         <span class="num">${l.sold} / ${l.quantity}<small>зарагдсан</small></span>
       </span>
-      ${may('org.idesh.stall:edit') ? `<span class="btns">
-        <button class="btn" type="button" data-a="edit">Засах</button>
-        <button class="btn quiet" type="button" data-a="toggle">${l.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>
+      ${may('org.idesh.stall:edit') || may('org.idesh.stall:promote') ? `<span class="btns">
+        ${may('org.idesh.stall:promote') && l.active && l.remaining > 0 ? `<button class="btn" type="button" data-a="promote">${l.tier ? 'Сунгах' : 'Онцлох'}</button>` : ''}
+        ${may('org.idesh.stall:edit') ? `<button class="btn" type="button" data-a="edit">Засах</button>
+        <button class="btn quiet" type="button" data-a="toggle">${l.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>` : ''}
       </span>` : ''}
     </div>`);
+  row.querySelector('[data-a="promote"]')?.addEventListener('click', () => void promote(l));
   if (!may('org.idesh.stall:edit')) return row;
 
   const patch = async (body) => {
@@ -761,6 +777,75 @@ function renderRow(l) {
     row.replaceWith(form);
   });
   return row;
+}
+
+/**
+ * Put a listing first, paid to Basu. Two steps in one popup: pick the tier at
+ * the desk's price, then pay the QPay invoice and say so — the tier starts
+ * when the bank says the money arrived, not when the button is pressed.
+ */
+async function promote(l) {
+  let offer;
+  try {
+    offer = await sup('/v1/supplier/promotions');
+  } catch (error) {
+    return toast(error.message, 'bad');
+  }
+  const plans = offer.plans.filter((p) => !(l.tier === 'vip' && p.tier === 'featured'));
+  const WHAT = {
+    featured: 'Энгийн зараас дээгүүр, ногоон «Онцгой» тэмдэгтэй.',
+    vip: 'Бүх зараас дээр, тод хүрээтэй, шар «VIP» тэмдэгтэй. Нүүр хуудсанд эхэлж гарна.',
+  };
+  const cards = plans
+    .map(
+      (p, i) => `<label class="promo-opt" data-tier="${p.tier}">
+        <input type="radio" name="tier" value="${p.tier}"${i === plans.length - 1 ? ' checked' : ''}>
+        <b>${p.name}<span class="chip" data-size="sm" data-tone="${p.tier === 'vip' ? 'hi' : 'accent'}" data-strong>${p.days} хоног</span></b>
+        <span class="price">${p.price_mnt ? mnt(p.price_mnt) : 'Үнэгүй'}</span>
+        <small>${WHAT[p.tier]}${l.tier === p.tier ? ' Одоогийн хугацаан дээр нэмэгдэнэ.' : ''}</small>
+      </label>`,
+    )
+    .join('');
+  let started = null;
+  const done = await popup({
+    title: l.tier ? 'Онцлолтоо сунгах' : 'Зарыг онцлох',
+    sub: esc(l.title),
+    width: 520,
+    fields: [
+      { type: 'static', label: 'Зэрэглэл', html: `<div class="promo-opts">${cards}</div>` },
+      { type: 'note', text: 'Basu-д QPay-ээр, банкны аппаасаа төлнө. Төлбөр орсон даруйд эхэлж, хугацаа дуусахад энгийн зар болно.' },
+    ],
+    submit: 'Үргэлжлүүлэх',
+    onSubmit: async (values, box) => {
+      if (!started) {
+        started = await sup(`/v1/supplier/listings/${l.id}/promote`, { method: 'POST', body: { tier: values.tier } });
+        if (!started.invoice) return true;
+        const pay = started.invoice.action_url
+          ? `<a class="btn" data-v="primary" href="${esc(started.invoice.action_url)}" target="_blank" rel="noopener">QPay-ээр төлөх →</a>`
+          : '<span class="cap">Туршилтын сервер: нэхэмжлэх шууд төлөгдсөнд тооцогдоно.</span>';
+        box.step({
+          title: 'QPay-ээр төлөх',
+          sub: `${esc(started.promotion.name)} · ${started.promotion.days} хоног · ${esc(l.title)}`,
+          fields: [
+            { type: 'static', label: 'Төлөх дүн', html: `<div class="promo-pay"><span class="amount">${mnt(started.invoice.amount_mnt)}</span>${pay}</div>` },
+            { type: 'note', text: 'Банкны аппаасаа төлсний дараа «Төлсөн» дарна уу. Бид банкнаас шалгаад зарыг тань онцолно.' },
+          ],
+          submit: 'Төлсөн',
+        });
+        return false;
+      }
+      await sup(`/v1/supplier/promotions/${started.promotion.id}/settle`, { method: 'POST' });
+      return true;
+    },
+  });
+  if (!done) return;
+  toast(l.tier ? 'Хугацаа сунгагдлаа' : 'Зар онцлогдлоо');
+  try {
+    const { listings } = await sup('/v1/supplier/listings');
+    renderStall(listings);
+  } catch {
+    // The row keeps its old mark until the page is opened again.
+  }
 }
 
 function newForm() {

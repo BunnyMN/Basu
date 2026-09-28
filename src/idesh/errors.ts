@@ -19,7 +19,8 @@ export type IdeshErrorCode =
   | 'ALREADY_APPLIED'
   | 'NEEDS_PHONE'
   | 'NOT_PENDING'
-  | 'OPS_CLOSED';
+  | 'OPS_CLOSED'
+  | 'NOT_PROMOTABLE';
 
 export class IdeshError extends Error {
   constructor(

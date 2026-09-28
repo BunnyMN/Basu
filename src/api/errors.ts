@@ -90,6 +90,10 @@ const IDESH_ERRORS: Record<IdeshErrorCode, Spec> = {
     status: 503,
     mn: 'Ops хаалттай байна: сервер дээр OPS_TOKEN тохируулаагүй.',
   },
+  NOT_PROMOTABLE: {
+    status: 409,
+    mn: 'Энэ зарыг онцлох боломжгүй: зар зогссон, дууссан, эсвэл аль хэдийн VIP байна.',
+  },
 };
 
 const PASSWORD_ERRORS: Record<PasswordError['code'], Spec> = {

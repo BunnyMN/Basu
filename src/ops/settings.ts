@@ -15,6 +15,10 @@ export interface SettingSpec {
 export const SETTINGS: readonly SettingSpec[] = [
   { key: 'sms_unit_mnt', label: 'Нэг SMS-ийн үнэ, ₮', hint: 'CallPro-ийн гэрээний үнэ. Сарын зардлыг үүгээр тооцно.', kind: 'number', fallback: 0 },
   { key: 'push_unit_mnt', label: 'Нэг push-ийн үнэ, ₮', hint: 'Ихэвчлэн 0. APNs үнэгүй.', kind: 'number', fallback: 0 },
+  { key: 'promo_featured_mnt', label: 'Онцгой зарын үнэ, ₮', hint: 'Нийлүүлэгч нэг удаа төлөхөд. 0 бол үнэгүй.', kind: 'number', fallback: 20000 },
+  { key: 'promo_featured_days', label: 'Онцгой зарын хугацаа, хоног', hint: 'Төлснөөс хойш хэдэн хоног жагсаалтын дээд хэсэгт гарах.', kind: 'number', fallback: 7 },
+  { key: 'promo_vip_mnt', label: 'VIP зарын үнэ, ₮', hint: 'Нийлүүлэгч нэг удаа төлөхөд. 0 бол үнэгүй.', kind: 'number', fallback: 50000 },
+  { key: 'promo_vip_days', label: 'VIP зарын хугацаа, хоног', hint: 'Хамгийн дээр, нүүр хуудсанд хэдэн хоног гарах.', kind: 'number', fallback: 7 },
   { key: 'desk_banner', label: 'Ширээний зарлал', hint: 'Самбарын дээр бүх гишүүнд харагдана. Хоосон бол харагдахгүй.', kind: 'text', fallback: '' },
 ];
 

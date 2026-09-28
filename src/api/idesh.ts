@@ -48,7 +48,14 @@ import {
   type OrderScope,
   bankWouldChange,
   ownerOf,
+  startPromotion,
+  settlePromotion,
+  promotionsOf,
+  TIER_WORD,
+  type Plan,
+  type Promotion,
 } from '../idesh/index.js';
+import { setting } from '../ops/index.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import { confirmPassword, contactsFor, resolveGuest } from '../platform/identity/index.js';
 import { enqueue } from '../platform/notify/index.js';
@@ -120,6 +127,8 @@ const shapeListing = (l: Listing) => ({
   delivers: l.delivers,
   delivery_fee_mnt: l.deliveryFeeMnt,
   active: l.active,
+  tier: l.tier,
+  tier_until: l.tierUntil?.toISOString() ?? null,
 });
 
 
@@ -257,11 +266,11 @@ export async function registerIdeshRoutes(
 
   app.get('/v1/idesh/listings', async () => ({
     today: dayOf(ctx.clock.now()),
-    listings: (await openListings()).map(shapeListing),
+    listings: (await openListings(ctx.clock.now())).map(shapeListing),
   }));
 
   app.get<{ Params: { id: string } }>('/v1/idesh/listings/:id', async (request, reply) => {
-    const listing = await listingById(request.params.id);
+    const listing = await listingById(request.params.id, ctx.clock.now());
     if (!listing) return sendError(reply, new IdeshError('NOT_FOUND', 'no such listing'));
     return reply.send({ today: dayOf(ctx.clock.now()), listing: shapeListing(listing) });
   });
@@ -455,7 +464,7 @@ export async function registerIdeshRoutes(
    */
   const screen = async (supplierId: string) => {
     const board = await boardFor(supplierId);
-    const listings = (await listingsOf(supplierId)).map(shapeListing);
+    const listings = (await listingsOf(supplierId, ctx.clock.now())).map(shapeListing);
     const lane = (tickets: typeof board.lanes.paid) =>
       tickets.map((t) => ({
         ...shapeSummary(t),
@@ -748,8 +757,85 @@ export async function registerIdeshRoutes(
   );
 
   app.get('/v1/supplier/listings', asSupplierMay('org.idesh.stall'), async (request) => ({
-    listings: (await listingsOf(request.supplierSeat!.supplierId)).map(shapeListing),
+    listings: (await listingsOf(request.supplierSeat!.supplierId, ctx.clock.now())).map(shapeListing),
   }));
+
+  /* ── putting a listing first, paid to Basu ─────────────────────────── */
+
+  /** What each tier costs and holds for, as the desk has set it. */
+  const plans = async (): Promise<Plan[]> => {
+    const [featuredMnt, featuredDays, vipMnt, vipDays] = await Promise.all([
+      setting<number>('promo_featured_mnt'),
+      setting<number>('promo_featured_days'),
+      setting<number>('promo_vip_mnt'),
+      setting<number>('promo_vip_days'),
+    ]);
+    return [
+      { tier: 'featured', days: Math.max(1, Math.round(featuredDays)), priceMnt: Math.round(featuredMnt) },
+      { tier: 'vip', days: Math.max(1, Math.round(vipDays)), priceMnt: Math.round(vipMnt) },
+    ];
+  };
+  const shapePlan = (p: Plan) => ({ tier: p.tier, name: TIER_WORD[p.tier], days: p.days, price_mnt: p.priceMnt });
+  const shapePromotion = (p: Promotion) => ({
+    id: p.id,
+    listing_id: p.listingId,
+    listing_title: p.listingTitle,
+    tier: p.tier,
+    name: TIER_WORD[p.tier],
+    days: p.days,
+    price_mnt: p.priceMnt,
+    state: p.state,
+    starts_at: p.startsAt?.toISOString() ?? null,
+    ends_at: p.endsAt?.toISOString() ?? null,
+    paid_at: p.paidAt?.toISOString() ?? null,
+    created_at: p.createdAt.toISOString(),
+  });
+
+  app.get('/v1/supplier/promotions', asSupplierMay('org.idesh.stall'), async (request) => ({
+    plans: (await plans()).map(shapePlan),
+    may_buy: holds(request, 'org.idesh.stall:promote'),
+    promotions: (await promotionsOf(request.supplierSeat!.supplierId)).map(shapePromotion),
+  }));
+
+  /** Raise the QPay invoice for a tier on one of this supplier's listings. */
+  app.post<{ Params: { id: string }; Body: { tier?: string } }>(
+    '/v1/supplier/listings/:id/promote',
+    asSupplierMay('org.idesh.stall:promote'),
+    async (request, reply) => {
+      const plan = (await plans()).find((p) => p.tier === request.body?.tier);
+      if (!plan) return badRequest(reply, 'Онцгой эсвэл VIP-ийг сонгоно уу.', 'tier must be featured or vip');
+      try {
+        const started = await startPromotion(ctx, {
+          supplierId: request.supplierSeat!.supplierId,
+          listingId: request.params.id,
+          plan,
+          boughtBy: request.supplierSeat!.person,
+        });
+        return reply.status(201).send({
+          promotion: shapePromotion(started.promotion),
+          invoice: started.invoice
+            ? { topup_id: started.invoice.topupId, action_url: started.invoice.actionUrl, amount_mnt: started.invoice.amountMnt }
+            : null,
+        });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  /** Paid yet? Takes the money and starts the tier once the bank says so. */
+  app.post<{ Params: { id: string } }>(
+    '/v1/supplier/promotions/:id/settle',
+    asSupplierMay('org.idesh.stall:promote'),
+    async (request, reply) => {
+      try {
+        const done = await settlePromotion(ctx, request.supplierSeat!.supplierId, request.params.id);
+        return reply.send({ promotion: shapePromotion(done) });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
 
   app.post<{ Body: Record<string, unknown> }>(
     '/v1/supplier/listings',

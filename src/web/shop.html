@@ -37,6 +37,12 @@
 .sh-card .tags{position:absolute;left:10px;top:10px;right:10px;display:flex;justify-content:space-between;gap:6px}
 .sh-card .tags .s-pill{background:rgba(255,255,255,.94);border-color:transparent;color:var(--accent-ink)}
 .sh-card .tags .s-pill[data-tone="hi"]{background:var(--hi-soft);color:var(--hi-ink)}
+/* the paid tiers: VIP two columns wide with a honey ring, Онцгой a pine ring */
+.sh-card[data-tier="vip"] .ph{box-shadow:0 0 0 3px var(--hi)}
+.sh-card[data-tier="featured"] .ph{box-shadow:0 0 0 2px var(--accent)}
+.sh-card .tags .s-pill[data-tone="vip"]{background:var(--hi);color:#2B1F05}
+.sh-card .tags .s-pill[data-tone="pine"]{background:var(--accent);color:var(--on-accent)}
+@media (min-width:600px){.sh-card[data-tier="vip"]{grid-column:span 2}.sh-card[data-tier="vip"] .ph{aspect-ratio:8/3}}
 .sh-card[data-gone] .ph::after{content:"Дууссан";position:absolute;inset:0;display:grid;place-items:center;background:rgba(255,255,255,.72);font-weight:600;color:var(--ink)}
 .sh-card .bd{padding:14px 2px 0}
 .sh-card b{display:block;font-size:1.0625rem;font-weight:600;line-height:1.35}
@@ -197,10 +203,13 @@ function paintKinds() {
 function shown() {
   const list = market.listings.filter((l) => (view.kind === 'all' || l.kind === view.kind) && (!view.delivers || l.delivers));
   const open = (l) => (l.remaining > 0 ? 0 : 1);
-  if (view.sort === 'cheap') list.sort((a, b) => open(a) - open(b) || a.price_mnt - b.price_mnt);
-  else if (view.sort === 'dear') list.sort((a, b) => open(a) - open(b) || b.price_mnt - a.price_mnt);
-  else if (view.sort === 'soon') list.sort((a, b) => open(a) - open(b) || a.ready_from.localeCompare(b.ready_from));
-  else list.sort((a, b) => open(a) - open(b));
+  // A tier a supplier paid for holds in every order: VIP, then Онцгой, then the rest.
+  const rank = (l) => (l.tier === 'vip' ? 0 : l.tier === 'featured' ? 1 : 2);
+  const first = (a, b) => open(a) - open(b) || rank(a) - rank(b);
+  if (view.sort === 'cheap') list.sort((a, b) => first(a, b) || a.price_mnt - b.price_mnt);
+  else if (view.sort === 'dear') list.sort((a, b) => first(a, b) || b.price_mnt - a.price_mnt);
+  else if (view.sort === 'soon') list.sort((a, b) => first(a, b) || a.ready_from.localeCompare(b.ready_from));
+  else list.sort(first);
   return list;
 }
 
@@ -219,9 +228,11 @@ function paintGrid() {
   for (const l of list) {
     const gone = l.remaining === 0;
     grid.append(
-      el(`<a class="sh-card" href="/shop/${l.id}" data-id="${l.id}" data-kind="${l.kind}"${gone ? ' data-gone' : ''}>
+      el(`<a class="sh-card" href="/shop/${l.id}" data-id="${l.id}" data-kind="${l.kind}"${l.tier ? ` data-tier="${l.tier}"` : ''}${gone ? ' data-gone' : ''}>
             <span class="ph"><img src="${PHOTO(l.kind)}" alt="" loading="lazy" width="960" height="720">
-              <span class="tags">${l.supplier.contracted ? `<span class="s-pill">${MARK.check}Гэрээт</span>` : '<span></span>'}${
+              <span class="tags">${
+                l.tier ? `<span class="s-pill" data-tone="${l.tier === 'vip' ? 'vip' : 'pine'}">${l.tier === 'vip' ? '★ VIP' : `${MARK.check}Онцгой`}</span>`
+                : l.supplier.contracted ? `<span class="s-pill">${MARK.check}Гэрээт</span>` : '<span></span>'}${
                 l.delivers ? `<span class="s-pill" data-tone="hi">${MARK.truckSm}Хүргэлттэй</span>` : ''
               }</span></span>
             <span class="bd">
@@ -250,7 +261,7 @@ function drawStall(l) {
     el(`<a class="s-crumb" href="/shop">${MARK.back}Бүх зар</a>`),
     el(`<div class="sd-title">
           <h1>${esc(l.title)}</h1>
-          <div class="sd-who">${l.supplier.contracted ? `<span class="s-pill" data-tone="brand">${MARK.check}Гэрээт нийлүүлэгч</span>` : ''}<span>${esc(l.supplier.name)} · ${esc(l.origin)}</span></div>
+          <div class="sd-who">${l.tier ? `<span class="s-pill" data-tone="${l.tier === 'vip' ? 'vip' : 'pine'}">${l.tier === 'vip' ? '★ VIP' : 'Онцгой'}</span>` : ''}${l.supplier.contracted ? `<span class="s-pill" data-tone="brand">${MARK.check}Гэрээт нийлүүлэгч</span>` : ''}<span>${esc(l.supplier.name)} · ${esc(l.origin)}</span></div>
         </div>`),
     el(`<div class="sd">
           <div>

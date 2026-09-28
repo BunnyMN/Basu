@@ -90,7 +90,7 @@ export const PAGES: Record<Scope, PageSpec[]> = {
     { key: 'home', module: TOP, name: 'Нүүр', icon: 'overview' },
     { key: 'idesh.today', module: 'idesh', name: 'Өнөөдөр', icon: 'today', kind: 'supplier' },
     { key: 'idesh.orders', module: 'idesh', name: 'Захиалга', icon: 'orders', kind: 'supplier', actions: { act: 'Бэлтгэх, бэлэн болгох, хүлээлгэн өгөх, цуцлах' } },
-    { key: 'idesh.stall', module: 'idesh', name: 'Зар', icon: 'stall', kind: 'supplier', actions: { edit: 'Зар нэмэх, засах, зогсоох' } },
+    { key: 'idesh.stall', module: 'idesh', name: 'Зар', icon: 'stall', kind: 'supplier', actions: { edit: 'Зар нэмэх, засах, зогсоох', promote: 'Зарыг Онцгой, VIP болгох (Basu-д төлнө)' } },
     { key: 'idesh.money', module: 'idesh', name: 'Мөнгө', icon: 'pay', kind: 'supplier' },
     { key: 'idesh.profile', module: 'idesh', name: 'Профайл', icon: 'person', kind: 'supplier', actions: { edit: 'Нэр, мах авах цэг, тайлбар засах', bank: 'Мөнгө очих данс солих' } },
     { key: 'dine.orders', module: 'dine', name: 'Захиалга', icon: 'lunches', kind: 'restaurant', actions: { act: 'Захиалгыг гал тогоонд удирдах' } },

@@ -7,6 +7,7 @@ import { buildServer } from './server.js';
 import { createListing, registerSupplier, type Listing } from '../idesh/index.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
+import { setSetting } from '../ops/index.js';
 
 /**
  * Өвлийн идэш over HTTP, driven the way the page and the supplier's screen
@@ -165,6 +166,85 @@ describe('browsing', () => {
     });
     // A listing is not a phone book.
     expect(JSON.stringify(body)).not.toContain('+97688010001');
+  });
+});
+
+describe('putting a listing first', () => {
+  const stalls = async () =>
+    (await app.inject({ method: 'GET', url: '/v1/idesh/listings' })).json().listings as Array<{ id: string; tier: string | null; tier_until: string | null }>;
+
+  it('raises an invoice at the desk’s price, starts only once paid, and puts the listing first', async () => {
+    // Another supplier's listing, ready sooner: on its own it would come first.
+    const beef = await createListing(
+      rivalId,
+      { kind: 'beef', unit: 'kg', title: 'Үхрийн мах', priceMnt: 14_000, minQty: 10, quantity: 300, origin: 'Хэнтий', readyFrom: '2026-09-05' },
+      clock.now(),
+    );
+    expect((await stalls()).map((l) => l.id)).toEqual([beef.id, sheep.id]);
+
+    const owner = await atCounter(supplierId);
+    const offer = (await app.inject({ method: 'GET', url: '/v1/supplier/promotions', headers: auth(owner) })).json();
+    expect(offer.may_buy).toBe(true);
+    expect(offer.plans).toEqual([
+      { tier: 'featured', name: 'Онцгой', days: 7, price_mnt: 20_000 },
+      { tier: 'vip', name: 'VIP', days: 7, price_mnt: 50_000 },
+    ]);
+
+    const asked = await app.inject({ method: 'POST', url: `/v1/supplier/listings/${sheep.id}/promote`, headers: auth(owner), payload: { tier: 'vip' } });
+    expect(asked.statusCode, asked.body).toBe(201);
+    expect(asked.json().invoice).toMatchObject({ amount_mnt: 50_000 });
+    expect(asked.json().promotion).toMatchObject({ tier: 'vip', state: 'pending', starts_at: null });
+    // Not before the money: an unpaid invoice puts nothing first.
+    expect((await stalls())[0]!.id).toBe(beef.id);
+
+    const paid = await app.inject({ method: 'POST', url: `/v1/supplier/promotions/${asked.json().promotion.id}/settle`, headers: auth(owner) });
+    expect(paid.statusCode, paid.body).toBe(200);
+    const promotion = paid.json().promotion;
+    expect(promotion.state).toBe('active');
+    expect(new Date(promotion.ends_at).getTime() - new Date(promotion.starts_at).getTime()).toBe(7 * 86_400_000);
+    // Asked again, it answers with what holds rather than charging twice.
+    expect((await app.inject({ method: 'POST', url: `/v1/supplier/promotions/${promotion.id}/settle`, headers: auth(owner) })).json().promotion.id).toBe(promotion.id);
+
+    const now = await stalls();
+    expect(now.map((l) => [l.id, l.tier])).toEqual([[sheep.id, 'vip'], [beef.id, null]]);
+    expect(now[0]!.tier_until).toBe(promotion.ends_at);
+    // The money went to Basu, from the person who bought it.
+    const wallet = (await app.inject({ method: 'GET', url: '/v1/wallet', headers: auth(owner) })).json();
+    expect(wallet.lines[0]).toMatchObject({ subject: 'idesh_promo', amount_mnt: -50_000 });
+    expect(wallet.lines[0].memo).toContain('VIP');
+
+    // Its days run out, and the listing takes its ordinary place again.
+    clock.advanceMinutes(7 * 24 * 60 + 1);
+    expect((await stalls()).map((l) => [l.id, l.tier])).toEqual([[beef.id, null], [sheep.id, null]]);
+  });
+
+  it('adds the days on when the same tier is bought again, at whatever price the desk has set', async () => {
+    const owner = await atCounter(supplierId);
+    // The desk gives the featured tier away this week: no invoice, it starts at once.
+    await setSetting('promo_featured_mnt', 0, 'test');
+    await setSetting('promo_featured_days', 3, 'test');
+
+    const first = (await app.inject({ method: 'POST', url: `/v1/supplier/listings/${sheep.id}/promote`, headers: auth(owner), payload: { tier: 'featured' } })).json();
+    expect(first.invoice).toBeNull();
+    expect(first.promotion.state).toBe('active');
+    const second = (await app.inject({ method: 'POST', url: `/v1/supplier/listings/${sheep.id}/promote`, headers: auth(owner), payload: { tier: 'featured' } })).json();
+    expect(new Date(second.promotion.ends_at).getTime() - new Date(first.promotion.starts_at).getTime()).toBe(6 * 86_400_000);
+    expect((await stalls())[0]).toMatchObject({ id: sheep.id, tier: 'featured', tier_until: second.promotion.ends_at });
+    // A featured listing may go VIP; a VIP one is not sold the lesser tier.
+    await setSetting('promo_vip_mnt', 0, 'test');
+    expect((await app.inject({ method: 'POST', url: `/v1/supplier/listings/${sheep.id}/promote`, headers: auth(owner), payload: { tier: 'vip' } })).statusCode).toBe(201);
+    const lesser = await app.inject({ method: 'POST', url: `/v1/supplier/listings/${sheep.id}/promote`, headers: auth(owner), payload: { tier: 'featured' } });
+    expect(lesser.json().error.code).toBe('NOT_PROMOTABLE');
+  });
+
+  it('refuses another supplier’s listing, a paused one, and a tier that does not exist', async () => {
+    const rival = await atCounter(rivalId);
+    expect((await app.inject({ method: 'POST', url: `/v1/supplier/listings/${sheep.id}/promote`, headers: auth(rival), payload: { tier: 'vip' } })).statusCode).toBe(404);
+    const owner = await atCounter(supplierId);
+    expect((await app.inject({ method: 'POST', url: `/v1/supplier/listings/${sheep.id}/promote`, headers: auth(owner), payload: { tier: 'gold' } })).statusCode).toBe(400);
+    await app.inject({ method: 'PATCH', url: `/v1/supplier/listings/${sheep.id}`, headers: auth(owner), payload: { active: false } });
+    const paused = await app.inject({ method: 'POST', url: `/v1/supplier/listings/${sheep.id}/promote`, headers: auth(owner), payload: { tier: 'vip' } });
+    expect(paused.json().error.code).toBe('NOT_PROMOTABLE');
   });
 });
 
