@@ -967,22 +967,14 @@ describe('өвлийн идэш', () => {
     return title;
   }
 
-  it('shows a stranger the ways in, not the stalls', async () => {
+  it('shows a stranger the stalls — App Review asks for no account before products', async () => {
     storage.removeItem('basu.guest');
     const dom = await openPage('idesh.html');
     const d = dom.window.document;
-    await until(dom, 'the door', () => !(d.getElementById('gate') as HTMLElement).hidden);
-    expect(d.querySelectorAll('.listing')).toHaveLength(0);
-    expect((d.getElementById('listings') as HTMLElement).hidden).toBe(true);
-    expect((d.getElementById('kinds') as HTMLElement).hidden).toBe(true);
-    expect(d.getElementById('tally')?.textContent).toBe('');
-    expect(d.querySelector('#gate-doors .ways')).not.toBeNull();
-
-    // Signed in — here by the demo's own way, which has no inbox — the stalls open.
-    await until(dom, 'the demo way in', () => Boolean(d.querySelector('#gate .demo')));
-    (d.querySelector('#gate .demo') as HTMLButtonElement).click();
     await until(dom, 'the stalls', () => d.querySelectorAll('.listing').length >= seeded.listings);
-    expect((d.getElementById('gate') as HTMLElement).hidden).toBe(true);
+    // No door where the stalls are, and nobody signed in on the way through.
+    expect(d.getElementById('gate')).toBeNull();
+    expect(storage.getItem('basu.guest')).toBeNull();
   });
 
   it('says who is signed in, and signs out for real', async () => {
@@ -995,14 +987,14 @@ describe('өвлийн идэш', () => {
     expect(d.querySelectorAll('.listing').length).toBeGreaterThan(0);
 
     (d.getElementById('sign-out') as HTMLButtonElement).click();
-    await until(dom, 'the door', () => !(d.getElementById('gate') as HTMLElement).hidden);
-    expect((d.getElementById('listings') as HTMLElement).hidden).toBe(true);
-    expect((d.getElementById('me') as HTMLElement).hidden).toBe(true);
+    await until(dom, 'signed out', () => (d.getElementById('me') as HTMLElement).hidden);
     expect(storage.getItem('basu.guest')).toBeNull();
+    // Signed out, the stalls stay open to look at.
+    expect(d.querySelectorAll('.listing').length).toBeGreaterThan(0);
     // The session is over on the server too, not only forgotten here.
     let status = 0;
     for (let i = 0; i < 40 && status !== 401; i++) {
-      status = (await fetch(`${base}/v1/idesh/listings`, { headers: { authorization: `Bearer ${token}` } })).status;
+      status = (await fetch(`${base}/v1/me`, { headers: { authorization: `Bearer ${token}` } })).status;
       if (status !== 401) await new Promise((resolve) => setTimeout(resolve, 60));
     }
     expect(status).toBe(401);

@@ -128,16 +128,21 @@ afterAll(async () => {
 });
 
 describe('browsing', () => {
-  it('shows nothing to somebody who is not signed in', async () => {
+  it('lets anybody browse — App Review asks for no account before products — but not order', async () => {
     const list = await app.inject({ method: 'GET', url: '/v1/idesh/listings' });
-    expect(list.statusCode).toBe(401);
-    expect(list.body).not.toContain('Хонь, залуу ирэг');
+    expect(list.statusCode).toBe(200);
+    expect(list.body).toContain('Хонь, залуу ирэг');
     const one = await app.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}` });
-    expect(one.statusCode).toBe(401);
-    expect(one.body).not.toContain('Хонь, залуу ирэг');
-    // A token that means nothing is nobody.
-    const forged = await app.inject({ method: 'GET', url: '/v1/idesh/listings', headers: auth('not-a-session') });
-    expect(forged.statusCode).toBe(401);
+    expect(one.statusCode).toBe(200);
+    // Nothing of the owner rides along with a stall.
+    expect(one.body).not.toMatch(/\+976\d{8}/);
+    // Ordering is the account's: a stranger is refused.
+    const order = await app.inject({
+      method: 'POST',
+      url: '/v1/idesh',
+      payload: { listing_id: sheep.id, qty: 1, receive: 'pickup', receive_on: '2026-09-12' },
+    });
+    expect(order.statusCode).toBe(401);
   });
 
   it('shows every listing to a signed-in guest, with the supplier and the day it is ready', async () => {

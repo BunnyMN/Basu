@@ -51,11 +51,6 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 /* ── the filter and the stalls ───────────────────────────────────── */
 /* «14 зар · 4 гэрээт нийлүүлэгч» is a sentence, not a section eyebrow: sans, 13, ink-2 */
 .market > .section-label{min-height:0;margin:0 0 10px}
-/* the door where the stalls would be, for somebody not signed in */
-.gate{padding:24px 20px 20px}
-.gate h2{margin:0;font-size:var(--t-title-3);font-weight:600;line-height:var(--lh-snug)}
-.gate > p{margin:6px 0 18px;font-size:var(--t-body);line-height:var(--lh-body);color:var(--ink-2)}
-.gate .demo{margin-top:12px;width:100%}
 .market .tally{font-family:var(--sans);font-size:var(--t-cap);line-height:1.4;letter-spacing:0;text-transform:none;color:var(--ink-2)}
 .kinds{margin:0 0 12px}
 /* the pill stays 36px to look at; the thumb gets the full 44px (4.5) */
@@ -305,11 +300,6 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
   </div>
 
   <div class="market">
-  <section class="gate card" id="gate" hidden aria-labelledby="gate-title">
-    <h2 id="gate-title">Зарыг үзэхийн тулд нэвтэрнэ үү</h2>
-    <p>Идшийн зар зөвхөн Basu-д нэвтэрсэн хүнд харагдана. Google, имэйл эсвэл утасны дугаараараа нэвтэрнэ.</p>
-    <div id="gate-doors"></div>
-  </section>
   <div class="section-label" id="tally-row"><span class="n tally" id="tally"></span></div>
   <div class="kinds filter" id="kinds" role="group" aria-label="Малын төрөл"></div>
   <ul class="listings" id="listings" data-rows aria-busy="true">
@@ -334,7 +324,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
 <script type="module">
-import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, KIND, dayLabel, dayShort, signInSheet, signInDoors } from '/api.js';
+import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, KIND, dayLabel, dayShort, signInSheet } from '/api.js';
 import { mapStyle, ULAANBAATAR } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -457,28 +447,16 @@ async function guestApi(path, options = {}) {
 /* ── the stalls ──────────────────────────────────────────────────── */
 
 /**
- * The stalls are for people signed in to Basu, and the server holds to that
- * whatever this page does. Inside the phone app the shell's own sheet asks;
- * in a browser a stranger gets the ways in, drawn where the stalls would be,
- * and a session that has ended is treated the same.
+ * The stalls are open to anybody: App Review sends back an app that asks for
+ * an account before its products can be seen (guideline 5.1.1(v)), and the
+ * owner chose browsing. An account is asked for where one is needed — the
+ * order (`signIn` above: inside the phone app, the shell's own sheet).
  */
 async function loadListings() {
-  let token = store.guestToken;
-  if (!token && shell.present) token = await shell.signIn().catch(() => null);
+  const token = store.guestToken;
+  const answer = await api('/v1/idesh/listings');
   if (gone) return;
-  if (!token) return paintGate();
-  let answer;
-  try {
-    answer = await api('/v1/idesh/listings', { token });
-  } catch (error) {
-    if (error.status !== 401) throw error;
-    store.guestToken = null;
-    if (!gone) paintGate();
-    return;
-  }
-  if (gone) return;
-  showMarket(true);
-  void paintMe(token);
+  if (token) void paintMe(token);
   const { today, listings } = answer;
   state.today = today;
   state.listings = listings;
@@ -504,14 +482,12 @@ async function paintMe(token) {
   }
 }
 
-/** Sign out here: end this session on the server, forget it, and close the stalls. */
+/** Sign out here: end this session on the server and forget it; the stalls stay open to look at. */
 async function signOutHere() {
   const token = store.guestToken;
   store.guestToken = null;
   $('me').hidden = true;
-  state.listings = [];
   paintMine([]);
-  paintGate();
   if (!token) return;
   try {
     const { sessions } = await api('/v1/me/sessions', { token });
@@ -522,34 +498,6 @@ async function signOutHere() {
   }
 }
 $('sign-out').addEventListener('click', () => void signOutHere());
-
-/** The stalls, or the door in their place. */
-function showMarket(open) {
-  $('gate').hidden = open;
-  for (const id of ['tally-row', 'kinds', 'listings']) $(id).hidden = !open;
-}
-
-let gateDrawn = false;
-function paintGate() {
-  showMarket(false);
-  if (gateDrawn) return;
-  gateDrawn = true;
-  const signedIn = () => void Promise.all([loadListings(), loadMine()]).then(resume);
-  const doors = signInDoors({ device: 'Вэб', returnTo: location.pathname + location.search, onToken: signedIn });
-  $('gate-doors').replaceChildren(doors);
-  // The demo has no inbox to read a code from; a walkthrough skips straight in.
-  api('/dev/clock')
-    .then(() => {
-      const demo = el('<button class="btn demo" type="button">Демо: кодгүй нэвтрэх</button>');
-      demo.addEventListener('click', async () => {
-        const { token } = await api('/dev/login', { method: 'POST', body: {} });
-        store.guestToken = token;
-        signedIn();
-      });
-      $('gate').append(demo);
-    })
-    .catch(() => {});
-}
 
 function paintKinds() {
   const box = $('kinds');
@@ -1464,7 +1412,7 @@ function paintMine(orders) {
  * Two ways in: the Basu home screen deep-links an order (`/idesh?order=…`),
  * or the page is simply opened, in which case the guest's own orders sit at
  * the top and the stalls below. Nobody is signed in on the way through — a
- * stranger gets the ways in, not the stalls and not an account made for them.
+ * stranger gets the stalls to look at, and the way in only when ordering.
  */
 async function resume() {
   const wanted = new URLSearchParams(location.search).get('order');

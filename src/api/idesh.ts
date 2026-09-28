@@ -246,19 +246,21 @@ export async function registerIdeshRoutes(
   /** What a seat without the money sees of an amount that is the supplier's own: nothing. */
   const moneyFor = (request: FastifyRequest, value: number | null | undefined) => (holds(request, 'org.idesh.money') ? value ?? null : null);
 
-  /* ── browsing — for somebody signed in ─────────────────────────────
+  /* ── browsing — for anybody ────────────────────────────────────────
    *
-   * The stalls are shown to people with a Basu account and nobody else: a
-   * supplier's prices, stock and district are not for scraping, and a guest
-   * who can see a stall can also buy from it. The page asks a stranger to
-   * sign in first; this is the part that holds whatever the page does. */
+   * The stalls are open to whoever opens the app: App Review refuses an app
+   * that asks for an account before its products can be seen (guideline
+   * 5.1.1(v), 1.0.3 was sent back for it on 2026-09-26), and the owner chose
+   * browsing over a sign-in wall. An account is asked for where one is
+   * needed — ordering and paying (`/v1/idesh`, guarded below). What a stall
+   * shows is what its card shows: no phone, no bank, nothing of the owner. */
 
-  app.get('/v1/idesh/listings', guarded, async () => ({
+  app.get('/v1/idesh/listings', async () => ({
     today: dayOf(ctx.clock.now()),
     listings: (await openListings()).map(shapeListing),
   }));
 
-  app.get<{ Params: { id: string } }>('/v1/idesh/listings/:id', guarded, async (request, reply) => {
+  app.get<{ Params: { id: string } }>('/v1/idesh/listings/:id', async (request, reply) => {
     const listing = await listingById(request.params.id);
     if (!listing) return sendError(reply, new IdeshError('NOT_FOUND', 'no such listing'));
     return reply.send({ today: dayOf(ctx.clock.now()), listing: shapeListing(listing) });
