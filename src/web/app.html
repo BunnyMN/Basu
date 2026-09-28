@@ -70,7 +70,7 @@ main:has(.live[data-any]) .hello,main:has(.live[data-loading]) .hello{display:no
   transition:transform 120ms var(--ease),border-color var(--dur),background var(--dur);
 }
 .app .tile svg{width:34px;height:34px;fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-/* A tile with a photograph is the photograph, edge to edge: the thing itself, not a drawing of it. */
+/* A tile with art is the art, edge to edge — the render the iPhone launcher shows. */
 .app .tile:has(> img){padding:0;overflow:hidden;background:none}
 .app .tile > img{width:100%;height:100%;display:block;object-fit:cover}
 @media (hover:hover){.app:hover .tile{border-color:var(--line-2);background:var(--surface-2)}}
@@ -165,7 +165,7 @@ const SUPPLIER_APP = {
   tag: 'миний зар',
   href: '/supplier',
   // A ger with a sheep by its door: where the meat comes from.
-  icon: '<img src="/brand/supplier-tile.webp" alt="" width="92" height="92">',
+  icon: '<img src="/brand/supplier-tile.svg" alt="" width="92" height="92">',
 };
 
 function tileOf(app) {
