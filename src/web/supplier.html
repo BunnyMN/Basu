@@ -222,8 +222,27 @@ desk?.addEventListener?.('change', () => {
   if (document.getElementById('view')) openModule();
 });
 
+/**
+ * Inside the Basu app this page is one of the app's: the app owns the
+ * session, and the way out is the app's own home. It never signs anybody out
+ * of the app, and never draws a way in of its own — no code by email, no
+ * password form inside a page inside the app.
+ */
+function goHome() {
+  shell.post({ type: 'home' });
+}
+
+/** The app's session was refused: the app asks on its own sheet; closed, back home. */
+function askShell() {
+  shell.signIn().then(() => boot(), goHome);
+}
+
 /** Sign out of the session this page is using — and, having come from the dashboard, go back there. */
 function signOut() {
+  if (shell.present) {
+    askShell();
+    return;
+  }
   const used = token();
   if (store.guestToken === used) store.guestToken = null;
   if (store.opsToken === used) store.opsToken = null;
@@ -311,6 +330,10 @@ function signInCard() {
 
 /** The front door: a person, signed in as themselves. */
 function showLanding() {
+  if (shell.present) {
+    askShell();
+    return;
+  }
   root.replaceChildren(signInCard());
 }
 
@@ -329,7 +352,7 @@ async function showApply() {
   root.replaceChildren();
   const person = token();
   if (!person) {
-    root.append(signInCard());
+    showLanding();
     return;
   }
   let application;
@@ -341,6 +364,7 @@ async function showApply() {
     ]);
   } catch (error) {
     if (error.status === 401) {
+      if (shell.present) return askShell();
       if (store.guestToken === person) store.guestToken = null;
       if (store.opsToken === person) store.opsToken = null;
       root.append(signInCard());
@@ -971,20 +995,22 @@ function openModule() {
   // On a phone the page follows the phone's light or dark, as every guest page does.
   document.documentElement.removeAttribute('data-theme');
   const name = seat?.supplier?.name ?? '…';
-  const out = 'Гарах';
+  // Inside the app the corner button is the way home, one tap; in a browser it signs out, asked twice.
+  const out = shell.present ? 'Basu нүүр' : 'Гарах';
   const frame = el(`
     <div class="shell">
       <header class="bar topbar">
         <span class="conn" id="conn">Холбогдсон</span>
         <div class="title"><b class="supplier-name" id="supplier">${esc(name)}</b></div>
-        <div class="act"><button class="btn out" type="button" data-v="quiet" data-icon id="out" aria-label="${out}">${ICON.out}<span class="t sr-only">${out}</span></button></div>
+        <div class="act"><button class="btn out" type="button" data-v="quiet" data-icon id="out" aria-label="${out}">${shell.present ? ICON.left : ICON.out}<span class="t sr-only">${out}</span></button></div>
       </header>
       <nav class="tabs tabbar" aria-label="Хэсгүүд">
         ${tabs.map((t) => `<button type="button" data-tab="${t.key}">${t.icon}<span class="t">${t.label}</span></button>`).join('')}
       </nav>
       <main class="view" id="view"></main>
     </div>`);
-  frame.querySelector('#out').addEventListener('click', twoTaps([frame.querySelector('#out')], out, signOut));
+  const outButton = frame.querySelector('#out');
+  outButton.addEventListener('click', shell.present ? goHome : twoTaps([outButton], out, signOut));
   frame.querySelector('.tabs').addEventListener('click', (e) => {
     const button = e.target.closest('button[data-tab]');
     if (button) show(button.dataset.tab);
@@ -1037,7 +1063,7 @@ async function openDesk(tabs) {
       toDashboard(`#${current.id}/${item.key}`);
     },
     onWorkspace: (w) => toDashboard(`#${w.id}`),
-    onSignOut: () => ask(),
+    onSignOut: () => (shell.present ? goHome() : ask()),
   });
   const ask = twoTaps([frame.root.querySelector('#out')], 'Гарах', signOut);
   deskNav = frame;
