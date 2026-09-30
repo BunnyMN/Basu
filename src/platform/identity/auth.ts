@@ -515,6 +515,15 @@ export async function startSessionFor(ctx: Ctx, guestId: string, label?: string 
   return tx((client) => mintSession(client, guestId, ctx.clock.now(), label));
 }
 
+/**
+ * What a device calls itself, as a session keeps it: one line, short. It is
+ * whatever the device sent, and it is read back where a line break would
+ * pass for a line of the page's own — the desk's record, a list of sessions.
+ */
+function deviceLabel(label: unknown): string | null {
+  return typeof label === 'string' ? label.replace(/\s+/g, ' ').trim().slice(0, 60) || null : null;
+}
+
 async function mintSession(
   client: PoolClient,
   guestId: string,
@@ -527,7 +536,7 @@ async function mintSession(
     `INSERT INTO identity.guest_session
        (guest_id, token_hash, expires_at, created_at, last_seen_at, label)
      VALUES ($1, $2, $3, $4, $4, $5)`,
-    [guestId, sha256(token), expiresAt, now, label?.slice(0, 60) || null],
+    [guestId, sha256(token), expiresAt, now, deviceLabel(label)],
   );
   return { token, guestId, expiresAt };
 }

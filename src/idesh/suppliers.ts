@@ -346,16 +346,19 @@ export async function applicationOf(_ctx: Ctx, guestId: string): Promise<Applica
  * Yes. The row becomes a supplier, the applicant its owner, and they are
  * told by SMS: they sign in to /supplier as themselves, and bring in the
  * people who work there by giving them roles.
+ *
+ * Says what it approved, for the desk's record: the supplier's name, and
+ * whether the account the applicant gave is now one money may go to.
  */
-export async function approveSupplier(ctx: Ctx, supplierId: string): Promise<void> {
+export async function approveSupplier(ctx: Ctx, supplierId: string): Promise<{ name: string; bankVerified: boolean }> {
   const now = ctx.clock.now();
   const approved = await tx(async (client) => {
-    const { rows } = await client.query<{ owner_guest_id: string | null; name: string }>(
+    const { rows } = await client.query<{ owner_guest_id: string | null; name: string; bank_verified: boolean }>(
       `UPDATE idesh.supplier
           SET state = 'contracted', contracted_at = $2, decided_at = $2,
              bank_verified_at = CASE WHEN bank_account IS NOT NULL THEN $2::timestamptz ELSE NULL END, decline_reason = NULL
         WHERE id = $1 AND state = 'applied'
-        RETURNING owner_guest_id, name`,
+        RETURNING owner_guest_id, name, bank_verified_at IS NOT NULL AS bank_verified`,
       [supplierId, now],
     );
     return rows[0] ?? null;
@@ -375,10 +378,14 @@ export async function approveSupplier(ctx: Ctx, supplierId: string): Promise<voi
       dedupeKey: `supplier:${supplierId}:approved`,
     });
   }
+  return { name: approved.name, bankVerified: approved.bank_verified };
 }
 
-/** No, and why. The row stays as the record; the person may ask again. */
-export async function declineSupplier(ctx: Ctx, supplierId: string, reason: string): Promise<void> {
+/**
+ * No, and why. The row stays as the record; the person may ask again.
+ * Says whom it declined, and the reason as the applicant is told it.
+ */
+export async function declineSupplier(ctx: Ctx, supplierId: string, reason: string): Promise<{ name: string; reason: string }> {
   const now = ctx.clock.now();
   const why = reason.trim() || 'шалтгаан заагаагүй';
   const { rows } = await getPool().query<{ owner_guest_id: string | null; name: string }>(
@@ -403,6 +410,7 @@ export async function declineSupplier(ctx: Ctx, supplierId: string, reason: stri
       dedupeKey: `supplier:${supplierId}:declined:${now.getTime()}`,
     });
   }
+  return { name: declined.name, reason: why };
 }
 
 export interface SupplierRow {

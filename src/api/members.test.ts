@@ -4,11 +4,11 @@ import { closePool, getPool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { FakeMailer, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
-import { seedRestaurant, sessionRowOf, storedAudit, truncateAll } from '../test/seed.js';
+import { seedRestaurant, sessionRowOf, storeAudit, storedAudit, truncateAll } from '../test/seed.js';
 import { NO_GRANTS } from '../platform/access/index.js';
 import { setMemberRole, syncMembersFromEnv, upsertMember } from '../ops/index.js';
 import { relay } from '../platform/notify/index.js';
-import { opsToken } from './ops.js';
+import { actingAs, opsToken } from './ops.js';
 import { buildServer } from './server.js';
 
 /**
@@ -844,5 +844,113 @@ describe('the desk’s record names the account and the session that acted', () 
       { id: (await sessionRowOf(own)).id, label: 'Сараагийн утас', signed_in_at: clock.now().toISOString() },
       { id: (await sessionRowOf(left)).id, label: 'Оффисын компьютер', signed_in_at: at('11:40').toISOString() },
     ]);
+  });
+
+  it('writes what the desk does with suppliers — registered, approved, declined — under the account, the session and the seat', async () => {
+    // An ops seat: it registers suppliers and answers applications, and does not hold the contract's terms.
+    const token = await seatedByEmail('ops@gmail.com', 'ops');
+    const account = await accountId(token);
+    const seatId = (await me(token)).json().member.id as string;
+    const session = await sessionRowOf(token);
+    const as = bearer(token);
+
+    // A supplier written straight in with an account to pay, which is one money may go to at once.
+    await byPhone('+97699110031', 'Дорж');
+    const made = await app.inject({
+      method: 'POST',
+      url: '/v1/ops/suppliers',
+      headers: as,
+      payload: { name: 'Хэнтий · Хэрлэн', phone: '+97699110031', address: 'Эмээлт', bank_name: 'Хаан банк', bank_account: '5012 3456 78', bank_holder: 'Д. Дорж' },
+    });
+    expect(made.statusCode, made.body).toBe(201);
+    // Two applications, each with the applicant's own account: one taken, one not.
+    const application = async (phone: string, name: string, bankAccount: string) => {
+      const person = await byPhone(phone, name);
+      const asked = await app.inject({
+        method: 'POST',
+        url: '/v1/supplier/apply',
+        headers: bearer(person.token),
+        payload: { name, address: 'Хархорин зах', bank_name: 'Голомт', bank_account: bankAccount, bank_holder: name },
+      });
+      expect(asked.statusCode, asked.body).toBe(201);
+      return asked.json().id as string;
+    };
+    const taken = await application('+97699110032', 'Завхан · Бат', '1105012345');
+    const refused = await application('+97699110033', 'Увс · Сараа', '1105067890');
+    expect((await app.inject({ method: 'POST', url: `/v1/ops/suppliers/${taken}/approve`, headers: as, payload: {} })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'POST', url: `/v1/ops/suppliers/${refused}/decline`, headers: as, payload: { reason: 'ТТД баталгаажаагүй' } })).statusCode).toBe(200);
+
+    const written = (await storedAudit()).filter((row) => String(row['action']).startsWith('supplier.'));
+    expect(written.map((row) => [row['action'], row['target_id'], row['note']])).toEqual([
+      ['supplier.decline', refused, 'Увс · Сараа · ТТД баталгаажаагүй'],
+      ['supplier.approve', taken, 'Завхан · Бат · данс баталгаажуулсан'],
+      ['supplier.register', made.json().id, 'Хэнтий · Хэрлэн · эзэмшигч +97699110031 · данс оруулж баталгаажуулсан'],
+    ]);
+    for (const row of written) {
+      expect(row).toMatchObject({ who: 'ops:ops@gmail.com', actor_guest: account, actor_session: session.id, actor_member: seatId });
+      // That an account came with it, never the account's number.
+      for (const digits of ['5012', '1105012345', '1105067890']) expect(JSON.stringify(row)).not.toContain(digits);
+    }
+  });
+
+  it('keeps what a device calls itself to one line, whatever it sent', async () => {
+    const made = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/register',
+      payload: { phone: '+97699110041', password: 'миний нууц үг', name: 'Номин', device: '  Ops\nБүртгэл:\tadmin@basu.mn  ' },
+    });
+    expect(made.statusCode, made.body).toBe(201);
+    const token = made.json().token as string;
+    expect((await seat({ guest_id: made.json().guest_id, role: 'finance' })).statusCode).toBe(201);
+    expect(await exported(token)).toBe(200);
+    const [line] = (await record(token)).filter((a) => a.action === 'ledger.export');
+    expect(line?.session?.label).toBe('Ops Бүртгэл: admin@basu.mn');
+  });
+
+  it('still names a session somebody has since signed out of, and an account since closed — by the same ids', async () => {
+    const person = await byPhone('+97699110051', 'Тэмүүлэн');
+    const given = await seat({ guest_id: person.id, role: 'finance' });
+    expect(given.statusCode).toBe(201);
+    const session = await sessionRowOf(person.token);
+    expect(await exported(person.token)).toBe(200);
+
+    // Signed out, and the account closed on the desk — its seat switched off first, as it has to be.
+    expect((await app.inject({ method: 'POST', url: '/v1/auth/sign-out', headers: bearer(person.token) })).statusCode).toBe(204);
+    const signedOut = (await record(opsToken()!)).find((a) => a.action === 'ledger.export');
+    expect(signedOut?.session).toEqual({ id: session.id, label: null, signed_in_at: at('11:40').toISOString() });
+    expect((await setActive(given.json().id, false)).statusCode).toBe(200);
+    const closed = await app.inject({ method: 'POST', url: `/v1/ops/guests/${person.id}/close`, headers: desk(), payload: { note: 'бичгээр хүссэн' } });
+    expect(closed.statusCode, closed.body).toBe(200);
+
+    const line = (await record(opsToken()!)).find((a) => a.action === 'ledger.export');
+    expect(line).toMatchObject({
+      who: 'ops:Тэмүүлэн',
+      member_id: given.json().id,
+      // Nothing of the person is left to show; the ids are the record, and stay.
+      account: { id: person.id, name: null, email: null, phone: null, closed: true },
+      session: { id: session.id, signed_in_at: at('11:40').toISOString() },
+    });
+  });
+
+  it('reads a line from before it named anybody as the name alone, and never takes a session or a seat without the account', async () => {
+    const line = { who: 'ops:Бат', action: 'ledger.export', target_kind: 'ledger', target_id: '00000000-0000-0000-0000-000000000000' };
+    // A line as the desk wrote them before: who, and nothing else.
+    await storeAudit({ ...line, note: 'хуучин' });
+    const [old] = await record(opsToken()!);
+    expect(old).toMatchObject({ who: 'ops:Бат', note: 'хуучин', member_id: null, account: null, session: null });
+
+    const someone = '11111111-1111-1111-1111-111111111111';
+    for (const column of ['actor_session', 'actor_member']) {
+      await expect(storeAudit({ ...line, [column]: someone })).rejects.toMatchObject({ code: '23514' });
+    }
+  });
+
+  it('writes a request that has an account but no seat as the account alone, rather than failing after it acted', () => {
+    const sitting = { id: 'the-seat', name: 'Бат', role: 'ops', roleName: 'Ops', locked: false, phone: null, email: null, grants: NO_GRANTS };
+    expect(actingAs({ guestId: 'the-account', sessionId: 'the-session', ops: sitting })).toEqual({ account: 'the-account', session: 'the-session', member: 'the-seat' });
+    // Let in by a guard that is not the desk's: an account, and no seat.
+    expect(actingAs({ guestId: 'the-account', sessionId: 'the-session' })).toEqual({ account: 'the-account', session: 'the-session', member: null });
+    // The demo's shared secret: a seat, and nobody's account.
+    expect(actingAs({ ops: { ...sitting, id: 'demo' } })).toEqual({ account: null, session: null, member: null });
   });
 });

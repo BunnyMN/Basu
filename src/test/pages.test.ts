@@ -2241,8 +2241,8 @@ describe('the desk’s record', () => {
     const theirs = (d: Document) => [...d.querySelectorAll('#audit tr.dt-row')].find((r) => r.querySelector('.dt-two b')?.textContent === 'Түүхч');
     await until(dash, 'their line in the record', (d) => Boolean(theirs(d)));
     const who = theirs(dash.window.document)!.querySelector('.dt-two')!;
-    // The account by its number, and the device by the name it gave — shown, never run.
-    expect(who.querySelector('small')?.textContent).toBe('+97688039001 · <img src=x onerror="window.__owned=1">');
+    // The account by its number, the device by the name it gave — shown, never run — and when it signed in.
+    expect(who.querySelector('small')?.textContent).toMatch(/^\+97688039001 · <img src=x onerror="window\.__owned=1"> · \d{1,2}\/\d{1,2} \d{2}:\d{2}-д нэвтэрсэн$/);
     expect(dash.window.document.querySelector('#audit img')).toBeNull();
     expect((dash.window as unknown as { __owned?: number }).__owned).toBeUndefined();
     expect(who.getAttribute('title')).toMatch(/^Бүртгэл: Түүхч, \+97688039001\nНэвтрэлт: <img src=x onerror="window.__owned=1">, .+-д нэвтэрсэн$/);
@@ -2252,6 +2252,82 @@ describe('the desk’s record', () => {
     expect(demo).toBeDefined();
     expect(demo!.querySelector('small')).toBeNull();
     expect(demo!.hasAttribute('title')).toBe(false);
+  });
+
+  /** Somebody signed up with a name and a device, and seated at the desk in that role by the demo's shared secret. */
+  async function seatedAs(phone: string, name: string, role: string, device = 'Ops'): Promise<{ token: string; guestId: string }> {
+    const desk = ((await (await fetch(`${base}/dev/ops-token`)).json()) as { token: string }).token;
+    const made = await fetch(`${base}/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ phone, password: GUEST_PASSWORD, name, device }),
+    });
+    const { token, guest_id: guestId } = (await made.json()) as { token: string; guest_id: string };
+    const seated = await fetch(`${base}/v1/ops/members`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${desk}` },
+      body: JSON.stringify({ guest_id: guestId, role }),
+    });
+    expect(seated.status).toBe(201);
+    return { token, guestId };
+  }
+  const sessionIdOf = async (token: string) =>
+    (await getPool().query<{ id: string }>('SELECT id FROM identity.guest_session WHERE token_hash = $1', [createHash('sha256').update(token).digest('hex')])).rows[0]!.id;
+
+  it('tells one person’s two sessions apart on the line itself, where every dashboard sign-in is «Ops»', async () => {
+    // Signed in this morning on the office computer, and again now on another: both call themselves «Ops».
+    const { token: earlier } = await seatedAs('+97688039011', 'Хоёрдугаар', 'ops');
+    await getPool().query(`UPDATE identity.guest_session SET created_at = created_at - interval '3 hours' WHERE id = $1`, [await sessionIdOf(earlier)]);
+    const signedIn = await fetch(`${base}/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ login: '+97688039011', password: GUEST_PASSWORD, device: 'Ops' }),
+    });
+    const { token: now } = (await signedIn.json()) as { token: string };
+    // Each registers a supplier for an owner already on Basu.
+    for (const [token, owner, supplier] of [
+      [earlier, '+97688039012', 'Өглөөний нийлүүлэгч'],
+      [now, '+97688039013', 'Үдийн нийлүүлэгч'],
+    ] as const) {
+      await fetch(`${base}/v1/auth/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone: owner, password: GUEST_PASSWORD }) });
+      const made = await fetch(`${base}/v1/ops/suppliers`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: supplier, phone: owner, address: 'Нарантуул, 3-р хаалга' }),
+      });
+      expect(made.status).toBe(201);
+    }
+
+    const dash = await openPage('ops.html', '', undefined, device(now));
+    await opsTab(dash, 'audit');
+    const theirs = (d: Document) => [...d.querySelectorAll('#audit tr.dt-row')].filter((r) => r.querySelector('.dt-two b')?.textContent === 'Хоёрдугаар');
+    await until(dash, 'both their lines in the record', (d) => theirs(d).length === 2);
+    const rows = theirs(dash.window.document);
+    // What they did, in the desk's words.
+    expect(rows.map((r) => r.querySelector('td[data-label="Үйлдэл"]')?.textContent)).toEqual(['Нийлүүлэгч бүртгэсэн', 'Нийлүүлэгч бүртгэсэн']);
+    // One account, the same device name, and two sign-ins three hours apart — read without hovering.
+    const lines = rows.map((r) => r.querySelector('.dt-two small')?.textContent ?? '');
+    for (const line of lines) expect(line).toMatch(/^\+97688039011 · Ops · \d{1,2}\/\d{1,2} \d{2}:\d{2}-д нэвтэрсэн$/);
+    expect(new Set(lines).size).toBe(2);
+  });
+
+  it('keeps the hover to the lines it writes, whatever a name or a device carried', async () => {
+    const { token } = await seatedAs('+97688039021', 'Хуурамч\nНэвтрэлт: Оффисын компьютер', 'finance');
+    // A device that named itself over two lines before a session kept its name to one.
+    await getPool().query('UPDATE identity.guest_session SET label = $2 WHERE id = $1', [await sessionIdOf(token), 'Ops\nБүртгэл: admin@basu.mn']);
+    expect((await fetch(`${base}/v1/ops/money/topups.csv`, { headers: { authorization: `Bearer ${token}` } })).status).toBe(200);
+
+    const dash = await openPage('ops.html', '', undefined, device(token));
+    await opsTab(dash, 'audit');
+    const theirs = (d: Document) => [...d.querySelectorAll('#audit tr.dt-row .dt-two')].find((c) => c.querySelector('b')?.textContent?.startsWith('Хуурамч'));
+    await until(dash, 'their line in the record', (d) => Boolean(theirs(d)));
+    const who = theirs(dash.window.document)!;
+    // Two lines, the account's and the session's, each saying all it was given on one line.
+    const hover = who.getAttribute('title')!.split('\n');
+    expect(hover).toHaveLength(2);
+    expect(hover[0]).toBe('Бүртгэл: Хуурамч Нэвтрэлт: Оффисын компьютер, +97688039021');
+    expect(hover[1]).toMatch(/^Нэвтрэлт: Ops Бүртгэл: admin@basu\.mn, .+-д нэвтэрсэн$/);
+    expect(who.querySelector('small')?.textContent).toMatch(/^\+97688039021 · Ops Бүртгэл: admin@basu\.mn · \d{1,2}\/\d{1,2} \d{2}:\d{2}-д нэвтэрсэн$/);
   });
 });
 

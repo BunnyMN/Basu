@@ -23,6 +23,7 @@ import {
   statsFor,
   updateSupplier,
   verifySupplierBank,
+  type AuditActor,
   type AuditLine,
   type CancelReason,
   type IdeshState,
@@ -212,6 +213,22 @@ export async function deskSeatFor(
   };
 }
 
+/**
+ * Who a desk request acts as, for the record: the account, the session it
+ * came in on and the seat, each by id. None of the three for the demo's
+ * shared secret, which is nobody's account; and a request that has an
+ * account but no seat — one a guard other than the desk's let in — is
+ * written as the account alone rather than failing after it has acted.
+ */
+export function actingAs(request: Pick<FastifyRequest, 'guestId' | 'sessionId' | 'ops'>): AuditActor {
+  const account = request.guestId ?? null;
+  return {
+    account,
+    session: account ? (request.sessionId ?? null) : null,
+    member: account && request.ops ? request.ops.id : null,
+  };
+}
+
 const shape = (s: SupplierRow) => ({
   id: s.id,
   name: s.name,
@@ -288,16 +305,7 @@ export async function registerOpsRoutes(
    * records writes through here, so none can leave them out. The demo's
    * shared secret has none of the three.
    */
-  const audit = (request: FastifyRequest, line: AuditLine) =>
-    recordAudit({
-      ...line,
-      who: who(request),
-      by: {
-        account: request.guestId ?? null,
-        session: request.sessionId ?? null,
-        member: request.guestId ? request.ops!.id : null,
-      },
-    });
+  const audit = (request: FastifyRequest, line: AuditLine) => recordAudit({ ...line, who: who(request), by: actingAs(request) });
 
   /**
    * Whoever is changing a seat, as `ops/` weighs them: what their seat opens,
@@ -548,6 +556,10 @@ export async function registerOpsRoutes(
    * email, the supplier's phone when not given — and holds the business's
    * owner role from the start; the people who work there come in by that
    * role, as in any business.
+   *
+   * An account written in here is one money may go to at once, so the
+   * record says whose business it made and that it came with an account —
+   * never the account's number.
    */
   app.post<{
     Body: {
@@ -593,15 +605,30 @@ export async function registerOpsRoutes(
         bankAccount: body.bank_account,
         bankHolder: body.bank_holder,
       });
+      // Written the way the row is: an account of nothing but spaces is none.
+      const withAccount = Boolean(body.bank_account?.replace(/\s+/g, ''));
+      await audit(request, {
+        action: 'supplier.register',
+        targetKind: 'supplier',
+        targetId: id,
+        note: `${body.name.trim()} · эзэмшигч ${owner.email ?? owner.phone ?? owner.guestId}${withAccount ? ' · данс оруулж баталгаажуулсан' : ''}`,
+      });
       return reply.status(201).send({ id, owner: { id: owner.guestId, name: owner.name, phone: owner.phone, email: owner.email } });
     } catch (error) {
       return sendError(reply, error);
     }
   });
 
+  /** Yes to an application — and the account the applicant gave, if any, is one money may go to from now. */
   app.post<{ Params: { id: string } }>('/v1/ops/suppliers/:id/approve', desk('desk.suppliers:manage'), async (request, reply) => {
     try {
-      await approveSupplier(ctx, request.params.id);
+      const approved = await approveSupplier(ctx, request.params.id);
+      await audit(request, {
+        action: 'supplier.approve',
+        targetKind: 'supplier',
+        targetId: request.params.id,
+        note: `${approved.name}${approved.bankVerified ? ' · данс баталгаажуулсан' : ''}`,
+      });
       return reply.send({ state: 'contracted' });
     } catch (error) {
       return sendError(reply, error);
@@ -613,7 +640,8 @@ export async function registerOpsRoutes(
     desk('desk.suppliers:manage'),
     async (request, reply) => {
       try {
-        await declineSupplier(ctx, request.params.id, request.body?.reason ?? '');
+        const declined = await declineSupplier(ctx, request.params.id, request.body?.reason ?? '');
+        await audit(request, { action: 'supplier.decline', targetKind: 'supplier', targetId: request.params.id, note: `${declined.name} · ${declined.reason}` });
         return reply.send({ state: 'declined' });
       } catch (error) {
         return sendError(reply, error);

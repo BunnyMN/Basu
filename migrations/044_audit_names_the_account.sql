@@ -16,7 +16,10 @@
 --
 -- No foreign keys, as everywhere across the line: the record outlives what
 -- it names and is never edited. A closed account's id stays here, naming
--- nobody; a session's row is only ever revoked, never deleted.
+-- nobody; a session's row is only ever revoked, never deleted. Whatever
+-- comes to clear out expired sessions (docs/security-and-admin-architecture.md
+-- §4) must keep the ones named here, or their lines lose the device and the
+-- sign-in time that tell one of somebody's sessions from another.
 
 ALTER TABLE idesh.audit
   ADD COLUMN actor_guest   uuid,

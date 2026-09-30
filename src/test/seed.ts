@@ -206,6 +206,18 @@ export async function storedAudit(db: Db = getPool()): Promise<Array<Record<stri
   return rows;
 }
 
+/**
+ * A line put straight into the desk's record, column by column: as the desk
+ * wrote them before it named anybody, or as no code is allowed to.
+ */
+export async function storeAudit(line: Record<string, string | null>, db: Db = getPool()): Promise<void> {
+  const columns = Object.keys(line);
+  await db.query(
+    `INSERT INTO idesh.audit (${columns.join(', ')}) VALUES (${columns.map((_, i) => `$${i + 1}`).join(', ')})`,
+    Object.values(line),
+  );
+}
+
 /** The row identity keeps for a session, found by its token's hash the way the server finds it. */
 export async function sessionRowOf(token: string, db: Db = getPool()): Promise<{ id: string; guestId: string; tokenHash: string }> {
   const tokenHash = createHash('sha256').update(token).digest('hex');

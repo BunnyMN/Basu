@@ -4045,6 +4045,7 @@ function renderPay(view) {
 
 const ACTION = {
   'order.cancel': 'Захиалга цуцалсан', 'order.hand': 'Хүлээлгэн өгсөн гэж тэмдэглэсэн', 'order.resend': 'Мэдэгдэл дахин илгээсэн', 'order.no_show': 'Ирээгүй гэж тэмдэглэсэн',
+  'supplier.register': 'Нийлүүлэгч бүртгэсэн', 'supplier.approve': 'Нийлүүлэгчийн хүсэлт баталсан', 'supplier.decline': 'Нийлүүлэгчийн хүсэлт татгалзсан',
   'supplier.suspend': 'Нийлүүлэгчийг түр зогсоосон', 'supplier.activate': 'Нийлүүлэгчийг идэвхжүүлсэн', 'supplier.terms': 'Гэрээний нөхцөл өөрчилсөн',
   'supplier.bank_verify': 'Данс баталгаажуулсан', 'listing.hide': 'Зар нуусан',
   'settlement.approve': 'Олголт баталсан', 'settlement.paid': 'Олголт шилжүүлсэн гэж тэмдэглэсэн',
@@ -4069,24 +4070,32 @@ const TARGET_WORD = {
 
 /**
  * Who did it: the member's name, as the record has always said, and under
- * it the account and the device its session was signed in on — two people
- * may share a name, and a browser left signed in acts in its owner's.
- * Hovered, the account's own name, and when that session was signed in:
- * the time the person's list of sessions shows it by. A line from before
- * the record kept these, or from the demo's shared key, has the name alone.
- * Built as a node, so the hover is set as text and never parsed.
+ * it the account, the device its session was signed in on, and when — two
+ * people may share a name, a browser left signed in acts in its owner's,
+ * and every sign-in to the dashboard calls itself «Ops», so the time is
+ * what tells one of somebody's sessions from another. It is on the line,
+ * where a phone and a screen reader find it too. Hovered, the account's own
+ * name as well, and the day in words. A line from before the record kept
+ * these, or from the demo's shared key, has the name alone.
+ *
+ * Every part is one line: a name or a device may carry a line break, and
+ * the hover must not gain a line nobody wrote. The cell is built as a node,
+ * so the hover is set as text and never parsed.
  */
 function auditWho(a) {
-  const account = a.account && (a.account.email ?? a.account.phone ?? (a.account.closed ? 'хаагдсан бүртгэл' : 'бүртгэл'));
-  const device = a.session && (a.session.label ?? 'нэргүй төхөөрөмж');
-  const cell = el(dtCell.two(a.who.replace(/^ops:/, ''), [account, device].filter(Boolean).join(' · ')));
-  const signedIn = (iso) => {
-    const d = new Date(iso);
-    return `${d.getMonth() + 1}-р сарын ${d.getDate()} ${clockOf(iso)}`;
-  };
+  const line = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
+  const name = a.account ? line(a.account.name) : '';
+  const contact = a.account ? line(a.account.email ?? a.account.phone) : '';
+  const label = a.session ? line(a.session.label) : '';
+  const iso = a.session?.signed_in_at;
+  const day = iso && new Date(iso);
+  const account = a.account && (contact || (a.account.closed ? 'хаагдсан бүртгэл' : 'бүртгэл'));
+  const device = a.session && (label || 'нэргүй төхөөрөмж');
+  const signedIn = iso && `${day.getMonth() + 1}/${day.getDate()} ${clockOf(iso)}-д нэвтэрсэн`;
+  const cell = el(dtCell.two(a.who.replace(/^ops:/, ''), [account, device, signedIn].filter(Boolean).join(' · ')));
   const hover = [
-    a.account && `Бүртгэл: ${[a.account.name, a.account.email ?? a.account.phone].filter(Boolean).join(', ') || (a.account.closed ? 'хаагдсан' : '—')}`,
-    a.session && `Нэвтрэлт: ${[a.session.label, a.session.signed_in_at && `${signedIn(a.session.signed_in_at)}-д нэвтэрсэн`].filter(Boolean).join(', ') || '—'}`,
+    a.account && `Бүртгэл: ${[name, contact].filter(Boolean).join(', ') || (a.account.closed ? 'хаагдсан' : '—')}`,
+    a.session && `Нэвтрэлт: ${[label, iso && `${day.getMonth() + 1}-р сарын ${day.getDate()} ${clockOf(iso)}-д нэвтэрсэн`].filter(Boolean).join(', ') || '—'}`,
   ].filter(Boolean).join('\n');
   if (hover) cell.title = hover;
   return cell;
