@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import type { FastifyInstance, FastifyRequest, RouteShorthandOptions } from 'fastify';
-import { DEFAULT_COMMISSION_PCT, FORFEIT_PCT, IdeshError, NO_SHOW_DAYS, recordAudit } from '../idesh/index.js';
+import { DEFAULT_COMMISSION_PCT, FORFEIT_PCT, IdeshError, NO_SHOW_DAYS, type AuditLine } from '../idesh/index.js';
 import { mode } from '../mode.js';
 import { lastTicks, pulse, SettingError, setSetting, settings } from '../ops/index.js';
 import { contactsFor, displayNamesFor, findGuests } from '../platform/identity/index.js';
@@ -23,6 +23,8 @@ export interface SystemGuards {
   /** A route for a desk seat that holds the permission. */
   desk: (permission: string) => RouteShorthandOptions;
   who: (request: FastifyRequest) => string;
+  /** A line in the desk's record, under whoever is acting: see `registerOpsRoutes`. */
+  audit: (request: FastifyRequest, line: AuditLine) => Promise<void>;
 }
 
 const NIL = '00000000-0000-0000-0000-000000000000';
@@ -40,7 +42,7 @@ function version(): string {
 /** A provider is real when it is not one of the fakes in `ports.ts`. */
 const flavour = (p: object) => (p.constructor.name.startsWith('Fake') ? 'fake' : 'real');
 
-export function registerSystemDesk(app: FastifyInstance, ctx: Ctx, { desk, who }: SystemGuards): void {
+export function registerSystemDesk(app: FastifyInstance, ctx: Ctx, { desk, who, audit }: SystemGuards): void {
   /* ── what we told people ── */
 
   type MessageQuery = { state?: string; channel?: string; template?: string; q?: string; from?: string; to?: string; limit?: string };
@@ -86,7 +88,7 @@ export function registerSystemDesk(app: FastifyInstance, ctx: Ctx, { desk, who }
 
   app.post<{ Params: { id: string } }>('/v1/ops/notify/messages/:id/retry', desk('desk.notify:retry'), async (request, reply) => {
     if (!(await retryMessage(request.params.id))) return sendError(reply, new IdeshError('NOT_FOUND', 'no failed message under that id'));
-    await recordAudit({ who: who(request), action: 'message.retry', targetKind: 'message', targetId: request.params.id });
+    await audit(request, { action: 'message.retry', targetKind: 'message', targetId: request.params.id });
     return reply.send({ id: request.params.id, state: 'queued' });
   });
 
@@ -181,7 +183,7 @@ export function registerSystemDesk(app: FastifyInstance, ctx: Ctx, { desk, who }
   app.put<{ Params: { key: string }; Body: { value?: unknown } }>('/v1/ops/system/settings/:key', desk('desk.system:manage'), async (request, reply) => {
     try {
       const saved = await setSetting(request.params.key, request.body?.value, who(request));
-      await recordAudit({ who: who(request), action: 'setting.change', targetKind: 'setting', targetId: NIL, note: `${saved.key} = ${String(saved.value)}` });
+      await audit(request, { action: 'setting.change', targetKind: 'setting', targetId: NIL, note: `${saved.key} = ${String(saved.value)}` });
       return reply.send({ key: saved.key, value: saved.value, updated_by: saved.updatedBy, updated_at: iso(saved.updatedAt) });
     } catch (error) {
       if (error instanceof SettingError) return badRequest(reply, error.code === 'UNKNOWN' ? 'Ийм тохиргоо алга.' : 'Утга буруу байна.', error.message);

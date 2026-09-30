@@ -74,6 +74,16 @@ export async function guestCard(guestId: string): Promise<GuestCard | null> {
   return rows[0] ? card(rows[0]) : null;
 }
 
+/** Several at once, by id — the accounts a page of the desk's record names. */
+export async function guestCards(guestIds: readonly string[]): Promise<Map<string, GuestCard>> {
+  if (guestIds.length === 0) return new Map();
+  const { rows } = await getPool().query<Row>(
+    `SELECT ${COLUMNS} FROM identity.guest WHERE id = ANY($1::uuid[])`,
+    [[...new Set(guestIds)]],
+  );
+  return new Map(rows.map((r) => [r.id, card(r)]));
+}
+
 /**
  * The account behind a phone number or an email address, exactly — for a
  * manager adding somebody they work with, who says «I signed in with this».

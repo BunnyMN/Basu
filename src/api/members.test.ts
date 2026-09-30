@@ -4,12 +4,12 @@ import { closePool, getPool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { FakeMailer, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
-import { truncateAll } from '../test/seed.js';
+import { seedRestaurant, sessionRowOf, storeAudit, storedAudit, truncateAll } from '../test/seed.js';
 import { NO_GRANTS } from '../platform/access/index.js';
 import { LETTERS_PER_DAY, closeAccount, requestEmailCode } from '../platform/identity/index.js';
 import { setMemberRole, syncMembersFromEnv, upsertMember } from '../ops/index.js';
 import { relay } from '../platform/notify/index.js';
-import { opsToken } from './ops.js';
+import { actingAs, opsToken } from './ops.js';
 import { buildServer } from './server.js';
 
 /**
@@ -28,7 +28,8 @@ import { buildServer } from './server.js';
  * out elsewhere. Nobody closes an account whose seat is on, its own person
  * included. The guests' pages leave the people at the desk to the members
  * page. There are no codes to hand out, and no addresses for an admin to
- * type.
+ * type. What a seat does goes into the desk's record under the account and
+ * the session it acted in, not only a name.
  */
 
 let app: FastifyInstance;
@@ -897,5 +898,213 @@ describe('a seat wants a recent sign-in', () => {
     const again = await app.inject({ method: 'POST', url: '/v1/ops/members', headers: { ...desk(), ...key }, payload });
     expect(again.headers['idempotent-replay']).toBe('true');
     expect(again.json().id).toBe(given.json().id);
+  });
+});
+
+/*
+ * A line of the desk's record said who acted by a member's name alone. Names
+ * repeat, and a browser that still holds somebody's session acts in their
+ * name: the record has to say which account acted, through which session,
+ * from which seat — by id, and never by the token.
+ */
+describe('the desk’s record names the account and the session that acted', () => {
+  type Line = {
+    who: string;
+    action: string;
+    member_id: string | null;
+    account: { id: string; name: string | null; email: string | null; phone: string | null; closed: boolean } | null;
+    session: { id: string; label: string | null; signed_in_at: string | null } | null;
+  };
+  const record = async (token: string): Promise<Line[]> => (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: bearer(token) })).json().audit;
+  const exported = async (token: string) => (await app.inject({ method: 'GET', url: '/v1/ops/money/topups.csv', headers: bearer(token) })).statusCode;
+
+  it('writes the account, the session it came in on and the seat into every part of the desk’s record — by id, never the token', async () => {
+    const token = await seatedByEmail('bat@gmail.com', 'admin');
+    const account = await accountId(token);
+    const seatId = (await me(token)).json().member.id as string;
+    const session = await sessionRowOf(token);
+
+    // Something from each part of the desk that keeps the record.
+    const as = bearer(token);
+    const { restaurantId } = await seedRestaurant();
+    const other = await byPhone('+97699110001', 'Болд');
+    expect((await seat({ guest_id: other.id, role: 'viewer' }, token)).statusCode).toBe(201);
+    expect((await app.inject({ method: 'PUT', url: '/v1/ops/system/settings/sms_unit_mnt', headers: as, payload: { value: 45 } })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'POST', url: '/v1/ops/roles/desk', headers: as, payload: { name: 'Хүний нөөц', permissions: ['desk.members'] } })).statusCode).toBe(201);
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/money/transfers.csv', headers: as })).statusCode).toBe(200);
+    const off = await app.inject({ method: 'POST', url: `/v1/ops/dine/restaurants/${restaurantId}/active`, headers: as, payload: { active: false, note: 'гэрээ дууссан' } });
+    expect(off.statusCode, off.body).toBe(200);
+
+    const written = (await storedAudit()).filter((row) => row['who'] === 'ops:bat@gmail.com');
+    expect(written.map((row) => row['action'])).toEqual(['restaurant.suspend', 'ledger.export', 'role.create', 'setting.change', 'member.grant']);
+    for (const row of written) {
+      expect(row).toMatchObject({ actor_guest: account, actor_session: session.id, actor_member: seatId });
+      // The session by its id: neither the token nor its hash is anywhere in the record.
+      expect(JSON.stringify(row)).not.toContain(token);
+      expect(JSON.stringify(row)).not.toContain(session.tokenHash);
+    }
+
+    // What the page reads: the same ids, and who they belong to.
+    const lines = await record(token);
+    expect(lines[0]).toMatchObject({
+      who: 'ops:bat@gmail.com',
+      action: 'restaurant.suspend',
+      member_id: seatId,
+      account: { id: account, email: 'bat@gmail.com', closed: false },
+      session: { id: session.id },
+    });
+    // The seat itself was given with the demo's shared secret, which is nobody's account and no session.
+    expect(lines.at(-1)).toMatchObject({ who: 'ops:Демо', action: 'member.grant', member_id: null, account: null, session: null });
+  });
+
+  it('tells apart two members who share a name', async () => {
+    const first = await byPhone('+97699110011', 'Бат');
+    const second = await byPhone('+97699110012', 'Бат');
+    for (const person of [first, second]) expect((await seat({ guest_id: person.id, role: 'finance' })).statusCode).toBe(201);
+    for (const person of [first, second]) expect(await exported(person.token)).toBe(200);
+
+    const lines = (await record(first.token)).filter((a) => a.action === 'ledger.export');
+    // The same name, as the record has always written it —
+    expect(lines.map((a) => a.who)).toEqual(['ops:Бат', 'ops:Бат']);
+    // — and two people: two accounts, two seats, two sessions.
+    expect(lines.map((a) => [a.account?.id, a.account?.phone])).toEqual([
+      [second.id, '+97699110012'],
+      [first.id, '+97699110011'],
+    ]);
+    expect(new Set(lines.map((a) => a.member_id)).size).toBe(2);
+    expect(lines.map((a) => a.session?.id)).toEqual([(await sessionRowOf(second.token)).id, (await sessionRowOf(first.token)).id]);
+  });
+
+  it('tells a browser left signed in from its owner at their own: one account, one seat, two sessions', async () => {
+    const password = 'миний нууц үг';
+    const made = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/register',
+      payload: { phone: '+97699110021', password, name: 'Сараа', device: 'Оффисын компьютер' },
+    });
+    expect(made.statusCode, made.body).toBe(201);
+    const left = made.json().token as string;
+    expect((await seat({ guest_id: made.json().guest_id, role: 'finance' })).statusCode).toBe(201);
+    // An hour and a half later she signs in on her own phone; the office computer still holds the first session.
+    clock.advanceMinutes(90);
+    const own = (await app.inject({ method: 'POST', url: '/v1/auth/login', payload: { login: '+97699110021', password, device: 'Сараагийн утас' } })).json().token as string;
+    for (const token of [left, own]) expect(await exported(token)).toBe(200);
+
+    const lines = (await record(own)).filter((a) => a.action === 'ledger.export');
+    expect(lines.map((a) => a.who)).toEqual(['ops:Сараа', 'ops:Сараа']);
+    expect(new Set(lines.map((a) => a.account?.id)).size).toBe(1);
+    expect(new Set(lines.map((a) => a.member_id)).size).toBe(1);
+    expect(lines.map((a) => a.session)).toEqual([
+      { id: (await sessionRowOf(own)).id, label: 'Сараагийн утас', signed_in_at: clock.now().toISOString() },
+      { id: (await sessionRowOf(left)).id, label: 'Оффисын компьютер', signed_in_at: at('11:40').toISOString() },
+    ]);
+  });
+
+  it('writes what the desk does with suppliers — registered, approved, declined — under the account, the session and the seat', async () => {
+    // An ops seat: it registers suppliers and answers applications, and does not hold the contract's terms.
+    const token = await seatedByEmail('ops@gmail.com', 'ops');
+    const account = await accountId(token);
+    const seatId = (await me(token)).json().member.id as string;
+    const session = await sessionRowOf(token);
+    const as = bearer(token);
+
+    // A supplier written straight in with an account to pay, which is one money may go to at once.
+    await byPhone('+97699110031', 'Дорж');
+    const made = await app.inject({
+      method: 'POST',
+      url: '/v1/ops/suppliers',
+      headers: as,
+      payload: { name: 'Хэнтий · Хэрлэн', phone: '+97699110031', address: 'Эмээлт', bank_name: 'Хаан банк', bank_account: '5012 3456 78', bank_holder: 'Д. Дорж' },
+    });
+    expect(made.statusCode, made.body).toBe(201);
+    // Two applications, each with the applicant's own account: one taken, one not.
+    const application = async (phone: string, name: string, bankAccount: string) => {
+      const person = await byPhone(phone, name);
+      const asked = await app.inject({
+        method: 'POST',
+        url: '/v1/supplier/apply',
+        headers: bearer(person.token),
+        payload: { name, address: 'Хархорин зах', bank_name: 'Голомт', bank_account: bankAccount, bank_holder: name },
+      });
+      expect(asked.statusCode, asked.body).toBe(201);
+      return asked.json().id as string;
+    };
+    const taken = await application('+97699110032', 'Завхан · Бат', '1105012345');
+    const refused = await application('+97699110033', 'Увс · Сараа', '1105067890');
+    expect((await app.inject({ method: 'POST', url: `/v1/ops/suppliers/${taken}/approve`, headers: as, payload: {} })).statusCode).toBe(200);
+    expect((await app.inject({ method: 'POST', url: `/v1/ops/suppliers/${refused}/decline`, headers: as, payload: { reason: 'ТТД баталгаажаагүй' } })).statusCode).toBe(200);
+
+    const written = (await storedAudit()).filter((row) => String(row['action']).startsWith('supplier.'));
+    expect(written.map((row) => [row['action'], row['target_id'], row['note']])).toEqual([
+      ['supplier.decline', refused, 'Увс · Сараа · ТТД баталгаажаагүй'],
+      ['supplier.approve', taken, 'Завхан · Бат · данс баталгаажуулсан'],
+      ['supplier.register', made.json().id, 'Хэнтий · Хэрлэн · эзэмшигч +97699110031 · данс оруулж баталгаажуулсан'],
+    ]);
+    for (const row of written) {
+      expect(row).toMatchObject({ who: 'ops:ops@gmail.com', actor_guest: account, actor_session: session.id, actor_member: seatId });
+      // That an account came with it, never the account's number.
+      for (const digits of ['5012', '1105012345', '1105067890']) expect(JSON.stringify(row)).not.toContain(digits);
+    }
+  });
+
+  it('keeps what a device calls itself to one line, whatever it sent', async () => {
+    const made = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/register',
+      payload: { phone: '+97699110041', password: 'миний нууц үг', name: 'Номин', device: '  Ops\nБүртгэл:\tadmin@basu.mn  ' },
+    });
+    expect(made.statusCode, made.body).toBe(201);
+    const token = made.json().token as string;
+    expect((await seat({ guest_id: made.json().guest_id, role: 'finance' })).statusCode).toBe(201);
+    expect(await exported(token)).toBe(200);
+    const [line] = (await record(token)).filter((a) => a.action === 'ledger.export');
+    expect(line?.session?.label).toBe('Ops Бүртгэл: admin@basu.mn');
+  });
+
+  it('still names a session somebody has since signed out of, and an account since closed — by the same ids', async () => {
+    const person = await byPhone('+97699110051', 'Тэмүүлэн');
+    const given = await seat({ guest_id: person.id, role: 'finance' });
+    expect(given.statusCode).toBe(201);
+    const session = await sessionRowOf(person.token);
+    expect(await exported(person.token)).toBe(200);
+
+    // Signed out, and the account closed on the desk — its seat switched off first, as it has to be.
+    expect((await app.inject({ method: 'POST', url: '/v1/auth/sign-out', headers: bearer(person.token) })).statusCode).toBe(204);
+    const signedOut = (await record(opsToken()!)).find((a) => a.action === 'ledger.export');
+    expect(signedOut?.session).toEqual({ id: session.id, label: null, signed_in_at: at('11:40').toISOString() });
+    expect((await setActive(given.json().id, false)).statusCode).toBe(200);
+    const closed = await app.inject({ method: 'POST', url: `/v1/ops/guests/${person.id}/close`, headers: desk(), payload: { note: 'бичгээр хүссэн' } });
+    expect(closed.statusCode, closed.body).toBe(200);
+
+    const line = (await record(opsToken()!)).find((a) => a.action === 'ledger.export');
+    expect(line).toMatchObject({
+      who: 'ops:Тэмүүлэн',
+      member_id: given.json().id,
+      // Nothing of the person is left to show; the ids are the record, and stay.
+      account: { id: person.id, name: null, email: null, phone: null, closed: true },
+      session: { id: session.id, signed_in_at: at('11:40').toISOString() },
+    });
+  });
+
+  it('reads a line from before it named anybody as the name alone, and never takes a session or a seat without the account', async () => {
+    const line = { who: 'ops:Бат', action: 'ledger.export', target_kind: 'ledger', target_id: '00000000-0000-0000-0000-000000000000' };
+    // A line as the desk wrote them before: who, and nothing else.
+    await storeAudit({ ...line, note: 'хуучин' });
+    const [old] = await record(opsToken()!);
+    expect(old).toMatchObject({ who: 'ops:Бат', note: 'хуучин', member_id: null, account: null, session: null });
+
+    const someone = '11111111-1111-1111-1111-111111111111';
+    for (const column of ['actor_session', 'actor_member']) {
+      await expect(storeAudit({ ...line, [column]: someone })).rejects.toMatchObject({ code: '23514' });
+    }
+  });
+
+  it('writes a request that has an account but no seat as the account alone, rather than failing after it acted', () => {
+    const sitting = { id: 'the-seat', name: 'Бат', role: 'ops', roleName: 'Ops', locked: false, phone: null, email: null, grants: NO_GRANTS };
+    expect(actingAs({ guestId: 'the-account', sessionId: 'the-session', ops: sitting })).toEqual({ account: 'the-account', session: 'the-session', member: 'the-seat' });
+    // Let in by a guard that is not the desk's: an account, and no seat.
+    expect(actingAs({ guestId: 'the-account', sessionId: 'the-session' })).toEqual({ account: 'the-account', session: 'the-session', member: null });
+    // The demo's shared secret: a seat, and nobody's account.
+    expect(actingAs({ ops: { ...sitting, id: 'demo' } })).toEqual({ account: null, session: null, member: null });
   });
 });

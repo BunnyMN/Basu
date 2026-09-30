@@ -280,10 +280,11 @@ const el = (html) => {
 };
 /**
  * Text into markup. Whatever came from a person — a name they chose, a
- * business, a listing, a reason, a phone they typed — goes through here on
- * its way into innerHTML or a template, and the desk is where a stranger's
- * words meet the person who holds everything. Quotes too: a value put inside
- * an attribute (a tel: link, a data-*) would otherwise end it and write an
+ * business, a listing, a reason, a phone they typed, a link somebody at the
+ * desk put in a business's menu — goes through here on its way into
+ * innerHTML or a template, and the desk is where a stranger's words meet the
+ * person who holds everything. Quotes too: a value put inside an attribute
+ * (a tel: link, an href, a data-*) would otherwise end it and write an
  * attribute of its own.
  */
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -4065,6 +4066,7 @@ function renderPay(view) {
 
 const ACTION = {
   'order.cancel': 'Захиалга цуцалсан', 'order.hand': 'Хүлээлгэн өгсөн гэж тэмдэглэсэн', 'order.resend': 'Мэдэгдэл дахин илгээсэн', 'order.no_show': 'Ирээгүй гэж тэмдэглэсэн',
+  'supplier.register': 'Нийлүүлэгч бүртгэсэн', 'supplier.approve': 'Нийлүүлэгчийн хүсэлт баталсан', 'supplier.decline': 'Нийлүүлэгчийн хүсэлт татгалзсан',
   'supplier.suspend': 'Нийлүүлэгчийг түр зогсоосон', 'supplier.activate': 'Нийлүүлэгчийг идэвхжүүлсэн', 'supplier.terms': 'Гэрээний нөхцөл өөрчилсөн',
   'supplier.bank_verify': 'Данс баталгаажуулсан', 'listing.hide': 'Зар нуусан',
   'settlement.approve': 'Олголт баталсан', 'settlement.paid': 'Олголт шилжүүлсэн гэж тэмдэглэсэн',
@@ -4087,18 +4089,58 @@ const TARGET_WORD = {
   message: 'Мэдэгдэл', setting: 'Систем', promotion: 'Онцлох зар',
 };
 
+/**
+ * Who did it: the member's name, as the record has always said, and under
+ * it the account, the device its session was signed in on, and when — two
+ * people may share a name, a browser left signed in acts in its owner's,
+ * and every sign-in to the dashboard calls itself «Ops», so the time is
+ * what tells one of somebody's sessions from another. It is on the line,
+ * where a phone and a screen reader find it too. Hovered, the account's own
+ * name as well, and the day in words. A line from before the record kept
+ * these, or from the demo's shared key, has the name alone.
+ *
+ * Every part is one line: a name or a device may carry a line break, and
+ * the hover must not gain a line nobody wrote. The cell is built as a node,
+ * so the hover is set as text and never parsed.
+ */
+function auditWho(a) {
+  const line = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
+  const name = a.account ? line(a.account.name) : '';
+  const contact = a.account ? line(a.account.email ?? a.account.phone) : '';
+  const label = a.session ? line(a.session.label) : '';
+  const iso = a.session?.signed_in_at;
+  const day = iso && new Date(iso);
+  const account = a.account && (contact || (a.account.closed ? 'хаагдсан бүртгэл' : 'бүртгэл'));
+  const device = a.session && (label || 'нэргүй төхөөрөмж');
+  const signedIn = iso && `${day.getMonth() + 1}/${day.getDate()} ${clockOf(iso)}-д нэвтэрсэн`;
+  const cell = el(dtCell.two(a.who.replace(/^ops:/, ''), [account, device, signedIn].filter(Boolean).join(' · ')));
+  const hover = [
+    a.account && `Бүртгэл: ${[name, contact].filter(Boolean).join(', ') || (a.account.closed ? 'хаагдсан' : '—')}`,
+    a.session && `Нэвтрэлт: ${[label, iso && `${day.getMonth() + 1}-р сарын ${day.getDate()} ${clockOf(iso)}-д нэвтэрсэн`].filter(Boolean).join(', ') || '—'}`,
+  ].filter(Boolean).join('\n');
+  if (hover) cell.title = hover;
+  return cell;
+}
+
 async function renderAudit(view) {
   view.append(head('Үйлдлийн түүх', 'Ширээнд хийсэн үйлдэл бүр — хэн, хэзээ, юуг, ямар тэмдэглэлтэй.'));
   const areas = [...new Set(Object.values(TARGET_WORD))];
   const table = dataTable({
     columns: [
       { key: 'at', label: 'Хэзээ', render: (a) => dtCell.when(a.at) },
-      { key: 'who', label: 'Хэн', value: (a) => a.who.replace('ops:', '') },
+      {
+        key: 'who',
+        label: 'Хэн',
+        sortValue: (a) => a.who.replace(/^ops:/, ''),
+        // Beside the name, the search finds the account, the device, and the session by its id.
+        value: (a) => [a.who.replace(/^ops:/, ''), a.account?.name, a.account?.email, a.account?.phone, a.session?.label, a.session?.id].filter(Boolean).join(' '),
+        render: auditWho,
+      },
       { key: 'action', label: 'Үйлдэл', value: (a) => ACTION[a.action] ?? a.action, render: (a) => `<b>${ACTION[a.action] ?? esc(a.action)}</b>` },
       { key: 'area', label: 'Хэсэг', value: (a) => TARGET_WORD[a.target_kind] ?? a.target_kind },
       { key: 'note', label: 'Тэмдэглэл', value: (a) => a.note ?? '', render: (a) => (a.note ? `<span class="dt-text">${esc(a.note)}</span>` : dtCell.none()), width: '36%' },
     ],
-    search: { placeholder: 'Хэн, үйлдэл, тэмдэглэл…' },
+    search: { placeholder: 'Хэн, имэйл, үйлдэл, тэмдэглэл…' },
     filters: [
       { key: 'area', label: 'Хэсэг', kind: 'select', options: [['', 'Бүх хэсэг'], ...areas.map((a) => [a, a])], test: (a, v) => !v || (TARGET_WORD[a.target_kind] ?? a.target_kind) === v },
     ],

@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest, RouteShorthandOptions } from 'fastify';
-import { endPromotion, promotionsForDesk, recordAudit, TIER_WORD, type DeskPromotion } from '../idesh/index.js';
+import { endPromotion, promotionsForDesk, TIER_WORD, type AuditLine, type DeskPromotion } from '../idesh/index.js';
 import { contactsFor, displayNamesFor } from '../platform/identity/index.js';
 import type { Ctx } from '../ports.js';
 import { badRequest, sendError } from './errors.js';
@@ -13,6 +13,8 @@ import { badRequest, sendError } from './errors.js';
 export interface PromotionGuards {
   desk: (permission: string) => RouteShorthandOptions;
   who: (request: FastifyRequest) => string;
+  /** A line in the desk's record, under whoever is acting: see `registerOpsRoutes`. */
+  audit: (request: FastifyRequest, line: AuditLine) => Promise<void>;
 }
 
 /** Where a purchase stands now, in one word the desk filters by. */
@@ -22,7 +24,7 @@ function standing(p: DeskPromotion, now: Date): 'pending' | 'live' | 'over' | 'e
   return p.endsAt && p.endsAt > now ? 'live' : 'over';
 }
 
-export function registerPromotionsDesk(app: FastifyInstance, ctx: Ctx, { desk, who }: PromotionGuards): void {
+export function registerPromotionsDesk(app: FastifyInstance, ctx: Ctx, { desk, who, audit }: PromotionGuards): void {
   app.get('/v1/ops/promotions', desk('desk.promotions'), async () => {
     const now = ctx.clock.now();
     const all = await promotionsForDesk();
@@ -72,8 +74,7 @@ export function registerPromotionsDesk(app: FastifyInstance, ctx: Ctx, { desk, w
       if (!note) return badRequest(reply, 'Яагаад зогсоож байгаагаа бичнэ үү.', 'a reason is required');
       try {
         const ended = await endPromotion({ id: request.params.id, at: ctx.clock.now(), by: who(request), note });
-        await recordAudit({
-          who: who(request),
+        await audit(request, {
           action: 'promotion.end',
           targetKind: 'promotion',
           targetId: ended.id,

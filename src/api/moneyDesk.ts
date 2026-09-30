@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest, RouteShorthandOptions } from 'fastify';
-import { IdeshError, listSuppliers, recordAudit } from '../idesh/index.js';
+import { IdeshError, listSuppliers, type AuditLine } from '../idesh/index.js';
 import { contactsFor, displayNamesFor } from '../platform/identity/index.js';
 import {
   accountsForDesk,
@@ -29,7 +29,8 @@ import { sendError } from './errors.js';
 export interface MoneyGuards {
   /** A route for a desk seat that holds the permission. */
   desk: (permission: string) => RouteShorthandOptions;
-  who: (request: FastifyRequest) => string;
+  /** A line in the desk's record, under whoever is acting: see `registerOpsRoutes`. */
+  audit: (request: FastifyRequest, line: AuditLine) => Promise<void>;
 }
 
 /** The whole ledger, as a target: there is one. */
@@ -114,7 +115,7 @@ const shapeTransfer = (t: DeskTransfer, names: Map<string, string>) => ({
 type TransferQuery = { kind?: string; from?: string; to?: string; guest?: string; limit?: string };
 type TopupQuery = { state?: string; from?: string; to?: string; limit?: string };
 
-export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, who }: MoneyGuards): void {
+export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, audit }: MoneyGuards): void {
   /** The books at a glance: the checks, and every named account. */
   app.get('/v1/ops/money', desk('desk.money'), async () => {
     const [checks, accounts] = await Promise.all([reconciliationForDesk(ctx.clock.now()), accountsForDesk()]);
@@ -159,7 +160,7 @@ export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, who }:
   app.get<{ Querystring: TransferQuery }>('/v1/ops/money/transfers.csv', desk('desk.money:manage'), async (request, reply) => {
     const transfers = await transfersForDesk(transferFilter(request.query, 5000));
     const names = await namesFor(transfers.flatMap((t) => [t.from, t.to]));
-    await recordAudit({ who: who(request), action: 'ledger.export', targetKind: 'ledger', targetId: LEDGER_ID, note: `transfers ${request.query.from ?? ''}..${request.query.to ?? ''} (${transfers.length})` });
+    await audit(request, { action: 'ledger.export', targetKind: 'ledger', targetId: LEDGER_ID, note: `transfers ${request.query.from ?? ''}..${request.query.to ?? ''} (${transfers.length})` });
     return sendCsv(
       reply,
       `basu-transfers-${request.query.from ?? 'all'}-${request.query.to ?? 'all'}.csv`,
@@ -196,7 +197,7 @@ export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, who }:
   app.get<{ Querystring: TopupQuery }>('/v1/ops/money/topups.csv', desk('desk.money:manage'), async (request, reply) => {
     const topups = await topupsForDesk(topupFilter(request.query, 5000));
     const contacts = await contactsFor(topups.map((t) => t.guestId));
-    await recordAudit({ who: who(request), action: 'ledger.export', targetKind: 'ledger', targetId: LEDGER_ID, note: `topups ${request.query.from ?? ''}..${request.query.to ?? ''} (${topups.length})` });
+    await audit(request, { action: 'ledger.export', targetKind: 'ledger', targetId: LEDGER_ID, note: `topups ${request.query.from ?? ''}..${request.query.to ?? ''} (${topups.length})` });
     return sendCsv(
       reply,
       `basu-topups-${request.query.from ?? 'all'}-${request.query.to ?? 'all'}.csv`,
@@ -226,15 +227,14 @@ export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, who }:
 
   app.post<{ Params: { id: string } }>('/v1/ops/money/receipts/:id/retry', desk('desk.money:manage'), async (request, reply) => {
     if (!(await retryReceipt(request.params.id))) return sendError(reply, new IdeshError('NOT_FOUND', 'no failed receipt under that id'));
-    await recordAudit({ who: who(request), action: 'receipt.retry', targetKind: 'receipt', targetId: request.params.id });
+    await audit(request, { action: 'receipt.retry', targetKind: 'receipt', targetId: request.params.id });
     return reply.send({ id: request.params.id, state: 'queued' });
   });
 
   /** Run the checks now rather than at 23:30, and push the receipt queue while at it. */
   app.post('/v1/ops/money/checks', desk('desk.money:manage'), async (request) => {
     const [ledger, receipts, pushed] = await Promise.all([reconcileLedger(), reconcile(), processReceipts(ctx)]);
-    await recordAudit({
-      who: who(request),
+    await audit(request, {
       action: 'ledger.checks',
       targetKind: 'ledger',
       targetId: LEDGER_ID,

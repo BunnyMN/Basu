@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { getPool, type Db } from '../db/pool.js';
 import { PILOT_KITCHEN, PILOT_MENU } from '../domain/fixtures.js';
 import type { OrderState } from '../domain/types.js';
@@ -194,6 +195,35 @@ export async function storedBankOf(
   );
   const r = rows[0];
   return { bankName: r?.bank_name ?? null, bankAccount: r?.bank_account ?? null, bankHolder: r?.bank_holder ?? null };
+}
+
+/**
+ * The desk's record as the database holds it, newest first: every column
+ * of every line, so a test can say both what is written and what is not.
+ */
+export async function storedAudit(db: Db = getPool()): Promise<Array<Record<string, unknown>>> {
+  const { rows } = await db.query<Record<string, unknown>>('SELECT * FROM idesh.audit ORDER BY id DESC');
+  return rows;
+}
+
+/**
+ * A line put straight into the desk's record, column by column: as the desk
+ * wrote them before it named anybody, or as no code is allowed to.
+ */
+export async function storeAudit(line: Record<string, string | null>, db: Db = getPool()): Promise<void> {
+  const columns = Object.keys(line);
+  await db.query(
+    `INSERT INTO idesh.audit (${columns.join(', ')}) VALUES (${columns.map((_, i) => `$${i + 1}`).join(', ')})`,
+    Object.values(line),
+  );
+}
+
+/** The row identity keeps for a session, found by its token's hash the way the server finds it. */
+export async function sessionRowOf(token: string, db: Db = getPool()): Promise<{ id: string; guestId: string; tokenHash: string }> {
+  const tokenHash = createHash('sha256').update(token).digest('hex');
+  const { rows } = await db.query<{ id: string; guest_id: string }>('SELECT id, guest_id FROM identity.guest_session WHERE token_hash = $1', [tokenHash]);
+  if (!rows[0]) throw new Error('no session for that token');
+  return { id: rows[0].id, guestId: rows[0].guest_id, tokenHash };
 }
 
 /** A server that has not written its roles yet — what production is for a moment at boot. */

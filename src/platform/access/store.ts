@@ -356,7 +356,9 @@ export async function saveLayout(
 /**
  * A link Basu adds to a scope's menu — another page of Basu, or an https
  * address anywhere (`linkHref` says which addresses those are). Opened, like
- * any page, by the roles given it.
+ * any page, by the roles given it. An address never needs a quote, an angle
+ * bracket or a backtick as it is, and a page drawing one inside an attribute
+ * could be made to end the attribute there: `linkHref` lets none of them in.
  */
 export async function addLink(scope: Scope, input: { name: string; href: string; module?: string; icon?: string; by: string }): Promise<LayoutPage> {
   const name = checkedLabel(input.name, 'a link');
