@@ -2544,31 +2544,43 @@ describe('who sees what', () => {
     expect((await fetch(`${base}/v1/me`, { headers: auth })).status).toBe(200);
   });
 
-  it('draws a link Basu added to a business’s menu as one address, whatever quotes it holds', async () => {
+  it('leaves out of a business’s menu a link stored with quotes, and nothing on the page grows from it', async () => {
     const desk = await deskToken();
     const owner = await account('+97688030061', 'Цэцэг');
     await business(owner, 'Цэцэгийн мах · тест', { supplier: true });
-    // A link in every business's menu, given to its owners — written in with quotes before a link was refused them.
-    const made = (await (
-      await fetch(`${base}/v1/ops/menus/org/links`, { method: 'POST', headers: as(desk), body: JSON.stringify({ name: 'Тусламж', href: '/help', module: 'org' }) })
-    ).json()) as { key: string };
-    const href = '/help"onmouseover="window.__owned=1';
-    await getPool().query(`UPDATE access.page SET href = $2 WHERE scope = 'org' AND key = $1`, [made.key, href]);
+    // Two links in every business's menu, given to its owners: an ordinary one, and one written in with quotes
+    // before a link was refused them. The server leaves such a link out of the menu it hands a page (`linkHref`),
+    // and the page would not draw one that came (`navHref`); either way no quote in it can end an attribute.
+    const link = async (name: string) =>
+      ((await (
+        await fetch(`${base}/v1/ops/menus/org/links`, { method: 'POST', headers: as(desk), body: JSON.stringify({ name, href: '/help', module: 'org' }) })
+      ).json()) as { key: string }).key;
+    const plain = await link('Тусламж');
+    const quoted = await link('Хуучин холбоос');
+    await getPool().query(`UPDATE access.page SET href = $2 WHERE scope = 'org' AND key = $1`, [quoted, '/help"onmouseover="window.__owned=1']);
     const { roles } = (await (await fetch(`${base}/v1/ops/access/org`, { headers: as(desk) })).json()) as { roles: Array<{ key: string; permissions: string[] }> };
     const owners = roles.find((r) => r.key === 'owner')!;
-    const given = await fetch(`${base}/v1/ops/roles/org/owner`, { method: 'PATCH', headers: as(desk), body: JSON.stringify({ permissions: [...owners.permissions, `org.${made.key}`] }) });
+    const given = await fetch(`${base}/v1/ops/roles/org/owner`, {
+      method: 'PATCH',
+      headers: as(desk),
+      body: JSON.stringify({ permissions: [...owners.permissions, `org.${plain}`, `org.${quoted}`] }),
+    });
     expect(given.status).toBe(200);
     try {
       const dash = await openPage('ops.html', '', undefined, device(owner));
-      const theLink = (d: Document) => [...d.querySelectorAll('.org-doors .door-link')].find((a) => a.querySelector('span')?.textContent === 'Тусламж');
-      await until(dash, 'the link among the business’s doors', (d) => Boolean(theLink(d)));
-      const link = theLink(dash.window.document)!;
-      // The whole address, as the one attribute it was written into.
-      expect(link.getAttribute('href')).toBe(href);
-      expect(link.hasAttribute('onmouseover')).toBe(false);
+      const door = (d: Document, name: string) => [...d.querySelectorAll('.org-doors .door-link')].find((a) => a.querySelector('span')?.textContent === name);
+      // The doors are drawn, Basu's links among them, once the ordinary one is there.
+      await until(dash, 'the ordinary link among the business’s doors', (d) => Boolean(door(d, 'Тусламж')));
+      const doc = dash.window.document;
+      expect(door(doc, 'Тусламж')!.getAttribute('href')).toBe('/help');
+      // The one with quotes is nowhere, the sidebar included, and no element carries an attribute out of it.
+      expect(door(doc, 'Хуучин холбоос')).toBeUndefined();
+      expect(doc.getElementById('root')?.textContent ?? '').not.toContain('Хуучин холбоос');
+      expect(doc.querySelector('[onmouseover]')?.outerHTML ?? null).toBeNull();
+      expect([...doc.querySelectorAll('a[href]')].map((a) => a.getAttribute('href')).filter((h) => h?.includes('"'))).toEqual([]);
     } finally {
-      // Gone, and no role opens it any more: the other businesses here keep the menu they had.
-      await fetch(`${base}/v1/ops/menus/org/links/${made.key}`, { method: 'DELETE', headers: { authorization: `Bearer ${desk}` } });
+      // Gone, and no role opens them any more: the other businesses here keep the menu they had.
+      for (const key of [plain, quoted]) await fetch(`${base}/v1/ops/menus/org/links/${key}`, { method: 'DELETE', headers: { authorization: `Bearer ${desk}` } });
     }
   });
 });
