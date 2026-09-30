@@ -311,11 +311,17 @@ describe('a session somebody else holds', () => {
     const bare = await post('/v1/me/password', { next: 'булаах нууц үг' }, left);
     expect(bare.statusCode, bare.body).toBe(403);
     expect(bare.json().error.code).toBe('PROOF_REQUIRED');
-    expect(bare.json().error.message_mn).toContain('имэйл рүү очих кодоор');
-    // What the app from before the code sends, and what it shows: where the password is set now.
+    expect(bare.json().error.message_mn).toContain('имэйл рүү очих код хэрэгтэй');
+    // What the app from before the code (iOS 1.0.3) sends, and what it shows:
+    // the code it cannot ask for, and the two ways that can.
     const old = await post('/v1/me/password', { current: '', next: 'булаах нууц үг' }, left);
+    expect(old.statusCode, old.body).toBe(403);
     expect(old.json().error.code).toBe('PROOF_REQUIRED');
-    expect(old.json().error.message_mn).toContain('Аппаа шинэчлэх, эсвэл Basu-гийн вэб сайтын «Бүртгэл» хуудаснаас');
+    const said = old.json().error.message_mn;
+    expect(said).toContain('бүртгэлийн тань имэйл рүү очих код хэрэгтэй');
+    expect(said).toContain('аппын энэ хувилбар кодыг асуудаггүй');
+    expect(said).toContain('Аппаа App Store-оос шинэчлээд');
+    expect(said).toContain('вэб сайтын «Бүртгэл» хуудаснаас');
     // A code that is not text is no code, and no crash either.
     const numeric = await post('/v1/me/password', { next: 'булаах нууц үг', code: 123456 }, left);
     expect(numeric.statusCode, numeric.body).toBe(403);

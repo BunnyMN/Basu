@@ -114,9 +114,11 @@ const AUTH_ERRORS: Record<AuthError['code'], Spec> = {
   // A session alone proves nothing about who holds it; these say what will.
   PROOF_REQUIRED: {
     status: 403,
-    // Only an app from before the code asks without one — it has no field
-    // for it — so this says where the password can be set instead.
-    mn: 'Нууц үгийг одоо бүртгэлийн тань имэйл рүү очих кодоор тохируулдаг болсон. Аппаа шинэчлэх, эсвэл Basu-гийн вэб сайтын «Бүртгэл» хуудаснаас тохируулна уу.',
+    // Only an app from before the code asks without one: iOS 1.0.3 sends an
+    // empty `current` from «Нууц үг тохируулах», has no field for a code, and
+    // shows these words as they are. So they say what is needed now, why
+    // that app cannot give it, and the two ways that can.
+    mn: 'Нууц үг тохируулахад бүртгэлийн тань имэйл рүү очих код хэрэгтэй болсон, харин аппын энэ хувилбар кодыг асуудаггүй. Аппаа App Store-оос шинэчлээд дахин оролдох, эсвэл Basu-гийн вэб сайтын «Бүртгэл» хуудаснаас тохируулна уу.',
   },
   PASSWORD_SET: { status: 409, mn: 'Таны бүртгэлд нууц үг аль хэдийн тохируулсан байна. Одоогийн нууц үгээрээ солино уу.' },
   SIGN_IN_AGAIN: {
