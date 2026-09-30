@@ -37,7 +37,7 @@ struct WalletView: View {
         }
       }
       .padding(.horizontal, BasuMetric.screenPadding)
-      .padding(.bottom, 78)
+      .padding(.bottom, BasuMetric.tabBarInset)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .scrollIndicators(.hidden)

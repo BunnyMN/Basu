@@ -48,7 +48,7 @@ struct InboxView: View {
         }
       }
       .padding(.horizontal, BasuMetric.screenPadding)
-      .padding(.bottom, 78)
+      .padding(.bottom, BasuMetric.tabBarInset)
       .frame(maxWidth: .infinity, alignment: .leading)
       .clipShape(RoundedRectangle(cornerRadius: BasuMetric.card, style: .continuous))
     }

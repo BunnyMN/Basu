@@ -59,6 +59,14 @@ public enum BasuColor {
     public static let hiInk        = Color(light: 0x7A5A12, dark: 0xE8C27A)
     public static let hiSoft       = Color(light: 0xFBF1DC, dark: 0x2B2312)
 
+    // The deep pine of the web's dark bands (--deep): the tab bar's ground,
+    // and the pale pill on it that marks the chosen tab.
+    public static let deep         = Color(light: 0x123A2C, dark: 0x17241D)
+    public static let deepEdge     = Color(light: 0x123A2C, dark: 0x2A4A3B)
+    public static let onDeep       = Color(light: 0xFFFFFF, dark: 0xEEF1EC, opacity: 0.62)
+    public static let deepPill     = Color(light: 0xF4F3EE, dark: 0x7CCBA2)
+    public static let onDeepPill   = Color(light: 0x1F5A43, dark: 0x0D1F16)
+
     // Semantic
     public static let ready        = Color(light: 0x136A4B, dark: 0x57C295)   // credits
     public static let hold         = Color(light: 0x7E6113, dark: 0xDAB65A)   // waiting
@@ -189,9 +197,7 @@ public enum BasuMetric {
     // Layout
     public static let screenPadding: CGFloat = 20
     public static let statusBar: CGFloat     = 54
-    public static let tabBar: CGFloat        = 66
-    public static let tabBarInset: CGFloat   = 74   // bottom content inset
-    public static let tabGlyph: CGFloat      = 25
+        public static let tabBarInset: CGFloat   = 104  // bottom content inset, clear of the floating bar
     public static let hairline: CGFloat      = 1
     public static let minTarget: CGFloat     = 44
 

@@ -170,38 +170,47 @@ struct RootView: View {
 
   /// The launcher and the three it shares a bar with.
   private var shell: some View {
-    ZStack(alignment: .bottom) {
-      LinearGradient.ground.ignoresSafeArea()
+    // Read before the bottom edge is given up below: the floating bar sits a
+    // fixed distance above the home indicator, and this is how far that is.
+    GeometryReader { outer in
+      ZStack(alignment: .bottom) {
+        LinearGradient.ground.ignoresSafeArea()
 
-      NavigationStack(path: $path) {
-        surface
-          .navigationDestination(for: Destination.self) { destination in
-            switch destination {
-            case .app(let id, let page):
-              ServiceView(app: id, path: page, back: { if !path.isEmpty { path.removeLast() } })
-            case .inbox:
-              InboxView(
-                back: { if !path.isEmpty { path.removeLast() } },
-                open: { path.append($0) },
-              )
+        NavigationStack(path: $path) {
+          surface
+            .navigationDestination(for: Destination.self) { destination in
+              switch destination {
+              case .app(let id, let page):
+                ServiceView(app: id, path: page, back: { if !path.isEmpty { path.removeLast() } })
+              case .inbox:
+                InboxView(
+                  back: { if !path.isEmpty { path.removeLast() } },
+                  open: { path.append($0) },
+                )
+              }
             }
-          }
-      }
+        }
 
-      // Drawn over the scrolling content rather than inset beside it: the
-      // glass wants something to be translucent against, and content sliding
-      // under it is the only thing that gives it that.
-      //
-      // It stays up over the inbox — that is still the shell, and the bell is
-      // a detour rather than a departure. An app takes the whole screen.
-      if !inApp {
-        TabBar(tab: $tab)
+        // Drawn over the scrolling content rather than inset beside it: the
+        // glass wants something to be translucent against, and content sliding
+        // under it is the only thing that gives it that.
+        //
+        // It stays up over the inbox — that is still the shell, and the bell is
+        // a detour rather than a departure. An app takes the whole screen.
+        if !inApp {
+          TabBar(tab: tab, bottom: outer.safeAreaInsets.bottom) { chosen in
+            // A tab always lands on its own root: from the inbox, Түрийвч
+            // shows the wallet rather than the inbox over it.
+            path = []
+            tab = chosen
+          }
+        }
       }
+      // Content pads itself past the bar. The shell's alone: the way in keeps
+      // the bottom edge, and the keyboard with it.
+      .ignoresSafeArea(edges: .bottom)
     }
-    // The bar is 66 from the screen's bottom edge, home indicator included —
-    // not 66 above the safe area. Content pads itself past it. The shell's
-    // alone: the way in keeps the bottom edge, and the keyboard with it.
-    .ignoresSafeArea(edges: .bottom)
+    .ignoresSafeArea(.keyboard, edges: .bottom)
   }
 
   /// True while a vertical owns the screen. The shell's own pushes do not
@@ -333,30 +342,52 @@ struct SplashView: View {
 }
 
 /**
- The bar. Glass, a hairline on top, 66 points tall, icon only.
+ The bar. A pine capsule floating just above the home indicator; the chosen tab
+ is a pale pill that says its name, the other two are marks alone.
 
  It carries the shell and nothing else. The launcher used to hold a wallet strip
  as well; at nine icons there was no room for both, and the strip and this tab
  were the same tap twice — so the balance is one tap away rather than visible on
  arrival. That is a real trade against the brief, made once, on purpose.
 
- The labels came off with the same revision. The bar is icon-only, so the
- accessibility labels below are the only thing VoiceOver has.
+ The pill slides between tabs and the phone ticks as it lands. Only the chosen
+ tab shows its name, so the accessibility labels below are what VoiceOver has
+ for the other two.
  */
 struct TabBar: View {
-  @Binding var tab: ShellTab
+  let tab: ShellTab
+  /// The screen's bottom safe area: the bar floats this far up, less a little.
+  let bottom: CGFloat
+  let select: (ShellTab) -> Void
+  @Namespace private var lit
 
   var body: some View {
-    HStack(spacing: 0) {
+    HStack(spacing: 4) {
       ForEach(ShellTab.allCases, id: \.self) { item in
         let active = item == tab
         Button {
-          tab = item
+          withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) { select(item) }
         } label: {
-          ShellGlyph(mark: item.mark, size: BasuMetric.tabGlyph)
-            .foregroundStyle(active ? Color.accent : Color.ink3)
-            .frame(maxWidth: .infinity, minHeight: BasuMetric.minTarget)
-            .contentShape(Rectangle())
+          HStack(spacing: 8) {
+            ShellGlyph(mark: item.mark, size: 22, lineWidth: active ? 2 : 1.7)
+            if active {
+              Text(item.title)
+                .font(.sans(14, .semibold))
+                .fixedSize()
+                .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
+            }
+          }
+          .foregroundStyle(active ? Color.onDeepPill : Color.onDeep)
+          .padding(.horizontal, active ? 18 : 0)
+          .frame(maxWidth: active ? nil : .infinity)
+          .frame(height: 50)
+          .background {
+            if active {
+              Capsule().fill(Color.deepPill)
+                .matchedGeometryEffect(id: "lit", in: lit)
+            }
+          }
+          .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("tab.\(item.rawValue)")
@@ -364,11 +395,15 @@ struct TabBar: View {
         .accessibilityAddTraits(active ? [.isSelected] : [])
       }
     }
-    .padding(.horizontal, 8)
-    .padding(.top, 14 - (BasuMetric.minTarget - BasuMetric.tabGlyph) / 2)
-    .frame(height: BasuMetric.tabBar, alignment: .top)
-    .background(.ultraThinMaterial)
-    .overlay(alignment: .top) { Hairline() }
+    .padding(6)
+    .background(Color.deep, in: Capsule())
+    .overlay(Capsule().strokeBorder(Color.deepEdge, lineWidth: BasuMetric.hairline))
+    .shadow(color: .barShadow, radius: 18, y: 8)
+    // The pill is 50 tall; past this the name would not fit inside it.
+    .dynamicTypeSize(...DynamicTypeSize.xxLarge)
+    .padding(.horizontal, 36)
+    .padding(.bottom, max(bottom - 10, 14))
+    .sensoryFeedback(.selection, trigger: tab)
   }
 }
 

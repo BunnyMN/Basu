@@ -29,6 +29,11 @@ extension Color {
   static let accent = BasuColor.accent
   static let accentInk = BasuColor.accentInk
   static let accentSoft = BasuColor.accentSoft
+  static let deep = BasuColor.deep
+  static let deepEdge = BasuColor.deepEdge
+  static let onDeep = BasuColor.onDeep
+  static let deepPill = BasuColor.deepPill
+  static let onDeepPill = BasuColor.onDeepPill
   static let hi = BasuColor.hi
   static let hiInk = BasuColor.hiInk
   static let hiSoft = BasuColor.hiSoft
@@ -52,12 +57,22 @@ extension Color {
   static let stopLine = dynamic(light: 0xE0A9A9, dark: 0x5A2A2C)
 
   /// The shadow under an icon tile. Barely there by design: one point down,
-  /// two of blur, and it is the only shadow in the shell.
+  /// two of blur. The floating tab bar's is the only other one in the shell.
   static var tileShadow: Color {
     Color(uiColor: UIColor { traits in
       traits.userInterfaceStyle == .dark
         ? UIColor(white: 0, alpha: 0.4)
         : UIColor(red: 24 / 255, green: 25 / 255, blue: 22 / 255, alpha: 0.05)
+    })
+  }
+
+  /// Under the floating tab bar: pine-tinted in light so it reads as lifted
+  /// off the ground rather than smudged; plain black in dark.
+  static var barShadow: Color {
+    Color(uiColor: UIColor { traits in
+      traits.userInterfaceStyle == .dark
+        ? UIColor(white: 0, alpha: 0.28)
+        : UIColor(red: 18 / 255, green: 58 / 255, blue: 44 / 255, alpha: 0.28)
     })
   }
 

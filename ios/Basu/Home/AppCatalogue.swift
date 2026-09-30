@@ -93,11 +93,6 @@ enum AppCatalogue {
     .init(id: "cafe", name: "Кофе", tag: "авч явах", icon: .glyph(.cafe), path: nil),
   ]
 
-  /// The line under the grid while there are few icons. A hairline and a
-  /// sentence — never an empty placeholder tile, which promises a tap that
-  /// does nothing.
-  static let comingSoon = "Такси, хүргэлт, тасалбар — 2026 оны төгсгөлд"
-
   /// A filter appears at seven icons and is hidden below that. Under seven it
   /// is slower than looking.
   static let searchThreshold = 7

@@ -201,19 +201,6 @@ struct HomeView: View {
           }
         }
       }
-
-      if iconCount <= AppCatalogue.shipped.count + 1 {
-        // A hairline and a sentence. Never a placeholder tile — that promises
-        // a tap which does nothing.
-        VStack(alignment: .leading, spacing: 0) {
-          Hairline()
-          Text(AppCatalogue.comingSoon)
-            .font(.mono(11.5))
-            .foregroundStyle(Color.ink3)
-            .padding(.top, 12)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-      }
     }
   }
 
