@@ -429,7 +429,18 @@ describe('the desk’s window onto orders', () => {
     const out = await app.inject({ method: 'POST', url: `/v1/ops/guests/${me.id}/sessions/${file.sessions[0].id}/revoke`, headers: desk(), payload: { note: 'утсаа гээсэн гэж залгасан' } });
     expect(out.json()).toEqual({ revoked: true });
     expect((await app.inject({ method: 'GET', url: '/v1/me', headers: auth(guest) })).statusCode).toBe(401);
-    expect((await app.inject({ method: 'POST', url: `/v1/ops/guests/${me.id}/sessions/${file.sessions[0].id}/revoke`, headers: desk(), payload: {} })).statusCode).toBe(404);
+    // Gone now, nobody's, or not an id at all: the one answer, and never a question put to Postgres.
+    for (const [guest, sid] of [
+      [me.id, file.sessions[0].id],
+      [me.id, '00000000-0000-0000-0000-000000000000'],
+      [me.id, 'not-a-session'],
+      [me.id, "1' OR '1'='1"],
+      ['not-a-guest', file.sessions[0].id],
+    ]) {
+      const none = await app.inject({ method: 'POST', url: `/v1/ops/guests/${encodeURIComponent(guest)}/sessions/${encodeURIComponent(sid)}/revoke`, headers: desk(), payload: {} });
+      expect(none.statusCode, `${guest} ${sid}`).toBe(404);
+      expect(none.json().error, `${guest} ${sid}`).toMatchObject({ code: 'NOT_FOUND', message_mn: 'Ийм нэвтрэлт олдсонгүй. Жагсаалтаа шинэчилнэ үү.' });
+    }
 
     // Money in the wallet: the desk is refused the same way the app is.
     const held = await app.inject({ method: 'POST', url: `/v1/ops/guests/${me.id}/close`, headers: desk(), payload: { note: 'зочин хүссэн' } });

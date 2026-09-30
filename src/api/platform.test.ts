@@ -288,6 +288,36 @@ describe('where you are signed in', () => {
     expect((await app.inject({ method: 'GET', url: '/v1/me', headers: auth(mine) })).statusCode)
       .toBe(200);
   });
+
+  it('signs one phone out by its id, and finds none by an id that is somebody else’s, nobody’s, or not an id', async () => {
+    const lost = await signIn('+97699001122', 'iPhone 15');
+    const mine = await signIn('+97699001122', 'iPad');
+    const stranger = await signIn('+97688112233', 'Android');
+    const listed = async (token: string) =>
+      (await app.inject({ method: 'GET', url: '/v1/me/sessions', headers: auth(token) })).json().sessions as Array<{ id: string; current: boolean }>;
+    const theirs = (await listed(stranger))[0]!.id;
+    const end = (id: string, token = mine) =>
+      app.inject({ method: 'DELETE', url: `/v1/me/sessions/${encodeURIComponent(id)}`, headers: auth(token) });
+
+    for (const id of ['not-a-session', "1' OR '1'='1", '00000000-0000-0000-0000-000000000000', theirs]) {
+      const none = await end(id);
+      expect(none.statusCode, id).toBe(404);
+      expect(none.json().error, id).toMatchObject({ code: 'NOT_FOUND', message_mn: 'Ийм нэвтрэлт олдсонгүй. Жагсаалтаа шинэчилнэ үү.' });
+      // What the database would have said about it is nobody's business.
+      expect(none.body, id).not.toMatch(/uuid|syntax/i);
+    }
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: auth(stranger) })).statusCode).toBe(200);
+
+    const lostId = (await listed(mine)).find((s) => !s.current)!.id;
+    expect((await end(lostId.toUpperCase())).json()).toEqual({ revoked: 1 });
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: auth(lost) })).statusCode).toBe(401);
+    expect((await end(lostId)).statusCode).toBe(404);
+
+    // Its own id is signing out here, as the app does it.
+    const here = (await listed(mine)).find((s) => s.current)!.id;
+    expect((await end(here)).json()).toEqual({ revoked: 1 });
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: auth(mine) })).statusCode).toBe(401);
+  });
 });
 
 describe('leaving', () => {
@@ -413,7 +443,7 @@ describe('one movement, in full', () => {
     expect(after.json().receipt.qr).toMatch(/ebarimt/);
   });
 
-  it('will not show one guest what another guest spent', async () => {
+  it('will not show one guest what another guest spent, and finds none by an id that is nobody’s or not an id', async () => {
     const mine = await signIn('+97699001122');
     const theirs = await signIn('+97688112233');
     await topUp(theirs, 30_000);
@@ -421,12 +451,16 @@ describe('one movement, in full', () => {
     const statement = await app.inject({ method: 'GET', url: '/v1/wallet', headers: auth(theirs) });
     const line = statement.json().lines[0];
 
-    const peek = await app.inject({
-      method: 'GET',
-      url: `/v1/wallet/${line.id}`,
-      headers: auth(mine),
-    });
-    expect(peek.statusCode).toBe(500);
+    for (const id of [line.id, '00000000-0000-0000-0000-000000000000', 'not-a-movement', "1' OR '1'='1"]) {
+      const peek = await app.inject({
+        method: 'GET',
+        url: `/v1/wallet/${encodeURIComponent(id)}`,
+        headers: auth(mine),
+      });
+      expect(peek.statusCode, id).toBe(404);
+      expect(peek.json().error, id).toMatchObject({ code: 'NOT_FOUND', message_mn: 'Ийм гүйлгээ олдсонгүй.' });
+    }
+    expect((await app.inject({ method: 'GET', url: `/v1/wallet/${line.id}`, headers: auth(theirs) })).statusCode).toBe(200);
   });
 });
 
@@ -454,6 +488,19 @@ describe('the inbox', () => {
       title: 'Basu-д тавтай морил',
       read: false,
     });
+
+    // An id that is no message of theirs marks nothing — least of all the
+    // whole inbox, which is what no id at all means.
+    for (const id of ['not-a-uuid', 42, '', '00000000-0000-0000-0000-000000000000']) {
+      const none = await app.inject({
+        method: 'POST',
+        url: '/v1/notifications/read',
+        headers: auth(token),
+        payload: { id },
+      });
+      expect(none.statusCode, JSON.stringify(id)).toBe(200);
+      expect(none.json(), JSON.stringify(id)).toEqual({ unread: 1 });
+    }
 
     const read = await app.inject({
       method: 'POST',

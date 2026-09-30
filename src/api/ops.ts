@@ -43,7 +43,7 @@ import { registerSystemDesk } from './systemDesk.js';
 import { registerAccessDesk } from './accessDesk.js';
 import { revokeSession } from '../platform/identity/index.js';
 import { mode } from '../mode.js';
-import { badRequest, forbidden, sendError, signInAgain, unauthorized } from './errors.js';
+import { badRequest, forbidden, noSuchSession, sendError, signInAgain, unauthorized } from './errors.js';
 import {
   deskRoleExists,
   linkByProof,
@@ -134,6 +134,16 @@ export async function seatOf(guestId: string): Promise<Member | null> {
     email: contact?.email ?? null,
     phone: contact?.phoneVerified ? contact.phone : null,
   });
+}
+
+/**
+ * Whether this account sits at the desk in a seat that is on — found the
+ * way the desk finds it, by proof (`seatOf`), whether or not its person has
+ * been to the desk yet. What the account's own pages ask before closing it,
+ * and before a letter about its password may be dropped.
+ */
+export async function seatedAtTheDesk(guestId: string): Promise<boolean> {
+  return Boolean((await seatOf(guestId))?.active);
 }
 
 export interface DeskSeat {
@@ -706,19 +716,22 @@ export async function registerOpsRoutes(
 
   /**
    * A phone is gone: sign that one out. The account of somebody at the desk
-   * is for whoever may hand out their seat's role (`mayActOnAccount`).
+   * is for whoever may hand out their seat's role (`mayActOnAccount`). A
+   * session ended already, nobody's, or named by something that is not an
+   * id is the one answer, as on the account's own list (`noSuchSession`).
    */
   app.post<{ Params: { id: string; sid: string }; Body: { note?: string } }>(
     '/v1/ops/guests/:id/sessions/:sid/revoke',
     desk('desk.guests:sessions'),
     async (request, reply) => {
+      if (!UUID.test(request.params.id) || !UUID.test(request.params.sid)) return noSuchSession(reply);
       try {
         await mayActOnAccount(request.params.id, actor(request), 'sign-out');
       } catch (error) {
         return sendError(reply, error);
       }
       const gone = await revokeSession(request.params.id, request.params.sid, ctx.clock.now());
-      if (!gone) return sendError(reply, new IdeshError('NOT_FOUND', 'no such open session'));
+      if (!gone) return noSuchSession(reply);
       await recordAudit({ who: who(request), action: 'guest.session_revoke', targetKind: 'guest', targetId: request.params.id, note: request.body?.note ?? null });
       return reply.send({ revoked: true });
     },

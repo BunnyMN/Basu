@@ -4,9 +4,8 @@ import { at } from '../../domain/fixtures.js';
 import { VirtualClock } from '../../domain/time.js';
 import { FakeMailer, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../../ports.js';
 import { truncateAll } from '../../test/seed.js';
-import { purgeChallenges, resolveGuest, sendEmailCode, startSession, verifyEmailCode } from './auth.js';
+import { LETTERS_PER_DAY, purgeChallenges, resolveGuest, sendEmailCode, startSession, verifyEmailCode } from './auth.js';
 import {
-  NOTICES_PER_DAY,
   attachEmail,
   changePassword,
   maskEmail,
@@ -304,27 +303,110 @@ describe('a first password, from inside a session', () => {
 });
 
 describe('letters about a password', () => {
-  it('stop at the day’s allowance for everybody, the password set all the same, and are swept a day on', async () => {
-    const made = await phoneAccountWithEmail('+97699001122', 'хуучин нууц үг', 'bat@example.mn');
-    // The day's letters, gone to other addresses over the last hour.
+  /**
+   * The day's letters, gone to other addresses in the last hours: `codes`
+   * codes by email and `notices` letters about a password (whose account
+   * they were about matters to nobody here, so it is `guestId`'s).
+   */
+  async function lettersSent(guestId: string, codes: number, notices: number): Promise<void> {
+    await getPool().query(
+      `INSERT INTO identity.otp_challenge (email, code_hash, expires_at, created_at)
+       SELECT 'code' || n || '@example.mn', 'x', $1::timestamptz, $1::timestamptz - n * interval '1 second' FROM generate_series(1, $2::int) n`,
+      [clock.now(), codes],
+    );
     await getPool().query(
       `INSERT INTO identity.notice (email, guest_id, created_at)
-       SELECT 'other' || n || '@example.mn', $1, $2::timestamptz - n * interval '1 minute' FROM generate_series(1, $3::int) n`,
-      [made.guestId, clock.now(), NOTICES_PER_DAY],
+       SELECT 'other' || n || '@example.mn', $1, $2::timestamptz - n * interval '1 second' FROM generate_series(1, $3::int) n`,
+      [guestId, clock.now(), notices],
     );
+  }
+  /** What the day's count is in production, where the codes are held to it too. */
+  async function inProduction<T>(work: () => Promise<T>): Promise<T> {
+    const before = process.env['BASU_MODE'];
+    process.env['BASU_MODE'] = 'production';
+    try {
+      return await work();
+    } finally {
+      if (before === undefined) delete process.env['BASU_MODE'];
+      else process.env['BASU_MODE'] = before;
+    }
+  }
+
+  it('stop once the day’s letters are gone, codes and all — the password set all the same — and are swept a day on', async () => {
+    const made = await phoneAccountWithEmail('+97699001122', 'хуучин нууц үг', 'bat@example.mn');
+    // With the code that tied the address, the day's letters — every one of them a code.
+    await lettersSent(made.guestId, LETTERS_PER_DAY - 1, 0);
     const before = mailer.sent.length;
     await changePassword(ctx, { guestId: made.guestId, current: 'хуучин нууц үг', next: 'шинэ нууц үг' });
     expect(mailer.sent).toHaveLength(before);
     await expect(signInWithPassword(ctx, { login: 'bat@example.mn', password: 'шинэ нууц үг' })).resolves.toBeTruthy();
 
     // A day on they count for nothing, and the sweep takes them.
-    clock.advanceMinutes(24 * 60);
+    clock.advanceMinutes(24 * 60 + 1);
     await changePassword(ctx, { guestId: made.guestId, current: 'шинэ нууц үг', next: 'гурав дахь нууц үг' });
     expect(mailer.sent).toHaveLength(before + 1);
     expect(mailer.to('bat@example.mn')!.subject).toBe('Basu · Нууц үг солигдлоо');
-    expect(await purgeChallenges(clock.now())).toBeGreaterThanOrEqual(NOTICES_PER_DAY);
+    expect(await purgeChallenges(clock.now())).toBeGreaterThanOrEqual(LETTERS_PER_DAY);
     const { rows } = await getPool().query<{ email: string }>('SELECT email FROM identity.notice');
     expect(rows).toEqual([{ email: 'bat@example.mn' }]);
+  });
+
+  it('are not silenced for everybody by fifty of them to addresses somebody holds', async () => {
+    const made = await phoneAccountWithEmail('+97699001122', 'хуучин нууц үг', 'bat@example.mn');
+    // Fifty accounts on the addresses of whoever wants the next letter unsent, each changing its password once.
+    await lettersSent(made.guestId, 0, 50);
+    await changePassword(ctx, { guestId: made.guestId, current: 'хуучин нууц үг', next: 'шинэ нууц үг' });
+    expect(mailer.to('bat@example.mn')!.subject).toBe('Basu · Нууц үг солигдлоо');
+  });
+
+  it('go past the day’s count to an account the caller says is always told, one an hour still', async () => {
+    const desk = await phoneAccountWithEmail('+97699001122', 'хуучин нууц үг', 'boss@example.mn');
+    const guest = await phoneAccountWithEmail('+97699003344', 'хуучин нууц үг', 'bat@example.mn');
+    await lettersSent(desk.guestId, 0, LETTERS_PER_DAY);
+    const asked: string[] = [];
+    const alwaysTold = async (guestId: string) => {
+      asked.push(guestId);
+      return guestId === desk.guestId;
+    };
+
+    await changePassword(ctx, { guestId: desk.guestId, current: 'хуучин нууц үг', next: 'шинэ нууц үг', alwaysTold });
+    expect(mailer.to('boss@example.mn')!.subject).toBe('Basu · Нууц үг солигдлоо');
+    expect(asked).toEqual([desk.guestId]);
+    // Anybody else's is counted as before, and the count is spent.
+    const before = mailer.sent.length;
+    await changePassword(ctx, { guestId: guest.guestId, current: 'хуучин нууц үг', next: 'шинэ нууц үг', alwaysTold });
+    expect(mailer.sent).toHaveLength(before);
+    // The hour's one letter to an address holds for the desk too.
+    await changePassword(ctx, { guestId: desk.guestId, current: 'шинэ нууц үг', next: 'гурав дахь нууц үг', alwaysTold });
+    expect(mailer.sent).toHaveLength(before);
+
+    // The door's way to a new password, by the code in the letter, the same.
+    clock.advanceMinutes(61);
+    await sendPasswordCode(ctx, { login: 'boss@example.mn', purpose: 'reset' });
+    await setPasswordWithCode(ctx, { login: 'boss@example.mn', code: mailer.codeFor('boss@example.mn')!, password: 'дөрөв дэх нууц үг', alwaysTold });
+    expect(mailer.to('boss@example.mn')!.subject).toBe('Basu · Нууц үг солигдлоо');
+    // A caller that cannot say is not taken for a yes.
+    clock.advanceMinutes(61);
+    const before2 = mailer.sent.length;
+    await changePassword(ctx, {
+      guestId: desk.guestId,
+      current: 'дөрөв дэх нууц үг',
+      next: 'тав дахь нууц үг',
+      alwaysTold: () => Promise.reject(new Error('the desk did not answer')),
+    });
+    expect(mailer.sent).toHaveLength(before2);
+    await expect(signInWithPassword(ctx, { login: 'boss@example.mn', password: 'тав дахь нууц үг' })).resolves.toBeTruthy();
+  });
+
+  it('use up the codes’ day as well: once the day’s letters are gone no code goes either', async () => {
+    const made = await phoneAccountWithEmail('+97699001122', 'хуучин нууц үг', 'bat@example.mn');
+    // With the code that tied the address, all the day's letters but one — every one of them about a password.
+    await lettersSent(made.guestId, 0, LETTERS_PER_DAY - 2);
+    await inProduction(async () => {
+      await sendEmailCode(ctx, 'last@example.mn');
+      await expect(sendEmailCode(ctx, 'next@example.mn')).rejects.toMatchObject({ code: 'RATE_LIMITED' });
+    });
+    expect(mailer.to('next@example.mn')).toBeUndefined();
   });
 });
 

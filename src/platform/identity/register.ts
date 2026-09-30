@@ -1,8 +1,18 @@
 import { getPool, tx } from '../../db/pool.js';
 import { hhmm } from '../../domain/time.js';
 import { publicOrigin, renderLetter } from '../../letter.js';
-import { AuthError, checkEmailCode, emailAddress, sendEmailCode, startSession, startSessionFor, type GuestSession } from './auth.js';
-import { checkPassword, hashPassword, verifyPassword } from './password.js';
+import {
+  AuthError,
+  LETTERS_PER_DAY,
+  checkEmailCode,
+  emailAddress,
+  lettersToday,
+  sendEmailCode,
+  startSession,
+  startSessionFor,
+  type GuestSession,
+} from './auth.js';
+import { checkPassword, hashPassword, verifyNobody, verifyPassword } from './password.js';
 import { sessionOpenedAt } from './sessions.js';
 import type { Ctx } from '../../ports.js';
 
@@ -123,7 +133,10 @@ function byLogin(login: string): { where: string; value: string } {
 
 /**
  * Sign in, by an email address or a phone number. A wrong login and a wrong
- * password are the same answer on purpose.
+ * password are the same answer on purpose, and take the same time: a login
+ * with no password behind it — nobody's, or an account made by an address,
+ * Google or Apple — is checked against nobody's (`verifyNobody`), at the
+ * cost of a real one.
  */
 export async function signInWithPassword(
   ctx: Ctx,
@@ -141,7 +154,10 @@ export async function signInWithPassword(
     throw new AuthError('LOCKED', 'too many wrong passwords — wait a few minutes');
   }
 
-  const ok = guest && !guest.closed_at ? await verifyPassword(input.password, guest.password_hash) : false;
+  const ok =
+    guest && !guest.closed_at && guest.password_hash
+      ? await verifyPassword(input.password, guest.password_hash)
+      : await verifyNobody(input.password);
   if (!ok) {
     if (guest) await countWrongPassword(guest.id, now);
     throw new AuthError('BAD_CREDENTIALS', 'wrong login or password');
@@ -259,7 +275,8 @@ export async function sendPasswordCode(
  * code-by-email door accepts — so the address with no account becomes one
  * here, with the password and the name given, and the address with one gets
  * the new password. An account that was already there hears of it by letter
- * (`tellInbox`); one made just now asked for exactly this, a moment ago.
+ * (`tellInbox`, past the day's count when it is `alwaysTold`); one made just
+ * now asked for exactly this, a moment ago.
  *
  * On an account that was already there, every session ends. A replaced
  * password is a way in somebody else may know, and every session it opened
@@ -274,7 +291,14 @@ export async function sendPasswordCode(
  */
 export async function setPasswordWithCode(
   ctx: Ctx,
-  input: { login: string; code: string; password: string; name?: string | null; device?: string | null },
+  input: {
+    login: string;
+    code: string;
+    password: string;
+    name?: string | null;
+    device?: string | null;
+    alwaysTold?: AlwaysTold;
+  },
 ): Promise<{ session: GuestSession; created: boolean }> {
   checkPassword(input.password);
   const email = await inboxFor(input.login);
@@ -317,7 +341,7 @@ export async function setPasswordWithCode(
   });
 
   const session = await startSessionFor(ctx, guestId, input.device ?? null);
-  if (!created) await tellInbox(ctx, { guestId, email }, replaced ? 'changed' : 'set');
+  if (!created) await tellInbox(ctx, { guestId, email }, replaced ? 'changed' : 'set', input.alwaysTold);
   return { session, created };
 }
 
@@ -430,6 +454,8 @@ export async function sendFirstPasswordCode(ctx: Ctx, input: { guestId: string }
 /**
  * Change it, knowing the old one — or set the first, with the code from the
  * letter `sendFirstPasswordCode` sent. The caller ends every other session.
+ * The address hears of it (`tellInbox`, past the day's count when the
+ * account is `alwaysTold`).
  *
  * An account made by an address, Google or Apple has no old password to
  * prove, and the session asking proves nothing about who holds it: a first
@@ -444,7 +470,7 @@ export async function sendFirstPasswordCode(ctx: Ctx, input: { guestId: string }
  */
 export async function changePassword(
   ctx: Ctx,
-  input: { guestId: string; current?: string | null; next: string; code?: string | null },
+  input: { guestId: string; current?: string | null; next: string; code?: string | null; alwaysTold?: AlwaysTold },
 ): Promise<void> {
   checkPassword(input.next);
   const me = await secretsOf(input.guestId);
@@ -463,26 +489,32 @@ export async function changePassword(
     `UPDATE identity.guest SET password_hash = $2, password_set_at = $3, failed_sign_ins = 0, locked_until = NULL WHERE id = $1`,
     [input.guestId, hash, ctx.clock.now()],
   );
-  await tellInbox(ctx, { guestId: input.guestId, email: me.email }, me.passwordHash ? 'changed' : 'set');
+  await tellInbox(ctx, { guestId: input.guestId, email: me.email }, me.passwordHash ? 'changed' : 'set', input.alwaysTold);
 }
 
 /* ── telling the inbox ─────────────────────────────────────────────── */
 
 /**
- * How many letters about a password go out: one an hour to an address,
- * fifty a day in all.
+ * How many letters about a password go to one address: one an hour.
  *
- * They leave from the same Gmail account as every code, which stops sending
- * — and may be suspended — past about 500 a day, and codes stop at 400
- * (`EMAIL_CODES_PER_DAY`). A password is changed knowing the old one without
- * any code, so with nothing counting them one person switching between two
- * passwords sent a letter a switch: the day's letters gone within the hour,
- * and every code with them, for everybody. A second change inside the hour
- * goes untold; the letter about the first said the same a moment before,
- * and what to do about it.
+ * A password is changed knowing the old one without any code, so with
+ * nothing counting them one person switching between two passwords sent a
+ * letter a switch. A second change inside the hour goes untold; the letter
+ * about the first said the same a moment before, and what to do about it.
+ * In all they are counted with the codes, the day's `LETTERS_PER_DAY` from
+ * the one Gmail account both leave from.
  */
 export const NOTICES_PER_EMAIL_PER_HOUR = 1;
-export const NOTICES_PER_DAY = 50;
+
+/**
+ * Whether the letter about this account's password goes out whatever the
+ * day's count says — its hour's one letter still holds. Identity cannot
+ * tell which accounts those are: they are the ones Basu's desk sits in,
+ * where a password somebody else chose is worth the most to them and its
+ * owner most needs to hear of it, and the desk is not identity's to ask.
+ * So whoever changes a password says.
+ */
+export type AlwaysTold = (guestId: string) => Promise<boolean>;
 
 /**
  * A letter to the account's own address: its password was just set, or
@@ -492,26 +524,34 @@ export const NOTICES_PER_DAY = 50;
  * the forgotten-password door, which signs every other device out as the
  * new password is set.
  *
- * Best-effort, and counted (`NOTICES_PER_DAY`): past the count nothing goes.
- * The password is set already, and neither a letter that cannot go nor a
- * mail server taking its time may undo it, make the person think it failed,
- * or keep them waiting for their answer.
+ * Best-effort, and counted: one an hour to an address, and in all what is
+ * left of the day's letters (`LETTERS_PER_DAY`) — except to an account
+ * that is `alwaysTold`, whose letter the day's count never stops. Past the
+ * count nothing goes. The password is set already, and neither a letter
+ * that cannot go nor a mail server taking its time may undo it, make the
+ * person think it failed, or keep them waiting for their answer.
  */
-async function tellInbox(ctx: Ctx, account: { guestId: string; email: string | null }, what: 'set' | 'changed'): Promise<void> {
+async function tellInbox(
+  ctx: Ctx,
+  account: { guestId: string; email: string | null },
+  what: 'set' | 'changed',
+  alwaysTold?: AlwaysTold,
+): Promise<void> {
   const { guestId, email } = account;
   const mailer = ctx.mailer;
   if (!email || !mailer) return;
   const now = ctx.clock.now();
   try {
-    // Written down only if it fits under both counts, and only then sent.
+    // Not knowing is not knowing: the letter is then counted like anybody's.
+    const always = alwaysTold ? await alwaysTold(guestId).catch(() => false) : false;
+    // Written down only if it fits under the counts, and only then sent.
     const { rowCount } = await getPool().query(
       `INSERT INTO identity.notice (email, guest_id, created_at)
-       SELECT $1::text, $2::uuid, $3::timestamptz
+       SELECT $2::text, $3::uuid, $1::timestamptz
         WHERE (SELECT count(*) FROM identity.notice
-                WHERE email = $1 AND created_at > $3::timestamptz - interval '1 hour') < $4
-          AND (SELECT count(*) FROM identity.notice
-                WHERE created_at > $3::timestamptz - interval '24 hours') < $5`,
-      [email, guestId, now, NOTICES_PER_EMAIL_PER_HOUR, NOTICES_PER_DAY],
+                WHERE email = $2 AND created_at > $1::timestamptz - interval '1 hour') < $4
+          AND ($6::boolean OR ${lettersToday('$1')} < $5)`,
+      [now, email, guestId, NOTICES_PER_EMAIL_PER_HOUR, LETTERS_PER_DAY, always],
     );
     if (!rowCount) return;
 

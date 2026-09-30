@@ -1,8 +1,11 @@
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
+import { STATUS_CODES } from 'node:http';
 import { join } from 'node:path';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { mode } from '../mode.js';
+import { WireError } from '../platform/ledger/index.js';
+import { sendError } from './errors.js';
 
 /**
  * What every response carries, and how often a caller may knock.
@@ -108,10 +111,37 @@ export function tooManyRequests(_request: FastifyRequest, context: { after: stri
   };
 }
 
-/** A thrown ceiling answers in the envelope; everything else as Fastify would. */
-export function errorHandler(error: Error & { statusCode?: number; body?: unknown }, _request: FastifyRequest, reply: FastifyReply) {
+/**
+ * What a request is told when something breaks under it.
+ *
+ * Left to Fastify, an error goes out as itself: its message, its code and
+ * whatever status it carries, to whoever asked. That was Postgres naming
+ * the type it could not read an id as, a TypeError quoting a line of ours,
+ * and — had one got past its route — the payment provider's own status and
+ * words, whose 401 would have signed a website visitor out. None of it is
+ * the caller's to read. It stays in the log, and the caller is answered as
+ * every route answers (`sendError`): a refusal of ours by its name, and
+ * anything else «Алдаа гарлаа».
+ *
+ * A refusal of the request itself is the caller's, and keeps its status:
+ * Fastify's own, made before any route runs — a body that is not JSON, or
+ * too large — in Fastify's words, which are about what was sent; and the web
+ * root's — a path it will not serve, a range the file has not got — in the
+ * words of its status alone, whatever the error says. The ceiling on
+ * knocking answers in the envelope (`tooManyRequests`).
+ */
+export function errorHandler(
+  error: Error & { statusCode?: unknown; status?: unknown; code?: unknown; body?: unknown },
+  _request: FastifyRequest,
+  reply: FastifyReply,
+) {
   if (error.statusCode === 429 && error.body) return reply.status(429).send(error.body);
-  return reply.send(error);
+  const status = Number(error.statusCode ?? error.status);
+  const refused = Number.isInteger(status) && status >= 400 && status < 500 && !(error instanceof WireError);
+  if (!refused) return sendError(reply, error);
+  if (typeof error.code === 'string' && error.code.startsWith('FST_')) return reply.send(error);
+  const words = STATUS_CODES[status] ?? 'Bad Request';
+  return reply.status(status).send({ statusCode: status, error: words, message: words });
 }
 
 export type Guard = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;

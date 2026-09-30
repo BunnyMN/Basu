@@ -20,7 +20,7 @@ export {
   emailAddress,
   requestEmailCode,
   sendEmailCode,
-  EMAIL_CODES_PER_DAY,
+  LETTERS_PER_DAY,
   type CodePurpose,
   checkEmailCode,
   verifyEmailCode,
@@ -46,6 +46,7 @@ export {
   ClosureError,
   closeAccount,
   endSession,
+  openAccounts,
   revokeOtherSessions,
   revokeSession,
   sessionsOf,
@@ -71,6 +72,7 @@ export {
   attachEmail,
   sendFirstPasswordCode,
   FRESH_SIGN_IN_MINUTES,
+  type AlwaysTold,
 } from './register.js';
 export { verifyIdToken, emailVerified, IdTokenError, type IdClaims } from './idtoken.js';
 export {

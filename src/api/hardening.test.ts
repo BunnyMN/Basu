@@ -1,10 +1,11 @@
-import type { FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { closePool } from '../db/pool.js';
+import { closePool, getPool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
+import { LedgerError, WireError } from '../platform/ledger/index.js';
 import { buildServer } from './server.js';
-import { contentSecurityPolicy, inlineScriptHashes, limits } from './hardening.js';
+import { contentSecurityPolicy, errorHandler, inlineScriptHashes, limits } from './hardening.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
 import { dirname, join } from 'node:path';
@@ -59,6 +60,93 @@ describe('security headers', () => {
     expect(csp).not.toContain("'unsafe-inline' https://cdnjs");
     expect(csp).toMatch(/script-src 'self' https:\/\/cdnjs\.cloudflare\.com 'sha256-/);
     expect(csp).toContain("connect-src 'self'");
+  });
+});
+
+describe('what somebody is told when a request breaks', () => {
+  /** Whatever Postgres, the code or the provider said, none of it is in the answer. */
+  const OURS = /uuid|bigint|syntax|22P02|trim|function|sk_live|API key|req_7Hq|srv|invalid input/i;
+  const generalWords = { code: 'INTERNAL', message_mn: 'Алдаа гарлаа. Түр хүлээгээд дахин оролдоно уу.', message_en: 'internal error' };
+
+  it('is never what Postgres, the code or the payment provider said', async () => {
+    // The handler alone, and a route for each way something of ours breaks.
+    const server = Fastify();
+    server.setErrorHandler(errorHandler);
+    server.get('/postgres', async () => getPool().query("SELECT 'not-an-id'::uuid"));
+    server.post('/code', async (request) => (request.body as { login: string }).login.trim());
+    server.get('/provider', async () => {
+      throw new WireError(401, 'invalid_api_key', 'req_7Hq', 'Invalid API key provided: sk_live_****abcd');
+    });
+    server.get('/ours', async () => {
+      throw new LedgerError('NOT_FOUND', 'no such top-up');
+    });
+    try {
+      for (const probe of [
+        { method: 'GET' as const, url: '/postgres' },
+        { method: 'POST' as const, url: '/code', payload: { login: 42 } },
+        // Wire's 401 is Wire refusing our key, not the caller signed out: as itself it would sign a website visitor out.
+        { method: 'GET' as const, url: '/provider' },
+      ]) {
+        const res = await server.inject(probe);
+        expect(res.statusCode, probe.url).toBe(500);
+        expect(res.json(), probe.url).toEqual({ error: generalWords });
+        expect(res.body, probe.url).not.toMatch(OURS);
+      }
+      // A refusal of ours by its name, as a route would have sent it.
+      const ours = await server.inject({ method: 'GET', url: '/ours' });
+      expect(ours.statusCode).toBe(404);
+      expect(ours.json().error).toMatchObject({ code: 'NOT_FOUND', message_mn: 'Ийм гүйлгээ олдсонгүй.' });
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('is general on the real server too, where a route lets Postgres answer', async () => {
+    const { token } = (await app.inject({ method: 'POST', url: '/dev/login', payload: { phone: '+97699007788' } })).json();
+    const res = await app.inject({ method: 'GET', url: '/v1/wallet?before=x', headers: { authorization: `Bearer ${token}` } });
+    expect(res.statusCode).toBe(500);
+    expect(res.json()).toEqual({ error: generalWords });
+    expect(res.body).not.toMatch(OURS);
+  });
+
+  it('keeps a refusal of the request itself, with its status, in words about the request', async () => {
+    // Fastify's own, before any route runs: its words are about what was sent.
+    const json = { 'content-type': 'application/json' };
+    const notJson = await app.inject({ method: 'POST', url: '/v1/auth/login', headers: json, payload: '{' });
+    expect(notJson.statusCode).toBe(400);
+    expect(notJson.json()).toMatchObject({ code: 'FST_ERR_CTP_INVALID_JSON_BODY', message: "Body is not valid JSON but content-type is set to 'application/json'" });
+    const tooLarge = await app.inject({ method: 'POST', url: '/v1/auth/login', headers: json, payload: JSON.stringify({ login: 'x'.repeat(70_000) }) });
+    expect(tooLarge.statusCode).toBe(413);
+    expect(tooLarge.json()).toMatchObject({ code: 'FST_ERR_CTP_BODY_TOO_LARGE' });
+    const xml = await app.inject({ method: 'POST', url: '/v1/auth/login', headers: { 'content-type': 'text/xml' }, payload: '<a/>' });
+    expect(xml.statusCode).toBe(415);
+
+    // The web root's: a path it will not serve, a range the file has not got, a version it is not.
+    for (const [request, status] of [
+      [{ url: '//api.js' }, 403],
+      [{ url: '/brand//favicon.png' }, 403],
+      [{ url: '/api.js', headers: { range: 'bytes=99999999-' } }, 416],
+      [{ url: '/api.js', headers: { 'if-match': '"not-this-one"' } }, 412],
+    ] as const) {
+      const res = await app.inject({ method: 'GET', ...request });
+      expect(res.statusCode, JSON.stringify(request)).toBe(status);
+      expect(res.body, JSON.stringify(request)).not.toContain('INTERNAL');
+    }
+
+    // Any other refusal that carries a status keeps it, and says only that status's name.
+    const server = Fastify();
+    server.setErrorHandler(errorHandler);
+    server.get('/refused', async () => {
+      throw Object.assign(new Error('Forbidden: /srv/basu/dist/web/.env'), { status: 403, statusCode: 403 });
+    });
+    try {
+      const refused = await server.inject({ method: 'GET', url: '/refused' });
+      expect(refused.statusCode).toBe(403);
+      expect(refused.json()).toMatchObject({ statusCode: 403, error: 'Forbidden', message: 'Forbidden' });
+      expect(refused.body).not.toMatch(OURS);
+    } finally {
+      await server.close();
+    }
   });
 });
 

@@ -157,11 +157,31 @@ const EMAIL_CODE_TTL_MINUTES = 10;
 /** Letters can go to spam and be re-asked for; a few more than SMS, still few. */
 export const CODES_PER_EMAIL_PER_HOUR = 5;
 /**
- * Codes by email the whole service sends in a day. The letters go out through
- * a Gmail account, which stops sending — and may be suspended — past about
- * 500 a day; this leaves room under that for the other letters Basu sends.
+ * Letters the whole service sends in a day: every code by email, and every
+ * letter telling an address its password was set or changed (`tellInbox`
+ * in register.ts). They go out through one Gmail account, which stops
+ * sending — and may be suspended — past about 500 a day; this leaves room
+ * under that for the other letters Basu sends.
+ *
+ * One count for both, because it is one sender. The letters about a
+ * password once had fifty of their own, and fifty was cheap: fifty
+ * accounts on addresses somebody holds, each changing its password once,
+ * and for a day no letter told anybody — the desk's admin included — that
+ * their password had just been changed. Counted with the codes, they are
+ * used up only by using up every code as well, which stops every sign-in
+ * by email for everybody and is seen at once.
  */
-export const EMAIL_CODES_PER_DAY = 400;
+export const LETTERS_PER_DAY = 400;
+
+/**
+ * The day's letters so far, as one SQL expression: codes by email and
+ * letters about a password, in the 24 hours before the moment the query
+ * parameter `at` names ('$1'). Codes to a phone are SMS, and count only
+ * toward `OTP_PER_DAY`. The parameter is ours, never input.
+ */
+export const lettersToday = (at: string): string => `(
+  (SELECT count(*) FROM identity.otp_challenge WHERE email IS NOT NULL AND created_at > ${at}::timestamptz - interval '24 hours')
+  + (SELECT count(*) FROM identity.notice WHERE created_at > ${at}::timestamptz - interval '24 hours'))::int`;
 
 /**
  * Who asked for a code from inside a session, and what for. A code the door
@@ -183,12 +203,12 @@ export async function requestEmailCode(
   const now = ctx.clock.now();
 
   if (mode() === 'production') {
-    const { rows: day } = await getPool().query<{ n: number; by_email: number }>(
-      `SELECT count(*)::int AS n, count(email)::int AS by_email
-         FROM identity.otp_challenge WHERE created_at > $1::timestamptz - interval '24 hours'`,
+    const { rows: day } = await getPool().query<{ n: number; letters: number }>(
+      `SELECT (SELECT count(*)::int FROM identity.otp_challenge WHERE created_at > $1::timestamptz - interval '24 hours') AS n,
+              ${lettersToday('$1')} AS letters`,
       [now],
     );
-    if ((day[0]?.n ?? 0) >= OTP_PER_DAY || (day[0]?.by_email ?? 0) >= EMAIL_CODES_PER_DAY) {
+    if ((day[0]?.n ?? 0) >= OTP_PER_DAY || (day[0]?.letters ?? 0) >= LETTERS_PER_DAY) {
       throw new AuthError('RATE_LIMITED', 'the day’s allowance of codes is spent');
     }
   }

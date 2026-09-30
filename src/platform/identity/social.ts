@@ -34,8 +34,14 @@ const PUBLIC_ORIGIN = () => process.env['PUBLIC_ORIGIN']?.trim() || 'https://bas
 /**
  * Our own pages, and the app's own scheme. Nothing else: a sign-in that
  * could return anywhere is an open redirect with a session token attached.
+ *
+ * Only the pages that claim what Google sends back — each loads api.js,
+ * which trades the code in the address for the session. /app, /idesh and
+ * /dine are the phone app's pages: a browser is sent on from them before
+ * api.js runs, and the code went with it, unclaimed. The app itself comes
+ * back to `basu://auth`.
  */
-const RETURN_PATHS = ['/', '/login', '/home', '/app', '/idesh', '/dine', '/supplier', '/kds', '/dashboard'];
+const RETURN_PATHS = ['/', '/login', '/home', '/supplier', '/kds', '/dashboard'];
 export const APP_RETURN = 'basu://auth';
 
 export function safeReturn(raw: unknown): string {

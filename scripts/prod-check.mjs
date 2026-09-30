@@ -74,7 +74,9 @@ try {
     }
     const google = await head('/v1/auth/google/start?return=https://evil.example');
     const to = google.headers.get('location') ?? '';
-    check('Google эхлэл Google руу, state cookie-тэй', !open.google || (to.startsWith('https://accounts.google.com/') && (google.headers.get('set-cookie') ?? '').includes('HttpOnly')), `HTTP ${google.status}`);
+    // A __Host- cookie is this host's alone: no other site under burzai.cloud can plant a state of its own.
+    const state = google.headers.get('set-cookie') ?? '';
+    check('Google эхлэл Google руу, __Host- state cookie-тэй', !open.google || (to.startsWith('https://accounts.google.com/') && state.startsWith('__Host-') && state.includes('HttpOnly')), `HTTP ${google.status}`);
   }
 
   const tls = base.startsWith('https://');
