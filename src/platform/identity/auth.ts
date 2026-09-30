@@ -53,7 +53,10 @@ export class AuthError extends Error {
       | 'EMAIL_CLOSED'
       | 'EMAIL_FAILED'
       | 'SOCIAL_CLOSED'
-      | 'SOCIAL_REFUSED',
+      | 'SOCIAL_REFUSED'
+      | 'PROOF_REQUIRED'
+      | 'PASSWORD_SET'
+      | 'SIGN_IN_AGAIN',
     message: string,
   ) {
     super(message);
@@ -138,7 +141,22 @@ export const CODES_PER_EMAIL_PER_HOUR = 5;
  */
 export const EMAIL_CODES_PER_DAY = 400;
 
-export async function requestEmailCode(ctx: Ctx, rawEmail: string): Promise<OtpIssued> {
+/**
+ * Who asked for a code from inside a session, and what for. A code the door
+ * sends proves an inbox and nothing else; one asked for from inside a
+ * session is sent only after that session has shown it is still its person,
+ * and is good only for that account and that purpose (see `sendEmailCode`).
+ */
+export interface CodeAsked {
+  guestId: string;
+  purpose: CodePurpose;
+}
+
+export async function requestEmailCode(
+  ctx: Ctx,
+  rawEmail: string,
+  asked: { purpose?: CodePurpose; guestId?: string | null } = {},
+): Promise<OtpIssued> {
   const email = emailAddress(rawEmail);
   const now = ctx.clock.now();
 
@@ -163,20 +181,22 @@ export async function requestEmailCode(ctx: Ctx, rawEmail: string): Promise<OtpI
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
   const inserted = await getPool().query<{ id: string }>(
-    `INSERT INTO identity.otp_challenge (email, code_hash, expires_at, created_at)
-     VALUES ($1, $2, $3, $4) RETURNING id`,
-    [email, sha256(code), addMinutes(now, EMAIL_CODE_TTL_MINUTES), now],
+    `INSERT INTO identity.otp_challenge (email, code_hash, expires_at, created_at, purpose, guest_id)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+    [email, sha256(code), addMinutes(now, EMAIL_CODE_TTL_MINUTES), now, asked.purpose ?? null, asked.guestId ?? null],
   );
   return { challengeId: inserted.rows[0]!.id, code };
 }
 
 /**
- * What a code by email is for. The code is the same kind whatever it is for —
- * each proves only that the person can read that inbox — so only the letter's
- * words change, so that nobody is told they are signing in when they asked to
- * reset a password.
+ * What a code by email is for. At the door the code is the same kind whatever
+ * it is for — each proves only that the person can read that inbox — so only
+ * the letter's words change, so that nobody is told they are signing in when
+ * they asked to reset a password. The two asked for from inside a session,
+ * `attach` and `set_password`, are held to the account that asked (see
+ * `sendEmailCode`).
  */
-export type CodePurpose = 'sign_in' | 'sign_up' | 'reset' | 'attach';
+export type CodePurpose = 'sign_in' | 'sign_up' | 'reset' | 'attach' | 'set_password';
 
 const LETTERS: Record<CodePurpose, { subject: string; lead: string; unasked: string }> = {
   sign_in: {
@@ -199,16 +219,35 @@ const LETTERS: Record<CodePurpose, { subject: string; lead: string; unasked: str
     lead: 'Энэ хаягийг Basu бүртгэлдээ холбох код:',
     unasked: 'Та хаягаа холбох гэж оролдоогүй бол энэ захидлыг үл тоомсорлоорой.',
   },
+  // Asked for only from inside a session on this very account, so a letter
+  // nobody here asked for means somebody holds one: it says so, and what to do.
+  set_password: {
+    subject: 'Basu нууц үг тохируулах код',
+    lead: 'Таны Basu бүртгэлд нууц үг тохируулах код:',
+    unasked:
+      'Та нууц үг тохируулах гэж оролдоогүй бол хэн нэгэн таны бүртгэлээр нэвтэрсэн байна. Кодыг хэнд ч бүү өгөөрэй: Basu-д нэвтэрч «Бусад бүх төхөөрөмжөөс гарах»-ыг дараад, нууц үгээ өөрөө тохируулна уу.',
+  },
 };
 
 /**
  * The code, by email — the one way it leaves. The subject carries it too,
  * so it can be read off the notification without opening the letter.
+ *
+ * `askedBy` is the account that asked, when it asked from inside a session,
+ * past a proof that session gave first. The code then counts for that
+ * account and this purpose alone: otherwise a code the door sends to any
+ * inbox for the asking would stand in for the proof, and a session left open
+ * in a borrowed browser could tie its holder's address to the account.
  */
-export async function sendEmailCode(ctx: Ctx, rawEmail: string, purpose: CodePurpose = 'sign_in'): Promise<void> {
+export async function sendEmailCode(
+  ctx: Ctx,
+  rawEmail: string,
+  purpose: CodePurpose = 'sign_in',
+  askedBy: string | null = null,
+): Promise<void> {
   if (!ctx.mailer) throw new AuthError('EMAIL_CLOSED', 'this server has nothing to send email with');
   const email = emailAddress(rawEmail);
-  const { code } = await requestEmailCode(ctx, email);
+  const { code } = await requestEmailCode(ctx, email, { purpose, guestId: askedBy });
   const letter = LETTERS[purpose];
   try {
     await ctx.mailer.send({
@@ -235,9 +274,13 @@ export async function sendEmailCode(ctx: Ctx, rawEmail: string, purpose: CodePur
   }
 }
 
-/** Is this the code we sent this address? Consumed on success, counted on failure. */
-export async function checkEmailCode(ctx: Ctx, rawEmail: string, code: string): Promise<void> {
-  return checkCode(ctx, { column: 'email', value: emailAddress(rawEmail) }, code);
+/**
+ * Is this the code we sent this address? Consumed on success, counted on
+ * failure. With `asked`, only a code that account asked for, for that, will
+ * do; without, only one the door sent.
+ */
+export async function checkEmailCode(ctx: Ctx, rawEmail: string, code: string, asked: CodeAsked | null = null): Promise<void> {
+  return checkCode(ctx, { column: 'email', value: emailAddress(rawEmail) }, code, asked);
 }
 
 /**
@@ -335,8 +378,16 @@ export async function checkOtp(ctx: Ctx, phone: string, code: string): Promise<v
 /** Where a code went: a phone or an address. The column name is ours, never input. */
 type CodeAddress = { column: 'phone_e164' | 'email'; value: string };
 
-async function checkCode(ctx: Ctx, where: CodeAddress, code: string): Promise<void> {
+/**
+ * The newest code that could be the one typed: among those the asking
+ * account asked for, for this — or, at the door, among those nobody asked
+ * for from inside a session. A door and a session each wait for their own
+ * letter, and a wrong guess at one spends nothing of the other's.
+ */
+async function checkCode(ctx: Ctx, where: CodeAddress, code: string, asked: CodeAsked | null = null): Promise<void> {
   const now = ctx.clock.now();
+  const scope = asked ? 'guest_id = $2 AND purpose = $3' : 'guest_id IS NULL';
+  const params = asked ? [where.value, asked.guestId, asked.purpose] : [where.value];
 
   /**
    * The check runs in its own transaction that always commits.
@@ -355,11 +406,11 @@ async function checkCode(ctx: Ctx, where: CodeAddress, code: string): Promise<vo
     }>(
       `SELECT id, code_hash, attempts, expires_at, consumed_at
          FROM identity.otp_challenge
-        WHERE ${where.column} = $1 AND consumed_at IS NULL
+        WHERE ${where.column} = $1 AND consumed_at IS NULL AND ${scope}
         ORDER BY created_at DESC
         LIMIT 1
         FOR UPDATE`,
-      [where.value],
+      params,
     );
     const challenge = rows[0];
     if (!challenge || challenge.consumed_at) return { ok: false, code: 'INVALID_CODE' } as const;

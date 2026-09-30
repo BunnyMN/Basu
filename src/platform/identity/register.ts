@@ -1,6 +1,9 @@
 import { getPool, tx } from '../../db/pool.js';
+import { hhmm } from '../../domain/time.js';
+import { publicOrigin, renderLetter } from '../../letter.js';
 import { AuthError, checkEmailCode, emailAddress, sendEmailCode, startSession, startSessionFor, type GuestSession } from './auth.js';
 import { checkPassword, hashPassword, verifyPassword } from './password.js';
+import { sessionOpenedAt } from './sessions.js';
 import type { Ctx } from '../../ports.js';
 
 /**
@@ -22,6 +25,13 @@ import type { Ctx } from '../../ports.js';
  * account with one is made by the code sent to its address, and a forgotten
  * one is replaced by a code sent to the address on the account. A number with
  * no address behind it has no way back but the ones it already has.
+ *
+ * That holds from inside a session too. An account made by an address,
+ * Google or Apple has no password to know, and a session is only something
+ * somebody holds — a borrowed browser, a tab left open — so its first
+ * password is set by a code to the address on it, never on the session's
+ * word. And the address hears of every password set or replaced, so one its
+ * owner did not choose is found the day it is chosen.
  */
 
 /** Five in a row, then a quarter of an hour. Enough to stop a script, not a person. */
@@ -214,7 +224,9 @@ export async function sendPasswordCode(
  * code-by-email door accepts — so the address with no account becomes one
  * here, with the password and the name given, and the address with one gets
  * the new password. A password somebody else might know is a way in, so a
- * replaced one ends every session it could have opened.
+ * replaced one ends every session it could have opened. An account that was
+ * already there hears of it by letter (`tellInbox`); one made just now asked
+ * for exactly this, a moment ago.
  *
  * The password is checked before the code is looked at: a password that is
  * too short is a typing mistake, and must not spend the code.
@@ -230,7 +242,7 @@ export async function setPasswordWithCode(
   const now = ctx.clock.now();
   const name = input.name?.trim() || null;
 
-  const { guestId, created } = await tx(async (client) => {
+  const { guestId, created, replaced } = await tx(async (client) => {
     const { rows } = await client.query<{ id: string; password_hash: string | null }>(
       'SELECT id, password_hash FROM identity.guest WHERE lower(email) = $1 AND closed_at IS NULL FOR UPDATE',
       [email],
@@ -247,7 +259,7 @@ export async function setPasswordWithCode(
         id,
         name,
       ]);
-      return { guestId: id, created: true };
+      return { guestId: id, created: true, replaced: false };
     }
     await client.query(
       `UPDATE identity.guest
@@ -262,26 +274,43 @@ export async function setPasswordWithCode(
         [found.id, now],
       );
     }
-    return { guestId: found.id, created: false };
+    return { guestId: found.id, created: false, replaced: Boolean(found.password_hash) };
   });
 
-  return { session: await startSessionFor(ctx, guestId, input.device ?? null), created };
+  const session = await startSessionFor(ctx, guestId, input.device ?? null);
+  if (!created) await tellInbox(ctx, email, replaced ? 'changed' : 'set');
+  return { session, created };
 }
 
 /* ── an address for an account that has none ───────────────────────── */
+
+/**
+ * How lately an account with neither a password nor an address must have
+ * come through a door to give itself an address. It came in by Google,
+ * Apple or a code to its phone, and a session opened a moment ago is that
+ * door passed again; one left open in a browser for longer is only a token
+ * somebody holds.
+ */
+const FRESH_SIGN_IN_MINUTES = 10;
 
 /**
  * The first step of giving an account an address: a code to it.
  *
  * An account made by phone has no way back when its password is forgotten;
  * an address on it is that way back. The person is signed in, but a session
- * can be stolen, and an address is how a password gets replaced — so an
- * account with a password must type it here, or a stolen session could make
- * itself permanent.
+ * can be stolen, and an address is how a password gets replaced — so the
+ * session shows first that it is still its person, or a stolen one could
+ * make itself permanent. An account with a password types it. One without
+ * has no secret to type: it shows it by having come through its door a
+ * moment ago, which a session lifted from a borrowed browser has not.
+ *
+ * The code is held to this account and this purpose (`sendEmailCode`): a
+ * code the door sends to anybody's inbox for the asking, or one another
+ * account asked for, ties no address to this one.
  */
 export async function sendAttachCode(
   ctx: Ctx,
-  input: { guestId: string; email: string; password?: string | null },
+  input: { guestId: string; email: string; password?: string | null; token?: string | null },
 ): Promise<void> {
   const email = emailAddress(input.email);
   const { rows } = await getPool().query<{ email: string | null; password_hash: string | null }>(
@@ -291,18 +320,29 @@ export async function sendAttachCode(
   const me = rows[0];
   if (!me) throw new AuthError('UNAUTHORIZED', 'no such account');
   if (me.email) throw new AuthError('EMAIL_SET', 'this account already has an address');
-  if (me.password_hash && !(await verifyPassword(input.password ?? '', me.password_hash))) {
-    throw new AuthError('WRONG_PASSWORD', 'the password is wrong');
+  if (me.password_hash) {
+    if (!(await verifyPassword(input.password ?? '', me.password_hash))) {
+      throw new AuthError('WRONG_PASSWORD', 'the password is wrong');
+    }
+  } else {
+    const opened = input.token ? await sessionOpenedAt(input.guestId, input.token) : null;
+    const since = ctx.clock.now().getTime() - FRESH_SIGN_IN_MINUTES * 60 * 1000;
+    if (!opened || opened.getTime() < since) {
+      throw new AuthError('SIGN_IN_AGAIN', 'an account with no password adds an address only from a sign-in a moment old');
+    }
   }
   const { rows: taken } = await getPool().query('SELECT 1 FROM identity.guest WHERE lower(email) = $1', [email]);
   if (taken.length) throw new AuthError('EMAIL_TAKEN', 'another account has this address');
-  await sendEmailCode(ctx, email, 'attach');
+  await sendEmailCode(ctx, email, 'attach', input.guestId);
 }
 
-/** The second: the code from the letter, and the address is the account's. */
+/**
+ * The second: the code from the letter, and the address is the account's —
+ * the code this account asked for, for this, and no other.
+ */
 export async function attachEmail(ctx: Ctx, input: { guestId: string; email: string; code: string }): Promise<void> {
   const email = emailAddress(input.email);
-  await checkEmailCode(ctx, email, input.code);
+  await checkEmailCode(ctx, email, input.code, { guestId: input.guestId, purpose: 'attach' });
   try {
     const { rowCount } = await getPool().query(
       `UPDATE identity.guest SET email = $2, email_verified_at = $3
@@ -317,27 +357,115 @@ export async function attachEmail(ctx: Ctx, input: { guestId: string; email: str
   }
 }
 
-/** Change it, knowing the old one. Every other session is ended. */
+/* ── a password, from inside a session ─────────────────────────────── */
+
+/** What an account has to prove itself with: its password, and its address once proved. */
+async function secretsOf(guestId: string): Promise<{ passwordHash: string | null; email: string | null } | null> {
+  const { rows } = await getPool().query<{ password_hash: string | null; email: string | null }>(
+    `SELECT password_hash, CASE WHEN email_verified_at IS NOT NULL THEN email END AS email
+       FROM identity.guest WHERE id = $1 AND closed_at IS NULL`,
+    [guestId],
+  );
+  const row = rows[0];
+  return row ? { passwordHash: row.password_hash, email: row.email } : null;
+}
+
+/**
+ * The code for an account's first password, to the address on the account —
+ * never one the request names — so the letter reaches whoever the account
+ * is, and says what it means when they did not ask for it.
+ *
+ * An account with a password is sent nothing: it changes that one knowing
+ * it. One with no address is told to add one first.
+ */
+export async function sendFirstPasswordCode(ctx: Ctx, input: { guestId: string }): Promise<{ sentTo: string }> {
+  const me = await secretsOf(input.guestId);
+  if (!me) throw new AuthError('UNAUTHORIZED', 'no such account');
+  if (me.passwordHash) throw new AuthError('PASSWORD_SET', 'this account has a password; it is changed knowing that one');
+  if (!me.email) throw new AuthError('NO_EMAIL', 'no address stands behind this account');
+  await sendEmailCode(ctx, me.email, 'set_password', input.guestId);
+  return { sentTo: me.email };
+}
+
+/**
+ * Change it, knowing the old one — or set the first, with the code from the
+ * letter `sendFirstPasswordCode` sent. The caller ends every other session.
+ *
+ * An account made by an address, Google or Apple has no old password to
+ * prove, and the session asking proves nothing about who holds it: a first
+ * password set on its word let whoever found one open in a borrowed browser
+ * keep the account after it — and sign its owner out everywhere on the way.
+ * So the first is set by proving the inbox, as every password is.
+ *
+ * The new password is checked before the code is looked at: one that is too
+ * short is a typing mistake, and must not spend the code.
+ */
 export async function changePassword(
   ctx: Ctx,
-  input: { guestId: string; current: string; next: string },
+  input: { guestId: string; current?: string | null; next: string; code?: string | null },
 ): Promise<void> {
   checkPassword(input.next);
-  const { rows } = await getPool().query<{ password_hash: string | null }>(
-    'SELECT password_hash FROM identity.guest WHERE id = $1',
-    [input.guestId],
-  );
-  const stored = rows[0]?.password_hash ?? null;
-  // An account that has never had one (made before passwords) may set the
-  // first without proving the old, because there is no old to prove.
-  if (stored && !(await verifyPassword(input.current, stored))) {
-    throw new AuthError('WRONG_PASSWORD', 'the current password is wrong');
+  const me = await secretsOf(input.guestId);
+  if (!me) throw new AuthError('UNAUTHORIZED', 'no such account');
+  if (me.passwordHash) {
+    if (!(await verifyPassword(input.current ?? '', me.passwordHash))) {
+      throw new AuthError('WRONG_PASSWORD', 'the current password is wrong');
+    }
+  } else {
+    if (!me.email) throw new AuthError('NO_EMAIL', 'no address stands behind this account');
+    if (!input.code) throw new AuthError('PROOF_REQUIRED', 'a first password needs the code sent to the address on the account');
+    await checkEmailCode(ctx, me.email, input.code, { guestId: input.guestId, purpose: 'set_password' });
   }
   const hash = await hashPassword(input.next);
   await getPool().query(
     `UPDATE identity.guest SET password_hash = $2, password_set_at = $3, failed_sign_ins = 0, locked_until = NULL WHERE id = $1`,
     [input.guestId, hash, ctx.clock.now()],
   );
+  await tellInbox(ctx, me.email, me.passwordHash ? 'changed' : 'set');
+}
+
+/* ── telling the inbox ─────────────────────────────────────────────── */
+
+/**
+ * A letter to the account's own address: its password was just set, or
+ * replaced. A password is a way in that lasts, so its owner hears of every
+ * new one, and one they did not choose is found the day it is chosen rather
+ * than the day something is gone. The one button is the way to take it back:
+ * the forgotten-password door, which signs every other device out as the
+ * new password is set.
+ *
+ * Best-effort. The password is set already, and a mail server that is down
+ * must neither undo it nor make the person think it failed.
+ */
+async function tellInbox(ctx: Ctx, email: string | null, what: 'set' | 'changed'): Promise<void> {
+  if (!email || !ctx.mailer) return;
+  const now = ctx.clock.now();
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ulaanbaatar', year: 'numeric', month: 'numeric', day: 'numeric' });
+  const part = (type: Intl.DateTimeFormatPartTypes) => day.formatToParts(now).find((p) => p.type === type)?.value ?? '';
+  const when = `Хэзээ: ${part('year')} оны ${part('month')}-р сарын ${part('day')}, ${hhmm(now)} (Улаанбаатарын цагаар).`;
+  const title = what === 'set' ? 'Нууц үг тохирууллаа' : 'Нууц үг солигдлоо';
+  const said = what === 'set' ? 'Таны Basu бүртгэлд нууц үг тохирууллаа.' : 'Таны Basu бүртгэлийн нууц үг солигдлоо.';
+  const notYou =
+    'Та өөрөө хийгээгүй бол хэн нэгэн таны бүртгэлд нэвтэрсэн байна. Нууц үгээ даруй сэргээнэ үү — шинэ нууц үг тавихад бусад бүх төхөөрөмж дээрх нэвтрэлт хаагдана.';
+  const you = 'Та өөрөө хийсэн бол юу ч хийх шаардлагагүй.';
+  const reset = '/login?forgot';
+  try {
+    await ctx.mailer.send({
+      to: email,
+      subject: `Basu · ${title}`,
+      text: [said, when, '', notYou, `${publicOrigin()}${reset}`, '', you].join('\n'),
+      html: renderLetter({
+        preheader: `${said} Та өөрөө хийгээгүй бол нууц үгээ даруй сэргээнэ үү.`,
+        title,
+        paragraphs: [said, when],
+        note: notYou,
+        action: { label: 'Нууц үг сэргээх', url: reset },
+        small: you,
+      }),
+    });
+  } catch {
+    // The password stands whether or not the letter went: nothing to undo.
+  }
 }
 
 /**

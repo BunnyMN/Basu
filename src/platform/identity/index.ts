@@ -66,6 +66,7 @@ export {
   setPasswordWithCode,
   sendAttachCode,
   attachEmail,
+  sendFirstPasswordCode,
 } from './register.js';
 export { verifyIdToken, emailVerified, IdTokenError, type IdClaims } from './idtoken.js';
 export {

@@ -4,12 +4,14 @@ import { at } from '../../domain/fixtures.js';
 import { VirtualClock } from '../../domain/time.js';
 import { FakeMailer, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../../ports.js';
 import { truncateAll } from '../../test/seed.js';
-import { resolveGuest, sendEmailCode, verifyEmailCode } from './auth.js';
+import { resolveGuest, sendEmailCode, startSession, verifyEmailCode } from './auth.js';
 import {
   attachEmail,
+  changePassword,
   maskEmail,
   registerGuest,
   sendAttachCode,
+  sendFirstPasswordCode,
   sendPasswordCode,
   setPasswordWithCode,
   signInWithPassword,
@@ -212,6 +214,73 @@ describe('an address for an account made by phone', () => {
     await expect(
       sendAttachCode(ctx, { guestId: made.guestId, email: 'dorj2@example.mn', password: 'сайн нууц үг' }),
     ).rejects.toMatchObject({ code: 'EMAIL_SET' });
+  });
+
+  it('takes only the code this account asked for, past its own password', async () => {
+    const made = await registerGuest(ctx, { phone: '+97699001122', password: 'сайн нууц үг' });
+    // A code the door sends to anybody's inbox for the asking.
+    await sendEmailCode(ctx, 'dorj@example.mn');
+    await expect(
+      attachEmail(ctx, { guestId: made.guestId, email: 'dorj@example.mn', code: mailer.codeFor('dorj@example.mn')! }),
+    ).rejects.toMatchObject({ code: 'INVALID_CODE' });
+
+    // One another account asked for is that account's.
+    const other = await registerGuest(ctx, { phone: '+97699003344', password: 'өөр нууц үг' });
+    await sendAttachCode(ctx, { guestId: other.guestId, email: 'dorj@example.mn', password: 'өөр нууц үг' });
+    const theirs = mailer.codeFor('dorj@example.mn')!;
+    await expect(attachEmail(ctx, { guestId: made.guestId, email: 'dorj@example.mn', code: theirs })).rejects.toMatchObject({
+      code: 'INVALID_CODE',
+    });
+    await attachEmail(ctx, { guestId: other.guestId, email: 'dorj@example.mn', code: theirs });
+  });
+
+  it('asks an account with neither a password nor an address to have signed in a moment ago', async () => {
+    // Made by a code to its phone: nothing to type, and nowhere else to send a code.
+    const { guestId, token } = await startSession(ctx, '+97688010001');
+    clock.advanceMinutes(11);
+    await expect(sendAttachCode(ctx, { guestId, email: 'bat@example.mn', token })).rejects.toMatchObject({ code: 'SIGN_IN_AGAIN' });
+    await expect(sendAttachCode(ctx, { guestId, email: 'bat@example.mn' })).rejects.toMatchObject({ code: 'SIGN_IN_AGAIN' });
+    // Somebody else's session a moment old is not this account's.
+    const stranger = await startSession(ctx, '+97688010002');
+    await expect(sendAttachCode(ctx, { guestId, email: 'bat@example.mn', token: stranger.token })).rejects.toMatchObject({
+      code: 'SIGN_IN_AGAIN',
+    });
+    expect(mailer.sent).toHaveLength(0);
+
+    const again = await startSession(ctx, '+97688010001');
+    await sendAttachCode(ctx, { guestId, email: 'bat@example.mn', token: again.token });
+    await attachEmail(ctx, { guestId, email: 'bat@example.mn', code: mailer.codeFor('bat@example.mn')! });
+  });
+});
+
+describe('a first password, from inside a session', () => {
+  it('is set only with the code sent to the account’s own address for it, and the address hears of it', async () => {
+    await sendEmailCode(ctx, 'bat@example.mn');
+    const made = await verifyEmailCode(ctx, 'bat@example.mn', mailer.codeFor('bat@example.mn')!);
+    await expect(changePassword(ctx, { guestId: made.guestId, next: 'шинэ нууц үг' })).rejects.toMatchObject({
+      code: 'PROOF_REQUIRED',
+    });
+
+    // A code the door sent to that inbox is the door's, and stays good there.
+    clock.advanceMinutes(1);
+    await sendEmailCode(ctx, 'bat@example.mn');
+    const doors = mailer.codeFor('bat@example.mn')!;
+    await expect(changePassword(ctx, { guestId: made.guestId, next: 'шинэ нууц үг', code: doors })).rejects.toMatchObject({
+      code: 'INVALID_CODE',
+    });
+
+    expect(await sendFirstPasswordCode(ctx, { guestId: made.guestId })).toEqual({ sentTo: 'bat@example.mn' });
+    const code = mailer.codeFor('bat@example.mn')!;
+    // …and this one is not the door's.
+    await expect(verifyEmailCode(ctx, 'bat@example.mn', code)).rejects.toMatchObject({ code: 'INVALID_CODE' });
+    await verifyEmailCode(ctx, 'bat@example.mn', doors);
+
+    await changePassword(ctx, { guestId: made.guestId, next: 'шинэ нууц үг', code });
+    await expect(signInWithPassword(ctx, { login: 'bat@example.mn', password: 'шинэ нууц үг' })).resolves.toMatchObject({
+      guestId: made.guestId,
+    });
+    expect(mailer.to('bat@example.mn')!.subject).toBe('Basu · Нууц үг тохирууллаа');
+    await expect(sendFirstPasswordCode(ctx, { guestId: made.guestId })).rejects.toMatchObject({ code: 'PASSWORD_SET' });
   });
 });
 

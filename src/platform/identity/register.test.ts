@@ -6,7 +6,7 @@ import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '..
 import { truncateAll } from '../../test/seed.js';
 import { hashPassword, verifyPassword } from './password.js';
 import { changePassword, registerGuest, signInWithPassword } from './register.js';
-import { resolveGuest } from './auth.js';
+import { resolveGuest, startSession } from './auth.js';
 
 /**
  * A door that opens without an SMS gateway.
@@ -152,5 +152,17 @@ describe('changing it', () => {
     await changePassword(ctx, { guestId, current: 'хуучин нууц үг', next: 'шинэ нууц үг' });
     await expect(signInWithPassword(ctx, { login: '+97699001122', password: 'хуучин нууц үг' })).rejects.toBeTruthy();
     await expect(signInWithPassword(ctx, { login: '+97699001122', password: 'шинэ нууц үг' })).resolves.toBeTruthy();
+  });
+
+  it('gives an account that has none no first password on a session’s word', async () => {
+    // Made by a code to its phone: no password to know, and no address to prove.
+    const { guestId } = await startSession(ctx, '+97688010001');
+    await expect(changePassword(ctx, { guestId, next: 'булаах нууц үг' })).rejects.toMatchObject({ code: 'NO_EMAIL' });
+    await expect(changePassword(ctx, { guestId, current: '', next: 'булаах нууц үг', code: '123456' })).rejects.toMatchObject({
+      code: 'NO_EMAIL',
+    });
+    await expect(signInWithPassword(ctx, { login: '+97688010001', password: 'булаах нууц үг' })).rejects.toMatchObject({
+      code: 'BAD_CREDENTIALS',
+    });
   });
 });

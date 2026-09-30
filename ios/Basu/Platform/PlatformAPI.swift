@@ -208,6 +208,7 @@ struct NotifyPreferences: Decodable, Sendable, Equatable {
 }
 
 private struct Revoked: Decodable { let revoked: Int }
+private struct Sent: Decodable { let to: String }
 
 // MARK: - the calls
 
@@ -230,6 +231,7 @@ extension API {
    A code to an address, for an account that has none. An account with a
    password types it too: a session can be stolen, and an address is how a
    password gets replaced, so a stolen one must not be able to add its own.
+   One with no password must have signed in a moment ago, or is told to.
    */
   func attachEmailCode(email: String, password: String?, token: String) async throws {
     var body: [String: Any] = ["email": email]
@@ -250,11 +252,28 @@ extension API {
     )
   }
 
-  /// A new password, knowing the old one — or the first, with `current`
-  /// empty. Every other session ends; the one in hand stays. Returns how many.
-  func changePassword(current: String, next: String, token: String) async throws -> Int {
+  /**
+   A code for an account's first password, to the address on the account —
+   the server sends it nowhere else. Returns that address.
+
+   An account made by email, Google or Apple has no old password to prove
+   itself with, and a session alone proves nothing: whoever holds one left
+   signed in somewhere would give themselves a way in that outlives it.
+   */
+  func firstPasswordCode(token: String) async throws -> String {
+    let answer: Sent = try await send(.init(path: "/v1/me/password/code", method: "POST", token: token))
+    return answer.to
+  }
+
+  /// A new password, knowing the old one — or the first, with the code from
+  /// `firstPasswordCode`'s letter. Every other session ends; the one in hand
+  /// stays. Returns how many.
+  func changePassword(current: String?, next: String, code: String?, token: String) async throws -> Int {
+    var body: [String: Any] = ["next": next]
+    if let current { body["current"] = current }
+    if let code { body["code"] = code }
     let answer: Revoked = try await send(
-      .init(path: "/v1/me/password", method: "POST", body: ["current": current, "next": next], token: token),
+      .init(path: "/v1/me/password", method: "POST", body: body, token: token),
     )
     return answer.revoked
   }

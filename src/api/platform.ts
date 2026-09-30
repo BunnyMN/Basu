@@ -9,6 +9,7 @@ import {
   revokeOtherSessions,
   revokeSession,
   sendAttachCode,
+  sendFirstPasswordCode,
   sessionsOf,
   updateProfile,
   type Profile,
@@ -118,18 +119,22 @@ export async function registerPlatformRoutes(
   /* ── the ways back in ─────────────────────────────────────────────── */
 
   /**
-   * A password: changed knowing the old one, or set for the first time by an
-   * account that never had one. Every other session ends — whoever knew the
-   * old one is out — and the one in hand stays.
+   * A password: changed knowing the old one, or — for an account made by an
+   * address, Google or Apple, which has none — set with the code a letter to
+   * the account's own address carried (`/v1/me/password/code`). Never on the
+   * session's word alone: a session is only something somebody holds, and
+   * one left open in a borrowed browser would give its holder a way in that
+   * outlives it. Every other session ends — whoever knew the old one is out —
+   * and the one in hand stays.
    */
-  app.post<{ Body: { current?: string; next?: string } }>(
+  app.post<{ Body: { current?: string; next?: string; code?: string } }>(
     '/v1/me/password',
     { preHandler: requireGuest, config: { rateLimit: rate.otp } },
     async (request, reply) => {
-      const { current, next } = request.body ?? {};
+      const { current, next, code } = request.body ?? {};
       if (!next) return badRequest(reply, 'Шинэ нууц үгээ оруулна уу.', 'next is required');
       try {
-        await changePassword(ctx, { guestId: request.guestId!, current: current ?? '', next });
+        await changePassword(ctx, { guestId: request.guestId!, current: current ?? null, next, code: code?.trim() || null });
         const revoked = await revokeOtherSessions(request.guestId!, bearer(request) ?? '', ctx.clock.now());
         return { changed: true, revoked };
       } catch (error) {
@@ -139,9 +144,23 @@ export async function registerPlatformRoutes(
   );
 
   /**
+   * The code for a first password, to the address on the account and never
+   * to one the request names. `to` says where it went.
+   */
+  app.post('/v1/me/password/code', { preHandler: requireGuest, config: { rateLimit: rate.otp } }, async (request, reply) => {
+    try {
+      const { sentTo } = await sendFirstPasswordCode(ctx, { guestId: request.guestId! });
+      return reply.status(202).send({ sent: true, to: sentTo });
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
+
+  /**
    * An address, for an account that has none — the way back when a password
-   * is forgotten. A code goes to it first; an account with a password types
-   * that too, so a stolen session cannot give itself a way back.
+   * is forgotten. A code goes to it first. Before that the session shows it
+   * is still its person, so a stolen one cannot give itself a way back: an
+   * account with a password types it, one without has signed in a moment ago.
    */
   app.post<{ Body: { email?: string; password?: string } }>(
     '/v1/me/email/code',
@@ -150,7 +169,7 @@ export async function registerPlatformRoutes(
       const { email, password } = request.body ?? {};
       if (!email) return badRequest(reply, 'Имэйл хаягаа оруулна уу.', 'email is required');
       try {
-        await sendAttachCode(ctx, { guestId: request.guestId!, email, password: password ?? null });
+        await sendAttachCode(ctx, { guestId: request.guestId!, email, password: password ?? null, token: bearer(request) });
         return reply.status(202).send({ sent: true });
       } catch (error) {
         return sendError(reply, error);

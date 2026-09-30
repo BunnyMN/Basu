@@ -183,9 +183,16 @@ final class Platform {
     await refresh()
   }
 
-  /// Returns how many other devices it signed out; the list catches up.
-  func changePassword(current: String, next: String) async throws -> Int {
-    let revoked = try await api.changePassword(current: current, next: next, token: bearer())
+  /// A code for the first password, to the address on the account. Returns
+  /// where it went.
+  func requestPasswordCode() async throws -> String {
+    try await api.firstPasswordCode(token: bearer())
+  }
+
+  /// Returns how many other devices it signed out; the list catches up. The
+  /// first password comes with the code from its letter, and no `current`.
+  func changePassword(current: String?, next: String, code: String? = nil) async throws -> Int {
+    let revoked = try await api.changePassword(current: current, next: next, code: code, token: bearer())
     await refresh()
     await loadSessions()
     return revoked

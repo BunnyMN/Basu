@@ -184,6 +184,12 @@ const arrive = () => {
   sessionStorage.removeItem('basu.next');
   location.replace(next);
 };
+/**
+ * The letter that says a password was set or changed has one button, and it
+ * opens /login?forgot: whoever follows it came to replace that password, so
+ * they land on the step that does — even in a browser already signed in.
+ */
+const forgot = new URLSearchParams(location.search).has('forgot');
 
 /* ── one step on screen at a time ──────────────────────────────────── */
 
@@ -365,7 +371,7 @@ $('signup-form').addEventListener('submit', (event) => {
    password and all, so nothing above waits on the network. */
 
 // Back from Google with a session, or already signed in: straight on.
-if (authReturn?.token || store.guestToken) {
+if (authReturn?.token || (store.guestToken && !forgot)) {
   const token = authReturn?.token ?? store.guestToken;
   try {
     await api('/v1/me', { token });
@@ -385,7 +391,7 @@ $('or').hidden = !(methods.google && methods.email);
 $('to-forgot').hidden = !methods.email;
 $('to-signup').hidden = methods.email;
 if (!methods.email && !methods.google) go('password');
-else go('start');
+else go(forgot && methods.email ? 'forgot' : 'start');
 if (authReturn?.refused) $('email-error').textContent = 'Google-ээр нэвтэрч чадсангүй. Дахин оролдоно уу.';
 
 document.documentElement.dataset.ready = '';
