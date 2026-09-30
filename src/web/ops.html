@@ -278,11 +278,13 @@ const el = (html) => {
   t.innerHTML = html.trim();
   return t.content.firstElementChild;
 };
-const esc = (value) => {
-  const node = document.createElement('span');
-  node.textContent = value ?? '';
-  return node.innerHTML;
-};
+/**
+ * A value as text in HTML — between tags or inside an attribute's quotes.
+ * Quotes too: a value written into `href="…"` that could close the quote
+ * would add attributes of its own, and a link in a business's menu is text
+ * somebody at the desk typed.
+ */
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const when = (iso) => (iso ? dayLabel(iso.slice(0, 10)) : '—');
 const clockOf = (iso) => {
   const d = new Date(iso);

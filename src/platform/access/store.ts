@@ -353,11 +353,17 @@ export async function saveLayout(
   return layoutOf(scope);
 }
 
-/** A link Basu adds to a scope's menu — another page of Basu, or anywhere. Opened, like any page, by the roles given it. */
+/**
+ * A link Basu adds to a scope's menu — another page of Basu, or anywhere.
+ * Opened, like any page, by the roles given it. An address never needs a
+ * quote, an angle bracket or a backtick as it is, and a page drawing one
+ * inside an attribute could be made to end the attribute there: a link
+ * carries none of them.
+ */
 export async function addLink(scope: Scope, input: { name: string; href: string; module?: string; icon?: string; by: string }): Promise<LayoutPage> {
   const name = checkedLabel(input.name, 'a link');
   const href = input.href?.trim() ?? '';
-  if (!/^(\/[^\s]*|https:\/\/[^\s]+)$/.test(href) || href.length > 500) throw new AccessError('BAD_INPUT', 'a link is a path on Basu or an https address');
+  if (!/^(\/[^\s"'<>`]*|https:\/\/[^\s"'<>`]+)$/.test(href) || href.length > 500) throw new AccessError('BAD_INPUT', 'a link is a path on Basu or an https address');
   const layout = await layoutOf(scope);
   const module = input.module && layout.modules.some((m) => m.key === input.module) ? input.module : TOP;
   const sort = Math.max(0, ...layout.pages.filter((p) => p.module === module).map((p) => p.sort)) + 10;

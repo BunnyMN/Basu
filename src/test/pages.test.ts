@@ -1802,6 +1802,34 @@ describe('who sees what', () => {
     expect((await fetch(`${base}/v1/ops/me`, { headers: auth })).status).toBe(401);
     expect((await fetch(`${base}/v1/me`, { headers: auth })).status).toBe(200);
   });
+
+  it('draws a link Basu added to a business’s menu as one address, whatever quotes it holds', async () => {
+    const desk = await deskToken();
+    const owner = await account('+97688030061', 'Цэцэг');
+    await business(owner, 'Цэцэгийн мах · тест', { supplier: true });
+    // A link in every business's menu, given to its owners — written in with quotes before a link was refused them.
+    const made = (await (
+      await fetch(`${base}/v1/ops/menus/org/links`, { method: 'POST', headers: as(desk), body: JSON.stringify({ name: 'Тусламж', href: '/help', module: 'org' }) })
+    ).json()) as { key: string };
+    const href = '/help"onmouseover="window.__owned=1';
+    await getPool().query(`UPDATE access.page SET href = $2 WHERE scope = 'org' AND key = $1`, [made.key, href]);
+    const { roles } = (await (await fetch(`${base}/v1/ops/access/org`, { headers: as(desk) })).json()) as { roles: Array<{ key: string; permissions: string[] }> };
+    const owners = roles.find((r) => r.key === 'owner')!;
+    const given = await fetch(`${base}/v1/ops/roles/org/owner`, { method: 'PATCH', headers: as(desk), body: JSON.stringify({ permissions: [...owners.permissions, `org.${made.key}`] }) });
+    expect(given.status).toBe(200);
+    try {
+      const dash = await openPage('ops.html', '', undefined, device(owner));
+      const theLink = (d: Document) => [...d.querySelectorAll('.org-doors .door-link')].find((a) => a.querySelector('span')?.textContent === 'Тусламж');
+      await until(dash, 'the link among the business’s doors', (d) => Boolean(theLink(d)));
+      const link = theLink(dash.window.document)!;
+      // The whole address, as the one attribute it was written into.
+      expect(link.getAttribute('href')).toBe(href);
+      expect(link.hasAttribute('onmouseover')).toBe(false);
+    } finally {
+      // Gone, and no role opens it any more: the other businesses here keep the menu they had.
+      await fetch(`${base}/v1/ops/menus/org/links/${made.key}`, { method: 'DELETE', headers: { authorization: `Bearer ${desk}` } });
+    }
+  });
 });
 
 describe('one browser, one person', () => {

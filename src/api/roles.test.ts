@@ -300,6 +300,17 @@ describe('the menu Basu arranges', () => {
     expect((await call('POST', '/v1/ops/menus/desk/links', DESK(), { name: 'Муу', href: 'javascript:alert(1)' })).statusCode).toBe(400);
   });
 
+  it('refuses a link that could end the attribute a page draws it in', async () => {
+    for (const href of ['/help"onmouseover="alert(1)', "/help'onfocus='alert(1)", '/help><img src=x>', '/help`x', 'https://basu.mn/"x']) {
+      for (const scope of ['desk', 'org']) {
+        const refused = await call('POST', `/v1/ops/menus/${scope}/links`, DESK(), { name: 'Муу', href });
+        expect(refused.statusCode, `${scope} ${href}`).toBe(400);
+      }
+    }
+    // An address of the ordinary kind still goes in, its query and anchor with it.
+    expect((await call('POST', '/v1/ops/menus/org/links', DESK(), { name: 'Тусламж', href: 'https://basu.mn/help?from=desk#top', module: 'org' })).statusCode).toBe(201);
+  });
+
   it('is the desk’s to change only for a seat that holds the menu', async () => {
     const worker = await member('+97699130043', 'Ops', 'ops');
     expect((await call('PUT', '/v1/ops/menus/desk', worker, { pages: [{ key: 'guests', hidden: true }] })).statusCode).toBe(403);
