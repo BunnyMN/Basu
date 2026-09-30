@@ -106,6 +106,9 @@ async function backFromGoogle(guestId: string, browser: object): Promise<string>
  */
 const open: JSDOM[] = [];
 
+/** A page's requests to the server: how many it has made, how many have not come back. */
+const trafficOf = new WeakMap<JSDOM, { made: number; pending: number }>();
+
 /**
  * Load a page into jsdom, wire fetch to the live server, run its script.
  *
@@ -130,20 +133,30 @@ async function openPage(
   const { window } = dom;
 
   // jsdom has no fetch; point it at the running server and resolve relative
-  // paths the way a browser would, with the cookies this browser holds.
+  // paths the way a browser would, with the cookies this browser holds. The
+  // requests are counted, for a test that waits until nothing more is on its
+  // way (`settled`).
   const jar = cookiesOf(browser);
+  const traffic = { made: 0, pending: 0 };
+  trafficOf.set(dom, traffic);
   (window as unknown as { fetch: typeof fetch }).fetch = (async (input: string, init?: RequestInit) => {
     const canned = respond?.(String(input), init);
     if (canned) return canned;
-    const url = new URL(String(input), base);
-    const headers = new Headers(init?.headers);
-    const sent = [...jar].filter(([, c]) => url.pathname.startsWith(c.path)).map(([name, c]) => `${name}=${c.value}`);
-    if (sent.length) headers.set('cookie', sent.join('; '));
-    // The page's AbortSignal is jsdom's, and Node's fetch takes only its own:
-    // one of those follows it, so a request the page gives up on is given up.
-    const response = await fetch(url.toString(), { ...init, headers, signal: init?.signal ? following(init.signal) : null });
-    for (const line of response.headers.getSetCookie()) keepCookie(jar, line);
-    return response;
+    traffic.made += 1;
+    traffic.pending += 1;
+    try {
+      const url = new URL(String(input), base);
+      const headers = new Headers(init?.headers);
+      const sent = [...jar].filter(([, c]) => url.pathname.startsWith(c.path)).map(([name, c]) => `${name}=${c.value}`);
+      if (sent.length) headers.set('cookie', sent.join('; '));
+      // The page's AbortSignal is jsdom's, and Node's fetch takes only its own:
+      // one of those follows it, so a request the page gives up on is given up.
+      const response = await fetch(url.toString(), { ...init, headers, signal: init?.signal ? following(init.signal) : null });
+      for (const line of response.headers.getSetCookie()) keepCookie(jar, line);
+      return response;
+    } finally {
+      traffic.pending -= 1;
+    }
   }) as typeof fetch;
   Object.defineProperty(window, 'localStorage', { value: browser, writable: true });
 
@@ -296,6 +309,23 @@ async function until(
       (toast ? `\n--- toast --- ${toast}` : '') +
       `\n--- body ---\n${dom.window.document.body.textContent?.replace(/\s+/g, " ").slice(0, 2400)}`,
   );
+}
+
+/**
+ * Wait until a page has had nothing on its way to or from the server for a
+ * moment — whatever a view asked for has come back and been drawn, and
+ * whatever that asked for next has too. With `since` (a count of requests
+ * made, read before a search was typed) it waits for the page to have asked
+ * at all first: a search asks only once the typing pauses.
+ */
+async function settled(dom: JSDOM, label: string, since?: number): Promise<void> {
+  const traffic = trafficOf.get(dom)!;
+  let quiet = 0;
+  await until(dom, `${label}, with nothing more on its way`, () => {
+    const done = traffic.pending === 0 && (since === undefined || traffic.made > since);
+    quiet = done ? quiet + 1 : 0;
+    return quiet >= 3;
+  });
 }
 
 const text = (dom: JSDOM) => dom.window.document.body.textContent ?? '';
@@ -2331,21 +2361,6 @@ describe('a stranger’s words render as text, never as markup', () => {
     expect((dom.window as unknown as { __xss?: number }).__xss).toBeUndefined();
   }
 
-  /** Buy one whole animal, collected — the same steps as buyOne, kept here so this block stands alone. */
-  async function buyPickup(dom: JSDOM): Promise<string> {
-    await until(dom, 'the stalls', (d) => d.querySelectorAll('.listing').length >= seeded.listings);
-    const whole = [...dom.window.document.querySelectorAll('.listing')].find(
-      (l) => !l.hasAttribute('data-gone') && l.textContent?.includes('бүтэн'),
-    ) as HTMLElement;
-    whole.click();
-    await until(dom, 'the stall', (d) => Boolean(d.querySelector('#next')));
-    (dom.window.document.querySelector('#next') as HTMLElement).click();
-    await until(dom, 'the review', (d) => Boolean(d.querySelector('#pay')));
-    (dom.window.document.querySelector('#pay') as HTMLElement).click();
-    await until(dom, 'the status', (d) => Boolean(d.querySelector('.handcode b')));
-    return dom.window.document.querySelector('.handcode b')!.textContent!;
-  }
-
   it('draws an ops member’s name in an order’s story as text, not the markup they signed up with', async () => {
     // The proven path: the story reads «ops · <name>», and the name is whatever
     // the account chose. Left as markup it would run in the admin's dashboard,
@@ -2444,6 +2459,375 @@ describe('a stranger’s words render as text, never as markup', () => {
     expect((await find('99007021')).querySelector('.flag')?.textContent).toBe('баталгаагүй');
     expect((await find('99007022')).querySelector('.flag')).toBeNull();
   });
+
+  it('marks a number no code reached when a business finds somebody by it', async () => {
+    // A business brings its people in by the number they sign in with, and
+    // whoever it brings in reads its guests. A password sign-up types any
+    // number — a cook's, before the cook comes — so the person found by one
+    // that nothing proved is shown with the number marked.
+    const register = async (phone: string, name: string) =>
+      ((await (await fetch(`${base}/v1/auth/register`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ phone, password: GUEST_PASSWORD, name }),
+      })).json()) as { token: string }).token;
+    const owner = await register('+97699007031', 'Эзэн');
+    await register('+97699007032', 'Тогооч Дулмаа');
+    const made = (await (await fetch(`${base}/v1/orgs`, {
+      method: 'POST',
+      headers: asJson(owner),
+      body: JSON.stringify({ name: 'Дулмаагийн гал тогоо · тест', restaurant: true, phone: '8811 0001', address: 'Нарантуул' }),
+    })).json()) as { id: string };
+    await fetch(`${base}/v1/ops/orgs/${made.id}/approve`, { method: 'POST', headers: asJson(await deskToken()), body: '{}' });
+
+    const dash = await openPage('ops.html', `#${made.id}/team`, undefined, device(owner));
+    await until(dash, 'the team', (d) => d.querySelectorAll('tr[data-member]').length === 1);
+    (dash.window.document.querySelector('#team-add') as HTMLElement).click();
+    await answerPopup(dash, { contact: '99007032' });
+    await until(dash, 'the person found', (d) => Boolean(d.querySelector('#member-add .popup-static')));
+    const found = dash.window.document.querySelector('#member-add .popup-static')!;
+    expect(found.textContent).toContain('Тогооч Дулмаа');
+    expect(found.textContent).toContain('+97699007032');
+    expect(found.querySelector('.flag')?.textContent).toBe('баталгаагүй');
+  });
+
+  it('takes the order a link names only as an order’s id, never as a path elsewhere on Basu', async () => {
+    // The home screen opens an order at ?order=<id>, and the page puts the id
+    // into the API's paths with the guest's session: a link carrying «../» in
+    // its place would send that session wherever the rest of it pointed.
+    await ownGuest('+97699007041');
+    const asked: string[] = [];
+    const page = await openPage('idesh.html', '?order=../../v1/ops/whoami', (path) => void asked.push(path));
+    await until(page, 'the stalls', (d) => d.querySelectorAll('.listing').length >= seeded.listings);
+    await settled(page, 'what the page asks on its way in');
+    expect(asked.filter((path) => path.includes('..'))).toEqual([]);
+  });
+});
+
+describe('every page, with a tag in whatever somebody could have typed', () => {
+  /*
+   * The tests above follow one path each. This block writes a tag into every
+   * column somebody could have filled — a name, a business, a listing, an
+   * address, a reason, a note, a review, a message, and what the desk's own
+   * seats write for each other — the way a row would hold it, then walks
+   * every page of the desk and the files behind its lists, a business's own
+   * dashboard, a supplier's own screen, the kitchen and the guests' pages.
+   * The tag is on each of them as text and nowhere as an element. It stays
+   * the last block of this file: after it, no row reads the way the tests
+   * above expect.
+   */
+  const TAG = `"'><img data-xss src=x>`;
+  const AS_TEXT = '<img data-xss';
+
+  /** A table, the columns in it that people write, and — where empty means something — which rows. */
+  const WRITTEN: Array<[string, string[], string?]> = [
+    // Anybody, about themselves.
+    ['identity.guest', ['name']],
+    ['identity.guest', ['email'], 'email IS NOT NULL'],
+    ['identity.profile', ['display_name']],
+    ['identity.guest_session', ['label']],
+    ['notify.device', ['label']],
+    // A business, about itself: applying, and after.
+    ['org.organization', ['name', 'about', 'address', 'phone', 'tin', 'decline_reason']],
+    ['idesh.supplier', ['name', 'about', 'pickup_address', 'phone', 'ebarimt_merchant_tin', 'bank_name', 'bank_account', 'bank_holder', 'decline_reason']],
+    ['idesh.listing', ['title', 'origin', 'note']],
+    ['dine.restaurant', ['name']],
+    ['dine.menu_item', ['name', 'description']],
+    ['dine.menu_item', ['image_url'], 'image_url IS NOT NULL'],
+    ['dine.station', ['display_name']],
+    // A guest, ordering and after.
+    ['idesh.idesh_order', ['title', 'origin', 'address', 'address_phone']],
+    ['dine.order_line', ['name', 'notes']],
+    ['dine.order_review', ['comment']],
+    // Who did what, and why — a seat's own name among it.
+    ['idesh.order_event', ['actor']],
+    ['dine.order_event', ['actor']],
+    ['idesh.audit', ['who', 'note']],
+    ['ops.member', ['name']],
+    ['org.membership_log', ['role_name', 'was_name']],
+    ['org.membership_log', ['actor_desk'], 'actor_desk IS NOT NULL'],
+    ['idesh.idesh_order', ['cancelled_by'], 'cancelled_by IS NOT NULL'],
+    ['idesh.settlement', ['approved_by'], 'approved_by IS NOT NULL'],
+    ['idesh.settlement', ['paid_by'], 'paid_by IS NOT NULL'],
+    ['idesh.promotion', ['ended_by'], 'ended_by IS NOT NULL'],
+    // The words that ride with the money.
+    ['idesh.settlement', ['memo', 'bank_name', 'bank_account', 'bank_holder', 'reference']],
+    ['idesh.promotion', ['ended_note']],
+    ['ledger.transfer', ['memo']],
+    ['ledger.topup', ['provider_ref']],
+    ['ledger.ebarimt_receipt', ['last_error', 'lottery', 'bill_id']],
+    // What the desk's seats write for each other: roles, the menu, messages.
+    ['access.role', ['name', 'description']],
+    ['access.module', ['name'], "key <> 'main'"],
+    ['access.page', ['name']],
+    ['access.page', ['href'], 'href IS NOT NULL'],
+    ['notify.message', ['title', 'body']],
+  ];
+
+  /** An order somebody at the desk has done something to: its story names the seat, the line the desk was proven open by. */
+  let storied: { id: string; code: string };
+
+  /** Somebody new buys a whole animal, collected, on a browser of their own: the order, and the number its seller signs in with. */
+  async function bought(phone: string): Promise<{ id: string; code: string; seller: string }> {
+    const made = await fetch(`${base}/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ phone, password: GUEST_PASSWORD }),
+    });
+    const { token } = (await made.json()) as { token: string };
+    const code = await buyPickup(await openPage('idesh.html', '', undefined, device(token)));
+    const { rows } = await getPool().query<{ id: string; seller: string }>(
+      `SELECT o.id, g.phone_e164 AS seller FROM idesh.idesh_order o
+         JOIN idesh.supplier s ON s.id = o.supplier_id JOIN identity.guest g ON g.id = s.owner_guest_id
+        WHERE o.code = $1`,
+      [code],
+    );
+    return { id: rows[0]!.id, code, seller: rows[0]!.seller };
+  }
+
+  beforeAll(async () => {
+    const asDesk = { 'content-type': 'application/json', authorization: `Bearer ${((await (await fetch(`${base}/dev/ops-token`)).json()) as { token: string }).token}` };
+    // What the walk opens is made here, not borrowed from the tests above:
+    // an order the supplier cancels, so a refund waits at the desk; an order
+    // the desk then does something to; a second seat at the desk, whose row
+    // has its buttons; a link the desk added to its menu; a listing put first.
+    const refunded = await bought('+97699007053');
+    const asItsSeller = { 'content-type': 'application/json', authorization: `Bearer ${await devLogin(refunded.seller, 'Нийлүүлэгч')}` };
+    const cancelled = await fetch(`${base}/v1/supplier/orders/${refunded.id}/cancel`, { method: 'POST', headers: asItsSeller, body: JSON.stringify({ reason: 'guest_asked' }) });
+    expect(cancelled.status, await cancelled.text()).toBe(200);
+    storied = await bought('+97699007051');
+    const resent = await fetch(`${base}/v1/ops/orders/${storied.id}/resend`, { method: 'POST', headers: asDesk, body: '{}' });
+    expect(resent.status, await resent.text()).toBe(200);
+    const made = await fetch(`${base}/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ phone: '+97699007052', password: GUEST_PASSWORD, name: 'Ширээний ажилтан' }),
+    });
+    const seat = ((await made.json()) as { token: string }).token;
+    const { id: seatId } = (await (await fetch(`${base}/v1/me`, { headers: { authorization: `Bearer ${seat}` } })).json()) as { id: string };
+    const seated = await fetch(`${base}/v1/ops/members`, { method: 'POST', headers: asDesk, body: JSON.stringify({ guest_id: seatId, role: 'viewer' }) });
+    expect(seated.status, await seated.text()).toBe(201);
+    const linked = await fetch(`${base}/v1/ops/menus/desk/links`, { method: 'POST', headers: asDesk, body: JSON.stringify({ name: 'Гал тогоо', href: '/kds' }) });
+    expect(linked.status, await linked.text()).toBe(201);
+    const seller = seeded.suppliers[0]!.phone;
+    const asSeller = { 'content-type': 'application/json', authorization: `Bearer ${await devLogin(seller, 'Нийлүүлэгч')}` };
+    const { rows: stall } = await getPool().query<{ id: string }>(
+      `SELECT l.id FROM idesh.listing l JOIN idesh.supplier s ON s.id = l.supplier_id JOIN identity.guest g ON g.id = s.owner_guest_id
+        WHERE g.phone_e164 = $1 LIMIT 1`,
+      [seller],
+    );
+    const promoted = await fetch(`${base}/v1/supplier/listings/${stall[0]!.id}/promote`, { method: 'POST', headers: asSeller, body: JSON.stringify({ tier: 'featured' }) });
+    const { promotion } = (await promoted.json()) as { promotion: { id: string } };
+    expect(promoted.status).toBe(201);
+    const paid = await fetch(`${base}/v1/supplier/promotions/${promotion.id}/settle`, { method: 'POST', headers: asSeller, body: '{}' });
+    expect(paid.status, await paid.text()).toBe(200);
+
+    for (const [table, columns, which] of WRITTEN) {
+      const set = columns.map((column) => `${column} = coalesce(${column}, '') || $1`).join(', ');
+      await getPool().query(`UPDATE ${table} SET ${set}${which ? ` WHERE ${which}` : ''}`, [TAG]);
+    }
+    // The desk's banner, which one seat writes for all the others to read.
+    const banner = await fetch(`${base}/v1/ops/system/settings/desk_banner`, { method: 'PUT', headers: asDesk, body: JSON.stringify({ value: TAG }) });
+    expect(banner.status, await banner.text()).toBe(200);
+  });
+
+  /**
+   * Nothing on the page grew from the tag; where `shows` lists what people
+   * wrote, the tag is in it, as text. What `shows` names is waited for first
+   * — the tag in it, as text or grown into an element — so a view is looked
+   * at once it is drawn, and one that drew the tag as markup says so.
+   */
+  async function look(dom: JSDOM, where: string, shows: string | null): Promise<void> {
+    const doc = dom.window.document;
+    await until(dom, where, (d) => !shows || Boolean(d.querySelector('[data-xss]')) || (d.querySelector(shows)?.textContent ?? '').includes(AS_TEXT));
+    expect(doc.querySelector('[data-xss]')?.outerHTML ?? null, `${where}: an element made of what somebody typed`).toBeNull();
+    if (shows) expect(doc.querySelector(shows)?.textContent ?? '', `${where}: what somebody typed, as text`).toContain(AS_TEXT);
+  }
+
+  /**
+   * One thing a person does — press a tab, open a row, type a search — then
+   * a wait until what it asked for has come and been drawn (`drawn` names
+   * what is there only once it is), and a look. `asks` is for a search: it
+   * asks only once the typing pauses.
+   */
+  async function step(
+    dom: JSDOM,
+    where: string,
+    act: () => void,
+    { shows = null, drawn, asks = false }: { shows?: string | null; drawn?: string | ((d: Document) => boolean); asks?: boolean } = {},
+  ): Promise<void> {
+    const before = trafficOf.get(dom)!.made;
+    act();
+    await settled(dom, where, asks ? before : undefined);
+    const there = (d: Document) => (typeof drawn === 'function' ? drawn(d) : !drawn || Boolean(d.querySelector(drawn)));
+    await until(dom, where, (d) => there(d) && !d.querySelector('#view [aria-busy="true"], #view .dt-skel, .popup-pick-list[aria-busy="true"]'));
+    await look(dom, where, shows);
+  }
+
+  const press = (dom: JSDOM, selector: string) => () => {
+    const node = dom.window.document.querySelector(selector) as HTMLElement | null;
+    if (!node) throw new Error(`nothing at ${selector} to press`);
+    node.click();
+  };
+  const type = (dom: JSDOM, selector: string, value: string) => () => {
+    const input = dom.window.document.querySelector(selector) as HTMLInputElement;
+    input.value = value;
+    input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+  };
+
+  /** The desk, signed in as the walkthrough's admin — who holds every page of it — on its front page. */
+  async function theDesk(): Promise<JSDOM> {
+    const dom = await openPage('ops.html', '', undefined, device());
+    await until(dom, 'the secret prefilled', (d) => Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value));
+    await step(dom, 'the desk’s front page', () => clickText(dom, '.pair button', 'Нэвтрэх'), { shows: '#view', drawn: '#alerts' });
+    return dom;
+  }
+
+  it('draws every page of the desk with it as text, and the menu around them', async () => {
+    const dom = await theDesk();
+    // The frame around every page: the person's own name, the places they work, the names of Basu's modules and pages.
+    await look(dom, 'the frame around the desk', '.sidebar');
+    const tabs = [...dom.window.document.querySelectorAll('.tabs button[data-tab]')].map((b) => (b as HTMLElement).dataset['tab']!);
+    expect(tabs).toEqual(
+      expect.arrayContaining(['overview', 'guests', 'money', 'notify', 'system', 'venues', 'lunches', 'reviews', 'stats', 'orders', 'suppliers', 'pay', 'promotions', 'orgs', 'members', 'roles', 'menus', 'audit']),
+    );
+    // Two carry nobody's words as they open: the books' own checks, and the payouts when none waits.
+    const wordless = new Set(['money', 'pay']);
+    for (const tab of tabs) {
+      await step(dom, `the ${tab} page`, press(dom, `.tabs button[data-tab="${tab}"]`), { shows: wordless.has(tab) ? null : '#view' });
+    }
+    // Every payout and refund, not only what waits: the names and the bank's words on each.
+    await step(dom, 'the payouts', press(dom, '.tabs button[data-tab="pay"]'), { drawn: '#pay' });
+    await step(dom, 'every payout and refund', press(dom, '#pay .dt-seg button[data-v="all"]'), { shows: '#pay' });
+    // The books, each of their views, and the messages by month.
+    await step(dom, 'the books', press(dom, '.tabs button[data-tab="money"]'), { drawn: '#money .kpi' });
+    for (const view of ['transfers', 'topups', 'receipts']) {
+      await step(dom, `the books’ ${view}`, press(dom, `button[data-m="${view}"]`), { shows: `#${view}`, drawn: `#${view}` });
+    }
+    await step(dom, 'the messages', press(dom, '.tabs button[data-tab="notify"]'), { shows: '#messages', drawn: '#messages' });
+    await step(dom, 'the messages by month', press(dom, 'button[data-n="volume"]'), { drawn: (d) => !d.querySelector('#messages') && Boolean(d.querySelector('#notify table')) });
+  });
+
+  it('opens the files behind the lists with it as text: a guest found by it, an order, a kitchen, a reviewed lunch, a supplier, a business', async () => {
+    const dom = await theDesk();
+    await step(dom, 'the guests', press(dom, '.tabs button[data-tab="guests"]'), { shows: '#guests' });
+    // Searched for by the tag's own letters, the people whose names carry it answer, as text.
+    await step(dom, 'the guests found by «img»', type(dom, '#q', 'img'), { shows: '#guests', asks: true });
+    await step(dom, 'a guest’s file', press(dom, '#guests tr[data-guest]'), { shows: '#view', drawn: '#back' });
+    await step(dom, 'the orders', press(dom, '.tabs button[data-tab="orders"]'), { shows: '#orders' });
+    const row = `#orders tr[data-order="${storied.id}"]`;
+    await step(dom, 'the order a seat acted on, found by its code', type(dom, '#orders .dt-search input', storied.code), { shows: '#orders', drawn: row, asks: true });
+    await step(dom, 'its story, which names the seat', press(dom, row), { shows: '.detail .story', drawn: '.detail .story' });
+    await step(dom, 'the lunches', press(dom, '.tabs button[data-tab="lunches"]'), { shows: '#lunches' });
+    await step(dom, 'the kitchens', press(dom, '.tabs button[data-tab="venues"]'), { shows: '#venues' });
+    await step(dom, 'a kitchen’s menu', press(dom, '#venues [data-venue]'), { shows: '#view', drawn: '#back' });
+    await step(dom, 'the reviews', press(dom, '.tabs button[data-tab="reviews"]'), { shows: '#reviews' });
+    await step(dom, 'a reviewed lunch and its story', press(dom, '#reviews tr[data-lunch]'), { shows: '#view', drawn: '.detail .story' });
+    await step(dom, 'the suppliers', press(dom, '.tabs button[data-tab="suppliers"]'), { shows: '#view' });
+    await step(dom, 'a supplier’s file', press(dom, '#view tr[data-supplier]'), { shows: '#view', drawn: '#back' });
+    await step(dom, 'the businesses', press(dom, '.tabs button[data-tab="orgs"]'), { shows: '#orgs' });
+    await step(dom, 'a business’s people and roles', press(dom, '#orgs [data-a="access"]'), { shows: '#view', drawn: '#back' });
+  });
+
+  it('shows it as text among Basu’s users to seat, and on a seat’s own row', async () => {
+    const dom = await theDesk();
+    await step(dom, 'the members', press(dom, '.tabs button[data-tab="members"]'), { shows: '#members' });
+    await step(dom, 'Basu’s users to seat', press(dom, '#add-member'), { shows: '#member-new', drawn: '#member-new .popup-pick-row', asks: true });
+    await step(dom, 'Basu’s users found by «img»', type(dom, '#member-new .popup-pick input[type="search"]', 'img'), { shows: '#member-new .popup-pick-list', asks: true });
+    await step(dom, 'the picker put away', press(dom, '#member-new [data-cancel]'));
+    await until(dom, 'the picker gone', (d) => !d.querySelector('#member-new[data-open]'));
+    await step(dom, 'a seat’s role, to change', press(dom, '#members [data-a="role"]'), { shows: '.sheet.popup[data-open]', drawn: '.sheet.popup[data-open]' });
+  });
+
+  it('draws a business’s own dashboard with it as text, and its owner’s corner', async () => {
+    // The butcher with the longest record: its people, their roles, who changed what. A butcher's stall and orders
+    // open its own screen, walked below; a restaurant's lunch pages here carry nobody's words.
+    const { rows } = await getPool().query<{ id: string; phone: string }>(
+      `SELECT o.id, g.phone_e164 AS phone FROM org.organization o
+         JOIN org.membership m ON m.org_id = o.id AND m.role = 'owner'
+         JOIN identity.guest g ON g.id = m.guest_id
+        WHERE o.state = 'active' AND o.supplier AND NOT o.restaurant AND g.phone_e164 IS NOT NULL
+        ORDER BY (SELECT count(*) FROM org.membership_log l WHERE l.org_id = o.id) DESC LIMIT 1`,
+    );
+    const owner = await devLogin(rows[0]!.phone, 'Вэб');
+    const dom = await openPage('ops.html', `#${rows[0]!.id}/home`, undefined, device(owner));
+    await until(dom, 'the business', (d) => Boolean(d.querySelector('.tabs button[data-tab="team"]')));
+    await settled(dom, 'the business’s front page');
+    await look(dom, 'the business’s name, over its menu', '.ws-btn');
+    const pagesOfIt = [...dom.window.document.querySelectorAll('.tabs button[data-tab]')].map((b) => (b as HTMLElement).dataset['tab']!);
+    expect(pagesOfIt).toEqual(expect.arrayContaining(['home', 'team', 'profile', 'roles', 'log']));
+    for (const page of pagesOfIt) {
+      await step(dom, `the business’s ${page}`, press(dom, `.tabs button[data-tab="${page}"]`), { shows: '#view' });
+    }
+    const corner = await openPage('ops.html', '#me/home', undefined, device(owner));
+    await until(corner, 'the corner', (d) => Boolean(d.querySelector('#org-list')));
+    await settled(corner, 'the corner');
+    await look(corner, 'the owner’s corner, their businesses in it', '#view');
+  });
+
+  it('draws a supplier’s own screen with it as text: the day, the orders and one of them, the stall, the money, the profile', async () => {
+    const { rows } = await getPool().query<{ code: string }>('SELECT code FROM idesh.idesh_order ORDER BY created_at DESC LIMIT 1');
+    const screen = await supplierScreenFor(rows[0]!.code);
+    await until(screen, 'the day', (d) => Boolean(d.querySelector('#board[data-ready]')));
+    await settled(screen, 'the day');
+    await look(screen, 'the supplier’s day', '#view');
+    await look(screen, 'the supplier’s name above it', '#supplier');
+    await step(screen, 'the supplier’s orders', press(screen, '.tabbar button[data-tab="orders"]'), { shows: '#view' });
+    await step(screen, 'one of them', press(screen, '#view [data-order]'), { shows: '#view', drawn: '.order-page' });
+    for (const tab of ['stall', 'money', 'profile']) {
+      await step(screen, `the supplier’s ${tab}`, press(screen, `.tabbar button[data-tab="${tab}"]`), { shows: '#view' });
+    }
+  });
+
+  it('draws the kitchen, and the guest’s pages on the website, with it as text', async () => {
+    const kitchen = await openPage('kds.html');
+    await settled(kitchen, 'the kitchen', 0);
+    await look(kitchen, 'the kitchen', 'body');
+    const guest = await buyer();
+    for (const page of ['index.html', 'shop.html', 'home.html', 'orders.html', 'account.html']) {
+      const dom = await openPage(page, '', undefined, device(guest.token));
+      await settled(dom, page, 0);
+      await look(dom, page, 'body');
+    }
+  });
+
+  it('draws the guest’s pages in the app with it as text: the home, the stalls and one of them, an order, the lunch map and a kitchen on it', async () => {
+    const guest = await buyer();
+    const home = await openPage('app.html', '', undefined, device(guest.token));
+    await settled(home, 'the app’s home', 0);
+    await look(home, 'the app’s home', 'body');
+
+    const stalls = await openPage('idesh.html', '', undefined, device(guest.token));
+    await until(stalls, 'the stalls', (d) => d.querySelectorAll('.listing').length > 0);
+    await settled(stalls, 'the stalls');
+    await look(stalls, 'the stalls', '#listings');
+    await step(stalls, 'a stall', press(stalls, '.listing'), { shows: 'body', drawn: '#next' });
+
+    const order = await openPage('idesh.html', `?order=${guest.order}`, undefined, device(guest.token));
+    await until(order, 'the order', (d) => Boolean(d.querySelector('.status')));
+    await settled(order, 'the order');
+    await look(order, 'the order, its supplier and their number', 'body');
+
+    const map = await openPage('dine.html', '', undefined, device(guest.token));
+    await until(map, 'the pins', () => pins(map).length > 0);
+    await settled(map, 'the map');
+    await look(map, 'the map', null);
+    const stub = (map.window as unknown as { __map: { clickLayer: (layer: string, event: unknown) => void } }).__map;
+    await step(map, 'a kitchen on the map', () => stub.clickLayer('venue-pin', { features: [{ properties: pins(map)[0]!.properties }] }), {
+      shows: 'body',
+      drawn: '.item',
+      asks: true,
+    });
+  });
+
+  /** The guest who bought the newest idesh, signed in afresh on the website: the one whose pages carry the most. */
+  async function buyer(): Promise<{ token: string; order: string }> {
+    const { rows } = await getPool().query<{ id: string; phone: string }>(
+      `SELECT o.id, g.phone_e164 AS phone FROM idesh.idesh_order o JOIN identity.guest g ON g.id = o.guest_id
+        WHERE g.phone_e164 IS NOT NULL ORDER BY o.created_at DESC LIMIT 1`,
+    );
+    return { token: await devLogin(rows[0]!.phone, 'Вэб'), order: rows[0]!.id };
+  }
 });
 
 /**
@@ -2474,6 +2858,25 @@ async function supplierScreenFor(code: string): Promise<JSDOM> {
     [code],
   );
   return ownerScreen(rows[0]!.phone);
+}
+
+/**
+ * Buy one whole animal, collected, on the stalls page as it stands — the
+ * steps of buyOne without its checks along the way, for a block that needs
+ * an order and is not about buying one. The code the guest is given.
+ */
+async function buyPickup(dom: JSDOM): Promise<string> {
+  await until(dom, 'the stalls', (d) => d.querySelectorAll('.listing').length >= seeded.listings);
+  const whole = [...dom.window.document.querySelectorAll('.listing')].find(
+    (l) => !l.hasAttribute('data-gone') && l.textContent?.includes('бүтэн'),
+  ) as HTMLElement;
+  whole.click();
+  await until(dom, 'the stall', (d) => Boolean(d.querySelector('#next')));
+  (dom.window.document.querySelector('#next') as HTMLElement).click();
+  await until(dom, 'the review', (d) => Boolean(d.querySelector('#pay')));
+  (dom.window.document.querySelector('#pay') as HTMLElement).click();
+  await until(dom, 'the status', (d) => Boolean(d.querySelector('.handcode b')));
+  return dom.window.document.querySelector('.handcode b')!.textContent!;
 }
 
 /** The desk opens on the numbers; a test goes to the section it is about. */

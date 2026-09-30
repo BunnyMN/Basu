@@ -686,10 +686,19 @@ async function renderOrgTeam(view) {
       onSubmit: async (v, { step }) => {
         if (!who) {
           who = await ops(`/v1/orgs/${org.id}/lookup?contact=${encodeURIComponent(v.contact)}`);
+          // Who it is, by what the account proved: its address first. A number a password sign-up typed proves nothing —
+          // anybody can register a cook's number before the cook does — so a match by one that no code reached says so.
+          const unproved = Boolean(who.phone && !who.phone_verified);
+          const known = [
+            who.email && `<span class="mono">${esc(who.email)}</span>`,
+            who.phone && `<span class="mono">${esc(who.phone)}</span>${unproved ? ' <em class="flag">баталгаагүй</em>' : ''}`,
+          ].filter(Boolean).join(' · ');
           step({
-            sub: 'Олдлоо. Ямар эрхтэй ажиллахыг сонгоно уу.',
+            sub: unproved
+              ? 'Олдлоо, гэхдээ энэ дугаарыг SMS кодоор баталгаажуулаагүй — өөр хүн бүртгүүлсэн байж болзошгүй. Эргэлзвэл имэйлээр нь хайгаарай.'
+              : 'Олдлоо. Ямар эрхтэй ажиллахыг сонгоно уу.',
             fields: [
-              { type: 'static', label: 'Хүн', html: `<b>${esc(who.name ?? 'Нэргүй')}</b> · <span class="mono">${esc(who.contact ?? '')}</span>` },
+              { type: 'static', label: 'Хүн', html: `<b>${esc(who.name ?? 'Нэргүй')}</b>${known ? ` · ${known}` : ''}` },
               roleField(giving.find((r) => !r.head)?.key),
             ],
             submit: 'Нэмэх',

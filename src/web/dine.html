@@ -13,7 +13,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F3EE">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0F1110">
 <title>Basu — үдийн хоол</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.css" integrity="sha512-KIMsMWIdnoG9OwZa+oaIafmbDonqck1UCmq+/zcUi2aaZ97N9QE6TqpTM+n36EO40HGh64hU/375zxtjx7WTyQ==" crossorigin="anonymous">
 <link rel="stylesheet" href="/app.css">
 <style>
 /* Layout only. Colour, type, radius, buttons, chips, rows, the sheet and the
@@ -230,7 +230,8 @@ body{display:flex;flex-direction:column}
   <span class="when mono" id="ob-when"></span>
 </button>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
+<!-- MapLibre from cdnjs, held to cdnjs's own hash of the file: bytes that ever differ do not run. A new version takes its new hash, here and on the stylesheet. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js" integrity="sha512-hoXlvOdSmh58mppUyZHZsscHkR/yXl6zLpTMTNwA6IZ61DpeaCNjosRu1WJ2DeIpkfW5MsJJ9H89zjV4IBGqRw==" crossorigin="anonymous"></script>
 <script type="module">
 import { api, store, shell, toast, mountClock, mnt, money, hhmm, HEADLINE, signInSheet } from '/api.js';
 import { mapStyle, pinImage, ULAANBAATAR, isCovered, metresBetween, walkMinutes } from '/mapStyle.js';

@@ -14,7 +14,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F3EE">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0F1110">
 <title>Basu — өвлийн идэш</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.css" integrity="sha512-KIMsMWIdnoG9OwZa+oaIafmbDonqck1UCmq+/zcUi2aaZ97N9QE6TqpTM+n36EO40HGh64hU/375zxtjx7WTyQ==" crossorigin="anonymous">
 <link rel="stylesheet" href="/app.css">
 <style>
 /* A list, not a map: the question here is "which animal, from whom, at what
@@ -312,7 +312,8 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
   <footer class="screen-foot" id="screen-foot"></footer>
 </section>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
+<!-- MapLibre from cdnjs, held to cdnjs's own hash of the file: bytes that ever differ do not run. A new version takes its new hash, here and on the stylesheet. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js" integrity="sha512-hoXlvOdSmh58mppUyZHZsscHkR/yXl6zLpTMTNwA6IZ61DpeaCNjosRu1WJ2DeIpkfW5MsJJ9H89zjV4IBGqRw==" crossorigin="anonymous"></script>
 <script type="module">
 import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, KIND, dayLabel, dayShort, signInSheet, dropSession } from '/api.js';
 import { mapStyle, ULAANBAATAR } from '/mapStyle.js';
@@ -1399,8 +1400,10 @@ function paintMine(orders) {
  * stranger gets the stalls to look at, and the way in only when ordering.
  */
 async function resume() {
+  // An order's id and nothing else: it goes into the API's paths with the guest's session, and a link carrying
+  // «../» in its place would send that session wherever the rest of it pointed.
   const wanted = new URLSearchParams(location.search).get('order');
-  if (!wanted || !store.guestToken) return;
+  if (!wanted || !/^[0-9a-f-]{36}$/.test(wanted) || !store.guestToken) return;
   state.orderId = wanted;
   rendered = null;
   await showStatus(true);

@@ -116,6 +116,8 @@ describe('the books at the desk', () => {
     expect((await app.inject({ method: 'GET', url: '/v1/ops/money/topups?state=pending', headers: desk() })).json().topups).toEqual([]);
     const topupCsv = await app.inject({ method: 'GET', url: '/v1/ops/money/topups.csv?state=settled', headers: desk() });
     expect(topupCsv.body.replace(/^﻿/, '').trim().split('\n')).toHaveLength(2);
+    // The phone is the number it is, on every row: a signed number cannot run as a formula, and a `'` in front of it would be in the data.
+    expect(topupCsv.body).toContain(',+97699004009,');
 
     const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() })).json().audit;
     expect(audit.map((a: { action: string }) => a.action)).toEqual(['ledger.export', 'ledger.export']);

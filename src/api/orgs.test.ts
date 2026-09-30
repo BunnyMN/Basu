@@ -3,7 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { closePool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
-import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
+import { FakeMailer, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
 import { opsToken } from './ops.js';
 import { buildServer } from './server.js';
@@ -198,6 +198,29 @@ describe('the people who work there', () => {
     expect((await call('PATCH', `/v1/orgs/${orgId}/members/${staffId}`, owner, { role: 'accountant' })).statusCode).toBe(200);
     expect((await call('DELETE', `/v1/orgs/${orgId}/members/${staffId}`, owner)).statusCode).toBe(204);
     expect((await call('GET', '/v1/supplier/me', staff)).json().supplier).toBeNull();
+  });
+
+  it('names a person found by a number by the address they proved, and says whether a code ever reached the number', async () => {
+    // A password sign-up types any number it likes — a cook's, before the
+    // cook ever comes — and whoever is brought in reads the guests' names,
+    // phones and addresses. So the manager sees what the account proved.
+    const owner = await person('+97699110001', 'Дорж');
+    const orgId = await aButcher(owner);
+    const typed = await person('+97699110005', 'Бат');
+    const mailer = new FakeMailer();
+    ctx.mailer = mailer;
+    expect((await call('POST', '/v1/me/email/code', typed, { email: 'bat@example.mn', password: 'нууц үг 1234' })).statusCode).toBe(202);
+    expect((await call('POST', '/v1/me/email', typed, { email: 'bat@example.mn', code: mailer.codeFor('bat@example.mn') })).statusCode).toBe(200);
+    // Another number, proved by the code it received.
+    await app.inject({ method: 'POST', url: '/v1/auth/otp', payload: { phone: '+97699110006' } });
+    const code = /(\d{6})/.exec((ctx.notifier as FakeNotifier).of('auth.otp').at(-1)?.body ?? '')?.[1];
+    expect((await app.inject({ method: 'POST', url: '/v1/auth/verify', payload: { phone: '+97699110006', code } })).statusCode).toBe(200);
+
+    const lookup = async (contact: string) => (await call('GET', `/v1/orgs/${orgId}/lookup?contact=${encodeURIComponent(contact)}`, owner)).json();
+    expect(await lookup('9911 0005')).toMatchObject({ name: 'Бат', email: 'bat@example.mn', phone: '+97699110005', phone_verified: false });
+    expect(await lookup('99110006')).toMatchObject({ phone: '+97699110006', phone_verified: true });
+    // Found by the address: no number comes back — the manager had none to type.
+    expect(await lookup('bat@example.mn')).toMatchObject({ name: 'Бат', email: 'bat@example.mn', phone: null, phone_verified: false });
   });
 
   it('says plainly when nobody signs in with that phone or address', async () => {

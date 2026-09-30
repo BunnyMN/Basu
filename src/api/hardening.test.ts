@@ -7,6 +7,7 @@ import { buildServer } from './server.js';
 import { contentSecurityPolicy, externalScripts, inlineScriptHashes, limits } from './hardening.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -73,7 +74,52 @@ describe('security headers', () => {
     // The bare host, allowed alone, is what must not be there.
     expect(scriptSrc).not.toMatch(/https:\/\/cdnjs\.cloudflare\.com(\s|$)/);
   });
+
+  it('names every script a page loads from another server, so none is dropped from the policy unseen', () => {
+    // The policy is read off the pages, and an address it could not carry
+    // whole — a query after it, an odd character in it — is left out, so that
+    // page's script would not load. A page under test runs no policy: the map
+    // would break in a real browser and nowhere here. Read loosely, every
+    // such tag is one the policy names.
+    const named = externalScripts(webRoot);
+    for (const [page, html] of pages()) {
+      for (const tag of html.matchAll(/<script\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)) {
+        const src = tag[1] ?? tag[2] ?? tag[3] ?? '';
+        if (src.startsWith('/') && !src.startsWith('//')) continue;
+        expect(named, `${page}: ${src}`).toContain(src);
+      }
+    }
+  });
+
+  it('holds what a page loads from another server to the hash of the file', () => {
+    // The policy pins the address, not the bytes: a CDN serving other bytes
+    // under it one day — a library swapped, the CDN itself broken into —
+    // would run them beside the dashboard's session. With the file's hash on
+    // the tag the browser refuses bytes that differ, and asks for them the
+    // way a hash can be checked (crossorigin).
+    let held = 0;
+    for (const [page, html] of pages()) {
+      const tags = [
+        ...html.matchAll(/<script\b[^>]*?\bsrc="(?:https?:)?\/\/[^"]*"[^>]*>/gi),
+        ...html.matchAll(/<link\b(?=[^>]*\brel="stylesheet")[^>]*?\bhref="(?:https?:)?\/\/[^"]*"[^>]*>/gi),
+      ].map((m) => m[0]);
+      for (const tag of tags) {
+        expect(tag, page).toMatch(/\bintegrity="sha(256|384|512)-[A-Za-z0-9+/]+={0,2}"/);
+        expect(tag, page).toMatch(/\bcrossorigin="anonymous"/);
+        held += 1;
+      }
+    }
+    // MapLibre's script and stylesheet, on each of the two map pages.
+    expect(held).toBeGreaterThanOrEqual(4);
+  });
 });
+
+/** Every page on disk, by name, as it is served. */
+function pages(): Array<[string, string]> {
+  return readdirSync(webRoot)
+    .filter((file) => file.endsWith('.html'))
+    .map((file) => [file, readFileSync(join(webRoot, file), 'utf8')]);
+}
 
 describe('a server with no demo in it', () => {
   it('serves every page, and none of the shortcuts past the door', async () => {

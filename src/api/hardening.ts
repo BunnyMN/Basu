@@ -15,7 +15,9 @@ import { mode } from '../mode.js';
  * loads from a CDN is named by its whole address, read off the same files,
  * and never the CDN itself: a CDN serves every version of every library, an
  * old template engine among them, and with the host allowed a scrap of
- * markup that slipped past an escape could load one and run it here.
+ * markup that slipped past an escape could load one and run it here. The
+ * address pins the file, not its bytes, so the page's tag carries the
+ * file's hash too (`integrity`), and bytes that ever differ do not run.
  */
 
 const WEB_ORIGINS = {
