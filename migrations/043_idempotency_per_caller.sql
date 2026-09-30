@@ -7,18 +7,29 @@
 -- a retry, not a secret, and was never meant to say who anybody is.
 --
 -- An answer is now kept under the session that asked (a hash of it, never
--- the token), the method and the address, and the key within those. What
--- was kept the old way is dropped rather than guessed at: nobody can say
--- whose it was, and a day of retries is all it was ever for.
+-- the token), the method and the address, and the key within those — in a
+-- table of its own. The old table stays as it is for the release before
+-- this one, which still writes to it: rolled back to, that release keeps
+-- remembering answers the way it always did. A later release drops it.
 --
--- The release before this one cannot write into this shape: rolled back to,
--- it stops remembering answers — its insert fails, and it lets it.
+-- What the old table holds is emptied rather than carried over: nobody can
+-- say whose each answer was, and a day of retries is all it was ever for.
+-- Nothing swept it, so it held every answer since the database began.
+
+CREATE TABLE idempotency_answer (
+  -- The sha256 of the bearer token the request came with.
+  caller       text NOT NULL,
+  method       text NOT NULL,
+  url          text NOT NULL,
+  key          text NOT NULL,
+  status       int  NOT NULL,
+  content_type text,
+  body         text NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (caller, method, url, key)
+);
+
+-- The window a phone might retry in, and the sweep of what is older.
+CREATE INDEX idempotency_answer_age_idx ON idempotency_answer (created_at);
 
 TRUNCATE idempotency_key;
-
-ALTER TABLE idempotency_key DROP CONSTRAINT idempotency_key_pkey;
-ALTER TABLE idempotency_key
-  ADD COLUMN caller text NOT NULL,
-  ADD COLUMN method text NOT NULL,
-  ADD COLUMN url    text NOT NULL;
-ALTER TABLE idempotency_key ADD PRIMARY KEY (caller, method, url, key);

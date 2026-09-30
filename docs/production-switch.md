@@ -152,7 +152,8 @@ npm run check:prod -- https://basu.burzai.cloud
 ```
 
 Бүх мөр ✓ байх ёстой: демо замууд 404, толгойнууд, ops хаалга 401, гадаад
-дугаарт код явахгүй. Дараа нь гараар:
+дугаарт код явахгүй, SMS gateway-гүй бол SMS код хаалттай, хуурамч
+X-Forwarded-For хязгаарыг тойрохгүй. Дараа нь гараар:
 
 - [ ] Өөрийн имэйлээр `/idesh`-д нэвтрэх — код **бодит имэйлээр** ирнэ (Spam-ийг шалга), 123456 ажиллахгүй.
 - [ ] «Google-ээр нэвтрэх» → Google-ийн данс сонгоод буцаад ирэхэд нэвтэрсэн байна; хаягийн мөрөнд `#auth=` үлдэхгүй.
@@ -181,7 +182,21 @@ npm run check:prod -- https://basu.burzai.cloud
 
 ## 7. Буцах зам
 
-Асуудал гарвал `.env`-д `BASU_MODE=demo`, `DATABASE_URL=…/basu` (демо DB), `systemctl restart basu-api`, `systemctl stop basu-scheduler` — демо буцаад ирнэ. Production DB хэвээр үлдэнэ.
+`.env`-ийг засах нь хангалтгүй: горимыг deploy `/opt/basu/mode.env`-д
+бэхэлдэг, тэр нь `.env`-ээс давуу. Демо руу буцах бол сервер дээр root-оор:
+
+```bash
+cd /opt/basu/app
+cp -p .env.demo .env                                  # демо DB (…/basu) руу заасан .env
+sudo -u basu node --env-file=.env dist/db/migrate.js  # демо DB-ийн схемийг шинэчилнэ
+sed -i 's/^BASU_MODE=.*/BASU_MODE=demo/' /opt/basu/mode.env
+systemctl disable --now basu-scheduler
+systemctl restart basu-api
+```
+
+Production DB хэвээр үлдэнэ. main руу орох дараагийн push-ийн deploy демо
+`.env`-ийг хараад дахин production болгоно — асуудал засагдтал main руу push
+хийхгүй.
 
 ## Дараа нь (1-р үе)
 

@@ -64,7 +64,7 @@ export async function seedDemo(): Promise<{
 
   // Wipe first: a demo you cannot re-run is a demo that rots.
   await db.query(`
-    TRUNCATE outbox, idempotency_key,
+    TRUNCATE outbox, idempotency_key, idempotency_answer,
              notify.message, notify.device, notify.preference,
              ledger.ebarimt_receipt, ledger.payment, ledger.topup, ledger.entry, ledger.transfer,
              dine.order_event, dine.fire_job, dine.arrival_signal, dine.table_hold,

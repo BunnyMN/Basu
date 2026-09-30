@@ -218,7 +218,7 @@ describe('signing in', () => {
     await inProduction(async () => {
       const asked = await app.inject({ method: 'POST', url: '/v1/auth/otp', payload: { phone: '+97699001166' } });
       expect(asked.statusCode).toBe(503);
-      expect(asked.json().error).toMatchObject({ code: 'SMS_CLOSED', message_mn: expect.stringContaining('Утсанд код') });
+      expect(asked.json().error).toMatchObject({ code: 'SMS_CLOSED', message_mn: expect.stringContaining('SMS кодоор') });
       expect(codeSentTo('+97699001166')).toBeUndefined();
 
       const guessed = await app.inject({ method: 'POST', url: '/v1/auth/verify', payload: { phone: '+97699001155', code } });
@@ -497,6 +497,36 @@ describe('ordering over HTTP', () => {
     expect(second.headers['idempotent-replay']).toBeUndefined();
     const view = await app.inject({ method: 'GET', url: `/v1/orders/${two}`, headers: auth(guest) });
     expect(view.json().state).toBe('PLACED');
+  });
+
+  it('forgets a kept answer once no retry can still come for it', async () => {
+    const guest = await signIn();
+    await atKitchen(venue.restaurantId);
+    const made = await app.inject({
+      method: 'POST',
+      url: '/v1/orders',
+      headers: { ...auth(guest), 'idempotency-key': 'lunch-yesterday' },
+      payload: {
+        restaurant_id: venue.restaurantId,
+        slot_starts_at: at('12:30').toISOString(),
+        party_size: 2,
+        items: [{ menu_item_id: venue.menuIds['tsuivan'], qty: 1 }],
+      },
+    });
+    expect(made.statusCode, made.body).toBe(201);
+    const kept = async () =>
+      (await pool().query<{ n: number }>('SELECT count(*)::int AS n FROM idempotency_answer')).rows[0]!.n;
+    expect(await kept()).toBe(1);
+
+    // Within the day a phone may still be retrying, so the answer stays…
+    const hours = (n: number) => new Date(clock.now().getTime() + n * 3_600_000);
+    clock.set(hours(23));
+    await tick(ctx, { spacingMs: 0 });
+    expect(await kept()).toBe(1);
+    // …and past it the answer is nobody's to keep: an order, as it was sent.
+    clock.set(hours(2));
+    await tick(ctx, { spacingMs: 0 });
+    expect(await kept()).toBe(0);
   });
 
   it('answers “what of mine is happening” with the live orders and nothing else', async () => {

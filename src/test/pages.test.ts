@@ -67,12 +67,13 @@ const open: JSDOM[] = [];
  * `search` is how a deep link is opened: the home screen sends people into
  * the dine-in app at `/dine?order=…`, and a page that reads location has to
  * be given one that says something. `respond` answers a request in place of
- * the server, for a state the seed cannot be put in — an empty market.
+ * the server, for a state the seed cannot be put in — an empty market — or
+ * loses the server's answer on its way back, the way a patchy connection does.
  */
 async function openPage(
   file: string,
   search = '',
-  respond?: (path: string) => Response | undefined,
+  respond?: (path: string, init?: RequestInit) => Response | Promise<Response> | undefined,
   browser: ReturnType<typeof memoryStorage> = storage,
 ): Promise<JSDOM> {
   const html = await readFile(join(WEB, file), 'utf8');
@@ -86,7 +87,7 @@ async function openPage(
   // jsdom has no fetch; point it at the running server and resolve relative
   // paths the way a browser would.
   (window as unknown as { fetch: typeof fetch }).fetch = ((input: string, init?: RequestInit) => {
-    const canned = respond?.(String(input));
+    const canned = respond?.(String(input), init);
     return canned ? Promise.resolve(canned) : fetch(new URL(String(input), base).toString(), init);
   }) as typeof fetch;
   Object.defineProperty(window, 'localStorage', { value: browser, writable: true });
@@ -357,6 +358,33 @@ async function orderFromMap(
   await until(dom, 'the status screen', (d) => Boolean(d.querySelector('.status')));
 }
 
+/** The Pay button, ready for a tap: a price on it and no spinner. */
+function payable(d: Document): boolean {
+  const button = d.querySelector('.sheet footer button');
+  return Boolean(button && !button.hasAttribute('data-busy') && button.textContent?.includes('төлөх'));
+}
+
+/** A tsuivan at the paired kitchen for `slot`, chosen as far as its Pay button. */
+async function chooseLunch(dom: JSDOM, slot: string): Promise<void> {
+  await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
+  tapPin(dom, pairedVenue);
+  await until(dom, 'the menu', (d) => d.querySelectorAll('.item').length > 3);
+  const row = [...dom.window.document.querySelectorAll('.item')].find((r) => r.textContent?.includes('Цуйван'))!;
+  (row.querySelector('button[data-d="1"]') as HTMLElement).click();
+  await until(dom, 'the pay button', (d) => Boolean(d.querySelector('.sheet footer button')));
+  clickText(dom, '.slot', slot);
+  await until(dom, 'a price', payable);
+}
+
+/** Every lunch this number has ordered, paid for or not. */
+async function lunchesOf(phone: string): Promise<number> {
+  const { rows } = await getPool().query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM dine.dining_order o JOIN identity.guest g ON g.id = o.guest_id WHERE g.phone_e164 = $1`,
+    [phone],
+  );
+  return rows[0]!.n;
+}
+
 describe('the guest app', () => {
   it('draws every restaurant on the map', async () => {
     const dom = await openPage('dine.html');
@@ -457,18 +485,7 @@ describe('the guest app', () => {
         headers: { 'content-type': 'application/json' },
       });
     });
-    await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
-    tapPin(dom, pairedVenue);
-    await until(dom, 'the menu', (d) => d.querySelectorAll('.item').length > 3);
-    const row = [...dom.window.document.querySelectorAll('.item')].find((r) => r.textContent?.includes('Цуйван'))!;
-    (row.querySelector('button[data-d="1"]') as HTMLElement).click();
-    await until(dom, 'the pay button', (d) => Boolean(d.querySelector('.sheet footer button')));
-    clickText(dom, '.slot', '12:15');
-    const payable = (d: Document) => {
-      const button = d.querySelector('.sheet footer button');
-      return Boolean(button && !button.hasAttribute('data-busy') && button.textContent?.includes('төлөх'));
-    };
-    await until(dom, 'a price', payable);
+    await chooseLunch(dom, '12:15');
     (dom.window.document.querySelector('.sheet footer button') as HTMLElement).click();
     await until(dom, 'Pay again, after the refusal', (d) => refused && payable(d));
     (dom.window.document.querySelector('.sheet footer button') as HTMLElement).click();
@@ -477,17 +494,63 @@ describe('the guest app', () => {
     // One key, nobody's to guess — not the venue, slot and dishes spelled out…
     const caller = createHash('sha256').update(storage.getItem('basu.guest')!).digest('hex');
     const kept = await getPool().query<{ key: string }>(
-      `SELECT key FROM idempotency_key WHERE caller = $1 AND method = 'POST' AND url = '/v1/orders'`,
+      `SELECT key FROM idempotency_answer WHERE caller = $1 AND method = 'POST' AND url = '/v1/orders'`,
       [caller],
     );
     expect(kept.rows).toHaveLength(1);
     expect(kept.rows[0]!.key).toMatch(/^order-[0-9a-f]{32}$/);
     // …and the tap after the refusal was the same attempt: one lunch, not two.
-    const orders = await getPool().query<{ n: number }>(
-      `SELECT count(*)::int AS n FROM dine.dining_order o JOIN identity.guest g ON g.id = o.guest_id WHERE g.phone_e164 = $1`,
-      ['+97699003010'],
-    );
-    expect(orders.rows[0]!.n).toBe(1);
+    expect(await lunchesOf('+97699003010')).toBe(1);
+  });
+
+  it('never sells a lunch twice when the look at it fails after it is paid for', async () => {
+    await ownGuest('+97699003011');
+    // The payment goes through and the first look at the lunch is lost, the
+    // way a patchy connection loses one. Every look after that waits until
+    // the test lets it through, so no poll can draw the lunch meanwhile.
+    let lost = false;
+    let letThrough!: () => void;
+    const later = new Promise<void>((resolve) => (letThrough = resolve));
+    const dom = await openPage('dine.html', '', (path, init) => {
+      if (!/^\/v1\/orders\/[0-9a-f-]{36}$/.test(path)) return undefined;
+      if (lost) return later.then(() => fetch(new URL(path, base).toString(), init));
+      lost = true;
+      return new Response(JSON.stringify({ error: { code: 'UNAVAILABLE', message_mn: 'Сүлжээ тасарлаа.' } }), {
+        status: 503,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+    await chooseLunch(dom, '12:00');
+    (dom.window.document.querySelector('.sheet footer button') as HTMLElement).click();
+    await until(dom, 'the lost look', (d) => d.getElementById('toast')?.textContent === 'Сүлжээ тасарлаа.');
+
+    // Bought: the sheet waits for the lunch and does not offer to sell it again…
+    expect(payable(dom.window.document)).toBe(false);
+    expect(dom.window.document.querySelector('.sheet')?.hasAttribute('data-busy')).toBe(true);
+    // …and a tap that lands anyway is the same attempt, handed the lunch it bought.
+    (dom.window.document.querySelector('.sheet footer button') as HTMLElement).click();
+    letThrough();
+    await until(dom, 'the status screen', (d) => Boolean(d.querySelector('.status')));
+    expect(await lunchesOf('+97699003011')).toBe(1);
+  });
+
+  it('takes a Pay whose answer was lost for the payment it made, and shows the lunch', async () => {
+    await ownGuest('+97699003012');
+    // The payment goes through; its answer never reaches the phone.
+    let lost = false;
+    const dom = await openPage('dine.html', '', (path, init) => {
+      if (lost || !/^\/v1\/orders\/[0-9a-f-]{36}\/pay$/.test(path)) return undefined;
+      lost = true;
+      return fetch(new URL(path, base).toString(), init).then(() => Promise.reject(new TypeError('Failed to fetch')));
+    });
+    await chooseLunch(dom, '12:45');
+    (dom.window.document.querySelector('.sheet footer button') as HTMLElement).click();
+    await until(dom, 'Pay again, after the lost answer', (d) => lost && payable(d));
+    (dom.window.document.querySelector('.sheet footer button') as HTMLElement).click();
+
+    // Not «already paid» in front of a Pay button: the payment it made, and the lunch.
+    await until(dom, 'the status screen', (d) => Boolean(d.querySelector('.status')));
+    expect(await lunchesOf('+97699003012')).toBe(1);
   });
 
   it('draws the walk with layers MapLibre can actually paint', async () => {

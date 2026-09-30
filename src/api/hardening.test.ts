@@ -125,6 +125,21 @@ describe('rate limits', () => {
     }
   });
 
+  it('keep callers behind nginx apart, whichever loopback nginx comes in on', async () => {
+    const behind = await buildServer(ctx, { trustProxy: true });
+    try {
+      // A listen on `::`, or an upstream written as localhost, brings nginx in
+      // from ::1, or with its IPv4 address spelled the IPv6 way. Still nginx:
+      // taken for a caller, it would be everybody's one shared count.
+      for (const [n, socket] of ['127.0.0.1', '::1', '::ffff:127.0.0.1'].entries()) {
+        const last = await knock(behind, (i) => ({ socket, forwarded: `198.51.${100 + n}.${i + 1}` }));
+        expect(last.statusCode, socket).not.toBe(429);
+      }
+    } finally {
+      await behind.close();
+    }
+  });
+
   it('believe no forwarded address from anybody who is not nginx', async () => {
     const behind = await buildServer(ctx, { trustProxy: true });
     try {

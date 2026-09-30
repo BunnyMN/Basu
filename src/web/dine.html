@@ -914,22 +914,28 @@ function renderFoot() {
 }
 
 /**
- * The key an order goes with: one per attempt. Tapping again after the
- * network lost the answer is the same attempt, sends the same key, and gets
- * the same order back — never a second lunch. The key is a random one made
- * for the attempt, not the venue, slot and dishes spelled out, which anybody
- * could guess. Another cart or slot is another attempt, and so is the next
- * order once this one is placed.
+ * One attempt at a lunch: this venue, slot and cart, and a random nonce its
+ * two calls go under — placing the order, then paying for it. Tapping again
+ * after the network lost an answer is the same attempt, sends the same keys,
+ * and gets the same order and the same payment back — never a second lunch.
+ * The nonce is made for the attempt, not the venue, slot and dishes spelled
+ * out, which anybody could guess. Another cart or slot is another attempt.
+ *
+ * An attempt is over when its lunch is on the screen (showStatus ends it),
+ * not when the payment goes through: the look at the lunch can fail after
+ * the money has gone, and until the guest has seen it, a tap is a retry of
+ * it. After that, the same cart and slot again is a second lunch somebody
+ * meant.
  */
 let attempt = null;
 
-function orderKey() {
+function currentAttempt() {
   const what = `${state.venue.id}|${state.slot}|${[...state.cart].join(',')}`;
   if (attempt?.what !== what) {
     const nonce = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
-    attempt = { what, key: `order-${nonce}` };
+    attempt = { what, nonce, order: null };
   }
-  return attempt.key;
+  return attempt;
 }
 
 async function placeOrder() {
@@ -940,11 +946,13 @@ async function placeOrder() {
   sheet.dataset.busy = '1';
   button.dataset.busy = '1';
   button.textContent = 'Түр хүлээнэ үү…';
+  let paid = false;
   try {
+    const current = currentAttempt();
     const order = await guestApi('/v1/orders', {
       method: 'POST',
       // A phone on a patchy connection retries; the same key must not buy lunch twice.
-      idempotencyKey: orderKey(),
+      idempotencyKey: `order-${current.nonce}`,
       body: {
         restaurant_id: state.venue.id,
         slot_starts_at: state.slot,
@@ -952,16 +960,24 @@ async function placeOrder() {
         items: [...state.cart].map(([menu_item_id, qty]) => ({ menu_item_id, qty })),
       },
     });
-    await guestApi(`/v1/orders/${order.id}/pay`, { method: 'POST' });
-    attempt = null;
+    current.order = order.id;
+    // Paying can lose its answer too. Under the attempt's own key the retry
+    // is handed the payment already made, rather than told the lunch is paid
+    // for and left in front of a Pay button for it.
+    await guestApi(`/v1/orders/${order.id}/pay`, { method: 'POST', idempotencyKey: `pay-${current.nonce}` });
+    paid = true;
     state.orderId = order.id;
     state.sent = new Set();
     rendered = null;
     shell.ordersChanged();
     await showStatus(true);
   } catch (error) {
-    delete sheet.dataset.busy;
     toast(error.message, 'bad');
+    // Paid for, and only the look at it failed: a bought lunch never offers
+    // its Pay button again. The sheet stays busy, and the next poll draws
+    // the lunch as soon as the network lets it.
+    if (paid) return;
+    delete sheet.dataset.busy;
     renderFoot();
   }
 }
@@ -1018,6 +1034,8 @@ async function showStatus(force) {
   if (!state.orderId) return;
   const order = await guestApi(`/v1/orders/${state.orderId}`);
   if (gone) return;
+  // The attempt that made this lunch is over: the lunch is on the screen.
+  if (attempt?.order === order.id) attempt = null;
 
   // Everything the sheet draws. Same signature, same picture — so leave it.
   const signature = [
