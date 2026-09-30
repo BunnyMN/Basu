@@ -475,6 +475,8 @@ async function paintMe(token) {
 /** Sign out here: end this session on the server and forget it; the stalls stay open to look at. */
 function signOutHere() {
   dropSession();
+  // An attempt at an order was this person's; whoever signs in next starts their own.
+  attempt = null;
   $('me').hidden = true;
   paintMine([]);
 }
@@ -937,46 +939,114 @@ function renderReview({ replace = false } = {}) {
   foot.append(row);
 }
 
-async function placeOrder() {
+/** The order as it goes to the server: the stall, and every answer on the form. */
+function orderBody() {
   const l = state.listing;
   const f = state.form;
+  return {
+    listing_id: l.id,
+    qty: f.qty,
+    receive: f.receive,
+    receive_on: f.receiveOn,
+    ...(f.receive === 'delivery'
+      ? {
+          address: f.address,
+          address_phone: f.phone,
+          ...(f.lat ? { address_lat: f.lat, address_lon: f.lon } : {}),
+        }
+      : {}),
+  };
+}
+
+/**
+ * One attempt at an идэш: this order, answer for answer, and a random nonce
+ * its two calls go under — making the order, then paying for it. Tapping
+ * «Төлөх» again after the network lost an answer is the same attempt, sends
+ * the same keys, and gets the same order and the same payment back — never
+ * a second animal. The key used to be made afresh on every tap, and a retry
+ * after a lost answer was a second order — a second payment, when the lost
+ * answer was the payment's. Another quantity, day, way or address is another
+ * attempt: a key's order is handed back whatever the retry asks for, so a
+ * changed order must not go under it.
+ *
+ * An attempt is over when its order is on the screen (showStatus ends it),
+ * not when the payment goes through: the look at the order can fail after
+ * the money has gone, and until the guest has seen it, a tap is a retry of
+ * it. After that, the same order again is a second animal somebody meant.
+ */
+let attempt = null;
+
+function currentAttempt(body) {
+  const what = JSON.stringify(body);
+  if (attempt?.what !== what) {
+    const nonce = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
+    attempt = { what, nonce, order: null };
+  }
+  return attempt;
+}
+
+/**
+ * Make the order and pay for it under the attempt's keys; the order bought.
+ *
+ * A changed order is another attempt, but the one before it may have made
+ * an order and paid for it with the answer lost on the way. A guest who
+ * changes the order after a failure means it instead of that one, not
+ * beside it — so an order the last attempt made is looked at first, and if
+ * it was paid for, it is the animal bought and the one shown. The changed
+ * order is the next tap's, as a new attempt.
+ */
+async function purchase(body) {
+  if (attempt?.order && attempt.what !== JSON.stringify(body)) {
+    const last = await guestApi(`/v1/idesh/${attempt.order}`);
+    if (last.paid_at) return last.id;
+  }
+  const current = currentAttempt(body);
+  // A phone on a patchy connection retries; the same key must not sell a second animal.
+  const order = await guestApi('/v1/idesh', { method: 'POST', idempotencyKey: `idesh-${current.nonce}`, body });
+  current.order = order.id;
+  try {
+    // Paying can lose its answer too. Under the attempt's own key the retry
+    // is handed the payment already made, rather than told the order is paid
+    // for and left in front of a Pay button for it.
+    await guestApi(`/v1/idesh/${order.id}/pay`, { method: 'POST', idempotencyKey: `pay-${current.nonce}` });
+  } catch (error) {
+    if (error.code !== 'WRONG_STATE') throw error;
+    // The order has left its draft without this tap. Paid for by a tap whose
+    // answer never came, it is the animal bought. Given back after half an
+    // hour unpaid, it has spent the attempt: the next tap is a new one, not
+    // the lapsed order handed back again.
+    if ((await guestApi(`/v1/idesh/${order.id}`)).paid_at) return order.id;
+    attempt = null;
+    throw error;
+  }
+  return order.id;
+}
+
+async function placeOrder() {
   const button = $('pay');
   button.disabled = true;
   button.textContent = 'Түр хүлээнэ үү…';
+  let paid = false;
   try {
-    const order = await guestApi('/v1/idesh', {
-      method: 'POST',
-      // One key per tap of «Төлөх»: a retry buys one sheep, a new tap is a
-      // new intention rather than yesterday's cancelled order handed back.
-      idempotencyKey: `idesh-${l.id}-${Date.now().toString(36)}`,
-      body: {
-        listing_id: l.id,
-        qty: f.qty,
-        receive: f.receive,
-        receive_on: f.receiveOn,
-        ...(f.receive === 'delivery'
-          ? {
-              address: f.address,
-              address_phone: f.phone,
-              ...(f.lat ? { address_lat: f.lat, address_lon: f.lon } : {}),
-            }
-          : {}),
-      },
-    });
-    await guestApi(`/v1/idesh/${order.id}/pay`, { method: 'POST' });
+    const bought = await purchase(orderBody());
+    paid = true;
     if (gone) return;
     // The card outside the page, on a phone, should say so now.
     shell.ordersChanged();
     state.listing = null;
     state.form = null;
     dropMap();
-    state.orderId = order.id;
+    state.orderId = bought;
     rendered = null;
     // Paid: back from here goes to the list, not to a form for a sheep
     // that is already bought.
     await Promise.all([showStatus(true, { replace: true }), loadMine(), loadListings()]);
   } catch (error) {
     toast(error.message, 'bad');
+    // Paid for, and only the look at it failed: a bought animal never offers
+    // its Pay button again. The button stays busy, and the next poll draws
+    // the order in the review's place as soon as the network lets it.
+    if (paid) return;
     button.disabled = false;
     button.textContent = 'Төлөх';
   }
@@ -1187,6 +1257,8 @@ async function showStatus(force, { replace = false } = {}) {
   if (!state.orderId) return;
   const order = await guestApi(`/v1/idesh/${state.orderId}`);
   if (gone || !state.orderId) return;
+  // The attempt that bought this order is over: the order is on the screen.
+  if (attempt?.order === order.id) attempt = null;
 
   const signature = [order.state, order.receipt ? 'receipt' : '', order.refund?.state ?? ''].join('|');
   // A poll that found no news changes nothing. News redraws: the supplier
@@ -1411,6 +1483,9 @@ void Promise.all([loadListings(), loadMine()]).then(resume);
 const poll = setInterval(() => {
   if (document.hidden) return;
   if (state.orderId && state.screen === 'status') void showStatus();
+  // An order behind the review is one paid for whose first look was lost:
+  // it takes the review's place, as it would have after the tap.
+  else if (state.orderId && state.screen === 'review') void showStatus(true, { replace: true });
   else if (!state.screen) void loadMine();
 }, 4000);
 addEventListener('pagehide', () => {

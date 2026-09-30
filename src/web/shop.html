@@ -250,6 +250,71 @@ function paintGrid() {
 
 const earliest = (l) => (l.ready_from > market.today ? l.ready_from : market.today);
 
+/**
+ * One attempt at buying from a stall: this order, answer for answer, and a
+ * random nonce its two calls go under — making the order, then paying for
+ * it. Pressing «Төлөх» again after the network lost an answer is the same
+ * attempt, sends the same keys, and gets the same order and the same
+ * payment back — never a second animal. The key used to be made afresh on
+ * every press, and a retry after a lost answer was a second order — a
+ * second payment, when the lost answer was the payment's. Another quantity,
+ * day, way or address is another attempt: a key's order is handed back
+ * whatever the retry asks for, so a changed order must not go under it.
+ *
+ * An attempt is over when it hands the person to its order's own page,
+ * which is where a bought order is seen — not when the payment goes
+ * through. Until then a press is a retry of it. A page the browser keeps
+ * and shows again on the way back from the order buys the same order
+ * again as a second animal somebody meant.
+ */
+let attempt = null;
+
+function currentAttempt(body) {
+  const what = JSON.stringify(body);
+  if (attempt?.what !== what) {
+    const nonce = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
+    attempt = { what, nonce, order: null };
+  }
+  return attempt;
+}
+
+/**
+ * Make the order and pay for it under the attempt's keys; the order bought.
+ *
+ * A changed order is another attempt, but the one before it may have made
+ * an order and paid for it with the answer lost on the way. Somebody who
+ * changes the order after a failure means it instead of that one, not
+ * beside it — so an order the last attempt made is looked at first, and if
+ * it was paid for, it is the animal bought and the page goes on to it. The
+ * changed order is the next press's, as a new attempt.
+ */
+async function purchase(body) {
+  if (attempt?.order && attempt.what !== JSON.stringify(body)) {
+    const last = await authed(`/v1/idesh/${attempt.order}`);
+    if (last.paid_at) return last.id;
+  }
+  const current = currentAttempt(body);
+  // A connection that drops an answer is retried; the same key must not sell a second animal.
+  const order = await authed('/v1/idesh', { method: 'POST', idempotencyKey: `idesh-${current.nonce}`, body });
+  current.order = order.id;
+  try {
+    // Paying can lose its answer too. Under the attempt's own key the retry
+    // is handed the payment already made, rather than told the order is paid
+    // for and left in front of «Төлөх» for it.
+    await authed(`/v1/idesh/${order.id}/pay`, { method: 'POST', idempotencyKey: `pay-${current.nonce}` });
+  } catch (error) {
+    if (error.code !== 'WRONG_STATE') throw error;
+    // The order has left its draft without this press. Paid for by a press
+    // whose answer never came, it is the animal bought. Given back after half
+    // an hour unpaid, it has spent the attempt: the next press is a new one,
+    // not the lapsed order handed back again.
+    if ((await authed(`/v1/idesh/${order.id}`)).paid_at) return order.id;
+    attempt = null;
+    throw error;
+  }
+  return order.id;
+}
+
 function drawStall(l) {
   document.title = `${l.title} — Basu`;
   // A form filled before signing in comes back filled after it.
@@ -418,25 +483,21 @@ function drawStall(l) {
       button.setAttribute('data-busy', '');
       buy.querySelector('#pay-error').textContent = '';
       try {
-        const order = await authed('/v1/idesh', {
-          method: 'POST',
-          // One key per tap of «Төлөх»: a retry buys one sheep, a new tap is a new intention.
-          idempotencyKey: `idesh-${l.id}-${Date.now().toString(36)}`,
-          body: {
-            listing_id: l.id,
-            qty: form.qty,
-            receive: form.receive,
-            receive_on: form.receiveOn,
-            ...(delivery ? { address: form.address.trim(), address_phone: form.phone.replace(/\s+/g, '') } : {}),
-          },
+        const bought = await purchase({
+          listing_id: l.id,
+          qty: form.qty,
+          receive: form.receive,
+          receive_on: form.receiveOn,
+          ...(delivery ? { address: form.address.trim(), address_phone: form.phone.replace(/\s+/g, '') } : {}),
         });
-        await authed(`/v1/idesh/${order.id}/pay`, { method: 'POST' });
         try {
           sessionStorage.removeItem(`basu.shop.${l.id}`);
         } catch {
           // nothing kept
         }
-        location.href = `/orders/${order.id}?new=1`;
+        // Bought: the button stays busy, and the attempt ends with the way to the order.
+        attempt = null;
+        location.href = `/orders/${bought}?new=1`;
       } catch (error) {
         button.removeAttribute('data-busy');
         buy.querySelector('#pay-error').textContent = error.message;
