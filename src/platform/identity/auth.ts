@@ -52,6 +52,7 @@ export class AuthError extends Error {
       | 'WRONG_PASSWORD'
       | 'EMAIL_CLOSED'
       | 'EMAIL_FAILED'
+      | 'SMS_CLOSED'
       | 'SOCIAL_CLOSED'
       | 'SOCIAL_REFUSED'
       | 'HANDOFF_REFUSED'
@@ -83,7 +84,27 @@ export interface OtpIssued {
  */
 export const OTP_PER_DAY = 2000;
 
+/**
+ * Whether a code by SMS can reach a phone from here.
+ *
+ * Production needs a gateway, and no Basu server has one yet: the SMS
+ * channel ends at a fake that keeps the code to itself. A door that sends
+ * nothing but still takes guesses is a door only for whoever guesses — six
+ * digits, nine tries an hour on any number, and a hit is that number's
+ * account and a phone the desk takes as proved. So without a gateway it is
+ * shut both ways: no code goes out, and none is checked. The demo and the
+ * tests read their codes off the fake, and keep it.
+ */
+export function smsCodesOpen(ctx: Ctx): boolean {
+  return Boolean(ctx.smsGateway) || mode() !== 'production';
+}
+
+function smsClosed(): AuthError {
+  return new AuthError('SMS_CLOSED', 'this server has no SMS gateway to send a code with');
+}
+
 export async function requestOtp(ctx: Ctx, phone: string): Promise<OtpIssued> {
+  if (!smsCodesOpen(ctx)) throw smsClosed();
   const now = ctx.clock.now();
 
   if (mode() === 'production') {
@@ -381,6 +402,8 @@ export async function sendOtp(ctx: Ctx, phone: string): Promise<void> {
  * phone for — changing where their money goes.
  */
 export async function checkOtp(ctx: Ctx, phone: string, code: string): Promise<void> {
+  // A code issued before the door shut is no better than a guess now.
+  if (!smsCodesOpen(ctx)) throw smsClosed();
   return checkCode(ctx, { column: 'phone_e164', value: phone }, code);
 }
 

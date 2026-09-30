@@ -4,6 +4,7 @@ import { ARM_LEAD_MINUTES, armOrder, findAbandoned, markNoShow } from '../servic
 import { findPlannable, planAndSchedule } from '../services/planning.js';
 import { purgeCodes, relay as relayNotifications } from '../platform/notify/index.js';
 import { purgeChallenges } from '../platform/identity/index.js';
+import { purgeAnswers } from '../api/idempotency.js';
 import { processReceipts } from '../platform/ledger/index.js';
 import { recordTick } from '../ops/index.js';
 import { housekeeping as ideshHousekeeping } from '../idesh/index.js';
@@ -34,7 +35,10 @@ export interface TickReport {
   /** Idesh drafts that gave their animal back, and handovers that closed. */
   ideshExpired: number;
   ideshClosed: number;
-  /** Yesterday's one-time codes swept out of both tables. */
+  /**
+   * Yesterday's one-time codes swept out of both tables, and the answers
+   * kept for retries that can no longer come.
+   */
   purged: number;
   /** Lock screen cards moved by push, and cards taken down. */
   activitiesUpdated: number;
@@ -130,8 +134,9 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
   report.relayed = await relayOutbox(ctx);
   report.notified = await relayNotifications(ctx);
   report.receipts = (await processReceipts(ctx)).issued;
-  // Secrets past their use: yesterday's codes and the rows that carried them.
-  report.purged = (await purgeChallenges(now)) + (await purgeCodes(now));
+  // Secrets past their use: yesterday's codes and the rows that carried them,
+  // and the answers kept for a retry that can no longer come.
+  report.purged = (await purgeChallenges(now)) + (await purgeCodes(now)) + (await purgeAnswers(now));
 
   /* 8. The lock screens. After everything above, so one push carries the
    *    tick's whole result rather than each step's. */

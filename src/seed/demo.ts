@@ -64,7 +64,7 @@ export async function seedDemo(): Promise<{
 
   // Wipe first: a demo you cannot re-run is a demo that rots.
   await db.query(`
-    TRUNCATE outbox, idempotency_key,
+    TRUNCATE outbox, idempotency_key, idempotency_answer,
              notify.message, notify.device, notify.preference,
              ledger.ebarimt_receipt, ledger.payment, ledger.topup, ledger.entry, ledger.transfer,
              dine.order_event, dine.fire_job, dine.arrival_signal, dine.table_hold,
@@ -73,7 +73,8 @@ export async function seedDemo(): Promise<{
              dine.trust_profile, dine.restaurant,
              idesh.order_event, idesh.idesh_order, idesh.listing,
              idesh.supplier, org.membership_log, org.membership, org.organization, access.org_role,
-             identity.profile, identity.guest_session, identity.guest, identity.otp_challenge
+             identity.profile, identity.guest_session, identity.guest, identity.otp_challenge,
+             identity.auth_handoff
     RESTART IDENTITY CASCADE
   `);
   // The house accounts are reference data the migration created; only the

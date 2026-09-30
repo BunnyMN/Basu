@@ -125,6 +125,7 @@ const AUTH_ERRORS: Record<AuthError['code'], Spec> = {
   },
   EMAIL_CLOSED: { status: 503, mn: 'Имэйлээр нэвтрэх түр ажиллахгүй байна. Өөр аргаар нэвтэрнэ үү.' },
   EMAIL_FAILED: { status: 502, mn: 'Код илгээж чадсангүй. Хэсэг хүлээгээд дахин оролдоно уу.' },
+  SMS_CLOSED: { status: 503, mn: 'SMS кодоор нэвтрэх түр ажиллахгүй байна. Өөр аргаар нэвтэрнэ үү.' },
   SOCIAL_CLOSED: { status: 503, mn: 'Энэ аргаар нэвтрэх түр ажиллахгүй байна.' },
   SOCIAL_REFUSED: { status: 401, mn: 'Нэвтрэлт баталгаажсангүй. Дахин оролдоно уу.' },
   // One answer for a code never made, spent, late or brought without its

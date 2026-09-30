@@ -1,6 +1,6 @@
 import '../env.js';
 import { closePool } from '../db/pool.js';
-import { mode } from '../mode.js';
+import { modeOrExit } from '../mode.js';
 import { buildServer } from '../api/server.js';
 import { buildProviders } from './providers.js';
 import { syncMembersFromEnv } from '../ops/index.js';
@@ -13,7 +13,7 @@ import { syncMembersFromEnv } from '../ops/index.js';
  * when its credentials are in the environment, the fakes for everything that
  * has no adapter yet (QPay, the PosAPI, SMS).
  */
-const running = mode();
+const running = modeOrExit('api');
 
 const ctx = buildProviders((line) => console.log(line.replace('[providers]', '[api]')));
 

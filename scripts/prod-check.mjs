@@ -36,6 +36,22 @@ try {
   const desk = await head('/v1/ops/suppliers');
   check('ops хаалга сессгүй хаалттай', desk.status === 401, `HTTP ${desk.status}`);
 
+  // Every per-address limit counts the address nginx saw, whatever the caller
+  // wrote in X-Forwarded-For: two knocks under two made-up addresses are one
+  // caller, so the second finds the count the first left. Asked twice, in
+  // case a window closed between the two.
+  const left = async (as) =>
+    Number((await fetch(`${base}/health`, { headers: { 'x-forwarded-for': as } })).headers.get('x-ratelimit-remaining'));
+  let counted = false;
+  let counts = '';
+  for (let i = 0; i < 2 && !counted; i++) {
+    const first = await left('203.0.113.7');
+    const second = await left('198.51.100.7');
+    counted = second < first;
+    counts = `${first} → ${second}`;
+  }
+  check('хуурамч X-Forwarded-For хязгаарыг тойрохгүй', counted, counts);
+
   const foreign = await fetch(`${base}/v1/auth/otp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"phone":"+15550001111"}' });
   check('гадаад дугаарт код илгээхгүй', foreign.status === 400, `HTTP ${foreign.status}`);
 
@@ -50,6 +66,12 @@ try {
   if (open) {
     check('имэйл код нээлттэй (SMTP_URL, MAIL_FROM)', open.email === true);
     check('Google нээлттэй (GOOGLE_CLIENT_ID, _SECRET)', open.google === true);
+    // Without an SMS gateway nobody receives a code, so the door must not
+    // take guesses at one either.
+    if (open.sms !== true) {
+      const guess = await fetch(`${base}/v1/auth/verify`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"phone":"+97699000000","code":"000000"}' });
+      check('SMS код хаалттай (gateway алга)', guess.status === 503, `HTTP ${guess.status}`);
+    }
     const google = await head('/v1/auth/google/start?return=https://evil.example');
     const to = google.headers.get('location') ?? '';
     check('Google эхлэл Google руу, state cookie-тэй', !open.google || (to.startsWith('https://accounts.google.com/') && (google.headers.get('set-cookie') ?? '').includes('HttpOnly')), `HTTP ${google.status}`);

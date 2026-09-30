@@ -9,6 +9,7 @@ export {
   AuthError,
   OTP_PER_PHONE_PER_HOUR,
   requestOtp,
+  smsCodesOpen,
   OTP_PER_DAY,
   purgeChallenges,
   verifyOtp,

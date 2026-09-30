@@ -722,4 +722,26 @@ describe('a seat wants a recent sign-in', () => {
     expect(tied.statusCode, tied.body).toBe(200);
     expect(tied.json().email).toBe('saraa@gmail.com');
   });
+
+  it('gives a retried seat back to the admin who gave it, and to nobody who only has the key', async () => {
+    const person = await byPhone('+97699110002', 'Цэцэг');
+    const payload = { guest_id: person.id, role: 'ops' };
+    const key = { 'idempotency-key': 'seat-tap' };
+    const given = await app.inject({ method: 'POST', url: '/v1/ops/members', headers: { ...desk(), ...key }, payload });
+    expect(given.statusCode, given.body).toBe(201);
+
+    // The key alone, with no session: the desk's own answer to that, not the admin's.
+    const nobody = await app.inject({ method: 'POST', url: '/v1/ops/members', headers: key, payload });
+    expect(nobody.statusCode).toBe(401);
+    expect(nobody.body).not.toContain(given.json().id);
+    // Signed in, but not at the desk: the same.
+    const outsider = await byPhone('+97699110003', 'Хөндлөнгийн');
+    const refused = await app.inject({ method: 'POST', url: '/v1/ops/members', headers: { ...bearer(outsider.token), ...key }, payload });
+    expect(refused.statusCode).toBe(401);
+    expect(refused.body).not.toContain(given.json().id);
+
+    const again = await app.inject({ method: 'POST', url: '/v1/ops/members', headers: { ...desk(), ...key }, payload });
+    expect(again.headers['idempotent-replay']).toBe('true');
+    expect(again.json().id).toBe(given.json().id);
+  });
 });

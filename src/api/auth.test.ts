@@ -177,9 +177,21 @@ describe('the list of open doors', () => {
       email: true,
       google: true,
       apple: true,
+      sms: true,
     });
     delete process.env['GOOGLE_CLIENT_SECRET'];
     expect((await app.inject({ method: 'GET', url: '/v1/auth/methods' })).json()).toMatchObject({ google: false });
+  });
+
+  it('says the SMS code door is shut in production while no gateway sends one', async () => {
+    const before = process.env['BASU_MODE'];
+    process.env['BASU_MODE'] = 'production';
+    try {
+      expect((await app.inject({ method: 'GET', url: '/v1/auth/methods' })).json()).toMatchObject({ sms: false });
+    } finally {
+      if (before === undefined) delete process.env['BASU_MODE'];
+      else process.env['BASU_MODE'] = before;
+    }
   });
 });
 

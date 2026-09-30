@@ -30,11 +30,81 @@ incoming=""
 if [ ! -t 0 ]; then incoming=$(timeout 10 cat || true); fi
 exec </dev/null
 
+# ── What .env says ─────────────────────────────────────────────────────
+# Read in $APP, before anything there changes, and the way the API reads it.
+
+env_url() { sudo -u "$RUN_AS" sh -c 'sed -n "s/^DATABASE_URL=//p" .env'; }
+
+# A key of .env as the API will read it: by Node's own parser, which takes
+# quotes, a trailing comment and the last of two lines the way the API does.
+# Empty when .env does not have it.
+env_value() { env -u "$1" node -e 'process.loadEnvFile(".env"); console.log(process.env[process.argv[1]] ?? "")' "$1" 2>/dev/null || true; }
+
+# The mode .env names as the API reads one: in any case, without the blanks
+# around it. Empty when it names none.
+named_mode() { node -e 'console.log(process.argv[1].trim().toLowerCase())' "$(env_value BASU_MODE)"; }
+
+# The database .env points at, by name. A URL that names none this can read
+# — a # in an unquoted password starts a comment, for the API as well — is
+# refused rather than taken for some other database: which one it is decides
+# whether the demo may run on it, and whether this server has left the demo.
+named_db() {
+  local name
+  name=$(node -e 'try { console.log(decodeURIComponent(new URL(process.argv[1]).pathname.slice(1))) } catch { console.log("") }' "$(env_value DATABASE_URL)")
+  if [ -z "$name" ]; then
+    echo "✗ .env names no database in DATABASE_URL that the deploy can read — refused" >&2
+    return 1
+  fi
+  echo "$name"
+}
+
+# What the API is to run as. A server is production unless its .env says
+# demo in as many words: naming no mode is production — it used to be the
+# demo — and a word that is neither is refused, not guessed at. Nor is the
+# real database ever a demo, whatever the line says: the demo signs anybody
+# in as anybody and hands out the desk's secret.
+pinned_mode() {
+  local db
+  case "$(named_mode)" in
+    production | '') echo production ;;
+    demo)
+      db=$(named_db) || return 1
+      if [ "$db" = "$PROD_DB" ]; then
+        echo "✗ .env names the demo on $PROD_DB, the real database — refused" >&2
+        return 1
+      fi
+      echo demo
+      ;;
+    *)
+      echo "✗ .env names a BASU_MODE that is neither demo nor production — refused" >&2
+      return 1
+      ;;
+  esac
+}
+
+# Whether this server is still the demo, and the switch below still to come.
+# Once is once: an .env that names production however it is spelled, or
+# that already points at the production database, is not the demo's. Taking
+# it for the demo's would keep it as .env.demo — the way back — and a
+# failure would then put it back and stop the scheduler.
+still_the_demo() {
+  local db
+  [ "$(named_mode)" != production ] || return 1
+  db=$(named_db) || exit 1
+  [ "$db" != "$PROD_DB" ]
+}
+
 cd "$APP"
 # git is run as the checkout's owner throughout; root in another user's repo is
 # "dubious ownership" and a refusal.
 sha=$(sudo -u "$RUN_AS" git rev-parse --short HEAD)
 echo "── deploy $sha ─────────────────────────────────────────"
+
+# A mode or a database the deploy refuses stops it here, before the
+# dependencies, the build or the schema change: the API goes on as it was.
+pinned_mode >/dev/null || exit 1
+leaving=0
+if still_the_demo; then leaving=1; fi
 
 echo "→ dependencies"
 sudo -u "$RUN_AS" npm ci --no-audit --no-fund --silent
@@ -42,17 +112,16 @@ sudo -u "$RUN_AS" npm ci --no-audit --no-fund --silent
 echo "→ build"
 sudo -u "$RUN_AS" npm run build --silent
 
-env_url() { sudo -u "$RUN_AS" sh -c 'sed -n "s/^DATABASE_URL=//p" .env'; }
-
 # The units were written for the demo and may carry a BASU_MODE of their own,
 # and a variable already in the process environment beats one in .env. So
-# the mode .env names is pinned into both units with a drop-in whose
-# EnvironmentFile is read last — later files win, and files beat Environment=.
+# the mode is pinned into both units with a drop-in whose EnvironmentFile is
+# read last — later files win, and files beat Environment=. A mode refused
+# pins nothing and restarts nothing: the API keeps the one it has.
 pin_mode() {
-  local mode node_env unit
-  mode=$(sed -n 's/^BASU_MODE=//p' .env | tail -n 1)
-  node_env=$(sed -n 's/^NODE_ENV=//p' .env | tail -n 1)
-  { echo "BASU_MODE=${mode:-demo}"; [ -z "$node_env" ] || echo "NODE_ENV=$node_env"; } > /opt/basu/mode.env
+  local node_env unit
+  PINNED=$(pinned_mode) || exit 1
+  node_env=$(env_value NODE_ENV)
+  { echo "BASU_MODE=$PINNED"; [ -z "$node_env" ] || echo "NODE_ENV=$node_env"; } > /opt/basu/mode.env
   chmod 644 /opt/basu/mode.env
   for unit in basu-api basu-scheduler; do
     systemctl cat "$unit" >/dev/null 2>&1 || continue
@@ -60,6 +129,7 @@ pin_mode() {
     printf '[Service]\nEnvironmentFile=/opt/basu/mode.env\n' > "/etc/systemd/system/$unit.service.d/zz-mode.conf"
   done
   systemctl daemon-reload
+  echo "  mode: $PINNED"
 }
 
 # ── Leaving the demo, once ─────────────────────────────────────────────
@@ -69,8 +139,10 @@ pin_mode() {
 # nothing seeded. The demo database stays beside it, untouched, and is
 # dumped once more for good measure. Nothing printed here may carry the
 # database URL: this log is public.
+#
+# Whether it is still to come was read at the start, by still_the_demo.
 flipped=0
-if ! sudo -u "$RUN_AS" grep -q '^BASU_MODE=production$' .env; then
+if [ "$leaving" = 1 ]; then
   echo "→ production (once): a fresh database, the demo one kept"
   demo_url=$(env_url)
   [ -n "$demo_url" ] || { echo "no DATABASE_URL in $APP/.env"; exit 1; }
@@ -167,7 +239,8 @@ echo "→ health"
 for _ in $(seq 1 30); do
   if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
     echo "✓ $sha is up on :$PORT"
-    if grep -q '^BASU_MODE=production$' .env; then
+    # Anything but a demo pinned by name must have no /dev at all.
+    if [ "$PINNED" != demo ]; then
       dev=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/dev/clock")
       if [ "$dev" != 404 ]; then
         # Demo shortcuts on the real database let anybody in as anybody.
