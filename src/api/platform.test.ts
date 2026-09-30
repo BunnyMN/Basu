@@ -288,6 +288,36 @@ describe('where you are signed in', () => {
     expect((await app.inject({ method: 'GET', url: '/v1/me', headers: auth(mine) })).statusCode)
       .toBe(200);
   });
+
+  it('signs one phone out by its id, and finds none by an id that is somebody else’s, nobody’s, or not an id', async () => {
+    const lost = await signIn('+97699001122', 'iPhone 15');
+    const mine = await signIn('+97699001122', 'iPad');
+    const stranger = await signIn('+97688112233', 'Android');
+    const listed = async (token: string) =>
+      (await app.inject({ method: 'GET', url: '/v1/me/sessions', headers: auth(token) })).json().sessions as Array<{ id: string; current: boolean }>;
+    const theirs = (await listed(stranger))[0]!.id;
+    const end = (id: string, token = mine) =>
+      app.inject({ method: 'DELETE', url: `/v1/me/sessions/${encodeURIComponent(id)}`, headers: auth(token) });
+
+    for (const id of ['not-a-session', "1' OR '1'='1", '00000000-0000-0000-0000-000000000000', theirs]) {
+      const none = await end(id);
+      expect(none.statusCode, id).toBe(404);
+      expect(none.json().error, id).toMatchObject({ code: 'NOT_FOUND', message_mn: 'Ийм нэвтрэлт олдсонгүй. Жагсаалтаа шинэчилнэ үү.' });
+      // What the database would have said about it is nobody's business.
+      expect(none.body, id).not.toMatch(/uuid|syntax/i);
+    }
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: auth(stranger) })).statusCode).toBe(200);
+
+    const lostId = (await listed(mine)).find((s) => !s.current)!.id;
+    expect((await end(lostId.toUpperCase())).json()).toEqual({ revoked: 1 });
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: auth(lost) })).statusCode).toBe(401);
+    expect((await end(lostId)).statusCode).toBe(404);
+
+    // Its own id is signing out here, as the app does it.
+    const here = (await listed(mine)).find((s) => s.current)!.id;
+    expect((await end(here)).json()).toEqual({ revoked: 1 });
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: auth(mine) })).statusCode).toBe(401);
+  });
 });
 
 describe('leaving', () => {

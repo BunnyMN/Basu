@@ -30,10 +30,27 @@ export { ICON };
 
 /* ── where to go after signing in ──────────────────────────────────── */
 
-/** A path on this site to come back to — never another site, never the door itself. */
+/**
+ * A path on this site to come back to — never another site, never the door itself.
+ *
+ * Asked of the address the browser would open, not of how it is spelled.
+ * A browser reads a backslash as a slash and drops a tab or a newline, so
+ * `/\evil.com` and `/<tab>/evil.com` look like paths here and go to
+ * evil.com there, straight from Basu's own sign-in. So the text is read as
+ * the browser reads it (`new URL`), kept only if it stays on this site, and
+ * handed back as the path it came to; one with a backslash or a control
+ * character in it is not a path anybody typed, and is not read at all.
+ */
 export function safeNext(raw, fallback = '/home') {
-  if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/login')) return fallback;
-  return raw;
+  if (typeof raw !== 'string' || !raw.startsWith('/') || /[\\\u0000-\u001f\u007f]/.test(raw)) return fallback;
+  let url;
+  try {
+    url = new URL(raw, location.origin);
+  } catch {
+    return fallback;
+  }
+  if (url.origin !== location.origin || url.pathname.startsWith('/login')) return fallback;
+  return url.pathname + url.search + url.hash;
 }
 
 export const loginUrl = (next = location.pathname + location.search) => `/login?next=${encodeURIComponent(next)}`;
@@ -48,13 +65,21 @@ export function requireSignIn() {
   return token;
 }
 
-/** A call as the signed-in person. A session that has ended sends them to sign in again. */
+/**
+ * A call as the signed-in person. A session that has ended sends them to
+ * sign in again. So does one that Basu's desk wants signed in afresh
+ * (SIGN_IN_AGAIN) before it signs anybody out — and that one the server
+ * still takes for the rest of the website, so it is ended there as well as
+ * forgotten here, the way the dashboard ends it: the person is about to
+ * sign in anew, and the old session is left to nobody.
+ */
 export async function authed(path, options = {}) {
   try {
     return await api(path, { ...options, token: store.guestToken });
   } catch (error) {
     if (error.status === 401) {
-      store.guestToken = null;
+      if (error.code === 'SIGN_IN_AGAIN') dropSession();
+      else store.guestToken = null;
       location.replace(loginUrl());
     }
     throw error;

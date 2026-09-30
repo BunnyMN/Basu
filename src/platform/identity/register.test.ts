@@ -116,6 +116,32 @@ describe('signing in', () => {
     expect((wrong as Error).message).toBe((unknown as Error).message);
   });
 
+  it('takes as long to refuse a login with no password behind it as a wrong password', async () => {
+    // Made by a code to its phone: an account, with no password to check.
+    await startSession(ctx, '+97688010001');
+    /** The middle of five: one slow moment on the machine does not decide it. */
+    const middle = async (work: () => Promise<unknown>) => {
+      const took: number[] = [];
+      for (let i = 0; i < 5; i++) {
+        const start = performance.now();
+        await work();
+        took.push(performance.now() - start);
+      }
+      return took.sort((a, b) => a - b)[2]!;
+    };
+    // What the door spends on somebody real who typed the wrong password.
+    const stored = await hashPassword('сайн нууц үг');
+    const check = await middle(() => verifyPassword('буруу нууц үг', stored));
+
+    for (const login of ['+97688009999', 'nobody@example.mn', '+97688010001']) {
+      const refused = await middle(() => signInWithPassword(ctx, { login, password: 'буруу нууц үг' }).catch((e: unknown) => e));
+      expect(refused, login).toBeGreaterThan(check / 2);
+    }
+    await expect(signInWithPassword(ctx, { login: 'nobody@example.mn', password: 'буруу нууц үг' })).rejects.toMatchObject({
+      code: 'BAD_CREDENTIALS',
+    });
+  });
+
   it('rests the door after five wrong guesses, even for the right password', async () => {
     for (let i = 0; i < 5; i++) {
       await expect(signInWithPassword(ctx, { login: '+97699001122', password: `буруу ${i}` })).rejects.toMatchObject({

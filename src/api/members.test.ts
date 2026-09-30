@@ -6,6 +6,7 @@ import { VirtualClock } from '../domain/time.js';
 import { FakeMailer, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
 import { NO_GRANTS } from '../platform/access/index.js';
+import { LETTERS_PER_DAY, closeAccount, requestEmailCode } from '../platform/identity/index.js';
 import { setMemberRole, syncMembersFromEnv, upsertMember } from '../ops/index.js';
 import { relay } from '../platform/notify/index.js';
 import { opsToken } from './ops.js';
@@ -21,11 +22,13 @@ import { buildServer } from './server.js';
  * proves nothing when anybody can type it and choose a password for it. The
  * environment only seeds: what the desk changes afterwards stays changed.
  * Nobody moves a seat past what they hold — as the desk has them when the
- * change is made — the desk always keeps an admin, and a seat wants a
- * sign-in from the last twelve hours, which an older one cannot make itself
- * by choosing a new way in. The guests' pages leave the people at the desk
- * to the members page. There are no codes to hand out, and no addresses for
- * an admin to type.
+ * change is made — the desk always keeps an admin somebody can sign in as,
+ * and a seat wants a sign-in from the last twelve hours, which an older one
+ * cannot make itself by choosing a new way in, nor use to sign its person
+ * out elsewhere. Nobody closes an account whose seat is on, its own person
+ * included. The guests' pages leave the people at the desk to the members
+ * page. There are no codes to hand out, and no addresses for an admin to
+ * type.
  */
 
 let app: FastifyInstance;
@@ -412,6 +415,29 @@ describe('nobody moves a seat past what they hold', () => {
     expect(await activeAdmins()).toHaveLength(1);
   });
 
+  it('keeps an admin somebody can sign in as: a seat nobody came to, or one over a closed account, is none', async () => {
+    await syncMembersFromEnv('admin@gmail.com:Админ:admin,gone@gmail.com:Явсан:admin,never@gmail.com:Ирээгүй:admin');
+    const admin = await byEmail('admin@gmail.com');
+    const adminSeat = (await me(admin)).json().member.id as string;
+    // An admin whose account was closed under a seat left on — what closing an account at the desk once left behind.
+    const gone = await byEmail('gone@gmail.com');
+    const goneSeat = (await me(gone)).json().member.id as string;
+    await closeAccount({ guestId: await websiteId(gone), at: clock.now(), balanceMnt: 0, liveWork: 0 });
+    // And the one the environment named, who has never come.
+
+    for (const refused of [await setActive(adminSeat, false), await setRole(adminSeat, 'viewer')]) {
+      expect(refused.statusCode, refused.body).toBe(409);
+      expect(refused.json().error.code).toBe('LAST_ADMIN');
+    }
+    expect((await me(admin)).json().member).toMatchObject({ role: 'admin' });
+
+    // A seat nobody can sign in as goes off like any other.
+    expect((await setActive(goneSeat, false, admin)).statusCode).toBe(200);
+    // Once the person the environment named has come, there is an admin besides.
+    await me(await byEmail('never@gmail.com'));
+    expect((await setActive(adminSeat, false)).statusCode).toBe(200);
+  });
+
   it('finds no member by an id that is nobody’s, or no id at all', async () => {
     for (const id of ['not-an-id', '00000000-0000-0000-0000-000000000000']) {
       const off = await setActive(id, false);
@@ -508,8 +534,9 @@ describe('the guests’ pages leave the desk to the members page', () => {
         payload: { name: 'Хаагч', permissions: ['desk.guests', 'desk.guests:close'] },
       })
     ).json().key as string;
-    // Two admins, so that one of them may be switched off.
+    // Two admins somebody can sign in as, so that one of them may be switched off.
     await syncMembersFromEnv('admin@gmail.com:Админ:admin,boss@gmail.com:Эзэн:admin');
+    await me(await byEmail('boss@gmail.com'));
     const admin = await byEmail('admin@gmail.com');
     const adminId = await accountId(admin);
     const clerk = await seatedByEmail('closer@gmail.com', closer);
@@ -548,11 +575,53 @@ describe('the guests’ pages leave the desk to the members page', () => {
   });
 });
 
+describe('a desk member hears of every new password', () => {
+  /** An address tied to the account, the way the account's own page ties one. */
+  async function withAddress(token: string, email: string): Promise<void> {
+    const asked = await app.inject({ method: 'POST', url: '/v1/me/email/code', headers: bearer(token), payload: { email, password: 'миний нууц үг' } });
+    expect(asked.statusCode, asked.body).toBe(202);
+    const tied = await app.inject({ method: 'POST', url: '/v1/me/email', headers: bearer(token), payload: { email, code: mailer.codeFor(email) } });
+    expect(tied.statusCode, tied.body).toBe(200);
+  }
+  const change = (token: string, current: string, next: string) =>
+    app.inject({ method: 'POST', url: '/v1/me/password', headers: bearer(token), payload: { current, next } });
+
+  it('whatever the day’s count of letters says, where anybody else’s is counted', async () => {
+    const worker = await byPhone('+97699110007', 'Ажилтан');
+    expect((await seat({ guest_id: worker.id, role: 'ops' })).statusCode).toBe(201);
+    await withAddress(worker.token, 'worker@gmail.com');
+    const guest = await byPhone('+97699110008', 'Зочин');
+    await withAddress(guest.token, 'guest@gmail.com');
+    // The day's letters, gone: codes the door sent to other addresses, as many as a day allows.
+    for (let sent = 0; sent < LETTERS_PER_DAY; sent += 50) {
+      await Promise.all(Array.from({ length: 50 }, (_, i) => requestEmailCode(ctx, `other${sent + i}@example.mn`)));
+    }
+
+    expect((await change(worker.token, 'миний нууц үг', 'ажлын шинэ нууц үг')).statusCode).toBe(200);
+    expect(mailer.to('worker@gmail.com')!.subject).toBe('Basu · Нууц үг солигдлоо');
+    expect((await change(guest.token, 'миний нууц үг', 'зочны шинэ нууц үг')).statusCode).toBe(200);
+    expect(mailer.to('guest@gmail.com')!.subject).not.toContain('Нууц үг');
+
+    // By the door's code, too: whoever takes the account back that way is heard of.
+    clock.advanceMinutes(61);
+    await app.inject({ method: 'POST', url: '/v1/auth/password/code', payload: { login: 'worker@gmail.com', purpose: 'reset' } });
+    const reset = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/password',
+      payload: { login: 'worker@gmail.com', code: mailer.codeFor('worker@gmail.com'), password: 'гурав дахь нууц үг' },
+    });
+    expect(reset.statusCode, reset.body).toBe(200);
+    expect(mailer.to('worker@gmail.com')!.subject).toBe('Basu · Нууц үг солигдлоо');
+  });
+});
+
 describe('the environment only seeds the desk', () => {
   it('makes the members it names once, and leaves what the desk changed as the desk left it', async () => {
     const list = 'boss@gmail.com:Эзэн:admin,deputy@gmail.com:Орлогч:admin,bat@gmail.com:Бат:finance';
     expect(await syncMembersFromEnv(list)).toBe(3);
     const named = async (email: string) => (await members()).find((m) => m.email === email)!;
+    // The owner comes in: the desk keeps an admin somebody can sign in as.
+    await me(await byEmail('boss@gmail.com'));
     // The desk demotes one admin and switches the finance seat off…
     expect((await setRole((await named('deputy@gmail.com')).id, 'viewer')).statusCode).toBe(200);
     expect((await setActive((await named('bat@gmail.com')).id, false)).statusCode).toBe(200);
@@ -713,7 +782,72 @@ describe('a seat wants a recent sign-in', () => {
     expect((await login('+97699110001', 'дараагийн нууц үг')).statusCode).toBe(200);
   });
 
-  it('leaves an account with no seat its sixty days for its own ways in', async () => {
+  /*
+   * Nor may it take the desk from the person at it: sign them out of the
+   * sessions they are using — the one at the desk now among them — and
+   * close the account under the seat.
+   */
+  const sessions = async (token: string) =>
+    (await app.inject({ method: 'GET', url: '/v1/me/sessions', headers: bearer(token) })).json().sessions as Array<{ id: string; current: boolean }>;
+  const endOne = (token: string, id: string) => app.inject({ method: 'DELETE', url: `/v1/me/sessions/${id}`, headers: bearer(token) });
+  const endOthers = (token: string) => app.inject({ method: 'POST', url: '/v1/me/sessions/revoke', headers: bearer(token) });
+  const leave = (token: string) => app.inject({ method: 'DELETE', url: '/v1/me', headers: bearer(token) });
+
+  it('lets no stale desk session sign its person out of the desk they are at, or close the account under the seat', async () => {
+    await syncMembersFromEnv('boss@gmail.com:Эзэн:admin');
+    // Left open somewhere, and the admin at the desk this morning.
+    const stale = await byEmail('boss@gmail.com');
+    clock.advanceMinutes(13 * 60);
+    const fresh = await byEmail('boss@gmail.com');
+    expect((await me(fresh)).json().member.role).toBe('admin');
+    const listed = await sessions(stale);
+    const desk = listed.find((s) => !s.current)!.id;
+
+    const everywhere = await endOthers(stale);
+    expect(everywhere.statusCode).toBe(401);
+    expect(everywhere.json().error).toMatchObject({
+      code: 'SIGN_IN_AGAIN',
+      message_mn: 'Аюулгүй байдлын үүднээс гараад дахин нэвтэрсний дараа бусад төхөөрөмжөөсөө гарна уу.',
+    });
+    const one = await endOne(stale, desk);
+    expect(one.statusCode).toBe(401);
+    expect(one.json().error).toMatchObject({ code: 'SIGN_IN_AGAIN', message_mn: expect.stringContaining('тэр төхөөрөмжөөс гарна уу') });
+    const closed = await leave(stale);
+    expect(closed.statusCode).toBe(409);
+    expect(closed.json().error).toMatchObject({ code: 'AT_THE_DESK', message_mn: expect.stringContaining('«Гишүүд»') });
+    // The admin is at the desk still, on the session they signed in with.
+    expect((await me(fresh)).json().member).toMatchObject({ role: 'admin', name: 'Эзэн' });
+
+    // Its own session it may end, as every sign-out is: that takes nothing from anybody.
+    expect((await endOne(stale, listed.find((s) => s.current)!.id)).json()).toEqual({ revoked: 1 });
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(stale) })).statusCode).toBe(401);
+    // Signed in afresh, the person signs out elsewhere as anybody does.
+    const again = await byEmail('boss@gmail.com');
+    expect((await endOthers(again)).json()).toEqual({ revoked: 1 });
+    expect((await me(fresh)).statusCode).toBe(401);
+  });
+
+  it('closes no account whose seat is on, however new the session, until somebody switches the seat off', async () => {
+    await syncMembersFromEnv('admin@gmail.com:Админ:admin,boss@gmail.com:Эзэн:admin');
+    const admin = await byEmail('admin@gmail.com');
+    // Signed in a moment ago, and not yet at the desk: the seat is theirs by the address they proved.
+    const boss = await byEmail('boss@gmail.com');
+    const refused = await leave(boss);
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json().error).toMatchObject({
+      code: 'AT_THE_DESK',
+      message_mn: 'Та Basu ops-ийн идэвхтэй гишүүн байна. Бүртгэлээ хаахаас өмнө админ таны гишүүнчлэлийг «Гишүүд» хуудсанд хаах ёстой.',
+    });
+    const bossSeat = (await me(boss)).json().member.id as string;
+
+    // Switched off on «Гишүүд», the account is a guest's like any other, and closes.
+    expect((await setActive(bossSeat, false, admin)).statusCode).toBe(200);
+    expect((await leave(boss)).json()).toEqual({ closed: true });
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(boss) })).statusCode).toBe(401);
+    expect((await members()).find((m) => m.id === bossSeat)).toMatchObject({ active: false });
+  });
+
+  it('leaves an account with no seat its sixty days for its own ways in, for signing out elsewhere, and for leaving', async () => {
     const person = await byPhone('+97699110002', 'Сараа');
     clock.advanceMinutes(13 * 60);
     expect((await setPassword(person.token, { current: 'миний нууц үг', next: 'дараагийн нууц үг' })).statusCode).toBe(200);
@@ -721,6 +855,13 @@ describe('a seat wants a recent sign-in', () => {
     const tied = await attach(person.token, 'saraa@gmail.com', mailer.codeFor('saraa@gmail.com'));
     expect(tied.statusCode, tied.body).toBe(200);
     expect(tied.json().email).toBe('saraa@gmail.com');
+
+    await login('+97699110002', 'дараагийн нууц үг');
+    await login('+97699110002', 'дараагийн нууц үг');
+    const others = (await sessions(person.token)).filter((s) => !s.current);
+    expect((await endOne(person.token, others[0]!.id)).json()).toEqual({ revoked: 1 });
+    expect((await endOthers(person.token)).json()).toEqual({ revoked: 1 });
+    expect((await leave(person.token)).json()).toEqual({ closed: true });
   });
 
   it('gives a retried seat back to the admin who gave it, and to nobody who only has the key', async () => {

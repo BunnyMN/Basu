@@ -22,6 +22,7 @@ import {
 import type { Ctx } from '../ports.js';
 import { badRequest, sendError } from './errors.js';
 import { limits } from './hardening.js';
+import { seatedAtTheDesk } from './ops.js';
 
 /**
  * The ways in that do not need a phone: a code by email, Google, Apple — and
@@ -46,11 +47,26 @@ import { limits } from './hardening.js';
  * The state is also written into a short-lived cookie at the start and must
  * match at the callback, so that nobody can sign a stranger into an account
  * of the attacker's choosing by getting them to open a callback link.
+ *
+ * Both cookies are `__Host-` ones, which a browser takes only from this very
+ * host, over https, for the whole of it (Path=/) and for no domain around
+ * it. A plain cookie could be planted by any other site under burzai.cloud,
+ * for the parent domain or a deeper path, and ours could not tell it from
+ * its own: a state of the planter's choosing in a stranger's browser signs
+ * that stranger into the planter's account at the callback, and a binding
+ * of theirs spends the stranger's code. The price of Path=/ is that the
+ * browser sends them with every request here for the minutes they live —
+ * to this server, which set them. The old names are not read at all: they
+ * are exactly the cookies another site can plant. A round trip to Google
+ * that is out while the server restarts comes back refused, and its person
+ * presses «Google» again.
  */
 
-const STATE_COOKIE = 'basu_oauth';
+const STATE_COOKIE = '__Host-basu_oauth';
 /** The binding a page's code is good only with, in the browser the callback sent it to. */
-const HANDOFF_COOKIE = 'basu_handoff';
+const HANDOFF_COOKIE = '__Host-basu_handoff';
+/** What a `__Host-` cookie must say to be taken, apart from how long it lives. */
+const HOST_ONLY = 'Path=/; HttpOnly; Secure; SameSite=Lax';
 
 function cookie(request: FastifyRequest, name: string): string | null {
   const header = request.headers.cookie ?? '';
@@ -78,14 +94,13 @@ function back(reply: FastifyReply, returnTo: string, fragment: Record<string, st
   const hash = new URLSearchParams(fragment).toString();
   const target = returnTo === APP_RETURN ? `${APP_RETURN}#${hash}` : `${safeReturn(returnTo)}#${hash}`;
   return reply
-    .header('set-cookie', [`${STATE_COOKIE}=; Path=/v1/auth/google; Max-Age=0; HttpOnly; Secure; SameSite=Lax`, ...cookies])
+    .header('set-cookie', [`${STATE_COOKIE}=; Max-Age=0; ${HOST_ONLY}`, ...cookies])
     .header('cache-control', 'no-store')
     .redirect(target, 302);
 }
 
-/** The handoff's cookie: sent only to the one address that claims it, and gone soon after the code is. */
-const handoffCookie = (binding: string, maxAge = 120) =>
-  `${HANDOFF_COOKIE}=${binding}; Path=/v1/auth/handoff; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
+/** The handoff's cookie: this browser's only, and gone soon after the code is. */
+const handoffCookie = (binding: string, maxAge = 120) => `${HANDOFF_COOKIE}=${binding}; Max-Age=${maxAge}; ${HOST_ONLY}`;
 
 export async function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> {
   const rate = limits();
@@ -167,7 +182,9 @@ export async function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): Promis
 
   /**
    * The code, the password, and a session. `created` says whether an account
-   * was made — false means the address already had one, now with this password.
+   * was made — false means the address already had one, now with this
+   * password, and the address hears of it: for a desk member, whatever the
+   * day's count of letters says (`seatedAtTheDesk`).
    */
   app.post<{ Body: { login?: string; code?: string; password?: string; name?: string; device?: string } }>(
     '/v1/auth/password',
@@ -185,6 +202,7 @@ export async function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): Promis
           password,
           name: name ?? null,
           device: device ?? null,
+          alwaysTold: seatedAtTheDesk,
         });
         return reply.status(created ? 201 : 200).send({ ...shapeSession(session), created });
       } catch (error) {
@@ -204,7 +222,7 @@ export async function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): Promis
       if (!google) return back(reply, returnTo, { auth_error: 'SOCIAL_CLOSED' });
       const { url, state } = await beginGoogle(google, returnTo, ctx.clock.now());
       return reply
-        .header('set-cookie', `${STATE_COOKIE}=${encodeURIComponent(state)}; Path=/v1/auth/google; Max-Age=600; HttpOnly; Secure; SameSite=Lax`)
+        .header('set-cookie', `${STATE_COOKIE}=${encodeURIComponent(state)}; Max-Age=600; ${HOST_ONLY}`)
         .header('cache-control', 'no-store')
         .redirect(url, 302);
     },

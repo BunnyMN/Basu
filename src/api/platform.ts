@@ -34,9 +34,9 @@ import {
   setPreferences,
   unreadCount,
 } from '../platform/notify/index.js';
-import { addEmailFirst, badRequest, sendError, signInAgain } from './errors.js';
+import { addEmailFirst, badRequest, leaveTheDeskFirst, notFound, sendError, signInAgain } from './errors.js';
 import { limits } from './hardening.js';
-import { deskSeatFor } from './ops.js';
+import { deskSeatFor, seatedAtTheDesk } from './ops.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -98,22 +98,28 @@ export async function registerPlatformRoutes(
   const rate = limits();
 
   /**
-   * For the ways back in, below. Basu's desk takes a session signed in
-   * within the last `DESK_SESSION_HOURS`, and a way in chosen from an older
-   * one would undo that. Whoever holds a desk member's session left open
+   * Basu's desk takes a session signed in within the last
+   * `DESK_SESSION_HOURS`, and what an older one does to the account must
+   * not undo that. Whoever holds a desk member's session left open
    * somewhere could give the account a password, or an address, of their
-   * own, sign in afresh with it and have the desk again — and the way in
-   * would outlast the session. So a desk member on such a session signs in
-   * again before changing either, old password in hand or not: it is one
-   * sign-in, and nothing is left to weigh. Everybody else keeps the sixty
-   * days a session lives. The desk is Basu's own staff, not a vertical:
-   * asking it here answers a guest who has only ever taken a taxi exactly
-   * as before.
+   * own, sign in afresh with it and have the desk again — the way in
+   * outlasting the session. Or sign the person out of the desk they are at
+   * now, from wherever they are, and close the account under their seat.
+   * So a desk member on such a session signs in again before any of these,
+   * old password in hand or not: it is one sign-in, and nothing is left to
+   * weigh. `then` is what the refusal tells them to do once they have.
+   * Everybody else keeps the sixty days a session lives. The desk is
+   * Basu's own staff, not a vertical: asking it here answers a guest who
+   * has only ever taken a taxi exactly as before.
    */
-  const recentAtTheDesk: Guard = async (request, reply) =>
-    (await deskSeatFor(ctx, bearer(request) ?? undefined)).stale
-      ? signInAgain(reply, 'Аюулгүй байдлын үүднээс гараад дахин нэвтэрсний дараа нууц үг, имэйлээ тохируулна уу.')
-      : undefined;
+  const recentAtTheDesk =
+    (then: string): Guard =>
+    async (request, reply) =>
+      (await deskSeatFor(ctx, bearer(request) ?? undefined)).stale
+        ? signInAgain(reply, `Аюулгүй байдлын үүднээс гараад дахин нэвтэрсний дараа ${then}.`)
+        : undefined;
+  /** For the ways back in, below. */
+  const wayIn = recentAtTheDesk('нууц үг, имэйлээ тохируулна уу');
 
   /* ── profile ──────────────────────────────────────────────────────── */
 
@@ -160,16 +166,23 @@ export async function registerPlatformRoutes(
    * session's word alone: a session is only something somebody holds, and
    * one left open in a borrowed browser would give its holder a way in that
    * outlives it. Every other session ends — whoever knew the old one is out —
-   * and the one in hand stays.
+   * and the one in hand stays. The address hears of it; for a desk member,
+   * whatever the day's count of letters says (`seatedAtTheDesk`).
    */
   app.post<{ Body: { current?: unknown; next?: unknown; code?: unknown } }>(
     '/v1/me/password',
-    { preHandler: [requireGuest, recentAtTheDesk], config: { rateLimit: rate.otp } },
+    { preHandler: [requireGuest, wayIn], config: { rateLimit: rate.otp } },
     async (request, reply) => {
       const { current, next, code } = request.body ?? {};
       if (typeof next !== 'string' || !next) return badRequest(reply, 'Шинэ нууц үгээ оруулна уу.', 'next is required');
       try {
-        await changePassword(ctx, { guestId: request.guestId!, current: text(current), next, code: text(code)?.trim() || null });
+        await changePassword(ctx, {
+          guestId: request.guestId!,
+          current: text(current),
+          next,
+          code: text(code)?.trim() || null,
+          alwaysTold: seatedAtTheDesk,
+        });
         const revoked = await revokeOtherSessions(request.guestId!, bearer(request) ?? '', ctx.clock.now());
         return { changed: true, revoked };
       } catch (error) {
@@ -184,7 +197,7 @@ export async function registerPlatformRoutes(
    * of setting that password, so a desk seat on a stale session is sent to
    * sign in again here already, not after its owner has read the letter.
    */
-  app.post('/v1/me/password/code', { preHandler: [requireGuest, recentAtTheDesk], config: { rateLimit: rate.otp } }, async (request, reply) => {
+  app.post('/v1/me/password/code', { preHandler: [requireGuest, wayIn], config: { rateLimit: rate.otp } }, async (request, reply) => {
     try {
       const { sentTo } = await sendFirstPasswordCode(ctx, { guestId: request.guestId! });
       return reply.status(202).send({ sent: true, to: sentTo });
@@ -201,7 +214,7 @@ export async function registerPlatformRoutes(
    */
   app.post<{ Body: { email?: unknown; password?: unknown } }>(
     '/v1/me/email/code',
-    { preHandler: [requireGuest, recentAtTheDesk], config: { rateLimit: rate.otp } },
+    { preHandler: [requireGuest, wayIn], config: { rateLimit: rate.otp } },
     async (request, reply) => {
       const email = text(request.body?.email);
       if (!email) return badRequest(reply, 'Имэйл хаягаа оруулна уу.', 'email is required');
@@ -216,7 +229,7 @@ export async function registerPlatformRoutes(
 
   app.post<{ Body: { email?: unknown; code?: unknown } }>(
     '/v1/me/email',
-    { preHandler: [requireGuest, recentAtTheDesk], config: { rateLimit: rate.verify } },
+    { preHandler: [requireGuest, wayIn], config: { rateLimit: rate.verify } },
     async (request, reply) => {
       const email = text(request.body?.email);
       const code = text(request.body?.code);
@@ -252,22 +265,45 @@ export async function registerPlatformRoutes(
   });
 
   /** Everywhere *else*: signing somebody out of the phone in their hand
-      mid-panic is the wrong end of the tool. */
-  app.post('/v1/me/sessions/revoke', guarded, async (request) => {
-    const revoked = await revokeOtherSessions(
-      request.guestId!,
-      bearer(request) ?? '',
-      ctx.clock.now(),
-    );
-    return { revoked };
-  });
+      mid-panic is the wrong end of the tool. A desk member's session the
+      desk no longer takes signs in again first (`recentAtTheDesk`). */
+  app.post(
+    '/v1/me/sessions/revoke',
+    { preHandler: [requireGuest, recentAtTheDesk('бусад төхөөрөмжөөсөө гарна уу')] },
+    async (request) => {
+      const revoked = await revokeOtherSessions(
+        request.guestId!,
+        bearer(request) ?? '',
+        ctx.clock.now(),
+      );
+      return { revoked };
+    },
+  );
+
+  /**
+   * One session, by its id in the list. Ending the one that asks is
+   * signing out here, and nobody is refused that: the app signs out this
+   * way, and a session the desk no longer takes is exactly one its person
+   * must be able to end. Ending any other is signing somebody out, and a
+   * desk member's session that old signs in again first, as above.
+   */
+  const endingAnother = recentAtTheDesk('тэр төхөөрөмжөөс гарна уу');
+  const recentUnlessHere: Guard = async (request, reply) => {
+    const id = String((request.params as { id?: unknown }).id ?? '').toLowerCase();
+    const here = (await sessionsOf(request.guestId!, bearer(request) ?? '')).some((s) => s.current && s.id === id);
+    return here ? undefined : endingAnother(request, reply);
+  };
+  /** The same answer for an id that is nobody's and one that is not an id: never a question put to Postgres. */
+  const noSuchSession = (reply: FastifyReply) =>
+    notFound(reply, 'Ийм нэвтрэлт олдсонгүй. Жагсаалтаа шинэчилнэ үү.', 'no such open session');
 
   app.delete<{ Params: { id: string } }>(
     '/v1/me/sessions/:id',
-    guarded,
+    { preHandler: [requireGuest, recentUnlessHere] },
     async (request, reply) => {
+      if (!UUID.test(request.params.id)) return noSuchSession(reply);
       const gone = await revokeSession(request.guestId!, request.params.id, ctx.clock.now());
-      if (!gone) return sendError(reply, new Error('no such session'));
+      if (!gone) return noSuchSession(reply);
       return { revoked: 1 };
     },
   );
@@ -280,8 +316,20 @@ export async function registerPlatformRoutes(
    * the wallet holds money or something of theirs is still running — those are
    * not obstacles, they are the two things somebody would be furious to
    * discover they had thrown away.
+   *
+   * Refused, too, for an account that sits at Basu's desk in a seat that is
+   * on, whatever the session: closing it would take its person off the desk
+   * past every rule «Гишүүд» keeps, and leave the seat on over an account
+   * nobody can sign in to. The seat is switched off there first, by somebody
+   * who may — the desk's own close asks the same (`mayActOnAccount`). Asked
+   * before the desk's twelve hours, because it is the true answer whatever
+   * the session's age; the twelve hours stand behind it, as for every
+   * change here that outlasts the session.
    */
-  app.delete('/v1/me', guarded, async (request, reply) => {
+  const notAtTheDesk: Guard = async (request, reply) =>
+    (await seatedAtTheDesk(request.guestId!)) ? leaveTheDeskFirst(reply) : undefined;
+
+  app.delete('/v1/me', { preHandler: [requireGuest, notAtTheDesk, recentAtTheDesk('бүртгэлээ хаана уу')] }, async (request, reply) => {
     const guestId = request.guestId!;
     try {
       await closeAccount({

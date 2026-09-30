@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg';
 import { getPool, tx, type Db } from '../db/pool.js';
 import { ensureRoles, grantsOf, linksOf, mayHandOutDesk, roleOf, type Grants } from '../platform/access/index.js';
+import { openAccounts } from '../platform/identity/index.js';
 
 /**
  * The people at the desk.
@@ -232,13 +233,25 @@ async function mayMove(client: PoolClient, actor: DeskActor, from: Role, into: R
  * The seat leaving the admin role, or going off, must not be the last active
  * admin: without one, nobody could say yes to the next seat. Asked inside
  * the change, after `oneAtATime`.
+ *
+ * An admin is counted only when somebody can sign in as them: the seat has
+ * an account, and not every account it has is closed. A seat the
+ * environment named for somebody who never came, or one left on over an
+ * account closed under it, says yes to nothing — and counted, it would let
+ * the one admin who can still sign in be taken off, and leave the desk with
+ * nobody. Counting fewer only ever refuses more, and never the admin making
+ * the change: their own seat is on, in the admin role, over the account
+ * they are signed in with, and it is never the one leaving (`notYourOwn`).
+ * Only the demo's key, which sits in no seat, is ever refused by it.
  */
 async function keepAnAdmin(client: PoolClient, leaving: string): Promise<void> {
-  const { rows } = await client.query<{ n: number }>(
-    'SELECT count(*)::int AS n FROM ops.member WHERE role = $1 AND active AND id <> $2',
+  const { rows } = await client.query<{ guest_id: string }>(
+    `SELECT link.guest_id FROM ops.member m JOIN ops.member_account link ON link.member_id = m.id
+      WHERE m.role = $1 AND m.active AND m.id <> $2`,
     [ADMIN, leaving],
   );
-  if (!rows[0]?.n) throw new MemberError('LAST_ADMIN', 'the desk keeps one active admin');
+  const open = await openAccounts(rows.map((r) => r.guest_id), client);
+  if (!open.size) throw new MemberError('LAST_ADMIN', 'the desk keeps one active admin somebody can sign in as');
 }
 
 /**

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { getPool, tx } from '../../db/pool.js';
+import { getPool, tx, type Db } from '../../db/pool.js';
 
 /**
  * Where somebody is signed in, and how they get out.
@@ -172,4 +172,20 @@ export async function closeAccount(input: {
       [input.guestId, input.at],
     );
   });
+}
+
+/**
+ * Which of these accounts are open: made, and not closed. For Basu's desk,
+ * which keeps an admin somebody can still sign in as, and must not take a
+ * seat whose every account is closed for one. Asked on the caller's own
+ * connection when it passes one, so a change that holds the desk's lock
+ * reads this inside itself rather than waiting on the pool for another.
+ */
+export async function openAccounts(guestIds: readonly string[], db: Db = getPool()): Promise<Set<string>> {
+  if (guestIds.length === 0) return new Set();
+  const { rows } = await db.query<{ id: string }>(
+    'SELECT id FROM identity.guest WHERE id = ANY($1::uuid[]) AND closed_at IS NULL',
+    [[...new Set(guestIds)]],
+  );
+  return new Set(rows.map((r) => r.id));
 }

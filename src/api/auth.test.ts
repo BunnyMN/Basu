@@ -125,12 +125,12 @@ const stillIn = async (token: string) => (await app.inject({ method: 'GET', url:
 async function throughGoogle(
   options: { return?: string; code?: string | null; error?: string; cookie?: 'same' | 'none' | 'other' } = {},
 ) {
-  const start = await app.inject({ method: 'GET', url: `/v1/auth/google/start?return=${encodeURIComponent(options.return ?? '/idesh')}` });
+  const start = await app.inject({ method: 'GET', url: `/v1/auth/google/start?return=${encodeURIComponent(options.return ?? '/login')}` });
   expect(start.statusCode, start.body).toBe(302);
   const to = new URL(start.headers.location as string);
   const state = to.searchParams.get('state')!;
   const setCookie = String(start.headers['set-cookie']);
-  const cookie = options.cookie === 'none' ? undefined : options.cookie === 'other' ? 'basu_oauth=someone-elses' : setCookie.split(';')[0]!;
+  const cookie = options.cookie === 'none' ? undefined : options.cookie === 'other' ? '__Host-basu_oauth=someone-elses' : setCookie.split(';')[0]!;
 
   const query = new URLSearchParams({ state });
   if (options.code !== null) query.set('code', options.code ?? 'good-code');
@@ -143,8 +143,8 @@ async function throughGoogle(
   expect(callback.statusCode, callback.body).toBe(302);
   const location = callback.headers.location as string;
   const [path, fragment = ''] = location.split('#');
-  // What this browser now holds for the page to claim with: `basu_handoff=…`, or nothing.
-  const handoff = [callback.headers['set-cookie'] ?? []].flat().map(String).find((c) => c.startsWith('basu_handoff='));
+  // What this browser now holds for the page to claim with: `__Host-basu_handoff=…`, or nothing.
+  const handoff = [callback.headers['set-cookie'] ?? []].flat().map(String).find((c) => c.startsWith('__Host-basu_handoff='));
   return {
     start: to,
     setCookie,
@@ -596,8 +596,8 @@ describe('Google', () => {
     expect(to.searchParams.get('redirect_uri')).toBe('https://basu.burzai.cloud/v1/auth/google/callback');
     expect(to.searchParams.get('code_challenge_method')).toBe('S256');
     expect(to.searchParams.get('scope')).toBe('openid email profile');
-    // The state rides in a cookie only this browser holds, scoped to these two addresses.
-    expect(String(start.headers['set-cookie'])).toMatch(/^basu_oauth=[\w-]+; Path=\/v1\/auth\/google; Max-Age=600; HttpOnly; Secure; SameSite=Lax$/);
+    // The state rides in a cookie only this browser holds, and only this host could have set.
+    expect(String(start.headers['set-cookie'])).toMatch(/^__Host-basu_oauth=[\w-]+; Max-Age=600; Path=\/; HttpOnly; Secure; SameSite=Lax$/);
   });
 
   it('comes back to the page it started from, signed in there, and the verifier matches the challenge', async () => {
@@ -645,7 +645,7 @@ describe('Google', () => {
     await signInWithGoogle();
     nextPerson = { sub: 'google-other', email: 'bat@gmail.com', email_verified: true };
     const { outcome, path, handoff } = await throughGoogle();
-    expect(path).toBe('/idesh');
+    expect(path).toBe('/login');
     expect(outcome.get('auth')).toBeNull();
     expect(outcome.get('auth_code')).toBeNull();
     expect(handoff).toBeUndefined();
@@ -671,7 +671,7 @@ describe('Google', () => {
     const made_up = await app.inject({ method: 'GET', url: '/v1/auth/google/callback?state=made-up&code=good-code' });
     expect(made_up.headers.location).toBe('/#auth_error=SOCIAL_REFUSED');
 
-    const start = await app.inject({ method: 'GET', url: '/v1/auth/google/start?return=/idesh' });
+    const start = await app.inject({ method: 'GET', url: '/v1/auth/google/start?return=/login' });
     const state = new URL(start.headers.location as string).searchParams.get('state')!;
     clock.advanceMinutes(11);
     const late = await app.inject({
@@ -691,6 +691,10 @@ describe('Google', () => {
     for (const elsewhere of ['https://evil.example/steal', '//evil.example', '/v1/me', 'javascript:alert(1)']) {
       expect((await throughGoogle({ return: elsewhere })).path).toBe('/');
     }
+    // Nor to the phone app's pages: a browser is sent on from them before the code could be claimed.
+    for (const appsOwn of ['/app', '/idesh', '/dine?order=1']) {
+      expect((await throughGoogle({ return: appsOwn })).path, appsOwn).toBe('/');
+    }
     const app_ = await throughGoogle({ return: 'basu://auth' });
     expect(app_.path).toBe('basu://auth');
     expect(app_.outcome.get('auth')).toBeTruthy();
@@ -698,8 +702,8 @@ describe('Google', () => {
 
   it('says the door is closed when Google is not set up', async () => {
     delete process.env['GOOGLE_CLIENT_ID'];
-    const start = await app.inject({ method: 'GET', url: '/v1/auth/google/start?return=/dine' });
-    expect(start.headers.location).toBe('/dine#auth_error=SOCIAL_CLOSED');
+    const start = await app.inject({ method: 'GET', url: '/v1/auth/google/start?return=/supplier' });
+    expect(start.headers.location).toBe('/supplier#auth_error=SOCIAL_CLOSED');
   });
 });
 
@@ -720,9 +724,9 @@ describe('Google, back on a page', () => {
     expect(code).toMatch(/^[\w-]{43}$/);
     expect((await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(code) })).statusCode).toBe(401);
 
-    // The cookie it is good with: this browser's only, sent only to the one address that claims it.
-    expect(back.handoffCookie).toMatch(/^basu_handoff=[\w-]{43}; Path=\/v1\/auth\/handoff; Max-Age=120; HttpOnly; Secure; SameSite=Lax$/);
-    expect(back.handoff!.slice('basu_handoff='.length)).not.toBe(code);
+    // The cookie it is good with: this browser's only, and this host's alone.
+    expect(back.handoffCookie).toMatch(/^__Host-basu_handoff=[\w-]{43}; Max-Age=120; Path=\/; HttpOnly; Secure; SameSite=Lax$/);
+    expect(back.handoff!.slice('__Host-basu_handoff='.length)).not.toBe(code);
   });
 
   it('trades the code for a session once, with the cookie, and the cookie goes', async () => {
@@ -733,7 +737,7 @@ describe('Google, back on a page', () => {
     expect(claimed.json()).toMatchObject({ token: expect.any(String), guest_id: expect.any(String), expires_at: expect.any(String) });
     expect(claimed.json().token).not.toBe(code);
     expect(await whoIs(claimed.json().token)).toMatchObject({ id: claimed.json().guest_id, email: 'bat@gmail.com' });
-    expect(String(claimed.headers['set-cookie'])).toBe('basu_handoff=; Path=/v1/auth/handoff; Max-Age=0; HttpOnly; Secure; SameSite=Lax');
+    expect(String(claimed.headers['set-cookie'])).toBe('__Host-basu_handoff=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax');
 
     // A code read out of a history later, cookie and all, is spent.
     const again = await claim(code, back.handoff);
@@ -764,12 +768,40 @@ describe('Google, back on a page', () => {
     expect((await claim(back.outcome.get('auth_code'), back.handoff)).json().error).toMatchObject(REFUSED);
 
     for (const code of ['made-up', '', null, 42]) {
-      const refused = await app.inject({ method: 'POST', url: '/v1/auth/handoff', payload: { code }, headers: { cookie: 'basu_handoff=made-up' } });
+      const refused = await app.inject({ method: 'POST', url: '/v1/auth/handoff', payload: { code }, headers: { cookie: '__Host-basu_handoff=made-up' } });
       expect(refused.statusCode).toBe(400);
       expect(refused.json().error).toMatchObject(REFUSED);
     }
-    const nothing = await app.inject({ method: 'POST', url: '/v1/auth/handoff', headers: { cookie: 'basu_handoff=%E0%A4%A' } });
+    const nothing = await app.inject({ method: 'POST', url: '/v1/auth/handoff', headers: { cookie: '__Host-basu_handoff=%E0%A4%A' } });
     expect(nothing.statusCode).toBe(400);
+  });
+
+  it('takes no state and no binding from a cookie another site under burzai.cloud could have planted', async () => {
+    // Every cookie a round trip sets is this host's alone: over https, for the whole host, for no domain around it.
+    const start = await app.inject({ method: 'GET', url: '/v1/auth/google/start?return=/login' });
+    const back = await throughGoogle({ return: '/login' });
+    const set = [start.headers['set-cookie'], back.callback.headers['set-cookie']].flat().map(String);
+    expect(set).toHaveLength(3);
+    for (const line of set) {
+      expect(line).toMatch(/^__Host-basu_(oauth|handoff)=[^;]*; Max-Age=\d+; Path=\/; HttpOnly; Secure; SameSite=Lax$/);
+    }
+
+    // Somebody's own round trip to Google, its state put in a stranger's browser under the name a
+    // plain cookie had — which any site under the parent domain may set: it signs nobody in.
+    const theirs = await app.inject({ method: 'GET', url: '/v1/auth/google/start?return=/login' });
+    const state = new URL(theirs.headers.location as string).searchParams.get('state')!;
+    const planted = await app.inject({
+      method: 'GET',
+      url: `/v1/auth/google/callback?state=${state}&code=good-code`,
+      headers: { cookie: `basu_oauth=${state}` },
+    });
+    expect(planted.headers.location).toBe('/login#auth_error=SOCIAL_REFUSED');
+    expect(String(planted.headers['set-cookie'])).not.toContain('handoff');
+
+    // A binding under that name opens nothing either, and the try spends the code.
+    const binding = back.handoff!.slice('__Host-basu_handoff='.length);
+    expect((await claim(back.outcome.get('auth_code'), `basu_handoff=${binding}`)).json().error).toMatchObject(REFUSED);
+    expect((await claim(back.outcome.get('auth_code'), back.handoff)).statusCode).toBe(400);
   });
 
   it('still gives the iPhone app the session itself, at basu://auth, and no code or cookie', async () => {

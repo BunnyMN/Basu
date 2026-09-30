@@ -50,6 +50,27 @@ export async function hashPassword(plain: string): Promise<string> {
   return ['scrypt', COST, BLOCK, PARALLEL, salt.toString('base64url'), key.toString('base64url')].join('$');
 }
 
+/**
+ * A stored password that is nobody's: the cost set above, a salt, and a key
+ * no password we will ever be sent makes. Written out rather than hashed
+ * from something, so it is here before the first request and always at
+ * today's cost.
+ */
+const NOBODY = ['scrypt', COST, BLOCK, PARALLEL, Buffer.alloc(16).toString('base64url'), Buffer.alloc(KEY_BYTES).toString('base64url')].join('$');
+
+/**
+ * What checking a password costs, spent where there is none to check: a
+ * login nobody has, or an account made without a password. The door's
+ * refusal then takes as long as a wrong password for somebody real. Its
+ * words are the same either way on purpose, and without this the clock
+ * said what the words do not — a scrypt later for an account, at once for
+ * nobody. Always false.
+ */
+export async function verifyNobody(plain: string): Promise<false> {
+  await verifyPassword(plain, NOBODY);
+  return false;
+}
+
 /** False for a wrong password and for a stored value this code cannot read. */
 export async function verifyPassword(plain: string, stored: string | null): Promise<boolean> {
   if (!stored) return false;

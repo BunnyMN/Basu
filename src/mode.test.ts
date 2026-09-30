@@ -168,7 +168,11 @@ describe('the mode a deploy pins', () => {
   });
 
   it('is asked before the deploy changes anything, so a refusal leaves the server as it was', () => {
-    const asked = [script.indexOf('\npinned_mode >/dev/null || exit 1\n'), script.indexOf('\nif still_the_demo; then')];
+    const node = script.indexOf('\nnode_reads_env || exit 1\n');
+    const asked = [node, script.indexOf('\npinned_mode >/dev/null || exit 1\n'), script.indexOf('\nif still_the_demo; then')];
+    // Whether node can read .env at all comes before anything reads it.
+    expect(node).toBeGreaterThan(-1);
+    expect(node).toBeLessThan(asked[1]!);
     for (const change of ['npm ci', 'npm run build', 'pg_dump "$DATABASE_URL"', 'dist/db/migrate.js', '\npin_mode\n']) {
       const at = script.indexOf(change);
       expect(at, change).toBeGreaterThan(-1);
@@ -177,6 +181,50 @@ describe('the mode a deploy pins', () => {
         expect(question, change).toBeLessThan(at);
       }
     }
+  });
+});
+
+/**
+ * Every question the deploy puts to .env goes to root's node, and a node
+ * that cannot answer used to read as an .env that says nothing. The deploy
+ * asks first whether there is one that can.
+ */
+describe('the node a deploy reads .env with', () => {
+  /** A folder of stand-ins for the commands on root's PATH, gone after the test. */
+  let bin: string;
+  beforeEach(() => {
+    bin = mkdtempSync(join(tmpdir(), 'basu-bin-'));
+  });
+  afterEach(() => rmSync(bin, { recursive: true, force: true }));
+
+  const asks = (path: string) => deploying(`BASU_MODE=demo\n${demoDb}`, ['node_reads_env'], `PATH=${JSON.stringify(path)}\nnode_reads_env`);
+
+  it('lets a node that reads .env through, and says nothing', async () => {
+    const fine = await asks(`${dirname(process.execPath)}:${process.env['PATH']}`);
+    expect(fine.code, fine.stderr).toBe(0);
+    expect(fine.stdout + fine.stderr).toBe('');
+  });
+
+  it('stops, and says so, when root has no node', async () => {
+    const none = await asks(bin);
+    expect(none.code).not.toBe(0);
+    expect(none.stdout).toBe('');
+    expect(none.stderr).toContain("no node on root's PATH");
+    expect(none.stderr).toContain('nothing was changed');
+  });
+
+  it('stops, and says so, when root’s node is too old to read .env', async () => {
+    // Today's node, with what Node before 20.12 did not have taken out of it.
+    writeFileSync(
+      join(bin, 'node'),
+      `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} --import 'data:text/javascript,delete process.loadEnvFile' "$@"\n`,
+      { mode: 0o755 },
+    );
+    const old = await asks(bin);
+    expect(old.code).not.toBe(0);
+    expect(old.stdout).toBe('');
+    expect(old.stderr).toContain('cannot read .env: process.loadEnvFile came in Node 20.12');
+    expect(old.stderr).toContain('nothing was changed');
   });
 });
 

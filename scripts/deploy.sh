@@ -35,9 +35,27 @@ exec </dev/null
 
 env_url() { sudo -u "$RUN_AS" sh -c 'sed -n "s/^DATABASE_URL=//p" .env'; }
 
+# Every question below is put to root's node, and env_value takes any
+# failure of it for a key .env does not have. With no node on root's PATH,
+# or one from before process.loadEnvFile (Node 20.12), every key would read
+# as missing: the mode and the database .env names would be named nowhere,
+# and what the deploy then refused, or let through, would be for a reason
+# that is not the real one. So it is asked first, and said plainly.
+node_reads_env() {
+  if ! command -v node >/dev/null 2>&1; then
+    echo "✗ no node on root's PATH — the deploy reads .env with it. Install Node 22 for root, or put it on root's PATH; nothing was changed." >&2
+    return 1
+  fi
+  if ! node -e 'process.exit(typeof process.loadEnvFile === "function" ? 0 : 1)' >/dev/null 2>&1; then
+    echo "✗ root's node ($(node --version 2>/dev/null || echo 'version unknown')) cannot read .env: process.loadEnvFile came in Node 20.12, and Basu runs on 22. Upgrade it; nothing was changed." >&2
+    return 1
+  fi
+}
+
 # A key of .env as the API will read it: by Node's own parser, which takes
 # quotes, a trailing comment and the last of two lines the way the API does.
-# Empty when .env does not have it.
+# Empty when .env does not have it — and when node cannot read it at all,
+# which node_reads_env has ruled out before anything asks.
 env_value() { env -u "$1" node -e 'process.loadEnvFile(".env"); console.log(process.env[process.argv[1]] ?? "")' "$1" 2>/dev/null || true; }
 
 # The mode .env names as the API reads one: in any case, without the blanks
@@ -100,8 +118,10 @@ cd "$APP"
 sha=$(sudo -u "$RUN_AS" git rev-parse --short HEAD)
 echo "── deploy $sha ─────────────────────────────────────────"
 
-# A mode or a database the deploy refuses stops it here, before the
-# dependencies, the build or the schema change: the API goes on as it was.
+# A node that cannot read .env, a mode or a database the deploy refuses:
+# each stops it here, before the dependencies, the build or the schema
+# change, and the API goes on as it was.
+node_reads_env || exit 1
 pinned_mode >/dev/null || exit 1
 leaving=0
 if still_the_demo; then leaving=1; fi

@@ -136,6 +136,16 @@ export async function seatOf(guestId: string): Promise<Member | null> {
   });
 }
 
+/**
+ * Whether this account sits at the desk in a seat that is on — found the
+ * way the desk finds it, by proof (`seatOf`), whether or not its person has
+ * been to the desk yet. What the account's own pages ask before closing it,
+ * and before a letter about its password may be dropped.
+ */
+export async function seatedAtTheDesk(guestId: string): Promise<boolean> {
+  return Boolean((await seatOf(guestId))?.active);
+}
+
 export interface DeskSeat {
   id: string;
   name: string;

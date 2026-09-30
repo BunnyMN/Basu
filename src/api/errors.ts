@@ -272,6 +272,29 @@ export function badRequest(reply: FastifyReply, mn: string, en: string): Fastify
   return reply.status(400).send(envelope('BAD_REQUEST', mn, en));
 }
 
+/** Nothing of theirs by that name — an id nobody has, or one that is not an id at all. */
+export function notFound(reply: FastifyReply, mn: string, en: string): FastifyReply {
+  return reply.status(404).send(envelope('NOT_FOUND', mn, en));
+}
+
+/**
+ * AT_THE_DESK, said to the account's own person. The desk is told to
+ * switch the seat off on «Гишүүд» first. Somebody closing their own account
+ * cannot: nobody switches their own seat off (OWN_SEAT). So they are told
+ * who does.
+ */
+export function leaveTheDeskFirst(reply: FastifyReply): FastifyReply {
+  return reply
+    .status(MEMBER_ERRORS.AT_THE_DESK.status)
+    .send(
+      envelope(
+        'AT_THE_DESK',
+        'Та Basu ops-ийн идэвхтэй гишүүн байна. Бүртгэлээ хаахаас өмнө админ таны гишүүнчлэлийг «Гишүүд» хуудсанд хаах ёстой.',
+        'switch the seat off before closing the account',
+      ),
+    );
+}
+
 /**
  * NO_EMAIL, said inside the account. At the door somebody typed a number
  * with no address behind it, and is told to try their address or write to

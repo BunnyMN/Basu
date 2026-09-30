@@ -94,7 +94,7 @@ function following(signal: AbortSignal): AbortSignal {
  */
 async function backFromGoogle(guestId: string, browser: object): Promise<string> {
   const { code, binding } = await handOff(guestId, 'Google', clock.now());
-  keepCookie(cookiesOf(browser), `basu_handoff=${binding}; Path=/v1/auth/handoff; Max-Age=120; HttpOnly; Secure; SameSite=Lax`);
+  keepCookie(cookiesOf(browser), `__Host-basu_handoff=${binding}; Max-Age=120; Path=/; HttpOnly; Secure; SameSite=Lax`);
   return `#auth_code=${code}`;
 }
 
@@ -1875,7 +1875,7 @@ describe('one browser, one person', () => {
     expect([admin, next]).not.toContain(now);
     expect(await guestOf(now)).toBe(await guestOf(next));
     expect(dash.window.location.hash).not.toContain('auth');
-    expect(cookiesOf(browser).has('basu_handoff')).toBe(false);
+    expect(cookiesOf(browser).has('__Host-basu_handoff')).toBe(false);
     expect(await ended(admin)).toBe(true);
   });
 
@@ -2026,6 +2026,27 @@ describe('one browser, one person', () => {
     expect(noDesk(dash)).toBe(true);
     expect(browser.getItem('basu.guest')).toBeNull();
     expect(await ended(admin)).toBe(true);
+  });
+
+  it('asks a desk seat signed in too long ago to sign in again before it signs anybody out on the website, and ends that session', async () => {
+    const admin = await seated('+97688050151', 'Админ Арав');
+    // The same admin, signed in again this morning somewhere else: the one at the desk now.
+    const signedIn = await fetch(`${base}/v1/auth/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ login: '+97688050151', password: GUEST_PASSWORD }),
+    });
+    const atTheDesk = ((await signedIn.json()) as { token: string }).token;
+    await longAgo(admin);
+    const browser = device(admin);
+    const page = await openPage('account.html', '', undefined, browser);
+    await until(page, 'another device to sign out of', (d) => (d.querySelector('#others') as HTMLButtonElement | null)?.disabled === false);
+
+    (page.window.document.querySelector('#others') as HTMLElement).click();
+    await until(page, 'the session let go', () => browser.getItem('basu.guest') === null);
+    expect(await ended(admin)).toBe(true);
+    // Nobody was signed out by it: the admin at the desk still is.
+    expect((await fetch(`${base}/v1/ops/me`, { headers: { authorization: `Bearer ${atTheDesk}` } })).status).toBe(200);
   });
 
   it('shows the door from the books’ CSV too', async () => {
