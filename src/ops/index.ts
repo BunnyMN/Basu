@@ -8,6 +8,8 @@ export {
   listMembers,
   memberForAccount,
   linkByProof,
+  mayActOnAccount,
+  mayHandle,
   seatAccount,
   seatsOfAccounts,
   upsertMember,
@@ -15,6 +17,7 @@ export {
   setMemberRole,
   MemberError,
   syncMembersFromEnv,
+  type DeskActor,
   type Member,
   type Role,
 } from './members.js';

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -1664,6 +1665,21 @@ describe('who sees what', () => {
     const theirs = await openPage('ops.html', '', undefined, device(chosen));
     await until(theirs, 'the desk', (d) => Boolean(d.querySelector('.tabs [data-tab="overview"]')));
     expect(theirs.window.document.querySelector('.ws-btn')?.textContent).toContain('Зөвхөн харах');
+
+    // Switched off, the desk closes to them and nothing else does: the popup says just that, and it is so.
+    const row = () => [...doc.querySelectorAll('#members tr[data-member]')].find((r) => r.textContent?.includes('Сонгосон ажилтан'))!;
+    (row().querySelector('[data-a="active"]') as HTMLElement).click();
+    await until(desk, 'the question', (d) => Boolean(d.querySelector('.sheet.popup[data-open]')));
+    const asked = [...doc.querySelectorAll('.sheet.popup[data-open]')].pop()!;
+    expect(asked.textContent).toContain('нэвтэрсэн хэвээр үлдэнэ');
+    expect(asked.textContent).toContain('нээлттэй байгаа ops хэсэг нь ч дараагийн алхамд хаагдана');
+    // The dashboard itself stays open for them: it drops to their own corner.
+    expect(asked.textContent).not.toMatch(/нэвтрэлт нь хаагдана|dashboard нь ч/);
+    (asked.querySelector('[data-submit]') as HTMLElement).click();
+    await until(desk, 'the seat off', () => Boolean(row()?.hasAttribute('data-off')));
+    const auth = { authorization: `Bearer ${chosen}` };
+    expect((await fetch(`${base}/v1/ops/me`, { headers: auth })).status).toBe(401);
+    expect((await fetch(`${base}/v1/me`, { headers: auth })).status).toBe(200);
   });
 });
 
@@ -1846,6 +1862,77 @@ describe('one browser, one person', () => {
     const dash = await openPage('ops.html', '', undefined, browser);
     await until(dash, 'the door', (d) => Boolean(d.querySelector('.door')));
     expect(noDesk(dash)).toBe(true);
+  });
+
+  /** Signed in thirteen hours ago by the server's clock: a desk left open on some machine overnight. */
+  const longAgo = (token: string) =>
+    getPool().query('UPDATE identity.guest_session SET created_at = $2 WHERE token_hash = $1', [
+      createHash('sha256').update(token).digest('hex'),
+      new Date(clock.now().getTime() - 13 * 60 * 60 * 1000),
+    ]);
+
+  it('shows a desk seat signed in more than twelve hours ago the door, saying why, and signs that session out', async () => {
+    const admin = await seated('+97688050111', 'Админ Долоо');
+    await longAgo(admin);
+    const browser = device(admin);
+    const dash = await openPage('ops.html', '', undefined, browser);
+    await until(dash, 'the door, saying why', (d) => Boolean(d.querySelector('.door #door-why')));
+    expect(dash.window.document.querySelector('#door-why')?.textContent).toBe('Аюулгүй байдлын үүднээс ops-д дахин нэвтэрнэ үү.');
+    expect(dash.window.document.querySelectorAll('.door')).toHaveLength(1);
+    expect(noDesk(dash)).toBe(true);
+    expect(browser.getItem('basu.guest')).toBeNull();
+    expect(await ended(admin)).toBe(true);
+  });
+
+  it('shows the door from the books’ CSV too', async () => {
+    const admin = await seated('+97688050131', 'Админ Ес');
+    const browser = device(admin);
+    // The movements, as last left: the page draws them and nothing before them.
+    browser.setItem('basu.ops.money', 'transfers');
+    const dash = await openPage('ops.html', '', undefined, browser);
+    await opsTab(dash, 'money');
+    await until(dash, 'the CSV', (d) => Boolean(d.querySelector('#csv')));
+
+    // The desk left open overnight, and the first thing pressed in the morning is the CSV.
+    await longAgo(admin);
+    (dash.window.document.querySelector('#csv') as HTMLElement).click();
+    await until(dash, 'the door, saying why', (d) => Boolean(d.querySelector('.door #door-why')));
+    expect(browser.getItem('basu.guest')).toBeNull();
+    expect(await ended(admin)).toBe(true);
+  });
+
+  it('never ends a sign-in the browser took while a refused call was on its way', async () => {
+    const admin = await seated('+97688050121', 'Админ Найм');
+    await longAgo(admin);
+    const next = await account('+97688050122', 'Шинэ таб');
+    const browser = device(admin);
+    // The page asks as the admin; before the answer comes, another tab signs somebody else in.
+    let swapped = false;
+    let answered = false;
+    const dash = await openPage(
+      'ops.html',
+      '',
+      (path) => {
+        if (swapped || !path.startsWith('/v1/access')) return undefined;
+        swapped = true;
+        browser.setItem('basu.guest', next);
+        return fetch(`${base}${path}`, { headers: { authorization: `Bearer ${admin}` } }).then((r) => {
+          answered = true;
+          return r;
+        }) as unknown as Response;
+      },
+      browser,
+    );
+    await until(dash, 'the admin’s answer', () => answered);
+    // The moment the page takes to act on it — a sign-out it sends does not wait.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    expect(browser.getItem('basu.guest')).toBe(next);
+    expect((await fetch(`${base}/v1/me`, { headers: { authorization: `Bearer ${next}` } })).status).toBe(200);
+
+    // The browser tells the page its person changed, as it does across tabs, and the page follows.
+    dash.window.dispatchEvent(new dash.window.StorageEvent('storage', { key: 'basu.guest' }));
+    await until(dash, 'the new person’s corner', (d) => Boolean(d.querySelector('#org-list')));
+    expect(nameOn(dash)).toContain('Шинэ таб');
   });
 
   it('never lends the supplier’s screen a session the browser no longer holds', async () => {

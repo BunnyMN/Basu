@@ -25,7 +25,9 @@ export {
   verifyEmailCode,
   CODES_PER_EMAIL_PER_HOUR,
   resolveGuest,
+  resolveSession,
   type GuestSession,
+  type LiveSession,
   type OtpIssued,
 } from './auth.js';
 

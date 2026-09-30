@@ -17,7 +17,15 @@ const running = mode();
 
 const ctx = buildProviders((line) => console.log(line.replace('[providers]', '[api]')));
 
-await syncMembersFromEnv(process.env['OPS_MEMBERS']);
+// The desk's first members, from the environment. A list that cannot be
+// read keeps no server down: it says so — never what the list held, boot
+// logs are public — and the desk keeps the members it already has.
+try {
+  const made = await syncMembersFromEnv(process.env['OPS_MEMBERS'], (line) => console.log(`[api] ${line}`));
+  if (made) console.log(`[api] OPS_MEMBERS: ${made} new desk member(s)`);
+} catch (error) {
+  console.log(`[api] OPS_MEMBERS was not applied (${(error as { code?: string }).code ?? (error as Error).name}); the desk keeps the members it has`);
+}
 const app = await buildServer(ctx, { logger: false, dev: running === 'demo', trustProxy: running === 'production' });
 const port = Number(process.env['PORT'] ?? 3000);
 await app.listen({ port, host: '0.0.0.0' });

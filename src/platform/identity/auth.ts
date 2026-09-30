@@ -459,11 +459,28 @@ async function mintSession(
  * It is what makes the session list on the profile screen worth reading.
  */
 export async function resolveGuest(ctx: Ctx, token: string): Promise<string | null> {
-  const { rows } = await getPool().query<{ guest_id: string }>(
+  return (await resolveSession(ctx, token))?.guestId ?? null;
+}
+
+/** A live session: whose it is, and when that person signed in to make it. */
+export interface LiveSession {
+  guestId: string;
+  signedInAt: Date;
+}
+
+/**
+ * Who is asking, and since when — `resolveGuest` with the moment the
+ * session was made, for a door that wants a recent sign-in and not merely a
+ * live one. Basu's desk is such a door: a session lives sixty days, and the
+ * desk will not take one that old. The heartbeat is recorded the same way.
+ */
+export async function resolveSession(ctx: Ctx, token: string): Promise<LiveSession | null> {
+  const { rows } = await getPool().query<{ guest_id: string; created_at: Date }>(
     `UPDATE identity.guest_session SET last_seen_at = $2
       WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > $2
-      RETURNING guest_id`,
+      RETURNING guest_id, created_at`,
     [sha256(token), ctx.clock.now()],
   );
-  return rows[0]?.guest_id ?? null;
+  const row = rows[0];
+  return row ? { guestId: row.guest_id, signedInAt: row.created_at } : null;
 }

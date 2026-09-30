@@ -16,7 +16,7 @@ import {
 import { profileOf } from '../platform/identity/index.js';
 import { orgById, roleIn, seatsOf, type OrgState } from '../platform/org/index.js';
 import type { Ctx } from '../ports.js';
-import { forbidden, unauthorized } from './errors.js';
+import { forbidden, signInAgain, unauthorized } from './errors.js';
 import { limits } from './hardening.js';
 import { deskSeatFor } from './ops.js';
 
@@ -122,7 +122,9 @@ export async function registerAccessRoutes(app: FastifyInstance, ctx: Ctx): Prom
   const limit = { config: { rateLimit: limits().ops } };
 
   app.get('/v1/access', limit, async (request, reply) => {
-    const { guestId, seat } = await deskSeatFor(ctx, bearer(request));
+    const { guestId, seat, stale } = await deskSeatFor(ctx, bearer(request));
+    // A seat at the desk, on a sign-in older than the desk takes: the door, and a fresh sign-in, before anything else.
+    if (stale) return signInAgain(reply);
     if (!guestId && !seat) return unauthorized(reply);
 
     const workspaces: Workspace[] = [];
@@ -187,7 +189,8 @@ export async function registerAccessRoutes(app: FastifyInstance, ctx: Ctx): Prom
    * seats are given by an admin, and the public has nothing to choose from.
    */
   app.get<{ Querystring: { scope?: string; org?: string } }>('/v1/access/roles', limit, async (request, reply) => {
-    const { guestId, seat } = await deskSeatFor(ctx, bearer(request));
+    const { guestId, seat, stale } = await deskSeatFor(ctx, bearer(request));
+    if (stale) return signInAgain(reply);
     if (!guestId && !seat) return unauthorized(reply);
     if (request.query.scope === 'desk') {
       if (!seat) return forbidden(reply, "the desk's roles are the desk's");

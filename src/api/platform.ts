@@ -32,8 +32,9 @@ import {
   setPreferences,
   unreadCount,
 } from '../platform/notify/index.js';
-import { badRequest, sendError } from './errors.js';
+import { badRequest, sendError, signInAgain } from './errors.js';
 import { limits } from './hardening.js';
+import { deskSeatFor } from './ops.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -78,6 +79,24 @@ export async function registerPlatformRoutes(
 ): Promise<void> {
   const guarded = { preHandler: requireGuest };
   const rate = limits();
+
+  /**
+   * For the ways back in, below. Basu's desk takes a session signed in
+   * within the last `DESK_SESSION_HOURS`, and a way in chosen from an older
+   * one would undo that. Whoever holds a desk member's session left open
+   * somewhere could give the account a password, or an address, of their
+   * own, sign in afresh with it and have the desk again — and the way in
+   * would outlast the session. So a desk member on such a session signs in
+   * again before changing either, old password in hand or not: it is one
+   * sign-in, and nothing is left to weigh. Everybody else keeps the sixty
+   * days a session lives. The desk is Basu's own staff, not a vertical:
+   * asking it here answers a guest who has only ever taken a taxi exactly
+   * as before.
+   */
+  const recentAtTheDesk: Guard = async (request, reply) =>
+    (await deskSeatFor(ctx, bearer(request) ?? undefined)).stale
+      ? signInAgain(reply, 'Аюулгүй байдлын үүднээс гараад дахин нэвтэрсний дараа нууц үг, имэйлээ тохируулна уу.')
+      : undefined;
 
   /* ── profile ──────────────────────────────────────────────────────── */
 
@@ -124,7 +143,7 @@ export async function registerPlatformRoutes(
    */
   app.post<{ Body: { current?: string; next?: string } }>(
     '/v1/me/password',
-    { preHandler: requireGuest, config: { rateLimit: rate.otp } },
+    { preHandler: [requireGuest, recentAtTheDesk], config: { rateLimit: rate.otp } },
     async (request, reply) => {
       const { current, next } = request.body ?? {};
       if (!next) return badRequest(reply, 'Шинэ нууц үгээ оруулна уу.', 'next is required');
@@ -145,7 +164,7 @@ export async function registerPlatformRoutes(
    */
   app.post<{ Body: { email?: string; password?: string } }>(
     '/v1/me/email/code',
-    { preHandler: requireGuest, config: { rateLimit: rate.otp } },
+    { preHandler: [requireGuest, recentAtTheDesk], config: { rateLimit: rate.otp } },
     async (request, reply) => {
       const { email, password } = request.body ?? {};
       if (!email) return badRequest(reply, 'Имэйл хаягаа оруулна уу.', 'email is required');
@@ -160,7 +179,7 @@ export async function registerPlatformRoutes(
 
   app.post<{ Body: { email?: string; code?: string } }>(
     '/v1/me/email',
-    { preHandler: requireGuest, config: { rateLimit: rate.verify } },
+    { preHandler: [requireGuest, recentAtTheDesk], config: { rateLimit: rate.verify } },
     async (request, reply) => {
       const { email, code } = request.body ?? {};
       if (!email || !code) return badRequest(reply, 'Имэйл, кодоо оруулна уу.', 'email and code are required');
