@@ -179,28 +179,50 @@ const GOOGLE_REFUSALS = {
 
 /**
  * Back from Google. The server sends the person to the page they started on
- * with the session in the address's fragment — `/idesh#auth=…` — which never
- * reaches a server or a log. It is taken here, before the page's own script
- * runs, and wiped from the address bar and the history entry, so a copied
- * link or a screenshot of the address carries nothing.
+ * with a one-time code in the address's fragment — `/login#auth_code=…` —
+ * and never the session. A fragment reaches no server and no log, but the
+ * browser's history keeps the address as it was visited, fragment and all,
+ * and Chrome syncs that history to the person's other devices; wiping the
+ * address bar does not reach it. So the page trades the code for the session
+ * here, and the server gives it only once, within a minute, and only to the
+ * browser that went to Google — it set a cookie there on the way back, and
+ * wants it with the code. A code read out of a history is spent; one sent to
+ * somebody else in a link opens nothing in their browser.
+ *
+ * A session in the address — `#auth=…`, the way this once worked — is never
+ * taken: a page that took one signed whoever opened a link into the account
+ * of whoever made it.
+ *
+ * The fragment is wiped at once, before the page's own script runs and
+ * before anything waits on the network. Pages await this before asking who
+ * is signed in: `{ token }` once the code has become a session, `{ refused }`
+ * when Google or the server said no, and null when the page did not come
+ * back from Google at all.
  */
-export const authReturn = (() => {
+export const authReturn = (async () => {
   if (typeof location === 'undefined' || !location.hash.includes('auth')) return null;
   const fragment = new URLSearchParams(location.hash.slice(1));
-  const token = fragment.get('auth');
+  const code = fragment.get('auth_code');
   const refused = fragment.get('auth_error');
-  if (!token && !refused) return null;
+  if (!code && !refused && !fragment.has('auth')) return null;
   history.replaceState(null, '', location.pathname + location.search);
-  if (token) {
+  if (refused) {
+    setTimeout(() => toast(GOOGLE_REFUSALS[refused] ?? GOOGLE_REFUSALS.SOCIAL_REFUSED, 'bad'), 0);
+    return { refused };
+  }
+  if (!code) return null;
+  try {
+    const { token } = await api('/v1/auth/handoff', { method: 'POST', body: { code } });
     // The kitchen screen keeps a session of its own (`data-session` on its
     // root) and decides where this one goes. Everywhere else — the dashboard
     // too — the sign-in that just came back is the person, whoever was
     // signed in here before.
     if (!document.documentElement.dataset.session) takeSession(token);
     return { token };
+  } catch (error) {
+    toast(error instanceof ApiError ? error.message : GOOGLE_REFUSALS.SOCIAL_REFUSED, 'bad');
+    return { refused: error.code ?? 'SOCIAL_REFUSED' };
   }
-  setTimeout(() => toast(GOOGLE_REFUSALS[refused] ?? GOOGLE_REFUSALS.SOCIAL_REFUSED, 'bad'), 0);
-  return { refused };
 })();
 
 /** Google's mark, in Google's colours — its button guidelines ask for exactly this. */
@@ -220,10 +242,11 @@ const GOOGLE_MARK = `<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA
  * and signing up falls back to a phone number.
  *
  * `onToken(token)` is called once there is a session. Google does not call
- * it: the page is left for Google's and comes back to `returnTo`, signed in,
- * by way of `authReturn` above. `keep: false` leaves the token for `onToken`
- * to put where it belongs (the desk keeps its own); `password: false` leaves
- * the fold out. `box.ready` resolves with which doors were drawn.
+ * it: the page is left for Google's and comes back to `returnTo`, where
+ * `authReturn` above claims the sign-in. `keep: false` leaves the token for
+ * `onToken` to put where it belongs (the kitchen keeps its own);
+ * `password: false` leaves the fold out. `box.ready` resolves with which
+ * doors were drawn.
  */
 const EMAIL_HINT = 'Хаяг руу тань 6 оронтой код илгээнэ. Анх удаа бол бүртгэл шууд үүснэ.';
 

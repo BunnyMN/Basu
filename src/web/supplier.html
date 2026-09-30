@@ -178,7 +178,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;
 <div id="root"></div>
 
 <script type="module">
-import { api, store, shell, toast, mnt, money, KIND, dayLabel, signInDoors, accountWays, popup, dropSession } from '/api.js';
+import { api, store, shell, toast, mnt, money, KIND, dayLabel, signInDoors, accountWays, authReturn, popup, dropSession } from '/api.js';
 import { NAV_ICON, deskFrame } from '/sidenav.js';
 
 const root = document.getElementById('root');
@@ -1503,6 +1503,9 @@ async function boot() {
   root.replaceChildren();
   applyDesk();
   seat = null;
+  // Back from Google, the code in the address is claimed first: the session
+  // it becomes is this browser's person (api.js, authReturn).
+  await authReturn;
   if (!token()) {
     showLanding();
     return;

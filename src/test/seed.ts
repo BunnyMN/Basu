@@ -34,7 +34,8 @@ export async function truncateAll(db: Db = getPool()): Promise<void> {
              dine.trust_profile, dine.restaurant,
              ops.member, ops.member_account, ops.access_request, org.membership_log, org.membership, org.organization, access.role, access.org_role, access.module, access.page, ops.tick, ops.setting, idesh.audit, idesh.settlement, idesh.order_event, idesh.idesh_order, idesh.promotion, idesh.listing,
              idesh.supplier,
-             identity.profile, identity.guest_session, identity.guest, identity.otp_challenge, identity.oauth_state
+             identity.profile, identity.guest_session, identity.guest, identity.otp_challenge, identity.oauth_state,
+             identity.auth_handoff
     RESTART IDENTITY CASCADE
   `);
   // The house accounts are reference data the migration created; only the

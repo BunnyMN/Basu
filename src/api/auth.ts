@@ -4,14 +4,17 @@ import {
   AuthError,
   appleConfigFromEnv,
   beginGoogle,
+  claimHandoff,
   completeGoogle,
   endSession,
   googleConfigFromEnv,
+  handOff,
   safeReturn,
   sendEmailCode,
   sendPasswordCode,
   setPasswordWithCode,
   signInWithApple,
+  startSessionFor,
   takeGoogleState,
   verifyEmailCode,
 } from '../platform/identity/index.js';
@@ -25,11 +28,19 @@ import { limits } from './hardening.js';
  *
  * Google is a redirect: `/v1/auth/google/start` sends the person to Google
  * with a state we remember, Google sends them back to `/callback`, and we
- * send them on to the page they started from with the session in the URL's
- * fragment — `/supplier#auth=…`. A fragment never reaches a server or its
- * logs; the page takes the token and wipes it from the address bar. The
- * iPhone app does the same through the system sign-in sheet, and gets
- * `basu://auth#auth=…` back.
+ * send them on to the page they started from with a one-time code in the
+ * URL's fragment — `/supplier#auth_code=…` — never the session. A fragment
+ * stays out of every request and every server log, but not out of the
+ * browser's history, which keeps the address as it was visited and syncs
+ * it to the person's other devices. The page trades the code for the
+ * session at `/v1/auth/handoff`, together with a cookie set here, so the
+ * code is good once, for a minute, and only in the browser that went to
+ * Google.
+ *
+ * The iPhone app goes through the system sign-in sheet and gets
+ * `basu://auth#auth=…` — the session itself, as the builds on phones expect.
+ * The sheet hands that address straight to the app; no page ever loads it,
+ * so no history keeps it.
  *
  * The state is also written into a short-lived cookie at the start and must
  * match at the callback, so that nobody can sign a stranger into an account
@@ -37,12 +48,20 @@ import { limits } from './hardening.js';
  */
 
 const STATE_COOKIE = 'basu_oauth';
+/** The binding a page's code is good only with, in the browser the callback sent it to. */
+const HANDOFF_COOKIE = 'basu_handoff';
 
 function cookie(request: FastifyRequest, name: string): string | null {
   const header = request.headers.cookie ?? '';
   for (const part of header.split(';')) {
     const [key, ...rest] = part.trim().split('=');
-    if (key === name) return decodeURIComponent(rest.join('='));
+    if (key !== name) continue;
+    try {
+      return decodeURIComponent(rest.join('='));
+    } catch {
+      // Nothing we set is spelled like that: the same as no cookie, not a crash.
+      return null;
+    }
   }
   return null;
 }
@@ -53,15 +72,19 @@ const shapeSession = (s: { token: string; guestId: string; expiresAt: Date }) =>
   expires_at: s.expiresAt.toISOString(),
 });
 
-/** Where to go afterwards, with the outcome in the fragment. */
-function back(reply: FastifyReply, returnTo: string, fragment: Record<string, string>): FastifyReply {
+/** Where to go afterwards, with the outcome in the fragment and any cookie that goes with it. */
+function back(reply: FastifyReply, returnTo: string, fragment: Record<string, string>, cookies: string[] = []): FastifyReply {
   const hash = new URLSearchParams(fragment).toString();
   const target = returnTo === APP_RETURN ? `${APP_RETURN}#${hash}` : `${safeReturn(returnTo)}#${hash}`;
   return reply
-    .header('set-cookie', `${STATE_COOKIE}=; Path=/v1/auth/google; Max-Age=0; HttpOnly; Secure; SameSite=Lax`)
+    .header('set-cookie', [`${STATE_COOKIE}=; Path=/v1/auth/google; Max-Age=0; HttpOnly; Secure; SameSite=Lax`, ...cookies])
     .header('cache-control', 'no-store')
     .redirect(target, 302);
 }
+
+/** The handoff's cookie: sent only to the one address that claims it, and gone soon after the code is. */
+const handoffCookie = (binding: string, maxAge = 120) =>
+  `${HANDOFF_COOKIE}=${binding}; Path=/v1/auth/handoff; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
 
 export async function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> {
   const rate = limits();
@@ -207,8 +230,15 @@ export async function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): Promis
         return back(reply, pending.returnTo, { auth_error: 'SOCIAL_REFUSED' });
       }
       try {
-        const session = await completeGoogle(ctx, google, { code, verifier: pending.verifier, label: 'Google' });
-        return back(reply, pending.returnTo, { auth: session.token });
+        const guestId = await completeGoogle(ctx, google, { code, verifier: pending.verifier });
+        // The app: the session itself, where the builds on phones read it.
+        if (pending.returnTo === APP_RETURN) {
+          const session = await startSessionFor(ctx, guestId, 'Google');
+          return back(reply, APP_RETURN, { auth: session.token });
+        }
+        // A page: a code for the session, and the cookie it is good only with.
+        const handoff = await handOff(guestId, 'Google', ctx.clock.now());
+        return back(reply, pending.returnTo, { auth_code: handoff.code }, [handoffCookie(handoff.binding)]);
       } catch (caught) {
         request.log.warn({ err: caught }, 'google sign-in refused');
         const reason = caught instanceof AuthError ? caught.code : 'SOCIAL_REFUSED';
@@ -216,6 +246,22 @@ export async function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): Promis
       }
     },
   );
+
+  /**
+   * The page's half of a Google sign-in: the code from its address, and the
+   * cookie the callback set in this browser. A session, once, answered like
+   * every other way in. The cookie has done its one job whatever the answer,
+   * and goes.
+   */
+  app.post<{ Body: { code?: unknown } }>('/v1/auth/handoff', { config: { rateLimit: rate.verify } }, async (request, reply) => {
+    reply.header('set-cookie', handoffCookie('', 0));
+    const code = typeof request.body?.code === 'string' ? request.body.code : '';
+    try {
+      return reply.send(shapeSession(await claimHandoff(ctx, { code, binding: cookie(request, HANDOFF_COOKIE) })));
+    } catch (error) {
+      return sendError(reply, error);
+    }
+  });
 
   /* ── Apple, from the iPhone app ── */
 

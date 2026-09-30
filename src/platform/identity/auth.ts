@@ -53,7 +53,8 @@ export class AuthError extends Error {
       | 'EMAIL_CLOSED'
       | 'EMAIL_FAILED'
       | 'SOCIAL_CLOSED'
-      | 'SOCIAL_REFUSED',
+      | 'SOCIAL_REFUSED'
+      | 'HANDOFF_REFUSED',
     message: string,
   ) {
     super(message);
