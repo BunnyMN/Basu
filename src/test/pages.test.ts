@@ -552,6 +552,101 @@ function departures(dom: JSDOM): { count: number } {
   return left;
 }
 
+/**
+ * A connection that holds one answer on its way back. The first request
+ * `picked` chooses reaches the server and is carried out there; the page
+ * hears nothing of it until the test lets the answer through. It is the
+ * answer slow enough in coming that the person goes back and presses again.
+ */
+function holdingOne(picked: (path: string, init?: RequestInit) => boolean) {
+  let held = false;
+  let arrived!: () => void;
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => (release = resolve));
+  return {
+    /** Settles once the server has carried the request out: the order exists. */
+    answered: new Promise<void>((resolve) => (arrived = resolve)),
+    /** Lets the answer through to the page. */
+    release,
+    respond(path: string, init?: RequestInit): Promise<Response> | undefined {
+      if (held || !picked(path, init)) return undefined;
+      held = true;
+      return fetch(new URL(path, base).toString(), init).then(async (response) => {
+        arrived();
+        await released;
+        return response;
+      });
+    },
+  };
+}
+
+/**
+ * Somebody else buying at the same stall, in the middle of it: the listing's
+ * row is theirs until `done`, and an order made there waits at the server
+ * for it. That is an answer as slow as it gets, with nothing kept yet for a
+ * second press to be handed back.
+ */
+async function busyStall(listing: string): Promise<{ done: () => Promise<void> }> {
+  const other = await getPool().connect();
+  await other.query('BEGIN');
+  await other.query('SELECT id FROM idesh.listing WHERE id = $1 FOR UPDATE', [listing]);
+  return {
+    async done() {
+      await other.query('COMMIT');
+      other.release();
+    },
+  };
+}
+
+/** How many of the server's queries are waiting for a row somebody else holds. */
+async function waitingOnRows(): Promise<number> {
+  const { rows } = await getPool().query<{ n: number }>(
+    `SELECT count(*)::int AS n FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+  );
+  return rows[0]!.n;
+}
+
+/**
+ * The most of the server's queries seen waiting for a row at once, from now
+ * until `n` are or `ms` have gone by: long enough for a request on its way
+ * to have arrived and joined the queue.
+ */
+async function mostWaiting(n: number, ms: number): Promise<number> {
+  const deadline = Date.now() + ms;
+  let most = 0;
+  while (Date.now() < deadline && most < n) {
+    most = Math.max(most, await waitingOnRows());
+    await new Promise((r) => setTimeout(r, 30));
+  }
+  return most;
+}
+
+/** The server ending every session this number has — signed out elsewhere, or simply over. */
+async function endSessions(phone: string): Promise<void> {
+  const { rowCount } = await getPool().query(
+    `UPDATE identity.guest_session SET revoked_at = now()
+      WHERE revoked_at IS NULL AND guest_id = (SELECT id FROM identity.guest WHERE phone_e164 = $1)`,
+    [phone],
+  );
+  expect(rowCount, 'a session to end').toBeGreaterThan(0);
+}
+
+/**
+ * Signing in on the app's page, as `phone`: the page asks `/dev/login` where
+ * the phone app shows the shell's own sheet, and whoever is holding the
+ * phone signs in there — the same person again, or somebody else.
+ */
+const signingInAs = (phone: string) => (path: string) =>
+  path === '/dev/login'
+    ? fetch(`${base}/dev/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone }) })
+    : undefined;
+
+/** What a page says when the network, not the server, let a request down. */
+const CONNECTION_LOST = 'Холболт тасарлаа. Дахин оролдоно уу.';
+
+/** What a page says when the order bought is the one from before the person changed it. */
+const EARLIER_ORDER = 'Өмнөх захиалга тань төлөгдсөн байна';
+
 describe('the guest app', () => {
   it('draws every restaurant on the map', async () => {
     const dom = await openPage('dine.html');
@@ -1230,10 +1325,11 @@ describe('the website', () => {
 
   /**
    * A stall's page with the order as it opens — one whole animal, collected,
-   * on the first day — looked over, as far as «Төлөх».
+   * on the first day — looked over, as far as «Төлөх»: at `listing`, or at
+   * the stall with the most left.
    */
-  async function reviewAtStall(respond?: Parameters<typeof openPage>[2]): Promise<JSDOM> {
-    const stall = await openPage('shop.html', `/${await fullestStall()}`, respond);
+  async function reviewAtStall(respond?: Parameters<typeof openPage>[2], listing?: string): Promise<JSDOM> {
+    const stall = await openPage('shop.html', `/${listing ?? (await fullestStall())}`, respond);
     const s = stall.window.document;
     await until(stall, 'the order form', () => Boolean(s.getElementById('next')));
     (s.getElementById('next') as HTMLButtonElement).click();
@@ -1251,7 +1347,8 @@ describe('the website', () => {
 
     pay().click();
     await until(stall, '«Төлөх» again, after the lost answer', () => network.lost && !pay().hasAttribute('data-busy'));
-    expect(s.getElementById('pay-error')?.textContent).not.toBe('');
+    // In words the person reads, not the browser's «Failed to fetch».
+    expect(s.getElementById('pay-error')?.textContent).toBe(CONNECTION_LOST);
     // Pressed twice, in a hurry: still one press.
     pay().click();
     pay().click();
@@ -1358,6 +1455,94 @@ describe('the website', () => {
     (s.getElementById('pay') as HTMLButtonElement).click();
     await until(stall, 'the way to the second order', () => left.count === 2);
     expect(await ideshOf('+97699005006')).toEqual({ orders: 2, payments: 2 });
+  });
+
+  it('sells one animal when a changed order is paid for while the first press is still on its way', async () => {
+    await ownGuest('+97699005010');
+    const network = holdingOne(makingIdesh);
+    const stall = await reviewAtStall(network.respond);
+    const s = stall.window.document;
+    const pay = () => s.getElementById('pay') as HTMLButtonElement;
+    const left = departures(stall);
+
+    pay().click();
+    // The order is made at the server and its answer is slow in coming. The
+    // person does not wait for it: back to the form, one more, and «Төлөх».
+    await network.answered;
+    (s.getElementById('edit') as HTMLButtonElement).click();
+    (s.querySelector('.sd-qty [data-d="1"]') as HTMLButtonElement).click();
+    (s.getElementById('next') as HTMLButtonElement).click();
+    pay().click();
+    network.release();
+
+    // The second press waited for the first, and the animal the first bought
+    // is the one bought: both presses go to it.
+    await until(stall, 'the way to the order, from both presses', () => left.count === 2);
+    expect(await ideshOf('+97699005010')).toEqual({ orders: 1, payments: 1 });
+  });
+
+  it('sells one animal when «Төлөх» is pressed again while the first is held up at the server', async () => {
+    await ownGuest('+97699005011');
+    const listing = await fullestStall();
+    const stall = await reviewAtStall(undefined, listing);
+    const s = stall.window.document;
+    const pay = () => s.getElementById('pay') as HTMLButtonElement;
+    const left = departures(stall);
+
+    const other = await busyStall(listing);
+    try {
+      pay().click();
+      expect(await mostWaiting(1, PATIENCE), 'the first press, waiting at the server').toBe(1);
+      // The same order, looked over again and pressed for, under the same key:
+      // with nothing kept for it yet, a second request would make a second order.
+      (s.getElementById('edit') as HTMLButtonElement).click();
+      (s.getElementById('next') as HTMLButtonElement).click();
+      pay().click();
+      expect(await mostWaiting(2, 1500), 'requests waiting at the server').toBe(1);
+    } finally {
+      await other.done();
+    }
+    await until(stall, 'the way to the order, from both presses', () => left.count === 2);
+    expect(await ideshOf('+97699005011')).toEqual({ orders: 1, payments: 1 });
+  });
+
+  it('goes to the animal a lost «Төлөх» bought when the server kept no answer to making it either', async () => {
+    await ownGuest('+97699005012');
+    const network = losingOne(payingIdesh);
+    const stall = await reviewAtStall(network.respond);
+    const s = stall.window.document;
+    const pay = () => s.getElementById('pay') as HTMLButtonElement;
+    const left = departures(stall);
+    pay().click();
+    await until(stall, '«Төлөх» again, after the lost answer', () => network.lost && !pay().hasAttribute('data-busy'));
+
+    // A day on, or a store that failed: the order's own key has nothing to
+    // hand back, and the order it made is known — and paid for.
+    await forgetAnswers('^/v1/idesh$');
+    pay().click();
+    await until(stall, 'the way to the order', () => left.count > 0);
+    expect(await ideshOf('+97699005012')).toEqual({ orders: 1, payments: 1 });
+  });
+
+  it('says on the order it hands over to when that order is the one from before a change', async () => {
+    await ownGuest('+97699005013');
+    const stall = await reviewAtStall();
+    const left = departures(stall);
+    (stall.window.document.getElementById('pay') as HTMLButtonElement).click();
+    await until(stall, 'the way to the order', () => left.count > 0);
+    const { rows } = await getPool().query<{ id: string }>(
+      `SELECT o.id FROM idesh.idesh_order o JOIN identity.guest g ON g.id = o.guest_id WHERE g.phone_e164 = $1`,
+      ['+97699005013'],
+    );
+
+    // Handed over as bought, the order's page says the payment went through…
+    const bought = await openPage('orders.html', `/${rows[0]!.id}?new=1`);
+    await until(bought, 'the word on it', (d) => d.querySelector('.od-new b')?.textContent === 'Төлбөр амжилттай');
+    // …and handed over as the order before a change, it says that instead:
+    // the person looked over another quantity a moment ago.
+    const earlier = await openPage('orders.html', `/${rows[0]!.id}?new=1&earlier=1`);
+    await until(earlier, 'the word on it', (d) => d.querySelector('.od-new b')?.textContent === EARLIER_ORDER);
+    expect(earlier.window.location.search).toBe('');
   });
 });
 
@@ -1497,6 +1682,8 @@ describe('өвлийн идэш', () => {
 
     pay().click();
     await until(dom, 'Pay again, after the lost answer', () => network.lost && !pay().disabled);
+    // In words the guest reads, not the browser's «Failed to fetch».
+    expect(dom.window.document.getElementById('toast')?.textContent).toBe(CONNECTION_LOST);
     // Tapped twice, in a hurry: still one tap.
     pay().click();
     pay().click();
@@ -1561,8 +1748,10 @@ describe('өвлийн идэш', () => {
     await until(dom, 'the review again', () => Boolean(pay()) && !pay().disabled);
     pay().click();
 
-    // The first was paid for: it is the one shown, and nothing is sold beside it.
+    // The first was paid for: it is the one shown, and nothing is sold beside
+    // it. The guest looked over two a moment ago, and is told why it is one.
     await until(dom, 'the status', (doc) => Boolean(doc.querySelector('.status')));
+    await until(dom, 'the word about it', (doc) => doc.getElementById('toast')?.textContent === `${EARLIER_ORDER}.`);
     expect(d.querySelector('#screen-sub')?.textContent).toMatch(/×1$/);
     expect(await ideshOf('+97699004020')).toEqual({ orders: 1, payments: 1 });
   });
@@ -1634,6 +1823,127 @@ describe('өвлийн идэш', () => {
     expect(d.querySelector('#screen-sub')?.textContent).toBe(first.what);
     expect(d.querySelector('.handcode b')?.textContent).not.toBe(first.code);
     expect(await ideshOf('+97699004019')).toEqual({ orders: 2, payments: 2 });
+  });
+
+  it('sells one animal when a changed order is paid for while the first tap is still on its way', async () => {
+    await ownGuest('+97699004023');
+    const network = holdingOne(makingIdesh);
+    const dom = await openPage('idesh.html', '', network.respond);
+    await chooseOne(dom, await fullestStall());
+    const d = dom.window.document;
+    const pay = () => d.querySelector('#pay') as HTMLButtonElement;
+
+    pay().click();
+    // The order is made at the server and its answer is slow in coming. The
+    // guest does not wait for it: back to the form, one more, and Pay.
+    await network.answered;
+    (d.getElementById('screen-back') as HTMLElement).click();
+    await until(dom, 'the form again', (doc) => Boolean(doc.querySelector('#step-qty [data-d="1"]')));
+    (d.querySelector('#step-qty [data-d="1"]') as HTMLButtonElement).click();
+    (d.querySelector('#next') as HTMLButtonElement).click();
+    await until(dom, 'the review again', () => Boolean(pay()) && !pay().disabled);
+    pay().click();
+    network.release();
+
+    // The second tap waited for the first, and the animal the first bought is
+    // the one bought: it is the one shown, and the guest is told why.
+    await until(dom, 'the word about it', (doc) => doc.getElementById('toast')?.textContent === `${EARLIER_ORDER}.`);
+    expect(d.querySelector('.status')).not.toBeNull();
+    expect(d.querySelector('#screen-sub')?.textContent).toMatch(/×1$/);
+    expect(await ideshOf('+97699004023')).toEqual({ orders: 1, payments: 1 });
+  });
+
+  it('sells one animal when Pay is tapped again while the first is held up at the server', async () => {
+    await ownGuest('+97699004024');
+    const listing = await fullestStall();
+    const dom = await openPage('idesh.html');
+    await chooseOne(dom, listing);
+    const d = dom.window.document;
+    const pay = () => d.querySelector('#pay') as HTMLButtonElement;
+
+    const other = await busyStall(listing);
+    try {
+      pay().click();
+      expect(await mostWaiting(1, PATIENCE), 'the first tap, waiting at the server').toBe(1);
+      // Back, on again to the same order, and Pay, under the same key: with
+      // nothing kept for it yet, a second request would make a second order.
+      (d.getElementById('screen-back') as HTMLElement).click();
+      await until(dom, 'the form again', (doc) => Boolean(doc.querySelector('#next')));
+      (d.querySelector('#next') as HTMLButtonElement).click();
+      await until(dom, 'the review again', () => Boolean(pay()) && !pay().disabled);
+      pay().click();
+      expect(await mostWaiting(2, 1500), 'requests waiting at the server').toBe(1);
+    } finally {
+      await other.done();
+    }
+    await until(dom, 'the status', (doc) => Boolean(doc.querySelector('.status')));
+    expect(await ideshOf('+97699004024')).toEqual({ orders: 1, payments: 1 });
+  });
+
+  it('shows the animal a lost Pay bought when the guest has had to sign in again since', async () => {
+    await ownGuest('+97699004025');
+    const network = losingOne(payingIdesh);
+    const signIn = signingInAs('+97699004025');
+    const dom = await openPage('idesh.html', '', (path, init) => signIn(path) ?? network.respond(path, init));
+    await chooseOne(dom, await fullestStall());
+    const pay = () => dom.window.document.querySelector('#pay') as HTMLButtonElement;
+    pay().click();
+    await until(dom, 'Pay again, after the lost answer', () => network.lost && !pay().disabled);
+
+    // The session ends meanwhile, and the tap after it signs the guest in
+    // again: a session the server has kept no answer for.
+    const before = storage.getItem('basu.guest');
+    await endSessions('+97699004025');
+    pay().click();
+    await until(dom, 'the status', (d) => Boolean(d.querySelector('.status')));
+    expect(storage.getItem('basu.guest')).not.toBe(before);
+    expect(dom.window.document.querySelector('.status .big')?.textContent).toBe('Захиалга баталгаажлаа');
+    expect(await ideshOf('+97699004025')).toEqual({ orders: 1, payments: 1 });
+  });
+
+  it('shows the animal a lost Pay bought when the server kept no answer to making it either', async () => {
+    await ownGuest('+97699004026');
+    const network = losingOne(payingIdesh);
+    const dom = await openPage('idesh.html', '', network.respond);
+    await chooseOne(dom, await fullestStall());
+    const pay = () => dom.window.document.querySelector('#pay') as HTMLButtonElement;
+    pay().click();
+    await until(dom, 'Pay again, after the lost answer', () => network.lost && !pay().disabled);
+
+    // A day on, or a store that failed: the order's own key has nothing to
+    // hand back, and the order it made is known — and paid for.
+    await forgetAnswers('^/v1/idesh$');
+    pay().click();
+    await until(dom, 'the status', (d) => Boolean(d.querySelector('.status')));
+    expect(dom.window.document.querySelector('.status .big')?.textContent).toBe('Захиалга баталгаажлаа');
+    expect(await ideshOf('+97699004026')).toEqual({ orders: 1, payments: 1 });
+  });
+
+  it('lets whoever signs in after a lost Pay buy their own, rather than stop at an order not theirs', async () => {
+    await ownGuest('+97699004027');
+    const network = losingOne(payingIdesh);
+    const signIn = signingInAs('+97699004028');
+    const dom = await openPage('idesh.html', '', (path, init) => signIn(path) ?? network.respond(path, init));
+    await chooseOne(dom, await fullestStall());
+    const d = dom.window.document;
+    const pay = () => d.querySelector('#pay') as HTMLButtonElement;
+    pay().click();
+    await until(dom, 'Pay again, after the lost answer', () => network.lost && !pay().disabled);
+
+    // The first guest's session ends, and somebody else signs in on the
+    // phone, wanting two. The order the tap before made is not theirs to see.
+    await endSessions('+97699004027');
+    (d.getElementById('screen-back') as HTMLElement).click();
+    await until(dom, 'the form again', (doc) => Boolean(doc.querySelector('#step-qty [data-d="1"]')));
+    (d.querySelector('#step-qty [data-d="1"]') as HTMLButtonElement).click();
+    (d.querySelector('#next') as HTMLButtonElement).click();
+    await until(dom, 'the review again', () => Boolean(pay()) && !pay().disabled);
+    pay().click();
+
+    await until(dom, 'the status', (doc) => Boolean(doc.querySelector('.status')));
+    expect(d.querySelector('#screen-sub')?.textContent).toMatch(/×2$/);
+    expect(await ideshOf('+97699004027')).toEqual({ orders: 1, payments: 1 });
+    expect(await ideshOf('+97699004028')).toEqual({ orders: 1, payments: 1 });
   });
 
   it('asks for an address only when the meat is to be delivered', async () => {

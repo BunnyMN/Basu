@@ -4,7 +4,7 @@ import { closePool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
-import { createListing, registerSupplier, type Listing } from '../idesh/index.js';
+import { createListing, housekeeping, registerSupplier, type Listing } from '../idesh/index.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
 import { setSetting } from '../ops/index.js';
@@ -288,6 +288,12 @@ describe('ordering', () => {
 
     const all = await app.inject({ method: 'GET', url: '/v1/idesh?scope=all', headers: auth(token) });
     expect(all.json().orders.map((o: { id: string }) => o.id)).toEqual([id]);
+    // Half an hour on, the scheduler gives the draft's animal back. Closed, it
+    // is still not an order anybody placed, and not «Дууслаа» among theirs.
+    clock.advanceMinutes(31);
+    expect((await housekeeping(ctx)).expired).toBe(1);
+    const lapsed = await app.inject({ method: 'GET', url: '/v1/idesh?scope=all', headers: auth(token) });
+    expect(lapsed.json().orders.map((o: { id: string }) => o.id)).toEqual([id]);
     // Somebody else's history is theirs.
     const other = await app.inject({ method: 'GET', url: '/v1/idesh?scope=all', headers: auth(await signIn('+97699001144')) });
     expect(other.json().orders).toEqual([]);

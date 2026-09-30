@@ -205,7 +205,12 @@ async function drawOrder(id, fresh) {
           <p class="od-sub">${esc(o.title)} × ${o.qty} ${unitWord(o)} · ${esc(o.supplier.name)}</p>
         </div>`),
   );
-  if (fresh && o.state === 'PAID') {
+  if (fresh === 'earlier' && o.state === 'PAID') {
+    // The stall bought the order as it was before the person changed it (a
+    // press whose answer was slow or lost had paid for it), and they looked
+    // over another one a moment ago: this says why it is this one.
+    page.append(el(`<div class="od-new" role="status">${MARK.done}<div><b>Өмнөх захиалга тань төлөгдсөн байна</b><span>Өөрчилсөн захиалга үүсээгүй, төлбөр нэг л удаа гарсан.</span></div></div>`));
+  } else if (fresh && o.state === 'PAID') {
     page.append(el(`<div class="od-new" role="status">${MARK.done}<div><b>Төлбөр амжилттай</b><span>Захиалга нийлүүлэгчид очлоо. Явцыг эндээс, мэдэгдлээр харна.</span></div></div>`));
   }
   const main = el('<div class="od"><div id="od-main"></div><div class="od-side" id="od-side"></div></div>');
@@ -289,7 +294,10 @@ const orderId = location.pathname.match(/^\/orders\/([0-9a-f-]{36})$/)?.[1];
 if (token) {
   try {
     if (orderId) {
-      const fresh = new URLSearchParams(location.search).has('new');
+      // Sent here by the stall just now (shop.html): bought, or `earlier`, the
+      // order from before a change. Said once; the address forgets it.
+      const sent = new URLSearchParams(location.search);
+      const fresh = sent.has('new') && (sent.has('earlier') ? 'earlier' : 'new');
       if (fresh) history.replaceState(null, '', location.pathname);
       const o = await drawOrder(orderId, fresh);
       // Still going: look again now and then, so a supplier starting shows here.

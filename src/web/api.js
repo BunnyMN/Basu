@@ -77,6 +77,16 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * What a failure says to the person in front of it: the server's own words
+ * when it answered, and plain ones when it never could. A request the
+ * network dropped fails in the browser's words — «Failed to fetch», «Load
+ * failed» — which are English, and do not say to try again.
+ */
+export function whatWentWrong(error) {
+  return error instanceof ApiError ? error.message : 'Холболт тасарлаа. Дахин оролдоно уу.';
+}
+
 export async function api(path, { method = 'GET', body, token, idempotencyKey, headers: extra = {}, signal } = {}) {
   const headers = { ...extra };
   if (body) headers['content-type'] = 'application/json';
