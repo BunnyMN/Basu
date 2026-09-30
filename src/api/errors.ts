@@ -114,6 +114,9 @@ const AUTH_ERRORS: Record<AuthError['code'], Spec> = {
   EMAIL_FAILED: { status: 502, mn: 'Код илгээж чадсангүй. Хэсэг хүлээгээд дахин оролдоно уу.' },
   SOCIAL_CLOSED: { status: 503, mn: 'Энэ аргаар нэвтрэх түр ажиллахгүй байна.' },
   SOCIAL_REFUSED: { status: 401, mn: 'Нэвтрэлт баталгаажсангүй. Дахин оролдоно уу.' },
+  // One answer for a code never made, spent, late or brought without its
+  // cookie: which of them it was is nothing a stranger with a code should learn.
+  HANDOFF_REFUSED: { status: 400, mn: 'Google-ээр нэвтрэлт хүчингүй болсон байна. Дахин нэвтэрнэ үү.' },
   BAD_PHONE: { status: 400, mn: 'Утасны дугаараа шалгана уу (+976XXXXXXXX).' },
   PHONE_TAKEN: { status: 409, mn: 'Энэ дугаар аль хэдийн бүртгэлтэй. Нэвтэрнэ үү.' },
   BAD_CREDENTIALS: { status: 401, mn: 'Имэйл/утас эсвэл нууц үг буруу байна.' },

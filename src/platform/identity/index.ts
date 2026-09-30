@@ -74,6 +74,8 @@ export {
   beginGoogle,
   takeGoogleState,
   completeGoogle,
+  handOff,
+  claimHandoff,
   googleConfigFromEnv,
   safeReturn,
   signInWithApple,

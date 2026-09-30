@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { PoolClient } from 'pg';
 import { getPool, tx } from '../../db/pool.js';
 import type { Ctx } from '../../ports.js';
@@ -13,7 +13,8 @@ import { emailVerified, IdTokenError, verifyIdToken, type IdClaims } from './idt
  * ID token over a back channel. No Google script is loaded into our pages,
  * and the same flow serves the iPhone app through the system's sign-in sheet
  * (Google refuses to sign anybody in inside an embedded web view, and it is
- * right to).
+ * right to). A page is handed the sign-in back as a code of our own, which
+ * it trades for the session itself — see `handOff`.
  *
  * Apple is native on the iPhone: the app hands us the identity token Apple
  * gave it, and we check it the same way. The App Store asks for Sign in with
@@ -79,6 +80,7 @@ const GOOGLE_JWKS = 'https://www.googleapis.com/oauth2/v3/certs';
 const STATE_MINUTES = 10;
 
 const b64 = (bytes: Buffer) => bytes.toString('base64url');
+const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');
 
 /** The first half: where to send the person, and the state that must come back. */
 export async function beginGoogle(config: GoogleConfig, returnTo: string, now: Date): Promise<{ url: string; state: string }> {
@@ -121,12 +123,16 @@ export async function takeGoogleState(state: string, now: Date): Promise<{ verif
   return row ? { verifier: row.verifier, returnTo: safeReturn(row.return_to) } : null;
 }
 
-/** The code traded for an ID token over the back channel, the token checked, the person signed in. */
+/**
+ * The code traded for an ID token over the back channel, the token checked,
+ * and the account it names — found, joined, or made. No session yet: the
+ * app is given one at once, a page is given a code for one (`handOff`).
+ */
 export async function completeGoogle(
   ctx: Ctx,
   config: GoogleConfig,
-  input: { code: string; verifier: string; label?: string | null },
-): Promise<GuestSession> {
+  input: { code: string; verifier: string },
+): Promise<string> {
   const response = await fetch(config.tokenUrl ?? 'https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -157,11 +163,68 @@ export async function completeGoogle(
     throw new AuthError('SOCIAL_REFUSED', `Google's token did not check out: ${(error as IdTokenError).message}`);
   }
 
-  return signInWithIdentity(
-    ctx,
-    { provider: 'google', sub: claims.sub, email: emailVerified(claims) ? claims.email ?? null : null, name: claims.name ?? null },
-    input.label ?? null,
+  return accountFor(ctx, {
+    provider: 'google',
+    sub: claims.sub,
+    email: emailVerified(claims) ? claims.email ?? null : null,
+    name: claims.name ?? null,
+  });
+}
+
+/* ── the sign-in, handed to the page that asked for it ──────────────── */
+
+/**
+ * The callback cannot give a browser the session itself. Whatever it puts
+ * in the address — even the fragment, which never reaches a server — the
+ * browser's history keeps as it was visited, and Chrome syncs that history
+ * to every device the person is signed in on. So a page is sent back a
+ * code instead and trades it for the session in a request of its own
+ * (`claimHandoff`).
+ *
+ * The code is good once, for a minute, and only together with the binding,
+ * which the callback puts in a cookie in the browser that went to Google.
+ * Read out of a history, it has been spent. Sent to somebody else in a link,
+ * it arrives without its cookie and opens nothing — where a link carrying a
+ * session once signed a stranger into an attacker's account. Both are kept
+ * as hashes, like a session.
+ */
+const HANDOFF_SECONDS = 60;
+
+export async function handOff(guestId: string, label: string, now: Date): Promise<{ code: string; binding: string }> {
+  const code = b64(randomBytes(32));
+  const binding = b64(randomBytes(32));
+  await getPool().query(
+    `WITH gone AS (DELETE FROM identity.auth_handoff WHERE expires_at < $5::timestamptz)
+     INSERT INTO identity.auth_handoff (code_hash, binding_hash, guest_id, label, created_at, expires_at)
+     VALUES ($1, $2, $3, $4, $5, $5::timestamptz + make_interval(secs => $6))`,
+    [sha256(code), sha256(binding), guestId, label, now, HANDOFF_SECONDS],
   );
+  return { code, binding };
+}
+
+/**
+ * The code from the page's address and the binding from its browser's
+ * cookie: a session, once. The code is spent on first sight, whether or not
+ * the binding matches, so nobody gets a second try at it. One never made,
+ * already spent, late, for an account closed since, or brought without its
+ * binding opens nothing — and the refusal does not say which.
+ */
+export async function claimHandoff(ctx: Ctx, input: { code: string; binding: string | null }): Promise<GuestSession> {
+  const refused = () => new AuthError('HANDOFF_REFUSED', 'no such handoff, or it was spent, late, or brought without its cookie');
+  if (!input.code) throw refused();
+  const { rows } = await getPool().query<{ guest_id: string; binding_hash: string; label: string | null }>(
+    `DELETE FROM identity.auth_handoff h
+      USING identity.guest g
+      WHERE h.code_hash = $1 AND h.expires_at > $2 AND g.id = h.guest_id AND g.closed_at IS NULL
+      RETURNING h.guest_id, h.binding_hash, h.label`,
+    [sha256(input.code), ctx.clock.now()],
+  );
+  const handoff = rows[0];
+  if (!handoff || !input.binding) throw refused();
+  const expected = Buffer.from(handoff.binding_hash, 'hex');
+  const brought = Buffer.from(sha256(input.binding), 'hex');
+  if (expected.length !== brought.length || !timingSafeEqual(expected, brought)) throw refused();
+  return startSessionFor(ctx, handoff.guest_id, handoff.label);
 }
 
 /* ── Apple ──────────────────────────────────────────────────────────── */
@@ -210,11 +273,13 @@ export async function signInWithApple(
   if (!input.nonce || claims.nonce !== expected) {
     throw new AuthError('SOCIAL_REFUSED', 'Apple’s token was not asked for by this sign-in');
   }
-  return signInWithIdentity(
-    ctx,
-    { provider: 'apple', sub: claims.sub, email: emailVerified(claims) ? claims.email ?? null : null, name: input.name ?? null },
-    input.label ?? null,
-  );
+  const guestId = await accountFor(ctx, {
+    provider: 'apple',
+    sub: claims.sub,
+    email: emailVerified(claims) ? claims.email ?? null : null,
+    name: input.name ?? null,
+  });
+  return startSessionFor(ctx, guestId, input.label ?? null);
 }
 
 /* ── one account, whichever door ────────────────────────────────────── */
@@ -222,16 +287,16 @@ export async function signInWithApple(
 /** The column that holds each provider's subject. Ours, never input. */
 const SUB_COLUMN = { google: 'google_sub', apple: 'apple_sub' } as const;
 
-async function signInWithIdentity(
+/** The account a provider's person is: found by their subject, joined by a vouched-for address, or made. */
+async function accountFor(
   ctx: Ctx,
   who: { provider: 'google' | 'apple'; sub: string; email: string | null; name: string | null },
-  label: string | null,
-): Promise<GuestSession> {
+): Promise<string> {
   const column = SUB_COLUMN[who.provider];
   const email = who.email?.trim().toLowerCase() || null;
   const now = ctx.clock.now();
 
-  const guestId = await tx(async (client: PoolClient) => {
+  return tx(async (client: PoolClient) => {
     const bySub = await client.query<{ id: string }>(
       `SELECT id FROM identity.guest WHERE ${column} = $1 AND closed_at IS NULL`,
       [who.sub],
@@ -270,6 +335,4 @@ async function signInWithIdentity(
     ]);
     return id;
   });
-
-  return startSessionFor(ctx, guestId, label);
 }

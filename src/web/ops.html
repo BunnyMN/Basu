@@ -267,7 +267,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mnt, money, KIND, HEADLINE, dayLabel, signInDoors, accountWays, takeSession, dropSession, popup, confirmPopup } from '/api.js';
+import { api, store, toast, mnt, money, KIND, HEADLINE, dayLabel, signInDoors, accountWays, authReturn, takeSession, dropSession, popup, confirmPopup } from '/api.js';
 import { NAV_ICON, deskFrame } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -4192,7 +4192,10 @@ let bootedAs = null;
  */
 async function boot() {
   root.replaceChildren();
-  // A sign-in that just came back from Google is already this browser's person (api.js, authReturn).
+  // Back from Google, the code in the address is claimed first, and the
+  // session it becomes is this browser's person, whoever was signed in here
+  // before (api.js, authReturn).
+  await authReturn;
   bootedAs = token();
   if (!bootedAs) {
     access = ws = nav = me = null;

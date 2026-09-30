@@ -162,7 +162,9 @@ function takeKitchen(t) {
   store.kitchenToken = t;
   if (before && before !== t) endSession(before);
 }
-if (authReturn?.token) takeKitchen(authReturn.token);
+// Back from Google: the claimed session is the kitchen's person, not the browser's guest.
+const back = await authReturn;
+if (back?.token) takeKitchen(back.token);
 const token = () => store.kitchenToken;
 const kitchen = (path, options = {}) => api(path, { ...options, token: token(), headers: ORG ? { 'x-basu-org': ORG } : {} });
 

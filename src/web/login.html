@@ -174,7 +174,7 @@ const DEVICE = 'Вэб';
 
 /**
  * Where the person was going. Google leaves the site and comes back to
- * /login with the session in the fragment, so the destination waits in
+ * /login with a code to claim in the fragment, so the destination waits in
  * this tab's storage for the round trip.
  */
 const asked = new URLSearchParams(location.search).get('next');
@@ -364,9 +364,10 @@ $('signup-form').addEventListener('submit', (event) => {
    A form submitted before its listener is on would go to the address bar,
    password and all, so nothing above waits on the network. */
 
-// Back from Google with a session, or already signed in: straight on.
-if (authReturn?.token || store.guestToken) {
-  const token = authReturn?.token ?? store.guestToken;
+// Back from Google with its code claimed for a session, or already signed in: straight on.
+const back = await authReturn;
+if (back?.token || store.guestToken) {
+  const token = back?.token ?? store.guestToken;
   try {
     await api('/v1/me', { token });
     arrive();
@@ -386,7 +387,7 @@ $('to-forgot').hidden = !methods.email;
 $('to-signup').hidden = methods.email;
 if (!methods.email && !methods.google) go('password');
 else go('start');
-if (authReturn?.refused) $('email-error').textContent = 'Google-ээр нэвтэрч чадсангүй. Дахин оролдоно уу.';
+if (back?.refused) $('email-error').textContent = 'Google-ээр нэвтэрч чадсангүй. Дахин оролдоно уу.';
 
 document.documentElement.dataset.ready = '';
 

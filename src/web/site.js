@@ -2,7 +2,7 @@
    the foot, the way to /login and back, and calls made as the person
    signed in. Every page of the website imports this; the app's pages do not. */
 
-import { api, store, dropSession } from '/api.js';
+import { api, store, dropSession, authReturn } from '/api.js';
 
 export const esc = (value) => {
   const node = document.createElement('span');
@@ -64,9 +64,14 @@ export async function authed(path, options = {}) {
 /* ── the person ────────────────────────────────────────────────────── */
 
 let meAsked = null;
-/** Who is signed in: their profile, asked once per page. Null for nobody. */
-export function me() {
-  if (!store.guestToken) return Promise.resolve(null);
+/**
+ * Who is signed in: their profile, asked once per page. Null for nobody.
+ * A page Google sent somebody back to has them only once the code in its
+ * address is claimed (api.js, authReturn), so that comes first.
+ */
+export async function me() {
+  await authReturn;
+  if (!store.guestToken) return null;
   meAsked ??= api('/v1/me', { token: store.guestToken }).catch((error) => {
     if (error.status === 401) store.guestToken = null;
     return null;

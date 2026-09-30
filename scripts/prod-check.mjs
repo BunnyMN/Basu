@@ -39,6 +39,10 @@ try {
   const foreign = await fetch(`${base}/v1/auth/otp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"phone":"+15550001111"}' });
   check('гадаад дугаарт код илгээхгүй', foreign.status === 400, `HTTP ${foreign.status}`);
 
+  // Google comes back to a page with a code, never a session; one nobody was given opens nothing.
+  const handoff = await fetch(`${base}/v1/auth/handoff`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"code":"made-up"}' });
+  check('Google-ээс буцсан код: зохиомол кодоор нэвтрэхгүй', handoff.status === 400, `HTTP ${handoff.status}`);
+
   // Which ways in are open: Google and email need keys only the server holds.
   const methods = await head('/v1/auth/methods');
   const open = methods.status === 200 ? JSON.parse(methods.text) : null;

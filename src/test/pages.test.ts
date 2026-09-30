@@ -7,6 +7,7 @@ import type { FastifyInstance } from 'fastify';
 import { closePool, getPool } from '../db/pool.js';
 import { DemoClock } from '../demoClock.js';
 import { buildServer } from '../api/server.js';
+import { handOff } from '../platform/identity/index.js';
 import { seedDemo } from '../seed/demo.js';
 import {
   FakeNotifier,
@@ -53,6 +54,39 @@ function device(token?: string): ReturnType<typeof memoryStorage> {
 }
 
 /**
+ * What a browser keeps beside its storage: the cookies our server set,
+ * each sent back with a request to the path it was set for, the way a
+ * browser sends them with a page's same-origin fetch.
+ */
+type Jar = Map<string, { value: string; path: string }>;
+const jars = new WeakMap<object, Jar>();
+function cookiesOf(browser: object): Jar {
+  let jar = jars.get(browser);
+  if (!jar) jars.set(browser, (jar = new Map()));
+  return jar;
+}
+/** One `Set-Cookie` line, kept — or dropped, when it says Max-Age=0. */
+function keepCookie(jar: Jar, line: string): void {
+  const [pair = '', ...attributes] = line.split(';').map((part) => part.trim());
+  const name = pair.slice(0, pair.indexOf('='));
+  const path = attributes.find((a) => /^path=/i.test(a))?.slice('path='.length) ?? '/';
+  if (attributes.some((a) => /^max-age=0$/i.test(a))) jar.delete(name);
+  else jar.set(name, { value: pair.slice(name.length + 1), path });
+}
+
+/**
+ * Back from Google, the way the callback leaves a browser: the page's
+ * address carries a code, and the browser holds the cookie the code is good
+ * only with. The handoff is the server's own; only the round trip to Google
+ * is skipped here — src/api/auth.test.ts walks that.
+ */
+async function backFromGoogle(guestId: string, browser: object): Promise<string> {
+  const { code, binding } = await handOff(guestId, 'Google', clock.now());
+  keepCookie(cookiesOf(browser), `basu_handoff=${binding}; Path=/v1/auth/handoff; Max-Age=120; HttpOnly; Secure; SameSite=Lax`);
+  return `#auth_code=${code}`;
+}
+
+/**
  * Pages opened by the current test. They are closed afterwards so their polling
  * stops: a jsdom window left running keeps hitting the API and, because the
  * store is shared the way a browser shares an origin, a zombie page can clear
@@ -83,10 +117,18 @@ async function openPage(
   const { window } = dom;
 
   // jsdom has no fetch; point it at the running server and resolve relative
-  // paths the way a browser would.
-  (window as unknown as { fetch: typeof fetch }).fetch = ((input: string, init?: RequestInit) => {
+  // paths the way a browser would, with the cookies this browser holds.
+  const jar = cookiesOf(browser);
+  (window as unknown as { fetch: typeof fetch }).fetch = (async (input: string, init?: RequestInit) => {
     const canned = respond?.(String(input));
-    return canned ? Promise.resolve(canned) : fetch(new URL(String(input), base).toString(), init);
+    if (canned) return canned;
+    const url = new URL(String(input), base);
+    const headers = new Headers(init?.headers);
+    const sent = [...jar].filter(([, c]) => url.pathname.startsWith(c.path)).map(([name, c]) => `${name}=${c.value}`);
+    if (sent.length) headers.set('cookie', sent.join('; '));
+    const response = await fetch(url.toString(), { ...init, headers });
+    for (const line of response.headers.getSetCookie()) keepCookie(jar, line);
+    return response;
   }) as typeof fetch;
   Object.defineProperty(window, 'localStorage', { value: browser, writable: true });
 
@@ -1631,6 +1673,11 @@ describe('one browser, one person', () => {
    * the website replaced or cleared it: a browser where the admin had opened
    * the desk opened it again for whoever signed in there next, with any
    * account at all. These are that browser.
+   *
+   * And every page took a session from its address, which is how Google's
+   * sign-in came back: whoever opened a link carrying somebody's session
+   * became them. A page takes a code there now, and only the browser that
+   * went to Google can trade it.
    */
   async function account(phone: string, name: string): Promise<string> {
     const made = await fetch(`${base}/v1/auth/register`, {
@@ -1657,6 +1704,9 @@ describe('one browser, one person', () => {
     }
     return false;
   }
+  /** Whose session this is. */
+  const guestOf = async (token: string) =>
+    ((await (await fetch(`${base}/v1/me`, { headers: { authorization: `Bearer ${token}` } })).json()) as { id: string }).id;
   const noDesk = (dom: JSDOM) => dom.window.document.querySelector('.ws-opt[data-ws="desk"]') === null;
   const nameOn = (dom: JSDOM) => dom.window.document.querySelector('.ws-btn')?.textContent ?? '';
 
@@ -1679,12 +1729,76 @@ describe('one browser, one person', () => {
     const admin = await seated('+97688050011', 'Админ Хоёр');
     const next = await account('+97688050012', 'Google-ийн хүн');
     const browser = device(admin);
-    const dash = await openPage('ops.html', `#auth=${next}`, undefined, browser);
+    const dash = await openPage('ops.html', await backFromGoogle(await guestOf(next), browser), undefined, browser);
     await until(dash, 'the corner', (d) => Boolean(d.querySelector('#org-list')));
     expect(nameOn(dash)).toContain('Google-ийн хүн');
     expect(noDesk(dash)).toBe(true);
-    expect(browser.getItem('basu.guest')).toBe(next);
+    // The session the code became — nobody's from before — and nothing of it left in the address.
+    const now = browser.getItem('basu.guest')!;
+    expect([admin, next]).not.toContain(now);
+    expect(await guestOf(now)).toBe(await guestOf(next));
+    expect(dash.window.location.hash).not.toContain('auth');
+    expect(cookiesOf(browser).has('basu_handoff')).toBe(false);
     expect(await ended(admin)).toBe(true);
+  });
+
+  it('signs in on the website’s own door with the code Google sent back to it', async () => {
+    const before = await account('+97688050061', 'Өмнөх хүн');
+    const person = await account('+97688050062', 'Google-ээр орсон хүн');
+    const browser = device(before);
+    const login = await openPage('login.html', await backFromGoogle(await guestOf(person), browser), undefined, browser);
+    await until(login, 'the session the code became', () => ![null, before].includes(browser.getItem('basu.guest')));
+    expect(await guestOf(browser.getItem('basu.guest')!)).toBe(await guestOf(person));
+    expect(login.window.location.hash).not.toContain('auth');
+    expect(await ended(before)).toBe(true);
+  });
+
+  it('takes no session from the address: a link carrying somebody’s signs nobody in', async () => {
+    const stranger = await account('+97688050071', 'Холбоос явуулсан хүн');
+    // Nobody signed in: nobody still, and the address wiped.
+    const fresh = device();
+    const door = await openPage('login.html', `#auth=${stranger}`, undefined, fresh);
+    await until(door, 'the door', (d) => d.documentElement.hasAttribute('data-ready'));
+    expect(fresh.getItem('basu.guest')).toBeNull();
+    expect(door.window.location.hash).not.toContain('auth');
+
+    // Somebody signed in: still them, on the dashboard as everywhere.
+    const own = await account('+97688050072', 'Хөтчийн эзэн');
+    const theirs = device(own);
+    const dash = await openPage('ops.html', `#auth=${stranger}`, undefined, theirs);
+    await until(dash, 'the corner', (d) => Boolean(d.querySelector('#org-list')));
+    expect(nameOn(dash)).toContain('Хөтчийн эзэн');
+    expect(theirs.getItem('basu.guest')).toBe(own);
+  });
+
+  it('opens nothing with a code that came back to another browser, and says so', async () => {
+    const stranger = await account('+97688050081', 'Өөр хөтчийн хүн');
+    // The round trip was the stranger's: the cookie is in their browser, the code in a link.
+    const link = await backFromGoogle(await guestOf(stranger), device());
+    const mine = device();
+    const login = await openPage('login.html', link, undefined, mine);
+    await until(login, 'the refusal', (d) => (d.getElementById('email-error')?.textContent ?? '').length > 0);
+    expect(mine.getItem('basu.guest')).toBeNull();
+    expect(login.window.document.getElementById('toast')?.textContent).toBe('Google-ээр нэвтрэлт хүчингүй болсон байна. Дахин нэвтэрнэ үү.');
+  });
+
+  it('gives a Google sign-in on the kitchen screen to the kitchen, and leaves the browser’s guest alone', async () => {
+    const guest = await account('+97688050091', 'Гал тогооны хөтчийн зочин');
+    const cook = await cookFor(pairedVenue);
+    const browser = device(guest);
+    const kds = await openPage('kds.html', await backFromGoogle(await guestOf(cook), browser), undefined, browser);
+    await until(kds, 'the board', (d) => d.querySelectorAll('.lane').length === 3);
+    expect(kds.window.document.querySelector('#venue')?.textContent).toBe(pairedVenue);
+    expect(await guestOf(browser.getItem('basu.kitchen')!)).toBe(await guestOf(cook));
+    expect(browser.getItem('basu.guest')).toBe(guest);
+  });
+
+  it('opens the supplier’s screen for whoever came back from Google to it', async () => {
+    const person = await account('+97688050101', 'Нийлүүлэгч болох хүн');
+    const browser = device();
+    const screen = await openPage('supplier.html', await backFromGoogle(await guestOf(person), browser), undefined, browser);
+    await until(screen, 'the application form', (d) => Boolean(d.querySelector('#apply')));
+    expect(await guestOf(browser.getItem('basu.guest')!)).toBe(await guestOf(person));
   });
 
   it('makes whoever signs in on the website the dashboard’s person too', async () => {
