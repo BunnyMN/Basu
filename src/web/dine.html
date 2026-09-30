@@ -13,7 +13,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F3EE">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0F1110">
 <title>Basu — үдийн хоол</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.css" integrity="sha512-KIMsMWIdnoG9OwZa+oaIafmbDonqck1UCmq+/zcUi2aaZ97N9QE6TqpTM+n36EO40HGh64hU/375zxtjx7WTyQ==" crossorigin="anonymous">
 <link rel="stylesheet" href="/app.css">
 <style>
 /* Layout only. Colour, type, radius, buttons, chips, rows, the sheet and the
@@ -230,7 +230,8 @@ body{display:flex;flex-direction:column}
   <span class="when mono" id="ob-when"></span>
 </button>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
+<!-- MapLibre from cdnjs, held to cdnjs's own hash of the file: bytes that ever differ do not run. A new version takes its new hash, here and on the stylesheet. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js" integrity="sha512-hoXlvOdSmh58mppUyZHZsscHkR/yXl6zLpTMTNwA6IZ61DpeaCNjosRu1WJ2DeIpkfW5MsJJ9H89zjV4IBGqRw==" crossorigin="anonymous"></script>
 <script type="module">
 import { api, store, shell, toast, mountClock, mnt, money, hhmm, HEADLINE, signInSheet } from '/api.js';
 import { mapStyle, pinImage, ULAANBAATAR, isCovered, metresBetween, walkMinutes } from '/mapStyle.js';
@@ -764,7 +765,7 @@ function renderSheet() {
     const button = el(
       `<button class="slot mono" type="button" aria-pressed="${state.slot === slot.starts_at}"${
         slot.available ? '' : ' disabled'
-      }>${slot.label}</button>`,
+      }>${escapeHtml(slot.label)}</button>`,
     );
     button.addEventListener('click', () => {
       state.slot = slot.starts_at;
@@ -780,7 +781,7 @@ function renderSheet() {
     const qty = state.cart.get(item.id) ?? 0;
     const row = el(`
       <div class="item row"${item.sold_out ? ' data-sold data-off' : ''}>
-        <span class="lead"><img class="thumb" src="${item.image_url ?? '/dishes/unknown.svg'}" alt="" loading="lazy" width="56" height="56"></span>
+        <span class="lead"><img class="thumb" src="${escapeHtml(dishPicture(item.image_url))}" alt="" loading="lazy" width="56" height="56"></span>
         <span class="main">
           <span class="name title">${escapeHtml(item.name)}</span>
           ${item.description ? `<span class="sub desc">${escapeHtml(item.description)}</span>` : ''}
@@ -867,11 +868,21 @@ async function appendComments(venueId) {
   $('sheet-body').append(said);
 }
 
-/** Guest text goes into the DOM as text, never as markup. */
+/**
+ * Guest text goes into the DOM as text, never as markup — a comment, a name,
+ * a dish. Quotes too, for whatever sits inside an attribute.
+ */
 function escapeHtml(value) {
-  const node = document.createElement('span');
-  node.textContent = value;
-  return node.innerHTML;
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
+
+/**
+ * A dish's picture: a file of ours or an https address, else the drawing that
+ * stands in for a missing one. Whatever writes `image_url` one day — a
+ * restaurant's own menu page — writes into every guest's page.
+ */
+function dishPicture(url) {
+  return typeof url === 'string' && /^(\/(?![/\\])|https:\/\/)[^\s"'<>\\`]*$/.test(url) ? url : '/dishes/unknown.svg';
 }
 
 function renderFoot() {
@@ -899,7 +910,7 @@ function renderFoot() {
   }
   if (slot) {
     foot.append(
-      el(`<div class="summary"><span>Ирэх цаг</span><span class="mono">${slot.label}</span></div>`),
+      el(`<div class="summary"><span>Ирэх цаг</span><span class="mono">${escapeHtml(slot.label)}</span></div>`),
     );
   }
   foot.append(el(`<div class="summary" data-total><span>Нийт</span>${money(total)}</div>`));
@@ -1101,7 +1112,7 @@ async function showStatus(force) {
   const lastStep = STEPS.filter(([key]) => done[key]).at(-1)?.[1] ?? '';
   const tone = TONE[order.state];
   const card = el(`
-    <div class="status" data-s="${order.state}">
+    <div class="status" data-s="${escapeHtml(order.state)}">
       <div class="lab"><span class="dot"${tone ? ` data-tone="${tone}"` : ''}></span>${negative ? word : lastStep}</div>
       <div class="big${word ? '' : ' mono'}">${negative ? cap : big}</div>
       <div class="cap">${negative ? '' : sub}</div>
@@ -1238,7 +1249,7 @@ function appendReview(body, foot, order) {
   for (const line of order.lines ?? []) {
     const row = el(`
       <div class="row">
-        ${line.image_url ? `<img src="${line.image_url}" alt="">` : ''}
+        ${line.image_url ? `<img src="${escapeHtml(dishPicture(line.image_url))}" alt="">` : ''}
         <div class="n">${escapeHtml(line.name)}${line.qty > 1 ? ` ×${line.qty}` : ''}</div>
       </div>`);
     row.append(

@@ -414,14 +414,27 @@ export async function registerOpsRoutes(
    * Basu's users, for choosing whom to seat: found by name, phone or email,
    * the newest first, each with the seat it holds already. Only for whoever
    * may seat people — the list is the desk's, not the public's.
+   *
+   * Each says whether its number was proved: the name is whatever the
+   * account chose and a password sign-up types any number it likes, so the
+   * picker marks a number no SMS code reached, and leads with the email,
+   * which is always one somebody vouched for.
    */
   app.get<{ Querystring: { q?: string } }>('/v1/ops/people', desk('desk.members:manage'), async (request) => {
     const found = (await findGuests(String(request.query.q ?? '').slice(0, 100), 30)).filter((g) => !g.closedAt);
-    const seats = await seatsOfAccounts(found.map((g) => g.id));
+    const ids = found.map((g) => g.id);
+    const [seats, proved] = await Promise.all([seatsOfAccounts(ids), contactsFor(ids)]);
     return {
       people: found.map((g) => {
         const seat = seats.get(g.id);
-        return { id: g.id, name: g.name, phone: g.phone, email: g.email, member: seat ? { id: seat.id, role: seat.role, active: seat.active } : null };
+        return {
+          id: g.id,
+          name: g.name,
+          phone: g.phone,
+          phone_verified: Boolean(g.phone && proved.get(g.id)?.phoneVerified),
+          email: g.email,
+          member: seat ? { id: seat.id, role: seat.role, active: seat.active } : null,
+        };
       }),
     };
   });

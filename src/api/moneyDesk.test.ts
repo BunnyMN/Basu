@@ -116,6 +116,8 @@ describe('the books at the desk', () => {
     expect((await app.inject({ method: 'GET', url: '/v1/ops/money/topups?state=pending', headers: desk() })).json().topups).toEqual([]);
     const topupCsv = await app.inject({ method: 'GET', url: '/v1/ops/money/topups.csv?state=settled', headers: desk() });
     expect(topupCsv.body.replace(/^﻿/, '').trim().split('\n')).toHaveLength(2);
+    // The phone is the number it is, on every row: a signed number cannot run as a formula, and a `'` in front of it would be in the data.
+    expect(topupCsv.body).toContain(',+97699004009,');
 
     const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() })).json().audit;
     expect(audit.map((a: { action: string }) => a.action)).toEqual(['ledger.export', 'ledger.export']);
@@ -123,6 +125,18 @@ describe('the books at the desk', () => {
 
     // Nobody without a seat reads the books, let alone carries them out.
     expect((await app.inject({ method: 'GET', url: '/v1/ops/money/transfers.csv' })).statusCode).toBe(401);
+  });
+
+  it('never lets a name in the exported books run as a spreadsheet formula', async () => {
+    // A guest's name is theirs to choose; a spreadsheet reads a cell that
+    // starts with `=` as a formula. The name goes into the CSV as text.
+    const { guest } = await aSale();
+    const patched = await app.inject({ method: 'PATCH', url: '/v1/me', headers: auth(guest), payload: { display_name: '=1+2' } });
+    expect(patched.statusCode, patched.body).toBe(200);
+    const body = (await app.inject({ method: 'GET', url: '/v1/ops/money/transfers.csv', headers: desk() })).body.replace(/^﻿/, '');
+    // The name arrives as text — prefixed so the sheet does not evaluate it — never a bare formula cell.
+    expect(body).toContain("'=1+2");
+    expect(body).not.toMatch(/(^|,)=1\+2/m);
   });
 
   it('shows the receipt queue, pushes it on request, and puts a failed one back', async () => {

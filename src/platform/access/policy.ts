@@ -135,10 +135,34 @@ export interface MenuGroup {
 }
 
 /**
+ * What a link Basu adds to a menu may point at: a path on Basu, or an https
+ * address elsewhere — the address as given, or null when it is neither.
+ * Whoever presses a menu link follows it with their own session, the
+ * admin's included, so `javascript:` and `data:` are no link; nor is
+ * `//host` or `/\host`, which a browser reads as another site that only
+ * looks like a path, nor an address with somebody's name before an `@`.
+ * Nothing that could end an attribute or start a tag — a quote, an angle
+ * bracket, a space, a control character — is in one either.
+ */
+export function linkHref(raw: unknown): string | null {
+  const href = typeof raw === 'string' ? raw.trim() : '';
+  if (!href || href.length > 500 || /[\s\\"'<>`\u0000-\u001f\u007f]/.test(href)) return null;
+  if (href.startsWith('/')) return href.startsWith('//') ? null : href;
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return null;
+  }
+  return url.protocol === 'https:' && url.hostname && !url.username && !url.password ? href : null;
+}
+
+/**
  * The menu one person sees in one place: Basu's modules in Basu's order,
  * under each the pages Basu put there that this person may open, and no
  * module left with nothing in it. A supplier's pages are the supplier's own
- * screen, opened for this business.
+ * screen, opened for this business. A link whose address `linkHref` would
+ * refuse — one written before it did — is left out.
  */
 export function buildMenu(scope: Scope, layout: Layout, held: Grants, opts: { orgId?: string } = {}): MenuGroup[] {
   const modules = [...layout.modules].sort((a, b) => Number(b.key === TOP) - Number(a.key === TOP) || a.sort - b.sort);
@@ -148,7 +172,7 @@ export function buildMenu(scope: Scope, layout: Layout, held: Grants, opts: { or
       label: m.key === TOP ? null : m.name,
       icon: m.icon,
       items: layout.pages
-        .filter((p) => p.module === m.key && !p.hidden && held.has(`${scope}.${p.key}`))
+        .filter((p) => p.module === m.key && !p.hidden && held.has(`${scope}.${p.key}`) && (!p.href || linkHref(p.href)))
         .sort((a, b) => a.sort - b.sort)
         .map((p) => ({
           key: p.key,

@@ -228,7 +228,7 @@ function paintGrid() {
   for (const l of list) {
     const gone = l.remaining === 0;
     grid.append(
-      el(`<a class="sh-card" href="/shop/${l.id}" data-id="${l.id}" data-kind="${l.kind}"${l.tier ? ` data-tier="${l.tier}"` : ''}${gone ? ' data-gone' : ''}>
+      el(`<a class="sh-card" href="/shop/${esc(l.id)}" data-id="${esc(l.id)}" data-kind="${esc(l.kind)}"${l.tier ? ` data-tier="${esc(l.tier)}"` : ''}${gone ? ' data-gone' : ''}>
             <span class="ph"><img src="${PHOTO(l.kind)}" alt="" loading="lazy" width="960" height="720">
               <span class="tags">${
                 l.tier ? `<span class="s-pill" data-tone="${l.tier === 'vip' ? 'vip' : 'pine'}">${l.tier === 'vip' ? '★ VIP' : `${MARK.check}Онцгой`}</span>`

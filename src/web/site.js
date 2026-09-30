@@ -4,11 +4,13 @@
 
 import { api, store, dropSession, authReturn } from '/api.js';
 
-export const esc = (value) => {
-  const node = document.createElement('span');
-  node.textContent = value ?? '';
-  return node.innerHTML;
-};
+/**
+ * Text into markup, for everything a page draws from what people wrote: a
+ * listing, a supplier's name and number, a delivery address. Quotes too — a
+ * value inside an attribute (a tel: link, an input's value) would otherwise
+ * end it and write one of its own.
+ */
+export const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 /** One element from a string of markup. */
 export function el(html) {

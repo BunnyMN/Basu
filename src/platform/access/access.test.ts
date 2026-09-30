@@ -7,6 +7,7 @@ import {
   buildMenu,
   grantsOf,
   known,
+  linkHref,
   mayHandOut,
   mayHandOutDesk,
   mayShape,
@@ -169,5 +170,44 @@ describe('the menu', () => {
     expect(items.find((i) => i.key === 'idesh.orders')?.href).toBe('/supplier?org=o1#orders');
     expect(items.find((i) => i.key === 'link-help')?.href).toBe('https://basu.mn/help');
     expect(menu.some((g) => g.key === 'dine')).toBe(false);
+  });
+
+  it('leaves out a stored link whose address it would not follow now', () => {
+    // A link the desk added before the address rule tightened is not drawn:
+    // a menu link is followed with the presser's own session.
+    const layout = layoutOf('desk');
+    layout.pages.push({ key: 'link-bad', module: 'admin', name: 'Хуучин', icon: 'link', sort: 998, hidden: false, href: 'javascript:alert(1)' });
+    layout.pages.push({ key: 'link-ok', module: 'admin', name: 'Сайн', icon: 'link', sort: 999, hidden: false, href: '/kds' });
+    const admin = grantsOf(builtin('desk', 'admin'), ['desk.link-bad', 'desk.link-ok']);
+    const items = buildMenu('desk', layout, admin).flatMap((g) => g.items);
+    expect(items.find((i) => i.key === 'link-ok')?.href).toBe('/kds');
+    expect(items.some((i) => i.key === 'link-bad')).toBe(false);
+  });
+});
+
+describe('a menu link’s address', () => {
+  it('takes a path on Basu or an https address, and nothing that could run or mislead', () => {
+    for (const ok of ['/kds', '/dashboard#desk/guests', 'https://basu.mn/help', 'https://qpay.mn/pay?id=1']) {
+      expect(linkHref(ok), ok).toBe(ok);
+    }
+    for (const bad of [
+      'javascript:alert(1)',
+      'JavaScript:alert(1)',
+      ' javascript:alert(1)',
+      'java\tscript:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
+      'vbscript:msgbox(1)',
+      '//evil.example/x',
+      '/\\evil.example',
+      'https://user@evil.example',
+      'http://basu.mn/x',
+      'https://basu.mn/"><img src=x>',
+      'https://',
+      'not-a-url',
+      123,
+      null,
+    ]) {
+      expect(linkHref(bad as unknown), String(bad)).toBeNull();
+    }
   });
 });

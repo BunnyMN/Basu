@@ -269,7 +269,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 
 <script type="module">
 import { api, ApiError, store, toast, mnt, money, KIND, HEADLINE, dayLabel, signInDoors, accountWays, authReturn, takeSession, dropSession, popup, confirmPopup } from '/api.js';
-import { NAV_ICON, deskFrame } from '/sidenav.js';
+import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
 const root = document.getElementById('root');
@@ -278,11 +278,15 @@ const el = (html) => {
   t.innerHTML = html.trim();
   return t.content.firstElementChild;
 };
-const esc = (value) => {
-  const node = document.createElement('span');
-  node.textContent = value ?? '';
-  return node.innerHTML;
-};
+/**
+ * Text into markup. Whatever came from a person — a name they chose, a
+ * business, a listing, a reason, a phone they typed — goes through here on
+ * its way into innerHTML or a template, and the desk is where a stranger's
+ * words meet the person who holds everything. Quotes too: a value put inside
+ * an attribute (a tel: link, a data-*) would otherwise end it and write an
+ * attribute of its own.
+ */
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const when = (iso) => (iso ? dayLabel(iso.slice(0, 10)) : '—');
 const clockOf = (iso) => {
   const d = new Date(iso);
@@ -309,8 +313,13 @@ const STORY_K = {
   DISPATCHED: 'route', RESLOTTED: 'route', RESENT: 'route', PAID: 'route',
   HANDED: 'ready', CLOSED: 'ready', SERVED: 'ready', READY: 'ready',
 };
+/**
+ * One line of an order's story. What happened and the line under it — who
+ * did it, why — are text: the record says who by the name their account
+ * chose, and a desk seat's name is whatever that account calls itself.
+ */
 const step = (type, title, sub, at) =>
-  `<li data-done${STORY_K[type] ? ` data-k="${STORY_K[type]}"` : ''}><span class="w">${title}<span class="s">${sub}</span></span><span class="t">${when(at)} ${clockOf(at)}</span></li>`;
+  `<li data-done${STORY_K[type] ? ` data-k="${STORY_K[type]}"` : ''}><span class="w">${esc(title)}<span class="s">${esc(sub)}</span></span><span class="t">${when(at)} ${clockOf(at)}</span></li>`;
 const STATE = { applied: 'хүлээгдэж байна', contracted: 'гэрээт', declined: 'татгалзсан' };
 const STATE_WORD = {
   PAID: 'Төлсөн', PREPARING: 'Бэлтгэж байна', READY: 'Бэлэн', DISPATCHED: 'Замд',
@@ -442,7 +451,7 @@ function renderMeHome(view) {
           <p class="cap" style="margin:2px 0 0">${esc(w.sub)}</p>
           ${w.state === 'declined' && w.decline_reason ? `<p class="cap" style="margin:4px 0 0">Шалтгаан: ${esc(w.decline_reason)}</p>` : ''}
         </div>
-        <div class="end"><span class="pill" data-s="${tone}">${word}</span></div>
+        <div class="end"><span class="pill" data-s="${esc(tone)}">${esc(word)}</span></div>
       </div>`);
     const go = () => open(w);
     row.addEventListener('click', go);
@@ -589,7 +598,7 @@ async function renderOrgHome(view) {
       declined: ['warn', 'Бүртгэлийг татгалзсан', w.decline_reason ? `Шалтгаан: ${esc(w.decline_reason)}. Засаад дахин бүртгүүлж болно.` : 'Засаад дахин бүртгүүлж болно.'],
       suspended: ['warn', 'Түр хаасан', 'Энэ байгууллагыг Basu түр хаасан байна. Дэлгэрэнгүйг Basu-гаас асууна уу.'],
     }[w.state] ?? ['warn', w.state, ''];
-    view.append(el(`<div class="callout" data-k="${word[0]}"><b>${word[1]}</b><span>${word[2]}</span></div>`));
+    view.append(el(`<div class="callout" data-k="${word[0]}"><b>${esc(word[1])}</b><span>${word[2]}</span></div>`));
     if (w.state === 'declined') {
       const again = el('<div class="form-foot" style="justify-content:flex-start;margin-top:16px"></div>');
       again.append(button('Дахин бүртгүүлэх', () => orgPopup()));
@@ -622,7 +631,10 @@ async function renderOrgHome(view) {
   for (const g of doors) {
     const card = el(`<div class="card org-door"><div class="card-body"><h3>${esc(g.label)}</h3><div class="links"></div></div></div>`);
     for (const it of g.items) {
-      const link = el(`<a class="door-link" href="${it.href ? esc(it.href) : `#${esc(w.id)}/${esc(it.key)}`}">${NAV_ICON[it.icon] ?? ''}<span>${esc(it.label)}</span></a>`);
+      // A link somebody added to the menu is followed only to a page of Basu's or an http(s) address — the sidebar's rule.
+      const away = it.href ? navHref(it.href) : null;
+      if (it.href && !away) continue;
+      const link = el(`<a class="door-link" href="${esc(away ?? `#${w.id}/${it.key}`)}">${NAV_ICON[it.icon] ?? ''}<span>${esc(it.label)}</span></a>`);
       if (!it.href) {
         link.addEventListener('click', (e) => {
           e.preventDefault();
@@ -674,10 +686,19 @@ async function renderOrgTeam(view) {
       onSubmit: async (v, { step }) => {
         if (!who) {
           who = await ops(`/v1/orgs/${org.id}/lookup?contact=${encodeURIComponent(v.contact)}`);
+          // Who it is, by what the account proved: its address first. A number a password sign-up typed proves nothing —
+          // anybody can register a cook's number before the cook does — so a match by one that no code reached says so.
+          const unproved = Boolean(who.phone && !who.phone_verified);
+          const known = [
+            who.email && `<span class="mono">${esc(who.email)}</span>`,
+            who.phone && `<span class="mono">${esc(who.phone)}</span>${unproved ? ' <em class="flag">баталгаагүй</em>' : ''}`,
+          ].filter(Boolean).join(' · ');
           step({
-            sub: 'Олдлоо. Ямар эрхтэй ажиллахыг сонгоно уу.',
+            sub: unproved
+              ? 'Олдлоо, гэхдээ энэ дугаарыг SMS кодоор баталгаажуулаагүй — өөр хүн бүртгүүлсэн байж болзошгүй. Эргэлзвэл имэйлээр нь хайгаарай.'
+              : 'Олдлоо. Ямар эрхтэй ажиллахыг сонгоно уу.',
             fields: [
-              { type: 'static', label: 'Хүн', html: `<b>${esc(who.name ?? 'Нэргүй')}</b> · <span class="mono">${esc(who.contact ?? '')}</span>` },
+              { type: 'static', label: 'Хүн', html: `<b>${esc(who.name ?? 'Нэргүй')}</b>${known ? ` · ${known}` : ''}` },
               roleField(giving.find((r) => !r.head)?.key),
             ],
             submit: 'Нэмэх',
@@ -812,8 +833,9 @@ async function renderOrgProfile(view) {
       ),
     );
   }
-  if (org.supplier && orgLink('idesh.profile')) {
-    view.append(el(`<div class="callout" style="margin-top:16px"><b>Зочдод харагдах профайл, олголтын данс</b><span>Нийлүүлэгчийн нэр, мах авах цэг, данс нь <a class="link" href="${esc(orgLink('idesh.profile').href)}">нийлүүлэгчийн профайл</a> дээр.</span></div>`));
+  const supplierProfile = org.supplier ? navHref(orgLink('idesh.profile')?.href) : null;
+  if (supplierProfile) {
+    view.append(el(`<div class="callout" style="margin-top:16px"><b>Зочдод харагдах профайл, олголтын данс</b><span>Нийлүүлэгчийн нэр, мах авах цэг, данс нь <a class="link" href="${esc(supplierProfile)}">нийлүүлэгчийн профайл</a> дээр.</span></div>`));
   }
 }
 
@@ -1045,9 +1067,6 @@ function matrixTable(table) {
   return el(`<section class="section"><div class="card"><div class="table-wrap"><table class="table roles"><thead>${thead}</thead><tbody>${body}</tbody></table></div></div></section>`);
 }
 
-/** Text for an attribute: esc() leaves quotes as they are. */
-const attr = (value) => esc(value).replace(/"/g, '&quot;');
-
 /** A scope's modules in menu order, each with its pages and every permission in it. */
 const moduleTree = (data) =>
   data.modules
@@ -1158,10 +1177,10 @@ async function renderRoles(view) {
       r.head && '<span class="badge" data-tone="neutral">эзэн</span>',
       accessScope === 'org' && !r.everyone && '<span class="badge" data-tone="hold">сонгосон байгууллагад</span>',
     ].filter(Boolean).join('');
-    const strip = mods.map((m) => `<span title="${attr(m.name)}"${levelOf(m, held) === 'none' ? ' data-off' : ''}>${NAV_ICON[m.icon] ?? ''}</span>`).join('');
+    const strip = mods.map((m) => `<span title="${esc(m.name)}"${levelOf(m, held) === 'none' ? ' data-off' : ''}>${NAV_ICON[m.icon] ?? ''}</span>`).join('');
     const acts = data.pages.reduce((n, p) => n + p.actions.filter((a) => held.has(a.permission)).length, 0);
     const row = el(`
-      <tr data-role="${attr(r.key)}" data-link tabindex="0"${r.key === lit ? ' data-on' : ''}>
+      <tr data-role="${esc(r.key)}" data-link tabindex="0"${r.key === lit ? ' data-on' : ''}>
         <td><div class="who">${roleMark(r)}<div><b>${esc(r.name)}</b>${tags ? `<span class="tags">${tags}</span>` : ''}<small>${esc(r.description ?? '')}</small></div></div></td>
         <td><span class="role-strip">${strip}</span></td>
         <td class="num">${data.pages.filter((p) => held.has(p.permission)).length}/${data.pages.length}</td>
@@ -1303,7 +1322,7 @@ function roleEditor(data, mods, role, { manage, from, close, copy }) {
           <div class="fields">
             <label class="field"><span>Үүргийн нэр</span><input name="name" maxlength="40" autocomplete="off" placeholder="Кассир, Тогооч, Нягтлан…"></label>
             <label class="field"><span>Тайлбар</span><input name="description" maxlength="200" autocomplete="off" placeholder="Юу хийдэг вэ, нэг өгүүлбэр"></label>
-            ${fresh ? `<label class="field wide"><span>Эхлэх цэг</span><select name="from"><option value="">Хоосноос — бүх модуль хаалттай</option>${data.roles.map((r) => `<option value="${attr(r.key)}">«${esc(r.name)}» үүргээс хуулах</option>`).join('')}</select></label>` : ''}
+            ${fresh ? `<label class="field wide"><span>Эхлэх цэг</span><select name="from"><option value="">Хоосноос — бүх модуль хаалттай</option>${data.roles.map((r) => `<option value="${esc(r.key)}">«${esc(r.name)}» үүргээс хуулах</option>`).join('')}</select></label>` : ''}
           </div>
           ${org ? `<div class="role-flags">
             <label class="role-flag"><input type="checkbox" name="everyone"><span><b>Бүх байгууллагад нээлттэй</b><small>Унтраавал Basu сонгосон байгууллагад л энэ үүргийг олгоно.</small></span></label>
@@ -1331,24 +1350,24 @@ function roleEditor(data, mods, role, { manage, from, close, copy }) {
     const id = `role-mod-${data.scope}-${m.key}`;
     const levels = m.acts.length ? [['none', 'Хаах'], ['view', 'Харах'], ['full', 'Бүрэн']] : [['none', 'Хаах'], ['full', 'Нээх']];
     const mod = el(`
-      <div class="role-mod" data-module="${attr(m.key)}">
+      <div class="role-mod" data-module="${esc(m.key)}">
         <div class="role-mod-head">
-          <button class="role-fold" type="button" aria-expanded="false" aria-controls="${attr(id)}">
+          <button class="role-fold" type="button" aria-expanded="false" aria-controls="${esc(id)}">
             <span class="ic">${NAV_ICON[m.icon] ?? ''}</span>
             <span class="t"><b>${esc(m.name)}</b><small data-sum></small></span>
             <span class="fold">${NAV_ICON.chev}</span>
           </button>
-          <div class="seg role-level" role="group" aria-label="${attr(m.name)}">${levels.map(([k, l]) => `<button type="button" data-level="${k}" aria-pressed="false"${fixed ? ' disabled' : ''}>${l}</button>`).join('')}</div>
+          <div class="seg role-level" role="group" aria-label="${esc(m.name)}">${levels.map(([k, l]) => `<button type="button" data-level="${k}" aria-pressed="false"${fixed ? ' disabled' : ''}>${l}</button>`).join('')}</div>
         </div>
-        <div class="role-pages" id="${attr(id)}" hidden></div>
+        <div class="role-pages" id="${esc(id)}" hidden></div>
       </div>`);
     for (const p of m.pages) {
       const note = [p.hidden && 'цэснээс нуусан', !m.kind && p.kind && `зөвхөн ${kindWord[p.kind]}`, p.link && 'холбоос'].filter(Boolean).join(' · ');
       mod.querySelector('.role-pages').append(el(`
-        <div class="role-page" data-page="${attr(p.key)}">
-          <label class="role-view"><input type="checkbox" value="${attr(p.permission)}" data-view><span><b>${esc(p.name)}</b>${note ? `<small>${esc(note)}</small>` : ''}</span></label>
+        <div class="role-page" data-page="${esc(p.key)}">
+          <label class="role-view"><input type="checkbox" value="${esc(p.permission)}" data-view><span><b>${esc(p.name)}</b>${note ? `<small>${esc(note)}</small>` : ''}</span></label>
           <div class="role-acts">${p.actions.length
-            ? p.actions.map((a) => `<label><input type="checkbox" value="${attr(a.permission)}" data-act><span>${esc(a.label)}</span></label>`).join('')
+            ? p.actions.map((a) => `<label><input type="checkbox" value="${esc(a.permission)}" data-act><span>${esc(a.label)}</span></label>`).join('')
             : '<span class="none">Зөвхөн харна, үйлдэлгүй хуудас</span>'}</div>
         </div>`));
     }
@@ -1732,7 +1751,7 @@ async function openOrgAccess(orgId) {
   const deciding = can('desk.orgs:access');
   const back = el(`<button class="back link" type="button" id="back">${CHEV}Байгууллагууд</button>`);
   back.addEventListener('click', () => show('orgs'));
-  view.append(back, head(esc(data.org.name), `${kinds(data.org).join(' · ')} · ${ORG_STATE[data.org.state]?.[1] ?? data.org.state}`));
+  view.append(back, head(esc(data.org.name), esc(`${kinds(data.org).join(' · ')} · ${ORG_STATE[data.org.state]?.[1] ?? data.org.state}`)));
   const open = data.roles.filter((r) => r.open);
   const nameOf = (key) => data.roles.find((r) => r.key === key)?.name ?? key;
 
@@ -2025,6 +2044,7 @@ function show(key) {
   else view.append(head('Олдсонгүй', 'Энэ хуудас танд нээлттэй биш байна.'));
 }
 
+/** A page's h1 and its line. Both are markup — a pill beside a name, a phone link — so a caller escapes whatever a person wrote. */
 const head = (title, sub, right = '') =>
   el(`<div class="page-head"><div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ''}</div>${right}</div>`);
 
@@ -2085,7 +2105,7 @@ async function renderOverview(view) {
   if (v.banner) list.append(el(`<div class="card alert" data-level="info" id="banner"><span><b>Зарлал.</b> ${esc(v.banner)}</span></div>`));
   if (v.alerts.length) {
     for (const a of v.alerts) {
-      list.append(el(`<div class="card alert" data-level="${a.level}"><span>${esc(a.text)}</span>${a.tab && hasPage(a.tab) ? `<button type="button" class="btn" data-v="quiet" data-size="sm" data-go="${a.tab}">Очих</button>` : ''}</div>`));
+      list.append(el(`<div class="card alert" data-level="${esc(a.level)}"><span>${esc(a.text)}</span>${a.tab && hasPage(a.tab) ? `<button type="button" class="btn" data-v="quiet" data-size="sm" data-go="${esc(a.tab)}">Очих</button>` : ''}</div>`));
     }
     list.addEventListener('click', (e) => {
       const b = e.target.closest('button[data-go]');
@@ -2233,7 +2253,7 @@ async function openGuest(id) {
   view.append(back);
   view.append(head(
     `${esc(g.name ?? (closed ? 'Хаагдсан бүртгэл' : 'Нэргүй зочин'))}${closed ? ' <span class="pill" data-s="off">хаагдсан</span>' : ''}`,
-    `${g.phone ? `${tel(g.phone)} · ` : ''}${g.email ? `${esc(g.email)} · ` : ''}бүртгүүлсэн ${when(g.joined_at)}${g.ways?.length ? ` · нэвтэрдэг: ${g.ways.map((w) => WAY_WORD[w] ?? w).join(', ')}` : ''}`,
+    `${g.phone ? `${tel(g.phone)} · ` : ''}${g.email ? `${esc(g.email)} · ` : ''}бүртгүүлсэн ${when(g.joined_at)}${g.ways?.length ? ` · нэвтэрдэг: ${esc(g.ways.map((w) => WAY_WORD[w] ?? w).join(', '))}` : ''}`,
   ));
   const page = el(`
     <div class="detail">
@@ -2257,7 +2277,7 @@ async function openGuest(id) {
           ${f.sessions.length ? f.sessions.map((s) => `
             <div class="sess"><span>${esc(s.label ?? 'Утас')}<small>сүүлд ${when(s.last_seen_at ?? s.created_at)} ${clockOf(s.last_seen_at ?? s.created_at)}</small></span>
             ${can('desk.guests:sessions') ? `<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-sid="${s.id}">Гаргах</button>` : ''}</div>`).join('') : '<div class="hint">Нээлттэй сесс алга.</div>'}
-          ${f.devices.length ? `<div class="hint">Push: ${f.devices.map((d) => `${PLATFORM_WORD[d.platform] ?? d.platform}${d.label ? ` · ${esc(d.label)}` : ''}`).join(', ')}</div>` : ''}
+          ${f.devices.length ? `<div class="hint">Push: ${f.devices.map((d) => esc(`${PLATFORM_WORD[d.platform] ?? d.platform}${d.label ? ` · ${d.label}` : ''}`)).join(', ')}</div>` : ''}
           ${closed ? '' : `
           <div class="sep"></div>
           ${can('desk.guests:close') ? `
@@ -2640,7 +2660,7 @@ async function openLunch(id) {
   const back = el(`<button class="back link" type="button" id="back">${CHEV}Хоолны захиалга</button>`);
   back.addEventListener('click', () => show('lunches'));
   view.append(back);
-  view.append(head(`№${esc(o.code)} <span class="pill" data-s="${o.state}">${DINE_WORD[o.state] ?? o.state}</span>`, `${esc(o.restaurant.name)} · ${when(o.slot_starts_at)} ${clockOf(o.slot_starts_at)} · ${o.party_size} хүн`));
+  view.append(head(`№${esc(o.code)} <span class="pill" data-s="${esc(o.state)}">${esc(DINE_WORD[o.state] ?? o.state)}</span>`, `${esc(o.restaurant.name)} · ${when(o.slot_starts_at)} ${clockOf(o.slot_starts_at)} · ${esc(o.party_size)} хүн`));
   const page = el(`
     <div class="detail">
       <div>
@@ -2648,7 +2668,7 @@ async function openLunch(id) {
           <div class="facts">
             <div><div class="lab">Зочин</div><b>${esc(o.guest ?? 'зочин')}</b><br>${o.guest_phone ? tel(o.guest_phone) : ''}</div>
             <div><div class="lab">Ширээ</div><b>${o.table ? esc(o.table) : '—'}</b><br>${o.seated_at ? `суусан ${clockOf(o.seated_at)}` : 'суугаагүй'}</div>
-            <div><div class="lab">Гал</div><b class="mono">${o.fire_at ? clockOf(o.fire_at) : '—'}</b><br>${o.fired_at ? `гарсан ${clockOf(o.fired_at)}` : o.late ? '<span class="ink-stop">хоцорч байна</span>' : o.fire_mode ?? 'товлоогүй'}</div>
+            <div><div class="lab">Гал</div><b class="mono">${o.fire_at ? clockOf(o.fire_at) : '—'}</b><br>${o.fired_at ? `гарсан ${clockOf(o.fired_at)}` : o.late ? '<span class="ink-stop">хоцорч байна</span>' : esc(o.fire_mode ?? 'товлоогүй')}</div>
             <div><div class="lab">Бэлэн</div><b class="mono">${o.ready_at ? clockOf(o.ready_at) : '—'}</b><br>${o.eta_at ? `ирэх ${clockOf(o.eta_at)}` : ''}</div>
             <div><div class="lab">Дүн</div><b>${money(o.total_mnt)}</b><br>түрийвчээс</div>
           </div>
@@ -2658,7 +2678,7 @@ async function openLunch(id) {
           .join('')}</tbody></table></div></div></section>
         ${d.review ? `<section class="section"><h2 class="section-label">Үнэлгээ</h2><div class="card card-body">${stars(d.review.stars)} ${d.review.on_time === null ? '' : d.review.on_time ? '· цагтаа' : '· хоцорсон'}${d.review.comment ? `<br>${esc(d.review.comment)}` : ''}</div></section>` : ''}
         <section class="section"><h2 class="section-label">Явц</h2><div class="card card-body"><ol class="story stepper" data-stepper>${d.events
-          .map((e) => step(e.type, DINE_EVENT[e.type] ?? e.type, `${e.actor ? esc(dineActor(e.actor)) : ''}${e.payload?.reason ? ` · ${esc(e.payload.reason)}` : ''}`, e.at))
+          .map((e) => step(e.type, DINE_EVENT[e.type] ?? e.type, `${e.actor ? dineActor(e.actor) : ''}${e.payload?.reason ? ` · ${e.payload.reason}` : ''}`, e.at))
           .join('')}</ol></div></section>
       </div>
       <div class="card" id="acts">
@@ -3185,7 +3205,7 @@ async function drawSystem() {
   const page = el(`<div>
     <div class="kpis kpi-band" id="integrations">
       <div class="card kpi" data-word data-tone="${sch.ok ? 'good' : 'bad'}"><div class="lab">Scheduler</div><b>${sch.ok ? 'ажиллаж байна' : 'зогссон'}</b><span>сүүлийн тойрог ${ago(sch.last_at, s.now)}${sch.last_took_ms !== null ? ` · ${sch.last_took_ms} мс` : ''} · цагт ${sch.ticks_last_hour}${s.mode === 'demo' ? ' · demo: тойрог гараар' : ''}</span></div>
-      ${s.integrations.map((i) => `<div class="card kpi" data-word${i.flavour === 'fake' ? '' : i.ok ? ' data-tone="good"' : ' data-tone="bad"'} data-integration="${i.key}"><div class="lab">${esc(i.name)}</div><b>${i.flavour === 'fake' ? 'туршилтын' : i.ok ? 'хэвийн' : 'алдаатай'}</b><span>${i.detail.last_ok_at !== undefined ? `сүүлд ${ago(i.detail.last_ok_at, s.now)} · ` : ''}${Object.entries(i.detail).filter(([k]) => k !== 'last_ok_at').map(([k, v]) => `${{ pending: 'хүлээгдэж', stuck: 'гацсан', gap_mnt: 'зөрүү', queued: 'дараалалд', issued: 'гарсан', failed: 'амжилтгүй', sent_day: '24ц илгээсэн', failed_day: '24ц амжилтгүй' }[k] ?? k} ${k === 'gap_mnt' ? mnt(v) : v}`).join(' · ')}</span></div>`).join('')}
+      ${s.integrations.map((i) => `<div class="card kpi" data-word${i.flavour === 'fake' ? '' : i.ok ? ' data-tone="good"' : ' data-tone="bad"'} data-integration="${esc(i.key)}"><div class="lab">${esc(i.name)}</div><b>${i.flavour === 'fake' ? 'туршилтын' : i.ok ? 'хэвийн' : 'алдаатай'}</b><span>${i.detail.last_ok_at !== undefined ? `сүүлд ${ago(i.detail.last_ok_at, s.now)} · ` : ''}${Object.entries(i.detail).filter(([k]) => k !== 'last_ok_at').map(([k, v]) => `${{ pending: 'хүлээгдэж', stuck: 'гацсан', gap_mnt: 'зөрүү', queued: 'дараалалд', issued: 'гарсан', failed: 'амжилтгүй', sent_day: '24ц илгээсэн', failed_day: '24ц амжилтгүй' }[k] ?? esc(k)} ${k === 'gap_mnt' ? mnt(v) : esc(v)}`).join(' · ')}</span></div>`).join('')}
       <div class="card kpi"><div class="lab">Өгөгдлийн сан</div><b>${esc(s.database.size)}</b><span>${s.database.migrations} migration · сүүлийнх ${esc(s.database.last_migration ?? '—')}</span></div>
     </div>
     <div class="pair-cols">
@@ -3228,7 +3248,7 @@ async function drawSystem() {
               label: k.label,
               type: k.kind === 'number' ? 'number' : 'text',
               value: String(k.value),
-              hint: esc(k.hint),
+              hint: k.hint,
               wide: true,
             })),
             onSubmit: async (v) => {
@@ -3407,7 +3427,7 @@ async function openOrder(id) {
   const back = el(`<button class="back link" type="button" id="back">${CHEV}Захиалгууд</button>`);
   back.addEventListener('click', () => show('orders'));
   view.append(back);
-  view.append(head(`№${o.code} <span class="pill" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span>`, `${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''} · ${esc(o.supplier.name)}`));
+  view.append(head(`№${esc(o.code)} <span class="pill" data-s="${esc(o.state)}">${esc(STATE_WORD[o.state] ?? o.state)}</span>`, `${esc(o.title)} ×${esc(o.qty)}${o.unit === 'kg' ? ' кг' : ''} · ${esc(o.supplier.name)}`));
   const page = el(`
     <div class="detail">
       <div>
@@ -3417,7 +3437,7 @@ async function openOrder(id) {
             <div><div class="lab">${o.receive === 'delivery' ? 'Хүргэх' : 'Өөрөө авах'}</div><b>${dayLabel(o.receive_on)}</b><br>${o.receive === 'delivery' ? `${esc(o.address)} · <span class="mono">${esc(o.address_phone)}</span>` : 'нийлүүлэгчийн авах цэгээс'}</div>
             <div><div class="lab">Нийт төлсөн</div><b>${money(o.total_mnt)}</b><br>${o.delivery_fee_mnt ? `хүргэлт ${mnt(o.delivery_fee_mnt)} орсон` : 'хүргэлтгүй'}</div>
             <div><div class="lab">Нийлүүлэгчид</div><b>${money(o.payout_mnt)}</b><br>шимтгэл хассан</div>
-            ${o.cancel_reason ? `<div><div class="lab">Цуцлалт</div><b>${REASON[o.cancel_reason] ?? o.cancel_reason}</b><br>буцаалт ${mnt(o.refund_mnt ?? 0)}${o.forfeit_mnt ? ` · суутгал ${mnt(o.forfeit_mnt)}` : ''}</div>` : ''}
+            ${o.cancel_reason ? `<div><div class="lab">Цуцлалт</div><b>${esc(REASON[o.cancel_reason] ?? o.cancel_reason)}</b><br>буцаалт ${mnt(o.refund_mnt ?? 0)}${o.forfeit_mnt ? ` · суутгал ${mnt(o.forfeit_mnt)}` : ''}</div>` : ''}
           </div>
         </div>
         <section class="section"><h2 class="section-label">Мөнгө</h2><div id="money"></div></section>
@@ -4127,11 +4147,15 @@ async function renderMembers(view) {
                 label: 'Хэрэглэгч',
                 placeholder: 'Нэр, утас, имэйлээр хайх…',
                 empty: 'Ийм хэрэглэгч олдсонгүй. Хүн эхлээд Basu-д нэвтэрсэн байх ёстой.',
+                // What an account has proved leads: its email, which a code or Google vouched for. A name is whatever the
+                // account chose, and a number a password sign-up typed proves nothing, so it says so — anybody can sign up
+                // as «Бат» with Бат's number before Бат does.
                 search: async (q) =>
                   (await ops(`/v1/ops/people?q=${encodeURIComponent(q)}`)).people.map((p) => ({
                     value: p.id,
-                    title: p.name || p.email || p.phone || 'Нэргүй',
-                    sub: [p.phone, p.email].filter(Boolean).join(' · '),
+                    title: p.email || p.name || p.phone || 'Нэргүй',
+                    sub: [p.email ? p.name : null, p.email || p.name ? p.phone : null].filter(Boolean).join(' · '),
+                    flag: p.phone && !p.phone_verified ? 'баталгаагүй' : null,
                     note: p.member ? (p.member.active ? `Гишүүн · ${roleNames.get(p.member.role) ?? p.member.role}` : 'Хаасан гишүүн') : '',
                     // Somebody at the desk already has a seat to change in the table, not a second one.
                     disabled: Boolean(p.member?.active),

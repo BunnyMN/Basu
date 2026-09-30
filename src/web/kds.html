@@ -136,11 +136,11 @@
 import { api, store, toast, mountClock, hhmm, signInDoors, authReturn, endSession } from '/api.js';
 
 const root = document.getElementById('root');
-const esc = (value) => {
-  const node = document.createElement('span');
-  node.textContent = value ?? '';
-  return node.innerHTML;
-};
+/**
+ * Text into markup: a guest's name, the table they sat at, a dish. Quotes
+ * too, so that nothing put inside an attribute can end it.
+ */
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const el = (html) => {
   const t = document.createElement('template');
   t.innerHTML = html.trim();
@@ -265,7 +265,7 @@ function renderBoard(data) {
         </div>
         <span class="conn" id="conn" role="status">холбогдсон</span>
         <div class="act">
-          <span class="clock mn">${data.now}</span>
+          <span class="clock mn">${esc(data.now)}</span>
           <button class="btn" type="button" id="out">Гарах</button>
         </div>
         <div class="lanes seg" data-fill></div>
@@ -286,7 +286,7 @@ function renderBoard(data) {
     const stack = column.querySelector('.stack');
 
     if (!tickets.length) {
-      stack.append(el(`<div class="none empty" data-center>—<span class="mono">${data.now}</span></div>`));
+      stack.append(el(`<div class="none empty" data-center>—<span class="mono">${esc(data.now)}</span></div>`));
     }
 
     for (const ticket of tickets) stack.append(renderTicket(ticket, lane.key));
@@ -347,7 +347,7 @@ function renderTicket(ticket, lane) {
   // «32 мин» is a figure and a word: the word is marked so it can be set in
   // the sans face beside the number. The text is unchanged.
   const unit = value.match(/^(.*) мин$/);
-  const figure = unit ? `${unit[1]} <small>мин</small>` : value;
+  const figure = unit ? `${esc(unit[1])} <small>мин</small>` : esc(value);
 
   const node = el(`
     <article class="ticket card" data-lane="${lane}"${ticket.needs_attention ? ' data-attention' : ''}${
@@ -355,18 +355,18 @@ function renderTicket(ticket, lane) {
     }>
       <div class="top">
         <div class="who">
-          <span class="id mn">№${ticket.code}</span>
+          <span class="id mn">№${esc(ticket.code)}</span>
           ${ticket.table ? `<span class="tbl chip" data-size="lg">Ширээ ${esc(ticket.table)}</span>` : ''}
         </div>
         <div class="cdw"><span class="cd mn">${figure}</span>${note ? `<span class="cds">${note}</span>` : ''}</div>
         ${ticket.needs_attention ? '<div class="why">Багтаамж дүүрсэн — гараар шийд</div>' : ''}
       </div>
       <div class="body">
-        <div class="meta">${ticket.due_at} · ${ticket.party_size} хүн${
+        <div class="meta">${esc(ticket.due_at)} · ${esc(ticket.party_size)} хүн${
           ticket.guest ? ` · ${esc(ticket.guest)}` : ''
         }${ticket.seated ? ' <span class="chip" data-tone="ready">СУУСАН</span>' : ''}</div>
         <div class="lines">${ticket.lines
-          .map((l) => `<div><b class="mn">×${l.qty}</b><span>${esc(l.name)}</span></div>`)
+          .map((l) => `<div><b class="mn">×${esc(l.qty)}</b><span>${esc(l.name)}</span></div>`)
           .join('')}</div>
         <div class="btns"></div>
       </div>

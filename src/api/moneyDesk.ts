@@ -76,9 +76,24 @@ async function namesFor(labels: string[]): Promise<Map<string, string>> {
   return out;
 }
 
+/**
+ * One cell, for the accountant's spreadsheet. A name in these files is
+ * whatever a guest or a supplier called themselves, and a spreadsheet reads
+ * a cell that starts with `=`, `+`, `-` or `@` as a formula — one that can
+ * reach out to the web or run a command on the accountant's machine. Such a
+ * cell goes in with a `'` in front, which makes it text. A number is left a
+ * number, and so is a cell that is nothing but one with its sign — a phone
+ * in +976… form, on every row of the top-ups: nothing in it can run, and in
+ * a CSV file the `'` is not the sheet's typing mark but part of the data,
+ * there on every row the accountant holds against the bank's.
+ */
 const csvCell = (v: unknown): string => {
-  const s = v === null || v === undefined ? '' : String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'number') return String(v);
+  const s = String(v);
+  const formula = /^[=+\-@\t\r]/.test(s) && !/^[+-]?\d+(\.\d+)?$/.test(s);
+  const text = formula ? `'${s}` : s;
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 const csv = (header: string[], rows: unknown[][]): string => [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\n') + '\n';
 const sendCsv = (reply: FastifyReply, name: string, body: string) =>

@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { getPool, tx, type Db } from '../../db/pool.js';
 import { BUILTIN_ROLES, ICONS, MODULES, PAGES, TOP, known, parse, type Scope } from './catalog.js';
-import type { Layout, LayoutModule, LayoutPage, RoleShape } from './policy.js';
+import { linkHref, type Layout, type LayoutModule, type LayoutPage, type RoleShape } from './policy.js';
 
 /**
  * The roles Basu made and the menu Basu arranged, in the `access` schema.
@@ -353,11 +353,15 @@ export async function saveLayout(
   return layoutOf(scope);
 }
 
-/** A link Basu adds to a scope's menu — another page of Basu, or anywhere. Opened, like any page, by the roles given it. */
+/**
+ * A link Basu adds to a scope's menu — another page of Basu, or an https
+ * address anywhere (`linkHref` says which addresses those are). Opened, like
+ * any page, by the roles given it.
+ */
 export async function addLink(scope: Scope, input: { name: string; href: string; module?: string; icon?: string; by: string }): Promise<LayoutPage> {
   const name = checkedLabel(input.name, 'a link');
-  const href = input.href?.trim() ?? '';
-  if (!/^(\/[^\s]*|https:\/\/[^\s]+)$/.test(href) || href.length > 500) throw new AccessError('BAD_INPUT', 'a link is a path on Basu or an https address');
+  const href = linkHref(input.href);
+  if (!href) throw new AccessError('BAD_INPUT', 'a link is a path on Basu or an https address');
   const layout = await layoutOf(scope);
   const module = input.module && layout.modules.some((m) => m.key === input.module) ? input.module : TOP;
   const sort = Math.max(0, ...layout.pages.filter((p) => p.module === module).map((p) => p.sort)) + 10;

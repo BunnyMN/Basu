@@ -5,9 +5,10 @@ import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { LedgerError, WireError } from '../platform/ledger/index.js';
 import { buildServer } from './server.js';
-import { contentSecurityPolicy, errorHandler, inlineScriptHashes, limits } from './hardening.js';
+import { contentSecurityPolicy, errorHandler, externalScripts, inlineScriptHashes, limits } from './hardening.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
+import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -58,8 +59,59 @@ describe('security headers', () => {
     expect(hashes.every((h) => /^'sha256-[A-Za-z0-9+/=]+'$/.test(h))).toBe(true);
     const csp = contentSecurityPolicy(hashes);
     expect(csp).not.toContain("'unsafe-inline' https://cdnjs");
-    expect(csp).toMatch(/script-src 'self' https:\/\/cdnjs\.cloudflare\.com 'sha256-/);
+    expect(csp).toMatch(/script-src 'self' 'sha256-/);
     expect(csp).toContain("connect-src 'self'");
+  });
+
+  it('names the exact CDN file the pages load, never the CDN host', () => {
+    // The map pages load MapLibre from cdnjs; the policy carries that one
+    // address, not the host — a host allowed would let any library it serves
+    // run here, an old template engine a slipped-through scrap could reach.
+    const files = externalScripts(webRoot);
+    expect(files).toContain('https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js');
+    const csp = contentSecurityPolicy(inlineScriptHashes(webRoot), files);
+    const scriptSrc = /script-src([^;]*)/.exec(csp)![1]!;
+    expect(scriptSrc).toContain('/maplibre-gl.min.js');
+    // The bare host, allowed alone, is what must not be there.
+    expect(scriptSrc).not.toMatch(/https:\/\/cdnjs\.cloudflare\.com(\s|$)/);
+  });
+
+  it('names every script a page loads from another server, so none is dropped from the policy unseen', () => {
+    // The policy is read off the pages, and an address it could not carry
+    // whole — a query after it, an odd character in it — is left out, so that
+    // page's script would not load. A page under test runs no policy: the map
+    // would break in a real browser and nowhere here. Read loosely, every
+    // such tag is one the policy names.
+    const named = externalScripts(webRoot);
+    for (const [page, html] of pages()) {
+      for (const tag of html.matchAll(/<script\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi)) {
+        const src = tag[1] ?? tag[2] ?? tag[3] ?? '';
+        if (src.startsWith('/') && !src.startsWith('//')) continue;
+        expect(named, `${page}: ${src}`).toContain(src);
+      }
+    }
+  });
+
+  it('holds what a page loads from another server to the hash of the file', () => {
+    // The policy pins the address, not the bytes: a CDN serving other bytes
+    // under it one day — a library swapped, the CDN itself broken into —
+    // would run them beside the dashboard's session. With the file's hash on
+    // the tag the browser refuses bytes that differ, and asks for them the
+    // way a hash can be checked (crossorigin).
+    let held = 0;
+    for (const [page, html] of pages()) {
+      const tags = [
+        ...html.matchAll(/<script\b[^>]*?\bsrc="(?:https?:)?\/\/[^"]*"[^>]*>/gi),
+        ...html.matchAll(/<link\b(?=[^>]*\brel="stylesheet")[^>]*?\bhref="(?:https?:)?\/\/[^"]*"[^>]*>/gi),
+      ].map((m) => m[0]);
+      for (const tag of tags) {
+        expect(tag, page).toMatch(/\bintegrity="sha(256|384|512)-[A-Za-z0-9+/]+={0,2}"/);
+        expect(tag, page).toMatch(/\bcrossorigin="anonymous"/);
+        held += 1;
+      }
+    }
+    // MapLibre's script and stylesheet, on each of the two map pages.
+    expect(held).toBeGreaterThanOrEqual(4);
   });
 });
 
@@ -149,6 +201,13 @@ describe('what somebody is told when a request breaks', () => {
     }
   });
 });
+
+/** Every page on disk, by name, as it is served. */
+function pages(): Array<[string, string]> {
+  return readdirSync(webRoot)
+    .filter((file) => file.endsWith('.html'))
+    .map((file) => [file, readFileSync(join(webRoot, file), 'utf8')]);
+}
 
 describe('a server with no demo in it', () => {
   it('serves every page, and none of the shortcuts past the door', async () => {

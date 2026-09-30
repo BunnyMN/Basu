@@ -103,7 +103,7 @@ if (token) {
           el(`<a class="h-row" href="/orders/${o.id}" data-order="${o.id}">
                 <img src="${PHOTO(o.kind)}" alt="" loading="lazy" width="64" height="48">
                 <span><b>${esc(o.title)} × ${o.qty}</b><small>№${esc(o.code)} · ${esc(o.supplier.name)} · ${IDESH_HEADLINE[o.state]?.[1] ?? ''}</small></span>
-                <span class="end"><span class="when">${o.state === 'CANCELLED' ? '—' : dayShort(o.receive_on)}</span><span class="s-pill">${IDESH_HEADLINE[o.state]?.[0] ?? o.state}</span></span>
+                <span class="end"><span class="when">${o.state === 'CANCELLED' ? '—' : dayShort(o.receive_on)}</span><span class="s-pill">${esc(IDESH_HEADLINE[o.state]?.[0] ?? o.state)}</span></span>
               </a>`),
         ),
       );

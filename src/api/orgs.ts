@@ -219,6 +219,13 @@ export async function registerOrgRoutes(app: FastifyInstance, ctx: Ctx, requireG
    * Find the person to bring in, by exactly the phone or the address they
    * sign in to Basu with — shown by name, so the manager can see it is the
    * right person before adding them. Only for those who may add people.
+   *
+   * The name is whatever the account chose, so what shows who it is leads:
+   * the address the account proved, when it has one. Found by a number, the
+   * number comes back too, with whether an SMS code ever reached it — a
+   * password sign-up types any number it likes, a cook's before the cook
+   * ever comes, and a seat here reads the guests' names, phones and
+   * addresses. Found by an address, no number: there was none to type.
    */
   app.get<{ Params: { id: string }; Querystring: { contact?: string } }>(
     '/v1/orgs/:id/lookup',
@@ -236,7 +243,9 @@ export async function registerOrgRoutes(app: FastifyInstance, ctx: Ctx, requireG
           },
         });
       }
-      return reply.send({ guest_id: found.guestId, name: found.name, contact: found.email ?? found.phone });
+      const phone = request.query.contact?.includes('@') ? null : found.phone;
+      const proved = phone ? (await contactsFor([found.guestId])).get(found.guestId)?.phoneVerified : false;
+      return reply.send({ guest_id: found.guestId, name: found.name, email: found.email, phone, phone_verified: Boolean(phone && proved) });
     },
   );
 

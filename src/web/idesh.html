@@ -14,7 +14,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F3EE">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0F1110">
 <title>Basu — өвлийн идэш</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.css" integrity="sha512-KIMsMWIdnoG9OwZa+oaIafmbDonqck1UCmq+/zcUi2aaZ97N9QE6TqpTM+n36EO40HGh64hU/375zxtjx7WTyQ==" crossorigin="anonymous">
 <link rel="stylesheet" href="/app.css">
 <style>
 /* A list, not a map: the question here is "which animal, from whom, at what
@@ -312,7 +312,8 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
   <footer class="screen-foot" id="screen-foot"></footer>
 </section>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
+<!-- MapLibre from cdnjs, held to cdnjs's own hash of the file: bytes that ever differ do not run. A new version takes its new hash, here and on the stylesheet. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js" integrity="sha512-hoXlvOdSmh58mppUyZHZsscHkR/yXl6zLpTMTNwA6IZ61DpeaCNjosRu1WJ2DeIpkfW5MsJJ9H89zjV4IBGqRw==" crossorigin="anonymous"></script>
 <script type="module">
 import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, KIND, dayLabel, dayShort, signInSheet, dropSession } from '/api.js';
 import { mapStyle, ULAANBAATAR } from '/mapStyle.js';
@@ -324,11 +325,14 @@ const el = (html) => {
   return t.content.firstElementChild;
 };
 
-/** Guest text goes into the DOM as text, never as markup. */
+/**
+ * Guest text goes into the DOM as text, never as markup — and so does a
+ * supplier's: its name, its pickup point, the number it gave, which go in
+ * front of every guest who buys from it. Quotes too, for the values that sit
+ * inside an attribute: a tel: link, an input's value.
+ */
 function escapeHtml(value) {
-  const node = document.createElement('span');
-  node.textContent = value ?? '';
-  return node.innerHTML;
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
 /**
@@ -338,7 +342,7 @@ function escapeHtml(value) {
  * launcher's stroke, which is what shows if a picture fails to arrive — a
  * list with holes in it sells nothing.
  */
-const PHOTO = (kind) => `/idesh/${kind}.jpg`;
+const PHOTO = (kind) => `/idesh/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}.jpg`;
 
 const ART = {
   sheep: `<svg viewBox="0 0 24 24" aria-hidden="true">
@@ -537,7 +541,7 @@ function paintListings() {
     const low = !gone_ && l.remaining <= Math.max(2, Math.ceil(l.quantity * 0.15));
     const item = el(`
       <li>
-        <button class="listing row" type="button" data-kind="${l.kind}" data-id="${l.id}"${l.tier ? ` data-tier="${l.tier}"` : ''}${gone_ ? ' data-gone' : ''} data-chev>
+        <button class="listing row" type="button" data-kind="${escapeHtml(l.kind)}" data-id="${escapeHtml(l.id)}"${l.tier ? ` data-tier="${escapeHtml(l.tier)}"` : ''}${gone_ ? ' data-gone' : ''} data-chev>
           <span class="art lead"><img src="${PHOTO(l.kind)}" alt="" loading="lazy" width="64" height="64"></span>
           <span class="who main">
             <span class="name title">${l.tier ? `<i class="tier chip" data-size="sm" data-tone="${l.tier === 'vip' ? 'hi' : 'accent'}" data-strong>${l.tier === 'vip' ? '★ VIP' : 'Онцгой'}</i> ` : ''}${escapeHtml(l.title)}</span>
@@ -1054,12 +1058,12 @@ const FACE = {
     cap: (o) =>
       o.receive === 'delivery'
         ? 'Удахгүй замд гарна. Хүргэгч ирэхийн өмнө танд залгана.'
-        : `Авах цэг дээр очоод <b>${o.code}</b> кодоо хэлээд авна уу.`,
+        : `Авах цэг дээр очоод <b>${escapeHtml(o.code)}</b> кодоо хэлээд авна уу.`,
   },
   DISPATCHED: {
     mark: 'truck',
     word: 'Мах замд гарлаа',
-    cap: (o) => `Хүргэгч хаягаар тань очиж, ирэхдээ залгана. <b>${o.code}</b> кодоо хэлээд хүлээн авна уу.`,
+    cap: (o) => `Хүргэгч хаягаар тань очиж, ирэхдээ залгана. <b>${escapeHtml(o.code)}</b> кодоо хэлээд хүлээн авна уу.`,
   },
   HANDED: { mark: 'hand', word: 'Хүлээлгэн өгсөн', cap: () => 'Мах гарт орлоо. Амтархан хэрэглээрэй.' },
   CLOSED: { mark: 'check', word: 'Захиалга дууссан', cap: () => 'Энэ захиалга хаагдсан.' },
@@ -1204,9 +1208,9 @@ async function showStatus(force, { replace = false } = {}) {
 
   const body = $('screen-body');
   const card = el(`
-    <div class="status card" data-s="${order.state}">
+    <div class="status card" data-s="${escapeHtml(order.state)}">
       <div class="mark">${MARK[face.mark]}</div>
-      <div class="big">${face.word}</div>
+      <div class="big">${escapeHtml(face.word)}</div>
       <div class="cap">${face.cap(order)}</div>
     </div>`);
 
@@ -1251,7 +1255,7 @@ async function showStatus(force, { replace = false } = {}) {
     body.append(
       el(`<div class="handcode codebox">
             <span class="lab">${delivery ? 'Хүргэгчид энэ кодыг хэлнэ' : 'Мах авахдаа энэ кодыг хэлнэ'}</span>
-            <b>${order.code}</b>
+            <b>${escapeHtml(order.code)}</b>
             <small>Кодоо сонссон нийлүүлэгч махыг өгнө. Өөр хүн очих бол кодыг хэлээд явуулж болно.</small>
           </div>`),
     );
@@ -1285,7 +1289,7 @@ async function showStatus(force, { replace = false } = {}) {
           <div class="v">${escapeHtml(order.supplier.name)}<span class="badge">${MARK.check}Гэрээт</span>
             <small>Basu шалгаж, гэрээ байгуулсан.${
               order.supplier_phone
-                ? ` Асуух зүйл байвал шууд залгаарай: <a class="tel mn" href="tel:${order.supplier_phone}">${MARK.phone}${order.supplier_phone}</a>`
+                ? ` Асуух зүйл байвал шууд залгаарай: <a class="tel mn" href="tel:${escapeHtml(order.supplier_phone)}">${MARK.phone}${escapeHtml(order.supplier_phone)}</a>`
                 : ''
             }</small>
           </div>
@@ -1333,7 +1337,7 @@ async function showStatus(force, { replace = false } = {}) {
   if (live && order.supplier_phone) {
     foot.append(
       el(`<p class="why" data-calm>${MARK.warn}Өөрчлөх, цуцлах бол нийлүүлэгчтэй ярина уу — цуцлахыг тэр хийнэ.</p>`),
-      el(`<a class="btn" data-size="lg" href="tel:${order.supplier_phone}">${MARK.phone}Нийлүүлэгч рүү залгах</a>`),
+      el(`<a class="btn" data-size="lg" href="tel:${escapeHtml(order.supplier_phone)}">${MARK.phone}Нийлүүлэгч рүү залгах</a>`),
     );
   }
   if (!live) {
@@ -1371,8 +1375,8 @@ function paintMine(orders) {
       <button class="card row" type="button" data-order="${order.id}" data-chev>
         <span class="who main">
           <span class="venue title">${escapeHtml(order.supplier.name)}</span>
-          <span class="what sub">${escapeHtml(order.title)} ×${order.qty} · ${cap}</span>
-          <span class="code meta">№${order.code}<span class="chip" data-s="${order.state}" data-inline>${word}</span></span>
+          <span class="what sub">${escapeHtml(order.title)} ×${escapeHtml(order.qty)} · ${escapeHtml(cap)}</span>
+          <span class="code meta">№${escapeHtml(order.code)}<span class="chip" data-s="${escapeHtml(order.state)}" data-inline>${escapeHtml(word)}</span></span>
         </span>
         <span class="end"><span class="when val">${dayShort(order.receive_on)}<small>${order.receive === 'delivery' ? 'ирэх' : 'авах'}</small></span></span>
       </button>`);
@@ -1396,8 +1400,10 @@ function paintMine(orders) {
  * stranger gets the stalls to look at, and the way in only when ordering.
  */
 async function resume() {
+  // An order's id and nothing else: it goes into the API's paths with the guest's session, and a link carrying
+  // «../» in its place would send that session wherever the rest of it pointed.
   const wanted = new URLSearchParams(location.search).get('order');
-  if (!wanted || !store.guestToken) return;
+  if (!wanted || !/^[0-9a-f-]{36}$/.test(wanted) || !store.guestToken) return;
   state.orderId = wanted;
   rendered = null;
   await showStatus(true);

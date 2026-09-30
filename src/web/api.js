@@ -290,7 +290,7 @@ export function signInDoors({
     <div class="or" data-or hidden>эсвэл</div>
     <div data-email hidden>
       <label class="field"><span>Имэйл хаяг</span><input name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com"></label>
-      <p class="cap" data-email-hint>${emailHint}</p>
+      <p class="cap" data-email-hint></p>
       <div data-code hidden><input name="code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" aria-label="Имэйлд ирсэн код"></div>
       <button class="btn" data-v="primary" data-size="lg" type="button" data-email-go>Код авах</button>
       <div class="again" data-again-row hidden>
@@ -328,6 +328,7 @@ export function signInDoors({
   const code = $('[name="code"]');
   const emailGo = $('[data-email-go]');
   const hint = $('[data-email-hint]');
+  hint.textContent = emailHint;
   let sentTo = null;
 
   const askForCode = async () => {
@@ -609,10 +610,11 @@ export function signInSheet(reason = 'Үргэлжлүүлэхийн тулд н
     sheet.setAttribute('aria-labelledby', 'signin-title');
     sheet.innerHTML = `
       <header>
-        <div><h2 id="signin-title">Нэвтрэх</h2><div class="sub">${reason}</div></div>
+        <div><h2 id="signin-title">Нэвтрэх</h2><div class="sub"></div></div>
         <button class="x" type="button" aria-label="Хаах"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       </header>
       <div class="body" style="padding:16px 20px 20px"></div>`;
+    sheet.querySelector('header .sub').textContent = reason;
 
     let settled = false;
     const close = (token) => {
@@ -807,7 +809,7 @@ const POPUP_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12
 function popupField(f, n) {
   const id = `popup-${n}-${f.name ?? Math.random().toString(36).slice(2)}`;
   const wide = f.wide || ['textarea', 'checks', 'icons', 'static', 'note', 'pick'].includes(f.type) ? ' data-wide' : '';
-  const hint = f.hint ? `<small>${f.hint}</small>` : '';
+  const hint = f.hint ? `<small>${popupEsc(f.hint)}</small>` : '';
   const req = f.required ? ' required' : '';
   if (f.type === 'note') return `<p class="popup-text"${wide}>${f.html ?? popupEsc(f.text)}</p>`;
   if (f.type === 'static') return `<div class="field popup-static"${wide}><span>${popupEsc(f.label)}</span><div>${f.html ?? popupEsc(f.value)}</div></div>`;
@@ -856,10 +858,12 @@ function popupField(f, n) {
 
 /**
  * A pick field at work: it asks `search(q)` for rows ({ value, title, sub,
- * note, disabled }) when it opens and again as the person types, and draws
- * them as a list with one to choose. The one chosen stays in the list
- * whatever is typed next, so the form still carries it. Enter searches at
- * once; it does not answer the popup.
+ * flag, note, disabled }) when it opens and again as the person types, and
+ * draws them as a list with one to choose. Every word of a row is text; a
+ * `flag` is one word after the line under the title, in the tone that asks
+ * for a second look — «баталгаагүй» beside a number nobody proved. The one
+ * chosen stays in the list whatever is typed next, so the form still carries
+ * it. Enter searches at once; it does not answer the popup.
  */
 function mountPick(box, f) {
   if (!box) return;
@@ -872,9 +876,9 @@ function mountPick(box, f) {
   const row = (r) =>
     `<label class="popup-pick-row"${r.disabled ? ' data-off' : ''}><input type="radio" name="${popupEsc(f.name)}" value="${popupEsc(r.value)}"${
       chosen && String(chosen.value) === String(r.value) ? ' checked' : ''
-    }${r.disabled ? ' disabled' : ''}><span class="who"><b>${popupEsc(r.title)}</b>${r.sub ? `<small>${popupEsc(r.sub)}</small>` : ''}</span>${
-      r.note ? `<span class="note">${popupEsc(r.note)}</span>` : ''
-    }</label>`;
+    }${r.disabled ? ' disabled' : ''}><span class="who"><b>${popupEsc(r.title)}</b>${
+      r.sub || r.flag ? `<small>${popupEsc(r.sub ?? '')}${r.flag ? `${r.sub ? ' ' : ''}<em class="flag">${popupEsc(r.flag)}</em>` : ''}</small>` : ''
+    }</span>${r.note ? `<span class="note">${popupEsc(r.note)}</span>` : ''}</label>`;
   const draw = (rows) => {
     for (const r of rows) known.set(String(r.value), r);
     const shown = chosen && !rows.some((r) => String(r.value) === String(chosen.value)) ? [chosen, ...rows] : rows;
@@ -920,7 +924,10 @@ function mountPick(box, f) {
  * `fields` draw the form — { name, label, type: text | email | tel | number |
  * date | textarea | select | checks | icons | pick | static | note, value,
  * placeholder, options, required, hint, wide, inputmode, autocomplete }; a
- * pick also takes `search(q)` and `empty` (see `mountPick`). `onSubmit(values,
+ * pick also takes `search(q)` and `empty` (see `mountPick`). All of it is
+ * text, escaped here, except three things that are markup because they carry
+ * a name in bold or a code in mono: `sub`, and a note's or a static's
+ * `html`. Whoever fills those escapes what a person wrote. `onSubmit(values,
  * popup)` does the work: what it returns closes the popup and is what the
  * promise resolves to; `false` keeps it open (a first step done, the second
  * drawn with `popup.step(...)`); a thrown error is said inside the popup, over
