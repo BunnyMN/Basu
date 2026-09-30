@@ -2319,6 +2319,133 @@ describe('Basu decides who may do what', () => {
   });
 });
 
+describe('a stranger’s words render as text, never as markup', () => {
+  // A tag anybody can type, marked so it is findable however it is drawn.
+  const XSS = '<img data-xss src=x onerror="window.__xss=(window.__xss||0)+1">';
+  const deskToken = async () => ((await (await fetch(`${base}/dev/ops-token`)).json()) as { token: string }).token;
+  const asJson = (t: string) => ({ 'content-type': 'application/json', authorization: `Bearer ${t}` });
+
+  /** Nothing grew from the payload on the page, and no handler in it ran. */
+  function noInjection(dom: JSDOM): void {
+    expect(dom.window.document.querySelector('[data-xss]')).toBeNull();
+    expect((dom.window as unknown as { __xss?: number }).__xss).toBeUndefined();
+  }
+
+  /** Buy one whole animal, collected — the same steps as buyOne, kept here so this block stands alone. */
+  async function buyPickup(dom: JSDOM): Promise<string> {
+    await until(dom, 'the stalls', (d) => d.querySelectorAll('.listing').length >= seeded.listings);
+    const whole = [...dom.window.document.querySelectorAll('.listing')].find(
+      (l) => !l.hasAttribute('data-gone') && l.textContent?.includes('бүтэн'),
+    ) as HTMLElement;
+    whole.click();
+    await until(dom, 'the stall', (d) => Boolean(d.querySelector('#next')));
+    (dom.window.document.querySelector('#next') as HTMLElement).click();
+    await until(dom, 'the review', (d) => Boolean(d.querySelector('#pay')));
+    (dom.window.document.querySelector('#pay') as HTMLElement).click();
+    await until(dom, 'the status', (d) => Boolean(d.querySelector('.handcode b')));
+    return dom.window.document.querySelector('.handcode b')!.textContent!;
+  }
+
+  it('draws an ops member’s name in an order’s story as text, not the markup they signed up with', async () => {
+    // The proven path: the story reads «ops · <name>», and the name is whatever
+    // the account chose. Left as markup it would run in the admin's dashboard,
+    // with the admin's session, the next time the admin opened the order.
+    await ownGuest('+97699007001');
+    const guest = await openPage('idesh.html');
+    const code = await buyPickup(guest);
+    const { rows } = await getPool().query<{ id: string }>('SELECT id FROM idesh.idesh_order WHERE code = $1', [code]);
+    const orderId = rows[0]!.id;
+
+    // An account whose name is a tag, seated by the admin as ops, does one thing to the order.
+    const made = await fetch(`${base}/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ phone: '+97699007002', password: GUEST_PASSWORD, name: XSS }),
+    });
+    const memberToken = ((await made.json()) as { token: string }).token;
+    const meId = ((await (await fetch(`${base}/v1/me`, { headers: { authorization: `Bearer ${memberToken}` } })).json()) as { id: string }).id;
+    await fetch(`${base}/v1/ops/members`, { method: 'POST', headers: asJson(await deskToken()), body: JSON.stringify({ guest_id: meId, role: 'ops' }) });
+    const resend = await fetch(`${base}/v1/ops/orders/${orderId}/resend`, { method: 'POST', headers: asJson(memberToken), body: '{}' });
+    expect(resend.status, await resend.text()).toBe(200);
+
+    // The admin reads the order: the name is text in the story, and drew nothing.
+    const desk = await openPage('ops.html', '', undefined, device());
+    await until(desk, 'the secret prefilled', (d) => Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value));
+    clickText(desk, '.pair button', 'Нэвтрэх');
+    await opsTab(desk, 'orders');
+    await until(desk, 'the order', (d) => [...d.querySelectorAll('#orders tr[data-order]')].some((r) => r.textContent?.includes(`№${code}`)));
+    ([...desk.window.document.querySelectorAll('#orders tr[data-order]')].find((r) => r.textContent?.includes(`№${code}`)) as HTMLElement).click();
+    await until(desk, 'the story', (d) => Boolean(d.querySelector('.detail .story')));
+    noInjection(desk);
+    expect(desk.window.document.querySelector('.story')?.textContent).toContain('<img data-xss');
+  });
+
+  it('draws a guest’s delivery phone on the supplier’s screen as text, not out of the tel link', async () => {
+    // The number a guest types for a delivery goes into a tel: link on the
+    // supplier's ticket; a quote in it would end the attribute and open a tag.
+    await ownGuest('+97699007011');
+    const guest = await openPage('idesh.html');
+    await until(guest, 'the stalls', (d) => d.querySelectorAll('.listing').length >= seeded.listings);
+    const delivered = [...guest.window.document.querySelectorAll('.listing')].find(
+      (l) => l.textContent?.includes('Хүргэлттэй') && !l.hasAttribute('data-gone'),
+    ) as HTMLElement;
+    delivered.click();
+    await until(guest, 'the stall', (d) => Boolean(d.querySelector('#next')));
+    (guest.window.document.querySelector('.choice[data-r="delivery"]') as HTMLElement).click();
+    await until(guest, 'the address question', (d) => Boolean(d.querySelector('#step-where #address')));
+    const addr = guest.window.document.querySelector('#address') as HTMLTextAreaElement;
+    addr.value = XSS;
+    addr.dispatchEvent(new guest.window.Event('input'));
+    const phone = guest.window.document.querySelector('#phone') as HTMLInputElement;
+    phone.value = '"><img data-xss src=x>';
+    phone.dispatchEvent(new guest.window.Event('input'));
+    await until(guest, 'the way on', () => !(guest.window.document.querySelector('#next') as HTMLButtonElement).disabled);
+    (guest.window.document.querySelector('#next') as HTMLElement).click();
+    await until(guest, 'the review', (d) => Boolean(d.querySelector('#pay')));
+    (guest.window.document.querySelector('#pay') as HTMLElement).click();
+    await until(guest, 'the status', (d) => Boolean(d.querySelector('.handcode b')));
+    const code = guest.window.document.querySelector('.handcode b')!.textContent!;
+
+    const screen = await supplierScreenFor(code);
+    await until(screen, 'the ticket', (d) => [...d.querySelectorAll('.ticket')].some((t) => t.textContent?.includes(`№${code}`)));
+    noInjection(screen);
+    const ticket = [...screen.window.document.querySelectorAll('.ticket')].find((t) => t.textContent?.includes(`№${code}`))!;
+    expect(ticket.textContent).toContain('<img data-xss');
+  });
+
+  it('marks a typed, unproved number in the members picker, but not a proved one', async () => {
+    // The picker shows Basu's users to seat. A number a password sign-up typed
+    // proves nothing — anybody can register «Бат» with Бат's number — so it is
+    // marked «баталгаагүй»; a number an SMS code reached is not.
+    await fetch(`${base}/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ phone: '+97699007021', password: GUEST_PASSWORD, name: 'Бичсэн Болд' }),
+    });
+    // The same number, proved by a code, on another account.
+    await fetch(`${base}/v1/auth/otp`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone: '+97699007022' }) });
+    const otp = /(\d{6})/.exec(notifier.of('auth.otp').at(-1)?.body ?? '')?.[1];
+    await fetch(`${base}/v1/auth/verify`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone: '+97699007022', code: otp }) });
+
+    const desk = await openPage('ops.html', '', undefined, device());
+    await until(desk, 'the secret prefilled', (d) => Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value));
+    clickText(desk, '.pair button', 'Нэвтрэх');
+    await opsTab(desk, 'members');
+    await until(desk, 'the members page', (d) => Boolean(d.querySelector('#add-member')));
+    (desk.window.document.querySelector('#add-member') as HTMLElement).click();
+    await until(desk, 'the picker', (d) => Boolean(d.querySelector('#member-new .popup-pick input[type="search"]')));
+    const find = async (digits: string) => {
+      const search = desk.window.document.querySelector('#member-new .popup-pick input[type="search"]') as HTMLInputElement;
+      search.value = digits;
+      search.dispatchEvent(new desk.window.Event('input', { bubbles: true }));
+      await until(desk, `the row for ${digits}`, (d) => [...d.querySelectorAll('#member-new .popup-pick-row')].some((r) => r.textContent?.includes(digits)));
+      return [...desk.window.document.querySelectorAll('#member-new .popup-pick-row')].find((r) => r.textContent?.includes(digits))!;
+    };
+    expect((await find('99007021')).querySelector('.flag')?.textContent).toBe('баталгаагүй');
+    expect((await find('99007022')).querySelector('.flag')).toBeNull();
+  });
+});
+
 /**
  * Sign in as somebody nobody else is using.
  *

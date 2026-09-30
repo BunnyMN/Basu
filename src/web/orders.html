@@ -96,7 +96,7 @@ const PHOTO = (kind) => `/brand/meat/${['sheep', 'goat', 'beef', 'horse'].includ
 const unitWord = (o) => (o.unit === 'whole' ? 'толгой' : 'кг');
 const LIVE = ['PAID', 'PREPARING', 'READY', 'DISPATCHED'];
 const TONE = { PAID: 'route', PREPARING: 'hi', READY: 'ready', DISPATCHED: 'route', HANDED: 'ready', CLOSED: '', CANCELLED: 'stop', REFUNDED: '' };
-const pill = (state) => `<span class="s-pill" data-state="${state}"${TONE[state] ? ` data-tone="${TONE[state]}"` : ''}>${IDESH_HEADLINE[state]?.[0] ?? state}</span>`;
+const pill = (state) => `<span class="s-pill" data-state="${esc(state)}"${TONE[state] ? ` data-tone="${TONE[state]}"` : ''}>${esc(IDESH_HEADLINE[state]?.[0] ?? state)}</span>`;
 const MARK = {
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
@@ -213,7 +213,7 @@ async function drawOrder(id, fresh) {
   const left = main.querySelector('#od-main');
   const side = main.querySelector('#od-side');
 
-  left.append(el(`<div class="s-card od-state"><div class="big">${word}</div><p class="cap">${cap(o)}</p>${steps}</div>`));
+  left.append(el(`<div class="s-card od-state"><div class="big">${esc(word)}</div><p class="cap">${cap(o)}</p>${steps}</div>`));
   if (o.refund) left.append(refundBox(o));
 
   if (live) {

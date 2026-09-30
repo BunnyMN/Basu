@@ -4,11 +4,13 @@
 
 import { api, store, dropSession, authReturn } from '/api.js';
 
-export const esc = (value) => {
-  const node = document.createElement('span');
-  node.textContent = value ?? '';
-  return node.innerHTML;
-};
+/**
+ * Text into markup, for everything a page draws from what people wrote: a
+ * listing, a supplier's name and number, a delivery address. Quotes too — a
+ * value inside an attribute (a tel: link, an input's value) would otherwise
+ * end it and write one of its own.
+ */
+export const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 /** One element from a string of markup. */
 export function el(html) {
@@ -30,9 +32,15 @@ export { ICON };
 
 /* ── where to go after signing in ──────────────────────────────────── */
 
-/** A path on this site to come back to — never another site, never the door itself. */
+/**
+ * A path on this site to come back to — never another site, never the door
+ * itself. A browser reads `/\evil.example` as `//evil.example`, another site,
+ * and drops a tab or a line break from an address before it reads it, so a
+ * path with a backslash or any control character in it is no path of ours.
+ */
 export function safeNext(raw, fallback = '/home') {
   if (typeof raw !== 'string' || !raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/login')) return fallback;
+  if (/[\\\u0000-\u001f\u007f]/.test(raw)) return fallback;
   return raw;
 }
 

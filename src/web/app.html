@@ -125,12 +125,8 @@ main:has(.live[data-any]) .hello,main:has(.live[data-loading]) .hello{display:no
 <script type="module">
 import { api, store, hhmm, mountClock, HEADLINE, IDESH_HEADLINE, dayShort } from '/api.js';
 
-/** Text into markup, never the other way: a supplier's name is a name. */
-const esc = (value) => {
-  const node = document.createElement('span');
-  node.textContent = value ?? '';
-  return node.innerHTML;
-};
+/** Text into markup, never the other way: a supplier's name is a name. Quotes too, so nothing inside an attribute can end it. */
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 const $ = (id) => document.getElementById(id);
 const el = (html) => {
@@ -342,9 +338,9 @@ function paint(rows) {
         <span class="who main">
           <span class="venue title">${esc(row.title)}</span>
           <span class="what sub">${row.what}</span>
-          <span class="code meta">${row.source} · №${row.code}<span class="chip" data-s="${row.state}" data-inline>${row.word}</span></span>
+          <span class="code meta">${row.source} · №${esc(row.code)}<span class="chip" data-s="${esc(row.state)}" data-inline>${esc(row.word)}</span></span>
         </span>
-        <span class="end"><span class="when val" data-size="lg">${row.time}<small>${row.label}</small></span></span>
+        <span class="end"><span class="when val" data-size="lg">${esc(row.time)}<small>${row.label}</small></span></span>
       </a>`);
     list.append(card);
   }

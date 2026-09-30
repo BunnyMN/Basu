@@ -56,6 +56,25 @@ export const NAV_ICON = {
 };
 
 /**
+ * A menu link's address, when it is one the frame will follow: a path on
+ * this site, or an http(s) address elsewhere — else null. A `javascript:`
+ * address would run in the dashboard of whoever pressed it, with their
+ * session, and `//host` or `/\host` is another site that only looks like a
+ * path. The server takes no such link; this is for one that got in before
+ * it refused them, and for whatever else hands the frame a menu.
+ */
+export function navHref(href) {
+  if (typeof href !== 'string' || !href || /[\s\\"'<>`\u0000-\u001f\u007f]/.test(href)) return null;
+  if (href.startsWith('/')) return href.startsWith('//') ? null : href;
+  try {
+    const { protocol, hostname } = new URL(href);
+    return (protocol === 'https:' || protocol === 'http:') && hostname ? href : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The frame, built once per workspace.
  *
  * `workspaces` and `current` are /v1/access's; `account` is the person, or
@@ -84,7 +103,11 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', h
       .slice(0, 2)
       .map((w) => w[0].toUpperCase())
       .join('') || '?';
-  const mark = (ws) => `<span class="ws-mark" data-kind="${ws.kind}" aria-hidden="true">${ws.kind === 'desk' ? 'B' : esc(initials(ws.name))}</span>`;
+  const mark = (ws) => `<span class="ws-mark" data-kind="${esc(ws.kind)}" aria-hidden="true">${ws.kind === 'desk' ? 'B' : esc(initials(ws.name))}</span>`;
+  /** The place's menu, less any link the frame will not follow (`navHref`) and any module that leaves empty. */
+  const shown = current.menu
+    .map((g) => ({ ...g, items: g.items.filter((it) => !it.href || navHref(it.href)) }))
+    .filter((g) => g.items.length > 0);
 
   /* ── folded groups, remembered per kind of place ── */
   const SHUT_KEY = 'basu.nav.shut';
@@ -110,17 +133,18 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', h
    * on the module's guide line. A link to elsewhere says so, and opens apart.
    */
   const item = (it, sub) => {
-    const away = Boolean(it.href && /^https?:/.test(it.href));
+    const href = navHref(it.href);
+    const away = Boolean(href && /^https?:/.test(href));
     const inner = `${sub ? '' : icon(it.icon)}<span class="t">${esc(it.label)}</span>${away ? `<span class="away" aria-label="шинэ цонхонд">${NAV_ICON.away}</span>` : ''}<span class="n" data-badge="${esc(it.key)}" hidden></span>`;
     const cls = sub ? 'nav-item sub' : 'nav-item';
-    return it.href
-      ? `<a class="${cls}" data-tab="${esc(it.key)}" href="${esc(it.href)}"${away ? ' target="_blank" rel="noopener noreferrer"' : ''}>${inner}</a>`
+    return href
+      ? `<a class="${cls}" data-tab="${esc(it.key)}" href="${esc(href)}"${away ? ' target="_blank" rel="noopener noreferrer"' : ''}>${inner}</a>`
       : `<button class="${cls}" type="button" data-tab="${esc(it.key)}">${inner}</button>`;
   };
-  const groups = current.menu
+  const groups = shown
     .map((g) => {
       if (!g.label) return `<div class="nav-top">${g.items.map((it) => item(it, false)).join('')}</div>`;
-      const id = `nav-${current.kind}-${g.key}`;
+      const id = esc(`nav-${current.kind}-${g.key}`);
       const open = !shut.has(shutKey(g.key));
       return `<section class="nav-mod" data-group="${esc(g.key)}"${open ? '' : ' data-shut'}>
           <button class="mod" type="button" aria-expanded="${open}" aria-controls="${id}">${icon(g.icon)}<span class="t">${esc(g.label)}</span><span class="n" data-mod-badge hidden></span>${NAV_ICON.chev}</button>
@@ -246,7 +270,7 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', h
   }
 
   /* ── the pages ── */
-  const items = current.menu.flatMap((g) => g.items);
+  const items = shown.flatMap((g) => g.items);
   root.querySelector('.tabs').addEventListener('click', (e) => {
     const node = e.target.closest('[data-tab]');
     if (!node) return;

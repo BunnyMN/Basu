@@ -692,7 +692,7 @@ try {
       a.href = `/shop/${l.id}`;
       const where = [l.supplier?.name, l.origin].filter(Boolean).join(' · ');
       a.innerHTML = `<img src="${STALL_PHOTO[l.kind] ?? STALL_PHOTO.sheep}" alt="" loading="lazy">
-        <span><b>${l.tier ? `<i class="tierpill" data-tier="${l.tier}">${l.tier === 'vip' ? '★ VIP' : 'Онцгой'}</i>` : ''}${esc(l.title)}</b><small>${esc(where)}</small></span>
+        <span><b>${l.tier ? `<i class="tierpill" data-tier="${esc(l.tier)}">${l.tier === 'vip' ? '★ VIP' : 'Онцгой'}</i>` : ''}${esc(l.title)}</b><small>${esc(where)}</small></span>
         <span class="money">${mnt(l.price_mnt)}<small> / ${l.unit === 'whole' ? 'толгой' : 'кг'}</small></span>`;
       list.append(a);
     }

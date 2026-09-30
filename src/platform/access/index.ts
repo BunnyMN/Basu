@@ -30,6 +30,7 @@ export {
   buildMenu,
   grants,
   grantsOf,
+  linkHref,
   mayHandOut,
   mayHandOutDesk,
   mayShape,

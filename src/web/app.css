@@ -904,6 +904,8 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .popup .popup-pick-row .who{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .popup .popup-pick-row b{font-size:var(--t-body);font-weight:600;color:var(--ink);overflow-wrap:anywhere}
 .popup .popup-pick-row small{font-family:var(--mono);font-size:var(--t-meta);color:var(--ink-3);overflow-wrap:anywhere}
+/* a word that asks for a second look before choosing: «баталгаагүй» beside a number nobody proved */
+.popup .popup-pick-row small .flag{font-family:var(--sans);font-style:normal;font-weight:600;color:var(--hold)}
 .popup .popup-pick-row .note{flex:none;font-size:var(--t-cap);color:var(--ink-3)}
 .popup .popup-pick-row:has(input:checked){background:var(--accent-soft)}
 .popup .popup-pick-row[data-off]{cursor:default}

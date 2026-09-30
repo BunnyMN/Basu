@@ -219,6 +219,20 @@ describe('choosing a person from Basu’s users', () => {
     expect((await people('Болд')).json().people[0].member).toMatchObject({ role: 'finance', active: true });
   });
 
+  it('says whether a number was proved, so the picker never passes a typed one off as its owner’s', async () => {
+    // A password sign-up types any number it likes — «Бат» with Бат's number,
+    // before Бат ever comes — so the picker must be able to mark it unproved.
+    const typed = await byPhone('+97699119001', 'Хэн нэгэн');
+    await bySms('+97699119002');
+
+    const rows = (await people('9911900')).json().people as Array<{ phone: string; phone_verified: boolean; email: string | null }>;
+    const typedRow = rows.find((p) => p.phone === '+97699119001')!;
+    const provedRow = rows.find((p) => p.phone === '+97699119002')!;
+    expect(typedRow.phone_verified).toBe(false);
+    expect(provedRow.phone_verified).toBe(true);
+    void typed;
+  });
+
   it('tells the person their seat is there, by email where they have no app, and records who gave it', async () => {
     const token = await byEmail('bold@gmail.com');
     const given = await seat({ guest_id: await accountId(token), role: 'viewer' });

@@ -300,6 +300,38 @@ describe('the menu Basu arranges', () => {
     expect((await call('POST', '/v1/ops/menus/desk/links', DESK(), { name: 'Муу', href: 'javascript:alert(1)' })).statusCode).toBe(400);
   });
 
+  it('takes only a path on Basu or an https address as a link, never a way to run code', async () => {
+    // A menu link is followed with the presser's own session — the admin's
+    // among them — so anything but a plain path here or an https address
+    // elsewhere is refused, and never stored to be drawn.
+    const bad = [
+      'javascript:alert(1)',
+      'JavaScript:alert(1)',
+      ' javascript:alert(1)',
+      'java\tscript:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
+      'vbscript:msgbox(1)',
+      '//evil.example/x', // another site that only looks like a path
+      '/\\evil.example', // a browser reads this as //evil.example
+      'https://user@evil.example/x', // a name before the host
+      'http://basu.mn/x', // not https
+      'https://basu.mn/"><img src=x>', // would break out of the attribute
+      'https://basu.mn/ onmouseover=1',
+      'https://', // no host
+      'not-a-url',
+    ];
+    for (const href of bad) {
+      const res = await call('POST', '/v1/ops/menus/desk/links', DESK(), { name: 'Холбоос', href });
+      expect(res.statusCode, `${href} → ${res.body}`).toBe(400);
+    }
+    // The two that are fine go in, exactly as given.
+    for (const href of ['/kds', 'https://basu.mn/help']) {
+      const res = await call('POST', '/v1/ops/menus/desk/links', DESK(), { name: 'Холбоос', href });
+      expect(res.statusCode, `${href} → ${res.body}`).toBe(201);
+      expect(res.json().href).toBe(href);
+    }
+  });
+
   it('is the desk’s to change only for a seat that holds the menu', async () => {
     const worker = await member('+97699130043', 'Ops', 'ops');
     expect((await call('PUT', '/v1/ops/menus/desk', worker, { pages: [{ key: 'guests', hidden: true }] })).statusCode).toBe(403);

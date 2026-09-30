@@ -4,7 +4,7 @@ import { closePool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
-import { contentSecurityPolicy, inlineScriptHashes, limits } from './hardening.js';
+import { contentSecurityPolicy, externalScripts, inlineScriptHashes, limits } from './hardening.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
 import { dirname, join } from 'node:path';
@@ -57,8 +57,21 @@ describe('security headers', () => {
     expect(hashes.every((h) => /^'sha256-[A-Za-z0-9+/=]+'$/.test(h))).toBe(true);
     const csp = contentSecurityPolicy(hashes);
     expect(csp).not.toContain("'unsafe-inline' https://cdnjs");
-    expect(csp).toMatch(/script-src 'self' https:\/\/cdnjs\.cloudflare\.com 'sha256-/);
+    expect(csp).toMatch(/script-src 'self' 'sha256-/);
     expect(csp).toContain("connect-src 'self'");
+  });
+
+  it('names the exact CDN file the pages load, never the CDN host', () => {
+    // The map pages load MapLibre from cdnjs; the policy carries that one
+    // address, not the host — a host allowed would let any library it serves
+    // run here, an old template engine a slipped-through scrap could reach.
+    const files = externalScripts(webRoot);
+    expect(files).toContain('https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js');
+    const csp = contentSecurityPolicy(inlineScriptHashes(webRoot), files);
+    const scriptSrc = /script-src([^;]*)/.exec(csp)![1]!;
+    expect(scriptSrc).toContain('/maplibre-gl.min.js');
+    // The bare host, allowed alone, is what must not be there.
+    expect(scriptSrc).not.toMatch(/https:\/\/cdnjs\.cloudflare\.com(\s|$)/);
   });
 });
 

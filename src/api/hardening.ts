@@ -11,11 +11,14 @@ import { mode } from '../mode.js';
  * the scripts we shipped, only talk to us, never be framed by somebody
  * else. Our pages keep their script inline, so the policy names each one by
  * its hash — computed once from the files on disk, so a page edited and
- * deployed is allowed and a script injected into it is not.
+ * deployed is allowed and a script injected into it is not. A script a page
+ * loads from a CDN is named by its whole address, read off the same files,
+ * and never the CDN itself: a CDN serves every version of every library, an
+ * old template engine among them, and with the host allowed a scrap of
+ * markup that slipped past an escape could load one and run it here.
  */
 
 const WEB_ORIGINS = {
-  scripts: ['https://cdnjs.cloudflare.com'],
   styles: ['https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
   fonts: ['https://fonts.gstatic.com'],
 };
@@ -37,10 +40,29 @@ export function inlineScriptHashes(webRoot: string): string[] {
   return [...hashes];
 }
 
-export function contentSecurityPolicy(scriptHashes: string[]): string {
+/**
+ * The whole address of every script the pages under `webRoot` load from
+ * elsewhere (`<script src="https://…">`) — one file each, not the host it
+ * comes from. An address that would not read as one source in the policy is
+ * left out, and its page's script simply does not load.
+ */
+export function externalScripts(webRoot: string): string[] {
+  const urls = new Set<string>();
+  for (const file of readdirSync(webRoot)) {
+    if (!file.endsWith('.html')) continue;
+    const html = readFileSync(join(webRoot, file), 'utf8');
+    for (const match of html.matchAll(/<script\s[^>]*?\bsrc="(https:\/\/[^"]+)"/g)) {
+      const url = match[1] ?? '';
+      if (/^https:\/\/[A-Za-z0-9.-]+\/[A-Za-z0-9._~\/-]+$/.test(url)) urls.add(url);
+    }
+  }
+  return [...urls].sort();
+}
+
+export function contentSecurityPolicy(scriptHashes: string[], scriptFiles: string[] = []): string {
   return [
     "default-src 'self'",
-    `script-src 'self' ${WEB_ORIGINS.scripts.join(' ')} ${scriptHashes.join(' ')}`.trim(),
+    `script-src 'self' ${scriptFiles.join(' ')} ${scriptHashes.join(' ')}`.replace(/\s+/g, ' ').trim(),
     `style-src 'self' 'unsafe-inline' ${WEB_ORIGINS.styles.join(' ')}`,
     `font-src 'self' data: ${WEB_ORIGINS.fonts.join(' ')}`,
     "img-src 'self' data: blob:",
@@ -56,7 +78,7 @@ export function contentSecurityPolicy(scriptHashes: string[]): string {
 
 /** The same headers on every response, HTML or JSON: one place, no route forgets. */
 export function securityHeaders(app: FastifyInstance, webRoot: string): void {
-  const csp = contentSecurityPolicy(inlineScriptHashes(webRoot));
+  const csp = contentSecurityPolicy(inlineScriptHashes(webRoot), externalScripts(webRoot));
   app.addHook('onSend', async (_request, reply) => {
     reply.header('Content-Security-Policy', csp);
     reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');

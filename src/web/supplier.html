@@ -179,7 +179,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;
 
 <script type="module">
 import { api, store, shell, toast, mnt, money, KIND, dayLabel, signInDoors, accountWays, authReturn, popup, dropSession } from '/api.js';
-import { NAV_ICON, deskFrame } from '/sidenav.js';
+import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 
 const root = document.getElementById('root');
 const el = (html) => {
@@ -187,11 +187,14 @@ const el = (html) => {
   t.innerHTML = html.trim();
   return t.content.firstElementChild;
 };
-const esc = (value) => {
-  const node = document.createElement('span');
-  node.textContent = value ?? '';
-  return node.innerHTML;
-};
+/**
+ * Text into markup: a guest's name, the address and the number a guest typed
+ * for a delivery, a listing, the business's own name. Quotes too — a number
+ * goes into a tel: link and a name into an input's value, and a `"` would
+ * end the attribute and start one of its own on the screen of everybody who
+ * works here.
+ */
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 /**
  * The business the dashboard opened this page for — `/supplier?org=…` — so
@@ -455,8 +458,8 @@ function statusCard(a, needsPhone = false) {
       <div class="card" id="application">
         <div class="brand wordmark" data-size="sm">Basu</div>
         <h2>${esc(a.name)}</h2>
-        <div class="status" data-s="${a.state}">
-          <div class="big">${word}</div>
+        <div class="status" data-s="${esc(a.state)}">
+          <div class="big">${esc(word)}</div>
           <div class="cap">${a.state === 'declined' ? `Шалтгаан: ${esc(a.decline_reason)}` : cap}</div>
         </div>
       </div>
@@ -540,11 +543,11 @@ function renderTicket(ticket, lane) {
     <article class="card ticket" data-lane="${lane}"${dueToday ? ' data-due' : ''}>
       <div class="top">
         <span class="dot"${STATE_TONE[state] ? ` data-tone="${STATE_TONE[state]}"` : ''}></span><span>${STATE_WORD[state] ?? ''}</span>
-        <span class="id">№${ticket.code}</span>
+        <span class="id">№${esc(ticket.code)}</span>
         <span class="day"${dueToday ? ' data-s="due"' : ''}>${dueToday ? 'Өнөөдөр' : dayLabel(ticket.receive_on)}</span>
       </div>
       <div class="body">
-        <div class="what">${esc(ticket.title)} ×${ticket.qty}${ticket.unit === 'kg' ? ' кг' : ''}</div>
+        <div class="what">${esc(ticket.title)} ×${esc(ticket.qty)}${ticket.unit === 'kg' ? ' кг' : ''}</div>
         <div class="who"><span class="k">Зочин</span><span class="v">${
           ticket.guest
             ? `<span>${esc(ticket.guest)}</span>${ticket.guest_phone ? tel(ticket.guest_phone) : ''}`
@@ -795,9 +798,9 @@ async function promote(l) {
   };
   const cards = plans
     .map(
-      (p, i) => `<label class="promo-opt" data-tier="${p.tier}">
-        <input type="radio" name="tier" value="${p.tier}"${i === plans.length - 1 ? ' checked' : ''}>
-        <b>${p.name}<span class="chip" data-size="sm" data-tone="${p.tier === 'vip' ? 'hi' : 'accent'}" data-strong>${p.days} хоног</span></b>
+      (p, i) => `<label class="promo-opt" data-tier="${esc(p.tier)}">
+        <input type="radio" name="tier" value="${esc(p.tier)}"${i === plans.length - 1 ? ' checked' : ''}>
+        <b>${esc(p.name)}<span class="chip" data-size="sm" data-tone="${p.tier === 'vip' ? 'hi' : 'accent'}" data-strong>${esc(p.days)} хоног</span></b>
         <span class="price">${p.price_mnt ? mnt(p.price_mnt) : 'Үнэгүй'}</span>
         <small>${WHAT[p.tier]}${l.tier === p.tier ? ' Одоогийн хугацаан дээр нэмэгдэнэ.' : ''}</small>
       </label>`,
@@ -817,12 +820,14 @@ async function promote(l) {
       if (!started) {
         started = await sup(`/v1/supplier/listings/${l.id}/promote`, { method: 'POST', body: { tier: values.tier } });
         if (!started.invoice) return true;
-        const pay = started.invoice.action_url
-          ? `<a class="btn" data-v="primary" href="${esc(started.invoice.action_url)}" target="_blank" rel="noopener">QPay-ээр төлөх →</a>`
+        // The provider's page, and only an http(s) one: an address that runs here is no way to pay.
+        const payAt = navHref(started.invoice.action_url);
+        const pay = payAt
+          ? `<a class="btn" data-v="primary" href="${esc(payAt)}" target="_blank" rel="noopener">QPay-ээр төлөх →</a>`
           : '<span class="cap">Туршилтын сервер: нэхэмжлэх шууд төлөгдсөнд тооцогдоно.</span>';
         box.step({
           title: 'QPay-ээр төлөх',
-          sub: `${esc(started.promotion.name)} · ${started.promotion.days} хоног · ${esc(l.title)}`,
+          sub: `${esc(started.promotion.name)} · ${esc(started.promotion.days)} хоног · ${esc(l.title)}`,
           fields: [
             { type: 'static', label: 'Төлөх дүн', html: `<div class="promo-pay"><span class="amount">${mnt(started.invoice.amount_mnt)}</span>${pay}</div>` },
             { type: 'note', text: 'Банкны аппаасаа төлсний дараа «Төлсөн» дарна уу. Бид банкнаас шалгаад зарыг тань онцолно.' },
@@ -1226,7 +1231,7 @@ async function renderHome() {
           ].filter(Boolean).join(' · ') || 'хийх ажилтай захиалга'
         : 'хийх ажил алга'
     }</span></div>`),
-    el(`<div class="card stat kpi"><b>${h.season.handed}</b><span>${h.season.by_kind.map((b) => `${KIND[b.kind] ?? b.kind} ${k(b.qty, b.unit)}`).join(', ') || 'энэ улирал хүлээлгэн өгсөн'}</span></div>`),
+    el(`<div class="card stat kpi"><b>${h.season.handed}</b><span>${esc(h.season.by_kind.map((b) => `${KIND[b.kind] ?? b.kind} ${k(b.qty, b.unit)}`).join(', ')) || 'энэ улирал хүлээлгэн өгсөн'}</span></div>`),
     ...(h.season.payout_mnt === null
       ? []
       : [el(`<div class="card stat kpi"><b>${money(h.season.payout_mnt)}</b><span>танд очих орлого${h.season.forfeit_mnt ? `, суутгал ${mnt(h.season.forfeit_mnt)}` : ''}</span></div>`)]),
@@ -1282,7 +1287,7 @@ async function loadOrders() {
   if (!document.getElementById('orders')) return;
   const none = orderQuery.q ? 'Хайлтад тохирох захиалга олдсонгүй.' : 'Энэ хэсэгт захиалга байхгүй.';
   const ended = (o) => o.state === 'CANCELLED' || o.state === 'REFUNDED';
-  const what = (o) => `${esc(o.title)} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}`;
+  const what = (o) => `${esc(o.title)} ×${esc(o.qty)}${o.unit === 'kg' ? ' кг' : ''}`;
   // What the supplier keeps of an order is the money's; a seat without it reads what the guest paid.
   const mine = (o) => o.payout_mnt !== null && o.payout_mnt !== undefined;
   const amount = (o) => money(ended(o) ? o.forfeit_mnt ?? 0 : mine(o) ? o.payout_mnt : o.total_mnt);
@@ -1291,12 +1296,12 @@ async function loadOrders() {
     // A desk reads orders as a table: one line each, the code and the money in their columns.
     const rows = data.orders.map((o) => `
       <tr class="order" data-order="${o.id}" data-link tabindex="0">
-        <td><span class="mono">№${o.code}</span></td>
+        <td><span class="mono">№${esc(o.code)}</span></td>
         <td>${what(o)}</td>
         <td>${o.guest ? esc(o.guest) : ''}${o.guest_phone ? `<span class="sub mono">${esc(o.guest_phone)}</span>` : ''}${o.guest || o.guest_phone ? '' : '—'}</td>
         <td>${o.receive === 'delivery' ? 'Хүргэлт' : 'Өөрөө авна'}</td>
         <td><span class="mono">${dayLabel(o.receive_on)}</span></td>
-        <td><span class="chip" data-s="${o.state}" data-size="sm">${STATE_WORD[o.state] ?? o.state}</span></td>
+        <td><span class="chip" data-s="${esc(o.state)}" data-size="sm">${esc(STATE_WORD[o.state] ?? o.state)}</span></td>
         <td class="num">${amount(o)}${ended(o) ? '<span class="sub">суутгал</span>' : ''}</td>
       </tr>`);
     box.replaceChildren(el(`
@@ -1326,7 +1331,7 @@ async function loadOrders() {
     const row = el(`
       <button class="order row" type="button" data-order="${o.id}" data-chev>
         <span class="main">
-          <span class="title t"><span class="mn">№${o.code}</span> · ${what(o)}</span>
+          <span class="title t"><span class="mn">№${esc(o.code)}</span> · ${what(o)}</span>
           <span class="sub s">${[
             o.guest ? esc(o.guest) : '',
             o.guest_phone ? `<span class="mn">${esc(o.guest_phone)}</span>` : '',
@@ -1335,7 +1340,7 @@ async function loadOrders() {
           ].filter(Boolean).join(' · ')}</span>
         </span>
         <span class="end right">
-          <span class="chip" data-s="${o.state}" data-size="sm">${STATE_WORD[o.state] ?? o.state}</span>
+          <span class="chip" data-s="${esc(o.state)}" data-size="sm">${esc(STATE_WORD[o.state] ?? o.state)}</span>
           <span class="amt val">${amount(o)}<small>${amountWord(o)}</small></span>
         </span>
       </button>`);
@@ -1381,12 +1386,12 @@ async function openOrder(id) {
   view.replaceChildren(
     el(`<section class="order-page">
           <button class="back link" type="button" id="back">${ICON.left}Захиалгууд</button>
-          <div class="page-head head"><div><h1 class="mn">№${o.code}<span class="chip" data-s="${o.state}">${STATE_WORD[o.state] ?? o.state}</span></h1></div></div>
+          <div class="page-head head"><div><h1 class="mn">№${esc(o.code)}<span class="chip" data-s="${esc(o.state)}">${esc(STATE_WORD[o.state] ?? o.state)}</span></h1></div></div>
           <div id="act"></div>
-          ${o.cancel_reason ? `<div class="terms callout"><b>Цуцлагдсан: ${REASON_SHORT[o.cancel_reason] ?? o.cancel_reason}</b><span>Зочинд ${money(o.refund_mnt ?? 0)} буцна${o.forfeit_mnt ? `, танд ${money(o.forfeit_mnt)} үлдэнэ` : ''}.</span></div>` : ''}
+          ${o.cancel_reason ? `<div class="terms callout"><b>Цуцлагдсан: ${esc(REASON_SHORT[o.cancel_reason] ?? o.cancel_reason)}</b><span>Зочинд ${money(o.refund_mnt ?? 0)} буцна${o.forfeit_mnt ? `, танд ${money(o.forfeit_mnt)} үлдэнэ` : ''}.</span></div>` : ''}
           <div class="sec section-label">Явц</div>
           <ol class="story stepper" data-stepper>
-            ${data.events.map((e) => `<li data-done${EVENT_TONE[e.type] ? ` data-k="${EVENT_TONE[e.type]}"` : ''}><span class="w">${EVENT_WORD[e.type] ?? e.type}<span class="s">${ACTOR_WORD(e.actor)}${e.payload?.reason ? ` · ${REASON_SHORT[e.payload.reason] ?? e.payload.reason}` : ''}</span></span><span class="t">${when(e.at)}</span></li>`).join('')}
+            ${data.events.map((e) => `<li data-done${EVENT_TONE[e.type] ? ` data-k="${EVENT_TONE[e.type]}"` : ''}><span class="w">${esc(EVENT_WORD[e.type] ?? e.type)}<span class="s">${esc(`${ACTOR_WORD(e.actor)}${e.payload?.reason ? ` · ${REASON_SHORT[e.payload.reason] ?? e.payload.reason}` : ''}`)}</span></span><span class="t">${when(e.at)}</span></li>`).join('')}
           </ol>
         </section>`),
   );

@@ -20,7 +20,11 @@ try {
   const home = await head('/');
   check('нүүр хуудас нээгдэнэ', home.status === 200, `HTTP ${home.status}`);
   const h = home.headers;
-  check('Content-Security-Policy толгой', (h.get('content-security-policy') ?? '').includes("default-src 'self'"));
+  const csp = h.get('content-security-policy') ?? '';
+  check('Content-Security-Policy толгой', csp.includes("default-src 'self'"));
+  // A CDN named whole lets any library it serves run here; the policy names the one file a page loads.
+  const scriptSrc = /script-src([^;]*)/.exec(csp)?.[1] ?? '';
+  check('CSP: CDN бүхэлдээ биш, зөвхөн тухайн скрипт', !/https:\/\/[^\s/]+(\/)?(\s|$)/.test(scriptSrc), scriptSrc.trim().slice(0, 120));
   check('Strict-Transport-Security толгой', (h.get('strict-transport-security') ?? '').includes('max-age='));
   check('X-Content-Type-Options: nosniff', h.get('x-content-type-options') === 'nosniff');
   check('X-Frame-Options: DENY', h.get('x-frame-options') === 'DENY');

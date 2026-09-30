@@ -76,9 +76,36 @@ async function namesFor(labels: string[]): Promise<Map<string, string>> {
   return out;
 }
 
+/**
+ * One cell, for the accountant's spreadsheet. A name in these files is
+ * whatever a guest or a supplier called themselves, and a spreadsheet reads
+ * a cell that starts with `=`, `+`, `-` or `@` as a formula — one that can
+ * reach out to the web or run a command on the accountant's machine. Such a
+ * cell goes in with a `'` in front, which makes it text. A number is left a
+ * number: it is ours, not somebody's words.
+ */
+/**
+ * One cell, for the accountant's spreadsheet. A name in these files is
+ * whatever a guest or a supplier called themselves, and a spreadsheet reads
+ * a cell that starts with `=`, `+`, `-` or `@` as a formula — one that can
+ * reach out to the web or run a command on the accountant's machine. Such a
+ * cell goes in with a `'` in front, which makes it text. A number is left a
+ * number: it is ours, not somebody's words.
+ */
+/**
+ * One cell, for the accountant's spreadsheet. A name in these files is
+ * whatever a guest or a supplier called themselves, and a spreadsheet reads
+ * a cell that starts with `=`, `+`, `-` or `@` as a formula — one that can
+ * reach out to the web or run a command on the accountant's machine. Such a
+ * cell goes in with a `'` in front, which makes it text. A number is left a
+ * number: it is ours, not somebody's words.
+ */
 const csvCell = (v: unknown): string => {
-  const s = v === null || v === undefined ? '' : String(v);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'number') return String(v);
+  const s = String(v);
+  const text = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 };
 const csv = (header: string[], rows: unknown[][]): string => [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\n') + '\n';
 const sendCsv = (reply: FastifyReply, name: string, body: string) =>
