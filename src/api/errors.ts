@@ -112,6 +112,7 @@ const AUTH_ERRORS: Record<AuthError['code'], Spec> = {
   WRONG_PASSWORD: { status: 403, mn: 'Одоогийн нууц үг буруу байна.' },
   EMAIL_CLOSED: { status: 503, mn: 'Имэйлээр нэвтрэх түр ажиллахгүй байна. Өөр аргаар нэвтэрнэ үү.' },
   EMAIL_FAILED: { status: 502, mn: 'Код илгээж чадсангүй. Хэсэг хүлээгээд дахин оролдоно уу.' },
+  SMS_CLOSED: { status: 503, mn: 'Утсанд код илгээж нэвтрэх түр ажиллахгүй байна. Өөр аргаар нэвтэрнэ үү.' },
   SOCIAL_CLOSED: { status: 503, mn: 'Энэ аргаар нэвтрэх түр ажиллахгүй байна.' },
   SOCIAL_REFUSED: { status: 401, mn: 'Нэвтрэлт баталгаажсангүй. Дахин оролдоно уу.' },
   BAD_PHONE: { status: 400, mn: 'Утасны дугаараа шалгана уу (+976XXXXXXXX).' },

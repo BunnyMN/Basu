@@ -46,6 +46,12 @@ try {
   if (open) {
     check('имэйл код нээлттэй (SMTP_URL, MAIL_FROM)', open.email === true);
     check('Google нээлттэй (GOOGLE_CLIENT_ID, _SECRET)', open.google === true);
+    // Without an SMS gateway nobody receives a code, so the door must not
+    // take guesses at one either.
+    if (open.sms !== true) {
+      const guess = await fetch(`${base}/v1/auth/verify`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"phone":"+97699000000","code":"000000"}' });
+      check('SMS код хаалттай (gateway алга)', guess.status === 503, `HTTP ${guess.status}`);
+    }
     const google = await head('/v1/auth/google/start?return=https://evil.example');
     const to = google.headers.get('location') ?? '';
     check('Google эхлэл Google руу, state cookie-тэй', !open.google || (to.startsWith('https://accounts.google.com/') && (google.headers.get('set-cookie') ?? '').includes('HttpOnly')), `HTTP ${google.status}`);

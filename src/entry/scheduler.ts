@@ -1,6 +1,6 @@
 import '../env.js';
 import { closePool } from '../db/pool.js';
-import { mode } from '../mode.js';
+import { modeOrExit } from '../mode.js';
 import { run } from '../scheduler/runner.js';
 import { buildProviders } from './providers.js';
 
@@ -12,7 +12,7 @@ import { buildProviders } from './providers.js';
  * this going down means nothing happens at all and a table sits waiting. It
  * gets its own deploy and its own alert for that reason.
  */
-if (mode() === 'demo') {
+if (modeOrExit('scheduler') === 'demo') {
   // Two processes cannot each hold their own demo clock: they drift apart, and
   // this one would fire a lunch hours early and then call the guests no-shows.
   // In demo mode ticks come from the API, on the clock the page is driving.

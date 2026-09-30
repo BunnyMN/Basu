@@ -94,6 +94,47 @@ describe('rate limits', () => {
     expect(last!.headers['retry-after']).toBeTruthy();
   });
 
+  /**
+   * Knock on a code door one more time than it allows, from wherever `from`
+   * says each knock came: the socket, and the X-Forwarded-For it carried.
+   */
+  async function knock(server: FastifyInstance, from: (i: number) => { socket: string; forwarded: string }) {
+    const { max } = limits().otp;
+    let last;
+    for (let i = 0; i <= max; i++) {
+      const { socket, forwarded } = from(i);
+      last = await server.inject({
+        method: 'POST',
+        url: '/v1/auth/otp',
+        payload: {},
+        remoteAddress: socket,
+        headers: { 'x-forwarded-for': forwarded },
+      });
+    }
+    return last!;
+  }
+
+  it('count a caller behind nginx by the address nginx saw, not by one it made up in front', async () => {
+    const behind = await buildServer(ctx, { trustProxy: true });
+    try {
+      // nginx appends the address it saw to whatever the caller wrote there.
+      const last = await knock(behind, (i) => ({ socket: '127.0.0.1', forwarded: `10.0.${i}.1, 198.51.100.20` }));
+      expect(last.statusCode).toBe(429);
+    } finally {
+      await behind.close();
+    }
+  });
+
+  it('believe no forwarded address from anybody who is not nginx', async () => {
+    const behind = await buildServer(ctx, { trustProxy: true });
+    try {
+      const last = await knock(behind, (i) => ({ socket: '198.51.100.30', forwarded: `10.1.${i}.1` }));
+      expect(last.statusCode).toBe(429);
+    } finally {
+      await behind.close();
+    }
+  });
+
   it('are strict in production and merely present in the demo', () => {
     const before = process.env['BASU_MODE'];
     process.env['BASU_MODE'] = 'production';

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -442,6 +443,51 @@ describe('the guest app', () => {
     (dom.window.document.querySelector('#orderbar') as HTMLElement).click();
     await until(dom, 'the status again', (d) => Boolean(d.querySelector('.status')));
     expect(dom.window.document.querySelector('#orderbar')?.hasAttribute('data-open')).toBe(false);
+  });
+
+  it('sends an order under a key made for it, and the same key when Pay is tapped again', async () => {
+    await ownGuest('+97699003010');
+    // The first Pay is refused, the way a dropped connection or an empty wallet refuses it.
+    let refused = false;
+    const dom = await openPage('dine.html', '', (path) => {
+      if (refused || !/^\/v1\/orders\/[0-9a-f-]{36}\/pay$/.test(path)) return undefined;
+      refused = true;
+      return new Response(JSON.stringify({ error: { code: 'PAYMENT_FAILED', message_mn: 'Төлбөр амжилтгүй боллоо.' } }), {
+        status: 402,
+        headers: { 'content-type': 'application/json' },
+      });
+    });
+    await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
+    tapPin(dom, pairedVenue);
+    await until(dom, 'the menu', (d) => d.querySelectorAll('.item').length > 3);
+    const row = [...dom.window.document.querySelectorAll('.item')].find((r) => r.textContent?.includes('Цуйван'))!;
+    (row.querySelector('button[data-d="1"]') as HTMLElement).click();
+    await until(dom, 'the pay button', (d) => Boolean(d.querySelector('.sheet footer button')));
+    clickText(dom, '.slot', '12:15');
+    const payable = (d: Document) => {
+      const button = d.querySelector('.sheet footer button');
+      return Boolean(button && !button.hasAttribute('data-busy') && button.textContent?.includes('төлөх'));
+    };
+    await until(dom, 'a price', payable);
+    (dom.window.document.querySelector('.sheet footer button') as HTMLElement).click();
+    await until(dom, 'Pay again, after the refusal', (d) => refused && payable(d));
+    (dom.window.document.querySelector('.sheet footer button') as HTMLElement).click();
+    await until(dom, 'the status screen', (d) => Boolean(d.querySelector('.status')));
+
+    // One key, nobody's to guess — not the venue, slot and dishes spelled out…
+    const caller = createHash('sha256').update(storage.getItem('basu.guest')!).digest('hex');
+    const kept = await getPool().query<{ key: string }>(
+      `SELECT key FROM idempotency_key WHERE caller = $1 AND method = 'POST' AND url = '/v1/orders'`,
+      [caller],
+    );
+    expect(kept.rows).toHaveLength(1);
+    expect(kept.rows[0]!.key).toMatch(/^order-[0-9a-f]{32}$/);
+    // …and the tap after the refusal was the same attempt: one lunch, not two.
+    const orders = await getPool().query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM dine.dining_order o JOIN identity.guest g ON g.id = o.guest_id WHERE g.phone_e164 = $1`,
+      ['+97699003010'],
+    );
+    expect(orders.rows[0]!.n).toBe(1);
   });
 
   it('draws the walk with layers MapLibre can actually paint', async () => {

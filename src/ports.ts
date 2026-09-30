@@ -142,6 +142,12 @@ export interface Ctx {
    * that would swallow them.
    */
   mailer?: Mailer;
+  /**
+   * True where the notifier's SMS channel reaches a real gateway. None does
+   * yet: SMS ends at a fake that keeps the message to itself, and production
+   * then has no phone-code door (see `smsCodesOpen` in identity).
+   */
+  smsGateway?: boolean;
 }
 
 /* ── fakes ─────────────────────────────────────────────────────────── */

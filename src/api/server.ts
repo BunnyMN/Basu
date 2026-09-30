@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import rateLimit from '@fastify/rate-limit';
@@ -77,6 +78,18 @@ declare module 'fastify' {
  */
 const IDEMPOTENCY_TTL_HOURS = 24;
 
+/**
+ * The one proxy in front of the API: the pilot's nginx, on the same machine,
+ * reaching it over loopback — basu.burzai.cloud → nginx → 127.0.0.1:3210,
+ * with no CDN before it. nginx appends the address it saw to whatever
+ * X-Forwarded-For the caller sent. Trusting every hop, as `true` did, read
+ * the caller's own first entry instead: anybody could name a new address on
+ * every request and walk past every per-address limit, the ones on guessing
+ * a code included. Trusting this address alone reads the entry nginx wrote,
+ * and nothing at all from somebody who reached the port another way.
+ */
+const NGINX = '127.0.0.1';
+
 function bearer(request: FastifyRequest): string | undefined {
   const header = request.headers.authorization;
   if (!header?.startsWith('Bearer ')) return undefined;
@@ -85,7 +98,10 @@ function bearer(request: FastifyRequest): string | undefined {
 
 export interface ServerOptions {
   logger?: boolean;
-  /** Behind nginx the caller's address is in X-Forwarded-For; only there. */
+  /**
+   * Behind nginx: the caller is the address nginx added to X-Forwarded-For,
+   * believed only from nginx itself. Anywhere else the socket is the caller.
+   */
   trustProxy?: boolean;
   /**
    * Mounts the two demo pages and the clock controls they need. Never on in
@@ -95,7 +111,7 @@ export interface ServerOptions {
 }
 
 export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promise<FastifyInstance> {
-  const app = Fastify({ logger: options.logger ?? false, trustProxy: options.trustProxy ?? false, bodyLimit: 64 * 1024 });
+  const app = Fastify({ logger: options.logger ?? false, trustProxy: options.trustProxy ? NGINX : false, bodyLimit: 64 * 1024 });
   // The roles every server starts with, where they are missing. What Basu changed is left as it is.
   await ensureRoles();
   const db = getPool();
@@ -112,6 +128,10 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     errorResponseBuilder: tooManyRequests,
   });
   app.setErrorHandler(errorHandler);
+
+  // A retried POST gets the answer it was given — and only its caller does.
+  // Before any route, because it joins each route's own chain.
+  rememberAnswers(app, ctx);
 
   // Tiles and glyphs, same-origin. See src/api/tiles.ts for why they are
   // proxied rather than fetched straight from the tile host.
@@ -187,59 +207,6 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
     );
     return (rows[0]?.n ?? 0) > 0;
   };
-
-  /**
-   * Idempotency, because a phone on a patchy connection retries and a guest
-   * double-taps. Same key, same answer — never a second order.
-   *
-   * Kept in Postgres rather than in this process: two API instances behind one
-   * address do not share memory, and a retry landing on the other one would
-   * order lunch twice, which is precisely what the key is for.
-   */
-  app.addHook('onSend', async (request, reply, payload) => {
-    const key = request.headers['idempotency-key'];
-    // Only successful responses are remembered. The key exists to stop a
-    // retried request buying lunch twice — not to make a failure permanent.
-    // Caching a 401 would mean a client that signs in and tries again gets
-    // handed the same rejection forever.
-    if (typeof key !== 'string' || request.method !== 'POST' || reply.statusCode >= 400) {
-      return payload;
-    }
-    await db
-      .query(
-        `INSERT INTO idempotency_key (key, status, content_type, body, created_at)
-         VALUES ($1, $2, $3, $4, $5) ON CONFLICT (key) DO NOTHING`,
-        [
-          key,
-          reply.statusCode,
-          reply.getHeader('content-type') ?? null,
-          typeof payload === 'string' ? payload : JSON.stringify(payload),
-          ctx.clock.now(),
-        ],
-      )
-      .catch(() => {});
-    return payload;
-  });
-
-  app.addHook('preHandler', async (request, reply) => {
-    const key = request.headers['idempotency-key'];
-    if (typeof key !== 'string' || request.method !== 'POST') return undefined;
-
-    const { rows } = await db.query<{ status: number; content_type: string | null; body: string }>(
-      `SELECT status, content_type, body FROM idempotency_key
-        WHERE key = $1 AND created_at > $2::timestamptz - make_interval(hours => $3)`,
-      [key, ctx.clock.now(), IDEMPOTENCY_TTL_HOURS],
-    );
-    const hit = rows[0];
-    if (!hit) return undefined;
-
-    reply.header('idempotent-replay', 'true');
-    // The content type travels with the body. Without it the replay went out
-    // as text/plain and a client parsing by content-type got a string where
-    // the first attempt had given it an object.
-    if (hit.content_type) reply.header('content-type', hit.content_type);
-    return reply.status(hit.status).send(hit.body);
-  });
 
   /* ── health ─────────────────────────────────────────────────────── */
 
@@ -895,6 +862,103 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
   if (options.dev) await mountDevRoutes(app, ctx);
 
   return app;
+}
+
+/**
+ * Idempotency, because a phone on a patchy connection retries and a guest
+ * double-taps. Same key, same answer — never a second order.
+ *
+ * Kept in Postgres rather than in this process: two API instances behind one
+ * address do not share memory, and a retry landing on the other one would
+ * order lunch twice, which is precisely what the key is for.
+ *
+ * An answer is kept for the one it was given to: under the session that
+ * asked (its hash — the token itself is never written down), the method and
+ * the address, and only then the key. A key is the client's own label, not
+ * a secret, and what it was the label of may be an order, a seat at the
+ * desk, a session. Kept under the label alone, it went to anybody who sent
+ * the same label — without a session, before any route had asked who they
+ * were. Now the same key from somebody else is simply their own request,
+ * and says nothing about whether the label was ever used.
+ *
+ * A request without a session is nobody in particular, so nothing is kept
+ * for it: the doors it can knock on hand out sessions, and one stranger's
+ * answer there replayed to the next would be the first one's session.
+ *
+ * The replay is the last step of each POST route's own chain, after its
+ * guard, so it answers only a request the route itself let in: a session
+ * that has ended since is refused like any other.
+ */
+function rememberAnswers(app: FastifyInstance, ctx: Ctx): void {
+  const db = getPool();
+
+  /** The session behind a request, as a hash; null for a request without one. */
+  const callerOf = (request: FastifyRequest): string | null => {
+    const token = bearer(request);
+    return token ? createHash('sha256').update(token).digest('hex') : null;
+  };
+
+  const replay = async (request: FastifyRequest, reply: FastifyReply) => {
+    const key = request.headers['idempotency-key'];
+    if (typeof key !== 'string') return undefined;
+    const caller = callerOf(request);
+    if (!caller) return undefined;
+
+    const { rows } = await db.query<{ status: number; content_type: string | null; body: string }>(
+      `SELECT status, content_type, body FROM idempotency_key
+        WHERE caller = $1 AND method = $2 AND url = $3 AND key = $4
+          AND created_at > $5::timestamptz - make_interval(hours => $6)`,
+      [caller, request.method, request.url, key, ctx.clock.now(), IDEMPOTENCY_TTL_HOURS],
+    );
+    const hit = rows[0];
+    if (!hit) return undefined;
+
+    reply.header('idempotent-replay', 'true');
+    // The content type travels with the body. Without it the replay went out
+    // as text/plain and a client parsing by content-type got a string where
+    // the first attempt had given it an object.
+    if (hit.content_type) reply.header('content-type', hit.content_type);
+    return reply.status(hit.status).send(hit.body);
+  };
+
+  // A hook on the instance would run before every route's own — that is how
+  // the answer used to go out ahead of the guard — so each POST route takes
+  // the replay as the last of its own instead.
+  app.addHook('onRoute', (route) => {
+    if (![route.method].flat().includes('POST')) return;
+    route.preHandler = [route.preHandler ?? []].flat().concat(replay);
+  });
+
+  app.addHook('onSend', async (request, reply, payload) => {
+    const key = request.headers['idempotency-key'];
+    // Only successful responses are remembered. The key exists to stop a
+    // retried request buying lunch twice — not to make a failure permanent.
+    // Caching a 401 would mean a client that signs in and tries again gets
+    // handed the same rejection forever.
+    if (typeof key !== 'string' || request.method !== 'POST' || reply.statusCode >= 400) {
+      return payload;
+    }
+    // Nothing is kept for a request without a session, and a replay is kept already.
+    const caller = callerOf(request);
+    if (!caller || reply.getHeader('idempotent-replay')) return payload;
+    await db
+      .query(
+        `INSERT INTO idempotency_key (caller, method, url, key, status, content_type, body, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT DO NOTHING`,
+        [
+          caller,
+          request.method,
+          request.url,
+          key,
+          reply.statusCode,
+          reply.getHeader('content-type') ?? null,
+          typeof payload === 'string' ? payload : JSON.stringify(payload),
+          ctx.clock.now(),
+        ],
+      )
+      .catch(() => {});
+    return payload;
+  });
 }
 
 /**

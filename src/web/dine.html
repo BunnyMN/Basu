@@ -913,6 +913,25 @@ function renderFoot() {
   foot.append(button);
 }
 
+/**
+ * The key an order goes with: one per attempt. Tapping again after the
+ * network lost the answer is the same attempt, sends the same key, and gets
+ * the same order back — never a second lunch. The key is a random one made
+ * for the attempt, not the venue, slot and dishes spelled out, which anybody
+ * could guess. Another cart or slot is another attempt, and so is the next
+ * order once this one is placed.
+ */
+let attempt = null;
+
+function orderKey() {
+  const what = `${state.venue.id}|${state.slot}|${[...state.cart].join(',')}`;
+  if (attempt?.what !== what) {
+    const nonce = [...crypto.getRandomValues(new Uint8Array(16))].map((b) => b.toString(16).padStart(2, '0')).join('');
+    attempt = { what, key: `order-${nonce}` };
+  }
+  return attempt.key;
+}
+
 async function placeOrder() {
   const sheet = $('sheet');
   const button = $('sheet-foot').querySelector('button');
@@ -925,7 +944,7 @@ async function placeOrder() {
     const order = await guestApi('/v1/orders', {
       method: 'POST',
       // A phone on a patchy connection retries; the same key must not buy lunch twice.
-      idempotencyKey: `order-${state.venue.id}-${state.slot}-${[...state.cart].join(',')}`,
+      idempotencyKey: orderKey(),
       body: {
         restaurant_id: state.venue.id,
         slot_starts_at: state.slot,
@@ -934,6 +953,7 @@ async function placeOrder() {
       },
     });
     await guestApi(`/v1/orders/${order.id}/pay`, { method: 'POST' });
+    attempt = null;
     state.orderId = order.id;
     state.sent = new Set();
     rendered = null;

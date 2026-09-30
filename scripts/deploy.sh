@@ -44,15 +44,49 @@ sudo -u "$RUN_AS" npm run build --silent
 
 env_url() { sudo -u "$RUN_AS" sh -c 'sed -n "s/^DATABASE_URL=//p" .env'; }
 
+# A key of .env as the API will read it: by Node's own parser, which takes
+# quotes, a trailing comment and the last of two lines the way the API does.
+# Empty when .env does not have it.
+env_value() { env -u "$1" node -e 'process.loadEnvFile(".env"); console.log(process.env[process.argv[1]] ?? "")' "$1" 2>/dev/null || true; }
+
+# The mode .env names, in any case; empty when it names none.
+named_mode() { env_value BASU_MODE | tr '[:upper:]' '[:lower:]'; }
+
+# The database .env points at, by name.
+named_db() { node -e 'try { console.log(decodeURIComponent(new URL(process.argv[1]).pathname.slice(1))) } catch { console.log("") }' "$(env_value DATABASE_URL)"; }
+
+# What the API is to run as. A server is production unless its .env says
+# demo in as many words: naming no mode is production — it used to be the
+# demo — and a word that is neither is refused, not guessed at. Nor is the
+# real database ever a demo, whatever the line says: the demo signs anybody
+# in as anybody and hands out the desk's secret.
+pinned_mode() {
+  case "$(named_mode)" in
+    production | '') echo production ;;
+    demo)
+      if [ "$(named_db)" = "$PROD_DB" ]; then
+        echo "✗ .env names the demo on $PROD_DB, the real database — refused" >&2
+        return 1
+      fi
+      echo demo
+      ;;
+    *)
+      echo "✗ .env names a BASU_MODE that is neither demo nor production — refused" >&2
+      return 1
+      ;;
+  esac
+}
+
 # The units were written for the demo and may carry a BASU_MODE of their own,
 # and a variable already in the process environment beats one in .env. So
-# the mode .env names is pinned into both units with a drop-in whose
-# EnvironmentFile is read last — later files win, and files beat Environment=.
+# the mode is pinned into both units with a drop-in whose EnvironmentFile is
+# read last — later files win, and files beat Environment=. A mode refused
+# pins nothing and restarts nothing: the API keeps the one it has.
 pin_mode() {
-  local mode node_env unit
-  mode=$(sed -n 's/^BASU_MODE=//p' .env | tail -n 1)
-  node_env=$(sed -n 's/^NODE_ENV=//p' .env | tail -n 1)
-  { echo "BASU_MODE=${mode:-demo}"; [ -z "$node_env" ] || echo "NODE_ENV=$node_env"; } > /opt/basu/mode.env
+  local node_env unit
+  PINNED=$(pinned_mode) || exit 1
+  node_env=$(env_value NODE_ENV)
+  { echo "BASU_MODE=$PINNED"; [ -z "$node_env" ] || echo "NODE_ENV=$node_env"; } > /opt/basu/mode.env
   chmod 644 /opt/basu/mode.env
   for unit in basu-api basu-scheduler; do
     systemctl cat "$unit" >/dev/null 2>&1 || continue
@@ -60,6 +94,7 @@ pin_mode() {
     printf '[Service]\nEnvironmentFile=/opt/basu/mode.env\n' > "/etc/systemd/system/$unit.service.d/zz-mode.conf"
   done
   systemctl daemon-reload
+  echo "  mode: $PINNED"
 }
 
 # ── Leaving the demo, once ─────────────────────────────────────────────
@@ -69,8 +104,13 @@ pin_mode() {
 # nothing seeded. The demo database stays beside it, untouched, and is
 # dumped once more for good measure. Nothing printed here may carry the
 # database URL: this log is public.
+#
+# Once is once: an .env that names production however it is spelled, or
+# that already points at the production database, is not the demo's. Taking
+# it for the demo's would keep it as .env.demo — the way back — and a
+# failure would then put it back and stop the scheduler.
 flipped=0
-if ! sudo -u "$RUN_AS" grep -q '^BASU_MODE=production$' .env; then
+if [ "$(named_mode)" != production ] && [ "$(named_db)" != "$PROD_DB" ]; then
   echo "→ production (once): a fresh database, the demo one kept"
   demo_url=$(env_url)
   [ -n "$demo_url" ] || { echo "no DATABASE_URL in $APP/.env"; exit 1; }
@@ -167,7 +207,8 @@ echo "→ health"
 for _ in $(seq 1 30); do
   if curl -fsS "http://127.0.0.1:$PORT/health" >/dev/null 2>&1; then
     echo "✓ $sha is up on :$PORT"
-    if grep -q '^BASU_MODE=production$' .env; then
+    # Anything but a demo pinned by name must have no /dev at all.
+    if [ "$PINNED" != demo ]; then
       dev=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/dev/clock")
       if [ "$dev" != 404 ]; then
         # Demo shortcuts on the real database let anybody in as anybody.

@@ -5,6 +5,7 @@ import { at, PILOT_MENU } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
 import { addMember, removeMember } from '../platform/org/index.js';
+import { accountByContact } from '../platform/identity/index.js';
 import { tick } from '../scheduler/runner.js';
 import {
   FakeNotifier,
@@ -61,6 +62,22 @@ async function atKitchen(restaurantId: string): Promise<string> {
 }
 
 const auth = (token: string) => ({ authorization: `Bearer ${token}` });
+
+/** Run something the way production runs it; these tests otherwise run as the demo. */
+async function inProduction<T>(fn: () => Promise<T>): Promise<T> {
+  const before = process.env['BASU_MODE'];
+  process.env['BASU_MODE'] = 'production';
+  try {
+    return await fn();
+  } finally {
+    if (before === undefined) delete process.env['BASU_MODE'];
+    else process.env['BASU_MODE'] = before;
+  }
+}
+
+/** The code in the last SMS to this number. */
+const codeSentTo = (phone: string) =>
+  /(\d{6})/.exec(notifier.of('auth.otp').filter((m) => m.to === phone).at(-1)?.body ?? '')?.[1];
 
 async function placeAndPay(
   guestToken: string,
@@ -191,6 +208,45 @@ describe('signing in', () => {
     expect(fourth.statusCode).toBe(429);
     expect(fourth.json().error.retry_after).toBe(3600);
   });
+
+  it('is shut both ways in production while no SMS gateway sends the code', async () => {
+    // A code asked for while the door was open is no key once it has shut.
+    await app.inject({ method: 'POST', url: '/v1/auth/otp', payload: { phone: '+97699001155' } });
+    const code = codeSentTo('+97699001155');
+    expect(code).toBeTruthy();
+
+    await inProduction(async () => {
+      const asked = await app.inject({ method: 'POST', url: '/v1/auth/otp', payload: { phone: '+97699001166' } });
+      expect(asked.statusCode).toBe(503);
+      expect(asked.json().error).toMatchObject({ code: 'SMS_CLOSED', message_mn: expect.stringContaining('Утсанд код') });
+      expect(codeSentTo('+97699001166')).toBeUndefined();
+
+      const guessed = await app.inject({ method: 'POST', url: '/v1/auth/verify', payload: { phone: '+97699001155', code } });
+      expect(guessed.statusCode).toBe(503);
+      expect(guessed.json().error.code).toBe('SMS_CLOSED');
+    });
+
+    // Nobody came in on the number, so nobody proved it either.
+    expect(await accountByContact('+97699001155')).toBeNull();
+  });
+
+  it('opens in production once a gateway is there to send the code', async () => {
+    const withGateway = await buildServer({ ...ctx, smsGateway: true });
+    try {
+      await inProduction(async () => {
+        const asked = await withGateway.inject({ method: 'POST', url: '/v1/auth/otp', payload: { phone: '+97699001177' } });
+        expect(asked.statusCode, asked.body).toBe(202);
+        const verified = await withGateway.inject({
+          method: 'POST',
+          url: '/v1/auth/verify',
+          payload: { phone: '+97699001177', code: codeSentTo('+97699001177') },
+        });
+        expect(verified.statusCode, verified.body).toBe(200);
+      });
+    } finally {
+      await withGateway.close();
+    }
+  });
 });
 
 describe('ordering over HTTP', () => {
@@ -233,10 +289,11 @@ describe('ordering over HTTP', () => {
 
   it('turns away an order for a restaurant with nobody in its kitchen', async () => {
     // Production behaviour: demo mode ignores this, because a walkthrough that
-    // needs a second tab open before the first one works is a puzzle.
+    // needs a second tab open before the first one works is a puzzle. Signed
+    // in first: production has no SMS to sign in by.
+    const guest = await signIn();
     const before = process.env['BASU_MODE'];
     process.env['BASU_MODE'] = 'production';
-    const guest = await signIn();
     const response = await app.inject({
       method: 'POST',
       url: '/v1/orders',
@@ -338,6 +395,108 @@ describe('ordering over HTTP', () => {
     });
     expect(accepted.statusCode, accepted.body).toBe(201);
     expect(accepted.headers['idempotent-replay']).toBeUndefined();
+  });
+
+  it('never hands one caller’s remembered answer to anybody else', async () => {
+    const guest = await signIn();
+    await atKitchen(venue.restaurantId);
+    const payload = {
+      restaurant_id: venue.restaurantId,
+      slot_starts_at: at('12:30').toISOString(),
+      party_size: 2,
+      items: [{ menu_item_id: venue.menuIds['tsuivan'], qty: 1 }],
+    };
+    const key = { 'idempotency-key': 'order-mine' };
+    const mine = await app.inject({ method: 'POST', url: '/v1/orders', headers: { ...auth(guest), ...key }, payload });
+    expect(mine.statusCode, mine.body).toBe(201);
+
+    // The same label without a session is refused, like any request without one.
+    const nobody = await app.inject({ method: 'POST', url: '/v1/orders', headers: key, payload });
+    expect(nobody.statusCode).toBe(401);
+    expect(nobody.body).not.toContain(mine.json().id);
+
+    // The same label from somebody else is their own request, for their own lunch.
+    const other = await signIn('+97699002233');
+    const theirs = await app.inject({ method: 'POST', url: '/v1/orders', headers: { ...auth(other), ...key }, payload });
+    expect(theirs.statusCode, theirs.body).toBe(201);
+    expect(theirs.headers['idempotent-replay']).toBeUndefined();
+    expect(theirs.json().id).not.toBe(mine.json().id);
+
+    // And the one it was given to still gets it back.
+    const again = await app.inject({ method: 'POST', url: '/v1/orders', headers: { ...auth(guest), ...key }, payload });
+    expect(again.headers['idempotent-replay']).toBe('true');
+    expect(again.json().id).toBe(mine.json().id);
+  });
+
+  it('remembers nothing for a caller with no session: a sign-in is nobody else’s', async () => {
+    await app.inject({ method: 'POST', url: '/v1/auth/otp', payload: { phone: '+97699001188' } });
+    const key = { 'idempotency-key': 'sign-in-tap' };
+    const signedIn = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/verify',
+      headers: key,
+      payload: { phone: '+97699001188', code: codeSentTo('+97699001188') },
+    });
+    expect(signedIn.statusCode, signedIn.body).toBe(200);
+
+    // A stranger with the same label and no code of their own gets no session.
+    const stranger = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/verify',
+      headers: key,
+      payload: { phone: '+97699001199', code: '000000' },
+    });
+    expect(stranger.statusCode).toBe(400);
+    expect(stranger.body).not.toContain(signedIn.json().token);
+  });
+
+  it('replays nothing to a session that has ended since', async () => {
+    const guest = await signIn();
+    await atKitchen(venue.restaurantId);
+    const payload = {
+      restaurant_id: venue.restaurantId,
+      slot_starts_at: at('12:30').toISOString(),
+      party_size: 2,
+      items: [{ menu_item_id: venue.menuIds['tsuivan'], qty: 1 }],
+    };
+    const headers = { ...auth(guest), 'idempotency-key': 'order-then-gone' };
+    expect((await app.inject({ method: 'POST', url: '/v1/orders', headers, payload })).statusCode).toBe(201);
+
+    await app.inject({ method: 'POST', url: '/v1/auth/sign-out', headers: auth(guest) });
+    // The route's own guard answers first, and it answers no.
+    const after = await app.inject({ method: 'POST', url: '/v1/orders', headers, payload });
+    expect(after.statusCode).toBe(401);
+    expect(after.headers['idempotent-replay']).toBeUndefined();
+  });
+
+  it('keeps an answer to the address it was given at', async () => {
+    const guest = await signIn();
+    await atKitchen(venue.restaurantId);
+    const draft = async () => {
+      const made = await app.inject({
+        method: 'POST',
+        url: '/v1/orders',
+        headers: auth(guest),
+        payload: {
+          restaurant_id: venue.restaurantId,
+          slot_starts_at: at('12:30').toISOString(),
+          party_size: 2,
+          items: [{ menu_item_id: venue.menuIds['tsuivan'], qty: 1 }],
+        },
+      });
+      expect(made.statusCode, made.body).toBe(201);
+      return made.json().id as string;
+    };
+    const one = await draft();
+    const two = await draft();
+
+    // One label on two orders' Pay buttons: the second is paid, not answered for the first.
+    const headers = { ...auth(guest), 'idempotency-key': 'pay-tap' };
+    expect((await app.inject({ method: 'POST', url: `/v1/orders/${one}/pay`, headers })).statusCode).toBe(200);
+    const second = await app.inject({ method: 'POST', url: `/v1/orders/${two}/pay`, headers });
+    expect(second.headers['idempotent-replay']).toBeUndefined();
+    const view = await app.inject({ method: 'GET', url: `/v1/orders/${two}`, headers: auth(guest) });
+    expect(view.json().state).toBe('PLACED');
   });
 
   it('answers “what of mine is happening” with the live orders and nothing else', async () => {

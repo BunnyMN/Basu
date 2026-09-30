@@ -73,7 +73,12 @@ export function buildProviders(log: (line: string) => void = console.log): Ctx {
         ? '[providers] email: printed to this console (set SMTP_URL and MAIL_FROM to send)'
         : '[providers] email: none — the email door is closed (set SMTP_URL and MAIL_FROM)',
   );
-  log('[providers] sms: fake · tax: fake');
+  // No gateway yet, so no `smsGateway`: production keeps the phone-code door shut.
+  log(
+    mode() === 'production'
+      ? '[providers] sms: none — the phone-code door is closed until a gateway is configured · tax: fake'
+      : '[providers] sms: fake · tax: fake',
+  );
   log(sealing() ? '[providers] bank details: encrypted at rest' : '[providers] bank details: PLAIN TEXT (set BANK_KEY to encrypt)');
   return {
     clock: buildClock(),

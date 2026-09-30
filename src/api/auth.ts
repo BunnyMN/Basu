@@ -12,6 +12,7 @@ import {
   sendPasswordCode,
   setPasswordWithCode,
   signInWithApple,
+  smsCodesOpen,
   takeGoogleState,
   verifyEmailCode,
 } from '../platform/identity/index.js';
@@ -72,6 +73,8 @@ export async function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): Promis
     email: Boolean(ctx.mailer),
     google: Boolean(googleConfigFromEnv()),
     apple: true,
+    // A code by SMS: shut in production until a gateway sends one.
+    sms: smsCodesOpen(ctx),
   }));
 
   /**
