@@ -144,6 +144,24 @@ describe('the desk cannot lock itself out', () => {
     expect((await call('POST', '/v1/ops/members', clerk, { guest_id: friend, role: 'finance' })).statusCode).toBe(403);
     expect((await call('POST', '/v1/ops/members', clerk, { guest_id: friend, role: hr })).statusCode).toBe(201);
   });
+
+  it('leaves a seat whose role is gone to the admin alone', async () => {
+    const hr = (await call('POST', '/v1/ops/roles/desk', DESK(), { name: 'Хүний нөөц', permissions: ['desk.members', 'desk.members:manage'] })).json().key;
+    const clerk = await member('+97699130005', 'Нарийн бичиг', hr);
+    // A role the clerk could hand out, held by a seat that is switched off — and then taken away.
+    const temp = (await call('POST', '/v1/ops/roles/desk', DESK(), { name: 'Түр', permissions: ['desk.members'] })).json().key;
+    const worker = await member('+97699130006', 'Түр ажилтан', temp);
+    const seatId = (await call('GET', '/v1/ops/me', worker)).json().member.id as string;
+    expect((await call('POST', `/v1/ops/members/${seatId}/active`, clerk, { active: false })).statusCode).toBe(200);
+    expect((await call('DELETE', `/v1/ops/roles/desk/${temp}`, DESK())).statusCode).toBe(204);
+
+    // What the role opened is nobody's to know now, so only the admin may say what the seat becomes.
+    expect((await call('POST', `/v1/ops/members/${seatId}/active`, clerk, { active: true })).statusCode).toBe(403);
+    expect((await call('POST', `/v1/ops/members/${seatId}/role`, clerk, { role: hr })).statusCode).toBe(403);
+    expect((await call('POST', `/v1/ops/members/${seatId}/role`, DESK(), { role: 'viewer' })).statusCode).toBe(200);
+    expect((await call('POST', `/v1/ops/members/${seatId}/active`, DESK(), { active: true })).statusCode).toBe(200);
+    expect((await call('GET', '/v1/ops/me', worker)).json().member.role).toBe('viewer');
+  });
 });
 
 describe('a business role Basu writes', () => {

@@ -539,9 +539,10 @@ describe('the desk’s members', () => {
   it('needs two people to move money out, and says which did which half', async () => {
     await upsertMember({ phone: '+97699000014', name: 'Санхүү нэг', role: 'finance' });
     await upsertMember({ phone: '+97699000015', name: 'Санхүү хоёр', role: 'finance' });
+    await aPayout();
+    // Signed in on the day the line is paid: the desk takes a sign-in from the last twelve hours.
     const one = await signIn('+97699000014');
     const two = await signIn('+97699000015');
-    await aPayout();
     // From here the desk is production: two real members, and the rule holds.
     process.env['BASU_MODE'] = 'production';
 

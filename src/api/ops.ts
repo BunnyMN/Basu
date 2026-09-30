@@ -32,7 +32,7 @@ import {
 } from '../idesh/index.js';
 import { limits } from './hardening.js';
 import { need, needAny } from './guards.js';
-import { grantsOf, linksOf, mayHandOutDesk, roleOf, type Grants, type RoleShape } from '../platform/access/index.js';
+import { grantsOf, linksOf, roleOf, type Grants, type RoleShape } from '../platform/access/index.js';
 import { shapeOrder, shapeSettlement } from './shapes.js';
 import { overviewAt } from './overview.js';
 import { closeGuest, guestFile, guestSearch } from './guests.js';
@@ -43,21 +43,23 @@ import { registerSystemDesk } from './systemDesk.js';
 import { registerAccessDesk } from './accessDesk.js';
 import { revokeSession } from '../platform/identity/index.js';
 import { mode } from '../mode.js';
-import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
+import { badRequest, forbidden, sendError, signInAgain, unauthorized } from './errors.js';
 import {
-  MemberError,
   deskRoleExists,
   linkByProof,
   listMembers,
+  mayHandle,
   memberForAccount,
   seatAccount,
   seatsOfAccounts,
   setMemberActive,
   setMemberRole,
+  type DeskActor,
   type Member,
   type Role,
 } from '../ops/index.js';
-import { accountByContact, contactsFor, findGuests, guestCard, profileOf, resolveGuest } from '../platform/identity/index.js';
+import { accountByContact, contactsFor, findGuests, guestCard, profileOf, resolveSession } from '../platform/identity/index.js';
+import { addMinutes } from '../domain/time.js';
 import { enqueue } from '../platform/notify/index.js';
 import { approveOrg, declineOrg, listOrgs, membersOf, orgById } from '../platform/org/index.js';
 import { orgRefusal, shapeOrg } from './orgs.js';
@@ -68,12 +70,22 @@ import type { Ctx } from '../ports.js';
  *
  * They sign in like anybody — Google, a code by email, a password — and
  * what makes the session ops is that the account holds a seat on the desk's
- * own list, with a role: asked for by the person and granted by an admin, or
- * named by an address the account proved. Every action is recorded under
- * that member. The shared
- * `OPS_TOKEN` of the first weeks is kept only for the demo, where a
- * walkthrough needs a desk without a phone; in production it opens nothing.
+ * own list, with a role: given by an admin to an account chosen from Basu's
+ * users, or named by an address the account proved. Every action is
+ * recorded under that member. A session lives sixty days, for the website
+ * and the app; the desk takes only one signed in within the last
+ * `DESK_SESSION_HOURS`, so a sign-in left on some machine is not a desk
+ * left open for two months. The shared `OPS_TOKEN` of the first weeks is
+ * kept only for the demo, where a walkthrough needs a desk without a phone;
+ * in production it opens nothing.
  */
+
+/**
+ * How long ago a desk seat's session may have been signed in. Past it the
+ * desk answers SIGN_IN_AGAIN and the dashboard shows its door; the same
+ * session still opens everything else it opened.
+ */
+export const DESK_SESSION_HOURS = 12;
 
 type Guard = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
 
@@ -145,9 +157,17 @@ const DEMO_ROLE: RoleShape = { scope: 'desk', key: 'admin', name: 'Админ', 
  * with no account behind it; anybody else is the active member their
  * account sits as, with what their role opens — or nobody, and nobody too
  * when their role has gone. `guestId` is the account, when there is one.
+ *
+ * `stale` is an account that has a seat, on a session signed in longer ago
+ * than the desk takes: no seat for it until the person signs in again. An
+ * account without a seat is never stale — its sessions are the website's
+ * and the app's, and live their sixty days.
  */
-export async function deskSeatFor(ctx: Ctx, token: string | undefined): Promise<{ guestId: string | null; seat: DeskSeat | null }> {
-  if (!token) return { guestId: null, seat: null };
+export async function deskSeatFor(
+  ctx: Ctx,
+  token: string | undefined,
+): Promise<{ guestId: string | null; seat: DeskSeat | null; stale: boolean }> {
+  if (!token) return { guestId: null, seat: null, stale: false };
   const links = await linksOf('desk');
   const shared = opsToken();
   if (shared && same(token, shared)) {
@@ -155,15 +175,19 @@ export async function deskSeatFor(ctx: Ctx, token: string | undefined): Promise<
     return {
       guestId: null,
       seat: { id: 'demo', name: 'Демо', role: 'admin', roleName: role.name, locked: true, phone: null, email: null, grants: grantsOf({ ...role, locked: true }, links) },
+      stale: false,
     };
   }
-  const guestId = await resolveGuest(ctx, token);
-  if (!guestId) return { guestId: null, seat: null };
+  const session = await resolveSession(ctx, token);
+  if (!session) return { guestId: null, seat: null, stale: false };
+  const { guestId } = session;
   const member = await seatOf(guestId);
   const role = member?.active ? await roleOf('desk', member.role) : null;
-  if (!member?.active || !role) return { guestId, seat: null };
+  if (!member?.active || !role) return { guestId, seat: null, stale: false };
+  if (addMinutes(session.signedInAt, DESK_SESSION_HOURS * 60) <= ctx.clock.now()) return { guestId, seat: null, stale: true };
   return {
     guestId,
+    stale: false,
     seat: {
       id: member.id,
       name: member.name,
@@ -207,17 +231,24 @@ export async function registerOpsRoutes(
   opts: { dev: boolean },
 ): Promise<void> {
   const requireOps: Guard = async (request, reply) => {
-    const { seat } = await deskSeatFor(ctx, bearer(request));
+    const { guestId, seat, stale } = await deskSeatFor(ctx, bearer(request));
+    if (stale) return signInAgain(reply);
     if (!seat) return unauthorized(reply);
     request.ops = seat;
     request.grants = seat.grants;
+    // The account behind the seat — none for the demo's shared secret.
+    if (guestId) request.guestId = guestId;
     return undefined;
   };
 
-  /** Anybody signed in — the dashboard's front room, before a seat. */
+  /**
+   * Anybody signed in — the dashboard's front room, before a seat. Somebody
+   * who has a seat is at the desk's door here too, and the desk wants their
+   * sign-in recent.
+   */
   const requireAccount: Guard = async (request, reply) => {
-    const sent = bearer(request);
-    const guestId = sent ? await resolveGuest(ctx, sent) : null;
+    const { guestId, stale } = await deskSeatFor(ctx, bearer(request));
+    if (stale) return signInAgain(reply);
     if (!guestId) return unauthorized(reply);
     request.guestId = guestId;
     return undefined;
@@ -237,16 +268,22 @@ export async function registerOpsRoutes(
   /** Who is acting, for the record: the member the session belongs to. */
   const who = (request: FastifyRequest) => `ops:${request.ops?.name ?? '?'}`;
 
+  /** Whoever is changing a seat, as `ops/` weighs them: what their seat opens, and which seat and account are theirs. */
+  const actor = (request: FastifyRequest): DeskActor => ({
+    grants: request.grants!,
+    locked: request.ops!.locked,
+    seatId: request.ops!.id,
+    account: request.guestId ?? null,
+  });
+
   /**
    * Whether this seat may seat somebody in that desk role: the role opens
    * nothing the seat does not hold, and only somebody in the locked admin
    * role seats an admin. Whoever may manage members may not make themselves
-   * — or a friend — more than they are.
+   * — or a friend — more than they are. Asked again inside every change,
+   * of the role the seat leaves as well as the one it gets.
    */
-  const mayGive = async (request: FastifyRequest, key: string): Promise<boolean> => {
-    const role = await roleOf('desk', key);
-    return Boolean(role && mayHandOutDesk(request.grants!, role, await linksOf('desk'), request.ops!.locked));
-  };
+  const mayGive = (request: FastifyRequest, key: string): Promise<boolean> => mayHandle(actor(request), key);
   const beyond = (reply: FastifyReply) => forbidden(reply, 'that role opens more than you hold');
 
   /** Who am I at the desk — what the page asks after signing in. */
@@ -392,7 +429,14 @@ export async function registerOpsRoutes(
   /**
    * A seat for somebody already on Basu: the admin chooses the account from
    * Basu's users and gives it a role, and it sits at once. Nobody applies
-   * for the desk, and nobody's address is typed in.
+   * for the desk, and nobody's address is typed in. Somebody at the desk
+   * already is refused — a role is changed in the table — and so is the
+   * chooser's own account.
+   *
+   * The seat is found, and named, by what the account has proved: its email,
+   * which somebody vouched for, and its number only when an SMS code reached
+   * it. The number a password sign-up merely typed is a name to show for an
+   * account that gave none, and nothing more.
    */
   app.post<{ Body: { guest_id?: string; role?: string } }>('/v1/ops/members', desk('desk.members:manage'), async (request, reply) => {
     const body = request.body ?? {};
@@ -404,42 +448,57 @@ export async function registerOpsRoutes(
     if (!card || card.closedAt) {
       return reply.status(404).send({ error: { code: 'NOT_FOUND', message_mn: 'Ийм хэрэглэгч олдсонгүй.', message_en: 'no such open account' } });
     }
-    const member = await seatAccount({ guestId: card.id, name: card.name ?? '', email: card.email, phone: card.phone, role });
-    await recordAudit({ who: who(request), action: 'member.grant', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
-    await tellSeated(card.id, member, (await roleOf('desk', member.role))?.name ?? member.role);
-    return reply.status(201).send(shapeMember(member));
+    const proved = (await contactsFor([card.id])).get(card.id);
+    try {
+      const member = await seatAccount(
+        {
+          guestId: card.id,
+          name: card.name?.trim() || card.email || card.phone || '',
+          email: proved?.email ?? null,
+          phone: proved?.phoneVerified ? proved.phone : null,
+          role,
+        },
+        actor(request),
+      );
+      await recordAudit({ who: who(request), action: 'member.grant', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
+      await tellSeated(card.id, member, (await roleOf('desk', member.role))?.name ?? member.role);
+      return reply.status(201).send(shapeMember(member));
+    } catch (error) {
+      return sendError(reply, error);
+    }
   });
 
-  /** Another role for somebody already at the desk — never your own, and never the last admin's. */
+  /**
+   * Another role for somebody already at the desk — never your own, never
+   * out of or into a role beyond what you hold, and never the last admin's.
+   */
   app.post<{ Params: { id: string }; Body: { role?: string } }>('/v1/ops/members/:id/role', desk('desk.members:manage'), async (request, reply) => {
     const role = request.body?.role as Role | undefined;
     if (!role || !(await deskRoleExists(role))) return badRequest(reply, 'Эрх буруу байна.', `no such role: ${request.body?.role}`);
     if (request.params.id === request.ops!.id) return badRequest(reply, 'Өөрийн эрхийг өөрчлөх боломжгүй.', 'cannot change your own role');
-    if (!(await mayGive(request, role))) return beyond(reply);
-    // Nor take a seat out of a role that opens more than the seat taking it.
-    const current = (await listMembers()).find((m) => m.id === request.params.id);
-    if (current && !(await mayGive(request, current.role))) return beyond(reply);
     try {
-      const member = await setMemberRole(request.params.id, role);
+      const member = await setMemberRole(request.params.id, role, actor(request));
       await recordAudit({ who: who(request), action: 'member.role', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
       return reply.send(shapeMember(member));
     } catch (error) {
-      if (error instanceof MemberError && error.code === 'LAST_ADMIN') {
-        return reply.status(409).send({ error: { code: 'LAST_ADMIN', message_mn: 'Ядаж нэг идэвхтэй админ үлдэх ёстой.', message_en: error.message } });
-      }
-      return sendError(reply, new IdeshError('NOT_FOUND', (error as Error).message));
+      return sendError(reply, error);
     }
   });
 
+  /**
+   * A seat off, or on again: for whoever may hand out the role it holds,
+   * either way — never your own off, and never the last active admin. Off
+   * closes the desk to it and nothing else; see `setMemberActive`.
+   */
   app.post<{ Params: { id: string }; Body: { active?: boolean } }>('/v1/ops/members/:id/active', desk('desk.members:manage'), async (request, reply) => {
     if (typeof request.body?.active !== 'boolean') return badRequest(reply, 'active: true эсвэл false.', 'active must be a boolean');
     if (request.params.id === request.ops!.id && !request.body.active) return badRequest(reply, 'Өөрийгөө хаах боломжгүй.', 'cannot deactivate yourself');
     try {
-      await setMemberActive(request.params.id, request.body.active);
+      await setMemberActive(request.params.id, request.body.active, actor(request));
       await recordAudit({ who: who(request), action: request.body.active ? 'member.activate' : 'member.deactivate', targetKind: 'member', targetId: request.params.id });
       return reply.send({ id: request.params.id, active: request.body.active });
     } catch (error) {
-      return sendError(reply, new IdeshError('NOT_FOUND', (error as Error).message));
+      return sendError(reply, error);
     }
   });
 

@@ -3,6 +3,7 @@ import { AuthError, PasswordError } from '../platform/identity/index.js';
 import { LedgerError } from '../platform/ledger/index.js';
 import { ClosureError } from '../platform/identity/index.js';
 import { IdeshError, type IdeshErrorCode } from '../idesh/index.js';
+import { MemberError } from '../ops/index.js';
 import { OrderError, type OrderErrorCode } from '../services/orders.js';
 
 /**
@@ -146,6 +147,19 @@ const LEDGER_ERRORS: Record<LedgerError['code'], Spec> = {
   NOT_FOUND: { status: 404, mn: 'Ийм гүйлгээ олдсонгүй.' },
 };
 
+/** Who sits at the desk: the admin reading these is changing somebody's seat. */
+const MEMBER_ERRORS: Record<MemberError['code'], Spec> = {
+  NOT_FOUND: { status: 404, mn: 'Ийм гишүүн олдсонгүй.' },
+  LAST_ADMIN: { status: 409, mn: 'Ядаж нэг идэвхтэй админ үлдэх ёстой.' },
+  ALREADY_SEATED: {
+    status: 409,
+    // Says where the change is made instead: the seat is there, its role is changed in the table.
+    mn: 'Энэ хэрэглэгч ops-ийн гишүүн байна. Эрхийг нь «Гишүүд» хүснэгтээс «Эрх солих» товчоор солино уу.',
+  },
+  OWN_SEAT: { status: 400, mn: 'Өөрийн эрхийг өөрчлөх боломжгүй.' },
+  FORBIDDEN: { status: 403, mn: 'Танд энэ үйлдлийг хийх эрх алга.' },
+};
+
 const CLOSURE_ERRORS: Record<ClosureError['code'], Spec> = {
   HAS_BALANCE: {
     status: 409,
@@ -170,6 +184,10 @@ export function sendError(reply: FastifyReply, error: unknown): FastifyReply {
   }
   if (error instanceof OrderError) {
     const spec = ORDER_ERRORS[error.code];
+    return reply.status(spec.status).send(envelope(error.code, spec.mn, error.message));
+  }
+  if (error instanceof MemberError) {
+    const spec = MEMBER_ERRORS[error.code];
     return reply.status(spec.status).send(envelope(error.code, spec.mn, error.message));
   }
   if (error instanceof IdeshError) {
@@ -206,6 +224,17 @@ export function unauthorized(reply: FastifyReply): FastifyReply {
   return reply
     .status(401)
     .send(envelope('UNAUTHORIZED', 'Нэвтэрч орно уу.', 'authentication required'));
+}
+
+/**
+ * Signed in, but too long ago for Basu's desk. The session still opens the
+ * website and the app; the desk asks for a sign-in of its own, and the
+ * dashboard shows its door with these words.
+ */
+export function signInAgain(reply: FastifyReply): FastifyReply {
+  return reply
+    .status(401)
+    .send(envelope('SIGN_IN_AGAIN', 'Аюулгүй байдлын үүднээс ops-д дахин нэвтэрнэ үү.', 'the desk needs a recent sign-in'));
 }
 
 export function forbidden(reply: FastifyReply, what: string): FastifyReply {

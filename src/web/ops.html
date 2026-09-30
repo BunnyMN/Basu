@@ -20,6 +20,7 @@ p{margin:0}
 .pair .brand{margin-bottom:20px}
 .pair h2{margin-bottom:6px}
 .pair p{color:var(--ink-2);margin-bottom:20px}
+.pair .callout{margin:12px 0 16px}
 .pair .input{margin-bottom:10px}
 
 /* the frame: the grid, the sidebar and the drawer are /app.css's .desk-frame */
@@ -331,16 +332,29 @@ const actorWord = (a) =>
           : a.startsWith('ops') ? a.replace('ops:', 'ops · ') : 'систем';
 /* ── the door ─────────────────────────────────────────────────────── */
 
+/**
+ * Why the door is up, when the server said: the desk wants a sign-in more
+ * recent than the one this browser held. Kept until somebody is signed in
+ * again, so a second reason to show the door does not wipe the first.
+ */
+let doorWhy = null;
+/** The latest drawing of the door: two calls noticing at once draw it once. */
+let doorDrawn = 0;
+
 async function showToken() {
+  const drawing = ++doorDrawn;
   root.replaceChildren();
   // The demo hands its secret out; anywhere else a member signs in by phone.
   const demo = await api('/dev/ops-token').catch(() => null);
+  if (drawing !== doorDrawn) return;
   const door = el('<div class="door"></div>');
+  const why = doorWhy ? `<div class="callout" data-k="info" role="status" id="door-why"><span>${esc(doorWhy)}</span></div>` : '';
   if (demo?.token) {
     const card = el(`
       <div class="card pair">
         <div class="brand wordmark">Basu<small>Ops</small></div>
         <h2>Демо горим</h2>
+        ${why}
         <p>Нууц үг автоматаар орлоо. Нэвтрэхэд л болно.</p>
         <input class="input" type="password" placeholder="OPS_TOKEN" aria-label="Ops нууц" autocomplete="off">
         <button class="btn" data-v="primary" data-size="lg" type="button">Нэвтрэх</button>
@@ -367,6 +381,7 @@ async function showToken() {
     <div class="card pair">
       <div class="brand wordmark">Basu<small>Ops</small></div>
       <h2>Нэвтрэх</h2>
+      ${why}
       <p id="door-lead">Нэвтэрнэ үү.</p>
       <div data-doors></div>
     </div>`);
@@ -1814,7 +1829,17 @@ async function openOrgAccess(orgId) {
  * and what they see is what the server says that person sits in.
  */
 const token = () => store.guestToken;
-const ops = (path, options = {}) => api(path, { ...options, token: token() });
+/**
+ * A call as this browser's person. A desk seat's sign-in is good for the
+ * desk for twelve hours; past that the server answers SIGN_IN_AGAIN to
+ * whichever call comes first, and that call shows the door, saying why —
+ * not a toast on every page of a desk that no longer opens.
+ */
+const ops = (path, options = {}) =>
+  api(path, { ...options, token: token() }).catch((error) => {
+    if (error.code === 'SIGN_IN_AGAIN') signedOut(error);
+    throw error;
+  });
 
 /** What /v1/access said: the person, and every place they work, each with its menu. */
 let access = null;
@@ -1901,7 +1926,7 @@ async function reload(id) {
   try {
     access = await ops('/v1/access');
   } catch (error) {
-    if (error.status === 401) return signedOut();
+    if (error.status === 401) return signedOut(error);
     toast(error.message, 'bad');
     return;
   }
@@ -1916,9 +1941,19 @@ function signOut() {
   showToken();
 }
 
-/** The server no longer takes this session: forget it and show the door. */
-function signedOut() {
-  store.guestToken = null;
+/**
+ * The server no longer takes this session: forget it and show the door.
+ * When it is the desk that wants a fresh sign-in (SIGN_IN_AGAIN) the
+ * session still opens the website, so it is ended on the server as well —
+ * the door means nobody is signed in here — and the door says why.
+ */
+function signedOut(error) {
+  if (error?.code === 'SIGN_IN_AGAIN') {
+    doorWhy = error.message;
+    dropSession();
+  } else {
+    store.guestToken = null;
+  }
   access = ws = nav = me = null;
   showToken();
 }
@@ -4128,8 +4163,9 @@ async function renderMembers(view) {
           () =>
             confirmPopup({
               title: m.active ? 'Гишүүнийг хаах' : 'Гишүүнийг нээх',
+              // Off closes the desk to them at once, and only the desk: their account and sign-ins are theirs.
               text: m.active
-                ? `<b>${esc(m.name)}</b> ops-ийн хэсэгт орохоо болино; нээлттэй нэвтрэлт нь хаагдана. Дараа нь дахин нээж болно.`
+                ? `<b>${esc(m.name)}</b> ops-ийн хэсэгт шууд орохоо болино — нээлттэй байгаа dashboard нь ч дараагийн алхамд хаагдана. Бүртгэл нь хэвээр, Basu-гийн вэб, апп-д нэвтэрсэн хэвээр үлдэнэ. Дараа нь дахин нээж болно.`
                 : `<b>${esc(m.name)}</b> ${esc(roleNames.get(m.role) ?? m.role)} эрхээрээ дахин орно.`,
               ok: m.active ? 'Хаах' : 'Нээх',
               danger: m.active,
@@ -4202,10 +4238,12 @@ async function boot() {
   try {
     access = await ops('/v1/access');
   } catch (error) {
-    if (error.status === 401 || error.status === 503) return signedOut();
+    if (error.status === 401 || error.status === 503) return signedOut(error);
     toast(error.message, 'bad');
     return;
   }
+  // Somebody is signed in and the server took it: whatever the door last said is past.
+  doorWhy = null;
   const { w, page } = choose(location.hash);
   open(w, page);
 }

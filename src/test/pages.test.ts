@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -1622,6 +1623,19 @@ describe('who sees what', () => {
     const theirs = await openPage('ops.html', '', undefined, device(chosen));
     await until(theirs, 'the desk', (d) => Boolean(d.querySelector('.tabs [data-tab="overview"]')));
     expect(theirs.window.document.querySelector('.ws-btn')?.textContent).toContain('Зөвхөн харах');
+
+    // Switched off, the desk closes to them and nothing else does: the popup says just that, and it is so.
+    const row = () => [...doc.querySelectorAll('#members tr[data-member]')].find((r) => r.textContent?.includes('Сонгосон ажилтан'))!;
+    (row().querySelector('[data-a="active"]') as HTMLElement).click();
+    await until(desk, 'the question', (d) => Boolean(d.querySelector('.sheet.popup[data-open]')));
+    const asked = [...doc.querySelectorAll('.sheet.popup[data-open]')].pop()!;
+    expect(asked.textContent).toContain('нэвтэрсэн хэвээр үлдэнэ');
+    expect(asked.textContent).not.toContain('нэвтрэлт нь хаагдана');
+    (asked.querySelector('[data-submit]') as HTMLElement).click();
+    await until(desk, 'the seat off', () => Boolean(row()?.hasAttribute('data-off')));
+    const auth = { authorization: `Bearer ${chosen}` };
+    expect((await fetch(`${base}/v1/ops/me`, { headers: auth })).status).toBe(401);
+    expect((await fetch(`${base}/v1/me`, { headers: auth })).status).toBe(200);
   });
 });
 
@@ -1732,6 +1746,23 @@ describe('one browser, one person', () => {
     const dash = await openPage('ops.html', '', undefined, browser);
     await until(dash, 'the door', (d) => Boolean(d.querySelector('.door')));
     expect(noDesk(dash)).toBe(true);
+  });
+
+  it('shows a desk seat signed in more than twelve hours ago the door, saying why, and signs that session out', async () => {
+    const admin = await seated('+97688050061', 'Админ Долоо');
+    // Thirteen hours ago by the server's clock: a desk left open on some machine overnight.
+    await getPool().query('UPDATE identity.guest_session SET created_at = $2 WHERE token_hash = $1', [
+      createHash('sha256').update(admin).digest('hex'),
+      new Date(clock.now().getTime() - 13 * 60 * 60 * 1000),
+    ]);
+    const browser = device(admin);
+    const dash = await openPage('ops.html', '', undefined, browser);
+    await until(dash, 'the door, saying why', (d) => Boolean(d.querySelector('.door #door-why')));
+    expect(dash.window.document.querySelector('#door-why')?.textContent).toBe('Аюулгүй байдлын үүднээс ops-д дахин нэвтэрнэ үү.');
+    expect(dash.window.document.querySelectorAll('.door')).toHaveLength(1);
+    expect(noDesk(dash)).toBe(true);
+    expect(browser.getItem('basu.guest')).toBeNull();
+    expect(await ended(admin)).toBe(true);
   });
 
   it('never lends the supplier’s screen a session the browser no longer holds', async () => {
