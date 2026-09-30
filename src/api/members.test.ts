@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { closePool } from '../db/pool.js';
+import { closePool, getPool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { FakeMailer, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
-import { syncMembersFromEnv, upsertMember } from '../ops/index.js';
+import { NO_GRANTS } from '../platform/access/index.js';
+import { setMemberRole, syncMembersFromEnv, upsertMember } from '../ops/index.js';
 import { relay } from '../platform/notify/index.js';
 import { opsToken } from './ops.js';
 import { buildServer } from './server.js';
@@ -19,9 +20,12 @@ import { buildServer } from './server.js';
  * first members by email, because an address proves itself; a phone number
  * proves nothing when anybody can type it and choose a password for it. The
  * environment only seeds: what the desk changes afterwards stays changed.
- * Nobody moves a seat past what they hold, the desk always keeps an admin,
- * and a seat wants a sign-in from the last twelve hours. There are no codes
- * to hand out, and no addresses for an admin to type.
+ * Nobody moves a seat past what they hold — as the desk has them when the
+ * change is made — the desk always keeps an admin, and a seat wants a
+ * sign-in from the last twelve hours, which an older one cannot make itself
+ * by choosing a new way in. The guests' pages leave the people at the desk
+ * to the members page. There are no codes to hand out, and no addresses for
+ * an admin to type.
  */
 
 let app: FastifyInstance;
@@ -418,6 +422,130 @@ describe('nobody moves a seat past what they hold', () => {
       expect(role.json().error.message_mn, id).toBe('Ийм гишүүн олдсонгүй.');
     }
   });
+
+  it('knows your own seat however its id is spelled', async () => {
+    await syncMembersFromEnv('admin@gmail.com:Админ:admin,second@gmail.com:Хоёр:admin');
+    const admin = await byEmail('admin@gmail.com');
+    await byEmail('second@gmail.com');
+    const own = ((await me(admin)).json().member.id as string).toUpperCase();
+
+    for (const refused of [await setRole(own, 'viewer', admin), await setActive(own, false, admin)]) {
+      expect(refused.statusCode, refused.body).toBe(400);
+      expect(refused.json().error.code).toBe('OWN_SEAT');
+    }
+    expect((await me(admin)).json().member).toMatchObject({ role: 'admin' });
+    // Somebody else's seat, spelled so, is that seat — and answered under its own id.
+    const second = (await members()).find((m) => m.email === 'second@gmail.com')!;
+    const off = await setActive(second.id.toUpperCase(), false, admin);
+    expect(off.json()).toEqual({ id: second.id, active: false });
+  });
+
+  it('asks again, inside the change, what the one changing holds now', async () => {
+    await syncMembersFromEnv('admin@gmail.com:Админ:admin,second@gmail.com:Хоёр:admin');
+    const admin = await byEmail('admin@gmail.com');
+    const second = await byEmail('second@gmail.com');
+    const secondSeat = (await me(second)).json().member.id as string;
+    const viewer = await seatedByEmail('viewer@gmail.com', 'viewer');
+    const viewerSeat = (await me(viewer)).json().member.id as string;
+    /** How many changes wait for the desk's turn, in this database: Postgres hands it on in the order they came. */
+    const waiting = async () =>
+      (
+        await getPool().query<{ n: number }>(
+          `SELECT count(*)::int AS n FROM pg_locks
+            WHERE locktype = 'advisory' AND NOT granted AND database = (SELECT oid FROM pg_database WHERE datname = current_database())`,
+        )
+      ).rows[0]!.n;
+    const queued = async (n: number) => {
+      for (let i = 0; i < 300 && (await waiting()) < n; i++) await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(await waiting()).toBe(n);
+    };
+
+    // Another change holds the desk. Behind it the first admin switches the second off; behind that,
+    // the second — let in at the door while still on — asks to switch the viewer off.
+    const other = await getPool().connect();
+    try {
+      await other.query('BEGIN');
+      await other.query(`SELECT pg_advisory_xact_lock(hashtext('ops.member'))`);
+      const first = setActive(secondSeat, false, admin);
+      await queued(1);
+      const then = setActive(viewerSeat, false, second);
+      await queued(2);
+      await other.query('COMMIT');
+
+      expect((await first).statusCode).toBe(200);
+      const refused = await then;
+      expect(refused.statusCode, refused.body).toBe(403);
+    } finally {
+      other.release();
+    }
+    expect((await me(viewer)).json().member).toMatchObject({ role: 'viewer' });
+  });
+
+  it('says a role that went while the change waited is no role, not a failure of its own', async () => {
+    const token = await seatedByEmail('bold@gmail.com', 'viewer');
+    const seatId = (await me(token)).json().member.id as string;
+    await expect(setMemberRole(seatId, 'deleted-meanwhile', { grants: NO_GRANTS, locked: true, seatId: null, account: null })).rejects.toMatchObject({
+      name: 'MemberError',
+      code: 'NO_ROLE',
+    });
+  });
+});
+
+describe('the guests’ pages leave the desk to the members page', () => {
+  /** The desk's file on an account: its sessions among it. */
+  const file = async (guestId: string) => (await app.inject({ method: 'GET', url: `/v1/ops/guests/${guestId}`, headers: desk() })).json();
+  const signOutOne = (guestId: string, sessionId: string, token?: string) =>
+    app.inject({ method: 'POST', url: `/v1/ops/guests/${guestId}/sessions/${sessionId}/revoke`, headers: token ? bearer(token) : desk(), payload: {} });
+  const close = (guestId: string, token?: string) =>
+    app.inject({ method: 'POST', url: `/v1/ops/guests/${guestId}/close`, headers: token ? bearer(token) : desk(), payload: { note: 'тест' } });
+
+  it('closes no account whose seat is on — that seat is switched off on «Гишүүд» first — whoever asks', async () => {
+    const closer = (
+      await app.inject({
+        method: 'POST',
+        url: '/v1/ops/roles/desk',
+        headers: desk(),
+        payload: { name: 'Хаагч', permissions: ['desk.guests', 'desk.guests:close'] },
+      })
+    ).json().key as string;
+    // Two admins, so that one of them may be switched off.
+    await syncMembersFromEnv('admin@gmail.com:Админ:admin,boss@gmail.com:Эзэн:admin');
+    const admin = await byEmail('admin@gmail.com');
+    const adminId = await accountId(admin);
+    const clerk = await seatedByEmail('closer@gmail.com', closer);
+
+    for (const token of [clerk, undefined]) {
+      const refused = await close(adminId, token);
+      expect(refused.statusCode, refused.body).toBe(409);
+      expect(refused.json().error).toMatchObject({ code: 'AT_THE_DESK', message_mn: expect.stringContaining('«Гишүүд»') });
+    }
+    expect((await me(admin)).json().member.role).toBe('admin');
+
+    // Off on the members page, under its rules, the account is a guest like any other.
+    expect((await setActive((await me(admin)).json().member.id, false)).statusCode).toBe(200);
+    expect((await close(adminId, clerk)).statusCode).toBe(200);
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(admin) })).statusCode).toBe(401);
+    // Anybody with no seat is closed as before.
+    const guest = await byPhone('+97699110003', 'Зочин');
+    expect((await close(guest.id, clerk)).statusCode).toBe(200);
+  });
+
+  it('signs a desk member out only for whoever may hand out their seat’s role', async () => {
+    await syncMembersFromEnv('admin@gmail.com:Админ:admin');
+    const admin = await byEmail('admin@gmail.com');
+    const adminId = await accountId(admin);
+    // The built-in ops role signs lost phones out: a guest's, not an admin's.
+    const worker = await seatedByEmail('ops@gmail.com', 'ops');
+    const guest = await byPhone('+97699110004', 'Зочин');
+
+    const refused = await signOutOne(adminId, (await file(adminId)).sessions[0].id, worker);
+    expect(refused.statusCode, refused.body).toBe(403);
+    expect((await me(admin)).statusCode).toBe(200);
+    expect((await signOutOne(guest.id, (await file(guest.id)).sessions[0].id, worker)).statusCode).toBe(200);
+    // Whoever may seat an admin may sign one out.
+    expect((await signOutOne(adminId, (await file(adminId)).sessions[0].id)).statusCode).toBe(200);
+    expect((await me(admin)).statusCode).toBe(401);
+  });
 });
 
 describe('the environment only seeds the desk', () => {
@@ -500,5 +628,91 @@ describe('a seat wants a recent sign-in', () => {
       expect((await app.inject({ method: 'GET', url: '/v1/ops/whoami', headers: bearer(token) })).statusCode).toBe(200);
     }
     expect((await app.inject({ method: 'GET', url: '/v1/ops/overview', headers: desk() })).statusCode).toBe(200);
+  });
+
+  /*
+   * A session the desk no longer takes must not make itself a new sign-in.
+   * A password of its holder's choosing, or an address of theirs on the
+   * account, is exactly that: sign in with it, and the desk opens again.
+   */
+  const setPassword = (token: string, body: Record<string, string>) =>
+    app.inject({ method: 'POST', url: '/v1/me/password', headers: bearer(token), payload: body });
+  const askAttachCode = (token: string, body: Record<string, string>) =>
+    app.inject({ method: 'POST', url: '/v1/me/email/code', headers: bearer(token), payload: body });
+  const attach = (token: string, email: string, code: string | undefined) =>
+    app.inject({ method: 'POST', url: '/v1/me/email', headers: bearer(token), payload: { email, code: code ?? '' } });
+  const login = (who: string, password: string) => app.inject({ method: 'POST', url: '/v1/auth/login', payload: { login: who, password } });
+
+  it('lets no stale desk session set a first password and sign in afresh with it', async () => {
+    // An admin who signs in by email has no password: every admin in production.
+    await syncMembersFromEnv('boss@gmail.com:Эзэн:admin');
+    const stale = await byEmail('boss@gmail.com');
+    expect((await me(stale)).json().member.role).toBe('admin');
+    clock.advanceMinutes(13 * 60);
+    expect((await me(stale)).json().error.code).toBe('SIGN_IN_AGAIN');
+
+    const set = await setPassword(stale, { next: 'миний шинэ нууц үг' });
+    expect(set.statusCode).toBe(401);
+    expect(set.json().error.code).toBe('SIGN_IN_AGAIN');
+    expect(set.json().error.message_mn).toContain('дахин нэвтэр');
+    expect((await login('boss@gmail.com', 'миний шинэ нууц үг')).statusCode).toBe(401);
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(stale) })).json().has_password).toBe(false);
+  });
+
+  it('lets no stale desk session tie an address of its holder’s to the account', async () => {
+    // A seat an SMS code proved: no password, no address.
+    await upsertMember({ phone: '+97699001100', name: 'Санхүү', role: 'finance' });
+    const stale = await bySms('+97699001100');
+    expect((await me(stale)).json().member.role).toBe('finance');
+    clock.advanceMinutes(13 * 60);
+
+    const asked = await askAttachCode(stale, { email: 'thief@evil.test' });
+    expect(asked.statusCode).toBe(401);
+    expect(asked.json().error.code).toBe('SIGN_IN_AGAIN');
+    expect(mailer.to('thief@evil.test')).toBeUndefined();
+    // Nor with a code the public door sends to any inbox for the asking.
+    await app.inject({ method: 'POST', url: '/v1/auth/email/start', payload: { email: 'thief@evil.test' } });
+    const code = mailer.codeFor('thief@evil.test');
+    const tied = await attach(stale, 'thief@evil.test', code);
+    expect(tied.statusCode).toBe(401);
+    expect(tied.json().error.code).toBe('SIGN_IN_AGAIN');
+    // Signed in with it at that address, the thief is somebody else, with no seat.
+    const theirs = await app.inject({ method: 'POST', url: '/v1/auth/email/verify', payload: { email: 'thief@evil.test', code } });
+    expect(theirs.statusCode, theirs.body).toBe(200);
+    expect((await me(theirs.json().token)).json().error.code).toBe('UNAUTHORIZED');
+  });
+
+  it('asks a stale desk session with a password to sign in again too, and a recent one nothing', async () => {
+    const person = await byPhone('+97699110001', 'Болд');
+    expect((await seat({ guest_id: person.id, role: 'ops' })).statusCode).toBe(201);
+    // Signed in a moment ago, the seat changes its password knowing the old one, as anybody does.
+    expect((await setPassword(person.token, { current: 'миний нууц үг', next: 'дараагийн нууц үг' })).statusCode).toBe(200);
+
+    clock.advanceMinutes(13 * 60);
+    for (const refused of [
+      await setPassword(person.token, { current: 'дараагийн нууц үг', next: 'гурав дахь нууц үг' }),
+      await askAttachCode(person.token, { email: 'thief@evil.test', password: 'дараагийн нууц үг' }),
+      // A code the door sent to any inbox proves nothing about this account: without the rule it would tie it.
+      await (async () => {
+        await app.inject({ method: 'POST', url: '/v1/auth/email/start', payload: { email: 'thief@evil.test' } });
+        return attach(person.token, 'thief@evil.test', mailer.codeFor('thief@evil.test'));
+      })(),
+    ]) {
+      expect(refused.statusCode, refused.body).toBe(401);
+      expect(refused.json().error.code).toBe('SIGN_IN_AGAIN');
+    }
+    const profile = (await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(person.token) })).json();
+    expect(profile.email).toBeNull();
+    expect((await login('+97699110001', 'дараагийн нууц үг')).statusCode).toBe(200);
+  });
+
+  it('leaves an account with no seat its sixty days for its own ways in', async () => {
+    const person = await byPhone('+97699110002', 'Сараа');
+    clock.advanceMinutes(13 * 60);
+    expect((await setPassword(person.token, { current: 'миний нууц үг', next: 'дараагийн нууц үг' })).statusCode).toBe(200);
+    expect((await askAttachCode(person.token, { email: 'saraa@gmail.com', password: 'дараагийн нууц үг' })).statusCode).toBe(202);
+    const tied = await attach(person.token, 'saraa@gmail.com', mailer.codeFor('saraa@gmail.com'));
+    expect(tied.statusCode, tied.body).toBe(200);
+    expect(tied.json().email).toBe('saraa@gmail.com');
   });
 });

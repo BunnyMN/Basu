@@ -150,6 +150,7 @@ const LEDGER_ERRORS: Record<LedgerError['code'], Spec> = {
 /** Who sits at the desk: the admin reading these is changing somebody's seat. */
 const MEMBER_ERRORS: Record<MemberError['code'], Spec> = {
   NOT_FOUND: { status: 404, mn: 'Ийм гишүүн олдсонгүй.' },
+  NO_ROLE: { status: 400, mn: 'Эрх буруу байна.' },
   LAST_ADMIN: { status: 409, mn: 'Ядаж нэг идэвхтэй админ үлдэх ёстой.' },
   ALREADY_SEATED: {
     status: 409,
@@ -158,6 +159,11 @@ const MEMBER_ERRORS: Record<MemberError['code'], Spec> = {
   },
   OWN_SEAT: { status: 400, mn: 'Өөрийн эрхийг өөрчлөх боломжгүй.' },
   FORBIDDEN: { status: 403, mn: 'Танд энэ үйлдлийг хийх эрх алга.' },
+  AT_THE_DESK: {
+    status: 409,
+    // Says where it is done instead: the seat goes off on the members page, under that page's rules.
+    mn: 'Энэ хэрэглэгч ops-ийн идэвхтэй гишүүн байна. Бүртгэлийг нь хаахаас өмнө «Гишүүд» хуудсанд гишүүнийг хаана уу.',
+  },
 };
 
 const CLOSURE_ERRORS: Record<ClosureError['code'], Spec> = {
@@ -229,12 +235,12 @@ export function unauthorized(reply: FastifyReply): FastifyReply {
 /**
  * Signed in, but too long ago for Basu's desk. The session still opens the
  * website and the app; the desk asks for a sign-in of its own, and the
- * dashboard shows its door with these words.
+ * dashboard shows its door with these words. `mn` is for the account's own
+ * pages, which ask the same of a desk member before a way in is changed and
+ * say it in words of their own.
  */
-export function signInAgain(reply: FastifyReply): FastifyReply {
-  return reply
-    .status(401)
-    .send(envelope('SIGN_IN_AGAIN', 'Аюулгүй байдлын үүднээс ops-д дахин нэвтэрнэ үү.', 'the desk needs a recent sign-in'));
+export function signInAgain(reply: FastifyReply, mn = 'Аюулгүй байдлын үүднээс ops-д дахин нэвтэрнэ үү.'): FastifyReply {
+  return reply.status(401).send(envelope('SIGN_IN_AGAIN', mn, 'the desk needs a recent sign-in'));
 }
 
 export function forbidden(reply: FastifyReply, what: string): FastifyReply {

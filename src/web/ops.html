@@ -268,7 +268,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mnt, money, KIND, HEADLINE, dayLabel, signInDoors, accountWays, takeSession, dropSession, popup, confirmPopup } from '/api.js';
+import { api, ApiError, store, toast, mnt, money, KIND, HEADLINE, dayLabel, signInDoors, accountWays, takeSession, dropSession, popup, confirmPopup } from '/api.js';
 import { NAV_ICON, deskFrame } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -1832,14 +1832,27 @@ const token = () => store.guestToken;
 /**
  * A call as this browser's person. A desk seat's sign-in is good for the
  * desk for twelve hours; past that the server answers SIGN_IN_AGAIN to
- * whichever call comes first, and that call shows the door, saying why —
- * not a toast on every page of a desk that no longer opens.
+ * whichever call comes first, and that call brings up the door, saying why,
+ * whatever page it came from. The caller still hears of the refusal.
  */
-const ops = (path, options = {}) =>
-  api(path, { ...options, token: token() }).catch((error) => {
-    if (error.code === 'SIGN_IN_AGAIN') signedOut(error);
-    throw error;
+const ops = (path, options = {}) => {
+  const sent = token();
+  return api(path, { ...options, token: sent }).catch((error) => {
+    throw refused(error, sent);
   });
+};
+
+/**
+ * A refusal, marked with the session the call carried: what the server
+ * said is about that one. The browser may have moved on while the call was
+ * out — another tab signed somebody in — and the sign-in it holds now is
+ * not ended for an answer about the one before.
+ */
+function refused(error, sent) {
+  error.sent = sent;
+  if (error.code === 'SIGN_IN_AGAIN') signedOut(error);
+  return error;
+}
 
 /** What /v1/access said: the person, and every place they work, each with its menu. */
 let access = null;
@@ -1945,9 +1958,13 @@ function signOut() {
  * The server no longer takes this session: forget it and show the door.
  * When it is the desk that wants a fresh sign-in (SIGN_IN_AGAIN) the
  * session still opens the website, so it is ended on the server as well —
- * the door means nobody is signed in here — and the door says why.
+ * the door means nobody is signed in here — and the door says why. An
+ * answer about a session this browser has let go since changes nothing
+ * here: the storage event (below, by `boot`) brings the page to the one the
+ * browser holds now.
  */
 function signedOut(error) {
+  if (error && 'sent' in error && error.sent !== token()) return;
   if (error?.code === 'SIGN_IN_AGAIN') {
     doorWhy = error.message;
     dropSession();
@@ -1969,6 +1986,8 @@ async function refresh() {
       ]);
       cache = { suppliers, settlements, orgs };
     } catch (error) {
+      // The desk wants a fresh sign-in: the refusal has brought its door up already (`refused`).
+      if (error.code === 'SIGN_IN_AGAIN') return;
       // The seat went while the page was open: ask again where this person works rather than throw them out.
       if (error.status === 401) return reload();
       if (error.status === 503) return signedOut();
@@ -2753,10 +2772,19 @@ let moneyView = localStorage.getItem('basu.ops.money') ?? 'checks';
 let moneyFilter = { kind: '', from: '', to: '', topupState: '', receiptState: '' };
 const canMoney = () => can('desk.money:manage');
 
-/** A CSV the browser saves, fetched with the desk's token because a plain link cannot carry one. */
+/**
+ * A CSV the browser saves, fetched with the desk's token because a plain
+ * link cannot carry one. A desk that wants a fresh sign-in brings up its
+ * door here as from any other call (`refused`).
+ */
 async function download(path, name) {
-  const res = await fetch(path, { headers: { authorization: `Bearer ${token()}` } });
-  if (!res.ok) throw new Error('Экспорт амжилтгүй.');
+  const sent = token();
+  const res = await fetch(path, { headers: { authorization: `Bearer ${sent}` } });
+  if (!res.ok) {
+    const said = await res.json().catch(() => null);
+    if (said?.error?.code === 'SIGN_IN_AGAIN') throw refused(new ApiError(res.status, said), sent);
+    throw new Error('Экспорт амжилтгүй.');
+  }
   const url = URL.createObjectURL(await res.blob());
   const a = Object.assign(document.createElement('a'), { href: url, download: name });
   document.body.append(a);
@@ -4163,9 +4191,10 @@ async function renderMembers(view) {
           () =>
             confirmPopup({
               title: m.active ? 'Гишүүнийг хаах' : 'Гишүүнийг нээх',
-              // Off closes the desk to them at once, and only the desk: their account and sign-ins are theirs.
+              // Off closes the desk to them at once, and only the desk: an open dashboard drops to their own
+              // corner at its next step, and their account and sign-ins are theirs.
               text: m.active
-                ? `<b>${esc(m.name)}</b> ops-ийн хэсэгт шууд орохоо болино — нээлттэй байгаа dashboard нь ч дараагийн алхамд хаагдана. Бүртгэл нь хэвээр, Basu-гийн вэб, апп-д нэвтэрсэн хэвээр үлдэнэ. Дараа нь дахин нээж болно.`
+                ? `<b>${esc(m.name)}</b> ops-ийн хэсэгт шууд орохоо болино — нээлттэй байгаа ops хэсэг нь ч дараагийн алхамд хаагдана. Бүртгэл нь хэвээр, Basu-гийн вэб, апп-д нэвтэрсэн хэвээр үлдэнэ. Дараа нь дахин нээж болно.`
                 : `<b>${esc(m.name)}</b> ${esc(roleNames.get(m.role) ?? m.role)} эрхээрээ дахин орно.`,
               ok: m.active ? 'Хаах' : 'Нээх',
               danger: m.active,

@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 import { getPool, tx, type Db } from '../db/pool.js';
-import { ensureRoles, linksOf, mayHandOutDesk, roleOf, type Grants } from '../platform/access/index.js';
+import { ensureRoles, grantsOf, linksOf, mayHandOutDesk, roleOf, type Grants } from '../platform/access/index.js';
 
 /**
  * The people at the desk.
@@ -131,7 +131,10 @@ export async function seatsOfAccounts(guestIds: readonly string[], db: Db = getP
 /* ── changing a seat ─────────────────────────────────────────────── */
 
 export class MemberError extends Error {
-  constructor(readonly code: 'NOT_FOUND' | 'LAST_ADMIN' | 'ALREADY_SEATED' | 'OWN_SEAT' | 'FORBIDDEN', message: string) {
+  constructor(
+    readonly code: 'NOT_FOUND' | 'NO_ROLE' | 'LAST_ADMIN' | 'ALREADY_SEATED' | 'OWN_SEAT' | 'FORBIDDEN' | 'AT_THE_DESK',
+    message: string,
+  ) {
     super(message);
     this.name = 'MemberError';
   }
@@ -173,16 +176,45 @@ async function oneAtATime(client: PoolClient): Promise<void> {
   await client.query(`SELECT pg_advisory_xact_lock(hashtext('ops.member'))`);
 }
 
+/**
+ * The actor as the desk has them now. A change waits for the one before it
+ * (`oneAtATime`), and that one may have switched the actor's own seat off
+ * or given it another role — or Basu may have changed what the role opens —
+ * so what they held when they asked is asked again, inside the change. The
+ * demo's shared secret sits in no seat, and is taken as it came.
+ */
+async function actorNow(client: PoolClient, actor: DeskActor): Promise<DeskActor> {
+  if (!actor.seatId) return actor;
+  const { rows } = await client.query<{ role: Role; active: boolean }>('SELECT role, active FROM ops.member WHERE id = $1', [actor.seatId]);
+  const role = rows[0]?.active ? await roleOf('desk', rows[0].role, client) : null;
+  if (!role) throw new MemberError('FORBIDDEN', 'your own seat is off, or its role is gone');
+  return { ...actor, grants: grantsOf(role, await linksOf('desk', client)), locked: role.locked };
+}
+
+/** The role a seat is put in, asked for inside the change: a role nobody holds yet may be deleted meanwhile. */
+async function roleThere(client: PoolClient, key: Role): Promise<void> {
+  if (!(await deskRoleExists(key, client))) throw new MemberError('NO_ROLE', `no such role: ${key}`);
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** A seat as it is, locked for the change. An id that is not one names nobody, the same as one nobody has. */
+/**
+ * A seat as it is, locked for the change, under the id the desk wrote — the
+ * one to compare with the actor's own, however the request spelled it. An
+ * id that is not one names nobody, the same as one nobody has.
+ */
 async function heldSeat(client: PoolClient, id: string): Promise<{ id: string; role: Role; active: boolean; accounts: number }> {
   if (!UUID.test(id)) throw new MemberError('NOT_FOUND', 'no such member');
-  const { rows } = await client.query<{ role: Role; active: boolean }>('SELECT role, active FROM ops.member WHERE id = $1 FOR UPDATE', [id]);
+  const { rows } = await client.query<{ id: string; role: Role; active: boolean }>('SELECT id, role, active FROM ops.member WHERE id = $1 FOR UPDATE', [id]);
   const seat = rows[0];
   if (!seat) throw new MemberError('NOT_FOUND', 'no such member');
-  const { rows: linked } = await client.query<{ n: number }>('SELECT count(*)::int AS n FROM ops.member_account WHERE member_id = $1', [id]);
-  return { id, role: seat.role, active: seat.active, accounts: linked[0]?.n ?? 0 };
+  const { rows: linked } = await client.query<{ n: number }>('SELECT count(*)::int AS n FROM ops.member_account WHERE member_id = $1', [seat.id]);
+  return { ...seat, accounts: linked[0]?.n ?? 0 };
+}
+
+/** Your own seat is another's to change: nobody makes themselves more, or less, or lets themselves off. */
+function notYourOwn(seat: { id: string }, actor: DeskActor): void {
+  if (seat.id === actor.seatId) throw new MemberError('OWN_SEAT', 'not your own seat');
 }
 
 /**
@@ -226,21 +258,23 @@ async function keepAnAdmin(client: PoolClient, leaving: string): Promise<void> {
  *
  * Refused: the actor's own account or own seat; an account whose seat is on
  * already — a role is changed in the table, where the checks for that are;
- * a seat taken out of a role, or put in one, beyond the actor — switching a
- * seat back on, or taking over one the desk named, takes it out of the role
- * it held; and the last active admin taken out of the admin role.
+ * a seat taken out of a role, or put in one, beyond the actor as the desk
+ * has them now — switching a seat back on, or taking over one the desk
+ * named, takes it out of the role it held; and the last active admin taken
+ * out of the admin role.
  */
 export async function seatAccount(
   input: { guestId: string; name: string; email: string | null; phone: string | null; role: Role },
   actor: DeskActor,
   db: Db = getPool(),
 ): Promise<Member> {
-  if (!(await deskRoleExists(input.role, db))) throw new Error(`no such role: ${input.role}`);
   const email = input.email?.trim().toLowerCase() || null;
   const phone = input.phone || null;
   await tx(async (client) => {
     await oneAtATime(client);
-    if (input.guestId === actor.account) throw new MemberError('OWN_SEAT', 'not your own account');
+    const acting = await actorNow(client, actor);
+    await roleThere(client, input.role);
+    if (input.guestId === acting.account) throw new MemberError('OWN_SEAT', 'not your own account');
     const linked = await client.query<{ member_id: string }>('SELECT member_id FROM ops.member_account WHERE guest_id = $1', [input.guestId]);
     const named = linked.rows[0]
       ? linked.rows
@@ -256,14 +290,14 @@ export async function seatAccount(
     let memberId = named[0]?.member_id;
     if (memberId) {
       const seat = await heldSeat(client, memberId);
-      if (seat.id === actor.seatId) throw new MemberError('OWN_SEAT', 'not your own seat');
+      notYourOwn(seat, acting);
       // On, and somebody sits in it — this account, or another of the same person's: it is at the desk.
       if (seat.active && (linked.rows[0] || seat.accounts > 0)) throw new MemberError('ALREADY_SEATED', 'that account sits at the desk already');
-      await mayMove(client, actor, seat.role, input.role);
+      await mayMove(client, acting, seat.role, input.role);
       if (seat.active && seat.role === ADMIN && input.role !== ADMIN) await keepAnAdmin(client, seat.id);
       await client.query('UPDATE ops.member SET role = $2, active = true, updated_at = now() WHERE id = $1', [memberId, input.role]);
     } else {
-      await mayMove(client, actor, input.role, input.role);
+      await mayMove(client, acting, input.role, input.role);
       const made = await client.query<{ id: string }>(
         'INSERT INTO ops.member (name, role, email, phone) VALUES ($1, $2, $3, $4) RETURNING id',
         [input.name.trim() || email || phone || 'Нэргүй', input.role, email, phone],
@@ -334,34 +368,59 @@ export async function upsertMember(
  * seat on every request, so a dashboard left open loses the desk at its
  * next step — and it is only the desk: the person's own sign-ins are
  * theirs, and stay open for the website and the app. Either way it is for
- * somebody who may hand out the seat's role, and the last active admin
- * stays on.
+ * somebody who may hand out the seat's role, never for the seat's own
+ * person, and the last active admin stays on.
  */
-export async function setMemberActive(id: string, active: boolean, actor: DeskActor): Promise<void> {
-  await tx(async (client) => {
+export async function setMemberActive(id: string, active: boolean, actor: DeskActor): Promise<Member> {
+  const changed = await tx(async (client) => {
     await oneAtATime(client);
+    const acting = await actorNow(client, actor);
     const seat = await heldSeat(client, id);
-    await mayMove(client, actor, seat.role, seat.role);
-    if (!active && seat.active && seat.role === ADMIN) await keepAnAdmin(client, id);
-    await client.query('UPDATE ops.member SET active = $2, updated_at = now() WHERE id = $1', [id, active]);
+    notYourOwn(seat, acting);
+    await mayMove(client, acting, seat.role, seat.role);
+    if (!active && seat.active && seat.role === ADMIN) await keepAnAdmin(client, seat.id);
+    await client.query('UPDATE ops.member SET active = $2, updated_at = now() WHERE id = $1', [seat.id, active]);
+    return seat.id;
   });
+  return memberById(changed);
 }
 
 /**
  * Another role for a member already at the desk: for somebody who may take
- * the seat out of the role it holds and hand out the one it gets. The desk
- * always keeps one active admin.
+ * the seat out of the role it holds and hand out the one it gets, never for
+ * the seat's own person. The desk always keeps one active admin.
  */
 export async function setMemberRole(id: string, role: Role, actor: DeskActor): Promise<Member> {
-  if (!(await deskRoleExists(role))) throw new Error(`no such role: ${role}`);
-  await tx(async (client) => {
+  const changed = await tx(async (client) => {
     await oneAtATime(client);
+    const acting = await actorNow(client, actor);
+    await roleThere(client, role);
     const seat = await heldSeat(client, id);
-    await mayMove(client, actor, seat.role, role);
-    if (seat.active && seat.role === ADMIN && role !== ADMIN) await keepAnAdmin(client, id);
-    await client.query('UPDATE ops.member SET role = $2, updated_at = now() WHERE id = $1', [id, role]);
+    notYourOwn(seat, acting);
+    await mayMove(client, acting, seat.role, role);
+    if (seat.active && seat.role === ADMIN && role !== ADMIN) await keepAnAdmin(client, seat.id);
+    await client.query('UPDATE ops.member SET role = $2, updated_at = now() WHERE id = $1', [seat.id, role]);
+    return seat.id;
   });
-  return memberById(id);
+  return memberById(changed);
+}
+
+/**
+ * Before the desk's guest pages act on an account. An account that sits at
+ * the desk is a seat's way in as well as a guest's. Signing it out takes the
+ * desk from its person until they sign in again, so it is for whoever may
+ * hand out that seat's role — as switching the seat off is. Closing it would
+ * take them off the desk for good, past every rule the members page keeps —
+ * the ceiling, the last admin — so a seat that is on is switched off there
+ * first. An account with no seat, or one switched off, is a guest like any
+ * other.
+ */
+export async function mayActOnAccount(guestId: string, actor: DeskActor, act: 'sign-out' | 'close', db: Db = getPool()): Promise<void> {
+  if (!UUID.test(guestId)) return;
+  const seat = await memberForAccount(guestId, db);
+  if (!seat?.active) return;
+  if (act === 'close') throw new MemberError('AT_THE_DESK', 'switch the seat off before closing the account');
+  if (!(await mayHandle(actor, seat.role, db))) throw new MemberError('FORBIDDEN', `that account sits at the desk as ${seat.role}`);
 }
 
 /* ── the first members, from the environment ─────────────────────── */
@@ -392,13 +451,13 @@ async function seedOf(entry: string, db: Db): Promise<Seed | string> {
  * after the last; a name may hold a colon of its own.
  *
  * The environment only seeds. A member it names is made when the desk has
- * nobody by that address, and never touched after: the role, the name and
- * whether the seat is on are the desk's, on «Гишүүд». A seat an admin
- * switched off is not switched back on by the next deploy, nor a role taken
- * away given back; and taking an entry out of the list takes nobody off the
- * desk. Naming somebody gives nobody a seat by itself: the account still has
- * to prove the address — and in production, with no SMS, only an email can
- * be proved.
+ * nobody by that address, and never touched after: the role and whether the
+ * seat is on are the desk's, on «Гишүүд», and the name stays as it was first
+ * written. A seat an admin switched off is not switched back on by the next
+ * deploy, nor a role taken away given back; and taking an entry out of the
+ * list takes nobody off the desk. Naming somebody gives nobody a seat by
+ * itself: the account still has to prove the address — and in production,
+ * with no SMS, only an email can be proved.
  *
  * An entry that is not an address, a name and a desk role is skipped and
  * said so by its place in the list and why, never by what it holds: boot

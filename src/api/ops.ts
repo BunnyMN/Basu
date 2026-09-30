@@ -48,6 +48,7 @@ import {
   deskRoleExists,
   linkByProof,
   listMembers,
+  mayActOnAccount,
   mayHandle,
   memberForAccount,
   seatAccount,
@@ -268,11 +269,15 @@ export async function registerOpsRoutes(
   /** Who is acting, for the record: the member the session belongs to. */
   const who = (request: FastifyRequest) => `ops:${request.ops?.name ?? '?'}`;
 
-  /** Whoever is changing a seat, as `ops/` weighs them: what their seat opens, and which seat and account are theirs. */
+  /**
+   * Whoever is changing a seat, as `ops/` weighs them: what their seat opens,
+   * and which seat and account are theirs — neither, for the demo's shared
+   * secret, which has no account behind it and sits in no seat.
+   */
   const actor = (request: FastifyRequest): DeskActor => ({
     grants: request.grants!,
     locked: request.ops!.locked,
-    seatId: request.ops!.id,
+    seatId: request.guestId ? request.ops!.id : null,
     account: request.guestId ?? null,
   });
 
@@ -471,11 +476,12 @@ export async function registerOpsRoutes(
   /**
    * Another role for somebody already at the desk — never your own, never
    * out of or into a role beyond what you hold, and never the last admin's.
+   * Whose seat it is, `setMemberRole` asks of the seat as the desk wrote it:
+   * an id is the same seat however it is spelled.
    */
   app.post<{ Params: { id: string }; Body: { role?: string } }>('/v1/ops/members/:id/role', desk('desk.members:manage'), async (request, reply) => {
     const role = request.body?.role as Role | undefined;
     if (!role || !(await deskRoleExists(role))) return badRequest(reply, 'Эрх буруу байна.', `no such role: ${request.body?.role}`);
-    if (request.params.id === request.ops!.id) return badRequest(reply, 'Өөрийн эрхийг өөрчлөх боломжгүй.', 'cannot change your own role');
     try {
       const member = await setMemberRole(request.params.id, role, actor(request));
       await recordAudit({ who: who(request), action: 'member.role', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
@@ -487,16 +493,15 @@ export async function registerOpsRoutes(
 
   /**
    * A seat off, or on again: for whoever may hand out the role it holds,
-   * either way — never your own off, and never the last active admin. Off
+   * either way — never your own, and never the last active admin off. Off
    * closes the desk to it and nothing else; see `setMemberActive`.
    */
   app.post<{ Params: { id: string }; Body: { active?: boolean } }>('/v1/ops/members/:id/active', desk('desk.members:manage'), async (request, reply) => {
     if (typeof request.body?.active !== 'boolean') return badRequest(reply, 'active: true эсвэл false.', 'active must be a boolean');
-    if (request.params.id === request.ops!.id && !request.body.active) return badRequest(reply, 'Өөрийгөө хаах боломжгүй.', 'cannot deactivate yourself');
     try {
-      await setMemberActive(request.params.id, request.body.active, actor(request));
-      await recordAudit({ who: who(request), action: request.body.active ? 'member.activate' : 'member.deactivate', targetKind: 'member', targetId: request.params.id });
-      return reply.send({ id: request.params.id, active: request.body.active });
+      const member = await setMemberActive(request.params.id, request.body.active, actor(request));
+      await recordAudit({ who: who(request), action: member.active ? 'member.activate' : 'member.deactivate', targetKind: 'member', targetId: member.id });
+      return reply.send({ id: member.id, active: member.active });
     } catch (error) {
       return sendError(reply, error);
     }
@@ -699,11 +704,19 @@ export async function registerOpsRoutes(
     return reply.send(file);
   });
 
-  /** A phone is gone: sign that one out. */
+  /**
+   * A phone is gone: sign that one out. The account of somebody at the desk
+   * is for whoever may hand out their seat's role (`mayActOnAccount`).
+   */
   app.post<{ Params: { id: string; sid: string }; Body: { note?: string } }>(
     '/v1/ops/guests/:id/sessions/:sid/revoke',
     desk('desk.guests:sessions'),
     async (request, reply) => {
+      try {
+        await mayActOnAccount(request.params.id, actor(request), 'sign-out');
+      } catch (error) {
+        return sendError(reply, error);
+      }
       const gone = await revokeSession(request.params.id, request.params.sid, ctx.clock.now());
       if (!gone) return sendError(reply, new IdeshError('NOT_FOUND', 'no such open session'));
       await recordAudit({ who: who(request), action: 'guest.session_revoke', targetKind: 'guest', targetId: request.params.id, note: request.body?.note ?? null });
@@ -711,11 +724,16 @@ export async function registerOpsRoutes(
     },
   );
 
-  /** Closing on somebody's behalf: admin only, a reason required, the same two refusals the app has. */
+  /**
+   * Closing on somebody's behalf: a reason required, the same two refusals
+   * the app has — and never an account whose seat at the desk is on, which
+   * is switched off on «Гишүүд» first (`mayActOnAccount`).
+   */
   app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/guests/:id/close', desk('desk.guests:close'), async (request, reply) => {
     const note = request.body?.note?.trim();
     if (!note) return badRequest(reply, 'Шалтгаан бичнэ үү.', 'note required');
     try {
+      await mayActOnAccount(request.params.id, actor(request), 'close');
       await closeGuest(request.params.id, ctx.clock.now());
       await recordAudit({ who: who(request), action: 'guest.close', targetKind: 'guest', targetId: request.params.id, note });
       return reply.send({ closed: true });

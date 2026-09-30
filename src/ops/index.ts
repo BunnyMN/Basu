@@ -8,6 +8,7 @@ export {
   listMembers,
   memberForAccount,
   linkByProof,
+  mayActOnAccount,
   mayHandle,
   seatAccount,
   seatsOfAccounts,
