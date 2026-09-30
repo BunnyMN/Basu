@@ -368,7 +368,7 @@ export async function registerIdeshRoutes(
         if (!body.password) {
           return sendError(reply, new IdeshError('PASSWORD_REQUIRED', 'the account is confirmed with the password'));
         }
-        if (!(await confirmPassword(request.guestId!, body.password))) {
+        if (!(await confirmPassword(ctx, request.guestId!, body.password))) {
           return sendError(reply, new IdeshError('BAD_PASSWORD', 'that is not the password on this account'));
         }
         await setRefundAccount(request.params.id, request.guestId!, {
@@ -639,7 +639,7 @@ export async function registerIdeshRoutes(
         if (!body.password) {
           return sendError(reply, new IdeshError('PASSWORD_REQUIRED', 'changing the account takes the password'));
         }
-        if (!(await confirmPassword(person, body.password))) {
+        if (!(await confirmPassword(ctx, person, body.password))) {
           return sendError(reply, new IdeshError('BAD_PASSWORD', 'that is not the password on this account'));
         }
       }

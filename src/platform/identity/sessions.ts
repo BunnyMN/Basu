@@ -80,6 +80,20 @@ export async function revokeSession(guestId: string, sessionId: string, at: Date
 }
 
 /**
+ * When the session this token is was opened: the last time its person came
+ * through a door. Null for a token that is not this account's, or no longer
+ * open.
+ */
+export async function sessionOpenedAt(guestId: string, token: string): Promise<Date | null> {
+  const { rows } = await getPool().query<{ created_at: Date }>(
+    `SELECT created_at FROM identity.guest_session
+      WHERE guest_id = $1 AND token_hash = $2 AND revoked_at IS NULL`,
+    [guestId, sha256(token)],
+  );
+  return rows[0]?.created_at ?? null;
+}
+
+/**
  * Sign out here: the session this token is, and nothing else. A browser
  * that only forgets its token has not signed anybody out — the server would
  * still take that token from whoever copied it, out of a history, a stale

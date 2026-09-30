@@ -617,8 +617,12 @@ export function signInSheet(reason = 'Үргэлжлүүлэхийн тулд н
  * On the page where a person sees their own account: its address and its
  * password. The address is the way a forgotten password comes back — there
  * is no SMS — so an account made by phone is asked, plainly, to add one.
- * Adding it sends a code there; an account with a password types it too, so
- * that a session left open somewhere cannot give itself a way back in.
+ *
+ * Neither is given on the session's word, so that a session left open
+ * somewhere cannot give itself a way back in. Adding an address sends a code
+ * there, and an account with a password types it too. An account with no
+ * password yet — made by an address, Google or Apple — sets its first with a
+ * code sent to the address on it, so without an address it adds one first.
  *
  * `token` is the session to act as. The block asks `/v1/me` for itself and
  * draws nothing if that fails.
@@ -644,7 +648,11 @@ export function accountWays({ token }) {
         </div>
         <div class="row" data-row="password">
           <div class="main"><span class="title">Нууц үг</span><span class="sub">${
-            me.has_password ? 'Тохируулсан.' : 'Тохируулаагүй — нууц үггүйгээр ч нэвтэрч болно.'
+            me.has_password
+              ? 'Тохируулсан.'
+              : me.email
+                ? 'Тохируулаагүй — нууц үггүйгээр ч нэвтэрч болно.'
+                : 'Тохируулаагүй. Эхлээд имэйлээ холбоно уу — тохируулах код тэр хаяг руу очно.'
           }</span></div>
           <div class="end"><button class="btn" data-size="sm" type="button" data-open="password">${me.has_password ? 'Солих' : 'Тохируулах'}</button></div>
         </div>
@@ -652,6 +660,8 @@ export function accountWays({ token }) {
     const $ = (selector) => box.querySelector(selector);
     $('[data-email-sub]').textContent = me.email ?? 'Холбоогүй. Нууц үгээ мартвал энэ хаягаар сэргээнэ.';
     $('[data-open="email"]').hidden = Boolean(me.email);
+    // A first password's code goes to the address, so with none there is nothing to press yet.
+    $('[data-open="password"]').hidden = !me.has_password && !me.email;
 
     // An address: typed, a code sent to it, the code typed back — two steps of one popup.
     $('[data-open="email"]').addEventListener('click', () => {
@@ -686,20 +696,72 @@ export function accountWays({ token }) {
       });
     });
 
+    // A password: changed knowing the old one. The first has no old one to
+    // know, so it is two steps of one popup, like the address above: a code
+    // to the address on the account, then the code and the new password.
     $('[data-open="password"]').addEventListener('click', () => {
+      const nextField = { name: 'next', label: 'Шинэ нууц үг', type: 'password', autocomplete: 'new-password', placeholder: 'Дор хаяж 8 тэмдэгт', required: true, wide: true };
+      const saved = async (revoked) => {
+        toast(revoked ? `Нууц үг хадгалагдлаа. Өөр ${revoked} төхөөрөмжөөс гаргалаа.` : 'Нууц үг хадгалагдлаа.', 'good');
+        await draw();
+      };
+      if (me.has_password) {
+        void popup({
+          title: 'Нууц үг солих',
+          sub: 'Бусад төхөөрөмж дээрх нэвтрэлт хаагдана, энэ хэвээр үлдэнэ.',
+          width: 480,
+          fields: [{ name: 'current', label: 'Одоогийн нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true }, nextField],
+          onSubmit: async (v) => {
+            if (v.next.length < 8) throw new Error('Нууц үг дор хаяж 8 тэмдэгт байх ёстой.');
+            const { revoked } = await api('/v1/me/password', { method: 'POST', token, body: { current: v.current, next: v.next } });
+            await saved(revoked);
+          },
+        });
+        return;
+      }
+      let sentTo = null;
+      const sentSub = () => `<b>${popupEsc(sentTo)}</b> хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Spam хавтсаа шалгаарай.`;
       void popup({
-        title: me.has_password ? 'Нууц үг солих' : 'Нууц үг тохируулах',
-        sub: 'Бусад төхөөрөмж дээрх нэвтрэлт хаагдана, энэ хэвээр үлдэнэ.',
+        title: 'Нууц үг тохируулах',
+        sub: `Таныг мөн гэдгийг батлах 6 оронтой код <b>${popupEsc(me.email)}</b> хаяг руу илгээнэ. Бусад төхөөрөмж дээрх нэвтрэлт хаагдана, энэ хэвээр үлдэнэ.`,
+        submit: 'Код авах',
         width: 480,
-        fields: [
-          ...(me.has_password ? [{ name: 'current', label: 'Одоогийн нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true }] : []),
-          { name: 'next', label: 'Шинэ нууц үг', type: 'password', autocomplete: 'new-password', placeholder: 'Дор хаяж 8 тэмдэгт', required: true, wide: true },
-        ],
-        onSubmit: async (v) => {
+        onSubmit: async (v, { step, el, say }) => {
+          if (!sentTo) {
+            const sent = await api('/v1/me/password/code', { method: 'POST', token });
+            sentTo = sent.to;
+            step({
+              sub: sentSub(),
+              fields: [
+                { name: 'code', label: 'Имэйлд ирсэн код', inputmode: 'numeric', autocomplete: 'one-time-code', placeholder: '······', required: true, wide: true },
+                nextField,
+                { type: 'note', html: '<button class="btn" data-v="link" type="button" data-resend>Код дахин авах</button>' },
+              ],
+              submit: 'Тохируулах',
+            });
+            // A letter that never came, or a code spent on three wrong tries:
+            // another one, here, rather than closing the popup to start over.
+            const again = el.querySelector('[data-resend]');
+            again.addEventListener('click', async () => {
+              if (again.hasAttribute('data-busy')) return;
+              again.setAttribute('data-busy', '');
+              try {
+                sentTo = (await api('/v1/me/password/code', { method: 'POST', token })).to;
+                el.querySelector('[name="code"]').value = '';
+                step({ sub: sentSub() });
+              } catch (error) {
+                say(error?.message ?? 'Код илгээж чадсангүй.');
+              } finally {
+                again.removeAttribute('data-busy');
+              }
+            });
+            return false;
+          }
+          const code = v.code.replace(/\D/g, '');
+          if (code.length !== 6) throw new Error('Код 6 оронтой.');
           if (v.next.length < 8) throw new Error('Нууц үг дор хаяж 8 тэмдэгт байх ёстой.');
-          const { revoked } = await api('/v1/me/password', { method: 'POST', token, body: { current: v.current ?? '', next: v.next } });
-          toast(revoked ? `Нууц үг хадгалагдлаа. Өөр ${revoked} төхөөрөмжөөс гаргалаа.` : 'Нууц үг хадгалагдлаа.', 'good');
-          await draw();
+          const { revoked } = await api('/v1/me/password', { method: 'POST', token, body: { next: v.next, code } });
+          await saved(revoked);
         },
       });
     });
@@ -837,8 +899,9 @@ function mountPick(box, f) {
  * popup)` does the work: what it returns closes the popup and is what the
  * promise resolves to; `false` keeps it open (a first step done, the second
  * drawn with `popup.step(...)`); a thrown error is said inside the popup, over
- * the fields, and the popup stays for another try. Closed without an answer,
- * the promise resolves to null.
+ * the fields, and the popup stays for another try. A button a step draws for
+ * itself — «Код дахин авах» — says its own trouble in the same place, with
+ * `popup.say(...)`. Closed without an answer, the promise resolves to null.
  */
 export function popup({ title, sub = '', fields = [], submit = 'Хадгалах', cancel = 'Болих', danger = false, width = 560, onSubmit = async () => true, id = null }) {
   return new Promise((resolve) => {
@@ -936,7 +999,7 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
       go.setAttribute('data-busy', '');
       say(null);
       try {
-        const answer = await onSubmit(values(), { step, el: sheet });
+        const answer = await onSubmit(values(), { step, el: sheet, say });
         if (answer === false) return;
         close(answer ?? true);
       } catch (error) {

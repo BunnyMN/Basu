@@ -11,6 +11,7 @@ import { buildServer } from '../api/server.js';
 import { handOff } from '../platform/identity/index.js';
 import { seedDemo } from '../seed/demo.js';
 import {
+  FakeMailer,
   FakeNotifier,
   FakePaymentProvider,
   FakeTaxProvider,
@@ -30,6 +31,8 @@ const WEB = join(dirname(fileURLToPath(import.meta.url)), '..', 'web');
 
 let app: FastifyInstance;
 let base: string;
+/** What the server talks to. It has no email; a test about letters lends it a mailer while it runs. */
+let ctx: Ctx;
 let clock: DemoClock;
 let notifier: FakeNotifier;
 let pairedVenue: string;
@@ -318,7 +321,7 @@ beforeAll(async () => {
   clock = new DemoClock();
   clock.setTo('11:40');
   notifier = new FakeNotifier();
-  const ctx: Ctx = {
+  ctx = {
     clock,
     payments: new FakePaymentProvider(),
     tax: new FakeTaxProvider(),
@@ -1944,6 +1947,132 @@ describe('one browser, one person', () => {
     expect(browser.getItem('basu.ops')).toBeNull();
     expect(browser.getItem('basu.guest')).toBeNull();
     expect(await ended(admin)).toBe(true);
+  });
+});
+
+describe('a first password, on the account page', () => {
+  /*
+   * An account made by an address, Google or Apple has no password, and the
+   * session looking at the page is no proof of who holds it: the first one
+   * is set with a code sent to the address on the account.
+   */
+  const json = { 'content-type': 'application/json' };
+  const passwordRow = (dom: JSDOM) => dom.window.document.querySelector('.account-ways [data-row="password"]');
+
+  it('takes a code to the account’s own address, then the code and the password, in one popup', async () => {
+    const mailer = new FakeMailer();
+    ctx.mailer = mailer;
+    try {
+      await fetch(`${base}/v1/auth/email/start`, { method: 'POST', headers: json, body: JSON.stringify({ email: 'tuya@example.mn' }) });
+      const verified = await fetch(`${base}/v1/auth/email/verify`, {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({ email: 'tuya@example.mn', code: mailer.codeFor('tuya@example.mn') }),
+      });
+      const { token } = (await verified.json()) as { token: string };
+
+      const page = await openPage('account.html', '', undefined, device(token));
+      await until(page, 'the password row', () => Boolean(passwordRow(page)?.querySelector('[data-open="password"]')));
+      expect(passwordRow(page)!.textContent).toContain('Тохируулаагүй');
+      (passwordRow(page)!.querySelector('[data-open="password"]') as HTMLElement).click();
+
+      // The first step asks for nothing but says where the code goes.
+      await until(page, 'the popup', (d) => Boolean(d.querySelector('.sheet.popup[data-open]')));
+      const popupSays = () => page.window.document.querySelector('.sheet.popup[data-open] header .sub')?.textContent ?? '';
+      expect(popupSays()).toContain('tuya@example.mn');
+      await answerPopup(page);
+      await until(page, 'the letter', () => mailer.to('tuya@example.mn')?.subject.includes('нууц үг тохируулах') ?? false);
+      await answerPopup(page, { code: mailer.codeFor('tuya@example.mn')!, next: 'туяагийн нууц үг' });
+
+      await until(page, 'the row to say it is set', () => passwordRow(page)?.textContent?.includes('Тохируулсан.') ?? false);
+      const signedIn = await fetch(`${base}/v1/auth/login`, {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({ login: 'tuya@example.mn', password: 'туяагийн нууц үг' }),
+      });
+      expect(signedIn.status).toBe(200);
+      expect(mailer.to('tuya@example.mn')!.subject).toBe('Basu · Нууц үг тохирууллаа');
+    } finally {
+      delete ctx.mailer;
+    }
+  });
+
+  it('sends another code from the same popup when the first does not do, and says so there when it cannot', async () => {
+    const mailer = new FakeMailer();
+    ctx.mailer = mailer;
+    try {
+      await fetch(`${base}/v1/auth/email/start`, { method: 'POST', headers: json, body: JSON.stringify({ email: 'oyun@example.mn' }) });
+      const verified = await fetch(`${base}/v1/auth/email/verify`, {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({ email: 'oyun@example.mn', code: mailer.codeFor('oyun@example.mn') }),
+      });
+      const { token } = (await verified.json()) as { token: string };
+
+      // The second time a code is asked for, the server says no; after that it is asked properly.
+      let asked = 0;
+      const refusal = () =>
+        new Response(JSON.stringify({ error: { code: 'RATE_LIMITED', message_mn: 'Хэт олон удаа оролдлоо. Хэсэг хүлээгээд дахин оролдоно уу.', message_en: 'rate limited' } }), {
+          status: 429,
+          headers: { 'content-type': 'application/json' },
+        });
+      const page = await openPage(
+        'account.html',
+        '',
+        (path) => (path === '/v1/me/password/code' && ++asked === 2 ? refusal() : undefined),
+        device(token),
+      );
+      await until(page, 'the password row', () => Boolean(passwordRow(page)?.querySelector('[data-open="password"]')));
+      (passwordRow(page)!.querySelector('[data-open="password"]') as HTMLElement).click();
+      await answerPopup(page);
+      const letters = () => mailer.sent.filter((m) => m.subject.includes('нууц үг тохируулах')).length;
+      await until(page, 'the first letter', () => letters() === 1);
+
+      const sheet = () => page.window.document.querySelector('.sheet.popup[data-open]') as HTMLElement;
+      const again = () => sheet().querySelector('[data-resend]') as HTMLElement;
+      await until(page, '«Код дахин авах»', () => Boolean(again()));
+      expect(again().textContent).toBe('Код дахин авах');
+
+      // Refused: said inside the popup, which stays on its second step.
+      again().click();
+      await until(page, 'the refusal in the popup', () => !(sheet().querySelector('.popup-error') as HTMLElement).hidden);
+      expect(sheet().querySelector('.popup-error')!.textContent).toContain('Хэт олон удаа оролдлоо');
+      expect(sheet().querySelector('[name="code"]')).not.toBeNull();
+
+      // Asked again: a second letter, and its code sets the password.
+      again().click();
+      await until(page, 'the second letter', () => letters() === 2);
+      await until(page, 'the refusal to go', () => (sheet().querySelector('.popup-error') as HTMLElement).hidden === true);
+      await answerPopup(page, { code: mailer.codeFor('oyun@example.mn')!, next: 'оюуны нууц үг' });
+      await until(page, 'the row to say it is set', () => passwordRow(page)?.textContent?.includes('Тохируулсан.') ?? false);
+      const signedIn = await fetch(`${base}/v1/auth/login`, {
+        method: 'POST',
+        headers: json,
+        body: JSON.stringify({ login: 'oyun@example.mn', password: 'оюуны нууц үг' }),
+      });
+      expect(signedIn.status).toBe(200);
+    } finally {
+      delete ctx.mailer;
+    }
+  });
+
+  it('asks an account with no address to add one first', async () => {
+    const page = await openPage('account.html', '', undefined, device(await devLogin('+97688060001', 'Вэб')));
+    await until(page, 'the password row', () => Boolean(passwordRow(page)));
+    expect(passwordRow(page)!.textContent).toContain('Эхлээд имэйлээ холбоно уу');
+    expect((passwordRow(page)!.querySelector('[data-open="password"]') as HTMLElement).hidden).toBe(true);
+    expect((page.window.document.querySelector('.account-ways [data-open="email"]') as HTMLElement).hidden).toBe(false);
+  });
+
+  it('opens the button in the letter that says a password changed on the step that replaces it, signed in or not', async () => {
+    ctx.mailer = new FakeMailer();
+    try {
+      const login = await openPage('login.html', '?forgot', undefined, device(await devLogin('+97688060002', 'Вэб')));
+      await until(login, 'the door', (d) => d.documentElement.hasAttribute('data-ready'));
+      expect((login.window.document.querySelector('.l-step[data-step="forgot"]') as HTMLElement).hidden).toBe(false);
+    } finally {
+      delete ctx.mailer;
+    }
   });
 });
 

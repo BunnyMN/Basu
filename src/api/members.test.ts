@@ -651,6 +651,13 @@ describe('a seat wants a recent sign-in', () => {
     clock.advanceMinutes(13 * 60);
     expect((await me(stale)).json().error.code).toBe('SIGN_IN_AGAIN');
 
+    // Nor is the code a first password takes sent: the letter is the first half of setting one.
+    const letters = mailer.sent.length;
+    const code = await app.inject({ method: 'POST', url: '/v1/me/password/code', headers: bearer(stale) });
+    expect(code.statusCode).toBe(401);
+    expect(code.json().error.code).toBe('SIGN_IN_AGAIN');
+    expect(mailer.sent).toHaveLength(letters);
+
     const set = await setPassword(stale, { next: 'миний шинэ нууц үг' });
     expect(set.statusCode).toBe(401);
     expect(set.json().error.code).toBe('SIGN_IN_AGAIN');
