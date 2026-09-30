@@ -2217,6 +2217,44 @@ describe('a first password, on the account page', () => {
   });
 });
 
+describe('the desk’s record', () => {
+  it('shows under each name the account and the device that acted, as text', async () => {
+    const desk = ((await (await fetch(`${base}/dev/ops-token`)).json()) as { token: string }).token;
+    // Somebody at the desk, signed in on a device that named itself with markup.
+    const made = await fetch(`${base}/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ phone: '+97688039001', password: GUEST_PASSWORD, name: 'Түүхч', device: '<img src=x onerror="window.__owned=1">' }),
+    });
+    const { token, guest_id: guestId } = (await made.json()) as { token: string; guest_id: string };
+    const seated = await fetch(`${base}/v1/ops/members`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${desk}` },
+      body: JSON.stringify({ guest_id: guestId, role: 'finance' }),
+    });
+    expect(seated.status).toBe(201);
+    // They do something the record keeps.
+    expect((await fetch(`${base}/v1/ops/money/topups.csv`, { headers: { authorization: `Bearer ${token}` } })).status).toBe(200);
+
+    const dash = await openPage('ops.html', '', undefined, device(token));
+    await opsTab(dash, 'audit');
+    const theirs = (d: Document) => [...d.querySelectorAll('#audit tr.dt-row')].find((r) => r.querySelector('.dt-two b')?.textContent === 'Түүхч');
+    await until(dash, 'their line in the record', (d) => Boolean(theirs(d)));
+    const who = theirs(dash.window.document)!.querySelector('.dt-two')!;
+    // The account by its number, and the device by the name it gave — shown, never run.
+    expect(who.querySelector('small')?.textContent).toBe('+97688039001 · <img src=x onerror="window.__owned=1">');
+    expect(dash.window.document.querySelector('#audit img')).toBeNull();
+    expect((dash.window as unknown as { __owned?: number }).__owned).toBeUndefined();
+    expect(who.getAttribute('title')).toMatch(/^Бүртгэл: Түүхч, \+97688039001\nНэвтрэлт: <img src=x onerror="window.__owned=1">, .+-д нэвтэрсэн$/);
+
+    // The seat was given with the demo's shared secret: nobody's account, so the name alone.
+    const demo = [...dash.window.document.querySelectorAll('#audit tr.dt-row .dt-two')].find((c) => c.querySelector('b')?.textContent === 'Демо');
+    expect(demo).toBeDefined();
+    expect(demo!.querySelector('small')).toBeNull();
+    expect(demo!.hasAttribute('title')).toBe(false);
+  });
+});
+
 describe('Basu decides who may do what', () => {
   /** The demo's desk: the shared secret, prefilled, one press. */
   async function theDesk(): Promise<JSDOM> {

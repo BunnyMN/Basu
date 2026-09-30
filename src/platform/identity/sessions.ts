@@ -50,6 +50,29 @@ export async function sessionsOf(guestId: string, token?: string): Promise<Devic
   }));
 }
 
+/** A session as a record names it: which device, and when it was signed in. */
+export interface NamedSession {
+  id: string;
+  guestId: string;
+  /** What the device called itself when it signed in. */
+  label: string | null;
+  signedInAt: Date;
+}
+
+/**
+ * Sessions by their ids, for a record that names the one somebody acted
+ * in — the desk's record of who did what. Ended ones too, signed out or
+ * run out: the record outlives them, and a session's row is never deleted.
+ */
+export async function sessionsById(ids: readonly string[]): Promise<Map<string, NamedSession>> {
+  if (ids.length === 0) return new Map();
+  const { rows } = await getPool().query<{ id: string; guest_id: string; label: string | null; created_at: Date }>(
+    `SELECT id, guest_id, label, created_at FROM identity.guest_session WHERE id = ANY($1::uuid[])`,
+    [[...new Set(ids)]],
+  );
+  return new Map(rows.map((r) => [r.id, { id: r.id, guestId: r.guest_id, label: r.label, signedInAt: r.created_at }]));
+}
+
 /**
  * Sign out everywhere else.
  *

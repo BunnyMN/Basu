@@ -48,12 +48,14 @@ export {
   endSession,
   revokeOtherSessions,
   revokeSession,
+  sessionsById,
   sessionsOf,
   type DeviceSession,
+  type NamedSession,
 } from './sessions.js';
 
 export { guestCensus, type GuestCensus } from './census.js';
-export { accountByContact, findGuests, guestCard, type GuestCard } from './directory.js';
+export { accountByContact, findGuests, guestCard, guestCards, type GuestCard } from './directory.js';
 
 export { MIN_PASSWORD, PasswordError, checkPassword, hashPassword, verifyPassword } from './password.js';
 export {

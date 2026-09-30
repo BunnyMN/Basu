@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest, RouteShorthandOptions } from 'fastify';
-import { IdeshError, recordAudit } from '../idesh/index.js';
+import { IdeshError, type AuditLine } from '../idesh/index.js';
 import type { Ctx } from '../ports.js';
 import { cancelOrder, markNoShow } from '../services/orders.js';
 import {
@@ -29,6 +29,8 @@ export interface DeskGuards {
   /** A route two pages read from: a seat that holds either. */
   deskAny: (...permissions: string[]) => RouteShorthandOptions;
   who: (request: FastifyRequest) => string;
+  /** A line in the desk's record, under whoever is acting: see `registerOpsRoutes`. */
+  audit: (request: FastifyRequest, line: AuditLine) => Promise<void>;
 }
 
 const iso = (d: Date | null | undefined) => d?.toISOString() ?? null;
@@ -52,7 +54,7 @@ const shapeOrder = (o: DeskDineOrder) => ({
   created_at: o.createdAt.toISOString(),
 });
 
-export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, deskAny, who }: DeskGuards): void {
+export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, deskAny, who, audit }: DeskGuards): void {
   app.get('/v1/ops/dine/restaurants', deskAny('desk.venues', 'desk.lunches'), async () => ({
     restaurants: (await restaurantsForDesk(ctx.clock.now())).map((r) => ({
       id: r.id,
@@ -78,7 +80,7 @@ export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, deskAny
       const active = request.body?.active;
       if (typeof active !== 'boolean') return badRequest(reply, 'active: true эсвэл false.', 'active must be a boolean');
       if (!(await setRestaurantActive(request.params.id, active))) return sendError(reply, new IdeshError('NOT_FOUND', 'no such restaurant'));
-      await recordAudit({ who: who(request), action: active ? 'restaurant.activate' : 'restaurant.suspend', targetKind: 'restaurant', targetId: request.params.id, note: request.body?.note ?? null });
+      await audit(request, { action: active ? 'restaurant.activate' : 'restaurant.suspend', targetKind: 'restaurant', targetId: request.params.id, note: request.body?.note ?? null });
       return reply.send({ id: request.params.id, active });
     },
   );
@@ -101,7 +103,7 @@ export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, deskAny
     const active = request.body?.active;
     if (typeof active !== 'boolean') return badRequest(reply, 'active: true эсвэл false.', 'active must be a boolean');
     if (!(await setMenuItemActive(request.params.id, active))) return sendError(reply, new IdeshError('NOT_FOUND', 'no such menu item'));
-    await recordAudit({ who: who(request), action: active ? 'menu.show' : 'menu.hide', targetKind: 'menu_item', targetId: request.params.id, note: request.body?.note ?? null });
+    await audit(request, { action: active ? 'menu.show' : 'menu.hide', targetKind: 'menu_item', targetId: request.params.id, note: request.body?.note ?? null });
     return reply.send({ id: request.params.id, active });
   });
 
@@ -138,7 +140,7 @@ export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, deskAny
     if (!note) return badRequest(reply, 'Шалтгаан бичнэ үү.', 'note required');
     try {
       const result = await cancelOrder(ctx, request.params.id, who(request));
-      await recordAudit({ who: who(request), action: 'order.cancel', targetKind: 'order', targetId: request.params.id, note });
+      await audit(request, { action: 'order.cancel', targetKind: 'order', targetId: request.params.id, note });
       return reply.send({ state: 'CANCELLED', refunded: result.refunded });
     } catch (error) {
       return sendError(reply, error);
@@ -149,7 +151,7 @@ export function registerDineDesk(app: FastifyInstance, ctx: Ctx, { desk, deskAny
   app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/dine/orders/:id/no-show', desk('desk.lunches:manage'), async (request, reply) => {
     try {
       await markNoShow(ctx, request.params.id);
-      await recordAudit({ who: who(request), action: 'order.no_show', targetKind: 'order', targetId: request.params.id, note: request.body?.note ?? null });
+      await audit(request, { action: 'order.no_show', targetKind: 'order', targetId: request.params.id, note: request.body?.note ?? null });
       const file = await dineOrderFile(request.params.id, ctx.clock.now());
       return reply.send({ state: file?.order.state ?? 'NO_SHOW' });
     } catch (error) {

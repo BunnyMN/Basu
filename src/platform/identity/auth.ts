@@ -544,8 +544,13 @@ export async function resolveGuest(ctx: Ctx, token: string): Promise<string | nu
   return (await resolveSession(ctx, token))?.guestId ?? null;
 }
 
-/** A live session: whose it is, and when that person signed in to make it. */
+/** A live session: which one, whose it is, and when that person signed in to make it. */
 export interface LiveSession {
+  /**
+   * The session's own id: what a record names it by, and what signing that
+   * one device out takes. Never the token, which nothing keeps.
+   */
+  id: string;
   guestId: string;
   signedInAt: Date;
 }
@@ -557,12 +562,12 @@ export interface LiveSession {
  * desk will not take one that old. The heartbeat is recorded the same way.
  */
 export async function resolveSession(ctx: Ctx, token: string): Promise<LiveSession | null> {
-  const { rows } = await getPool().query<{ guest_id: string; created_at: Date }>(
+  const { rows } = await getPool().query<{ id: string; guest_id: string; created_at: Date }>(
     `UPDATE identity.guest_session SET last_seen_at = $2
       WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > $2
-      RETURNING guest_id, created_at`,
+      RETURNING id, guest_id, created_at`,
     [sha256(token), ctx.clock.now()],
   );
   const row = rows[0];
-  return row ? { guestId: row.guest_id, signedInAt: row.created_at } : null;
+  return row ? { id: row.id, guestId: row.guest_id, signedInAt: row.created_at } : null;
 }

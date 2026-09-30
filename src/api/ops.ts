@@ -23,6 +23,7 @@ import {
   statsFor,
   updateSupplier,
   verifySupplierBank,
+  type AuditLine,
   type CancelReason,
   type IdeshState,
   type OrderScope,
@@ -59,7 +60,7 @@ import {
   type Member,
   type Role,
 } from '../ops/index.js';
-import { accountByContact, contactsFor, findGuests, guestCard, profileOf, resolveSession } from '../platform/identity/index.js';
+import { accountByContact, contactsFor, findGuests, guestCard, guestCards, profileOf, resolveSession, sessionsById } from '../platform/identity/index.js';
 import { addMinutes } from '../domain/time.js';
 import { enqueue } from '../platform/notify/index.js';
 import { approveOrg, declineOrg, listOrgs, membersOf, orgById } from '../platform/org/index.js';
@@ -93,6 +94,12 @@ type Guard = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
 declare module 'fastify' {
   interface FastifyRequest {
     ops?: DeskSeat;
+    /**
+     * The session a desk request came in on, by its id — never its token:
+     * what the desk's record names beside the account. None for the demo's
+     * shared secret, which is no session.
+     */
+    sessionId?: string;
   }
 }
 
@@ -157,7 +164,8 @@ const DEMO_ROLE: RoleShape = { scope: 'desk', key: 'admin', name: 'Админ', 
  * Who a bearer token is at the desk: the demo's shared secret is one admin
  * with no account behind it; anybody else is the active member their
  * account sits as, with what their role opens — or nobody, and nobody too
- * when their role has gone. `guestId` is the account, when there is one.
+ * when their role has gone. `guestId` is the account, when there is one,
+ * and `sessionId` the session the token is — its id, for the record.
  *
  * `stale` is an account that has a seat, on a session signed in longer ago
  * than the desk takes: no seat for it until the person signs in again. An
@@ -167,27 +175,29 @@ const DEMO_ROLE: RoleShape = { scope: 'desk', key: 'admin', name: 'Админ', 
 export async function deskSeatFor(
   ctx: Ctx,
   token: string | undefined,
-): Promise<{ guestId: string | null; seat: DeskSeat | null; stale: boolean }> {
-  if (!token) return { guestId: null, seat: null, stale: false };
+): Promise<{ guestId: string | null; sessionId: string | null; seat: DeskSeat | null; stale: boolean }> {
+  if (!token) return { guestId: null, sessionId: null, seat: null, stale: false };
   const links = await linksOf('desk');
   const shared = opsToken();
   if (shared && same(token, shared)) {
     const role = (await roleOf('desk', 'admin')) ?? DEMO_ROLE;
     return {
       guestId: null,
+      sessionId: null,
       seat: { id: 'demo', name: 'Демо', role: 'admin', roleName: role.name, locked: true, phone: null, email: null, grants: grantsOf({ ...role, locked: true }, links) },
       stale: false,
     };
   }
   const session = await resolveSession(ctx, token);
-  if (!session) return { guestId: null, seat: null, stale: false };
-  const { guestId } = session;
+  if (!session) return { guestId: null, sessionId: null, seat: null, stale: false };
+  const { guestId, id: sessionId } = session;
   const member = await seatOf(guestId);
   const role = member?.active ? await roleOf('desk', member.role) : null;
-  if (!member?.active || !role) return { guestId, seat: null, stale: false };
-  if (addMinutes(session.signedInAt, DESK_SESSION_HOURS * 60) <= ctx.clock.now()) return { guestId, seat: null, stale: true };
+  if (!member?.active || !role) return { guestId, sessionId, seat: null, stale: false };
+  if (addMinutes(session.signedInAt, DESK_SESSION_HOURS * 60) <= ctx.clock.now()) return { guestId, sessionId, seat: null, stale: true };
   return {
     guestId,
+    sessionId,
     stale: false,
     seat: {
       id: member.id,
@@ -232,13 +242,14 @@ export async function registerOpsRoutes(
   opts: { dev: boolean },
 ): Promise<void> {
   const requireOps: Guard = async (request, reply) => {
-    const { guestId, seat, stale } = await deskSeatFor(ctx, bearer(request));
+    const { guestId, sessionId, seat, stale } = await deskSeatFor(ctx, bearer(request));
     if (stale) return signInAgain(reply);
     if (!seat) return unauthorized(reply);
     request.ops = seat;
     request.grants = seat.grants;
-    // The account behind the seat — none for the demo's shared secret.
+    // The account behind the seat, and the session it came in on — neither for the demo's shared secret.
     if (guestId) request.guestId = guestId;
+    if (sessionId) request.sessionId = sessionId;
     return undefined;
   };
 
@@ -268,6 +279,25 @@ export async function registerOpsRoutes(
 
   /** Who is acting, for the record: the member the session belongs to. */
   const who = (request: FastifyRequest) => `ops:${request.ops?.name ?? '?'}`;
+
+  /**
+   * A line in the desk's record, as whoever is acting: under the member's
+   * name, as `who` has always written it, and by the account, the session
+   * it came in on and the seat, each by id — two members may share a name,
+   * and a browser left signed in acts in its owner's. Every desk route that
+   * records writes through here, so none can leave them out. The demo's
+   * shared secret has none of the three.
+   */
+  const audit = (request: FastifyRequest, line: AuditLine) =>
+    recordAudit({
+      ...line,
+      who: who(request),
+      by: {
+        account: request.guestId ?? null,
+        session: request.sessionId ?? null,
+        member: request.guestId ? request.ops!.id : null,
+      },
+    });
 
   /**
    * Whoever is changing a seat, as `ops/` weighs them: what their seat opens,
@@ -365,7 +395,7 @@ export async function registerOpsRoutes(
           about: org.about,
         });
       }
-      await recordAudit({ who: who(request), action: 'org.approve', targetKind: 'org', targetId: org.id, note: org.name });
+      await audit(request, { action: 'org.approve', targetKind: 'org', targetId: org.id, note: org.name });
       await tellOwner(org.appliedBy, org.id, 'Байгууллага батлагдлаа', `«${org.name}» Basu дээр батлагдлаа. basu.burzai.cloud/dashboard-д ажилтнуудаа нэмж болно.`);
       return reply.send(shapeOrg(org));
     } catch (error) {
@@ -376,7 +406,7 @@ export async function registerOpsRoutes(
   app.post<{ Params: { id: string }; Body: { reason?: string } }>('/v1/ops/orgs/:id/decline', desk('desk.orgs:decide'), async (request, reply) => {
     try {
       const org = await declineOrg({ id: request.params.id, reason: request.body?.reason ?? null, by: who(request), now: ctx.clock.now() });
-      await recordAudit({ who: who(request), action: 'org.decline', targetKind: 'org', targetId: org.id, note: `${org.name}${org.declineReason ? ` · ${org.declineReason}` : ''}` });
+      await audit(request, { action: 'org.decline', targetKind: 'org', targetId: org.id, note: `${org.name}${org.declineReason ? ` · ${org.declineReason}` : ''}` });
       await tellOwner(org.appliedBy, org.id, 'Байгууллагын бүртгэл', `«${org.name}»-ийг батлах боломжгүй байлаа.${org.declineReason ? ` Шалтгаан: ${org.declineReason}.` : ''}`);
       return reply.send(shapeOrg(org));
     } catch (error) {
@@ -465,7 +495,7 @@ export async function registerOpsRoutes(
         },
         actor(request),
       );
-      await recordAudit({ who: who(request), action: 'member.grant', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
+      await audit(request, { action: 'member.grant', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
       await tellSeated(card.id, member, (await roleOf('desk', member.role))?.name ?? member.role);
       return reply.status(201).send(shapeMember(member));
     } catch (error) {
@@ -484,7 +514,7 @@ export async function registerOpsRoutes(
     if (!role || !(await deskRoleExists(role))) return badRequest(reply, 'Эрх буруу байна.', `no such role: ${request.body?.role}`);
     try {
       const member = await setMemberRole(request.params.id, role, actor(request));
-      await recordAudit({ who: who(request), action: 'member.role', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
+      await audit(request, { action: 'member.role', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
       return reply.send(shapeMember(member));
     } catch (error) {
       return sendError(reply, error);
@@ -500,7 +530,7 @@ export async function registerOpsRoutes(
     if (typeof request.body?.active !== 'boolean') return badRequest(reply, 'active: true эсвэл false.', 'active must be a boolean');
     try {
       const member = await setMemberActive(request.params.id, request.body.active, actor(request));
-      await recordAudit({ who: who(request), action: member.active ? 'member.activate' : 'member.deactivate', targetKind: 'member', targetId: member.id });
+      await audit(request, { action: member.active ? 'member.activate' : 'member.deactivate', targetKind: 'member', targetId: member.id });
       return reply.send({ id: member.id, active: member.active });
     } catch (error) {
       return sendError(reply, error);
@@ -608,7 +638,7 @@ export async function registerOpsRoutes(
         bankAccount: body.bank_account,
         bankHolder: body.bank_holder,
       });
-      await recordAudit({ who: who(request), action: 'supplier.terms', targetKind: 'supplier', targetId: request.params.id, note: body.commission_pct !== undefined ? `шимтгэл ${body.commission_pct}%` : null });
+      await audit(request, { action: 'supplier.terms', targetKind: 'supplier', targetId: request.params.id, note: body.commission_pct !== undefined ? `шимтгэл ${body.commission_pct}%` : null });
       const row = (await listSuppliers()).find((s) => s.id === request.params.id);
       return reply.send(row ? shape(row) : { id: request.params.id });
     } catch (error) {
@@ -680,7 +710,7 @@ export async function registerOpsRoutes(
           default:
             return badRequest(reply, 'Ийм үйлдэл алга.', `no such action: ${action}`);
         }
-        await recordAudit({ who: actor, action: `order.${action}`, targetKind: 'order', targetId: id, note: body.note ?? body.reason ?? null });
+        await audit(request, { action: `order.${action}`, targetKind: 'order', targetId: id, note: body.note ?? body.reason ?? null });
         return reply.send(result);
       } catch (error) {
         return sendError(reply, error);
@@ -688,11 +718,11 @@ export async function registerOpsRoutes(
     },
   );
 
-  registerDineDesk(app, ctx, { desk, deskAny, who });
-  registerMoneyDesk(app, ctx, { desk, who });
-  registerPromotionsDesk(app, ctx, { desk, who });
-  registerSystemDesk(app, ctx, { desk, who });
-  registerAccessDesk(app, ctx, { desk, deskAny, who });
+  registerDineDesk(app, ctx, { desk, deskAny, who, audit });
+  registerMoneyDesk(app, ctx, { desk, audit });
+  registerPromotionsDesk(app, ctx, { desk, who, audit });
+  registerSystemDesk(app, ctx, { desk, who, audit });
+  registerAccessDesk(app, ctx, { desk, deskAny, who, audit });
 
   /* ── the guests ── */
 
@@ -719,7 +749,7 @@ export async function registerOpsRoutes(
       }
       const gone = await revokeSession(request.params.id, request.params.sid, ctx.clock.now());
       if (!gone) return sendError(reply, new IdeshError('NOT_FOUND', 'no such open session'));
-      await recordAudit({ who: who(request), action: 'guest.session_revoke', targetKind: 'guest', targetId: request.params.id, note: request.body?.note ?? null });
+      await audit(request, { action: 'guest.session_revoke', targetKind: 'guest', targetId: request.params.id, note: request.body?.note ?? null });
       return reply.send({ revoked: true });
     },
   );
@@ -735,7 +765,7 @@ export async function registerOpsRoutes(
     try {
       await mayActOnAccount(request.params.id, actor(request), 'close');
       await closeGuest(request.params.id, ctx.clock.now());
-      await recordAudit({ who: who(request), action: 'guest.close', targetKind: 'guest', targetId: request.params.id, note });
+      await audit(request, { action: 'guest.close', targetKind: 'guest', targetId: request.params.id, note });
       return reply.send({ closed: true });
     } catch (error) {
       return sendError(reply, error);
@@ -807,7 +837,7 @@ export async function registerOpsRoutes(
       if (typeof active !== 'boolean') return badRequest(reply, 'active: true эсвэл false.', 'active must be a boolean');
       try {
         await setSupplierActive(request.params.id, active);
-        await recordAudit({ who: who(request), action: active ? 'supplier.activate' : 'supplier.suspend', targetKind: 'supplier', targetId: request.params.id, note: request.body?.note ?? null });
+        await audit(request, { action: active ? 'supplier.activate' : 'supplier.suspend', targetKind: 'supplier', targetId: request.params.id, note: request.body?.note ?? null });
         const row = (await listSuppliers()).find((s) => s.id === request.params.id);
         return reply.send(row ? shape(row) : { id: request.params.id, active });
       } catch (error) {
@@ -820,7 +850,7 @@ export async function registerOpsRoutes(
   app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/suppliers/:id/bank-verify', desk('desk.suppliers:terms'), async (request, reply) => {
     try {
       await verifySupplierBank(request.params.id);
-      await recordAudit({ who: who(request), action: 'supplier.bank_verify', targetKind: 'supplier', targetId: request.params.id, note: request.body?.note ?? null });
+      await audit(request, { action: 'supplier.bank_verify', targetKind: 'supplier', targetId: request.params.id, note: request.body?.note ?? null });
       const row = (await listSuppliers()).find((s) => s.id === request.params.id);
       return reply.send(row ? shape(row) : { id: request.params.id, bank_verified: true });
     } catch (error) {
@@ -831,24 +861,56 @@ export async function registerOpsRoutes(
   app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/listings/:id/hide', desk('desk.suppliers:manage'), async (request, reply) => {
     try {
       await hideListing(request.params.id, ctx.clock.now());
-      await recordAudit({ who: who(request), action: 'listing.hide', targetKind: 'listing', targetId: request.params.id, note: request.body?.note ?? null });
+      await audit(request, { action: 'listing.hide', targetKind: 'listing', targetId: request.params.id, note: request.body?.note ?? null });
       return reply.send({ id: request.params.id, active: false });
     } catch (error) {
       return sendError(reply, error);
     }
   });
 
-  app.get<{ Querystring: { limit?: string } }>('/v1/ops/audit', desk('desk.audit'), async (request) => ({
-    audit: (await listAudit({ limit: Math.min(Number(request.query.limit) || 100, 500) })).map((a) => ({
-      id: a.id,
-      who: a.who,
-      action: a.action,
-      target_kind: a.targetKind,
-      target_id: a.targetId,
-      note: a.note,
-      at: a.at.toISOString(),
-    })),
-  }));
+  /**
+   * The record, newest first, each line with who acted as identity knows
+   * them now: the account — its name and address, or that it has since
+   * been closed — and the session, by what the device called itself and
+   * when it was signed in. The ids are the record; the rest is for reading
+   * it. A line from before the record kept them, or from the demo's shared
+   * secret, has only the name.
+   */
+  app.get<{ Querystring: { limit?: string } }>('/v1/ops/audit', desk('desk.audit'), async (request) => {
+    const lines = await listAudit({ limit: Math.min(Number(request.query.limit) || 100, 500) });
+    const [accounts, sessions] = await Promise.all([
+      guestCards(lines.flatMap((a) => (a.by.account ? [a.by.account] : []))),
+      sessionsById(lines.flatMap((a) => (a.by.session ? [a.by.session] : []))),
+    ]);
+    return {
+      audit: lines.map((a) => {
+        const account = a.by.account ? accounts.get(a.by.account) : undefined;
+        const session = a.by.session ? sessions.get(a.by.session) : undefined;
+        return {
+          id: a.id,
+          who: a.who,
+          action: a.action,
+          target_kind: a.targetKind,
+          target_id: a.targetId,
+          note: a.note,
+          at: a.at.toISOString(),
+          member_id: a.by.member,
+          account: a.by.account
+            ? {
+                id: a.by.account,
+                name: account?.name ?? null,
+                email: account?.email ?? null,
+                phone: account?.phone ?? null,
+                closed: Boolean(account?.closedAt),
+              }
+            : null,
+          session: a.by.session
+            ? { id: a.by.session, label: session?.label ?? null, signed_in_at: session?.signedInAt.toISOString() ?? null }
+            : null,
+        };
+      }),
+    };
+  });
 
   /* ── the list to pay ── */
 
@@ -864,8 +926,7 @@ export async function registerOpsRoutes(
     async (request, reply) => {
       try {
         const released = await approveSettlement(request.params.id, who(request), ctx.clock.now());
-        await recordAudit({
-          who: who(request),
+        await audit(request, {
           action: 'settlement.approve',
           targetKind: 'settlement',
           targetId: request.params.id,
@@ -885,8 +946,7 @@ export async function registerOpsRoutes(
     async (request, reply) => {
       try {
         const paid = await markSettled(ctx, request.params.id, who(request), request.body?.reference ?? '');
-        await recordAudit({
-          who: who(request),
+        await audit(request, {
           action: 'settlement.paid',
           targetKind: 'settlement',
           targetId: request.params.id,

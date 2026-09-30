@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest, RouteShorthandOptions } from 'fastify';
-import { recordAudit } from '../idesh/index.js';
+import type { AuditLine } from '../idesh/index.js';
 import { listMembers } from '../ops/index.js';
 import {
   AccessError,
@@ -40,6 +40,8 @@ export interface AccessGuards {
   desk: (permission: string) => RouteShorthandOptions;
   deskAny: (...permissions: string[]) => RouteShorthandOptions;
   who: (request: FastifyRequest) => string;
+  /** A line in the desk's record, under whoever is acting: see `registerOpsRoutes`. */
+  audit: (request: FastifyRequest, line: AuditLine) => Promise<void>;
 }
 
 const NIL = '00000000-0000-0000-0000-000000000000';
@@ -73,7 +75,7 @@ async function usage(scope: Scope): Promise<Map<string, number>> {
   return counts;
 }
 
-export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskAny, who }: AccessGuards): void {
+export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskAny, who, audit }: AccessGuards): void {
   /** A desk role holds only what the person writing it holds — unless they sit in the locked admin role. Business roles are the desk's to write whole. */
   const mayWrite = (request: FastifyRequest, scope: Scope, permissions: unknown): boolean =>
     scope === 'org' || Boolean(request.ops?.locked) || (Array.isArray(permissions) && mayShape(request.grants!, permissions.map(String)));
@@ -110,7 +112,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
           ...(body.head !== undefined ? { head: body.head } : {}),
           by: who(request),
         });
-        await recordAudit({ who: who(request), action: 'role.create', targetKind: 'role', targetId: NIL, note: `${scope} · ${role.name} · ${role.permissions.length} эрх` });
+        await audit(request, { action: 'role.create', targetKind: 'role', targetId: NIL, note: `${scope} · ${role.name} · ${role.permissions.length} эрх` });
         return reply.status(201).send({ key: role.key, name: role.name });
       } catch (error) {
         return refusal(reply, error);
@@ -139,7 +141,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
           ...(body.head !== undefined ? { head: body.head } : {}),
           by: who(request),
         });
-        await recordAudit({ who: who(request), action: 'role.update', targetKind: 'role', targetId: NIL, note: `${scope} · ${role.name} · ${role.permissions.length} эрх` });
+        await audit(request, { action: 'role.update', targetKind: 'role', targetId: NIL, note: `${scope} · ${role.name} · ${role.permissions.length} эрх` });
         return reply.send({ key: role.key, name: role.name, permissions: role.permissions });
       } catch (error) {
         return refusal(reply, error);
@@ -155,7 +157,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
       const held = (await usage(scope)).get(request.params.key) ?? 0;
       if (held > 0) throw new AccessError('IN_USE', `${held} hold or wait for this role`);
       await deleteRole(scope, request.params.key);
-      await recordAudit({ who: who(request), action: 'role.delete', targetKind: 'role', targetId: NIL, note: `${scope} · ${request.params.key}` });
+      await audit(request, { action: 'role.delete', targetKind: 'role', targetId: NIL, note: `${scope} · ${request.params.key}` });
       return reply.status(204).send();
     } catch (error) {
       return refusal(reply, error);
@@ -172,7 +174,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
       if (!scope) return badRequest(reply, 'Хамрах хүрээ буруу.', 'scope is desk or org');
       try {
         const layout = await saveLayout(scope, request.body ?? {}, who(request));
-        await recordAudit({ who: who(request), action: 'menu.save', targetKind: 'menu', targetId: NIL, note: scope });
+        await audit(request, { action: 'menu.save', targetKind: 'menu', targetId: NIL, note: scope });
         return reply.send(layout);
       } catch (error) {
         return refusal(reply, error);
@@ -185,7 +187,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
     if (!scope) return badRequest(reply, 'Хамрах хүрээ буруу.', 'scope is desk or org');
     try {
       const module = await addModule(scope, { name: request.body?.name ?? '', ...(request.body?.icon ? { icon: request.body.icon } : {}), by: who(request) });
-      await recordAudit({ who: who(request), action: 'menu.module', targetKind: 'menu', targetId: NIL, note: `${scope} · ${module.name}` });
+      await audit(request, { action: 'menu.module', targetKind: 'menu', targetId: NIL, note: `${scope} · ${module.name}` });
       return reply.status(201).send(module);
     } catch (error) {
       return refusal(reply, error);
@@ -197,7 +199,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
     if (!scope) return badRequest(reply, 'Хамрах хүрээ буруу.', 'scope is desk or org');
     try {
       await removeModule(scope, request.params.key);
-      await recordAudit({ who: who(request), action: 'menu.module_remove', targetKind: 'menu', targetId: NIL, note: `${scope} · ${request.params.key}` });
+      await audit(request, { action: 'menu.module_remove', targetKind: 'menu', targetId: NIL, note: `${scope} · ${request.params.key}` });
       return reply.status(204).send();
     } catch (error) {
       return refusal(reply, error);
@@ -219,7 +221,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
           ...(body.icon ? { icon: body.icon } : {}),
           by: who(request),
         });
-        await recordAudit({ who: who(request), action: 'menu.link', targetKind: 'menu', targetId: NIL, note: `${scope} · ${page.name} → ${page.href}` });
+        await audit(request, { action: 'menu.link', targetKind: 'menu', targetId: NIL, note: `${scope} · ${page.name} → ${page.href}` });
         return reply.status(201).send(page);
       } catch (error) {
         return refusal(reply, error);
@@ -232,7 +234,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
     if (!scope) return badRequest(reply, 'Хамрах хүрээ буруу.', 'scope is desk or org');
     try {
       await removeLink(scope, request.params.key);
-      await recordAudit({ who: who(request), action: 'menu.link_remove', targetKind: 'menu', targetId: NIL, note: `${scope} · ${request.params.key}` });
+      await audit(request, { action: 'menu.link_remove', targetKind: 'menu', targetId: NIL, note: `${scope} · ${request.params.key}` });
       return reply.status(204).send();
     } catch (error) {
       return refusal(reply, error);
@@ -273,7 +275,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
     const keys = Array.isArray(request.body?.keys) ? request.body!.keys!.map(String) : [];
     const chosen = await setChosenRoles(org.id, keys, who(request));
     await noteRolesChanged({ orgId: org.id, desk: who(request), at: ctx.clock.now() });
-    await recordAudit({ who: who(request), action: 'org.roles', targetKind: 'org', targetId: org.id, note: `${org.name} · ${chosen.join(', ') || 'нэмэлт үүрэггүй'}` });
+    await audit(request, { action: 'org.roles', targetKind: 'org', targetId: org.id, note: `${org.name} · ${chosen.join(', ') || 'нэмэлт үүрэггүй'}` });
     return reply.send({ chosen });
   });
 
@@ -286,7 +288,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
       if (typeof role !== 'string' || !role) return badRequest(reply, 'Үүргээ сонгоно уу.', 'role is required');
       try {
         await setRole({ orgId: request.params.id, guestId: request.params.guestId, role, by: who(request), desk: who(request), now: ctx.clock.now() });
-        await recordAudit({ who: who(request), action: 'org.member_role', targetKind: 'org', targetId: request.params.id, note: `${request.params.guestId} → ${role}` });
+        await audit(request, { action: 'org.member_role', targetKind: 'org', targetId: request.params.id, note: `${request.params.guestId} → ${role}` });
         return reply.send({ guest_id: request.params.guestId, role });
       } catch (error) {
         return orgRefusal(reply, error);

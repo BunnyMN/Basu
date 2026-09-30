@@ -8,7 +8,7 @@
  */
 export { IdeshError, type IdeshErrorCode } from './errors.js';
 
-export { recordAudit, listAudit, type AuditEntry, type AuditTarget } from './audit.js';
+export { recordAudit, listAudit, type AuditActor, type AuditEntry, type AuditLine, type AuditTarget } from './audit.js';
 
 export {
   IDESH_STATES,

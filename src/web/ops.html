@@ -4067,18 +4067,50 @@ const TARGET_WORD = {
   message: 'Мэдэгдэл', setting: 'Систем', promotion: 'Онцлох зар',
 };
 
+/**
+ * Who did it: the member's name, as the record has always said, and under
+ * it the account and the device its session was signed in on — two people
+ * may share a name, and a browser left signed in acts in its owner's.
+ * Hovered, the account's own name, and when that session was signed in:
+ * the time the person's list of sessions shows it by. A line from before
+ * the record kept these, or from the demo's shared key, has the name alone.
+ * Built as a node, so the hover is set as text and never parsed.
+ */
+function auditWho(a) {
+  const account = a.account && (a.account.email ?? a.account.phone ?? (a.account.closed ? 'хаагдсан бүртгэл' : 'бүртгэл'));
+  const device = a.session && (a.session.label ?? 'нэргүй төхөөрөмж');
+  const cell = el(dtCell.two(a.who.replace(/^ops:/, ''), [account, device].filter(Boolean).join(' · ')));
+  const signedIn = (iso) => {
+    const d = new Date(iso);
+    return `${d.getMonth() + 1}-р сарын ${d.getDate()} ${clockOf(iso)}`;
+  };
+  const hover = [
+    a.account && `Бүртгэл: ${[a.account.name, a.account.email ?? a.account.phone].filter(Boolean).join(', ') || (a.account.closed ? 'хаагдсан' : '—')}`,
+    a.session && `Нэвтрэлт: ${[a.session.label, a.session.signed_in_at && `${signedIn(a.session.signed_in_at)}-д нэвтэрсэн`].filter(Boolean).join(', ') || '—'}`,
+  ].filter(Boolean).join('\n');
+  if (hover) cell.title = hover;
+  return cell;
+}
+
 async function renderAudit(view) {
   view.append(head('Үйлдлийн түүх', 'Ширээнд хийсэн үйлдэл бүр — хэн, хэзээ, юуг, ямар тэмдэглэлтэй.'));
   const areas = [...new Set(Object.values(TARGET_WORD))];
   const table = dataTable({
     columns: [
       { key: 'at', label: 'Хэзээ', render: (a) => dtCell.when(a.at) },
-      { key: 'who', label: 'Хэн', value: (a) => a.who.replace('ops:', '') },
+      {
+        key: 'who',
+        label: 'Хэн',
+        sortValue: (a) => a.who.replace(/^ops:/, ''),
+        // Beside the name, the search finds the account, the device, and the session by its id.
+        value: (a) => [a.who.replace(/^ops:/, ''), a.account?.name, a.account?.email, a.account?.phone, a.session?.label, a.session?.id].filter(Boolean).join(' '),
+        render: auditWho,
+      },
       { key: 'action', label: 'Үйлдэл', value: (a) => ACTION[a.action] ?? a.action, render: (a) => `<b>${ACTION[a.action] ?? esc(a.action)}</b>` },
       { key: 'area', label: 'Хэсэг', value: (a) => TARGET_WORD[a.target_kind] ?? a.target_kind },
       { key: 'note', label: 'Тэмдэглэл', value: (a) => a.note ?? '', render: (a) => (a.note ? `<span class="dt-text">${esc(a.note)}</span>` : dtCell.none()), width: '36%' },
     ],
-    search: { placeholder: 'Хэн, үйлдэл, тэмдэглэл…' },
+    search: { placeholder: 'Хэн, имэйл, үйлдэл, тэмдэглэл…' },
     filters: [
       { key: 'area', label: 'Хэсэг', kind: 'select', options: [['', 'Бүх хэсэг'], ...areas.map((a) => [a, a])], test: (a, v) => !v || (TARGET_WORD[a.target_kind] ?? a.target_kind) === v },
     ],
