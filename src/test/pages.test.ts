@@ -78,6 +78,14 @@ function keepCookie(jar: Jar, line: string): void {
   else jar.set(name, { value: pair.slice(name.length + 1), path });
 }
 
+/** A signal of Node's own that aborts when the page's does, and for the same reason. */
+function following(signal: AbortSignal): AbortSignal {
+  const controller = new AbortController();
+  if (signal.aborted) controller.abort(signal.reason);
+  else signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true });
+  return controller.signal;
+}
+
 /**
  * Back from Google, the way the callback leaves a browser: the page's
  * address carries a code, and the browser holds the cookie the code is good
@@ -131,7 +139,9 @@ async function openPage(
     const headers = new Headers(init?.headers);
     const sent = [...jar].filter(([, c]) => url.pathname.startsWith(c.path)).map(([name, c]) => `${name}=${c.value}`);
     if (sent.length) headers.set('cookie', sent.join('; '));
-    const response = await fetch(url.toString(), { ...init, headers });
+    // The page's AbortSignal is jsdom's, and Node's fetch takes only its own:
+    // one of those follows it, so a request the page gives up on is given up.
+    const response = await fetch(url.toString(), { ...init, headers, signal: init?.signal ? following(init.signal) : null });
     for (const line of response.headers.getSetCookie()) keepCookie(jar, line);
     return response;
   }) as typeof fetch;
@@ -1907,6 +1917,29 @@ describe('one browser, one person', () => {
     await until(login, 'the refusal', (d) => (d.getElementById('email-error')?.textContent ?? '').length > 0);
     expect(mine.getItem('basu.guest')).toBeNull();
     expect(login.window.document.getElementById('toast')?.textContent).toBe('Google-ээр нэвтрэлт хүчингүй болсон байна. Дахин нэвтэрнэ үү.');
+  });
+
+  it('gives up on a claim the server never answers, and draws the door rather than nothing', async () => {
+    const person = await account('+97688050141', 'Гацсан холболттой хүн');
+    const browser = device();
+    // The claim goes out and no answer comes: the page's own limit ends the
+    // wait, and fetch fails the way it fails when that limit is reached.
+    let signal: AbortSignal | null | undefined;
+    const dash = await openPage(
+      'ops.html',
+      await backFromGoogle(await guestOf(person), browser),
+      (path, init) => {
+        if (path !== '/v1/auth/handoff') return undefined;
+        signal = init?.signal;
+        return Promise.reject(new DOMException('The operation timed out.', 'TimeoutError'));
+      },
+      browser,
+    );
+    await until(dash, 'the door', (d) => Boolean(d.querySelector('.door')));
+    // Sent with a limit, not left to wait for an answer for ever.
+    expect(signal).toBeInstanceOf(dash.window.AbortSignal);
+    expect(browser.getItem('basu.guest')).toBeNull();
+    expect(dash.window.document.getElementById('toast')?.textContent).toBe('Google-ээр нэвтэрч чадсангүй. Дахин оролдоно уу.');
   });
 
   it('gives a Google sign-in on the kitchen screen to the kitchen, and leaves the browser’s guest alone', async () => {

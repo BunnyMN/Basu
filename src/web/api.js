@@ -77,7 +77,7 @@ export class ApiError extends Error {
   }
 }
 
-export async function api(path, { method = 'GET', body, token, idempotencyKey, headers: extra = {} } = {}) {
+export async function api(path, { method = 'GET', body, token, idempotencyKey, headers: extra = {}, signal } = {}) {
   const headers = { ...extra };
   if (body) headers['content-type'] = 'application/json';
   if (token) headers.authorization = `Bearer ${token}`;
@@ -87,6 +87,7 @@ export async function api(path, { method = 'GET', body, token, idempotencyKey, h
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    signal,
   });
   const text = await response.text();
   const parsed = text ? JSON.parse(text) : null;
@@ -178,6 +179,27 @@ const GOOGLE_REFUSALS = {
 };
 
 /**
+ * How long a page waits for the server to trade its code (below). Every page
+ * that came back from Google waits for that before it draws anything, so a
+ * claim that never answers — a stalled connection, a server restarting —
+ * would leave it blank. Past this it is a refused claim like any other: the
+ * page draws its door and says so, and the person signs in again.
+ */
+const CLAIM_WAIT_MS = 15_000;
+
+/**
+ * A signal that gives up after `ms`. Safari before 16 has no
+ * AbortSignal.timeout, and there a timer does the same: a limit there too,
+ * rather than none.
+ */
+function giveUpAfter(ms) {
+  if (typeof AbortSignal.timeout === 'function') return AbortSignal.timeout(ms);
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
+/**
  * Back from Google. The server sends the person to the page they started on
  * with a one-time code in the address's fragment — `/login#auth_code=…` —
  * and never the session. A fragment reaches no server and no log, but the
@@ -196,8 +218,8 @@ const GOOGLE_REFUSALS = {
  * The fragment is wiped at once, before the page's own script runs and
  * before anything waits on the network. Pages await this before asking who
  * is signed in: `{ token }` once the code has become a session, `{ refused }`
- * when Google or the server said no, and null when the page did not come
- * back from Google at all.
+ * when Google or the server said no — or never answered (`CLAIM_WAIT_MS`) —
+ * and null when the page did not come back from Google at all.
  */
 export const authReturn = (async () => {
   if (typeof location === 'undefined' || !location.hash.includes('auth')) return null;
@@ -212,7 +234,7 @@ export const authReturn = (async () => {
   }
   if (!code) return null;
   try {
-    const { token } = await api('/v1/auth/handoff', { method: 'POST', body: { code } });
+    const { token } = await api('/v1/auth/handoff', { method: 'POST', body: { code }, signal: giveUpAfter(CLAIM_WAIT_MS) });
     // The kitchen screen keeps a session of its own (`data-session` on its
     // root) and decides where this one goes. Everywhere else — the dashboard
     // too — the sign-in that just came back is the person, whoever was
@@ -220,8 +242,11 @@ export const authReturn = (async () => {
     if (!document.documentElement.dataset.session) takeSession(token);
     return { token };
   } catch (error) {
+    // Anything but the server's own answer — a timeout, a dropped connection
+    // — is a refusal in general words; a timeout's `code` is a number of the
+    // browser's, not one of ours.
     toast(error instanceof ApiError ? error.message : GOOGLE_REFUSALS.SOCIAL_REFUSED, 'bad');
-    return { refused: error.code ?? 'SOCIAL_REFUSED' };
+    return { refused: error instanceof ApiError ? error.code : 'SOCIAL_REFUSED' };
   }
 })();
 
