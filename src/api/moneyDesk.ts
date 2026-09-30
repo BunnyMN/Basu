@@ -14,7 +14,7 @@ import {
   type DeskTransfer,
 } from '../platform/ledger/index.js';
 import type { Ctx } from '../ports.js';
-import { sendError } from './errors.js';
+import { badRequest, sendError } from './errors.js';
 
 /**
  * The money side of the desk.
@@ -115,6 +115,34 @@ const shapeTransfer = (t: DeskTransfer, names: Map<string, string>) => ({
 type TransferQuery = { kind?: string; from?: string; to?: string; guest?: string; limit?: string };
 type TopupQuery = { state?: string; from?: string; to?: string; limit?: string };
 
+/** The days a list of money covers: each as the page's date field writes it, or no bound. */
+type Window = { from: string | undefined; to: string | undefined };
+
+/**
+ * One end of the window: a day the calendar has, written YYYY-MM-DD as the
+ * page's date field writes it, or nothing for no bound; null for anything
+ * else. Postgres reads far more as a date — `today`, `Sep 1, 2026`, a day
+ * with a quote or a line break after it — and the window goes on into the
+ * export's file name, where a quote ends the name in its header and a line
+ * break fails the answer after the export was written down.
+ */
+function dayOf(raw: unknown): string | undefined | null {
+  if (raw === undefined || raw === '') return undefined;
+  if (typeof raw !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+  const [y, m, d] = raw.split('-').map(Number) as [number, number, number];
+  const day = new Date(Date.UTC(y, m - 1, d));
+  return day.getUTCFullYear() === y && day.getUTCMonth() === m - 1 && day.getUTCDate() === d ? raw : null;
+}
+
+/** The window a list or an export was asked for, or null when either end is not a day. */
+function windowOf(query: { from?: unknown; to?: unknown }): Window | null {
+  const from = dayOf(query.from);
+  const to = dayOf(query.to);
+  return from === null || to === null ? null : { from, to };
+}
+
+const noSuchDay = (reply: FastifyReply) => badRequest(reply, 'Огноо буруу байна.', 'from and to are days, YYYY-MM-DD');
+
 export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, audit }: MoneyGuards): void {
   /** The books at a glance: the checks, and every named account. */
   app.get('/v1/ops/money', desk('desk.money'), async () => {
@@ -142,28 +170,32 @@ export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, audit 
     };
   });
 
-  const transferFilter = (q: TransferQuery, limit?: number) => ({
+  const transferFilter = (q: TransferQuery, window: Window, limit?: number) => ({
     kind: q.kind || undefined,
-    from: q.from || undefined,
-    to: q.to || undefined,
+    from: window.from,
+    to: window.to,
     guestId: q.guest || undefined,
     limit: limit ?? (Number(q.limit) || undefined),
   });
 
-  app.get<{ Querystring: TransferQuery }>('/v1/ops/money/transfers', desk('desk.money'), async (request) => {
-    const transfers = await transfersForDesk(transferFilter(request.query));
+  app.get<{ Querystring: TransferQuery }>('/v1/ops/money/transfers', desk('desk.money'), async (request, reply) => {
+    const window = windowOf(request.query);
+    if (!window) return noSuchDay(reply);
+    const transfers = await transfersForDesk(transferFilter(request.query, window));
     const names = await namesFor(transfers.flatMap((t) => [t.from, t.to]));
     return { transfers: transfers.map((t) => shapeTransfer(t, names)) };
   });
 
   /** For the accountant: every movement in the window, one line each. */
   app.get<{ Querystring: TransferQuery }>('/v1/ops/money/transfers.csv', desk('desk.money:manage'), async (request, reply) => {
-    const transfers = await transfersForDesk(transferFilter(request.query, 5000));
+    const window = windowOf(request.query);
+    if (!window) return noSuchDay(reply);
+    const transfers = await transfersForDesk(transferFilter(request.query, window, 5000));
     const names = await namesFor(transfers.flatMap((t) => [t.from, t.to]));
-    await audit(request, { action: 'ledger.export', targetKind: 'ledger', targetId: LEDGER_ID, note: `transfers ${request.query.from ?? ''}..${request.query.to ?? ''} (${transfers.length})` });
+    await audit(request, { action: 'ledger.export', targetKind: 'ledger', targetId: LEDGER_ID, note: `transfers ${window.from ?? ''}..${window.to ?? ''} (${transfers.length})` });
     return sendCsv(
       reply,
-      `basu-transfers-${request.query.from ?? 'all'}-${request.query.to ?? 'all'}.csv`,
+      `basu-transfers-${window.from ?? 'all'}-${window.to ?? 'all'}.csv`,
       csv(
         ['at', 'kind', 'amount_mnt', 'from', 'to', 'subject', 'subject_id', 'memo', 'transfer_id'],
         transfers.map((t) => [t.at.toISOString(), t.kind, t.amountMnt, names.get(t.from) ?? t.from, names.get(t.to) ?? t.to, t.subject, t.subjectId, t.memo, t.id]),
@@ -171,10 +203,12 @@ export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, audit 
     );
   });
 
-  const topupFilter = (q: TopupQuery, limit?: number) => ({ state: q.state || undefined, from: q.from || undefined, to: q.to || undefined, limit: limit ?? (Number(q.limit) || undefined) });
+  const topupFilter = (q: TopupQuery, window: Window, limit?: number) => ({ state: q.state || undefined, from: window.from, to: window.to, limit: limit ?? (Number(q.limit) || undefined) });
 
-  app.get<{ Querystring: TopupQuery }>('/v1/ops/money/topups', desk('desk.money'), async (request) => {
-    const topups = await topupsForDesk(topupFilter(request.query));
+  app.get<{ Querystring: TopupQuery }>('/v1/ops/money/topups', desk('desk.money'), async (request, reply) => {
+    const window = windowOf(request.query);
+    if (!window) return noSuchDay(reply);
+    const topups = await topupsForDesk(topupFilter(request.query, window));
     const ids = topups.map((t) => t.guestId);
     const [names, contacts] = await Promise.all([displayNamesFor(ids), contactsFor(ids)]);
     return {
@@ -195,12 +229,14 @@ export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, audit 
 
   /** For the QPay statement: what we think they sent, to hold against what they say. */
   app.get<{ Querystring: TopupQuery }>('/v1/ops/money/topups.csv', desk('desk.money:manage'), async (request, reply) => {
-    const topups = await topupsForDesk(topupFilter(request.query, 5000));
+    const window = windowOf(request.query);
+    if (!window) return noSuchDay(reply);
+    const topups = await topupsForDesk(topupFilter(request.query, window, 5000));
     const contacts = await contactsFor(topups.map((t) => t.guestId));
-    await audit(request, { action: 'ledger.export', targetKind: 'ledger', targetId: LEDGER_ID, note: `topups ${request.query.from ?? ''}..${request.query.to ?? ''} (${topups.length})` });
+    await audit(request, { action: 'ledger.export', targetKind: 'ledger', targetId: LEDGER_ID, note: `topups ${window.from ?? ''}..${window.to ?? ''} (${topups.length})` });
     return sendCsv(
       reply,
-      `basu-topups-${request.query.from ?? 'all'}-${request.query.to ?? 'all'}.csv`,
+      `basu-topups-${window.from ?? 'all'}-${window.to ?? 'all'}.csv`,
       csv(
         ['created_at', 'settled_at', 'state', 'provider', 'provider_ref', 'amount_mnt', 'guest_phone', 'topup_id'],
         topups.map((t) => [t.createdAt.toISOString(), iso(t.settledAt), t.state, t.provider, t.providerRef, t.amountMnt, contacts.get(t.guestId)?.phone ?? '', t.id]),

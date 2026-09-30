@@ -2,7 +2,7 @@
    the foot, the way to /login and back, and calls made as the person
    signed in. Every page of the website imports this; the app's pages do not. */
 
-import { api, store, dropSession, authReturn } from '/api.js';
+import { api, store, dropSession, endSession, authReturn } from '/api.js';
 
 /**
  * Text into markup, for everything a page draws from what people wrote: a
@@ -81,15 +81,24 @@ export function requireSignIn() {
  * still takes for the rest of the website, so it is ended there as well as
  * forgotten here, the way the dashboard ends it: the person is about to
  * sign in anew, and the old session is left to nobody.
+ *
+ * The answer is about the session the call went with. The browser may have
+ * moved on while the call was out — another tab signed somebody in, on the
+ * storage every tab shares — and the sign-in it holds now is not forgotten,
+ * nor ended, nor this page sent to the door, for an answer about the one
+ * before. The dashboard keeps the same rule (`refused` in ops.html).
  */
 export async function authed(path, options = {}) {
+  const sent = store.guestToken;
   try {
-    return await api(path, { ...options, token: store.guestToken });
+    return await api(path, { ...options, token: sent });
   } catch (error) {
     if (error.status === 401) {
-      if (error.code === 'SIGN_IN_AGAIN') dropSession();
-      else store.guestToken = null;
-      location.replace(loginUrl());
+      if (error.code === 'SIGN_IN_AGAIN') endSession(sent);
+      if (store.guestToken === sent) {
+        store.guestToken = null;
+        location.replace(loginUrl());
+      }
     }
     throw error;
   }
@@ -101,13 +110,16 @@ let meAsked = null;
 /**
  * Who is signed in: their profile, asked once per page. Null for nobody.
  * A page Google sent somebody back to has them only once the code in its
- * address is claimed (api.js, authReturn), so that comes first.
+ * address is claimed (api.js, authReturn), so that comes first. A session
+ * refused is forgotten only while it is still the one this browser holds,
+ * as with every call (`authed`).
  */
 export async function me() {
   await authReturn;
-  if (!store.guestToken) return null;
-  meAsked ??= api('/v1/me', { token: store.guestToken }).catch((error) => {
-    if (error.status === 401) store.guestToken = null;
+  const sent = store.guestToken;
+  if (!sent) return null;
+  meAsked ??= api('/v1/me', { token: sent }).catch((error) => {
+    if (error.status === 401 && store.guestToken === sent) store.guestToken = null;
     return null;
   });
   return meAsked;

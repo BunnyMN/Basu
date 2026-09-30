@@ -143,7 +143,8 @@ export function tooManyRequests(_request: FastifyRequest, context: { after: stri
  * the type it could not read an id as, a TypeError quoting a line of ours,
  * and — had one got past its route — the payment provider's own status and
  * words, whose 401 would have signed a website visitor out. None of it is
- * the caller's to read. It stays in the log, and the caller is answered as
+ * the caller's to read. The server's log keeps a line of it — the route and
+ * the kind of error, never what was sent — and the caller is answered as
  * every route answers (`sendError`): a refusal of ours by its name, and
  * anything else «Алдаа гарлаа».
  *

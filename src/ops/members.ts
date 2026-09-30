@@ -427,9 +427,14 @@ export async function setMemberRole(id: string, role: Role, actor: DeskActor): P
  * the ceiling, the last admin — so a seat that is on is switched off there
  * first. An account with no seat, or one switched off, is a guest like any
  * other.
+ *
+ * An id this cannot read as one is no account, and never a way past the
+ * question. Postgres reads a uuid with no hyphens, or in braces, as the
+ * account it names; a question that waved such an id through left the
+ * close after it to end an admin's account under a seat that was on.
  */
 export async function mayActOnAccount(guestId: string, actor: DeskActor, act: 'sign-out' | 'close', db: Db = getPool()): Promise<void> {
-  if (!UUID.test(guestId)) return;
+  if (!UUID.test(guestId)) throw new MemberError('NOT_FOUND', 'no such account');
   const seat = await memberForAccount(guestId, db);
   if (!seat?.active) return;
   if (act === 'close') throw new MemberError('AT_THE_DESK', 'switch the seat off before closing the account');

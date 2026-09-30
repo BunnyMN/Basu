@@ -127,6 +127,28 @@ describe('the books at the desk', () => {
     expect((await app.inject({ method: 'GET', url: '/v1/ops/money/transfers.csv' })).statusCode).toBe(401);
   });
 
+  it('takes a window only in days the calendar has, so nothing else reaches the file’s name', async () => {
+    await aSale();
+    // Postgres reads the first four as dates. A quote would end the file's name in its header, and a line
+    // break would fail the answer after the export was written down; the last two are days no calendar has.
+    for (const day of ['2026-09-01"', '2026-09-01\r\n', 'today', 'Sep 1, 2026', '2026-13-45', '2026-02-30']) {
+      for (const path of ['transfers', 'transfers.csv', 'topups', 'topups.csv']) {
+        for (const side of ['from', 'to']) {
+          const res = await app.inject({ method: 'GET', url: `/v1/ops/money/${path}?${side}=${encodeURIComponent(day)}`, headers: desk() });
+          expect(res.statusCode, `${path} ${side}=${JSON.stringify(day)}`).toBe(400);
+          expect(res.json().error, `${path} ${side}=${JSON.stringify(day)}`).toMatchObject({ code: 'BAD_REQUEST', message_mn: 'Огноо буруу байна.' });
+        }
+      }
+    }
+    // Refused before anything was carried out: the record holds no export.
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() })).json().audit).toEqual([]);
+
+    // A window the date fields give names the file.
+    const csv = await app.inject({ method: 'GET', url: '/v1/ops/money/transfers.csv?from=2026-09-01&to=2026-09-30', headers: desk() });
+    expect(csv.statusCode).toBe(200);
+    expect(csv.headers['content-disposition']).toBe('attachment; filename="basu-transfers-2026-09-01-2026-09-30.csv"');
+  });
+
   it('never lets a name in the exported books run as a spreadsheet formula', async () => {
     // A guest's name is theirs to choose; a spreadsheet reads a cell that
     // starts with `=` as a formula. The name goes into the CSV as text.

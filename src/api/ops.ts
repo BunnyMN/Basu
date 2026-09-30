@@ -45,7 +45,7 @@ import { registerSystemDesk } from './systemDesk.js';
 import { registerAccessDesk } from './accessDesk.js';
 import { revokeSession } from '../platform/identity/index.js';
 import { mode } from '../mode.js';
-import { badRequest, forbidden, noSuchSession, sendError, signInAgain, unauthorized } from './errors.js';
+import { badRequest, forbidden, noSuchSession, notFound, sendError, signInAgain, unauthorized } from './errors.js';
 import {
   deskRoleExists,
   linkByProof,
@@ -779,9 +779,19 @@ export async function registerOpsRoutes(
 
   app.get<{ Querystring: { q?: string } }>('/v1/ops/guests', desk('desk.guests'), async (request) => guestSearch(request.query.q ?? ''));
 
+  /**
+   * The guests' pages name an account by its id, written as an id is: its
+   * five groups with their hyphens, in either case. Postgres reads one with
+   * no hyphens, or in braces, as the same account, and a check that asks
+   * after an account by one spelling must never be passed by another. Any
+   * other spelling is nobody — as is an id nobody has.
+   */
+  const noSuchGuest = (reply: FastifyReply) => notFound(reply, 'Ийм зочин олдсонгүй.', 'no such guest');
+
   app.get<{ Params: { id: string } }>('/v1/ops/guests/:id', desk('desk.guests'), async (request, reply) => {
+    if (!UUID.test(request.params.id)) return noSuchGuest(reply);
     const file = await guestFile(request.params.id);
-    if (!file) return sendError(reply, new IdeshError('NOT_FOUND', 'no such guest'));
+    if (!file) return noSuchGuest(reply);
     return reply.send(file);
   });
 
@@ -811,15 +821,21 @@ export async function registerOpsRoutes(
   /**
    * Closing on somebody's behalf: a reason required, the same two refusals
    * the app has — and never an account whose seat at the desk is on, which
-   * is switched off on «Гишүүд» first (`mayActOnAccount`).
+   * is switched off on «Гишүүд» first (`mayActOnAccount`). The account is
+   * found first, and from there on named by the id identity handed back:
+   * what is asked about, closed and written down is one account, spelled
+   * one way.
    */
   app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/guests/:id/close', desk('desk.guests:close'), async (request, reply) => {
     const note = request.body?.note?.trim();
     if (!note) return badRequest(reply, 'Шалтгаан бичнэ үү.', 'note required');
+    if (!UUID.test(request.params.id)) return noSuchGuest(reply);
+    const card = await guestCard(request.params.id);
+    if (!card) return noSuchGuest(reply);
     try {
-      await mayActOnAccount(request.params.id, actor(request), 'close');
-      await closeGuest(request.params.id, ctx.clock.now());
-      await audit(request, { action: 'guest.close', targetKind: 'guest', targetId: request.params.id, note });
+      await mayActOnAccount(card.id, actor(request), 'close');
+      await closeGuest(card.id, ctx.clock.now());
+      await audit(request, { action: 'guest.close', targetKind: 'guest', targetId: card.id, note });
       return reply.send({ closed: true });
     } catch (error) {
       return sendError(reply, error);

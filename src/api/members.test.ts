@@ -7,7 +7,7 @@ import { FakeMailer, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ct
 import { seedRestaurant, sessionRowOf, storeAudit, storedAudit, truncateAll } from '../test/seed.js';
 import { NO_GRANTS } from '../platform/access/index.js';
 import { LETTERS_PER_DAY, closeAccount, requestEmailCode } from '../platform/identity/index.js';
-import { setMemberRole, syncMembersFromEnv, upsertMember } from '../ops/index.js';
+import { mayActOnAccount, setMemberRole, syncMembersFromEnv, upsertMember } from '../ops/index.js';
 import { relay } from '../platform/notify/index.js';
 import { actingAs, opsToken } from './ops.js';
 import { buildServer } from './server.js';
@@ -571,6 +571,44 @@ describe('the guests’ pages leave the desk to the members page', () => {
     expect((await close(guest.id, clerk)).statusCode).toBe(200);
   });
 
+  it('asks after the very account it would close, however its id is spelled', async () => {
+    const closer = (
+      await app.inject({
+        method: 'POST',
+        url: '/v1/ops/roles/desk',
+        headers: desk(),
+        payload: { name: 'Хаагч', permissions: ['desk.guests', 'desk.guests:close'] },
+      })
+    ).json().key as string;
+    await syncMembersFromEnv('admin@gmail.com:Админ:admin,boss@gmail.com:Эзэн:admin');
+    await me(await byEmail('boss@gmail.com'));
+    const admin = await byEmail('admin@gmail.com');
+    const adminId = await accountId(admin);
+    const clerk = await seatedByEmail('closer@gmail.com', closer);
+
+    // Spelled as an id, in either case, it is the admin's account, and their seat is on.
+    for (const spelled of [adminId, adminId.toUpperCase()]) {
+      const refused = await close(spelled, clerk);
+      expect(refused.statusCode, spelled).toBe(409);
+      expect(refused.json().error.code, spelled).toBe('AT_THE_DESK');
+    }
+    // Postgres reads these as the same account too; here they are no account at all. So is an id nobody has.
+    for (const spelled of [adminId.replace(/-/g, ''), `{${adminId}}`, '00000000-0000-0000-0000-000000000000', 'not-an-id']) {
+      for (const answer of [await close(encodeURIComponent(spelled), clerk), await app.inject({ method: 'GET', url: `/v1/ops/guests/${encodeURIComponent(spelled)}`, headers: desk() })]) {
+        expect(answer.statusCode, spelled).toBe(404);
+        expect(answer.json().error, spelled).toMatchObject({ code: 'NOT_FOUND', message_mn: 'Ийм зочин олдсонгүй.' });
+      }
+    }
+    // And the question itself takes nothing it cannot read as an id for an account with no seat.
+    const anybody = { grants: NO_GRANTS, locked: false, seatId: null, account: null };
+    await expect(mayActOnAccount(adminId.replace(/-/g, ''), anybody, 'close')).rejects.toMatchObject({ name: 'MemberError', code: 'NOT_FOUND' });
+
+    const file = (await app.inject({ method: 'GET', url: `/v1/ops/guests/${adminId}`, headers: desk() })).json();
+    expect(file.guest).toMatchObject({ email: 'admin@gmail.com', closed_at: null });
+    expect((await me(admin)).statusCode).toBe(200);
+    expect((await storedAudit()).filter((row) => row['action'] === 'guest.close')).toEqual([]);
+  });
+
   it('signs a desk member out only for whoever may hand out their seat’s role', async () => {
     await syncMembersFromEnv('admin@gmail.com:Админ:admin');
     const admin = await byEmail('admin@gmail.com');
@@ -1059,6 +1097,28 @@ describe('the desk’s record names the account and the session that acted', () 
     expect(await exported(token)).toBe(200);
     const [line] = (await record(token)).filter((a) => a.action === 'ledger.export');
     expect(line?.session?.label).toBe('Ops Бүртгэл: admin@basu.mn');
+  });
+
+  it('keeps of what a device calls itself only what can be read, whatever else it sent', async () => {
+    const labels = async (token: string) =>
+      ((await app.inject({ method: 'GET', url: '/v1/me/sessions', headers: bearer(token) })).json().sessions as Array<{ label: string | null; current: boolean }>).find((s) => s.current)?.label;
+    // A mark that turns the text after it around, so one device's line reads as another's; marks nobody sees; a NUL, which Postgres will not keep.
+    const made = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/register',
+      payload: { phone: '+97699110043', password: 'миний нууц үг', name: 'Номин', device: 'Номины\u202E утас\u0000 \u200Bшинэ\u2066' },
+    });
+    expect(made.statusCode, made.body).toBe(201);
+    expect(await labels(made.json().token)).toBe('Номины утас шинэ');
+    // Nothing that can be read is no name; sixty characters are sixty, never half of one.
+    for (const [device, kept] of [
+      ['\u202E\u0000\u200B', null],
+      [`${'а'.repeat(59)}📱 шинэ`, `${'а'.repeat(59)}📱`],
+    ] as const) {
+      const again = await app.inject({ method: 'POST', url: '/v1/auth/login', payload: { login: '+97699110043', password: 'миний нууц үг', device } });
+      expect(again.statusCode, again.body).toBe(200);
+      expect(await labels(again.json().token), device).toBe(kept);
+    }
   });
 
   it('still names a session somebody has since signed out of, and an account since closed — by the same ids', async () => {

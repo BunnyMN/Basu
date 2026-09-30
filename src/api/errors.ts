@@ -236,9 +236,30 @@ export function sendError(reply: FastifyReply, error: unknown): FastifyReply {
   }
 
   reply.log.error({ err: error }, 'unhandled request failure');
+  logFailure(reply, error);
   return reply
     .status(500)
     .send(envelope('INTERNAL', 'Алдаа гарлаа. Түр хүлээгээд дахин оролдоно уу.', 'internal error'));
+}
+
+/**
+ * One line in the server's log for a failure that is none of ours by name.
+ * The caller is told nothing of what broke (`errorHandler`), and the API
+ * runs without Fastify's logger, whose `reply.log` then writes nowhere; with
+ * no line of its own a failure would leave no trace at all. The line names
+ * the route and the kind of error, and nothing that was sent or said — no
+ * address as asked for, no id, not the error's own words, which quote what
+ * they could not read — because the tail of this log goes into the deploy's
+ * public output when a start fails. The route's pattern, the error's name
+ * and its code are enough to find the failure again.
+ */
+function logFailure(reply: FastifyReply, error: unknown): void {
+  const word = (value: unknown, shape: RegExp): string | null => (typeof value === 'string' && shape.test(value) ? value : null);
+  const request = reply.request;
+  const kind = error instanceof Error ? word(error.name, /^[A-Za-z]\w{0,40}$/) ?? 'Error' : typeof error;
+  const code = word((error as { code?: unknown } | null | undefined)?.code, /^\w{1,40}$/);
+  const route = request.routeOptions.url ?? '(no route)';
+  console.error(['[api] 500', word(request.method, /^[A-Z]{1,12}$/) ?? '?', route, kind, code].filter(Boolean).join(' '));
 }
 
 function envelope(code: string, mn: string, en: string): ErrorBody {

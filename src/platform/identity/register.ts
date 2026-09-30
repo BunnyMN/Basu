@@ -24,11 +24,18 @@ import type { Ctx } from '../../ports.js';
  * today, on a server with no gateway at all, and the code path that used to
  * hand out `123456` to anybody who asked is gone.
  *
- * Two rules do most of the work here. A failed sign-in never says whether
- * the phone is known, so the door cannot be used to find out who has an
- * account. And five wrong passwords in a row — at the door, or asked for
- * again inside a session — rest the door for a while, so that the rate
- * limiter is not the only thing between a script and a keyspace.
+ * Two rules do most of the work here. A wrong password and a login nobody
+ * has are one answer, given in the same time, so a failed sign-in does not
+ * say whether the phone is known. And five wrong passwords in a row — at
+ * the door, or asked for again inside a session — rest the door for a
+ * while, so that the rate limiter is not the only thing between a script
+ * and a keyspace.
+ *
+ * Neither keeps it secret who has an account, and nothing here claims to:
+ * the door rests only for an account that is there, so a sixth wrong
+ * password at a number tells whether it is known, and signing up with a
+ * number that has an account is refused as taken. What the first rule
+ * keeps is that no single failed sign-in tells.
  *
  * A password is forgotten sooner or later, and there is no SMS to send a
  * number a code. So a password is only ever *set* by proving an inbox: a new

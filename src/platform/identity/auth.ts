@@ -536,12 +536,20 @@ export async function startSessionFor(ctx: Ctx, guestId: string, label?: string 
 }
 
 /**
- * What a device calls itself, as a session keeps it: one line, short. It is
- * whatever the device sent, and it is read back where a line break would
- * pass for a line of the page's own — the desk's record, a list of sessions.
+ * What a device calls itself, as a session keeps it: one line, short, and
+ * only what can be read. It is whatever the device sent, and it is read back
+ * where a line break would pass for a line of the page's own — the desk's
+ * record, a list of sessions. So would a mark that turns the text after it
+ * around (U+202E), making one device's line read as another's; it goes,
+ * with every other character that is not text but an instruction about it.
+ * A control character is a space, as a line break is — a NUL among them,
+ * which Postgres will not keep, and which failed the sign-in it came with.
+ * Sixty characters are counted whole, so the cut never halves one.
  */
 function deviceLabel(label: unknown): string | null {
-  return typeof label === 'string' ? label.replace(/\s+/g, ' ').trim().slice(0, 60) || null : null;
+  if (typeof label !== 'string') return null;
+  const line = label.replace(/[\p{Cf}\p{Cs}]/gu, '').replace(/[\s\p{Cc}]+/gu, ' ').trim();
+  return Array.from(line).slice(0, 60).join('').trim() || null;
 }
 
 async function mintSession(

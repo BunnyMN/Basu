@@ -1,5 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { closePool, getPool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
@@ -151,6 +151,40 @@ describe('what somebody is told when a request breaks', () => {
     } finally {
       await server.close();
     }
+  });
+
+  it('leaves one line in the server’s log for each: the route and the kind of error, never what was sent or said', async () => {
+    const server = Fastify();
+    server.setErrorHandler(errorHandler);
+    server.post('/code', async (request) => (request.body as { login: string }).login.trim());
+    server.get('/provider', async () => {
+      throw new WireError(401, 'invalid_api_key', 'req_7Hq', 'Invalid API key provided: sk_live_****abcd');
+    });
+    server.get('/ours', async () => {
+      throw new LedgerError('NOT_FOUND', 'no such top-up');
+    });
+    const lines: string[] = [];
+    // The API runs without Fastify's logger, so this is all its log gets.
+    const logged = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => void lines.push(args.map(String).join(' ')));
+    try {
+      const { token } = (await app.inject({ method: 'POST', url: '/dev/login', payload: { phone: '+97699007789' } })).json();
+      expect((await app.inject({ method: 'GET', url: '/v1/wallet?before=Бат-ийн-нууц', headers: { authorization: `Bearer ${token}` } })).statusCode).toBe(500);
+      expect((await app.inject({ method: 'GET', url: '/v1/idesh/listings/Бат-ийн-нууц' })).statusCode).toBe(500);
+      expect((await server.inject({ method: 'POST', url: '/code', payload: { login: 42 } })).statusCode).toBe(500);
+      expect((await server.inject({ method: 'GET', url: '/provider' })).statusCode).toBe(500);
+      // A refusal of ours by its name is the caller's answer, not a failure to look into.
+      expect((await server.inject({ method: 'GET', url: '/ours' })).statusCode).toBe(404);
+    } finally {
+      logged.mockRestore();
+      await server.close();
+    }
+    expect(lines).toEqual([
+      '[api] 500 GET /v1/wallet error 22P02',
+      '[api] 500 GET /v1/idesh/listings/:id error 22P02',
+      '[api] 500 POST /code TypeError',
+      '[api] 500 GET /provider WireError invalid_api_key',
+    ]);
+    expect(lines.join('\n')).not.toMatch(/Бат|нууц|%D0|syntax|invalid input|trim|sk_live|req_7Hq|Invalid API key/);
   });
 
   it('is general on the real server too, where a route lets Postgres answer', async () => {
