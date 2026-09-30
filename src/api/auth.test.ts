@@ -275,7 +275,17 @@ describe('a session somebody else holds', () => {
     const bare = await post('/v1/me/password', { next: 'булаах нууц үг' }, left);
     expect(bare.statusCode, bare.body).toBe(403);
     expect(bare.json().error.code).toBe('PROOF_REQUIRED');
-    expect(bare.json().error.message_mn).toContain('имэйл рүү илгээсэн код');
+    expect(bare.json().error.message_mn).toContain('имэйл рүү очих кодоор');
+    // What the app from before the code sends, and what it shows: where the password is set now.
+    const old = await post('/v1/me/password', { current: '', next: 'булаах нууц үг' }, left);
+    expect(old.json().error.code).toBe('PROOF_REQUIRED');
+    expect(old.json().error.message_mn).toContain('Аппаа шинэчлэх, эсвэл Basu-гийн вэб сайтын «Бүртгэл» хуудаснаас');
+    // A code that is not text is no code, and no crash either.
+    const numeric = await post('/v1/me/password', { next: 'булаах нууц үг', code: 123456 }, left);
+    expect(numeric.statusCode, numeric.body).toBe(403);
+    expect(numeric.json().error.code).toBe('PROOF_REQUIRED');
+    expect((await post('/v1/me/password', { next: 12345678 }, left)).json().error.code).toBe('BAD_REQUEST');
+    expect(mailer.sent).toHaveLength(0);
 
     // The door sends a code to any inbox for the asking — the holder's own — and that is no proof.
     await post('/v1/auth/email/start', { email: 'thief@example.mn' });
@@ -355,10 +365,61 @@ describe('a session somebody else holds', () => {
     const asked = await post('/v1/me/password/code', {}, token);
     expect(asked.statusCode).toBe(404);
     expect(asked.json().error.code).toBe('NO_EMAIL');
+    // Inside the account nobody typed a number: it is told what to do first, not what the door says.
+    expect(asked.json().error.message_mn).toBe('Эхлээд имэйлээ холбоно уу — нууц үг тохируулах код тэр хаяг руу очно.');
     const set = await post('/v1/me/password', { next: 'шинэ нууц үг', code: '123456' }, token);
     expect(set.json().error.code).toBe('NO_EMAIL');
+    expect(set.json().error.message_mn).toContain('Эхлээд имэйлээ холбоно уу');
     expect(mailer.sent).toHaveLength(0);
     expect((await whoIs(token)).has_password).toBe(false);
+  });
+
+  it('signs whoever else holds a session out when the owner takes the account back through its inbox, password or none', async () => {
+    // Made by Google, with no password; somebody else has a session on it.
+    const owner = (await throughGoogle()).outcome.get('auth')!;
+    const intruder = (await throughGoogle()).outcome.get('auth')!;
+
+    // The owner does what the letters say: «Нууц үгээ мартсан?», a code to the inbox, a password.
+    expect((await post('/v1/auth/password/code', { login: 'bat@gmail.com' })).statusCode).toBe(202);
+    const back = await post('/v1/auth/password', { login: 'bat@gmail.com', code: mailer.codeFor('bat@gmail.com'), password: 'эзний нууц үг' });
+    expect(back.statusCode, back.body).toBe(200);
+    expect(await stillIn(intruder)).toBe(false);
+    expect(await stillIn(owner)).toBe(false);
+    expect(await stillIn(back.json().token)).toBe(true);
+  });
+
+  it('lets a session guess the password no more than the door lets anybody', async () => {
+    const owner = (await post('/v1/auth/register', { phone: '+97699001122', password: 'сайн нууц үг' })).json().token;
+    const left = (await post('/v1/auth/login', { login: '99001122', password: 'сайн нууц үг' })).json().token;
+
+    // Five wrong from a session somebody else holds rest the account, as five at the door do…
+    for (let i = 0; i < 5; i++) {
+      const wrong = await post('/v1/me/password', { current: `таамаг ${i}`, next: 'булаах нууц үг' }, left);
+      expect(wrong.json().error.code).toBe('WRONG_PASSWORD');
+    }
+    const right = await post('/v1/me/password', { current: 'сайн нууц үг', next: 'булаах нууц үг' }, left);
+    expect(right.statusCode, right.body).toBe(429);
+    expect(right.json().error.code).toBe('LOCKED');
+    // …at the door too, and nobody has been signed out by any of it.
+    expect((await post('/v1/auth/login', { login: '99001122', password: 'сайн нууц үг' })).json().error.code).toBe('LOCKED');
+    expect(await stillIn(owner)).toBe(true);
+
+    // And wrong guesses at the door rest it here: the session gets no fresh count of its own.
+    clock.advanceMinutes(16);
+    expect((await post('/v1/auth/login', { login: '99001122', password: 'сайн нууц үг' })).statusCode).toBe(200);
+    for (let i = 0; i < 5; i++) {
+      expect((await post('/v1/auth/login', { login: '99001122', password: `таамаг ${i}` })).statusCode).toBe(401);
+    }
+    expect((await post('/v1/me/password', { current: 'сайн нууц үг', next: 'булаах нууц үг' }, left)).json().error.code).toBe('LOCKED');
+    // An address — the way to reset a password — asks for it the same way.
+    expect((await post('/v1/me/email/code', { email: 'thief@example.mn', password: 'сайн нууц үг' }, left)).json().error.code).toBe('LOCKED');
+    expect(mailer.sent).toHaveLength(0);
+
+    // Rested, it opens to the password again, and the owner changes it.
+    clock.advanceMinutes(16);
+    const changed = await post('/v1/me/password', { current: 'сайн нууц үг', next: 'эзний шинэ нууц үг' }, owner);
+    expect(changed.json()).toEqual({ changed: true, revoked: 2 });
+    expect(await stillIn(left)).toBe(false);
   });
 
   it('tells the account’s inbox when its password is changed or replaced — and a letter that fails undoes nothing', async () => {
@@ -371,7 +432,9 @@ describe('a session somebody else holds', () => {
     expect(changed.subject).toBe('Basu · Нууц үг солигдлоо');
     expect(changed.text).toContain('Та өөрөө хийгээгүй бол');
 
-    // Replaced through the inbox: the same letter after it.
+    // Replaced through the inbox, an hour on (an address hears once an hour
+    // at most, see below): the same letter after it.
+    clock.advanceMinutes(61);
     await post('/v1/auth/password/code', { login: 'bat@example.mn' });
     const reset = await post('/v1/auth/password', { login: 'bat@example.mn', code: mailer.codeFor('bat@example.mn'), password: 'гурав дахь нууц үг' });
     expect(reset.statusCode, reset.body).toBe(200);
@@ -383,10 +446,42 @@ describe('a session somebody else holds', () => {
     expect(made.statusCode).toBe(201);
     expect(mailer.sent.filter((m) => m.to === 'saraa@example.mn')).toHaveLength(1);
 
+    clock.advanceMinutes(61);
     mailer.failNext = true;
     const quiet = await post('/v1/me/password', { current: 'гурав дахь нууц үг', next: 'дөрөв дэх нууц үг' }, reset.json().token);
     expect(quiet.statusCode, quiet.body).toBe(200);
+    // The letter was tried, and refused.
+    expect(mailer.failNext).toBe(false);
     expect((await post('/v1/auth/login', { login: 'bat@example.mn', password: 'дөрөв дэх нууц үг' })).statusCode).toBe(200);
+  });
+
+  it('sends an address one letter an hour however often its password changes, and changes it every time', async () => {
+    const first = (await post('/v1/auth/register', { phone: '+97699001122', password: 'сайн нууц үг' })).json().token;
+    await post('/v1/me/email/code', { email: 'bat@example.mn', password: 'сайн нууц үг' }, first);
+    await post('/v1/me/email', { email: 'bat@example.mn', code: mailer.codeFor('bat@example.mn') }, first);
+    const before = mailer.sent.length;
+
+    // Changing it knowing the old one takes no code: switched back and forth,
+    // a letter a switch would spend the Gmail account's day — and every code
+    // with it, for everybody.
+    const words = ['нэгдүгээр нууц үг', 'хоёрдугаар нууц үг'];
+    let current = 'сайн нууц үг';
+    for (let i = 0; i < 20; i++) {
+      const next = words[i % 2]!;
+      const switched = await post('/v1/me/password', { current, next }, first);
+      expect(switched.statusCode, switched.body).toBe(200);
+      current = next;
+      clock.advanceMinutes(2);
+    }
+    const letters = mailer.sent.slice(before);
+    expect(letters).toHaveLength(1);
+    expect(letters[0]).toMatchObject({ to: 'bat@example.mn', subject: 'Basu · Нууц үг солигдлоо' });
+    expect((await post('/v1/auth/login', { login: 'bat@example.mn', password: current })).statusCode).toBe(200);
+
+    // An hour after the letter, the next change is told again.
+    clock.advanceMinutes(21);
+    expect((await post('/v1/me/password', { current, next: 'гурав дахь нууц үг' }, first)).statusCode).toBe(200);
+    expect(mailer.sent.slice(before)).toHaveLength(2);
   });
 
   it('ties an address to the account only on the code that account asked for', async () => {

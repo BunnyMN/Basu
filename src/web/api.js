@@ -697,22 +697,40 @@ export function accountWays({ token }) {
         return;
       }
       let sentTo = null;
+      const sentSub = () => `<b>${popupEsc(sentTo)}</b> хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Spam хавтсаа шалгаарай.`;
       void popup({
         title: 'Нууц үг тохируулах',
         sub: `Таныг мөн гэдгийг батлах 6 оронтой код <b>${popupEsc(me.email)}</b> хаяг руу илгээнэ. Бусад төхөөрөмж дээрх нэвтрэлт хаагдана, энэ хэвээр үлдэнэ.`,
         submit: 'Код авах',
         width: 480,
-        onSubmit: async (v, { step }) => {
+        onSubmit: async (v, { step, el, say }) => {
           if (!sentTo) {
             const sent = await api('/v1/me/password/code', { method: 'POST', token });
             sentTo = sent.to;
             step({
-              sub: `<b>${popupEsc(sentTo)}</b> хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Spam хавтсаа шалгаарай.`,
+              sub: sentSub(),
               fields: [
                 { name: 'code', label: 'Имэйлд ирсэн код', inputmode: 'numeric', autocomplete: 'one-time-code', placeholder: '······', required: true, wide: true },
                 nextField,
+                { type: 'note', html: '<button class="btn" data-v="link" type="button" data-resend>Код дахин авах</button>' },
               ],
               submit: 'Тохируулах',
+            });
+            // A letter that never came, or a code spent on three wrong tries:
+            // another one, here, rather than closing the popup to start over.
+            const again = el.querySelector('[data-resend]');
+            again.addEventListener('click', async () => {
+              if (again.hasAttribute('data-busy')) return;
+              again.setAttribute('data-busy', '');
+              try {
+                sentTo = (await api('/v1/me/password/code', { method: 'POST', token })).to;
+                el.querySelector('[name="code"]').value = '';
+                step({ sub: sentSub() });
+              } catch (error) {
+                say(error?.message ?? 'Код илгээж чадсангүй.');
+              } finally {
+                again.removeAttribute('data-busy');
+              }
             });
             return false;
           }
@@ -858,8 +876,9 @@ function mountPick(box, f) {
  * popup)` does the work: what it returns closes the popup and is what the
  * promise resolves to; `false` keeps it open (a first step done, the second
  * drawn with `popup.step(...)`); a thrown error is said inside the popup, over
- * the fields, and the popup stays for another try. Closed without an answer,
- * the promise resolves to null.
+ * the fields, and the popup stays for another try. A button a step draws for
+ * itself — «Код дахин авах» — says its own trouble in the same place, with
+ * `popup.say(...)`. Closed without an answer, the promise resolves to null.
  */
 export function popup({ title, sub = '', fields = [], submit = 'Хадгалах', cancel = 'Болих', danger = false, width = 560, onSubmit = async () => true, id = null }) {
   return new Promise((resolve) => {
@@ -957,7 +976,7 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
       go.setAttribute('data-busy', '');
       say(null);
       try {
-        const answer = await onSubmit(values(), { step, el: sheet });
+        const answer = await onSubmit(values(), { step, el: sheet, say });
         if (answer === false) return;
         close(answer ?? true);
       } catch (error) {

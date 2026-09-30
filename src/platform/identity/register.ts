@@ -16,9 +16,9 @@ import type { Ctx } from '../../ports.js';
  *
  * Two rules do most of the work here. A failed sign-in never says whether
  * the phone is known, so the door cannot be used to find out who has an
- * account. And five wrong passwords in a row rest the door for a while, so
- * that the rate limiter is not the only thing between a script and a
- * keyspace.
+ * account. And five wrong passwords in a row — at the door, or asked for
+ * again inside a session — rest the door for a while, so that the rate
+ * limiter is not the only thing between a script and a keyspace.
  *
  * A password is forgotten sooner or later, and there is no SMS to send a
  * number a code. So a password is only ever *set* by proving an inbox: a new
@@ -143,22 +143,57 @@ export async function signInWithPassword(
 
   const ok = guest && !guest.closed_at ? await verifyPassword(input.password, guest.password_hash) : false;
   if (!ok) {
-    if (guest) {
-      const failures = guest.failed_sign_ins + 1;
-      await getPool().query(
-        `UPDATE identity.guest SET failed_sign_ins = $2, locked_until = $3 WHERE id = $1`,
-        [
-          guest.id,
-          failures,
-          failures >= MAX_FAILURES ? new Date(now.getTime() + LOCK_MINUTES * 60 * 1000) : null,
-        ],
-      );
-    }
+    if (guest) await countWrongPassword(guest.id, now);
     throw new AuthError('BAD_CREDENTIALS', 'wrong login or password');
   }
 
   await getPool().query('UPDATE identity.guest SET failed_sign_ins = 0, locked_until = NULL WHERE id = $1', [guest!.id]);
   return startSessionFor(ctx, guest!.id, input.device ?? null);
+}
+
+/**
+ * One more wrong password on this account, wherever it was typed: the fifth
+ * in a row rests every door that asks for it for a quarter of an hour. Added
+ * up in the row itself, so two guesses sent at once still count as two.
+ */
+async function countWrongPassword(guestId: string, now: Date): Promise<void> {
+  await getPool().query(
+    `UPDATE identity.guest
+        SET failed_sign_ins = failed_sign_ins + 1,
+            locked_until = CASE WHEN failed_sign_ins + 1 >= $2 THEN $3::timestamptz ELSE NULL END
+      WHERE id = $1`,
+    [guestId, MAX_FAILURES, new Date(now.getTime() + LOCK_MINUTES * 60 * 1000)],
+  );
+}
+
+/**
+ * Is this the account's password — asked from inside a session, before
+ * something that outlasts it: a new password, a new address, money going
+ * somewhere new. The question there is not who you are but whether it is
+ * still you, and a session somebody else holds is no more entitled to guess
+ * than a stranger at the door. So the door's count holds here too: while the
+ * door rests nothing is asked, a wrong password counts toward resting it,
+ * and the right one clears the count.
+ */
+async function ownPassword(ctx: Ctx, guestId: string, password: string | null | undefined): Promise<boolean> {
+  const now = ctx.clock.now();
+  const { rows } = await getPool().query<Row>(
+    'SELECT id, password_hash, failed_sign_ins, locked_until, closed_at FROM identity.guest WHERE id = $1 AND closed_at IS NULL',
+    [guestId],
+  );
+  const me = rows[0];
+  if (!me?.password_hash) return false;
+  if (me.locked_until && me.locked_until > now) {
+    throw new AuthError('LOCKED', 'too many wrong passwords — wait a few minutes');
+  }
+  if (!(await verifyPassword(password ?? '', me.password_hash))) {
+    await countWrongPassword(me.id, now);
+    return false;
+  }
+  if (me.failed_sign_ins > 0 || me.locked_until) {
+    await getPool().query('UPDATE identity.guest SET failed_sign_ins = 0, locked_until = NULL WHERE id = $1', [me.id]);
+  }
+  return true;
 }
 
 /* ── a password by way of an inbox ─────────────────────────────────── */
@@ -223,10 +258,16 @@ export async function sendPasswordCode(
  * Proving the inbox is proving the account behind it — the same proof the
  * code-by-email door accepts — so the address with no account becomes one
  * here, with the password and the name given, and the address with one gets
- * the new password. A password somebody else might know is a way in, so a
- * replaced one ends every session it could have opened. An account that was
- * already there hears of it by letter (`tellInbox`); one made just now asked
- * for exactly this, a moment ago.
+ * the new password. An account that was already there hears of it by letter
+ * (`tellInbox`); one made just now asked for exactly this, a moment ago.
+ *
+ * On an account that was already there, every session ends. A replaced
+ * password is a way in somebody else may know, and every session it opened
+ * goes with it. An account that had none — made by Google, Apple or a code —
+ * comes here too when a letter has told its owner that somebody is signed in
+ * as them, and this door is what the letter's button opens: the one who has
+ * just proved the inbox is signed in afresh, and whoever held a session they
+ * should not is out, whatever it was opened with.
  *
  * The password is checked before the code is looked at: a password that is
  * too short is a typing mistake, and must not spend the code.
@@ -268,17 +309,15 @@ export async function setPasswordWithCode(
         WHERE id = $1`,
       [found.id, hash, now, name],
     );
-    if (found.password_hash) {
-      await client.query(
-        'UPDATE identity.guest_session SET revoked_at = $2 WHERE guest_id = $1 AND revoked_at IS NULL',
-        [found.id, now],
-      );
-    }
+    await client.query(
+      'UPDATE identity.guest_session SET revoked_at = $2 WHERE guest_id = $1 AND revoked_at IS NULL',
+      [found.id, now],
+    );
     return { guestId: found.id, created: false, replaced: Boolean(found.password_hash) };
   });
 
   const session = await startSessionFor(ctx, guestId, input.device ?? null);
-  if (!created) await tellInbox(ctx, email, replaced ? 'changed' : 'set');
+  if (!created) await tellInbox(ctx, { guestId, email }, replaced ? 'changed' : 'set');
   return { session, created };
 }
 
@@ -289,9 +328,9 @@ export async function setPasswordWithCode(
  * come through a door to give itself an address. It came in by Google,
  * Apple or a code to its phone, and a session opened a moment ago is that
  * door passed again; one left open in a browser for longer is only a token
- * somebody holds.
+ * somebody holds. The refusal says how long (`SIGN_IN_AGAIN`).
  */
-const FRESH_SIGN_IN_MINUTES = 10;
+export const FRESH_SIGN_IN_MINUTES = 10;
 
 /**
  * The first step of giving an account an address: a code to it.
@@ -300,9 +339,10 @@ const FRESH_SIGN_IN_MINUTES = 10;
  * an address on it is that way back. The person is signed in, but a session
  * can be stolen, and an address is how a password gets replaced — so the
  * session shows first that it is still its person, or a stolen one could
- * make itself permanent. An account with a password types it. One without
- * has no secret to type: it shows it by having come through its door a
- * moment ago, which a session lifted from a borrowed browser has not.
+ * make itself permanent. An account with a password types it, counted like
+ * every wrong password (`ownPassword`). One without has no secret to type:
+ * it shows it by having come through its door a moment ago, which a session
+ * lifted from a borrowed browser has not.
  *
  * The code is held to this account and this purpose (`sendEmailCode`): a
  * code the door sends to anybody's inbox for the asking, or one another
@@ -321,7 +361,7 @@ export async function sendAttachCode(
   if (!me) throw new AuthError('UNAUTHORIZED', 'no such account');
   if (me.email) throw new AuthError('EMAIL_SET', 'this account already has an address');
   if (me.password_hash) {
-    if (!(await verifyPassword(input.password ?? '', me.password_hash))) {
+    if (!(await ownPassword(ctx, input.guestId, input.password))) {
       throw new AuthError('WRONG_PASSWORD', 'the password is wrong');
     }
   } else {
@@ -395,7 +435,9 @@ export async function sendFirstPasswordCode(ctx: Ctx, input: { guestId: string }
  * prove, and the session asking proves nothing about who holds it: a first
  * password set on its word let whoever found one open in a borrowed browser
  * keep the account after it — and sign its owner out everywhere on the way.
- * So the first is set by proving the inbox, as every password is.
+ * So the first is set by proving the inbox, as every password is. And the
+ * old one, where there is one, is guessed no more freely here than at the
+ * door: the same five wrong in a row rest both (`ownPassword`).
  *
  * The new password is checked before the code is looked at: one that is too
  * short is a typing mistake, and must not spend the code.
@@ -408,7 +450,7 @@ export async function changePassword(
   const me = await secretsOf(input.guestId);
   if (!me) throw new AuthError('UNAUTHORIZED', 'no such account');
   if (me.passwordHash) {
-    if (!(await verifyPassword(input.current ?? '', me.passwordHash))) {
+    if (!(await ownPassword(ctx, input.guestId, input.current))) {
       throw new AuthError('WRONG_PASSWORD', 'the current password is wrong');
     }
   } else {
@@ -421,10 +463,26 @@ export async function changePassword(
     `UPDATE identity.guest SET password_hash = $2, password_set_at = $3, failed_sign_ins = 0, locked_until = NULL WHERE id = $1`,
     [input.guestId, hash, ctx.clock.now()],
   );
-  await tellInbox(ctx, me.email, me.passwordHash ? 'changed' : 'set');
+  await tellInbox(ctx, { guestId: input.guestId, email: me.email }, me.passwordHash ? 'changed' : 'set');
 }
 
 /* ── telling the inbox ─────────────────────────────────────────────── */
+
+/**
+ * How many letters about a password go out: one an hour to an address,
+ * fifty a day in all.
+ *
+ * They leave from the same Gmail account as every code, which stops sending
+ * — and may be suspended — past about 500 a day, and codes stop at 400
+ * (`EMAIL_CODES_PER_DAY`). A password is changed knowing the old one without
+ * any code, so with nothing counting them one person switching between two
+ * passwords sent a letter a switch: the day's letters gone within the hour,
+ * and every code with them, for everybody. A second change inside the hour
+ * goes untold; the letter about the first said the same a moment before,
+ * and what to do about it.
+ */
+export const NOTICES_PER_EMAIL_PER_HOUR = 1;
+export const NOTICES_PER_DAY = 50;
 
 /**
  * A letter to the account's own address: its password was just set, or
@@ -434,35 +492,56 @@ export async function changePassword(
  * the forgotten-password door, which signs every other device out as the
  * new password is set.
  *
- * Best-effort. The password is set already, and a mail server that is down
- * must neither undo it nor make the person think it failed.
+ * Best-effort, and counted (`NOTICES_PER_DAY`): past the count nothing goes.
+ * The password is set already, and neither a letter that cannot go nor a
+ * mail server taking its time may undo it, make the person think it failed,
+ * or keep them waiting for their answer.
  */
-async function tellInbox(ctx: Ctx, email: string | null, what: 'set' | 'changed'): Promise<void> {
-  if (!email || !ctx.mailer) return;
+async function tellInbox(ctx: Ctx, account: { guestId: string; email: string | null }, what: 'set' | 'changed'): Promise<void> {
+  const { guestId, email } = account;
+  const mailer = ctx.mailer;
+  if (!email || !mailer) return;
   const now = ctx.clock.now();
-  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ulaanbaatar', year: 'numeric', month: 'numeric', day: 'numeric' });
-  const part = (type: Intl.DateTimeFormatPartTypes) => day.formatToParts(now).find((p) => p.type === type)?.value ?? '';
-  const when = `Хэзээ: ${part('year')} оны ${part('month')}-р сарын ${part('day')}, ${hhmm(now)} (Улаанбаатарын цагаар).`;
-  const title = what === 'set' ? 'Нууц үг тохирууллаа' : 'Нууц үг солигдлоо';
-  const said = what === 'set' ? 'Таны Basu бүртгэлд нууц үг тохирууллаа.' : 'Таны Basu бүртгэлийн нууц үг солигдлоо.';
-  const notYou =
-    'Та өөрөө хийгээгүй бол хэн нэгэн таны бүртгэлд нэвтэрсэн байна. Нууц үгээ даруй сэргээнэ үү — шинэ нууц үг тавихад бусад бүх төхөөрөмж дээрх нэвтрэлт хаагдана.';
-  const you = 'Та өөрөө хийсэн бол юу ч хийх шаардлагагүй.';
-  const reset = '/login?forgot';
   try {
-    await ctx.mailer.send({
-      to: email,
-      subject: `Basu · ${title}`,
-      text: [said, when, '', notYou, `${publicOrigin()}${reset}`, '', you].join('\n'),
-      html: renderLetter({
-        preheader: `${said} Та өөрөө хийгээгүй бол нууц үгээ даруй сэргээнэ үү.`,
-        title,
-        paragraphs: [said, when],
-        note: notYou,
-        action: { label: 'Нууц үг сэргээх', url: reset },
-        small: you,
-      }),
-    });
+    // Written down only if it fits under both counts, and only then sent.
+    const { rowCount } = await getPool().query(
+      `INSERT INTO identity.notice (email, guest_id, created_at)
+       SELECT $1::text, $2::uuid, $3::timestamptz
+        WHERE (SELECT count(*) FROM identity.notice
+                WHERE email = $1 AND created_at > $3::timestamptz - interval '1 hour') < $4
+          AND (SELECT count(*) FROM identity.notice
+                WHERE created_at > $3::timestamptz - interval '24 hours') < $5`,
+      [email, guestId, now, NOTICES_PER_EMAIL_PER_HOUR, NOTICES_PER_DAY],
+    );
+    if (!rowCount) return;
+
+    const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ulaanbaatar', year: 'numeric', month: 'numeric', day: 'numeric' });
+    const part = (type: Intl.DateTimeFormatPartTypes) => day.formatToParts(now).find((p) => p.type === type)?.value ?? '';
+    const when = `Хэзээ: ${part('year')} оны ${part('month')}-р сарын ${part('day')}, ${hhmm(now)} (Улаанбаатарын цагаар).`;
+    const title = what === 'set' ? 'Нууц үг тохирууллаа' : 'Нууц үг солигдлоо';
+    const said = what === 'set' ? 'Таны Basu бүртгэлд нууц үг тохирууллаа.' : 'Таны Basu бүртгэлийн нууц үг солигдлоо.';
+    const notYou =
+      'Та өөрөө хийгээгүй бол хэн нэгэн таны бүртгэлд нэвтэрсэн байна. Нууц үгээ даруй сэргээнэ үү — шинэ нууц үг тавихад бусад бүх төхөөрөмж дээрх нэвтрэлт хаагдана.';
+    const you = 'Та өөрөө хийсэн бол юу ч хийх шаардлагагүй.';
+    const reset = '/login?forgot';
+    // Not waited for. A mail server can take forty seconds to give up, and
+    // the person — and the other sessions this change ends — should not wait
+    // on it: the app gives up after fifteen and would say it failed.
+    void mailer
+      .send({
+        to: email,
+        subject: `Basu · ${title}`,
+        text: [said, when, '', notYou, `${publicOrigin()}${reset}`, '', you].join('\n'),
+        html: renderLetter({
+          preheader: `${said} Та өөрөө хийгээгүй бол нууц үгээ даруй сэргээнэ үү.`,
+          title,
+          paragraphs: [said, when],
+          note: notYou,
+          action: { label: 'Нууц үг сэргээх', url: reset },
+          small: you,
+        }),
+      })
+      .catch(() => {});
   } catch {
     // The password stands whether or not the letter went: nothing to undo.
   }
@@ -473,14 +552,11 @@ async function tellInbox(ctx: Ctx, email: string | null, what: 'set' | 'changed'
  *
  * For confirming something inside a session that is already open — money
  * going to a new bank account — where the question is not "who are you" but
- * "is it still you holding the phone".
+ * "is it still you holding the phone". Counted like the door counts
+ * (`ownPassword`): LOCKED while it rests.
  */
-export async function confirmPassword(guestId: string, password: string): Promise<boolean> {
-  const { rows } = await getPool().query<{ password_hash: string | null }>(
-    'SELECT password_hash FROM identity.guest WHERE id = $1 AND closed_at IS NULL',
-    [guestId],
-  );
-  return verifyPassword(password, rows[0]?.password_hash ?? null);
+export async function confirmPassword(ctx: Ctx, guestId: string, password: string): Promise<boolean> {
+  return ownPassword(ctx, guestId, password);
 }
 
 /** Whether this account can be signed into with a password at all. */

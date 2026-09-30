@@ -5,7 +5,7 @@ import { VirtualClock } from '../../domain/time.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../../ports.js';
 import { truncateAll } from '../../test/seed.js';
 import { hashPassword, verifyPassword } from './password.js';
-import { changePassword, registerGuest, signInWithPassword } from './register.js';
+import { changePassword, confirmPassword, registerGuest, sendAttachCode, signInWithPassword } from './register.js';
 import { resolveGuest, startSession } from './auth.js';
 
 /**
@@ -164,5 +164,39 @@ describe('changing it', () => {
     await expect(signInWithPassword(ctx, { login: '+97688010001', password: 'булаах нууц үг' })).rejects.toMatchObject({
       code: 'BAD_CREDENTIALS',
     });
+  });
+});
+
+describe('asked for again inside a session', () => {
+  /*
+   * A new password, a new address, money going somewhere new: each asks for
+   * the password again, from a session that may be somebody else's by now.
+   * Whoever holds it guesses no more freely there than at the door.
+   */
+  it('is counted with the door: five wrong anywhere rest it everywhere, and the right one clears the count', async () => {
+    const { guestId } = await registerGuest(ctx, { phone: '+97699001122', password: 'сайн нууц үг' });
+    for (let i = 0; i < 3; i++) expect(await confirmPassword(ctx, guestId, `таамаг ${i}`)).toBe(false);
+    await expect(changePassword(ctx, { guestId, current: 'таамаг 3', next: 'булаах нууц үг' })).rejects.toMatchObject({
+      code: 'WRONG_PASSWORD',
+    });
+    await expect(sendAttachCode(ctx, { guestId, email: 'thief@example.mn', password: 'таамаг 4' })).rejects.toMatchObject({
+      code: 'WRONG_PASSWORD',
+    });
+
+    // Resting now, whichever way it is asked — the right password included.
+    await expect(confirmPassword(ctx, guestId, 'сайн нууц үг')).rejects.toMatchObject({ code: 'LOCKED' });
+    await expect(changePassword(ctx, { guestId, current: 'сайн нууц үг', next: 'булаах нууц үг' })).rejects.toMatchObject({
+      code: 'LOCKED',
+    });
+    await expect(signInWithPassword(ctx, { login: '+97699001122', password: 'сайн нууц үг' })).rejects.toMatchObject({
+      code: 'LOCKED',
+    });
+
+    // A quarter of an hour on it opens, and the right one clears the count:
+    // four wrong after it are still under the ceiling.
+    (ctx.clock as VirtualClock).advanceMinutes(16);
+    expect(await confirmPassword(ctx, guestId, 'сайн нууц үг')).toBe(true);
+    for (let i = 0; i < 4; i++) expect(await confirmPassword(ctx, guestId, 'буруу нууц үг')).toBe(false);
+    await expect(signInWithPassword(ctx, { login: '+97699001122', password: 'сайн нууц үг' })).resolves.toBeTruthy();
   });
 });

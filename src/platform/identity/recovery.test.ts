@@ -4,8 +4,9 @@ import { at } from '../../domain/fixtures.js';
 import { VirtualClock } from '../../domain/time.js';
 import { FakeMailer, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../../ports.js';
 import { truncateAll } from '../../test/seed.js';
-import { resolveGuest, sendEmailCode, startSession, verifyEmailCode } from './auth.js';
+import { purgeChallenges, resolveGuest, sendEmailCode, startSession, verifyEmailCode } from './auth.js';
 import {
+  NOTICES_PER_DAY,
   attachEmail,
   changePassword,
   maskEmail,
@@ -88,8 +89,11 @@ describe('signing up with an address and a password', () => {
     });
     expect(created).toBe(false);
     expect(session.guestId).toBe(first.guestId);
-    // It had no password before, so nobody else could have known one: the session stays.
-    expect(await resolveGuest(ctx, first.token)).toBe(first.guestId);
+    // It had no password to know, but a session it opened may be somebody
+    // else's by now — the letter that sends people here says so — and this
+    // door ends every one of them, as it does for a password replaced.
+    expect(await resolveGuest(ctx, first.token)).toBeNull();
+    expect(await resolveGuest(ctx, session.token)).toBe(first.guestId);
   });
 
   it('does not spend the code on a password that is too short', async () => {
@@ -281,6 +285,46 @@ describe('a first password, from inside a session', () => {
     });
     expect(mailer.to('bat@example.mn')!.subject).toBe('Basu · Нууц үг тохирууллаа');
     await expect(sendFirstPasswordCode(ctx, { guestId: made.guestId })).rejects.toMatchObject({ code: 'PASSWORD_SET' });
+  });
+
+  it('is a code the table itself will not let name nobody, or name an account at the door', async () => {
+    const { guestId } = await registerGuest(ctx, { phone: '+97699001122', password: 'сайн нууц үг' });
+    const code = (purpose: string, who: string | null) =>
+      getPool().query(
+        `INSERT INTO identity.otp_challenge (email, code_hash, expires_at, created_at, purpose, guest_id)
+         VALUES ('bat@example.mn', 'x', $1, $1, $2, $3)`,
+        [clock.now(), purpose, who],
+      );
+    await expect(code('set_password', null)).rejects.toThrow(/otp_asked_by_an_account/);
+    await expect(code('attach', null)).rejects.toThrow(/otp_asked_by_an_account/);
+    await expect(code('sign_in', guestId)).rejects.toThrow(/otp_asked_by_an_account/);
+    await expect(code('whatever', null)).rejects.toThrow(/purpose/);
+    await expect(code('set_password', guestId)).resolves.toBeTruthy();
+  });
+});
+
+describe('letters about a password', () => {
+  it('stop at the day’s allowance for everybody, the password set all the same, and are swept a day on', async () => {
+    const made = await phoneAccountWithEmail('+97699001122', 'хуучин нууц үг', 'bat@example.mn');
+    // The day's letters, gone to other addresses over the last hour.
+    await getPool().query(
+      `INSERT INTO identity.notice (email, guest_id, created_at)
+       SELECT 'other' || n || '@example.mn', $1, $2::timestamptz - n * interval '1 minute' FROM generate_series(1, $3::int) n`,
+      [made.guestId, clock.now(), NOTICES_PER_DAY],
+    );
+    const before = mailer.sent.length;
+    await changePassword(ctx, { guestId: made.guestId, current: 'хуучин нууц үг', next: 'шинэ нууц үг' });
+    expect(mailer.sent).toHaveLength(before);
+    await expect(signInWithPassword(ctx, { login: 'bat@example.mn', password: 'шинэ нууц үг' })).resolves.toBeTruthy();
+
+    // A day on they count for nothing, and the sweep takes them.
+    clock.advanceMinutes(24 * 60);
+    await changePassword(ctx, { guestId: made.guestId, current: 'шинэ нууц үг', next: 'гурав дахь нууц үг' });
+    expect(mailer.sent).toHaveLength(before + 1);
+    expect(mailer.to('bat@example.mn')!.subject).toBe('Basu · Нууц үг солигдлоо');
+    expect(await purgeChallenges(clock.now())).toBeGreaterThanOrEqual(NOTICES_PER_DAY);
+    const { rows } = await getPool().query<{ email: string }>('SELECT email FROM identity.notice');
+    expect(rows).toEqual([{ email: 'bat@example.mn' }]);
   });
 });
 

@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
+  AuthError,
   ClosureError,
   attachEmail,
   changePassword,
@@ -33,7 +34,7 @@ import {
   setPreferences,
   unreadCount,
 } from '../platform/notify/index.js';
-import { badRequest, sendError } from './errors.js';
+import { addEmailFirst, badRequest, sendError } from './errors.js';
 import { limits } from './hardening.js';
 import type { Ctx } from '../ports.js';
 
@@ -57,6 +58,21 @@ const bearer = (request: FastifyRequest): string | null => {
   const header = request.headers.authorization;
   return header?.startsWith('Bearer ') ? header.slice(7) : null;
 };
+
+/**
+ * A field that should be text, or nothing. A code sent as a number, a
+ * password as an object: a client's mistake, answered as a missing field —
+ * never a crash that reads «Алдаа гарлаа».
+ */
+const text = (value: unknown): string | null => (typeof value === 'string' ? value : null);
+
+/**
+ * A refusal about a password, inside the account. The same as anywhere,
+ * except NO_EMAIL, which at the door means a number with no address and
+ * here an account that must add one first (`addEmailFirst`).
+ */
+const insideTheAccount = (reply: FastifyReply, error: unknown): FastifyReply =>
+  error instanceof AuthError && error.code === 'NO_EMAIL' ? addEmailFirst(reply) : sendError(reply, error);
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_TOPUP_MNT = 2_000_000;
@@ -127,18 +143,18 @@ export async function registerPlatformRoutes(
    * outlives it. Every other session ends — whoever knew the old one is out —
    * and the one in hand stays.
    */
-  app.post<{ Body: { current?: string; next?: string; code?: string } }>(
+  app.post<{ Body: { current?: unknown; next?: unknown; code?: unknown } }>(
     '/v1/me/password',
     { preHandler: requireGuest, config: { rateLimit: rate.otp } },
     async (request, reply) => {
       const { current, next, code } = request.body ?? {};
-      if (!next) return badRequest(reply, 'Шинэ нууц үгээ оруулна уу.', 'next is required');
+      if (typeof next !== 'string' || !next) return badRequest(reply, 'Шинэ нууц үгээ оруулна уу.', 'next is required');
       try {
-        await changePassword(ctx, { guestId: request.guestId!, current: current ?? null, next, code: code?.trim() || null });
+        await changePassword(ctx, { guestId: request.guestId!, current: text(current), next, code: text(code)?.trim() || null });
         const revoked = await revokeOtherSessions(request.guestId!, bearer(request) ?? '', ctx.clock.now());
         return { changed: true, revoked };
       } catch (error) {
-        return sendError(reply, error);
+        return insideTheAccount(reply, error);
       }
     },
   );
@@ -152,7 +168,7 @@ export async function registerPlatformRoutes(
       const { sentTo } = await sendFirstPasswordCode(ctx, { guestId: request.guestId! });
       return reply.status(202).send({ sent: true, to: sentTo });
     } catch (error) {
-      return sendError(reply, error);
+      return insideTheAccount(reply, error);
     }
   });
 
@@ -162,14 +178,14 @@ export async function registerPlatformRoutes(
    * is still its person, so a stolen one cannot give itself a way back: an
    * account with a password types it, one without has signed in a moment ago.
    */
-  app.post<{ Body: { email?: string; password?: string } }>(
+  app.post<{ Body: { email?: unknown; password?: unknown } }>(
     '/v1/me/email/code',
     { preHandler: requireGuest, config: { rateLimit: rate.otp } },
     async (request, reply) => {
-      const { email, password } = request.body ?? {};
+      const email = text(request.body?.email);
       if (!email) return badRequest(reply, 'Имэйл хаягаа оруулна уу.', 'email is required');
       try {
-        await sendAttachCode(ctx, { guestId: request.guestId!, email, password: password ?? null, token: bearer(request) });
+        await sendAttachCode(ctx, { guestId: request.guestId!, email, password: text(request.body?.password), token: bearer(request) });
         return reply.status(202).send({ sent: true });
       } catch (error) {
         return sendError(reply, error);
@@ -177,11 +193,12 @@ export async function registerPlatformRoutes(
     },
   );
 
-  app.post<{ Body: { email?: string; code?: string } }>(
+  app.post<{ Body: { email?: unknown; code?: unknown } }>(
     '/v1/me/email',
     { preHandler: requireGuest, config: { rateLimit: rate.verify } },
     async (request, reply) => {
-      const { email, code } = request.body ?? {};
+      const email = text(request.body?.email);
+      const code = text(request.body?.code);
       if (!email || !code) return badRequest(reply, 'Имэйл, кодоо оруулна уу.', 'email and code are required');
       try {
         await attachEmail(ctx, { guestId: request.guestId!, email, code: code.trim() });

@@ -1,5 +1,5 @@
 import type { FastifyReply } from 'fastify';
-import { AuthError, PasswordError } from '../platform/identity/index.js';
+import { AuthError, FRESH_SIGN_IN_MINUTES, PasswordError } from '../platform/identity/index.js';
 import { LedgerError } from '../platform/ledger/index.js';
 import { ClosureError } from '../platform/identity/index.js';
 import { IdeshError, type IdeshErrorCode } from '../idesh/index.js';
@@ -111,11 +111,16 @@ const AUTH_ERRORS: Record<AuthError['code'], Spec> = {
   EMAIL_SET: { status: 409, mn: 'Таны бүртгэлд имэйл аль хэдийн холбогдсон байна.' },
   WRONG_PASSWORD: { status: 403, mn: 'Одоогийн нууц үг буруу байна.' },
   // A session alone proves nothing about who holds it; these say what will.
-  PROOF_REQUIRED: { status: 403, mn: 'Нууц үг тохируулахын тулд бүртгэлийн тань имэйл рүү илгээсэн кодыг оруулна уу.' },
+  PROOF_REQUIRED: {
+    status: 403,
+    // Only an app from before the code asks without one — it has no field
+    // for it — so this says where the password can be set instead.
+    mn: 'Нууц үгийг одоо бүртгэлийн тань имэйл рүү очих кодоор тохируулдаг болсон. Аппаа шинэчлэх, эсвэл Basu-гийн вэб сайтын «Бүртгэл» хуудаснаас тохируулна уу.',
+  },
   PASSWORD_SET: { status: 409, mn: 'Таны бүртгэлд нууц үг аль хэдийн тохируулсан байна. Одоогийн нууц үгээрээ солино уу.' },
   SIGN_IN_AGAIN: {
     status: 403,
-    mn: 'Таныг мөн гэдгийг батлахын тулд гараад дахин нэвтэрнэ үү. Дараа нь 10 минутын дотор имэйлээ холбоно уу.',
+    mn: `Таныг мөн гэдгийг батлахын тулд гараад дахин нэвтэрнэ үү. Дараа нь ${FRESH_SIGN_IN_MINUTES} минутын дотор имэйлээ холбоно уу.`,
   },
   EMAIL_CLOSED: { status: 503, mn: 'Имэйлээр нэвтрэх түр ажиллахгүй байна. Өөр аргаар нэвтэрнэ үү.' },
   EMAIL_FAILED: { status: 502, mn: 'Код илгээж чадсангүй. Хэсэг хүлээгээд дахин оролдоно уу.' },
@@ -223,4 +228,16 @@ export function forbidden(reply: FastifyReply, what: string): FastifyReply {
 
 export function badRequest(reply: FastifyReply, mn: string, en: string): FastifyReply {
   return reply.status(400).send(envelope('BAD_REQUEST', mn, en));
+}
+
+/**
+ * NO_EMAIL, said inside the account. At the door somebody typed a number
+ * with no address behind it, and is told to try their address or write to
+ * Basu; inside, nobody typed anything, and the account is told what to do
+ * first — the code for a first password goes to an address it has not got.
+ */
+export function addEmailFirst(reply: FastifyReply): FastifyReply {
+  return reply
+    .status(AUTH_ERRORS.NO_EMAIL.status)
+    .send(envelope('NO_EMAIL', 'Эхлээд имэйлээ холбоно уу — нууц үг тохируулах код тэр хаяг руу очно.', 'no address stands behind this account'));
 }

@@ -321,13 +321,21 @@ export async function guestForEmail(client: PoolClient, email: string, now: Date
   return guestId;
 }
 
-/** Challenges older than a day are neither valid nor evidence. Swept by the scheduler. */
+/**
+ * Challenges older than a day are neither valid nor evidence, and letters
+ * about a password older than a day count against nothing (`tellInbox`).
+ * Swept by the scheduler.
+ */
 export async function purgeChallenges(now: Date): Promise<number> {
-  const { rowCount } = await getPool().query(
+  const { rowCount: codes } = await getPool().query(
     `DELETE FROM identity.otp_challenge WHERE created_at < $1::timestamptz - interval '24 hours'`,
     [now],
   );
-  return rowCount ?? 0;
+  const { rowCount: letters } = await getPool().query(
+    `DELETE FROM identity.notice WHERE created_at < $1::timestamptz - interval '24 hours'`,
+    [now],
+  );
+  return (codes ?? 0) + (letters ?? 0);
 }
 
 export interface GuestSession {
