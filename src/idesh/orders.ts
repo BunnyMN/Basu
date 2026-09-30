@@ -850,12 +850,14 @@ export async function liveFor(guestId: string, db: Db = getPool()): Promise<Ides
 /**
  * Every order of this guest's that was ever paid for, newest first: what the
  * website's «Миний захиалга» lists, finished ones included. A draft that was
- * never paid is not an order anybody made, so it is left out.
+ * never paid is not an order anybody made, so it is left out — still
+ * waiting, and after half an hour given back too. Asked for by its state,
+ * a lapsed draft came back closed, and was listed as a finished order.
  */
 export async function allFor(guestId: string, db: Db = getPool()): Promise<IdeshSummary[]> {
   const { rows } = await db.query<OrderRow>(
     `${ORDER_SELECT}
-      WHERE o.guest_id = $1 AND o.state <> 'DRAFT'
+      WHERE o.guest_id = $1 AND o.paid_at IS NOT NULL
       ORDER BY o.created_at DESC
       LIMIT 200`,
     [guestId],
