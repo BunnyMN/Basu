@@ -16,6 +16,7 @@ import {
   type Profile,
 } from '../platform/identity/index.js';
 import {
+  LedgerError,
   balance,
   movement,
   settleTopup,
@@ -34,7 +35,7 @@ import {
   setPreferences,
   unreadCount,
 } from '../platform/notify/index.js';
-import { addEmailFirst, badRequest, leaveTheDeskFirst, notFound, sendError, signInAgain } from './errors.js';
+import { addEmailFirst, badRequest, leaveTheDeskFirst, noSuchSession, sendError, signInAgain } from './errors.js';
 import { limits } from './hardening.js';
 import { deskSeatFor, seatedAtTheDesk } from './ops.js';
 import type { Ctx } from '../ports.js';
@@ -293,14 +294,12 @@ export async function registerPlatformRoutes(
     const here = (await sessionsOf(request.guestId!, bearer(request) ?? '')).some((s) => s.current && s.id === id);
     return here ? undefined : endingAnother(request, reply);
   };
-  /** The same answer for an id that is nobody's and one that is not an id: never a question put to Postgres. */
-  const noSuchSession = (reply: FastifyReply) =>
-    notFound(reply, 'Ийм нэвтрэлт олдсонгүй. Жагсаалтаа шинэчилнэ үү.', 'no such open session');
 
   app.delete<{ Params: { id: string } }>(
     '/v1/me/sessions/:id',
     { preHandler: [requireGuest, recentUnlessHere] },
     async (request, reply) => {
+      // The same answer for an id that is nobody's and one that is not an id: never a question put to Postgres.
       if (!UUID.test(request.params.id)) return noSuchSession(reply);
       const gone = await revokeSession(request.guestId!, request.params.id, ctx.clock.now());
       if (!gone) return noSuchSession(reply);
@@ -372,13 +371,17 @@ export async function registerPlatformRoutes(
    * The receipt is why this route exists. Somebody claiming lunch back needs
    * the ДДТД and the lottery number, and making them find the order it came
    * from to get at it is making them know how the software is built.
+   *
+   * Somebody else's movement, nobody's, and an id that is not one are the
+   * same answer: nothing of theirs by that name. The last is never a
+   * question put to Postgres.
    */
   app.get<{ Params: { id: string } }>(
     '/v1/wallet/:id',
     guarded,
     async (request, reply) => {
-      const line = await movement(request.guestId!, request.params.id);
-      if (!line) return sendError(reply, new Error('no such movement'));
+      const line = UUID.test(request.params.id) ? await movement(request.guestId!, request.params.id) : null;
+      if (!line) return sendError(reply, new LedgerError('NOT_FOUND', 'no such movement'));
       return {
         id: line.transferId,
         kind: line.kind,
@@ -470,9 +473,16 @@ export async function registerPlatformRoutes(
     };
   });
 
-  /** No id marks the whole inbox read — what opening the list means. */
-  app.post<{ Body: { id?: string } }>('/v1/notifications/read', guarded, async (request) => {
-    await markRead(request.guestId!, request.body?.id ?? null, ctx.clock.now());
+  /**
+   * No id marks the whole inbox read — what opening the list means. An id
+   * that is not a message's marks nothing, as the swipe below removes
+   * nothing, and is never Postgres's to read.
+   */
+  app.post<{ Body: { id?: unknown } }>('/v1/notifications/read', guarded, async (request) => {
+    const id = request.body?.id ?? null;
+    if (id === null || (typeof id === 'string' && UUID.test(id))) {
+      await markRead(request.guestId!, id, ctx.clock.now());
+    }
     return { unread: await unreadCount(request.guestId!) };
   });
 

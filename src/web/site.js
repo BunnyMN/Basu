@@ -40,6 +40,12 @@ export { ICON };
  * the browser reads it (`new URL`), kept only if it stays on this site, and
  * handed back as the path it came to; one with a backslash or a control
  * character in it is not a path anybody typed, and is not read at all.
+ *
+ * The path handed back is then read once more, by the browser, on its own.
+ * Reading drops dot segments, so `/.//evil.com` — this site, as spelled —
+ * comes back as `//evil.com`, and on its own that is evil.com. A path with
+ * one slash in front stays on this site however it is read; one with two is
+ * the address of another, and is refused like any other.
  */
 export function safeNext(raw, fallback = '/home') {
   if (typeof raw !== 'string' || !raw.startsWith('/') || /[\\\u0000-\u001f\u007f]/.test(raw)) return fallback;
@@ -49,8 +55,9 @@ export function safeNext(raw, fallback = '/home') {
   } catch {
     return fallback;
   }
-  if (url.origin !== location.origin || url.pathname.startsWith('/login')) return fallback;
-  return url.pathname + url.search + url.hash;
+  const path = url.pathname + url.search + url.hash;
+  if (url.origin !== location.origin || path.startsWith('//') || url.pathname.startsWith('/login')) return fallback;
+  return path;
 }
 
 export const loginUrl = (next = location.pathname + location.search) => `/login?next=${encodeURIComponent(next)}`;

@@ -443,7 +443,7 @@ describe('one movement, in full', () => {
     expect(after.json().receipt.qr).toMatch(/ebarimt/);
   });
 
-  it('will not show one guest what another guest spent', async () => {
+  it('will not show one guest what another guest spent, and finds none by an id that is nobody’s or not an id', async () => {
     const mine = await signIn('+97699001122');
     const theirs = await signIn('+97688112233');
     await topUp(theirs, 30_000);
@@ -451,12 +451,16 @@ describe('one movement, in full', () => {
     const statement = await app.inject({ method: 'GET', url: '/v1/wallet', headers: auth(theirs) });
     const line = statement.json().lines[0];
 
-    const peek = await app.inject({
-      method: 'GET',
-      url: `/v1/wallet/${line.id}`,
-      headers: auth(mine),
-    });
-    expect(peek.statusCode).toBe(500);
+    for (const id of [line.id, '00000000-0000-0000-0000-000000000000', 'not-a-movement', "1' OR '1'='1"]) {
+      const peek = await app.inject({
+        method: 'GET',
+        url: `/v1/wallet/${encodeURIComponent(id)}`,
+        headers: auth(mine),
+      });
+      expect(peek.statusCode, id).toBe(404);
+      expect(peek.json().error, id).toMatchObject({ code: 'NOT_FOUND', message_mn: 'Ийм гүйлгээ олдсонгүй.' });
+    }
+    expect((await app.inject({ method: 'GET', url: `/v1/wallet/${line.id}`, headers: auth(theirs) })).statusCode).toBe(200);
   });
 });
 
@@ -484,6 +488,19 @@ describe('the inbox', () => {
       title: 'Basu-д тавтай морил',
       read: false,
     });
+
+    // An id that is no message of theirs marks nothing — least of all the
+    // whole inbox, which is what no id at all means.
+    for (const id of ['not-a-uuid', 42, '', '00000000-0000-0000-0000-000000000000']) {
+      const none = await app.inject({
+        method: 'POST',
+        url: '/v1/notifications/read',
+        headers: auth(token),
+        payload: { id },
+      });
+      expect(none.statusCode, JSON.stringify(id)).toBe(200);
+      expect(none.json(), JSON.stringify(id)).toEqual({ unread: 1 });
+    }
 
     const read = await app.inject({
       method: 'POST',

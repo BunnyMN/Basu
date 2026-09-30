@@ -278,6 +278,14 @@ export function notFound(reply: FastifyReply, mn: string, en: string): FastifyRe
 }
 
 /**
+ * No open session by that id: ended already, somebody else's, nobody's, or
+ * not an id. Said the same by the account's own list and by the desk's.
+ */
+export function noSuchSession(reply: FastifyReply): FastifyReply {
+  return notFound(reply, 'Ийм нэвтрэлт олдсонгүй. Жагсаалтаа шинэчилнэ үү.', 'no such open session');
+}
+
+/**
  * AT_THE_DESK, said to the account's own person. The desk is told to
  * switch the seat off on «Гишүүд» first. Somebody closing their own account
  * cannot: nobody switches their own seat off (OWN_SEAT). So they are told

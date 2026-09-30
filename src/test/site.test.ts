@@ -57,6 +57,25 @@ describe('where the door sends somebody after signing in', () => {
     }
   });
 
+  it('is never another site once the browser reads the path it is handed', () => {
+    // Each stays on this site as spelled, and its path, with the dot segments
+    // gone, starts with two slashes: what is handed on is read once more, and
+    // then it is another site.
+    for (const spelled of ['/.//evil.com', '/..//evil.com', '/%2e//evil.com', '/.%2e//evil.com', '/%2E%2E//evil.com/x?y#z', '/a/..//evil.com']) {
+      const read = new window.URL(spelled, ORIGIN);
+      expect(read.origin, JSON.stringify(spelled)).toBe(ORIGIN);
+      expect(new window.URL(read.pathname + read.search + read.hash, ORIGIN).origin, JSON.stringify(spelled)).toBe('https://evil.com');
+      expect(safeNext(spelled), JSON.stringify(spelled)).toBe('/home');
+    }
+  });
+
+  it('is a page of this site however many dot segments it took to get there', () => {
+    expect(safeNext('/a/../dashboard#desk/overview')).toBe('/dashboard#desk/overview');
+    expect(safeNext('/./shop?x=1')).toBe('/shop?x=1');
+    // Two slashes further in are a path on this site, not an address.
+    expect(safeNext('/shop//evil.com')).toBe('/shop//evil.com');
+  });
+
   it('is never the door itself, and is home when nothing usable was asked for', () => {
     for (const nothing of ['/login', '/login?next=/login', '/login#x', 'shop', '', null, undefined, 42]) {
       expect(safeNext(nothing), JSON.stringify(nothing)).toBe('/home');
