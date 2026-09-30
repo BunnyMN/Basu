@@ -133,7 +133,7 @@
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mountClock, hhmm, signInDoors, authReturn } from '/api.js';
+import { api, store, toast, mountClock, hhmm, signInDoors, authReturn, endSession } from '/api.js';
 
 const root = document.getElementById('root');
 const esc = (value) => {
@@ -156,7 +156,13 @@ const el = (html) => {
  * on the same browser.
  */
 const ORG = new URLSearchParams(location.search).get('org');
-if (authReturn?.token) store.kitchenToken = authReturn.token;
+/** A sign-in at this screen: it is the kitchen's person now, and whoever was here before is signed out on the server too. */
+function takeKitchen(t) {
+  const before = store.kitchenToken;
+  store.kitchenToken = t;
+  if (before && before !== t) endSession(before);
+}
+if (authReturn?.token) takeKitchen(authReturn.token);
 const token = () => store.kitchenToken;
 const kitchen = (path, options = {}) => api(path, { ...options, token: token(), headers: ORG ? { 'x-basu-org': ORG } : {} });
 
@@ -176,7 +182,7 @@ async function showDoor() {
       returnTo: `/kds${location.search}`,
       keep: false,
       onToken: (t) => {
-        store.kitchenToken = t;
+        takeKitchen(t);
         boot();
       },
     }),
@@ -222,6 +228,7 @@ function showNotHere() {
 }
 
 function signOut() {
+  endSession(store.kitchenToken);
   store.kitchenToken = null;
   boot();
 }

@@ -258,6 +258,26 @@ describe('a password, by way of the inbox', () => {
   });
 });
 
+describe('signing out', () => {
+  const signOut = (headers: Record<string, string>) => app.inject({ method: 'POST', url: '/v1/auth/sign-out', headers });
+
+  it('ends the session that asks, on the server, and no other', async () => {
+    const register = await app.inject({ method: 'POST', url: '/v1/auth/register', payload: { phone: '+97699001133', password: 'сайн нууц үг' } });
+    const here = register.json().token;
+    const login = await app.inject({ method: 'POST', url: '/v1/auth/login', payload: { login: '99001133', password: 'сайн нууц үг' } });
+    const elsewhere = login.json().token;
+
+    expect((await signOut(bearer(here))).statusCode).toBe(204);
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(here) })).statusCode).toBe(401);
+    expect((await app.inject({ method: 'GET', url: '/v1/me', headers: bearer(elsewhere) })).statusCode).toBe(200);
+
+    // The same answer for a session already ended, one never made, and none at all: it tells nobody anything.
+    for (const headers of [bearer(here), bearer('nobody-ever-had-this'), {}]) {
+      expect((await signOut(headers)).statusCode).toBe(204);
+    }
+  });
+});
+
 describe('Google', () => {
   it('sends the person to Google with a state, a PKCE challenge and our own return address', async () => {
     const start = await app.inject({ method: 'GET', url: '/v1/auth/google/start?return=/supplier' });

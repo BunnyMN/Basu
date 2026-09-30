@@ -314,7 +314,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js"></script>
 <script type="module">
-import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, KIND, dayLabel, dayShort, signInSheet } from '/api.js';
+import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, KIND, dayLabel, dayShort, signInSheet, dropSession } from '/api.js';
 import { mapStyle, ULAANBAATAR } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -473,19 +473,10 @@ async function paintMe(token) {
 }
 
 /** Sign out here: end this session on the server and forget it; the stalls stay open to look at. */
-async function signOutHere() {
-  const token = store.guestToken;
-  store.guestToken = null;
+function signOutHere() {
+  dropSession();
   $('me').hidden = true;
   paintMine([]);
-  if (!token) return;
-  try {
-    const { sessions } = await api('/v1/me/sessions', { token });
-    const current = sessions.find((s) => s.current);
-    if (current) await api(`/v1/me/sessions/${current.id}`, { method: 'DELETE', token });
-  } catch {
-    // Forgotten here is signed out here; a session the server still holds ends on its own.
-  }
 }
 $('sign-out').addEventListener('click', () => void signOutHere());
 

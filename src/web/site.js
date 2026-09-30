@@ -2,7 +2,7 @@
    the foot, the way to /login and back, and calls made as the person
    signed in. Every page of the website imports this; the app's pages do not. */
 
-import { api, store } from '/api.js';
+import { api, store, dropSession } from '/api.js';
 
 export const esc = (value) => {
   const node = document.createElement('span');
@@ -77,19 +77,9 @@ export function me() {
 export const nameOf = (p) => p?.display_name || p?.email || p?.phone || 'Basu хэрэглэгч';
 const initialOf = (p) => (p?.display_name || p?.email || 'B').trim().charAt(0) || 'B';
 
-/** Sign out here: end this session on the server, forget it, and go to the front page. */
-export async function signOut() {
-  const token = store.guestToken;
-  store.guestToken = null;
-  if (token) {
-    try {
-      const { sessions } = await api('/v1/me/sessions', { token });
-      const current = sessions.find((s) => s.current);
-      if (current) await api(`/v1/me/sessions/${current.id}`, { method: 'DELETE', token });
-    } catch {
-      // Forgotten here is signed out here; a session the server still holds ends on its own.
-    }
-  }
+/** Sign out here — the dashboard too, it is the same person — end the session on the server, and go to the front page. */
+export function signOut() {
+  dropSession();
   location.href = '/';
 }
 

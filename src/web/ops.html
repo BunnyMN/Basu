@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="mn" data-theme="light" data-desk data-session="desk">
+<html lang="mn" data-theme="light" data-desk>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -267,7 +267,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 <div id="root"></div>
 
 <script type="module">
-import { api, store, toast, mnt, money, KIND, HEADLINE, dayLabel, signInDoors, accountWays, authReturn, popup, confirmPopup } from '/api.js';
+import { api, store, toast, mnt, money, KIND, HEADLINE, dayLabel, signInDoors, accountWays, takeSession, dropSession, popup, confirmPopup } from '/api.js';
 import { NAV_ICON, deskFrame } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -348,12 +348,12 @@ async function showToken() {
     const input = card.querySelector('input');
     input.value = demo.token;
     const submit = async () => {
-      store.opsToken = input.value.trim();
+      takeSession(input.value.trim());
       try {
-        ({ member: me } = await api('/v1/ops/me', { token: store.opsToken }));
+        ({ member: me } = await api('/v1/ops/me', { token: token() }));
         boot();
       } catch (error) {
-        store.opsToken = null;
+        store.guestToken = null;
         toast(error.message, 'bad');
       }
     };
@@ -367,33 +367,23 @@ async function showToken() {
     <div class="card pair">
       <div class="brand wordmark">Basu<small>Ops</small></div>
       <h2>Нэвтрэх</h2>
-      <p id="door-lead">Нэвтэрнэ үү. Гишүүн биш бол нэвтэрсний дараа эрх хүсэж болно.</p>
+      <p id="door-lead">Нэвтэрнэ үү.</p>
       <div data-doors></div>
     </div>`);
   // Every way in — Google, a code by email, a password and its reset — is
-  // the shared block; the desk keeps its session under its own key, so the
-  // block hands the token here. What the account may do is its roles', which
-  // it asks for once inside.
-  const doors = signInDoors({ device: 'Ops', returnTo: '/dashboard', onToken: enterDesk, keep: false });
+  // the shared block, and the session it makes is the browser's one person,
+  // the same as on the website. What the account may do is its roles',
+  // which it asks for once inside.
+  const doors = signInDoors({ device: 'Ops', returnTo: '/dashboard', onToken: () => boot() });
   card.querySelector('[data-doors]').append(doors);
   // Say only the ways that are really on the card.
   doors.ready.then((open) => {
     const others = [open.google && 'Google', open.email && 'имэйл'].filter(Boolean);
     const ways = others.length ? `${others.join(', ')} эсвэл нууц үгээрээ` : 'нууц үгээрээ';
-    card.querySelector('#door-lead').textContent = `${ways[0].toUpperCase()}${ways.slice(1)} нэвтэрнэ үү. Гишүүн биш бол нэвтэрсний дараа эрх хүсэж болно.`;
+    card.querySelector('#door-lead').textContent = `${ways[0].toUpperCase()}${ways.slice(1)} нэвтэрнэ үү.`;
   });
   door.append(card);
   root.append(door);
-}
-
-/**
- * A session from any door — Google, a code by email, the phone — comes in.
- * What it sees is the server's to say: a member gets the desk, anybody else
- * the front room, with their profile and the way to ask for a seat.
- */
-function enterDesk(t) {
-  store.opsToken = t;
-  boot();
 }
 
 /* ── a person's own corner ─────────────────────────────────────────── */
@@ -498,7 +488,7 @@ async function renderMeProfile(view) {
   );
   view.append(card);
   // The ways back into the account: an address to reset a forgotten password by, and the password itself.
-  view.append(accountWays({ token: store.opsToken }));
+  view.append(accountWays({ token: token() }));
 
   const sessions = el(`
     <section class="section"><h2 class="section-label">Нэвтэрсэн төхөөрөмжүүд</h2>
@@ -1816,12 +1806,14 @@ async function openOrgAccess(orgId) {
 /* ── the frame: one sidebar for every place a person works ─────────── */
 
 /**
- * The desk's own session: the demo's secret, or a person's sign-in — kept
- * under its own key, never the guest's, so a person who is both a guest
- * and a member keeps both, and a browser that is only a guest is simply
- * shown the door here.
+ * The person signed in on this browser — the website's sign-in, the same
+ * one; in the demo, the desk's shared secret. The dashboard once kept a
+ * sign-in of its own under another key, which nothing on the website ever
+ * replaced or cleared: whoever signed in next in that browser was shown the
+ * desk of whoever had opened it before. One browser holds one person now,
+ * and what they see is what the server says that person sits in.
  */
-const token = () => store.opsToken;
+const token = () => store.guestToken;
 const ops = (path, options = {}) => api(path, { ...options, token: token() });
 
 /** What /v1/access said: the person, and every place they work, each with its menu. */
@@ -1909,7 +1901,7 @@ async function reload(id) {
   try {
     access = await ops('/v1/access');
   } catch (error) {
-    if (error.status === 401) return signOut();
+    if (error.status === 401) return signedOut();
     toast(error.message, 'bad');
     return;
   }
@@ -1917,8 +1909,16 @@ async function reload(id) {
   open(w ?? choose('').w, w?.id === ws?.id ? tab : null);
 }
 
+/** «Гарах»: out of the website too — it is the same person — and the session ended on the server, not only forgotten here. */
 function signOut() {
-  store.opsToken = null;
+  dropSession();
+  access = ws = nav = me = null;
+  showToken();
+}
+
+/** The server no longer takes this session: forget it and show the door. */
+function signedOut() {
+  store.guestToken = null;
   access = ws = nav = me = null;
   showToken();
 }
@@ -1936,7 +1936,7 @@ async function refresh() {
     } catch (error) {
       // The seat went while the page was open: ask again where this person works rather than throw them out.
       if (error.status === 401) return reload();
-      if (error.status === 503) return signOut();
+      if (error.status === 503) return signedOut();
       toast(error.message, 'bad');
       return;
     }
@@ -4182,6 +4182,9 @@ async function renderMembers(view) {
 
 /* ── boot ─────────────────────────────────────────────────────────── */
 
+/** The session this page last drew — to notice when the browser has moved on to somebody else. */
+let bootedAs = null;
+
 /**
  * Signed in or not; and if so, where this person works. The server says
  * which places and which pages; the page opens the one the address names,
@@ -4189,31 +4192,33 @@ async function renderMembers(view) {
  */
 async function boot() {
   root.replaceChildren();
-  if (!token()) {
-    // Back from Google with a session: in, whoever it is.
-    const back = authReturn?.token;
-    if (back && !boot.tried) {
-      boot.tried = true;
-      enterDesk(back);
-      return;
-    }
+  // A sign-in that just came back from Google is already this browser's person (api.js, authReturn).
+  bootedAs = token();
+  if (!bootedAs) {
+    access = ws = nav = me = null;
     showToken();
     return;
   }
   try {
     access = await ops('/v1/access');
   } catch (error) {
-    if (error.status === 401 || error.status === 503) {
-      store.opsToken = null;
-      showToken();
-      return;
-    }
+    if (error.status === 401 || error.status === 503) return signedOut();
     toast(error.message, 'bad');
     return;
   }
   const { w, page } = choose(location.hash);
   open(w, page);
 }
+
+// Another tab signed somebody else in, or signed out; or the back button
+// brought this page out of the cache after that. This one follows, rather
+// than keep drawing a person the browser no longer holds.
+addEventListener('storage', (event) => {
+  if ((event.key === 'basu.guest' || event.key === null) && token() !== bootedAs) void boot();
+});
+addEventListener('pageshow', (event) => {
+  if (event.persisted && token() !== bootedAs) void boot();
+});
 
 // A link from the supplier's screen, or the back button: the address names another place or page.
 addEventListener('hashchange', () => {

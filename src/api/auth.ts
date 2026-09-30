@@ -5,6 +5,7 @@ import {
   appleConfigFromEnv,
   beginGoogle,
   completeGoogle,
+  endSession,
   googleConfigFromEnv,
   safeReturn,
   sendEmailCode,
@@ -72,6 +73,17 @@ export async function registerAuthRoutes(app: FastifyInstance, ctx: Ctx): Promis
     google: Boolean(googleConfigFromEnv()),
     apple: true,
   }));
+
+  /**
+   * Signing out: the session that asks ends on the server, and nothing else
+   * does. The same answer whether or not there was one to end, so it tells
+   * nobody anything about a token they try.
+   */
+  app.post('/v1/auth/sign-out', async (request, reply) => {
+    const header = request.headers.authorization;
+    if (header?.startsWith('Bearer ')) await endSession(header.slice(7), ctx.clock.now());
+    return reply.status(204).send();
+  });
 
   /* ── a code by email ── */
 

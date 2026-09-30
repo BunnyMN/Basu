@@ -3,6 +3,13 @@
    before it can be looked at is a PWA nobody looks at. */
 
 export const store = {
+  /**
+   * The person signed in on this browser — on the website, the dashboard and
+   * the supplier's screen alike. One browser holds one person. The dashboard
+   * once kept a sign-in of its own beside this one; nothing on the website
+   * touched it, and a browser where the admin had opened the desk opened it
+   * again for whoever signed in there next.
+   */
   get guestToken() {
     return localStorage.getItem('basu.guest');
   },
@@ -16,13 +23,49 @@ export const store = {
   set kitchenToken(v) {
     v ? localStorage.setItem('basu.kitchen', v) : localStorage.removeItem('basu.kitchen');
   },
-  get opsToken() {
-    return localStorage.getItem('basu.ops');
-  },
-  set opsToken(v) {
-    v ? localStorage.setItem('basu.ops', v) : localStorage.removeItem('basu.ops');
-  },
 };
+
+/**
+ * End a session on the server, not only in this browser: a token forgotten
+ * here but alive there is still a way in for whoever copies it. Nothing to
+ * wait for — forgotten here is signed out here, and the request outlives
+ * the page that sent it.
+ */
+export function endSession(token) {
+  if (!token) return;
+  fetch('/v1/auth/sign-out', { method: 'POST', headers: { authorization: `Bearer ${token}` }, keepalive: true }).catch(() => {});
+}
+
+/**
+ * A sign-in came in: from now on it is this browser's person. Whoever was
+ * signed in here before is signed out, on the server too — their session is
+ * not left alive in a browser that has moved on to somebody else.
+ */
+export function takeSession(token) {
+  const before = store.guestToken;
+  store.guestToken = token;
+  if (before && before !== token) endSession(before);
+}
+
+/** Sign the person out: forget the session here and end it there. */
+export function dropSession() {
+  const token = store.guestToken;
+  store.guestToken = null;
+  endSession(token);
+}
+
+// Earlier builds kept the dashboard's sign-in under a key of its own, and it
+// outlived every sign-in and sign-out on the rest of the site. It is dropped,
+// and ended on the server unless it is the very session the site holds.
+try {
+  const legacy = localStorage.getItem('basu.ops');
+  if (legacy) {
+    localStorage.removeItem('basu.ops');
+    if (legacy !== store.guestToken) endSession(legacy);
+  }
+} catch {
+  // No storage here: nothing was kept.
+}
 
 export class ApiError extends Error {
   constructor(status, body) {
@@ -149,10 +192,11 @@ export const authReturn = (() => {
   if (!token && !refused) return null;
   history.replaceState(null, '', location.pathname + location.search);
   if (token) {
-    // A page that keeps a session of its own — the desk and the kitchen,
-    // `data-session` on its root — decides where this one goes; everywhere
-    // else it is the guest's.
-    if (!document.documentElement.dataset.session) store.guestToken = token;
+    // The kitchen screen keeps a session of its own (`data-session` on its
+    // root) and decides where this one goes. Everywhere else — the dashboard
+    // too — the sign-in that just came back is the person, whoever was
+    // signed in here before.
+    if (!document.documentElement.dataset.session) takeSession(token);
     return { token };
   }
   setTimeout(() => toast(GOOGLE_REFUSALS[refused] ?? GOOGLE_REFUSALS.SOCIAL_REFUSED, 'bad'), 0);
@@ -223,7 +267,7 @@ export function signInDoors({
     </details>`;
   const $ = (selector) => box.querySelector(selector);
   const done = (token) => {
-    if (keep) store.guestToken = token;
+    if (keep) takeSession(token);
     onToken(token);
   };
 

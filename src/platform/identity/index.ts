@@ -42,6 +42,7 @@ export {
 export {
   ClosureError,
   closeAccount,
+  endSession,
   revokeOtherSessions,
   revokeSession,
   sessionsOf,

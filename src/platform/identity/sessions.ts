@@ -79,6 +79,21 @@ export async function revokeSession(guestId: string, sessionId: string, at: Date
   return (rowCount ?? 0) > 0;
 }
 
+/**
+ * Sign out here: the session this token is, and nothing else. A browser
+ * that only forgets its token has not signed anybody out — the server would
+ * still take that token from whoever copied it, out of a history, a stale
+ * tab, a key the page no longer reads.
+ */
+export async function endSession(token: string, at: Date): Promise<boolean> {
+  const { rowCount } = await getPool().query(
+    `UPDATE identity.guest_session SET revoked_at = $2
+      WHERE token_hash = $1 AND revoked_at IS NULL`,
+    [sha256(token), at],
+  );
+  return (rowCount ?? 0) > 0;
+}
+
 /* ── leaving ───────────────────────────────────────────────────────── */
 
 export class ClosureError extends Error {

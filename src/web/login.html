@@ -166,7 +166,7 @@
 </main>
 
 <script type="module">
-import { api, store, authReturn, authMethods } from '/api.js';
+import { api, store, authReturn, authMethods, takeSession } from '/api.js';
 import { safeNext } from '/site.js';
 
 const $ = (id) => document.getElementById(id);
@@ -213,7 +213,7 @@ const busy = async (button, work, errorBox) => {
   }
 };
 const signedIn = (token) => {
-  store.guestToken = token;
+  takeSession(token);
   arrive();
 };
 

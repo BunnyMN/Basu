@@ -178,7 +178,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;
 <div id="root"></div>
 
 <script type="module">
-import { api, store, shell, toast, mnt, money, KIND, dayLabel, signInDoors, accountWays, popup } from '/api.js';
+import { api, store, shell, toast, mnt, money, KIND, dayLabel, signInDoors, accountWays, popup, dropSession } from '/api.js';
 import { NAV_ICON, deskFrame } from '/sidenav.js';
 
 const root = document.getElementById('root');
@@ -199,12 +199,12 @@ const esc = (value) => {
  */
 const ORG = new URLSearchParams(location.search).get('org');
 /**
- * The person's own sign-in — made on this page, by the app, or on the
- * dashboard. Opened from the dashboard, the dashboard's session is the
- * person. A tablet on the counter is somebody who works there, signed in as
- * themselves, doing what their role allows.
+ * The person's own sign-in — made on this page, by the app, on the website
+ * or on the dashboard: one browser holds one person. A tablet on the
+ * counter is somebody who works there, signed in as themselves, doing what
+ * their role allows.
  */
-const token = () => (ORG ? store.opsToken || store.guestToken : store.guestToken || store.opsToken);
+const token = () => store.guestToken;
 /** The supplier's own routes: the token, and which business when the dashboard said. */
 const sup = (path, options = {}) => api(path, { ...options, token: token(), headers: ORG ? { 'x-basu-org': ORG } : {} });
 
@@ -255,9 +255,7 @@ function signOut() {
     askShell();
     return;
   }
-  const used = token();
-  if (store.guestToken === used) store.guestToken = null;
-  if (store.opsToken === used) store.opsToken = null;
+  dropSession();
   seat = null;
   if (ORG) {
     location.href = '/dashboard';
@@ -378,7 +376,6 @@ async function showApply() {
     if (error.status === 401) {
       if (shell.present) return askShell();
       if (store.guestToken === person) store.guestToken = null;
-      if (store.opsToken === person) store.opsToken = null;
       root.append(signInCard());
       return;
     }
@@ -1161,12 +1158,8 @@ async function openDesk(tabs) {
   show(tab);
 }
 
-/**
- * To the dashboard, as the same person: a session made on this page is the
- * dashboard's too, rather than a second sign-in for the one person.
- */
+/** To the dashboard, as the same person: the browser's one sign-in is the dashboard's too. */
 function toDashboard(hash) {
-  if (!store.opsToken && token()) store.opsToken = token();
   location.href = `/dashboard${hash}`;
 }
 

@@ -41,6 +41,18 @@ let seeded: Awaited<ReturnType<typeof seedDemo>>;
 const storage = memoryStorage();
 
 /**
+ * Another browser: somebody else's device with a store of its own — the
+ * desk at Basu's office, the tablet on a supplier's counter — beside the one
+ * the test's guest is on. One browser holds one person, so two people are
+ * two browsers. Given a session, somebody is already signed in on it.
+ */
+function device(token?: string): ReturnType<typeof memoryStorage> {
+  const browser = memoryStorage();
+  if (token) browser.setItem('basu.guest', token);
+  return browser;
+}
+
+/**
  * Pages opened by the current test. They are closed afterwards so their polling
  * stops: a jsdom window left running keeps hitting the API and, because the
  * store is shared the way a browser shares an origin, a zombie page can clear
@@ -60,6 +72,7 @@ async function openPage(
   file: string,
   search = '',
   respond?: (path: string) => Response | undefined,
+  browser: ReturnType<typeof memoryStorage> = storage,
 ): Promise<JSDOM> {
   const html = await readFile(join(WEB, file), 'utf8');
   const dom = new JSDOM(html, {
@@ -75,7 +88,7 @@ async function openPage(
     const canned = respond?.(String(input));
     return canned ? Promise.resolve(canned) : fetch(new URL(String(input), base).toString(), init);
   }) as typeof fetch;
-  Object.defineProperty(window, 'localStorage', { value: storage, writable: true });
+  Object.defineProperty(window, 'localStorage', { value: browser, writable: true });
 
   // Every local module the page imports, inlined. jsdom cannot resolve module
   // specifiers, so the pieces are concatenated and run as one script — the same
@@ -1139,8 +1152,7 @@ describe('өвлийн идэш', () => {
     expect(guest.window.document.querySelector('#refund')?.textContent).toContain('Basu ажлын өдөрт');
 
     /* the desk: one line to pay, then paid */
-    storage.removeItem('basu.ops');
-    const desk = await openPage('ops.html');
+    const desk = await openPage('ops.html', '', undefined, device());
     await until(desk, 'the secret prefilled', (d) =>
       Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
     );
@@ -1312,8 +1324,7 @@ describe('нийлүүлэгч болох', () => {
     ).toBe(false);
 
     /* the desk */
-    storage.removeItem('basu.ops');
-    const desk = await openPage('ops.html');
+    const desk = await openPage('ops.html', '', undefined, device());
     await until(desk, 'the secret prefilled', (d) =>
       Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
     );
@@ -1345,8 +1356,7 @@ describe('нийлүүлэгч болох', () => {
   });
 
   it('shows the seeded application waiting on the ops page', async () => {
-    storage.removeItem('basu.ops');
-    const desk = await openPage('ops.html');
+    const desk = await openPage('ops.html', '', undefined, device());
     await until(desk, 'the secret prefilled', (d) =>
       Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
     );
@@ -1357,9 +1367,7 @@ describe('нийлүүлэгч болох', () => {
   });
 
   it('opens on the whole house: what needs somebody, what is held, what the day brought', async () => {
-    storage.removeItem('basu.ops');
-    storage.removeItem('basu.ops.tab');
-    const desk = await openPage('ops.html');
+    const desk = await openPage('ops.html', '', undefined, device());
     await until(desk, 'the secret prefilled', (d) =>
       Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
     );
@@ -1380,8 +1388,7 @@ describe('нийлүүлэгч болох', () => {
   });
 
   it('finds a guest by phone and opens their file: wallet, lunches, meat, messages', async () => {
-    storage.removeItem('basu.ops');
-    const desk = await openPage('ops.html');
+    const desk = await openPage('ops.html', '', undefined, device());
     await until(desk, 'the secret prefilled', (d) =>
       Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
     );
@@ -1407,8 +1414,7 @@ describe('нийлүүлэгч болох', () => {
   });
 
   it('shows every kitchen and whether it is open, then the day’s lunches and one lunch’s story', async () => {
-    storage.removeItem('basu.ops');
-    const desk = await openPage('ops.html');
+    const desk = await openPage('ops.html', '', undefined, device());
     await until(desk, 'the secret prefilled', (d) =>
       Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
     );
@@ -1435,9 +1441,7 @@ describe('нийлүүлэгч болох', () => {
   });
 
   it('opens the books: the checks, every account, then the movements with a CSV to take away', async () => {
-    storage.removeItem('basu.ops');
-    storage.removeItem('basu.ops.money');
-    const desk = await openPage('ops.html');
+    const desk = await openPage('ops.html', '', undefined, device());
     await until(desk, 'the secret prefilled', (d) =>
       Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
     );
@@ -1456,9 +1460,7 @@ describe('нийлүүлэгч болох', () => {
   });
 
   it('shows what we told people, then how the machine is, and lets an admin turn a knob', async () => {
-    storage.removeItem('basu.ops');
-    storage.removeItem('basu.ops.notify');
-    const desk = await openPage('ops.html');
+    const desk = await openPage('ops.html', '', undefined, device());
     await until(desk, 'the secret prefilled', (d) =>
       Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value),
     );
@@ -1518,9 +1520,7 @@ describe('who sees what', () => {
     const owner = await account('+97688030001', 'Дорж');
     const staff = await account('+97688030003', 'Бат');
     const orgId = await business(owner, 'Хэрлэн мах · тест', { supplier: true }, [['+97688030003', 'staff']]);
-    storage.setItem('basu.ops', staff);
-    storage.removeItem('basu.dash.ws');
-    const dash = await openPage('ops.html');
+    const dash = await openPage('ops.html', '', undefined, device(staff));
     await until(dash, 'the business', (d) => Boolean(d.querySelector('.tabs [data-tab="idesh.today"]')));
     // Its front page draws: a door to each part the role opens.
     await until(dash, 'the front page', (d) => d.querySelectorAll('.org-doors .org-door').length === 2);
@@ -1545,8 +1545,7 @@ describe('who sees what', () => {
     const owner = await account('+97688030011', 'Сараа');
     await account('+97688030013', 'Туяа');
     const orgId = await business(owner, 'Алтан тогоо · тест', { restaurant: true });
-    storage.setItem('basu.ops', owner);
-    const dash = await openPage('ops.html', `#${orgId}/team`);
+    const dash = await openPage('ops.html', `#${orgId}/team`, undefined, device(owner));
     await until(dash, 'the team', (d) => d.querySelectorAll('tr[data-member]').length === 1);
     const doc = dash.window.document;
     // A restaurant: a menu, and no stall.
@@ -1568,12 +1567,10 @@ describe('who sees what', () => {
     const owner = await account('+97688030021', 'Болд');
     const accountant = await account('+97688030024', 'Номин');
     const orgId = await business(owner, 'Туул мах · тест', { supplier: true }, [['+97688030024', 'accountant']]);
-    storage.setItem('basu.ops', accountant);
-    const screen = await openPage('supplier.html', `?org=${orgId}`);
+    const screen = await openPage('supplier.html', `?org=${orgId}`, undefined, device(accountant));
     await until(screen, 'the module', (d) => d.querySelectorAll('.tabbar button[data-tab]').length > 0);
     expect([...screen.window.document.querySelectorAll('.tabbar button[data-tab]')].map((b) => (b as HTMLElement).dataset['tab'])).toEqual(['orders', 'money', 'profile']);
     expect(screen.window.document.querySelector('#supplier')?.textContent).toBe('Туул мах · тест');
-    storage.removeItem('basu.ops');
   });
 
   it('keeps the desk’s own pages to the roles that hold them', async () => {
@@ -1582,21 +1579,15 @@ describe('who sees what', () => {
     const finance = await account('+97688030031', 'Санхүү');
     const { account: chosen } = (await (await fetch(`${base}/v1/ops/whoami`, { headers: as(finance) })).json()) as { account: { id: string } };
     await fetch(`${base}/v1/ops/members`, { method: 'POST', headers: as(desk), body: JSON.stringify({ guest_id: chosen.id, role: 'finance' }) });
-    storage.setItem('basu.ops', finance);
-    storage.removeItem('basu.dash.ws');
-    storage.removeItem('basu.ops.tab');
-    const dash = await openPage('ops.html');
+    const dash = await openPage('ops.html', '', undefined, device(finance));
     await until(dash, 'the desk', (d) => Boolean(d.querySelector('.tabs [data-tab="money"]')));
     const seen = tabs(dash);
     expect(seen).toEqual(expect.arrayContaining(['overview', 'money', 'pay', 'audit']));
     for (const hidden of ['venues', 'lunches', 'notify', 'system', 'members']) expect(seen).not.toContain(hidden);
-    storage.removeItem('basu.ops');
   });
 
   it('shows a person nothing to ask of Basu’s desk: their corner has their businesses, and the way home', async () => {
-    storage.setItem('basu.ops', await account('+97688030041', 'Энгийн хүн'));
-    storage.removeItem('basu.dash.ws');
-    const dash = await openPage('ops.html');
+    const dash = await openPage('ops.html', '', undefined, device(await account('+97688030041', 'Энгийн хүн')));
     await until(dash, 'the corner', (d) => Boolean(d.querySelector('#org-list')));
     const doc = dash.window.document;
     expect(doc.querySelector('#view')?.textContent).not.toMatch(/ops эрх|Ops эрх|ops-ийн хэсэг/);
@@ -1605,14 +1596,11 @@ describe('who sees what', () => {
     // Out of the dashboard, to Basu's front page, in one press.
     expect(doc.querySelector('#go-home')?.getAttribute('href')).toBe('/');
     expect(doc.querySelector('.brand-home')?.getAttribute('href')).toBe('/');
-    storage.removeItem('basu.ops');
   });
 
   it('seats somebody an admin chose from Basu’s users, and the desk opens for them', async () => {
     const chosen = await account('+97688030051', 'Сонгосон ажилтан');
-    storage.setItem('basu.ops', await deskToken());
-    storage.removeItem('basu.dash.ws');
-    const desk = await openPage('ops.html');
+    const desk = await openPage('ops.html', '', undefined, device(await deskToken()));
     await opsTab(desk, 'members');
     const doc = desk.window.document;
     await until(desk, 'the members page', (d) => Boolean(d.querySelector('#add-member')));
@@ -1631,21 +1619,137 @@ describe('who sees what', () => {
     await until(desk, 'the new member in the table', (d) => [...d.querySelectorAll('#members tr[data-member]')].some((r) => r.textContent?.includes('Сонгосон ажилтан')));
 
     // The person opens the dashboard and the desk is there, in the role given.
-    storage.setItem('basu.ops', chosen);
-    storage.removeItem('basu.dash.ws');
-    storage.removeItem('basu.ops.tab');
-    const theirs = await openPage('ops.html');
+    const theirs = await openPage('ops.html', '', undefined, device(chosen));
     await until(theirs, 'the desk', (d) => Boolean(d.querySelector('.tabs [data-tab="overview"]')));
     expect(theirs.window.document.querySelector('.ws-btn')?.textContent).toContain('Зөвхөн харах');
-    storage.removeItem('basu.ops');
+  });
+});
+
+describe('one browser, one person', () => {
+  /*
+   * The dashboard kept its sign-in under a key of its own, and nothing on
+   * the website replaced or cleared it: a browser where the admin had opened
+   * the desk opened it again for whoever signed in there next, with any
+   * account at all. These are that browser.
+   */
+  async function account(phone: string, name: string): Promise<string> {
+    const made = await fetch(`${base}/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ phone, password: GUEST_PASSWORD, name }),
+    });
+    return ((await made.json()) as { token: string }).token;
+  }
+  /** Somebody an admin gave a seat at the desk, signed in. */
+  async function seated(phone: string, name: string): Promise<string> {
+    const token = await account(phone, name);
+    const as = (t: string) => ({ 'content-type': 'application/json', authorization: `Bearer ${t}` });
+    const desk = ((await (await fetch(`${base}/dev/ops-token`)).json()) as { token: string }).token;
+    const { account: who } = (await (await fetch(`${base}/v1/ops/whoami`, { headers: as(token) })).json()) as { account: { id: string } };
+    await fetch(`${base}/v1/ops/members`, { method: 'POST', headers: as(desk), body: JSON.stringify({ guest_id: who.id, role: 'admin' }) });
+    return token;
+  }
+  /** Whether the server has ended this session. A page's sign-out does not wait for the answer, so give it a moment. */
+  async function ended(token: string): Promise<boolean> {
+    for (let i = 0; i < 40; i++) {
+      if ((await fetch(`${base}/v1/me`, { headers: { authorization: `Bearer ${token}` } })).status === 401) return true;
+      await new Promise((resolve) => setTimeout(resolve, 60));
+    }
+    return false;
+  }
+  const noDesk = (dom: JSDOM) => dom.window.document.querySelector('.ws-opt[data-ws="desk"]') === null;
+  const nameOn = (dom: JSDOM) => dom.window.document.querySelector('.ws-btn')?.textContent ?? '';
+
+  it('drops the desk session an older page kept, ends it, and shows whoever is signed in now their own corner', async () => {
+    const admin = await seated('+97688050001', 'Админ Нэг');
+    const next = await account('+97688050002', 'Дараагийн хүн');
+    // What the old dashboard left: the admin's desk under its own key, and the next person signed in on the website.
+    const browser = device(next);
+    browser.setItem('basu.ops', admin);
+    const dash = await openPage('ops.html', '', undefined, browser);
+    await until(dash, 'the corner', (d) => Boolean(d.querySelector('#org-list')));
+    expect(nameOn(dash)).toContain('Дараагийн хүн');
+    expect(noDesk(dash)).toBe(true);
+    expect(browser.getItem('basu.ops')).toBeNull();
+    expect(browser.getItem('basu.guest')).toBe(next);
+    expect(await ended(admin)).toBe(true);
+  });
+
+  it('takes a sign-in that comes back from Google as the person, whoever was signed in before', async () => {
+    const admin = await seated('+97688050011', 'Админ Хоёр');
+    const next = await account('+97688050012', 'Google-ийн хүн');
+    const browser = device(admin);
+    const dash = await openPage('ops.html', `#auth=${next}`, undefined, browser);
+    await until(dash, 'the corner', (d) => Boolean(d.querySelector('#org-list')));
+    expect(nameOn(dash)).toContain('Google-ийн хүн');
+    expect(noDesk(dash)).toBe(true);
+    expect(browser.getItem('basu.guest')).toBe(next);
+    expect(await ended(admin)).toBe(true);
+  });
+
+  it('makes whoever signs in on the website the dashboard’s person too', async () => {
+    const admin = await seated('+97688050021', 'Админ Гурав');
+    await account('+97688050022', 'Вэбийн хүн');
+    const browser = device();
+    browser.setItem('basu.ops', admin);
+    const login = await openPage('login.html', '?next=/dashboard', undefined, browser);
+    const d = login.window.document;
+    await until(login, 'the door', () => d.documentElement.hasAttribute('data-ready'));
+    (d.querySelector('[data-go="password"]') as HTMLButtonElement).click();
+    const form = d.getElementById('pw-form') as HTMLFormElement;
+    (form.elements.namedItem('login') as HTMLInputElement).value = '+97688050022';
+    (form.elements.namedItem('password') as HTMLInputElement).value = GUEST_PASSWORD;
+    form.dispatchEvent(new login.window.Event('submit', { cancelable: true }));
+    await until(login, 'a session', () => Boolean(browser.getItem('basu.guest')));
+    expect(await ended(admin)).toBe(true);
+
+    const dash = await openPage('ops.html', '', undefined, browser);
+    await until(dash, 'the corner', (doc) => Boolean(doc.querySelector('#org-list')));
+    expect(nameOn(dash)).toContain('Вэбийн хүн');
+    expect(noDesk(dash)).toBe(true);
+  });
+
+  it('signs out of the desk on the server, not only in the browser', async () => {
+    const admin = await seated('+97688050031', 'Админ Дөрөв');
+    const browser = device(admin);
+    const dash = await openPage('ops.html', '', undefined, browser);
+    await until(dash, 'the desk', (d) => Boolean(d.querySelector('.ws-opt[data-ws="desk"]')));
+    (dash.window.document.querySelector('#out') as HTMLElement).click();
+    await until(dash, 'the door', (d) => Boolean(d.querySelector('.door')));
+    expect(browser.getItem('basu.guest')).toBeNull();
+    expect(await ended(admin)).toBe(true);
+  });
+
+  it('leaves no desk behind when the person signs out on the website', async () => {
+    const admin = await seated('+97688050041', 'Админ Тав');
+    const browser = device(admin);
+    const page = await openPage('account.html', '', undefined, browser);
+    await until(page, 'the account', (d) => Boolean(d.querySelector('#out')));
+    (page.window.document.querySelector('#out') as HTMLElement).click();
+    expect(await ended(admin)).toBe(true);
+    expect(browser.getItem('basu.guest')).toBeNull();
+
+    const dash = await openPage('ops.html', '', undefined, browser);
+    await until(dash, 'the door', (d) => Boolean(d.querySelector('.door')));
+    expect(noDesk(dash)).toBe(true);
+  });
+
+  it('never lends the supplier’s screen a session the browser no longer holds', async () => {
+    const admin = await seated('+97688050051', 'Админ Зургаа');
+    const browser = device();
+    browser.setItem('basu.ops', admin);
+    const screen = await openPage('supplier.html', '', undefined, browser);
+    await until(screen, 'the way in', (d) => Boolean(d.querySelector('#signin')));
+    expect(browser.getItem('basu.ops')).toBeNull();
+    expect(browser.getItem('basu.guest')).toBeNull();
+    expect(await ended(admin)).toBe(true);
   });
 });
 
 describe('Basu decides who may do what', () => {
   /** The demo's desk: the shared secret, prefilled, one press. */
   async function theDesk(): Promise<JSDOM> {
-    storage.removeItem('basu.ops');
-    const desk = await openPage('ops.html');
+    const desk = await openPage('ops.html', '', undefined, device());
     await until(desk, 'the secret prefilled', (d) => Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value));
     clickText(desk, '.pair button', 'Нэвтрэх');
     return desk;
@@ -1753,14 +1857,13 @@ describe('Basu decides who may do what', () => {
  */
 /**
  * A supplier's own screen, as its owner opens it from the dashboard: their
- * own session, and `?org=` naming the business. The guest pages in the same
- * test keep theirs.
+ * own device and session, and `?org=` naming the business. The guest pages
+ * in the same test stay on the guest's.
  */
 async function ownerScreen(phone: string): Promise<JSDOM> {
   const token = await devLogin(phone, 'Нийлүүлэгч');
   const seat = (await (await fetch(`${base}/v1/supplier/seat`, { headers: { authorization: `Bearer ${token}` } })).json()) as { org_id: string };
-  storage.setItem('basu.ops', token);
-  return openPage('supplier.html', `?org=${seat.org_id}`);
+  return openPage('supplier.html', `?org=${seat.org_id}`, undefined, device(token));
 }
 
 /** The screen of whoever sold the order with this code. */
