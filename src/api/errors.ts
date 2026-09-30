@@ -117,8 +117,9 @@ const AUTH_ERRORS: Record<AuthError['code'], Spec> = {
     // Only an app from before the code asks without one: iOS 1.0.3 sends an
     // empty `current` from «Нууц үг тохируулах», has no field for a code, and
     // shows these words as they are. So they say what is needed now, why
-    // that app cannot give it, and the two ways that can.
-    mn: 'Нууц үг тохируулахад бүртгэлийн тань имэйл рүү очих код хэрэгтэй болсон, харин аппын энэ хувилбар кодыг асуудаггүй. Аппаа App Store-оос шинэчлээд дахин оролдох, эсвэл Basu-гийн вэб сайтын «Бүртгэл» хуудаснаас тохируулна уу.',
+    // that app cannot give it, and the way that can today: the website. The
+    // app that asks for the code is the next one, not yet in the App Store.
+    mn: 'Нууц үг тохируулахад бүртгэлийн тань имэйл рүү очих код хэрэгтэй болсон, харин аппын энэ хувилбар кодыг асуудаггүй. Одоохондоо Basu-гийн вэб сайтын «Бүртгэл» хуудаснаас тохируулна уу — аппын дараагийн хувилбарт эндээс ч болно.',
   },
   PASSWORD_SET: { status: 409, mn: 'Таны бүртгэлд нууц үг аль хэдийн тохируулсан байна. Одоогийн нууц үгээрээ солино уу.' },
   SIGN_IN_AGAIN: {
