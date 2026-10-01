@@ -103,7 +103,16 @@ export function deskFrame({ workspaces, current, account, brand = 'Бизнес'
       .slice(0, 2)
       .map((w) => w[0].toUpperCase())
       .join('') || '?';
-  const mark = (ws) => `<span class="ws-mark" data-kind="${esc(ws.kind)}" aria-hidden="true">${ws.kind === 'desk' ? 'B' : esc(initials(ws.name))}</span>`;
+  /**
+   * A place's mark: «B» for Basu's desk, a business's first letters — and for
+   * the person's own corner, while their account has no name and the corner
+   * is called by the number or the address it signs in with, a person, as at
+   * the foot: never «+9», never two letters of an address.
+   */
+  const mark = (ws) =>
+    `<span class="ws-mark" data-kind="${esc(ws.kind)}" aria-hidden="true">${
+      ws.kind === 'desk' ? 'B' : (ws.kind === 'me' && !account?.name) || !/\p{L}/u.test(String(ws.name ?? '')) ? NAV_ICON.person : esc(initials(ws.name))
+    }</span>`;
   /** The place's menu, less any link the frame will not follow (`navHref`) and any module that leaves empty. */
   const shown = current.menu
     .map((g) => ({ ...g, items: g.items.filter((it) => !it.href || navHref(it.href)) }))

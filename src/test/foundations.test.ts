@@ -472,6 +472,30 @@ describe('the desk', () => {
     expect(byMail.querySelector('.deskbar-me')?.getAttribute('aria-label')).toBe('Нэвтэрсэн: basuappmn@gmail.com');
   });
 
+  it('marks the person’s own corner with a person while it is called by their number or address — never «+9»', () => {
+    const corner = (name: string) => ({ id: 'me', kind: 'me', name, sub: 'Миний бүртгэл', menu: access.current.menu });
+    const own = (name: string, account: unknown) =>
+      (window.deskFrame({ workspaces: [corner(name), access.workspaces[0]], current: corner(name), account, onPage: () => {}, onWorkspace: () => {}, onSignOut: () => {} }) as { root: HTMLElement })
+        .root;
+    for (const [name, account] of [
+      ['+976 8801 0001', { phone: '+97688010001' }],
+      ['basuappmn@gmail.com', { email: 'basuappmn@gmail.com' }],
+    ] as const) {
+      const root = own(name, account);
+      // the switcher's button and its line in the menu alike
+      const marks = root.querySelectorAll('.ws-btn .ws-mark, .ws-opt[data-ws="me"] .ws-mark');
+      expect(marks, name).toHaveLength(2);
+      for (const mark of marks) {
+        expect(mark.querySelector('svg'), name).not.toBeNull();
+        expect(mark.textContent, name).toBe('');
+      }
+    }
+    // A name of their own: its first letter, as at the foot. The desk keeps its «B».
+    const named = own('Ганхүлэг', { name: 'Ганхүлэг', phone: '+97688010001' });
+    expect(named.querySelector('.ws-btn .ws-mark')?.textContent).toBe('Г');
+    expect(named.querySelector('.ws-opt[data-ws="desk"] .ws-mark')?.textContent).toBe('B');
+  });
+
   it('keeps a server-side filter on an empty list — another choice may hold rows', () => {
     const t = window.dataTable({
       columns: [{ key: 'name', label: 'Нэр' }],

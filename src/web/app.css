@@ -859,6 +859,7 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 .ws-mark{flex:none;display:inline-grid;place-items:center;width:32px;height:32px;border-radius:var(--r-sm);background:var(--surface);border:1px solid var(--line-2);font-size:var(--t-cap);font-weight:600;letter-spacing:.02em;line-height:1;color:var(--ink-2)}
 .ws-mark[data-kind="desk"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .ws-mark[data-kind="me"]{border-radius:50%}
+.ws-mark svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .ws-text{display:flex;flex-direction:column;flex:1;min-width:0}
 .ws-text b{font-size:var(--t-body);font-weight:600;line-height:1.3;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ws-text small{margin-top:1px;font-size:var(--t-meta);line-height:1.35;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
