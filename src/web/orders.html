@@ -119,7 +119,7 @@
 </main>
 
 <script type="module">
-import { mnt, dayLabel, IDESH_HEADLINE, popup, whatWentWrong } from '/api.js';
+import { mnt, dayLabel, IDESH_STATE, IDESH_LIVE, popup, whatWentWrong } from '/api.js';
 import { mountFrame, requireSignIn, authed, esc, el, say, me, siteEmpty, howToBuy, statePill, tugrik, phoneShown } from '/site.js';
 
 const token = requireSignIn();
@@ -128,8 +128,10 @@ const page = document.getElementById('page');
 
 const PHOTO = (kind) => `/brand/meat/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}.webp`;
 const unitWord = (o) => (o.unit === 'whole' ? 'толгой' : 'кг');
-const LIVE = ['PAID', 'PREPARING', 'READY', 'DISPATCHED'];
-const pill = (state) => statePill(state, IDESH_HEADLINE[state]?.[0] ?? state);
+/** «Идэвхтэй»: paid for and not yet handed over — the same rule /home keeps. */
+const LIVE = IDESH_LIVE;
+/** A state in its one word, the same on every page: «Цуцлагдсан», «Хүлээлгэн өгсөн». */
+const pill = (state) => statePill(state, IDESH_STATE[state] ?? state);
 const MARK = {
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
@@ -336,19 +338,23 @@ async function refundBox(o) {
       sub: `<b>${esc(mnt(r.amount_mnt))}</b> энэ данс руу шилжинэ. Мөнгө тань руу очиж байгаа тул нууц үгээрээ баталгаажуулна.`,
       width: 520,
       submit: 'Данс илгээх',
+      // One column, top to bottom: an IBAN with its spaces is 24 characters, more than half this popup holds.
       fields: [
-        { name: 'bank', label: 'Банк', type: 'select', options: [['', 'Банкаа сонгоно уу'], ...BANKS.map((b) => [b, b]), [OTHER_BANK, 'Бусад банк']], required: true },
-        { name: 'other', label: 'Бусад банкны нэр', placeholder: 'Жагсаалтад байхгүй бол', hint: '«Бусад банк» сонгосон бол бичнэ үү.' },
-        { name: 'account', label: 'Дансны дугаар', inputmode: 'numeric', autocomplete: 'off', placeholder: '5012345678', required: true },
-        { name: 'holder', label: 'Данс эзэмшигчийн нэр', autocomplete: 'name', placeholder: 'Банкинд бүртгэлтэй нэр', required: true },
+        // «Бусад банк» opens the field for its name; any bank on the list needs none.
+        { name: 'bank', label: 'Банк', type: 'select', options: [['', 'Банкаа сонгоно уу'], ...BANKS.map((b) => [b, b]), [OTHER_BANK, 'Бусад банк']], required: true, wide: true, onChange: (bank, form) => form.show('other', bank === OTHER_BANK) },
+        { name: 'other', label: 'Банкны нэр', placeholder: 'Жагсаалтад байхгүй банк', required: true, wide: true },
+        // An IBAN starts with MN, so the keyboard is the one with letters; the spaces a bank prints it with are fine.
+        { name: 'account', label: 'Дансны дугаар', inputmode: 'text', autocomplete: 'off', placeholder: 'MN12 0005 0050 1234 5678', hint: 'IBAN (MN + 18 орон) эсвэл дансны дугаар (6–20 орон).', required: true, wide: true, attrs: { autocapitalize: 'characters', spellcheck: 'false' } },
+        { name: 'holder', label: 'Данс эзэмшигчийн нэр', autocomplete: 'name', placeholder: 'Банкинд бүртгэлтэй нэр', required: true, wide: true },
         { name: 'password', label: 'Нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true },
       ],
       onSubmit: async (v) => {
-        const account = v.account.replace(/\s+/g, '');
-        if (!/^\d{6,20}$/.test(account)) throw new Error('Дансны дугаар 6–20 оронтой тоо байна.');
-        if (v.holder.length < 2) throw new Error('Данс эзэмшигчийн нэрээ бичнэ үү.');
+        // The rule the server keeps: the spaces out, the letters up, then MN and 18 digits — or 6 to 20 digits.
+        const account = v.account.replace(/\s+/g, '').toUpperCase();
+        if (!/^(MN\d{18}|\d{6,20})$/.test(account)) throw Object.assign(new Error('IBAN бол MN + 18 орон, дансны дугаар бол 6–20 оронтой тоо байна.'), { field: 'account' });
+        if (v.holder.length < 2) throw Object.assign(new Error('Данс эзэмшигчийн нэрээ бичнэ үү.'), { field: 'holder' });
         const bank = v.bank === OTHER_BANK ? v.other : v.bank;
-        if (!bank) throw new Error('Банкныхаа нэрийг бичнэ үү.');
+        if (!bank) throw Object.assign(new Error('Банкныхаа нэрийг бичнэ үү.'), { field: v.bank === OTHER_BANK ? 'other' : 'bank' });
         try {
           await authed(`/v1/idesh/${o.id}/refund-account`, {
             method: 'POST',

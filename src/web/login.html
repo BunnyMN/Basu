@@ -140,7 +140,8 @@
         <h1>Нууц үгээр нэвтрэх</h1>
         <p class="l-lead">Бүртгэлтэй имэйл эсвэл утасны дугаар, нууц үгээ оруулна уу.</p>
         <form id="pw-form" novalidate>
-          <label class="s-field"><span>Имэйл эсвэл утасны дугаар</span><input class="s-input" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com · 8811 2233" aria-describedby="pw-error"></label>
+          <label class="s-field"><span>Имэйл эсвэл утасны дугаар</span><input class="s-input" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com · 8811 2233" aria-describedby="pw-login-error"></label>
+          <p class="s-error" id="pw-login-error" role="alert"></p>
           <label class="s-field"><span>Нууц үг</span><span class="l-eye"><input class="s-input" name="password" type="password" autocomplete="current-password" placeholder="Нууц үг" aria-describedby="pw-error"><button type="button" data-eye aria-label="Нууц үгийг харах" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
           <p class="s-error" id="pw-error" role="alert"></p>
           <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="submit">Нэвтрэх</button>
@@ -169,7 +170,8 @@
         <p class="l-lead">Утасны дугаар, өөрийн сонгосон нууц үгээр бүртгэл үүснэ.</p>
         <form id="signup-form" novalidate>
           <label class="s-field"><span>Нэр</span><input class="s-input" name="name" autocomplete="name" placeholder="Таны нэр"></label>
-          <label class="s-field"><span>Утасны дугаар</span><span class="s-affix"><i>+976</i><input class="s-input" name="phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="8811 2233" aria-describedby="signup-error"></span></label>
+          <label class="s-field"><span>Утасны дугаар</span><span class="s-affix"><i>+976</i><input class="s-input" name="phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="8811 2233" aria-describedby="signup-phone-error"></span></label>
+          <p class="s-error" id="signup-phone-error" role="alert"></p>
           <label class="s-field"><span>Нууц үг <small>— дор хаяж 8 тэмдэгт</small></span><span class="l-eye"><input class="s-input" name="password" type="password" autocomplete="new-password" placeholder="Нууц үг сонгох" aria-describedby="signup-error"><button type="button" data-eye aria-label="Нууц үгийг харах" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
           <p class="s-error" id="signup-error" role="alert"></p>
           <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="submit">Бүртгүүлэх</button>
@@ -246,18 +248,23 @@ for (const button of document.querySelectorAll('[data-go]')) {
 
 /**
  * What is wrong, said under the field it is about: the field in the stop
- * colour and the words between it and its button, until it is typed in again.
+ * colour and the words right under it — the login's under the login, not
+ * under the password after it — until it is typed in again. Whatever the
+ * form said before goes, so one thing is wrong at a time.
  */
 function flagField(input, box, message) {
   for (const marked of document.querySelectorAll('[aria-invalid]')) marked.removeAttribute('aria-invalid');
+  for (const said of input.form?.querySelectorAll('.s-error') ?? []) if (said !== box) said.textContent = '';
   box.textContent = message;
   input.setAttribute('aria-invalid', 'true');
   input.focus();
 }
+/** The line a field's words are said in: the one it is described by, else its form's own. */
+const errorOf = (input) => document.getElementById(input.getAttribute('aria-describedby') ?? '') ?? input.form?.querySelector('.s-error');
 document.addEventListener('input', (event) => {
   if (!event.target.hasAttribute?.('aria-invalid')) return;
   event.target.removeAttribute('aria-invalid');
-  const box = event.target.form?.querySelector('.s-error');
+  const box = errorOf(event.target);
   if (box) box.textContent = '';
 });
 
@@ -387,8 +394,9 @@ for (const eye of document.querySelectorAll('[data-eye]')) {
 $('pw-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const { login, password } = event.target.elements;
-  if (!login.value.trim()) return flagField(login, $('pw-error'), 'Имэйл эсвэл утасны дугаараа бичнэ үү.');
+  if (!login.value.trim()) return flagField(login, $('pw-login-error'), 'Имэйл эсвэл утасны дугаараа бичнэ үү.');
   if (!password.value) return flagField(password, $('pw-error'), 'Нууц үгээ бичнэ үү.');
+  $('pw-login-error').textContent = '';
   void busy(event.target.querySelector('[type="submit"]'), async () => {
     const { token } = await api('/v1/auth/login', {
       method: 'POST',
@@ -445,8 +453,9 @@ $('forgot-form').addEventListener('submit', (event) => {
 $('signup-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const { name, phone, password } = event.target.elements;
-  if (phone.value.replace(/\D/g, '').length < 8) return flagField(phone, $('signup-error'), 'Утасны дугаараа 8 оронтойгоор бичнэ үү.');
+  if (phone.value.replace(/\D/g, '').length < 8) return flagField(phone, $('signup-phone-error'), 'Утасны дугаараа 8 оронтойгоор бичнэ үү.');
   if (password.value.length < 8) return flagField(password, $('signup-error'), 'Нууц үг дор хаяж 8 тэмдэгт байх ёстой.');
+  $('signup-phone-error').textContent = '';
   void busy(event.target.querySelector('[type="submit"]'), async () => {
     const { token } = await api('/v1/auth/register', {
       method: 'POST',

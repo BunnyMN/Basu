@@ -126,7 +126,7 @@ main:has(.live[data-any]) .hello,main:has(.live[data-loading]) .hello{display:no
 </main>
 
 <script type="module">
-import { api, store, hhmm, mountClock, HEADLINE, IDESH_HEADLINE, dayShort } from '/api.js';
+import { api, store, hhmm, mountClock, HEADLINE, IDESH_HEADLINE, IDESH_STATE, headlineWord, dayShort } from '/api.js';
 
 /** Text into markup, never the other way: a supplier's name is a name. Quotes too, so nothing inside an attribute can end it. */
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -232,20 +232,12 @@ const SUB = {
   COOKING: 'Хоол хийгдэж байна',
 };
 
-/**
- * The chip's word for the lunch states the shared headline names by a time
- * instead of a word — in the status sheet's own words. Without them the chip
- * read «SCHEDULED»: the state's name in English, on the first screen.
+/*
+ * The chip's word is the state's one word, the same as on every other page:
+ * a lunch's from headlineWord() (LUNCH_WORD — «Хүлээн авсан», never
+ * «SCHEDULED»), an идэш's from IDESH_STATE («Цуцлагдсан», where the line
+ * under the name keeps the sentence: «Мөнгө буцаагдана»).
  */
-const DINE_WORD = {
-  SCHEDULED: 'Хүлээн авсан',
-  ARMED: 'Хөдлөх цаг',
-  COOKING: 'Гал дээр',
-  RESLOTTED: 'Цаг шилжсэн',
-};
-
-/** A state's word, whichever app it came from; never the raw name. */
-const wordFor = (headline, state) => headline[state]?.[0] ?? DINE_WORD[state] ?? '';
 
 /**
  * The colour of the dot at the head of a row: what the order is waiting on.
@@ -270,7 +262,7 @@ const TONE = {
  * does not know the difference.
  */
 function dineRow(order) {
-  const word = wordFor(HEADLINE, order.state);
+  const word = headlineWord(order.state);
   const cap = HEADLINE[order.state]?.[1] ?? '';
   const [time, label] = moment(order);
   return {
@@ -288,7 +280,7 @@ function dineRow(order) {
 }
 
 function ideshRow(order) {
-  const word = wordFor(IDESH_HEADLINE, order.state);
+  const word = IDESH_STATE[order.state] ?? '';
   const cap = IDESH_HEADLINE[order.state]?.[1] ?? '';
   return {
     // Noon on the day, in the restaurant's zone: a day, not an instant.

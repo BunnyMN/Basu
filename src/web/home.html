@@ -46,6 +46,12 @@ a.h-row:active{background:var(--surface-2)}
   .h-row img{width:56px;height:44px}
   .h-row .end{grid-column:2;flex-direction:row-reverse;flex-wrap:wrap-reverse;justify-content:flex-end;align-items:center;gap:6px 10px}
 }
+/* While the orders come: two rows in the shape of the live list's, so the page has its shape at once. */
+.h-wait .h-row{grid-template-columns:64px minmax(0,1fr) 96px}
+.h-wait .s-skel:nth-child(1){height:48px;border-radius:10px}
+.h-wait .s-skel:nth-child(2){height:38px;width:min(320px,90%)}
+.h-wait .s-skel:nth-child(3){height:38px}
+@media (max-width:560px){.h-wait .h-row{grid-template-columns:56px minmax(0,1fr)}.h-wait .s-skel:nth-child(1){height:44px}.h-wait .s-skel:nth-child(3){display:none}}
 .h-next{margin-top:32px}
 .h-hello{margin:0}
 </style>
@@ -64,12 +70,12 @@ a.h-row:active{background:var(--surface-2)}
 </main>
 
 <script type="module">
-import { api, store, dayShort, IDESH_HEADLINE } from '/api.js';
+import { api, store, dayShort, IDESH_STATE, IDESH_LIVE } from '/api.js';
 import { mountFrame, esc, el, loginUrl, siteEmpty, howToBuy, statePill } from '/site.js';
 
-const person = await mountFrame('home');
+// The header and the foot are drawn at once; who is signed in comes after — the tiles do not wait for it.
+const framed = mountFrame('home');
 const $ = (id) => document.getElementById(id);
-if (person?.display_name) $('hi').textContent = `Сайн байна уу, ${person.display_name}`;
 
 /**
  * The apps, as the phone's launcher has them — the same art. On the website
@@ -113,6 +119,17 @@ function nothingGoing(signedIn) {
 }
 
 const token = store.guestToken;
+if (token) {
+  // Somebody signed in has orders on the way, or the first step: either way the place holds its shape until they come.
+  $('home-next').replaceChildren(
+    el(`<div class="h-live h-wait" role="status" aria-busy="true" aria-label="Захиалга ачаалж байна">${'<div class="h-row" aria-hidden="true"><span class="s-skel"></span><span class="s-skel"></span><span class="s-skel"></span></div>'.repeat(2)}</div>`),
+  );
+}
+// Asked beside who it is, not after: the orders do not wait for the name either.
+const asked = token ? api('/v1/idesh', { token }).catch(() => null) : null;
+const person = await framed;
+if (person?.display_name) $('hi').textContent = `Сайн байна уу, ${person.display_name}`;
+
 if (!token || !person) {
   nothingGoing(false);
 } else {
@@ -123,29 +140,27 @@ if (!token || !person) {
     })
     .catch(() => {});
 
-  // What of theirs is going on: the meat still on its way.
-  try {
-    const { orders } = await api('/v1/idesh', { token });
-    const going = orders.filter((o) => o.state !== 'DRAFT');
-    if (going.length) {
-      const PHOTO = (kind) => `/brand/meat/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}.webp`;
-      // The day in the corner says what it is the day of.
-      const dayWord = (o) => (o.state === 'HANDED' ? 'авсан' : o.receive === 'delivery' ? 'хүргэх' : 'авах');
-      $('live-list').replaceChildren(
-        ...going.map((o) =>
-          el(`<a class="h-row" href="/orders/${o.id}" data-order="${o.id}">
-                <img src="${PHOTO(o.kind)}" alt="" loading="lazy" width="64" height="48">
-                <span><b>${esc(o.title)} × ${o.qty}</b><small><span class="mono">№${esc(o.code)}</span> · ${esc(o.supplier.name)}</small></span>
-                <span class="end">${o.state === 'CANCELLED' ? '' : `<span class="h-when">${dayShort(o.receive_on)}<small>${dayWord(o)}</small></span>`}${statePill(o.state, IDESH_HEADLINE[o.state]?.[0] ?? o.state)}</span>
-              </a>`),
-        ),
-      );
-      $('live').hidden = false;
-    } else {
-      nothingGoing(true);
-    }
-  } catch {
-    // Nothing to show is not an error on a home page; the next step still is.
+  // What of theirs is going on: the meat paid for and not yet in their hands — what «Миний захиалга» calls «Идэвхтэй».
+  // Handed over and cancelled are done; they are on «Миний захиалга» under «Дууссан».
+  const answer = await asked;
+  const going = (answer?.orders ?? []).filter((o) => IDESH_LIVE.includes(o.state));
+  if (going.length) {
+    const PHOTO = (kind) => `/brand/meat/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}.webp`;
+    // The day in the corner says what it is the day of.
+    const dayWord = (o) => (o.receive === 'delivery' ? 'хүргэх' : 'авах');
+    $('live-list').replaceChildren(
+      ...going.map((o) =>
+        el(`<a class="h-row" href="/orders/${o.id}" data-order="${o.id}">
+              <img src="${PHOTO(o.kind)}" alt="" loading="lazy" width="64" height="48">
+              <span><b>${esc(o.title)} × ${o.qty}</b><small><span class="mono">№${esc(o.code)}</span> · ${esc(o.supplier.name)}</small></span>
+              <span class="end"><span class="h-when">${dayShort(o.receive_on)}<small>${dayWord(o)}</small></span>${statePill(o.state, IDESH_STATE[o.state] ?? o.state)}</span>
+            </a>`),
+      ),
+    );
+    $('home-next').replaceChildren();
+    $('live').hidden = false;
+  } else {
+    // Nothing going on — or nothing could be asked: not an error on a home page; the next step still is.
     nothingGoing(true);
   }
 }

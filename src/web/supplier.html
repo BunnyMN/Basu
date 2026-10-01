@@ -98,7 +98,7 @@
   background:var(--surface-2);font-size:var(--t-pill);font-weight:500;line-height:1.2;color:var(--ink-2);
 }
 .ticket[data-lane="paid"] .top,.ticket[data-lane="dispatched"] .top{background:var(--route-soft);border-color:var(--route-line);color:var(--route)}
-.ticket[data-lane="preparing"] .top{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink)}
+.ticket[data-lane="preparing"] .top{background:var(--hi-soft);border-color:var(--hi-line);color:var(--hi-ink)}
 .ticket[data-lane="ready"] .top{background:var(--ready-soft);border-color:var(--ready-line);color:var(--ready)}
 .ticket .top .dot{margin:0}
 .ticket .top .id{font-family:var(--mono);font-size:var(--t-body-lg);font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);margin-left:4px}
@@ -130,6 +130,24 @@
 .board-skel .skel{height:14px}
 .board-skel .skel[data-h="band"]{height:24px}
 .board-skel .skel[data-h="btn"]{height:52px;margin-top:8px}
+/* the module's shape before the seat is known (waiting()): the frame at its sizes, bars where its words will be */
+.sup-wait .page-head > div{flex:1;min-width:0;display:grid;gap:10px}
+/* bars on the ground itself, not on a card: the hairline's tone, or the light ground swallows them */
+.sup-wait .page-head .skel{background:var(--line)}
+.sup-wait .wait-title{height:30px;width:min(220px,60%)}
+.sup-wait .page-head[data-large] .wait-title{height:34px}
+.sup-wait .wait-line{height:14px;width:min(180px,45%)}
+.sup-wait .kpi-band{margin-bottom:24px}
+.sup-wait .kpi{display:grid;gap:10px;padding:16px 18px}
+.sup-wait .ws-btn{background:var(--surface)}
+.sup-wait .ws-text{gap:6px}
+.sup-wait .ws-mark{background:var(--surface-2)}
+.sup-wait .wait-nav{display:grid;gap:14px;padding:10px 10px 0}
+.sup-wait .wait-nav .skel{height:14px;width:70%}
+.sup-wait .wait-nav .skel:nth-child(2n){width:52%}
+.sup-wait .topbar .title{display:grid;gap:6px}
+.sup-wait .wait-name{height:16px;width:min(200px,55%)}
+.sup-wait .wait-role{height:12px;width:min(120px,35%)}
 
 /* ── orders ── */
 .orders .tools{margin-bottom:16px}
@@ -221,7 +239,7 @@
 <div id="root"></div>
 
 <script type="module">
-import { api, store, shell, toast, mnt, money, KIND, dayLabel, dayShort, signInDoors, accountWays, authReturn, popup, dropSession } from '/api.js';
+import { api, store, shell, toast, mnt, money, KIND, IDESH_STATE, dayLabel, dayShort, signInDoors, accountWays, authReturn, popup, dropSession } from '/api.js';
 import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -506,9 +524,16 @@ async function showApply() {
   root.append(application ? statusCard(application, needsPhone) : applyForm(needsPhone));
 }
 
+/**
+ * A bank account as people write it — the spaces out, the letters up: the
+ * IBAN, MN and its 18 digits, or the plain 6–20 digit number. The server's
+ * own rule, word for word, so a number the page lets through is one the
+ * server takes (and the guest's refund account on /orders keeps it too).
+ */
+const ACCOUNT = /^(MN\d{18}|\d{6,20})$/;
+/** What a number the rule refuses is told, under its field. */
+const ACCOUNT_WORDS = 'IBAN бол MN-ээр эхэлсэн 20 тэмдэгт, эсвэл 6–20 оронтой дансны дугаар бичнэ үү.';
 /** The banks a person in Ulaanbaatar has an account at, most common first. */
-/** A bank account as people write it: the plain number, or the IBAN with its MN and two check digits. */
-const ACCOUNT = /^(MN\d{2})?\d{6,20}$/;
 const BANKS = ['Хаан банк', 'Голомт банк', 'Худалдаа хөгжлийн банк', 'Хас банк', 'Төрийн банк', 'Капитрон банк', 'Ариг банк', 'Богд банк', 'М банк'];
 
 /**
@@ -556,7 +581,7 @@ function applyForm(needsPhone = false) {
           <p class="cap">Мөнгө тань энэ данс руу очно — гэрээнд бичигдэж, Basu тулгаж шалгана. Одоо бөглөхгүй бол дараа нь профайлаасаа нэмнэ.</p>
           <label class="field"><span>Банк</span><input name="bank_name" list="banks" autocomplete="off"></label>
           <datalist id="banks">${BANKS.map((b) => `<option value="${b}">`).join('')}</datalist>
-          <label class="field"><span>Дансны дугаар</span><input name="bank_account" inputmode="numeric" autocomplete="off"></label>
+          <label class="field"><span>Дансны дугаар</span><input name="bank_account" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="MN12 0005 0050 1234 5678"><small>IBAN (MN + 18 орон) эсвэл дансны дугаар (6–20 орон).</small></label>
           <label class="field"><span>Данс эзэмшигчийн нэр</span><input name="bank_holder" autocomplete="name"><small>Гэрээнд гарын үсэг зурах хүний нэр.</small></label>
         </div>
         <div class="foot"><button class="btn" data-v="primary" data-size="lg" type="button" id="submit">Хүсэлт илгээх</button></div>
@@ -586,7 +611,7 @@ function applyForm(needsPhone = false) {
     say('address', v('address').length < 4 ? 'Зочин ирж авах газраа бичнэ үү.' : null);
     say('tin', v('tin') && !/^\d{7,10}$/.test(v('tin')) ? 'ТТД 7–10 оронтой тоо байна.' : null);
     const account = v('bank_account').replace(/\s+/g, '').toUpperCase();
-    say('bank_account', account && !ACCOUNT.test(account) ? 'Дансны дугаар 6–20 оронтой тоо, эсвэл MN-ээр эхэлсэн IBAN байна.' : null);
+    say('bank_account', account && !ACCOUNT.test(account) ? ACCOUNT_WORDS : null);
     wrong[0]?.focus();
     return wrong.length === 0;
   };
@@ -683,9 +708,9 @@ const LANES = [
   { key: 'ready', title: 'Өгөх, хүргэх' },
   { key: 'dispatched', title: 'Замд яваа' },
 ];
-/** The order state each lane holds, and the tone its band takes. */
+/** The order state each lane holds, and the tone its band takes: «бэлтгэж байна» in honey, as its chip is everywhere. */
 const LANE_STATE = { paid: 'PAID', preparing: 'PREPARING', ready: 'READY', dispatched: 'DISPATCHED' };
-const STATE_TONE = { PAID: 'route', PREPARING: 'accent', READY: 'ready', DISPATCHED: 'route', HANDED: 'ready', CLOSED: 'ready' };
+const STATE_TONE = { PAID: 'route', PREPARING: 'hi', READY: 'ready', DISPATCHED: 'route', HANDED: 'ready', CLOSED: 'ready' };
 
 /**
  * The server's day. The demo's clock is not the browser's, and an order
@@ -1326,14 +1351,15 @@ async function addListing() {
       { name: 'kind', label: 'Мал', type: 'select', options: Object.entries(KIND), value: 'sheep' },
       { name: 'unit', label: 'Яаж зарах', type: 'select', options: [['whole', 'Бүтэн мал'], ['kg', 'Кг-аар']], value: 'whole' },
       { name: 'title', label: 'Гарчиг', required: true, wide: true, hint: 'Зочид энэ нэрээр харна. Жишээ нь: Хонь, залуу ирэг.' },
-      { name: 'price_mnt', label: 'Нэг толгойн үнэ', inputmode: 'numeric', required: true },
+      // Money fields group the tögrög as they are typed («460,000 ₮») and hand the answer the digits.
+      { name: 'price_mnt', label: 'Нэг толгойн үнэ', format: 'money', required: true },
       { name: 'approx_kg', label: 'Ойролцоо жин', inputmode: 'decimal', hint: 'Бодит жин зөрсөн ч үнэ өөрчлөгдөхгүй.' },
       { name: 'min_qty', label: 'Доод захиалга', inputmode: 'numeric', hint: 'Зочин хамгийн багадаа хэдэн кг авах вэ.' },
       { name: 'quantity', label: 'Хэдэн толгой байгаа', inputmode: 'numeric', required: true },
       { name: 'ready_from', label: 'Бэлэн болох өдөр', type: 'date', value: weekFrom(day), required: true },
       { name: 'origin', label: 'Гарал', required: true, wide: true, hint: 'Мах хаанаас ирж байгаа: аймаг, сум, эсвэл хотын махны газар.' },
       { type: 'checks', label: 'Хүргэлт', options: [['delivers', 'Хүргэлт хийнэ', false, { hint: 'Хүргэлтийн үйлчилгээгээр зочны хаяг руу хүргүүлнэ — төлбөр нь бүтнээрээ танд.' }]] },
-      { name: 'delivery_fee_mnt', label: 'Хүргэлтийн төлбөр', inputmode: 'numeric', hint: 'Үнэгүй хүргэх бол 0.' },
+      { name: 'delivery_fee_mnt', label: 'Хүргэлтийн төлбөр', format: 'money', hint: 'Үнэгүй хүргэх бол 0.' },
       { name: 'note', label: 'Тайлбар (заавал биш)', type: 'textarea', placeholder: 'Толгой, дотор мөнтэйгээ…' },
     ],
     submit: 'Зар нэмэх',
@@ -1360,10 +1386,8 @@ async function addListing() {
   });
   const sheet = document.getElementById('listing-new');
   noKeyboard(sheet);
-  affix(sheet, 'price_mnt', '₮');
   affix(sheet, 'approx_kg', 'кг');
   affix(sheet, 'min_qty', 'кг');
-  affix(sheet, 'delivery_fee_mnt', '₮');
   const unit = sheet?.querySelector('[name="unit"]');
   const syncUnit = () => {
     const kg = unit.value === 'kg';
@@ -1396,12 +1420,12 @@ async function editListing(l) {
     width: 640,
     fields: [
       { name: 'title', label: 'Гарчиг', value: l.title, required: true, wide: true },
-      { name: 'price_mnt', label: kg ? '1 кг-ийн үнэ' : 'Нэг толгойн үнэ', inputmode: 'numeric', value: String(l.price_mnt), required: true },
+      { name: 'price_mnt', label: kg ? '1 кг-ийн үнэ' : 'Нэг толгойн үнэ', format: 'money', value: String(l.price_mnt), required: true },
       { name: 'quantity', label: kg ? 'Нийт хэдэн кг' : 'Нийт хэдэн толгой', inputmode: 'numeric', value: String(l.quantity), required: true, hint: l.sold ? `${l.sold} нь зарагдсан — үүнээс бага болгохгүй.` : 'Одоогоор зарагдаагүй.' },
       { name: 'ready_from', label: 'Бэлэн болох өдөр', type: 'date', value: l.ready_from, required: true },
       { type: 'checks', label: 'Хүргэлт', options: [['delivers', 'Хүргэлт хийнэ', Boolean(l.delivers)]] },
       // A listing that did not deliver offers no fee to keep: ticking delivery asks for one, never assumes 0.
-      { name: 'delivery_fee_mnt', label: 'Хүргэлтийн төлбөр', inputmode: 'numeric', value: l.delivers ? String(l.delivery_fee_mnt ?? 0) : '', hint: 'Үнэгүй хүргэх бол 0.' },
+      { name: 'delivery_fee_mnt', label: 'Хүргэлтийн төлбөр', format: 'money', value: l.delivers ? String(l.delivery_fee_mnt ?? 0) : '', hint: 'Үнэгүй хүргэх бол 0.' },
       { name: 'note', label: 'Тайлбар (заавал биш)', type: 'textarea', value: l.note ?? '' },
       { type: 'checks', label: 'Зочдод', options: [['active', 'Зочдод харагдана', Boolean(l.active), { hint: 'Арилгавал зар зогсож, шинэ захиалга авахгүй. Авсан захиалга хэвээр.' }]] },
     ],
@@ -1426,8 +1450,6 @@ async function editListing(l) {
   });
   const sheet = document.getElementById('listing-edit');
   noKeyboard(sheet);
-  affix(sheet, 'price_mnt', '₮');
-  affix(sheet, 'delivery_fee_mnt', '₮');
   wireDelivery(sheet);
   if (!(await done)) return;
   toast('Хадгалагдлаа.', 'good');
@@ -1580,7 +1602,8 @@ async function changeBank(b) {
     width: 560,
     fields: [
       { name: 'bank_name', label: 'Банк', value: b.bank_name ?? '', required: true },
-      { name: 'bank_account', label: 'Дансны дугаар', inputmode: 'numeric', value: b.bank_account ?? '', required: true },
+      // An IBAN starts with MN: the keyboard with letters, the letters up as they are typed.
+      { name: 'bank_account', label: 'Дансны дугаар', inputmode: 'text', autocomplete: 'off', placeholder: 'MN12 0005 0050 1234 5678', hint: 'IBAN (MN + 18 орон) эсвэл дансны дугаар (6–20 орон).', value: b.bank_account ?? '', required: true, attrs: { autocapitalize: 'characters', spellcheck: 'false' } },
       { name: 'bank_holder', label: 'Данс эзэмшигчийн нэр', value: b.bank_holder ?? '', required: true, wide: true },
       { name: 'password', label: 'Таны нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true, hint: 'Мөнгө очих газар солигдож байгаа тул өөрийн нууц үгээр баталгаажуулна.' },
       { type: 'note', text: 'Basu санхүү шинэ дансыг гэрээтэй тулгаж баталгаажуулах хүртэл олголт хийгдэхгүй. Солигдсоныг эзэн бүрт мессежээр мэдэгдэнэ.' },
@@ -1588,7 +1611,7 @@ async function changeBank(b) {
     submit: 'Хадгалах',
     onSubmit: async (v) => {
       const account = v.bank_account.replace(/\s+/g, '').toUpperCase();
-      const badForm = 'Дансны дугаар 6–20 оронтой тоо, эсвэл MN-ээр эхэлсэн IBAN байна.';
+      const badForm = ACCOUNT_WORDS;
       if (!ACCOUNT.test(account)) throw refuse('bank_account', badForm);
       try {
         await sup('/v1/supplier/profile', {
@@ -1882,7 +1905,8 @@ async function openDesk(tabs) {
     workspaces,
     current,
     account,
-    brand: 'Нийлүүлэгч',
+    // The same place the dashboard opens, under the same name: Basu Бизнес. The page's title still says Нийлүүлэгч.
+    brand: 'Бизнес',
     // Inside the app its own launcher is home; the corner button already goes there.
     home: shell.present ? null : '/',
     onPage: (item) => {
@@ -1958,19 +1982,16 @@ async function renderHome() {
   setTodo(todo);
   // Nothing yet — three zeros say less than the empty day below them.
   if (!todo && !h.season.handed && !h.season.payout_mnt) return;
-  const k = (n, unit) => `${n} ${unit === 'kg' ? 'кг' : 'толгой'}`;
+  // The same numbers under the same names and lines as the business's home on the dashboard: one place, one way of saying it.
+  const due = [h.due_today ? `${h.due_today} нь өнөөдөр авна` : '', h.overdue ? `${h.overdue} нь хоцорсон` : ''].filter(Boolean).join(' · ');
   const cells = [
     el(`<div class="card stat kpi"${h.overdue ? ' data-tone="warn"' : ''}><div class="lab">Хийх ажил</div><b>${todo}</b><span>${
-      todo
-        ? [h.due_today ? `${h.due_today} нь өнөөдөр авна` : '', h.overdue ? `${h.overdue} зочин ирээгүй` : ''].filter(Boolean).join(' · ') || 'захиалга хүлээж байна'
-        : 'хийх ажил алга'
+      todo ? due || 'хүлээлгэн өгөөгүй захиалга' : 'одоогоор хийх захиалга алга'
     }</span></div>`),
-    el(`<div class="card stat kpi"><div class="lab">Хүлээлгэн өгсөн</div><b>${h.season.handed}</b><span>${
-      esc(h.season.by_kind.map((b) => `${KIND[b.kind] ?? b.kind} ${k(b.qty, b.unit)}`).join(', ')) || 'энэ улирал'
-    }</span></div>`),
+    el(`<div class="card stat kpi"><div class="lab">Энэ улиралд</div><b>${h.season.handed}</b><span>зочинд хүлээлгэн өгсөн</span></div>`),
     ...(h.season.payout_mnt === null
       ? []
-      : [el(`<div class="card stat kpi"><div class="lab">Танд очих орлого</div><b>${money(h.season.payout_mnt)}</b><span>энэ улирал${h.season.forfeit_mnt ? ` · суутгал ${mnt(h.season.forfeit_mnt)}` : ''}</span></div>`)]),
+      : [el(`<div class="card stat kpi"><div class="lab">Танд очих</div><b>${money(h.season.payout_mnt)}</b><span>энэ улирлын орлого, шимтгэл хассан${h.season.forfeit_mnt ? ` · суутгал ${mnt(h.season.forfeit_mnt)}` : ''}</span></div>`)]),
   ];
   // Three on a phone: the work on a line of its own, the season's two under it.
   if (cells.length === 3) cells[0].setAttribute('data-span', '');
@@ -2124,10 +2145,8 @@ async function loadOrders() {
   }
 }
 
-const STATE_WORD = {
-  PAID: 'Төлсөн', PREPARING: 'Бэлтгэж байна', READY: 'Бэлэн', DISPATCHED: 'Замд',
-  HANDED: 'Өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан', REFUNDED: 'Буцаасан',
-};
+/** A state in its one word — «Хүлээлгэн өгсөн», «Цуцлагдсан» — the word the guest's pages and the desk say for the same order (api.js). */
+const STATE_WORD = IDESH_STATE;
 const EVENT_WORD = {
   CREATED: 'Захиалга үүссэн', PAID: 'Төлсөн', PREPARING: 'Бэлтгэж эхэлсэн', READY: 'Бэлэн болсон',
   DISPATCHED: 'Замд гарсан', HANDED: 'Хүлээлгэн өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан',
@@ -2304,6 +2323,8 @@ async function boot() {
   root.replaceChildren();
   applyDesk();
   seat = null;
+  // Somebody signed in is shown the shape of the module at once — not a blank screen while the seat is asked.
+  if (token()) waiting();
   // Back from Google, the code in the address is claimed first: the session
   // it becomes is this browser's person (api.js, authReturn).
   await authReturn;
@@ -2311,22 +2332,72 @@ async function boot() {
     showLanding();
     return;
   }
+  if (!root.firstElementChild) waiting();
   try {
     seat = await sup('/v1/supplier/seat');
     openModule();
     return;
   } catch (error) {
     if (error.status === 403) {
-      root.append(notHere(error.message));
+      root.replaceChildren(notHere(error.message));
       return;
     }
     if (error.status !== 401) {
       toast(error.message, 'bad');
+      root.replaceChildren(cannotReach(error.message));
       return;
     }
   }
   // Not a seat at a contracted supplier: still applying, or not signed in at all.
   showApply();
+}
+
+/**
+ * The module's shape while the seat is on its way: at a desk the dashboard's
+ * frame — Basu Бизнес, the place, the menu, the page — at its sizes and pinned
+ * light as the frame is; on a phone the bar, the tab bar and the day's work,
+ * in the phone's own light or dark. Bars, never words that could be wrong.
+ */
+function waiting() {
+  const desk = isDesk();
+  if (desk) document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.removeAttribute('data-theme');
+  const page = `
+    <div class="page-head head"${desk ? '' : ' data-large'}><div><span class="skel wait-title"></span><span class="skel wait-line"></span></div></div>
+    <div class="kpis kpi-band skel-kpis">${'<div class="kpi"><span class="skel" data-w="40"></span><span class="skel skel-kpi"></span><span class="skel" data-w="60"></span></div>'.repeat(3)}</div>
+    <div class="board-skel">${'<div class="card"><span class="skel" data-h="band"></span><span class="skel" data-w="60"></span><span class="skel" data-w="80"></span><span class="skel" data-w="40"></span><span class="skel" data-h="btn"></span></div>'.repeat(2)}</div>`;
+  root.replaceChildren(
+    el(
+      desk
+        ? `<div class="app desk-frame sup-wait" role="status" aria-busy="true" aria-label="Ачаалж байна">
+            <aside class="side sidebar" aria-hidden="true">
+              <div class="brand"><b>Basu</b><span>Бизнес</span></div>
+              <div class="ws"><div class="ws-btn"><span class="ws-mark"></span><span class="ws-text"><span class="skel" data-w="80"></span><span class="skel" data-w="40"></span></span></div></div>
+              <div class="wait-nav">${'<span class="skel"></span>'.repeat(7)}</div>
+            </aside>
+            <main class="main"><div class="page" aria-hidden="true">${page}</div></main>
+          </div>`
+        : `<div class="shell sup-wait" role="status" aria-busy="true" aria-label="Ачаалж байна">
+            <header class="bar topbar sup" aria-hidden="true"><div class="title"><span class="skel wait-name"></span><span class="skel wait-role"></span></div></header>
+            <main class="view" aria-hidden="true">${page}</main>
+          </div>`,
+    ),
+  );
+}
+
+/** The seat could not be asked — the network, the server: said where the module would be, with the way to try again. */
+function cannotReach(message) {
+  const card = el('<div class="door"></div>');
+  card.append(
+    blank({
+      icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0"/><path d="M12 19h.01M3 3l18 18"/></svg>',
+      title: 'Basu-д холбогдож чадсангүй',
+      text: message || 'Интернэтээ шалгаад дахин оролдоно уу.',
+      action: { label: 'Дахин оролдох', primary: true, id: 'retry', onClick: () => void boot() },
+      frame: true,
+    }),
+  );
+  return card;
 }
 
 /** Opened from the dashboard for a business this person does not work at as a supplier. */
