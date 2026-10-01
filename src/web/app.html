@@ -239,6 +239,7 @@ const DINE_WORD = {
   SCHEDULED: 'Хүлээн авсан',
   ARMED: 'Хөдлөх цаг',
   COOKING: 'Гал дээр',
+  RESLOTTED: 'Цаг шилжсэн',
 };
 
 /** A state's word, whichever app it came from; never the raw name. */
@@ -252,7 +253,7 @@ const wordFor = (headline, state) => headline[state]?.[0] ?? DINE_WORD[state] ??
  */
 const TONE = {
   PLACED: 'route', ACCEPTED: 'route', SCHEDULED: 'route', PAID: 'route', DISPATCHED: 'route',
-  ARMED: 'hold', DRAFT: 'hold',
+  ARMED: 'hold', DRAFT: 'hold', RESLOTTED: 'hold',
   FIRED: 'hi', COOKING: 'hi', PREPARING: 'hi',
   READY: 'ready', SERVED: 'ready', CLOSED: 'ready', HANDED: 'ready',
   HELD: 'stop',

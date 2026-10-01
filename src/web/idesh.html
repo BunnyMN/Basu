@@ -37,6 +37,8 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 #bar .title{opacity:1;transition:opacity var(--dur) var(--ease)}
 #bar[data-flat]{background:transparent;border-bottom-color:transparent;-webkit-backdrop-filter:none;backdrop-filter:none}
 #bar[data-flat] .title{opacity:0}
+/* a later look that failed: one line under the bar, over the list and over a stall's screen alike */
+#stale{position:fixed;left:0;right:0;top:calc(var(--bar-h) + var(--safe-t));z-index:calc(var(--z-sheet) + 1)}
 
 /* ── the list ────────────────────────────────────────────────────── */
 #list.wrap{padding-top:0}
@@ -309,6 +311,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
   <div class="title" aria-hidden="true"><b>Өвлийн идэш</b></div>
   <span class="act"></span>
 </header>
+<div class="stale-strip" id="stale" role="status" hidden>Холболт тасарлаа — дахин холбогдож байна…</div>
 
 <main class="wrap" id="list">
   <div class="intro">
@@ -346,7 +349,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
   <section class="how" id="how" hidden>
     <h2 class="section-title">Хэрхэн авах вэ?</h2>
     <ol data-rows>
-      <li><b>Зараа сонгоод төлнө</b><span>Үнэ нь зар дээр бичсэнээрээ эцсийнх. Түрийвчнээс, дутвал QPay-ээр.</span></li>
+      <li><b>Зараа сонгоод төлнө</b><span>Үнэ нь зар дээр бичсэнээрээ эцсийнх — нэг удаа, бүтнээр нь төлнө.</span></li>
       <li><b>Нийлүүлэгч бэлтгэнэ</b><span>Төлбөр орсны дараа малаа нядалж, махыг бэлтгэнэ. Явц нь энд харагдана.</span></li>
       <li><b>Кодоо хэлээд авна</b><span>Өөрөө очиж, эсвэл гэртээ хүргүүлж авна. Нийлүүлэгч кодыг тань сонсоод махыг өгнө.</span></li>
     </ol>
@@ -484,7 +487,9 @@ function settleBar() {
   barFrame = 0;
   const bar = $('bar');
   const title = $('title');
-  const under = title.getBoundingClientRect().bottom <= bar.getBoundingClientRect().bottom;
+  // Glass as soon as the big title starts under the bar, not once it is all
+  // gone: between the two it drew over «‹ Basu» on a clear bar.
+  const under = title.getBoundingClientRect().top < bar.getBoundingClientRect().bottom;
   bar.toggleAttribute('data-flat', !under);
 }
 addEventListener('scroll', () => {
@@ -537,11 +542,14 @@ async function loadListings() {
   } catch (error) {
     if (gone) return false;
     // Nothing drawn yet: the skeleton must not wait for ever. Stalls already
-    // on the screen stay; they are still what was on sale a moment ago.
+    // on the screen stay; they are still what was on sale a moment ago, and
+    // the strip under the bar says they may be out of date.
     if (!state.loaded) showBlank('offline');
+    else showStale(true);
     return false;
   }
   if (gone) return false;
+  showStale(false);
   state.loaded = true;
   if (token) void paintMe(token);
   const { today, listings } = answer;
@@ -681,10 +689,18 @@ function priceFor(l) {
 /**
  * «9-р сарын 20-нөөс · Улаанбаатар · Хүргэлттэй» — the day first, because it
  * is what a buyer plans around; one run, no whitespace between the items so
- * the dots space evenly. In the list the origin is left out (`where: false`):
- * the supplier's name above it nearly always says the same place, and three
- * parts wrapped every row onto three lines.
+ * the dots space evenly. In the list the origin is left out (`where: false`)
+ * only when the supplier's name already says the place (`placeInName`).
  */
+/**
+ * «Архангай · Доржийн хот айл» selling meat from «Архангай, Их тамир» says
+ * the place twice; «GH impex» selling «Хөвсгөл тайга» says it nowhere else.
+ */
+function placeInName(l) {
+  const place = String(l.origin ?? '').split(/[,·]/)[0].trim();
+  return !place || l.supplier.name.includes(place);
+}
+
 function bits(l, day, { where = true } = {}) {
   return [
     `<span>${MARK.day}${day}</span>`,
@@ -729,7 +745,7 @@ function paintListings() {
             <span class="from">${
               l.supplier.contracted ? `<i class="verified badge">${MARK.check}Гэрээт</i>` : ''
             }${escapeHtml(l.supplier.name)}</span>
-            <span class="bits">${bits(l, `${dayLabel(l.ready_from)}-нөөс`, { where: false })}</span>
+            <span class="bits">${bits(l, `${dayLabel(l.ready_from)}-нөөс`, { where: !placeInName(l) })}</span>
           </span>
           <span class="row">
             <span class="left chip"${gone_ ? ' data-gone' : low ? ' data-low data-tone="hold" data-strong' : ''}>${
@@ -1309,15 +1325,19 @@ async function placeOrder() {
     if (bought.what !== JSON.stringify(body)) toast('Өмнөх захиалга тань төлөгдсөн байна.');
   } catch (error) {
     const said = whatWentWrong(error);
-    toast(said, 'bad');
     // Paid for, and only the look at it failed: a bought animal never offers
     // its Pay button again. The button stays busy, and the next poll draws
-    // the order in the review's place as soon as the network lets it.
-    if (paid) return;
+    // the order in the review's place as soon as the network lets it; the
+    // toast is the only place to say so.
+    if (paid) {
+      toast(said, 'bad');
+      return;
+    }
     button.disabled = false;
     button.textContent = 'Төлөх';
-    // The reason stays where the press was, after the toast has gone, until
-    // the next press.
+    // Not paid: the reason is said where the press was, above the button,
+    // until the next press — not in a toast, which lay over the button for
+    // three seconds and swallowed the tap that would have tried again.
     if (!gone && button.isConnected) {
       const why = el(`<p class="why" data-tone="stop" role="alert">${MARK.warn}<span></span></p>`);
       why.querySelector('span').textContent = said;
@@ -1541,6 +1561,7 @@ async function showStatus(force, { replace = false } = {}) {
   if (!state.orderId) return;
   const order = await guestApi(`/v1/idesh/${state.orderId}`);
   if (gone || !state.orderId) return;
+  showStale(false);
   // The attempt that bought this order is over: the order is on the screen.
   if (attempt?.order === order.id) attempt = null;
 
@@ -1706,10 +1727,20 @@ async function loadMine() {
   try {
     const { orders } = await guestApi('/v1/idesh');
     if (gone) return;
+    showStale(false);
     paintMine(orders);
-  } catch {
-    if (!gone) paintMine([]);
+  } catch (error) {
+    if (gone) return;
+    // Nobody signed in any more: nothing of theirs to show. The network out:
+    // what is on the screen stays, with the strip saying it may be old.
+    if (error.status === 401 || error.code === 'SIGN_IN') paintMine([]);
+    else showStale(true);
   }
+}
+
+/** The server stopped answering a page that is already drawn: one line under the bar until it answers again. */
+function showStale(on) {
+  $('stale').hidden = !on;
 }
 
 function paintMine(orders) {
@@ -1776,7 +1807,9 @@ async function resume() {
 /** Whatever the last attempt could not draw, asked for again. */
 async function catchUp() {
   if (!state.loaded) {
-    if (await loadListings()) await resume();
+    // An offline start drew neither the stalls nor «Миний идэш»: both, now.
+    const [ok] = await Promise.all([loadListings(), loadMine()]);
+    if (ok) await resume();
   } else if (!state.screen) {
     await loadMine();
   }
@@ -1789,10 +1822,10 @@ void Promise.all([loadListings(), loadMine()]).then(([ok]) => (ok ? resume() : u
 
 const poll = setInterval(() => {
   if (document.hidden) return;
-  if (state.orderId && state.screen === 'status') void showStatus().catch(() => {});
+  if (state.orderId && state.screen === 'status') void showStatus().catch(() => showStale(true));
   // An order behind the review is one paid for whose first look was lost:
   // it takes the review's place, as it would have after the tap.
-  else if (state.orderId && state.screen === 'review') void showStatus(true, { replace: true }).catch(() => {});
+  else if (state.orderId && state.screen === 'review') void showStatus(true, { replace: true }).catch(() => showStale(true));
   else if (!state.screen) void catchUp();
 }, 4000);
 // The phone found its network again: ask now rather than at the next tick.

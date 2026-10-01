@@ -1820,8 +1820,10 @@ describe('өвлийн идэш', () => {
 
     pay().click();
     await until(dom, 'Pay again, after the lost answer', () => network.lost && !pay().disabled);
-    // In words the guest reads, not the browser's «Failed to fetch».
-    expect(dom.window.document.getElementById('toast')?.textContent).toBe(CONNECTION_LOST);
+    // In words the guest reads, not the browser's «Failed to fetch» — and
+    // above the button it is about, not in a toast lying over that button.
+    expect(dom.window.document.querySelector('#screen-foot .why[data-tone="stop"]')?.textContent).toBe(CONNECTION_LOST);
+    expect(dom.window.document.getElementById('toast')?.hasAttribute('data-show') ?? false).toBe(false);
     // Tapped twice, in a hurry: still one tap.
     pay().click();
     pay().click();
@@ -3296,26 +3298,32 @@ describe('Basu decides who may do what', () => {
   });
 
   it('renames a module and hides a page, and the sidebar follows the moment it is saved', async () => {
-    const desk = await theDesk();
-    await opsTab(desk, 'menus');
-    await until(desk, 'the menu', (d) => d.querySelectorAll('#menu-board .menu-mod').length >= 6);
-    const doc = desk.window.document;
-    // The page is read; each change is a popup, saved as it closes.
-    expect(doc.querySelector('#menu-board input')).toBeNull();
-    (doc.querySelector('.menu-mod[data-module="platform"] [data-edit-mod]') as HTMLElement).click();
-    await answerPopup(desk, { name: 'Үндсэн үйлчилгээ' });
-    await until(desk, 'the sidebar renamed', (d) => d.querySelector('.nav-mod[data-group="platform"] .mod .t')?.textContent === 'Үндсэн үйлчилгээ');
-    await until(desk, 'the menu again', (d) => Boolean(d.querySelector('.menu-page[data-page="reviews"] [data-edit-page]')));
-    (doc.querySelector('.menu-page[data-page="reviews"] [data-edit-page]') as HTMLElement).click();
-    await answerPopup(desk, { shown: '0' });
-    await until(desk, 'the page gone from the sidebar', (d) => !d.querySelector('.tabs [data-tab="reviews"]'));
-    expect(doc.querySelector('.menu-page[data-page="reviews"]')?.hasAttribute('data-off')).toBe(true);
-    // Put it back for whoever comes next.
-    await fetch(`${base}/v1/ops/menus/desk`, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${await deskToken()}` },
-      body: JSON.stringify({ modules: [{ key: 'platform', name: 'Платформ' }], pages: [{ key: 'reviews', hidden: false }] }),
-    });
+    try {
+      const desk = await theDesk();
+      await opsTab(desk, 'menus');
+      await until(desk, 'the menu', (d) => d.querySelectorAll('#menu-board .menu-mod').length >= 6);
+      const doc = desk.window.document;
+      // The page is read; each change is a popup, saved as it closes.
+      expect(doc.querySelector('#menu-board input')).toBeNull();
+      (doc.querySelector('.menu-mod[data-module="platform"] [data-edit-mod]') as HTMLElement).click();
+      await answerPopup(desk, { name: 'Үндсэн үйлчилгээ' });
+      await until(desk, 'the sidebar renamed', (d) => d.querySelector('.nav-mod[data-group="platform"] .mod .t')?.textContent === 'Үндсэн үйлчилгээ');
+      await until(desk, 'the menu again', (d) => Boolean(d.querySelector('.menu-page[data-page="reviews"] [data-edit-page]')));
+      (doc.querySelector('.menu-page[data-page="reviews"] [data-edit-page]') as HTMLElement).click();
+      await answerPopup(desk, { shown: '0' });
+      await until(desk, 'the page gone from the sidebar', (d) => !d.querySelector('.tabs [data-tab="reviews"]'));
+      // The board is drawn again from the server after the save; the sidebar
+      // can be quicker than it, so wait for the board's own redraw.
+      await until(desk, 'the board to mark it hidden', (d) => Boolean(d.querySelector('.menu-page[data-page="reviews"][data-off]')));
+      expect(doc.querySelector('.menu-page[data-page="reviews"]')?.hasAttribute('data-off')).toBe(true);
+    } finally {
+      // Put it back for whoever comes next — also when the test above failed.
+      await fetch(`${base}/v1/ops/menus/desk`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${await deskToken()}` },
+        body: JSON.stringify({ modules: [{ key: 'platform', name: 'Платформ' }], pages: [{ key: 'reviews', hidden: false }] }),
+      });
+    }
   });
 
   it('opens a business from the desk and gives somebody there another role', async () => {

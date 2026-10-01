@@ -144,9 +144,11 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var
 .item > .end{gap:8px}
 .item[data-off] .money{color:var(--ink-3)}
 .item[data-off] .lead img{opacity:.6}
-/* 44 × 44 per press, the target the thumb needs (the stepper was 40 tall) */
-.qty{display:inline-flex;align-items:stretch;height:44px;border:1px solid var(--line-2);border-radius:var(--r-ctl);background:var(--surface);overflow:hidden}
-.qty button{width:44px;padding:0;border:0;background:none;color:var(--ink-2);display:grid;place-items:center}
+/* 44 × 44 per press, the target the thumb needs (the stepper was 40 tall).
+   The edge is an outline drawn inside the box, over the buttons' own press
+   wash, so the hairline takes nothing from the 44. */
+.qty{display:inline-flex;align-items:stretch;height:44px;border:0;outline:1px solid var(--line-2);outline-offset:-1px;border-radius:var(--r-ctl);background:var(--surface);overflow:hidden}
+.qty button{width:44px;height:44px;padding:0;border:0;background:none;color:var(--ink-2);display:grid;place-items:center}
 .qty button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
 .qty button:active{background:var(--surface-2);color:var(--ink)}
 @media (hover:hover){.qty button:hover{background:var(--surface-2);color:var(--ink)}}
@@ -365,6 +367,8 @@ const state = {
   trouble: null,
   /** The server's clock as last read, and the phone's at that moment. */
   clock: { server: Date.now(), local: Date.now() },
+  /** Minutes on foot to the open restaurant, for the line under its name. */
+  walk: null,
 };
 
 /**
@@ -898,6 +902,19 @@ $('orderbar').addEventListener('click', () => {
   void showStatus(true).catch((error) => toast(whatWentWrong(error), 'bad'));
 });
 
+/**
+ * The line under a restaurant's name: the walk, whether it is taking orders
+ * — and, once today's last time has begun, that today's are over rather
+ * than «захиалга авч байна» over a menu nobody can order from.
+ */
+function venueSub(venue, { over = false } = {}) {
+  const said = !venue.accepting_orders ? 'хаалттай' : over ? 'өнөөдрийн захиалга дууссан' : 'захиалга авч байна';
+  $('sheet-sub').replaceChildren(
+    document.createTextNode(`${state.walk} мин алхаад · ${said} · `),
+    ratingLine(venue.rating),
+  );
+}
+
 /** Three rows in the shape of a dish, while the menu is on its way. */
 const MENU_LOADING = `
   <div class="menu-skel" role="status" aria-busy="true"><span class="sr-only">Цэс ачаалж байна…</span>${
@@ -918,13 +935,8 @@ async function openVenue(venue) {
   $('sheet-name').textContent = venue.name;
   $('sheet-name').classList.remove('mono'); // a name, not a code
   delete $('sheet').dataset.busy;
-  const sub = $('sheet-sub');
-  sub.replaceChildren(
-    document.createTextNode(
-      `${walk} мин алхаад · ${venue.accepting_orders ? 'захиалга авч байна' : 'хаалттай'} · `,
-    ),
-    ratingLine(venue.rating),
-  );
+  state.walk = walk;
+  venueSub(venue);
   $('sheet-body').replaceChildren(el(MENU_LOADING));
   $('sheet-foot').replaceChildren();
   $('sheet').dataset.open = '1';
@@ -958,7 +970,7 @@ async function openVenue(venue) {
   } catch (error) {
     if (gone || state.venue?.id !== venue.id) return;
     // Said where the menu would be, with the way to ask again.
-    const trouble = el(`<div class="empty" role="alert"><b>Цэс ачаалагдсангүй</b><span></span><br><button class="btn" data-size="sm" type="button">Дахин оролдох</button></div>`);
+    const trouble = el(`<div class="empty" role="alert"><b>Цэс ачаалагдсангүй</b><span></span><br><button class="btn" type="button">Дахин оролдох</button></div>`);
     trouble.querySelector('span').textContent = whatWentWrong(error);
     trouble.querySelector('button').addEventListener('click', () => void openVenue(venue));
     $('sheet-body').replaceChildren(trouble);
@@ -991,8 +1003,16 @@ function renderSheet() {
   // begun is let go, and the button asks for another.
   const ahead = openSlots();
   if (state.slot && !ahead.some((s) => s.starts_at === state.slot)) state.slot = null;
+  // No time left today: the menu is still worth reading, but it is not a
+  // basket — no steppers, nothing to pay for, and the line under the name
+  // says the day is over.
+  const readOnly = !ahead.length;
+  if (readOnly) {
+    state.cart.clear();
+    venueSub(state.venue, { over: true });
+  }
   const grid = el('<div class="slots" role="group" aria-label="Ирэх цаг"></div>');
-  if (!ahead.length) {
+  if (readOnly) {
     strip.append(el('<p class="none-left">Өнөөдрийн захиалах цаг дууссан. Маргааш дахин ирээрэй.</p>'));
   }
   for (const slot of ahead) {
@@ -1030,7 +1050,7 @@ function renderSheet() {
 
     if (item.sold_out) {
       end.append(el('<span class="chip">Дууссан</span>'));
-    } else {
+    } else if (!readOnly) {
       const stepper = el(`
         <div class="qty"${qty ? '' : ' data-zero'}>
           <button type="button" data-d="-1" aria-label="Хасах">${ICON.minus}</button>
@@ -1233,11 +1253,16 @@ async function placeOrder() {
     // In words the guest reads: the server's own, or plain ones when the
     // network never let it answer — never the browser's «Failed to fetch».
     const said = whatWentWrong(error);
-    toast(said, 'bad');
     // Paid for, and only the look at it failed: a bought lunch never offers
     // its Pay button again. The sheet stays busy, and the next poll draws
-    // the lunch as soon as the network lets it.
-    if (paid) return;
+    // the lunch as soon as the network lets it; the toast is the only place
+    // to say so.
+    if (paid) {
+      toast(said, 'bad');
+      return;
+    }
+    // Not paid: said above the button, until the next press — not in a
+    // toast, which lay over the button and swallowed the tap to try again.
     state.trouble = said;
     delete sheet.dataset.busy;
     renderFoot();
@@ -1282,6 +1307,7 @@ const TONE = {
   ACCEPTED: 'route',
   SCHEDULED: 'route',
   ARMED: 'hold',
+  RESLOTTED: 'hold',
   HELD: 'stop',
   FIRED: 'hi',
   COOKING: 'hi',
@@ -1347,10 +1373,11 @@ async function showStatus(force) {
   $('sheet-name').textContent = `№${order.code}`;
   $('sheet-name').classList.add('mono'); // a code, not a name
   // Where, when to be there, and which table: the arrival time is the
-  // guest's half of the plan, so it is said here as what it is.
+  // guest's half of the plan, so it is said here as what it is — while the
+  // lunch is still ahead, and not on one served, closed or cancelled.
   $('sheet-sub').textContent = [
     order.restaurant?.name ?? state.venue?.name,
-    order.slot_starts_at && `${hhmm(order.slot_starts_at)}-д ирнэ`,
+    order.slot_starts_at && !OVER.includes(order.state) && `${hhmm(order.slot_starts_at)}-д ирнэ`,
     order.table && `Ширээ ${order.table}`,
   ]
     .filter(Boolean)
@@ -1447,7 +1474,7 @@ async function showStatus(force) {
       void confirmPopup({
         title: 'Захиалгаа цуцлах уу?',
         text: `<p>Хоол гал дээр гараагүй тул <b>${mnt(order.total_mnt)}</b> бүтнээрээ буцаагдана.${
-          until ? ` ${until}-аас хойш цуцлах боломжгүй.` : ''
+          until ? ` ${until} цагаас хойш цуцлах боломжгүй.` : ''
         }</p>`,
         ok: 'Цуцлах',
         cancel: 'Болих',
