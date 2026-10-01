@@ -98,13 +98,18 @@ export function requireSignIn() {
  * storage every tab shares — and the sign-in it holds now is not forgotten,
  * nor ended, nor this page sent to the door, for an answer about the one
  * before. The dashboard keeps the same rule (`refused` in ops.html).
+ *
+ * A 401 that is about what the person typed — the password that confirms a
+ * refund's bank account was wrong (BAD_PASSWORD), or a login's
+ * (BAD_CREDENTIALS) — says nothing about the session: it is still good, and
+ * the person is told where they typed it, not signed out for a typo.
  */
 export async function authed(path, options = {}) {
   const sent = store.guestToken;
   try {
     return await api(path, { ...options, token: sent });
   } catch (error) {
-    if (error.status === 401) {
+    if (error.status === 401 && error.code !== 'BAD_PASSWORD' && error.code !== 'BAD_CREDENTIALS') {
       if (error.code === 'SIGN_IN_AGAIN') endSession(sent);
       if (store.guestToken === sent) {
         store.guestToken = null;
@@ -275,6 +280,10 @@ export function mountFrame(active) {
     if (event.key !== 'Escape' || drawer.hidden) return;
     fold(false);
     burger.focus();
+  });
+  // Tabbing past the last link leaves the menu, and the menu closes behind it.
+  drawer.addEventListener('focusout', (event) => {
+    if (!drawer.hidden && !drawer.contains(event.relatedTarget) && event.relatedTarget !== burger) fold(false);
   });
 
   document.body.prepend(bar);

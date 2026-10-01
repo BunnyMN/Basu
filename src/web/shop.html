@@ -469,6 +469,9 @@ function drawStall(l) {
       return null;
     }
   })();
+  // Back from signing in to pay (`review` was kept with the form): straight to the review it left, as its page said.
+  const resume = Boolean(kept?.review && store.guestToken);
+  if (kept) delete kept.review;
   const form = { qty: l.min_qty, receive: 'pickup', receiveOn: earliest(l), address: '', phone: '', ...(kept ?? {}) };
   const step = l.unit === 'whole' ? 1 : 5;
   const total = () => l.price_mnt * form.qty + (form.receive === 'delivery' ? l.delivery_fee_mnt : 0);
@@ -713,7 +716,7 @@ function drawStall(l) {
       // Somebody browsing without an account signs in here, and comes back to this order.
       if (!store.guestToken) {
         try {
-          sessionStorage.setItem(`basu.shop.${l.id}`, JSON.stringify(form));
+          sessionStorage.setItem(`basu.shop.${l.id}`, JSON.stringify({ ...form, review: true }));
         } catch {
           // Without storage the form is filled again, that is all.
         }
@@ -754,6 +757,21 @@ function drawStall(l) {
   }
 
   paintForm();
+  if (resume) {
+    // Only an order that still holds goes straight to its review: enough left, a day still to come, an address for a delivery.
+    const holds = !gone && form.qty >= l.min_qty && form.qty <= l.remaining && form.receiveOn >= earliest(l)
+      && (form.receive !== 'delivery' || (l.delivers && form.address.trim() && form.phone.replace(/\D/g, '').length >= 8));
+    if (holds) {
+      paintReview();
+      // On a phone the review sits under the picture: bring it up, it is what the person came back for.
+      if (buy.getBoundingClientRect().top > window.innerHeight / 2) toBox();
+    }
+    try {
+      sessionStorage.setItem(`basu.shop.${l.id}`, JSON.stringify(form));
+    } catch {
+      // nothing kept
+    }
+  }
 }
 
 /* ── which page this is ────────────────────────────────────────────── */

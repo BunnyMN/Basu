@@ -14,6 +14,8 @@
    the pine carries the one primary action on a screen. */
 
 html[data-site]{background:var(--bg);background-image:none}
+/* a field focused after a mistake, or a #section, lands under the sticky bar, not behind it */
+html[data-site]{scroll-padding-top:calc(var(--s-bar) + var(--safe-t) + 16px)}
 html[data-site] body{background:var(--bg);min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
 :root{--s-wrap:1200px;--s-gutter:max(20px,min(4vw,40px));--s-bar:64px;--s-dock:0px}
 @media (max-width:760px){:root{--s-bar:56px}}
@@ -32,6 +34,7 @@ html[data-site] body{background:var(--bg);min-height:100vh;min-height:100dvh;dis
 .s-btn-quiet{background:transparent;color:var(--ink-2)}
 .s-btn-lg{min-height:54px;padding:0 28px;font-size:1rem}
 .s-btn-sm{min-height:40px;padding:0 16px;font-size:.875rem}
+@media (pointer:coarse){.s-btn-sm{min-height:44px}}
 .s-btn-block{width:100%}
 @media (hover:hover){
   .s-btn-dark:not([disabled]):hover{background:var(--accent-hover)}
@@ -141,9 +144,9 @@ input.s-input[type="date"]{display:flex;align-items:center}
 .s-crumb{display:inline-flex;align-items:center;gap:6px;min-height:44px;margin:16px 0 0;padding-right:8px;font-size:.875rem;font-weight:500;color:var(--ink-2);text-decoration:none}
 .s-crumb svg{width:16px;height:16px}
 @media (hover:hover){.s-crumb:hover{color:var(--ink)}}
-.s-sec{display:flex;justify-content:space-between;align-items:baseline;gap:16px;margin:40px 0 14px}
+.s-sec{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:44px;margin:36px 0 8px}
 .s-sec h2{margin:0;font-size:1.25rem;letter-spacing:-.015em}
-.s-sec a,.s-sec .s-link{font-size:.9375rem;font-weight:600;color:var(--accent-ink)}
+.s-sec a,.s-sec .s-link{display:inline-flex;align-items:center;min-height:44px;font-size:.9375rem;font-weight:600;color:var(--accent-ink)}
 
 /* ── pieces ──────────────────────────────────────────────────────── */
 .s-card{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
@@ -200,6 +203,32 @@ input.s-input[type="date"]{display:flex;align-items:center}
 .s-note[data-k="warn"] > svg{color:var(--hold)}
 .s-note[data-k="ok"]{background:var(--ready-soft);border-color:var(--ready-line)}
 .s-note[data-k="ok"] > svg{color:var(--ready)}
+
+/* ── /terms and /privacy in a browser ───────────────────────────────
+   The pages are app.css's .doc; in a browser (data-site, set by their
+   head script outside the iOS shell) they take the website's header and
+   foot instead of the app's bar, a wider column, and on a wide screen
+   the contents beside the text, the section being read marked. Inside
+   the shell none of this applies. */
+html[data-site] .topbar{display:none}
+html[data-site] .doc{flex:1 0 auto;padding-top:32px;padding-bottom:56px}
+html[data-site] .doc h2{scroll-margin-top:calc(var(--s-bar) + var(--safe-t) + 20px)}
+html[data-site] .doc .toc a:not(.btn):not(.link):not(.go){text-decoration:none}
+.doc-aside{display:none}
+@media (max-width:480px){html[data-site] .doc{padding-top:0}html[data-site] .doc-card{border-top:0}}
+@media (min-width:760px){
+  html[data-site] main.doc{max-width:760px}
+  html[data-site] .doc-card{padding:36px 40px;border-radius:18px}
+}
+@media (min-width:1100px){
+  html[data-site] main.doc{max-width:1080px;display:grid;grid-template-columns:232px minmax(0,1fr);gap:48px;align-items:start}
+  html[data-site] .doc-aside{display:block;position:sticky;top:calc(var(--s-bar) + var(--safe-t) + 32px)}
+  html[data-site] .doc-aside .eyebrow{margin:8px 0 12px}
+  html[data-site] .doc-aside .toc a{min-height:36px;margin:0 -10px;padding:0 10px;border-radius:8px;font-size:.875rem;color:var(--ink-2)}
+  html[data-site] .doc-aside .toc a[aria-current]{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+  html[data-site] .doc-aside .toc a[aria-current] .n{color:var(--accent-ink)}
+  html[data-site] .doc-card > .toc{display:none}
+}
 
 /* Loading: blocks in the shape of what comes. */
 .s-skel{display:block;border-radius:12px;background:linear-gradient(90deg,var(--surface-2) 0%,color-mix(in srgb,var(--line) 70%,var(--surface-2)) 50%,var(--surface-2) 100%);background-size:200% 100%;animation:s-shine 1.2s linear infinite}

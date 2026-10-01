@@ -32,6 +32,7 @@
 .sa-ways [data-rows] > .row{padding:16px 24px}
 /* app.css's `[data-rows] > .row{border:0}` outweighs its own hairline between rows; said again here until it is fixed there */
 .sa-ways [data-rows] > .row + .row{border-top:1px solid var(--line)}
+@media (pointer:coarse){.sa-ways .btn[data-size="sm"]{min-height:44px}}
 .sa-sessions{margin:0;padding:0;list-style:none}
 .sa-sessions li{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:68px;padding:12px 0}
 .sa-sessions li + li{border-top:1px solid var(--line)}
@@ -60,7 +61,7 @@
 </main>
 
 <script type="module">
-import { store, accountWays, popup, whatWentWrong } from '/api.js';
+import { store, accountWays, popup, confirmPopup, whatWentWrong } from '/api.js';
 import { mountFrame, requireSignIn, authed, esc, el, say, signOut, nameOf, phoneShown } from '/site.js';
 
 const token = requireSignIn();
@@ -149,6 +150,7 @@ async function draw() {
       ),
     );
     const others = sessions.filter((s) => !s.current).length;
+    devices.dataset.others = String(others);
     // With nothing else signed in, the button is not drawn as a grey dead end: the line says why.
     devices.querySelector('#others').disabled = others === 0;
     devices.querySelector('#others').hidden = others === 0;
@@ -157,19 +159,25 @@ async function draw() {
       : 'Зөвхөн энэ төхөөрөмж дээр нэвтэрсэн байна.';
   };
   await paintSessions();
-  devices.querySelector('#others').addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-    button.setAttribute('data-busy', '');
-    try {
-      const { revoked } = await authed('/v1/me/sessions/revoke', { method: 'POST' });
-      say(revoked ? `${revoked} төхөөрөмжөөс гаргалаа.` : 'Өөр төхөөрөмж алга.', 'good');
-      await paintSessions();
-    } catch (error) {
-      say(whatWentWrong(error), 'bad');
-    } finally {
-      button.removeAttribute('data-busy');
-    }
-  });
+  // Signing every other device out cannot be taken back: it is asked first, saying how many.
+  devices.querySelector('#others').addEventListener('click', () =>
+    void confirmPopup({
+      title: 'Бусад төхөөрөмжөөс гарах',
+      text: `Энэ төхөөрөмжөөс бусад <b>${esc(devices.dataset.others)}</b> төхөөрөмж дээрх нэвтрэлт хаагдана. Тэнд дахин нэвтрэх хүртэл Basu-д орохгүй. Энэ төхөөрөмж нэвтэрсэн хэвээр үлдэнэ.`,
+      ok: 'Бусдаас гаргах',
+      danger: true,
+      onConfirm: async () => {
+        let revoked;
+        try {
+          ({ revoked } = await authed('/v1/me/sessions/revoke', { method: 'POST' }));
+        } catch (error) {
+          throw new Error(whatWentWrong(error));
+        }
+        say(revoked ? `${revoked} төхөөрөмжөөс гаргалаа.` : 'Өөр төхөөрөмж алга.', 'good');
+        await paintSessions();
+      },
+    }),
+  );
   out.querySelector('#out').addEventListener('click', () => void signOut());
 }
 

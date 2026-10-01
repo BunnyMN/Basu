@@ -154,7 +154,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 .board[hidden]{display:none}
 .board-head{display:flex;justify-content:space-between;align-items:center;gap:16px}
 .board-head b{font-size:1.125rem;font-weight:600}
-.board-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:14px}
+.board-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(300px,100%),1fr));gap:12px;margin-top:14px}
 .stall{display:grid;grid-template-columns:56px minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px;border-radius:14px;background:var(--surface);border:1px solid var(--line);text-decoration:none;transition:border-color var(--dur)}
 @media (hover:hover){.stall:hover{border-color:var(--line-2)}}
 .stall img{width:56px;height:56px;object-fit:cover;border-radius:10px;background:var(--surface-2)}
@@ -171,6 +171,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
   .stall{grid-template-columns:56px minmax(0,1fr);row-gap:2px}
   .stall img{grid-row:span 2}
   .stall .money{grid-column:2;text-align:left}
+  .stall .money small{display:inline}
 }
 .board-empty{display:flex;gap:14px;align-items:flex-start;margin-top:12px}
 .board-empty i{flex:none;width:9px;height:9px;margin-top:8px;border-radius:50%;background:var(--hi);box-shadow:0 0 0 5px var(--hi-soft)}
@@ -218,7 +219,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 .appetite button small{display:block;margin-top:2px;font-weight:400;font-size:.75rem;color:var(--ink-3)}
 .appetite button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .appetite button[aria-pressed="true"] small{color:inherit;opacity:.78}
-@media (max-width:420px){.appetite button{padding:6px 10px}}
+@media (max-width:480px){.appetite{grid-template-columns:1fr;max-width:none}}
 .calc .out{padding:32px;background:var(--accent-soft);display:flex;flex-direction:column;justify-content:center}
 .calc .out .outlab{font-size:.875rem;color:var(--ink-2)}
 .calc .kg{margin-top:6px;font-size:clamp(3.2rem,7vw,4.8rem);font-weight:600;letter-spacing:-.04em;line-height:1}
@@ -304,7 +305,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 @media (pointer:coarse){.foot .links a{min-height:44px}}
 @media (hover:hover){.foot .links a:hover{color:var(--ink)}}
 .photos{margin-top:36px;padding-top:14px;border-top:1px solid var(--line);font-size:.8125rem;color:var(--ink-3)}
-.photos summary{display:inline-flex;align-items:center;min-height:36px;cursor:pointer}
+.photos summary{padding:12px 0;cursor:pointer}
 .photos p{margin:10px 0 0;line-height:1.7}
 .photos a{color:inherit}
 
@@ -386,10 +387,10 @@ section.band{padding:clamp(72px,9vw,120px) 0}
         <p class="reveal">Нийлүүлэгч бүр малаа өөрөө зарлана: бүтэн толгойгоор нь, эсвэл кг-аар. Зар бүр дээр мал аль нутгийнх, ойролцоогоор хэдэн кг мах гарах, хэзээ бэлэн болох нь бичээстэй.</p>
       </div>
       <div class="animals">
-        <a class="animal reveal" href="/shop?kind=sheep" data-kind="sheep"><div class="ph"><img src="/brand/meat/sheep.webp" alt="Хонины гуя" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Хонь</b><small>Толгойгоор · кг-аар</small></a>
-        <a class="animal reveal" href="/shop?kind=goat" data-kind="goat"><div class="ph"><img src="/brand/meat/goat.webp" alt="Жижиглэсэн улаан мах" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Ямаа</b><small>Толгойгоор · кг-аар</small></a>
-        <a class="animal reveal" href="/shop?kind=beef" data-kind="beef"><div class="ph"><img src="/brand/meat/beef.webp" alt="Үхрийн цул мах" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Үхэр</b><small>Толгойгоор · кг-аар</small></a>
-        <a class="animal reveal" href="/shop?kind=horse" data-kind="horse"><div class="ph"><img src="/brand/meat/horse.webp" alt="Давс цацсан туранхай улаан мах" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Адуу</b><small>Толгойгоор · кг-аар</small></a>
+        <a class="animal reveal" href="/shop" data-kind="sheep"><div class="ph"><img src="/brand/meat/sheep.webp" alt="Хонины гуя" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Хонь</b><small>Толгойгоор · кг-аар</small></a>
+        <a class="animal reveal" href="/shop" data-kind="goat"><div class="ph"><img src="/brand/meat/goat.webp" alt="Жижиглэсэн улаан мах" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Ямаа</b><small>Толгойгоор · кг-аар</small></a>
+        <a class="animal reveal" href="/shop" data-kind="beef"><div class="ph"><img src="/brand/meat/beef.webp" alt="Үхрийн цул мах" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Үхэр</b><small>Толгойгоор · кг-аар</small></a>
+        <a class="animal reveal" href="/shop" data-kind="horse"><div class="ph"><img src="/brand/meat/horse.webp" alt="Давс цацсан туранхай улаан мах" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Адуу</b><small>Толгойгоор · кг-аар</small></a>
       </div>
 
       <div class="board" id="board" hidden aria-live="polite">
@@ -718,6 +719,8 @@ try {
   for (const card of document.querySelectorAll('.animal')) {
     const n = byKind[card.dataset.kind];
     card.querySelector('.ktag').textContent = n ? `${n} зар` : '';
+    // An animal with stalls opens them; one with none opens the whole market, not an empty filter.
+    card.href = n ? `/shop?kind=${card.dataset.kind}` : '/shop';
   }
   const shown = listings.slice(0, 6);
   if (shown.length) {

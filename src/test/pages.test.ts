@@ -1574,6 +1574,52 @@ describe('the website', () => {
     await until(earlier, 'the word on it', (d) => d.querySelector('.od-new b')?.textContent === EARLIER_ORDER);
     expect(earlier.window.location.search).toBe('');
   });
+
+  it('keeps the person signed in, and the popup open, when the refund’s account comes with a wrong password', async () => {
+    // Somebody with a password buys a whole animal, and its supplier cancels it: the refund waits for an account.
+    await ownGuest('+97699005014');
+    const token = storage.getItem('basu.guest')!;
+    const auth = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const { listing, today } = (await (await fetch(`${base}/v1/idesh/listings/${await fullestStall()}`)).json()) as {
+      listing: { id: string; ready_from: string };
+      today: string;
+    };
+    const made = (await (
+      await fetch(`${base}/v1/idesh`, {
+        method: 'POST',
+        headers: { ...auth, 'idempotency-key': 'refund-wrong-password' },
+        body: JSON.stringify({ listing_id: listing.id, qty: 1, receive: 'pickup', receive_on: listing.ready_from > today ? listing.ready_from : today }),
+      })
+    ).json()) as { id: string };
+    const paid = await fetch(`${base}/v1/idesh/${made.id}/pay`, { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+    expect(paid.status, await paid.text()).toBe(200);
+    const { rows } = await getPool().query<{ seller: string }>(
+      `SELECT g.phone_e164 AS seller FROM idesh.idesh_order o
+         JOIN idesh.supplier s ON s.id = o.supplier_id JOIN identity.guest g ON g.id = s.owner_guest_id
+        WHERE o.id = $1`,
+      [made.id],
+    );
+    const asSeller = { 'content-type': 'application/json', authorization: `Bearer ${await devLogin(rows[0]!.seller, 'Нийлүүлэгч')}` };
+    const cancelled = await fetch(`${base}/v1/supplier/orders/${made.id}/cancel`, { method: 'POST', headers: asSeller, body: JSON.stringify({ reason: 'guest_asked' }) });
+    expect(cancelled.status, await cancelled.text()).toBe(200);
+
+    const page = await openPage('orders.html', `/${made.id}`);
+    const d = page.window.document;
+    await until(page, 'the way to give an account', () => Boolean(d.querySelector('[data-account]')));
+    (d.querySelector('[data-account]') as HTMLElement).click();
+    await answerPopup(page, { bank: 'Хаан банк', account: '5012345678', holder: 'Туршилт Хүн', password: 'буруу нууц үг' });
+    const refusal = () => d.querySelector('.sheet.popup[data-open] .popup-error') as HTMLElement | null;
+    await until(page, 'the refusal in the popup', () => refusal()?.hidden === false);
+    expect(refusal()!.textContent).toContain('Нууц үг буруу байна.');
+    // A typo in the password is not a session that ended: still signed in, still here, the popup open for another try.
+    expect(storage.getItem('basu.guest')).toBe(token);
+    expect(d.querySelector('.sheet.popup[data-open]')).not.toBeNull();
+
+    // The right one keeps the account, and the order says where the money goes.
+    await answerPopup(page, { password: GUEST_PASSWORD });
+    await until(page, 'the account on the order', () => !d.querySelector('[data-account]') && (d.querySelector('.od-refund')?.textContent ?? '').includes('5012345678'));
+    expect(storage.getItem('basu.guest')).toBe(token);
+  });
 });
 
 describe('өвлийн идэш', () => {
@@ -2824,6 +2870,8 @@ describe('one browser, one person', () => {
     await until(page, 'another device to sign out of', (d) => (d.querySelector('#others') as HTMLButtonElement | null)?.disabled === false);
 
     (page.window.document.querySelector('#others') as HTMLElement).click();
+    // Signing the others out is asked first, in a popup.
+    await answerPopup(page);
     await until(page, 'the session let go', () => browser.getItem('basu.guest') === null);
     expect(await ended(admin)).toBe(true);
     // Nobody was signed out by it: the admin at the desk still is.

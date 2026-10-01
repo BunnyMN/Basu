@@ -41,6 +41,8 @@
 .l-lead{margin:10px 0 28px;font-size:1rem;line-height:1.6;color:var(--ink-2)}
 .l-lead b{color:var(--ink);overflow-wrap:anywhere}
 .l-google svg{width:20px;height:20px}
+/* a narrow phone wraps the words rather than pushing the page sideways */
+.l-google{white-space:normal;text-align:center;line-height:1.25;padding-top:10px;padding-bottom:10px}
 .l-or{display:flex;align-items:center;gap:14px;margin:22px 0;font-size:.8125rem;color:var(--ink-3)}
 .l-or::before,.l-or::after{content:"";flex:1;height:1px;background:var(--line)}
 .l-alt{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 20px;margin:18px 0 0;font-size:.9375rem}
@@ -75,7 +77,7 @@
 .l-demo p{margin:0 0 10px;font-size:.8125rem;color:var(--ink-3)}
 
 @media (max-width:900px){
-  .l{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  .l{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr}
   .l-art{height:calc(clamp(176px,27vh,232px) + var(--safe-t))}
   .l-art .s-word{top:calc(14px + var(--safe-t));left:24px}
   .l-say{left:24px;right:24px;bottom:20px}
@@ -223,7 +225,7 @@ if (why) document.querySelector('.l-step[data-step="start"] .l-lead').textConten
 if (next.startsWith('/shop/')) {
   const home = document.querySelector('.l-home');
   home.href = next;
-  home.lastChild.textContent = 'Буцах';
+  home.lastChild.textContent = 'Зар руу буцах';
 }
 
 /* ── one step on screen at a time ──────────────────────────────────── */

@@ -56,6 +56,7 @@
   .od-main,.od-side{display:contents}
   .od[data-state="READY"] .od-code,.od[data-state="DISPATCHED"] .od-code{order:-1}
 }
+.od-top{padding-top:8px;padding-bottom:0}
 .od-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
 .od-head h1{margin:0;font-size:clamp(1.75rem,3vw,2.3rem);letter-spacing:-.03em}
 .od-head .s-pill{font-size:.8125rem;padding:5px 12px}
@@ -224,7 +225,9 @@ const clockOf = (iso) => {
   const d = new Date(iso);
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
-const BANKS = ['Хаан банк', 'Голомт банк', 'Худалдаа хөгжлийн банк', 'Хас банк', 'Төрийн банк', 'Капитрон банк', 'Ариг банк', 'Богд банк', 'М банк', 'Тээвэр хөгжлийн банк', 'Үндэсний хөрөнгө оруулалтын банк'];
+/** «Бусад банк»: a bank not on the list, its name typed in the field under it. */
+const OTHER_BANK = '__other';
+const BANKS = ['Хаан банк', 'Голомт банк', 'Худалдаа хөгжлийн банк', 'Хас банк', 'Төрийн банк', 'Капитрон банк', 'Ариг банк', 'Богд банк', 'М банк', 'Тээвэр хөгжлийн банк', 'Үндэсний хөрөнгө оруулалтын банк', 'Чингис хаан банк'];
 
 let drawn = null;
 async function drawOrder(id, fresh) {
@@ -250,7 +253,7 @@ async function drawOrder(id, fresh) {
 
   page.replaceChildren(
     el(`<a class="s-crumb" href="/orders">${MARK.back}Миний захиалга</a>`),
-    el(`<div class="s-head" style="padding-top:8px;padding-bottom:0">
+    el(`<div class="s-head od-top">
           <div class="od-head"><h1>Захиалга №${esc(o.code)}</h1>${pill(o.state)}</div>
           <p class="od-sub">${esc(o.title)} × ${o.qty} ${unitWord(o)} · ${esc(o.supplier.name)}</p>
         </div>`),
@@ -306,7 +309,7 @@ async function refundBox(o) {
   const r = o.refund;
   if (r.state !== 'needs_account') {
     return el(`<div class="s-card od-refund"><h2>${r.state === 'paid' ? 'Буцаалт шилжүүлсэн' : 'Буцаалт'}</h2>
-      <p>${r.state === 'paid' ? 'Данс руу тань шилжүүлсэн.' : 'Basu ажлын өдөрт шилжүүлж, SMS илгээнэ.'}</p>
+      <p>${r.state === 'paid' ? 'Данс руу тань шилжүүлсэн.' : 'Basu ажлын өдөрт шилжүүлээд мэдэгдэл илгээнэ.'}</p>
       <dl>
         <div><dt>Дүн</dt><dd><span class="s-money">${tugrik(r.amount_mnt)}</span></dd></div>
         <div><dt>Данс</dt><dd>${esc(r.bank_name ?? '')} <span class="mono">${esc(r.bank_account ?? '')}</span></dd></div>
@@ -324,7 +327,7 @@ async function refundBox(o) {
   }
   const box = el(`<div class="s-card od-refund">
       <h2>Буцаалт авах данс</h2>
-      <p><span class="s-money">${tugrik(r.amount_mnt)}</span> аль банкны ямар данс руу шилжүүлэхийг оруулна уу. Basu шилжүүлмэгц SMS ирнэ.</p>
+      <p><span class="s-money">${tugrik(r.amount_mnt)}</span> аль банкны ямар данс руу шилжүүлэхийг оруулна уу. Basu шилжүүлмэгц мэдэгдэл ирнэ.</p>
       <button class="s-btn s-btn-dark" type="button" data-account>Данс оруулах</button>
     </div>`);
   box.querySelector('[data-account]').addEventListener('click', () =>
@@ -334,7 +337,8 @@ async function refundBox(o) {
       width: 520,
       submit: 'Данс илгээх',
       fields: [
-        { name: 'bank', label: 'Банк', type: 'select', options: [['', 'Банкаа сонгоно уу'], ...BANKS.map((b) => [b, b])], required: true, wide: true },
+        { name: 'bank', label: 'Банк', type: 'select', options: [['', 'Банкаа сонгоно уу'], ...BANKS.map((b) => [b, b]), [OTHER_BANK, 'Бусад банк']], required: true },
+        { name: 'other', label: 'Бусад банкны нэр', placeholder: 'Жагсаалтад байхгүй бол', hint: '«Бусад банк» сонгосон бол бичнэ үү.' },
         { name: 'account', label: 'Дансны дугаар', inputmode: 'numeric', autocomplete: 'off', placeholder: '5012345678', required: true },
         { name: 'holder', label: 'Данс эзэмшигчийн нэр', autocomplete: 'name', placeholder: 'Банкинд бүртгэлтэй нэр', required: true },
         { name: 'password', label: 'Нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true },
@@ -343,15 +347,17 @@ async function refundBox(o) {
         const account = v.account.replace(/\s+/g, '');
         if (!/^\d{6,20}$/.test(account)) throw new Error('Дансны дугаар 6–20 оронтой тоо байна.');
         if (v.holder.length < 2) throw new Error('Данс эзэмшигчийн нэрээ бичнэ үү.');
+        const bank = v.bank === OTHER_BANK ? v.other : v.bank;
+        if (!bank) throw new Error('Банкныхаа нэрийг бичнэ үү.');
         try {
           await authed(`/v1/idesh/${o.id}/refund-account`, {
             method: 'POST',
-            body: { bank_name: v.bank, bank_account: account, bank_holder: v.holder, password: v.password },
+            body: { bank_name: bank, bank_account: account, bank_holder: v.holder, password: v.password },
           });
         } catch (e) {
           throw new Error(e.code === 'BAD_PASSWORD' ? 'Нууц үг буруу байна.' : whatWentWrong(e));
         }
-        say('Данс бүртгэгдлээ. Шилжүүлмэгц SMS ирнэ.', 'good');
+        say('Данс бүртгэгдлээ. Шилжүүлмэгц мэдэгдэл ирнэ.', 'good');
         drawn = null;
         await drawOrder(o.id);
       },
