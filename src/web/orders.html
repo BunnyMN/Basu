@@ -114,21 +114,21 @@
 </style>
 </head>
 <body>
+<header class="s-bar" data-static><div class="s-wrap"><a class="s-word" href="/">Basu</a><nav class="s-nav" aria-label="Цэс"><a href="/home">Нүүр</a><a href="/shop">Зах</a><a href="/orders" aria-current="page">Миний захиалга</a><a href="/dashboard">Бизнест</a></nav><div class="s-right"></div></div></header>
 <main class="s-main">
   <div class="s-wrap" id="page"></div>
 </main>
 
 <script type="module">
-import { mnt, dayLabel, IDESH_STATE, IDESH_LIVE, popup, whatWentWrong } from '/api.js';
-import { mountFrame, requireSignIn, authed, esc, el, say, me, siteEmpty, howToBuy, statePill, tugrik, phoneShown } from '/site.js';
+import { store, mnt, dayLabel, IDESH_STATE, IDESH_LIVE, BANK_NAMES, popup, passwordPopup, whatWentWrong } from '/api.js';
+import { mountFrame, requireSignIn, authed, esc, el, say, me, siteEmpty, howToBuy, statePill, tugrik, phoneShown, meatPhoto, stillGoing, refundPill } from '/site.js';
 
 const token = requireSignIn();
 void mountFrame('orders');
 const page = document.getElementById('page');
 
-const PHOTO = (kind) => `/brand/meat/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}.webp`;
 const unitWord = (o) => (o.unit === 'whole' ? 'толгой' : 'кг');
-/** «Идэвхтэй»: paid for and not yet handed over — the same rule /home keeps. */
+/** Paid for and not yet handed over: an order whose page looks again now and then, and shows its handover code. */
 const LIVE = IDESH_LIVE;
 /** A state in its one word, the same on every page: «Цуцлагдсан», «Хүлээлгэн өгсөн». */
 const pill = (state) => statePill(state, IDESH_STATE[state] ?? state);
@@ -148,7 +148,10 @@ async function drawList() {
     el('<div class="so-tabs s-chips" id="tabs" role="group" aria-label="Захиалга" hidden></div>'),
     el(`<div id="list" role="status" aria-busy="true"><div class="so-list">${'<div class="so-skel" aria-hidden="true"><span class="s-skel"></span><span class="s-skel"></span><span class="s-skel"></span></div>'.repeat(3)}</div></div>`),
   );
-  const { orders } = await authed('/v1/idesh?scope=all');
+  // Every order, and which of them are still going on — the same «Идэвхтэй» /home keeps (site.js stillGoing):
+  // by id, null, or what a cancelled one's money waits for.
+  const [{ orders }, live] = await Promise.all([authed('/v1/idesh?scope=all'), stillGoing()]);
+  const going = new Map(live.map((o) => [o.id, o.refund]));
   const list = document.getElementById('list');
   list.removeAttribute('aria-busy');
   list.removeAttribute('role');
@@ -166,7 +169,10 @@ async function drawList() {
     );
     return;
   }
-  const groups = { live: orders.filter((o) => LIVE.includes(o.state)), done: orders.filter((o) => !LIVE.includes(o.state)) };
+  // A cancelled order whose money is still on its way back stays here too, saying what it waits for.
+  // Paid and not yet handed over is going on even when the server could not be asked which are.
+  const isLive = (o) => going.has(o.id) || LIVE.includes(o.state);
+  const groups = { live: orders.filter(isLive), done: orders.filter((o) => !isLive(o)) };
   let tab = groups.live.length || !groups.done.length ? 'live' : 'done';
   const tabs = document.getElementById('tabs');
   tabs.hidden = false;
@@ -193,9 +199,9 @@ async function drawList() {
     for (const o of rows) {
       box.append(
         el(`<a class="so-row" href="/orders/${o.id}" data-order="${o.id}">
-              <img src="${PHOTO(o.kind)}" alt="" loading="lazy" width="72" height="54">
+              <img src="${meatPhoto(o.kind)}" alt="" loading="lazy" width="72" height="54">
               <span><b>${esc(o.title)} × ${o.qty} ${unitWord(o)}</b><small>${esc(o.supplier.name)} · ${o.receive === 'delivery' ? 'хүргэлт' : 'очиж авна'} ${dayLabel(o.receive_on)}</small><small><span class="mono">№${esc(o.code)}</span></small></span>
-              <span class="end"><span class="s-money">${tugrik(o.total_mnt)}</span>${pill(o.state)}</span>
+              <span class="end"><span class="s-money">${tugrik(o.total_mnt)}</span>${going.get(o.id) ? refundPill(going.get(o.id)) : pill(o.state)}</span>
             </a>`),
       );
     }
@@ -206,9 +212,17 @@ async function drawList() {
 
 /* ── one order ─────────────────────────────────────────────────────── */
 
+/**
+ * How an order goes, step by step: [key, its word, the line once it is done,
+ * the line while it is ahead]. A word can depend on where the order stands —
+ * the preparing step is «Бэлтгэл» until the supplier starts, «Бэлтгэж байна»
+ * while they do and «Бэлтгэсэн» after, as the app says it: right after
+ * paying, the ringed step must not say the meat is being prepared before
+ * anybody has touched it.
+ */
 const STEPS = [
   ['paid', 'Төлсөн', () => 'Төлбөр хүлээн авсан', () => 'Төлбөр хүлээгдэж байна'],
-  ['preparing', 'Бэлтгэж байна', () => 'Нийлүүлэгч эхэлсэн', () => 'Нийлүүлэгч мал нядалж, махыг бэлтгэнэ'],
+  ['preparing', (o, done) => (!done ? 'Бэлтгэл' : o.state === 'PREPARING' ? 'Бэлтгэж байна' : 'Бэлтгэсэн'), () => 'Нийлүүлэгч эхэлсэн', () => 'Нийлүүлэгч бэлтгэхийг хүлээж байна'],
   ['ready', 'Бэлэн', () => 'Мах бэлэн болсон', (o) => `${dayLabel(o.receive_on)}-нд бэлэн болно`],
   ['dispatched', 'Замд', () => 'Хүргэлтэнд гарсан', () => 'Хүргэгч ирэхийн өмнө танд залгана'],
   ['handed', 'Хүлээлгэн өгсөн', () => 'Мах гарт орсон', () => 'Кодоо хэлээд махаа авна'],
@@ -229,7 +243,6 @@ const clockOf = (iso) => {
 };
 /** «Бусад банк»: a bank not on the list, its name typed in the field under it. */
 const OTHER_BANK = '__other';
-const BANKS = ['Хаан банк', 'Голомт банк', 'Худалдаа хөгжлийн банк', 'Хас банк', 'Төрийн банк', 'Капитрон банк', 'Ариг банк', 'Богд банк', 'М банк', 'Тээвэр хөгжлийн банк', 'Үндэсний хөрөнгө оруулалтын банк', 'Чингис хаан банк'];
 
 let drawn = null;
 async function drawOrder(id, fresh) {
@@ -249,7 +262,8 @@ async function drawOrder(id, fresh) {
       const when = at[k];
       const isNext = !when && !nextFound && o.state !== 'CLOSED';
       if (isNext) nextFound = true;
-      return `<li${when ? ' data-done' : ''}${isNext ? ' data-next aria-current="step"' : ''}><i>${when ? MARK.check : ''}</i><div><b>${label}</b><span>${when ? done(o) : ahead(o)}</span></div>${when ? `<time datetime="${esc(when)}">${clockOf(when)}</time>` : '<span></span>'}</li>`;
+      const word = typeof label === 'function' ? label(o, Boolean(when)) : label;
+      return `<li${when ? ' data-done' : ''}${isNext ? ' data-next aria-current="step"' : ''}><i>${when ? MARK.check : ''}</i><div><b>${word}</b><span>${when ? done(o) : ahead(o)}</span></div>${when ? `<time datetime="${esc(when)}">${clockOf(when)}</time>` : '<span></span>'}</li>`;
     })
     .join('')}</ol>`;
 
@@ -304,8 +318,10 @@ async function drawOrder(id, fresh) {
 /**
  * A cancelled order asks one thing of its guest: the bank account the money
  * goes to — in a popup, confirmed with the account's password. An account
- * made by Google or an email code has no password yet; it is told so, and
- * sent to set one first, rather than shown a field it cannot fill.
+ * made by Google or an email code has no password yet: the same button sets
+ * one first (a code to the address on the account, then the password), and
+ * the account's popup follows at once with the password just chosen in hand
+ * — never a trip to another page and back.
  */
 async function refundBox(o) {
   const r = o.refund;
@@ -319,57 +335,68 @@ async function refundBox(o) {
       </dl></div>`);
   }
   const person = await me();
-  if (person && !person.has_password) {
-    return el(`<div class="s-card od-refund">
-        <h2>Буцаалт авах данс</h2>
-        <p><span class="s-money">${tugrik(r.amount_mnt)}</span> таны банкны данс руу буцна. Дансаа нууц үгээрээ баталгаажуулж оруулдаг.</p>
-        <div class="s-note" data-k="warn">${MARK.key}<span><b>Эхлээд нууц үг тохируулна уу</b>Таны бүртгэлд нууц үг тохируулаагүй байна. «Бүртгэл» хуудаснаас тохируулаад энд буцаж ирээрэй.</span></div>
-        <a class="s-btn s-btn-dark" href="/account">Нууц үг тохируулах</a>
-      </div>`);
-  }
+  const needsPassword = Boolean(person && !person.has_password);
   const box = el(`<div class="s-card od-refund">
       <h2>Буцаалт авах данс</h2>
       <p><span class="s-money">${tugrik(r.amount_mnt)}</span> аль банкны ямар данс руу шилжүүлэхийг оруулна уу. Basu шилжүүлмэгц мэдэгдэл ирнэ.</p>
+      ${needsPassword ? `<div class="s-note">${MARK.key}<span><b>Эхлээд нууц үг тохируулна</b>Дансаа нууц үгээр баталгаажуулдаг. Таны бүртгэлд нууц үг алга — имэйлээр ирэх кодоор энд тохируулаад дансаа шууд оруулна.</span></div>` : ''}
       <button class="s-btn s-btn-dark" type="button" data-account>Данс оруулах</button>
     </div>`);
-  box.querySelector('[data-account]').addEventListener('click', () =>
-    void popup({
-      title: 'Буцаалт авах данс',
-      sub: `<b>${esc(mnt(r.amount_mnt))}</b> энэ данс руу шилжинэ. Мөнгө тань руу очиж байгаа тул нууц үгээрээ баталгаажуулна.`,
-      width: 520,
-      submit: 'Данс илгээх',
-      // One column, top to bottom: an IBAN with its spaces is 24 characters, more than half this popup holds.
-      fields: [
-        // «Бусад банк» opens the field for its name; any bank on the list needs none.
-        { name: 'bank', label: 'Банк', type: 'select', options: [['', 'Банкаа сонгоно уу'], ...BANKS.map((b) => [b, b]), [OTHER_BANK, 'Бусад банк']], required: true, wide: true, onChange: (bank, form) => form.show('other', bank === OTHER_BANK) },
-        { name: 'other', label: 'Банкны нэр', placeholder: 'Жагсаалтад байхгүй банк', required: true, wide: true },
-        // An IBAN starts with MN, so the keyboard is the one with letters; the spaces a bank prints it with are fine.
-        { name: 'account', label: 'Дансны дугаар', inputmode: 'text', autocomplete: 'off', placeholder: 'MN12 0005 0050 1234 5678', hint: 'IBAN (MN + 18 орон) эсвэл дансны дугаар (6–20 орон).', required: true, wide: true, attrs: { autocapitalize: 'characters', spellcheck: 'false' } },
-        { name: 'holder', label: 'Данс эзэмшигчийн нэр', autocomplete: 'name', placeholder: 'Банкинд бүртгэлтэй нэр', required: true, wide: true },
-        { name: 'password', label: 'Нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true },
-      ],
-      onSubmit: async (v) => {
-        // The rule the server keeps: the spaces out, the letters up, then MN and 18 digits — or 6 to 20 digits.
-        const account = v.account.replace(/\s+/g, '').toUpperCase();
-        if (!/^(MN\d{18}|\d{6,20})$/.test(account)) throw Object.assign(new Error('IBAN бол MN + 18 орон, дансны дугаар бол 6–20 оронтой тоо байна.'), { field: 'account' });
-        if (v.holder.length < 2) throw Object.assign(new Error('Данс эзэмшигчийн нэрээ бичнэ үү.'), { field: 'holder' });
-        const bank = v.bank === OTHER_BANK ? v.other : v.bank;
-        if (!bank) throw Object.assign(new Error('Банкныхаа нэрийг бичнэ үү.'), { field: v.bank === OTHER_BANK ? 'other' : 'bank' });
-        try {
-          await authed(`/v1/idesh/${o.id}/refund-account`, {
-            method: 'POST',
-            body: { bank_name: bank, bank_account: account, bank_holder: v.holder, password: v.password },
-          });
-        } catch (e) {
-          throw new Error(e.code === 'BAD_PASSWORD' ? 'Нууц үг буруу байна.' : whatWentWrong(e));
-        }
-        say('Данс бүртгэгдлээ. Шилжүүлмэгц мэдэгдэл ирнэ.', 'good');
-        drawn = null;
-        await drawOrder(o.id);
-      },
-    }),
-  );
+  box.querySelector('[data-account]').addEventListener('click', () => {
+    if (!needsPassword) return void askAccount(o);
+    void passwordPopup({
+      token: store.guestToken,
+      email: person.email,
+      why: 'Мөнгө тань руу очих дансыг нууц үгээр баталгаажуулдаг. Нууц үгээ тохируулмагц дансаа оруулна.',
+      // Set just now, or already set in another tab (null): either way the account is next.
+      then: ({ password }) => askAccount(o, password),
+    });
+  });
   return box;
+}
+
+/**
+ * The refund's bank account, in a popup. `password` is one the person has
+ * just chosen (passwordPopup): it confirms the account without being asked
+ * for again. Without it, the popup asks.
+ */
+function askAccount(o, password = null) {
+  const r = o.refund;
+  return popup({
+    title: 'Буцаалт авах данс',
+    sub: `<b>${esc(mnt(r.amount_mnt))}</b> энэ данс руу шилжинэ.${password ? '' : ' Мөнгө тань руу очиж байгаа тул нууц үгээрээ баталгаажуулна.'}`,
+    width: 520,
+    submit: 'Данс илгээх',
+    // One column, top to bottom: an IBAN with its spaces is 24 characters, more than half this popup holds.
+    fields: [
+      // «Бусад банк» opens the field for its name; any bank on the list needs none.
+      { name: 'bank', label: 'Банк', type: 'select', options: [['', 'Банкаа сонгоно уу'], ...BANK_NAMES.map((b) => [b, b]), [OTHER_BANK, 'Бусад банк']], required: true, wide: true, onChange: (bank, form) => form.show('other', bank === OTHER_BANK) },
+      { name: 'other', label: 'Банкны нэр', placeholder: 'Жагсаалтад байхгүй банк', required: true, wide: true },
+      // An IBAN starts with MN, so the keyboard is the one with letters; the spaces a bank prints it with are fine.
+      { name: 'account', label: 'Дансны дугаар', inputmode: 'text', autocomplete: 'off', placeholder: 'MN12 0005 0050 1234 5678', hint: 'IBAN (MN + 18 орон) эсвэл дансны дугаар (6–20 орон).', required: true, wide: true, attrs: { autocapitalize: 'characters', spellcheck: 'false' } },
+      { name: 'holder', label: 'Данс эзэмшигчийн нэр', autocomplete: 'name', placeholder: 'Банкинд бүртгэлтэй нэр', required: true, wide: true },
+      ...(password ? [] : [{ name: 'password', label: 'Нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true }]),
+    ],
+    onSubmit: async (v) => {
+      // The rule the server keeps: the spaces out, the letters up, then MN and 18 digits — or 6 to 20 digits.
+      const account = v.account.replace(/\s+/g, '').toUpperCase();
+      if (!/^(MN\d{18}|\d{6,20})$/.test(account)) throw Object.assign(new Error('IBAN бол MN + 18 орон, дансны дугаар бол 6–20 оронтой тоо байна.'), { field: 'account' });
+      if (v.holder.length < 2) throw Object.assign(new Error('Данс эзэмшигчийн нэрээ бичнэ үү.'), { field: 'holder' });
+      const bank = v.bank === OTHER_BANK ? v.other : v.bank;
+      if (!bank) throw Object.assign(new Error('Банкныхаа нэрийг бичнэ үү.'), { field: v.bank === OTHER_BANK ? 'other' : 'bank' });
+      try {
+        await authed(`/v1/idesh/${o.id}/refund-account`, {
+          method: 'POST',
+          body: { bank_name: bank, bank_account: account, bank_holder: v.holder, password: password ?? v.password },
+        });
+      } catch (e) {
+        throw new Error(e.code === 'BAD_PASSWORD' ? 'Нууц үг буруу байна.' : whatWentWrong(e));
+      }
+      say('Данс бүртгэгдлээ. Шилжүүлмэгц мэдэгдэл ирнэ.', 'good');
+      drawn = null;
+      await drawOrder(o.id);
+    },
+  });
 }
 
 /* ── which page this is ────────────────────────────────────────────── */

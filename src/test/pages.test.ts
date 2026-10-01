@@ -125,6 +125,7 @@ async function openPage(
   search = '',
   respond?: (path: string, init?: RequestInit) => Response | Promise<Response> | undefined,
   browser: ReturnType<typeof memoryStorage> = storage,
+  userAgent?: string,
 ): Promise<JSDOM> {
   const html = await readFile(join(WEB, file), 'utf8');
   const dom = new JSDOM(html, {
@@ -161,6 +162,8 @@ async function openPage(
     }
   }) as typeof fetch;
   Object.defineProperty(window, 'localStorage', { value: browser, writable: true });
+  // Another browser's own words for itself — Facebook's, which Google will not sign anybody in from.
+  if (userAgent) Object.defineProperty(window.navigator, 'userAgent', { value: userAgent, configurable: true });
 
   // Every local module the page imports, inlined. jsdom cannot resolve module
   // specifiers, so the pieces are concatenated and run as one script — the same
@@ -3497,6 +3500,271 @@ describe('a first password, on the account page', () => {
     } finally {
       delete ctx.mailer;
     }
+  });
+});
+
+describe('a first password, where money is about to go', () => {
+  /*
+   * A refund's account and a supplier's payout account are confirmed with the
+   * account's password. An account made by an address, Google or Apple has
+   * none: the button that asks for the account sets one first, in a popup —
+   * a code to the address on the account, then the password — and the
+   * account's popup or form follows with it, not a trip to another page.
+   */
+  const json = { 'content-type': 'application/json' };
+
+  /** Somebody who signed in with a code to this address: no password. Their session. */
+  async function byAddress(mailer: FakeMailer, email: string): Promise<string> {
+    await fetch(`${base}/v1/auth/email/start`, { method: 'POST', headers: json, body: JSON.stringify({ email }) });
+    const verified = await fetch(`${base}/v1/auth/email/verify`, { method: 'POST', headers: json, body: JSON.stringify({ email, code: mailer.codeFor(email) }) });
+    return ((await verified.json()) as { token: string }).token;
+  }
+
+  /** A whole animal bought by this session and cancelled by its supplier: the refund waits for an account. */
+  async function cancelledFor(token: string, key: string): Promise<string> {
+    const auth = { authorization: `Bearer ${token}`, ...json };
+    const { listing, today } = (await (await fetch(`${base}/v1/idesh/listings/${await fullestStall()}`)).json()) as {
+      listing: { id: string; ready_from: string };
+      today: string;
+    };
+    const made = (await (
+      await fetch(`${base}/v1/idesh`, {
+        method: 'POST',
+        headers: { ...auth, 'idempotency-key': key },
+        body: JSON.stringify({ listing_id: listing.id, qty: 1, receive: 'pickup', receive_on: listing.ready_from > today ? listing.ready_from : today }),
+      })
+    ).json()) as { id: string };
+    const paid = await fetch(`${base}/v1/idesh/${made.id}/pay`, { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+    expect(paid.status, await paid.text()).toBe(200);
+    const { rows } = await getPool().query<{ seller: string }>(
+      `SELECT g.phone_e164 AS seller FROM idesh.idesh_order o
+         JOIN idesh.supplier s ON s.id = o.supplier_id JOIN identity.guest g ON g.id = s.owner_guest_id
+        WHERE o.id = $1`,
+      [made.id],
+    );
+    const asSeller = { ...json, authorization: `Bearer ${await devLogin(rows[0]!.seller, 'Нийлүүлэгч')}` };
+    const cancelled = await fetch(`${base}/v1/supplier/orders/${made.id}/cancel`, { method: 'POST', headers: asSeller, body: JSON.stringify({ reason: 'guest_asked' }) });
+    expect(cancelled.status, await cancelled.text()).toBe(200);
+    return made.id;
+  }
+
+  const popupOnTop = (dom: JSDOM) => [...dom.window.document.querySelectorAll('.sheet.popup[data-open]')].pop() as HTMLElement | undefined;
+  const passwordLetters = (mailer: FakeMailer, to: string) => mailer.sent.filter((m) => m.to === to && m.subject.includes('нууц үг тохируулах')).length;
+
+  it('keeps a cancelled order waiting for its account under «Идэвхтэй», and sets the password and the account from the order in one go', async () => {
+    const mailer = new FakeMailer();
+    ctx.mailer = mailer;
+    try {
+      const token = await byAddress(mailer, 'saraa@example.mn');
+      const id = await cancelledFor(token, 'refund-first-password');
+
+      // The list: still going on — the money has not come back — and saying what it waits for.
+      const list = await openPage('orders.html', '', undefined, device(token));
+      await until(list, 'the row', (d) => Boolean(d.querySelector(`[data-order="${id}"]`)));
+      expect(list.window.document.querySelector('#tabs [data-tab="live"]')?.getAttribute('aria-pressed')).toBe('true');
+      expect(list.window.document.querySelector(`[data-order="${id}"]`)?.textContent).toContain('Данс оруулна уу');
+
+      // The order: one button, which sets the password first and then asks for the account.
+      const page = await openPage('orders.html', `/${id}`, undefined, device(token));
+      const d = page.window.document;
+      await until(page, 'the way to give an account', () => Boolean(d.querySelector('.od-refund [data-account]')));
+      expect(d.querySelector('.od-refund a[href="/account"]')).toBeNull();
+      expect(d.querySelector('.od-refund .s-note')?.textContent).toContain('нууц үг');
+      (d.querySelector('[data-account]') as HTMLElement).click();
+      await until(page, 'the password popup', () => popupOnTop(page)?.querySelector('h2')?.textContent === 'Нууц үг тохируулах');
+      expect(popupOnTop(page)!.querySelector('header .sub')?.textContent).toContain('saraa@example.mn');
+      await answerPopup(page);
+      await until(page, 'the letter', () => passwordLetters(mailer, 'saraa@example.mn') === 1);
+      await answerPopup(page, { code: mailer.codeFor('saraa@example.mn')!, next: 'сараагийн нууц үг' });
+
+      // Straight on to the account, the password just chosen in hand: not asked for again.
+      await until(page, 'the account popup', () => Boolean(popupOnTop(page)?.querySelector('[name="bank"]')));
+      expect(popupOnTop(page)!.querySelector('[name="password"]')).toBeNull();
+      await answerPopup(page, { bank: 'Хаан банк', account: '5012345678', holder: 'Сараа Бат' });
+      await until(page, 'the account on the order', () => !d.querySelector('[data-account]') && (d.querySelector('.od-refund')?.textContent ?? '').includes('5012345678'));
+
+      // The password is the account's now: it signs in.
+      const signedIn = await fetch(`${base}/v1/auth/login`, { method: 'POST', headers: json, body: JSON.stringify({ login: 'saraa@example.mn', password: 'сараагийн нууц үг' }) });
+      expect(signedIn.status).toBe(200);
+    } finally {
+      delete ctx.mailer;
+    }
+  });
+
+  it('sets the password in the app when «Данс илгээх» needs one, and sends the account with it', async () => {
+    const mailer = new FakeMailer();
+    ctx.mailer = mailer;
+    try {
+      const token = await byAddress(mailer, 'tsetseg@example.mn');
+      const id = await cancelledFor(token, 'app-refund-first-password');
+      const page = await openPage('idesh.html', `?order=${id}`, undefined, device(token));
+      await until(page, 'the refund form', (d) => Boolean(d.querySelector('#refund #send-account')));
+      const form = page.window.document.querySelector('#refund')!;
+      const send = form.querySelector('#send-account') as HTMLButtonElement;
+      const type = (field: string, value: string) => {
+        const input = form.querySelector(`#${field}`) as HTMLInputElement;
+        input.value = value;
+        input.dispatchEvent(new page.window.Event('input'));
+      };
+      type('bank', 'Хаан банк');
+      type('account', '5098765432');
+      type('holder', 'Цэцэг Болд');
+      expect(send.disabled).toBe(false);
+      send.click();
+
+      // No password to type: the popup sets one, and the account goes the moment it is set.
+      await until(page, 'the password popup', () => popupOnTop(page)?.querySelector('h2')?.textContent === 'Нууц үг тохируулах');
+      await answerPopup(page);
+      await until(page, 'the letter', () => passwordLetters(mailer, 'tsetseg@example.mn') === 1);
+      await answerPopup(page, { code: mailer.codeFor('tsetseg@example.mn')!, next: 'цэцэгийн нууц үг' });
+      await until(page, 'the account to be kept', (d) => d.querySelector('#refund')?.textContent?.includes('5098765432') ?? false);
+      expect(page.window.document.querySelector('#refund')?.textContent).toContain('мэдэгдэл');
+      expect(page.window.document.querySelector('#refund')?.textContent).not.toContain('SMS');
+    } finally {
+      delete ctx.mailer;
+    }
+  });
+
+  it('wakes «Данс илгээх» in the app as the password is typed after a refusal', async () => {
+    await ownGuest('+97699005015');
+    const id = await cancelledFor(storage.getItem('basu.guest')!, 'app-refund-wrong-password');
+    const page = await openPage('idesh.html', `?order=${id}`);
+    await until(page, 'the refund form', (d) => Boolean(d.querySelector('#refund #send-account')));
+    const form = page.window.document.querySelector('#refund')!;
+    const send = form.querySelector('#send-account') as HTMLButtonElement;
+    const type = (field: string, value: string) => {
+      const input = form.querySelector(`#${field}`) as HTMLInputElement;
+      input.value = value;
+      input.dispatchEvent(new page.window.Event('input'));
+    };
+    type('bank', 'Хаан банк');
+    type('account', '5012345678');
+    type('holder', 'Туршилт Хүн');
+    // An account with a password is asked for it, in its own field, and a wrong one is refused there.
+    send.click();
+    await until(page, 'the password field', (d) => !(d.querySelector('#otp-step') as HTMLElement).hidden && !send.disabled);
+    type('otp', 'буруу нууц үг');
+    send.click();
+    await until(page, 'the refusal', () => (form.querySelector('#refund-why')?.textContent ?? '').includes('Нууц үг буруу') && !send.disabled);
+    // Cleared, the button waits and says why; typed again, it wakes and the refusal goes.
+    type('otp', '');
+    expect(send.disabled).toBe(true);
+    expect(form.querySelector('#refund-why')?.textContent).toContain('Нууц үгээ бичнэ үү.');
+    type('otp', GUEST_PASSWORD);
+    expect(send.disabled).toBe(false);
+    expect((form.querySelector('#refund-why') as HTMLElement).hidden).toBe(true);
+    send.click();
+    await until(page, 'the account to be kept', (d) => d.querySelector('#refund')?.textContent?.includes('5012345678') ?? false);
+  });
+
+  it('sets the owner’s first password in front of the payout account, and goes on to the account', async () => {
+    const mailer = new FakeMailer();
+    ctx.mailer = mailer;
+    try {
+      // An owner signed in by their number: no password, and no address for its code to go to yet.
+      const screen = await ownerScreen(seeded.suppliers[3]!.phone);
+      const d = screen.window.document;
+      const profileTab = () => d.querySelector('.tabs button[data-tab="profile"], .tabbar button[data-tab="profile"]') as HTMLElement | null;
+      await until(screen, 'the module', () => Boolean(profileTab()));
+      profileTab()!.click();
+      await until(screen, 'the payout account', () => Boolean(d.querySelector('#bank-edit')));
+      (d.querySelector('#bank-edit') as HTMLElement).click();
+
+      // An address first, then the password — never «go to the profile» and back.
+      await until(screen, 'the address popup', () => popupOnTop(screen)?.querySelector('h2')?.textContent === 'Имэйл холбох');
+      await answerPopup(screen, { email: 'malchin@example.mn' });
+      await until(screen, 'the address letter', () => Boolean(mailer.codeFor('malchin@example.mn')));
+      await answerPopup(screen, { code: mailer.codeFor('malchin@example.mn')! });
+      await until(screen, 'the password popup', () => popupOnTop(screen)?.querySelector('h2')?.textContent === 'Нууц үг тохируулах');
+      expect(popupOnTop(screen)!.textContent).toContain('Олголт очих данс');
+      await answerPopup(screen);
+      await until(screen, 'the password letter', () => passwordLetters(mailer, 'malchin@example.mn') === 1);
+      await answerPopup(screen, { code: mailer.codeFor('malchin@example.mn')!, next: 'малчны нууц үг' });
+
+      // The account's popup, without asking for the password just chosen.
+      await until(screen, 'the account popup', () => Boolean(d.querySelector('#bank-change [name="bank_account"]')));
+      expect(d.querySelector('#bank-change [name="password"]')).toBeNull();
+      await answerPopup(screen, { bank_name: 'Хаан банк', bank_account: '5011223344', bank_holder: 'Малчин Бат' });
+      await until(screen, 'the new account on the card', () => (d.querySelector('#bank')?.textContent ?? '').includes('5011223344'));
+    } finally {
+      delete ctx.mailer;
+    }
+  });
+});
+
+describe('an order’s steps on the website', () => {
+  it('says the preparing step waits for the supplier until they start, as the app says it', async () => {
+    await ownGuest('+97699005016');
+    const token = storage.getItem('basu.guest')!;
+    const { listing, today } = (await (await fetch(`${base}/v1/idesh/listings/${await fullestStall()}`)).json()) as {
+      listing: { id: string; ready_from: string };
+      today: string;
+    };
+    const made = (await (
+      await fetch(`${base}/v1/idesh`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', 'idempotency-key': 'steps-honest' },
+        body: JSON.stringify({ listing_id: listing.id, qty: 1, receive: 'pickup', receive_on: listing.ready_from > today ? listing.ready_from : today }),
+      })
+    ).json()) as { id: string };
+    await fetch(`${base}/v1/idesh/${made.id}/pay`, { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+
+    const page = await openPage('orders.html', `/${made.id}`);
+    await until(page, 'the steps', (d) => Boolean(d.querySelector('.od-steps li[data-next]')));
+    const next = page.window.document.querySelector('.od-steps li[data-next]')!;
+    // Paid, and nobody has touched the meat yet: the ringed step says what it waits for.
+    expect(next.querySelector('b')?.textContent).toBe('Бэлтгэл');
+    expect(next.querySelector('span')?.textContent).toBe('Нийлүүлэгч бэлтгэхийг хүлээж байна');
+    expect(page.window.document.querySelector('.od-steps')?.textContent).not.toContain('Бэлтгэж байна');
+  });
+});
+
+describe('paying, said as it stands', () => {
+  /** The listings as production answers them while no payment provider is set up. */
+  const closed = (path: string) =>
+    path.startsWith('/v1/idesh/listings')
+      ? new Response(JSON.stringify({ today: '2026-10-02', payments_open: false, listings: [] }), { headers: { 'content-type': 'application/json' } })
+      : undefined;
+
+  it('does not offer QPay as something to do now while online payment is closed', async () => {
+    const home = await openPage('home.html', '', closed, device());
+    await until(home, 'the way it goes, said as it stands', (d) => d.querySelector('.s-how [data-pay] span')?.textContent === 'Онлайн төлбөр одоогоор хаалттай байна.');
+    const front = await openPage('index.html', '', closed, device());
+    await until(front, 'the front page’s steps, said as they stand', (d) => d.querySelector('#how [data-pay] span')?.textContent === 'Онлайн төлбөр одоогоор хаалттай байна.');
+  });
+});
+
+describe('Facebook’s and Instagram’s own browsers', () => {
+  /** Facebook's browser on an iPhone, as a link shared there opens. */
+  const FACEBOOK = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 [FBAN/FBIOS;FBAV/512.0.0.41.97;FBBV/700000000;FBDV/iPhone15,3;FBMD/iPhone;FBSN/iOS;FBSV/18.5;FBSS/3;FBCR/;FBID/phone;FBLC/mn_MN;FBOP/80]';
+  /** Google is open on this server, as it is in production. */
+  const withGoogle = (path: string) =>
+    path === '/v1/auth/methods'
+      ? new Response(JSON.stringify({ password: true, email: true, google: true, apple: true, sms: false }), { headers: { 'content-type': 'application/json' } })
+      : undefined;
+
+  it('lead the door with the code by email and say where Google works, instead of Google’s English refusal', async () => {
+    const login = await openPage('login.html', '', withGoogle, device(), FACEBOOK);
+    const d = login.window.document;
+    await until(login, 'the door', () => d.documentElement.hasAttribute('data-ready'));
+    expect(d.documentElement.hasAttribute('data-in-app')).toBe(true);
+    expect(d.getElementById('in-app')?.textContent).toBe('Google-ээр нэвтрэх бол Safari эсвэл Chrome-д нээнэ үү.');
+    expect((d.getElementById('email-form') as HTMLElement).hidden).toBe(false);
+
+    // Anywhere else, Google leads and nothing is said about it.
+    const elsewhere = await openPage('login.html', '', withGoogle, device());
+    await until(elsewhere, 'the door', (doc) => doc.documentElement.hasAttribute('data-ready'));
+    expect(elsewhere.window.document.documentElement.hasAttribute('data-in-app')).toBe(false);
+    expect((elsewhere.window.document.getElementById('google') as HTMLElement).hidden).toBe(false);
+  });
+
+  it('leave Google out of the doors in a popup or on a card too', async () => {
+    const page = await openPage('supplier.html', '', withGoogle, device(), FACEBOOK);
+    const d = page.window.document;
+    await until(page, 'the doors', () => Boolean(d.querySelector('.ways [data-email]:not([hidden])')));
+    expect((d.querySelector('.ways [data-google]') as HTMLElement).hidden).toBe(true);
+    expect((d.querySelector('.ways [data-in-app]') as HTMLElement).hidden).toBe(false);
+    expect(d.querySelector('.ways [data-in-app]')?.textContent).toContain('Safari эсвэл Chrome');
   });
 });
 

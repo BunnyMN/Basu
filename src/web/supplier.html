@@ -241,7 +241,7 @@
 <div id="root"></div>
 
 <script type="module">
-import { api, store, shell, toast, mnt, money, KIND, IDESH_STATE, dayLabel, dayShort, signInDoors, accountWays, authReturn, popup, dropSession, whatWentWrong } from '/api.js';
+import { api, store, shell, toast, mnt, money, KIND, IDESH_STATE, dayLabel, dayShort, signInDoors, accountWays, authReturn, popup, passwordPopup, BANK_NAMES, dropSession, whatWentWrong } from '/api.js';
 import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -1576,33 +1576,29 @@ function bankCard(b) {
 
 /**
  * Where the money goes is the one field a stolen phone would change, so it
- * takes the owner's own password. An account with none yet is told how to
- * make one rather than asked for what it does not have.
+ * takes the owner's own password. An account with none yet sets one here —
+ * a code to the address on the account, then the password (api.js
+ * passwordPopup) — and goes straight on to the account, the password just
+ * chosen in hand, rather than being sent to the profile to find the way.
+ * `password` is that one: it confirms the account without being asked for
+ * again.
  */
-async function changeBank(b) {
+async function changeBank(b, password = null) {
   let me = null;
-  try {
-    me = await api('/v1/me', { token: token() });
-  } catch {
-    // Asked for the password anyway; the server says if it is wrong.
+  if (!password) {
+    try {
+      me = await api('/v1/me', { token: token() });
+    } catch {
+      // Asked for the password anyway; the server says if it is wrong.
+    }
   }
   if (me && !me.has_password) {
-    await popup({
-      title: b.bank_account ? 'Данс солих' : 'Данс нэмэх',
-      sub: 'Эхлээд нууц үг тохируулна',
-      width: 460,
-      fields: [
-        {
-          type: 'note',
-          html: 'Олголт очих дансыг солихдоо өөрийн нууц үгээр баталгаажуулна — утсаа алдсан ч мөнгө тань өөр данс руу явахгүй. Таны бүртгэлд нууц үг алга: <b>Профайл → Нэвтрэх</b> хэсгээс эхлээд тохируулна уу.',
-        },
-      ],
-      submit: 'Профайл руу очих',
-      cancel: 'Хаах',
-      onSubmit: async () => {
-        show('profile');
-        return true;
-      },
+    await passwordPopup({
+      token: token(),
+      email: me.email,
+      why: 'Олголт очих дансыг өөрийн нууц үгээр баталгаажуулна — утсаа алдсан ч мөнгө тань өөр данс руу явахгүй. Таны бүртгэлд нууц үг алга: эхлээд тохируулаад, дараа нь дансаа оруулна.',
+      // Set just now — or already set in another tab (null), and then asked for in the account's popup.
+      then: ({ password: chosen }) => changeBank(b, chosen ?? null),
     });
     return;
   }
@@ -1616,7 +1612,7 @@ async function changeBank(b) {
       // An IBAN starts with MN: the keyboard with letters, the letters up as they are typed.
       { name: 'bank_account', label: 'Дансны дугаар', inputmode: 'text', autocomplete: 'off', placeholder: 'MN12 0005 0050 1234 5678', hint: 'IBAN (MN + 18 орон) эсвэл дансны дугаар (6–20 орон).', value: b.bank_account ?? '', required: true, attrs: { autocapitalize: 'characters', spellcheck: 'false' } },
       { name: 'bank_holder', label: 'Данс эзэмшигчийн нэр', value: b.bank_holder ?? '', required: true, wide: true },
-      { name: 'password', label: 'Таны нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true, hint: 'Мөнгө очих газар солигдож байгаа тул өөрийн нууц үгээр баталгаажуулна.' },
+      ...(password ? [] : [{ name: 'password', label: 'Таны нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true, hint: 'Мөнгө очих газар солигдож байгаа тул өөрийн нууц үгээр баталгаажуулна.' }]),
       { type: 'note', text: 'Basu санхүү шинэ дансыг гэрээтэй тулгаж баталгаажуулах хүртэл олголт хийгдэхгүй. Солигдсоныг эзэн бүрт мессежээр мэдэгдэнэ.' },
     ],
     submit: 'Хадгалах',
@@ -1627,7 +1623,7 @@ async function changeBank(b) {
       try {
         await sup('/v1/supplier/profile', {
           method: 'PATCH',
-          body: { bank_name: v.bank_name, bank_account: account, bank_holder: v.bank_holder, password: v.password },
+          body: { bank_name: v.bank_name, bank_account: account, bank_holder: v.bank_holder, password: password ?? v.password },
         });
       } catch (error) {
         // The server takes the same forms the application does; the one thing this change can say
@@ -1645,7 +1641,7 @@ async function changeBank(b) {
   if (bankInput) {
     bankInput.setAttribute('list', 'popup-banks');
     bankInput.setAttribute('autocomplete', 'off');
-    sheet.append(el(`<datalist id="popup-banks">${BANKS.map((name) => `<option value="${name}">`).join('')}</datalist>`));
+    sheet.append(el(`<datalist id="popup-banks">${BANK_NAMES.map((name) => `<option value="${name}">`).join('')}</datalist>`));
   }
   if (!(await done)) return;
   toast('Данс хадгалагдлаа. Basu санхүү шалгаж баталгаажуулна.', 'good');

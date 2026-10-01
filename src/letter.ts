@@ -85,9 +85,12 @@ export function renderLetter(letter: Letter): string {
     ? `<p style="margin:4px 0 0;font-family:${SANS};font-size:13px;line-height:1.55;color:${C.ink3}">${esc(letter.small)}</p>`
     : '';
 
+  // Each promise holds together; the line breaks between them. Joined by
+  // spaces that do not break, the three were one 420px word, and every letter
+  // was wider than a phone: the whole card scrolled sideways.
   const promise = ['Гэрээт нийлүүлэгч', 'Эцсийн үнэ', 'Таны захиалгаар нядална']
     .map((w) => `<span style="white-space:nowrap"><span style="color:${C.pine}">✓</span>&nbsp;${w}</span>`)
-    .join('&nbsp;&nbsp;·&nbsp;&nbsp;');
+    .join(' · ');
 
   return `<!doctype html>
 <html lang="mn">

@@ -32,6 +32,9 @@
 .sa-ways [data-rows] > .row{padding:16px 24px}
 /* app.css's `[data-rows] > .row{border:0}` outweighs its own hairline between rows; said again here until it is fixed there */
 .sa-ways [data-rows] > .row + .row{border-top:1px solid var(--line)}
+/* its buttons are the website's pills, as «Нэр засах» over them is, not the app's rounded rectangles */
+.sa-ways .btn{border-radius:999px;padding-inline:16px}
+.sa-ways .btn[data-size="sm"]{min-height:40px}
 @media (pointer:coarse){.sa-ways .btn[data-size="sm"]{min-height:44px}}
 .sa-sessions{margin:0;padding:0;list-style:none}
 .sa-sessions li{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:68px;padding:12px 0}
@@ -53,6 +56,7 @@
 </style>
 </head>
 <body>
+<header class="s-bar" data-static><div class="s-wrap"><a class="s-word" href="/">Basu</a><nav class="s-nav" aria-label="Цэс"><a href="/home">Нүүр</a><a href="/shop">Зах</a><a href="/orders">Миний захиалга</a><a href="/dashboard">Бизнест</a></nav><div class="s-right"></div></div></header>
 <main class="s-main">
   <div class="s-wrap">
     <section class="s-head"><h1>Бүртгэл</h1><p>Таны нэр, нэвтрэх арга, нэвтэрсэн төхөөрөмжүүд.</p></section>
@@ -86,16 +90,21 @@ const seen = (iso) => {
 const OUT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 16l-4-4 4-4M6 12h10"/></svg>';
 
 async function draw() {
-  const me = await authed('/v1/me');
+  // Everything the page holds is asked at once and drawn at once — the profile, the ways in (accountWays
+  // asks who this is for itself) and the devices: a section filled in after the others would push the
+  // rest of the page down under the eye.
+  const waysBlock = accountWays({ token: store.guestToken });
+  const [me, { sessions }] = await Promise.all([authed('/v1/me'), authed('/v1/me/sessions')]);
   const fact = (label, value, mono = false) =>
     `<div><dt>${label}</dt>${value ? `<dd>${mono ? `<span class="mono">${esc(value)}</span>` : esc(value)}</dd>` : '<dd class="none">—</dd>'}</div>`;
 
+  // The address is not among the facts: it is said once, under «Нэвтрэх арга», where it is a way in
+  // and where the button to add one is — not a second time here as «—».
   const profileHead = el('<div class="s-sec"><h2>Профайл</h2><button class="s-btn s-btn-line s-btn-sm" type="button" id="edit-name">Нэр засах</button></div>');
   const profile = el(`
     <div class="s-card sa-card">
       <dl class="sa-facts">
         ${fact('Нэр', me.display_name)}
-        ${fact('Имэйл', me.email)}
         ${fact('Утас', me.phone ? phoneShown(me.phone) : null, true)}
         ${fact('Бүртгүүлсэн', since(me.member_since))}
       </dl>
@@ -123,7 +132,7 @@ async function draw() {
 
   const waysHead = el('<div class="s-sec"><h2>Нэвтрэх арга</h2></div>');
   const ways = el('<div class="sa-ways"></div>');
-  ways.append(accountWays({ token: store.guestToken }));
+  ways.append(waysBlock);
 
   const devicesHead = el('<div class="s-sec"><h2>Нэвтэрсэн төхөөрөмж</h2></div>');
   const devices = el(`<div class="s-card sa-card">
@@ -137,12 +146,8 @@ async function draw() {
       <p><b>Энэ төхөөрөмжөөс гарах</b>Дараа нь Google, имэйл эсвэл нууц үгээрээ дахин нэвтэрнэ.</p>
       <button class="s-btn s-btn-line" type="button" id="out">${OUT}<span>Гарах</span></button>
     </div>`);
-  box.removeAttribute('aria-busy');
-  box.removeAttribute('role');
-  box.replaceChildren(profileHead, profile, waysHead, ways, devicesHead, devices, out);
 
-  const paintSessions = async () => {
-    const { sessions } = await authed('/v1/me/sessions');
+  const paintSessions = (sessions) => {
     const list = devices.querySelector('#sessions');
     list.replaceChildren(
       ...sessions.map((s) =>
@@ -158,7 +163,11 @@ async function draw() {
       ? 'Танихгүй төхөөрөмж байвал бусдаас нь гараарай.'
       : 'Зөвхөн энэ төхөөрөмж дээр нэвтэрсэн байна.';
   };
-  await paintSessions();
+  paintSessions(sessions);
+  await waysBlock.ready;
+  box.removeAttribute('aria-busy');
+  box.removeAttribute('role');
+  box.replaceChildren(profileHead, profile, waysHead, ways, devicesHead, devices, out);
   // Signing every other device out cannot be taken back: it is asked first, saying how many.
   devices.querySelector('#others').addEventListener('click', () =>
     void confirmPopup({
@@ -174,7 +183,7 @@ async function draw() {
           throw new Error(whatWentWrong(error));
         }
         say(revoked ? `${revoked} төхөөрөмжөөс гаргалаа.` : 'Өөр төхөөрөмж алга.', 'good');
-        await paintSessions();
+        paintSessions((await authed('/v1/me/sessions')).sessions);
       },
     }),
   );

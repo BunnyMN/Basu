@@ -21,6 +21,10 @@ html[data-site] body{background:var(--bg);min-height:100vh;min-height:100dvh;dis
 @media (max-width:760px){:root{--s-bar:56px}}
 
 .s-wrap{width:100%;max-width:var(--s-wrap);margin:0 auto;padding:0 var(--s-gutter)}
+/* Until site.js puts the bar in (mountFrame), its room is kept, so nothing on the page moves when
+   it comes. A page that draws the bar in its HTML (header.s-bar[data-static]) has it from the first
+   paint and never needs this; the door (/login) has no bar and no .s-main, and gets none. */
+html[data-site] body:not(:has(> .s-bar)):has(> main.s-main){padding-top:calc(var(--s-bar) + var(--safe-t) + 1px)}
 .s-main{flex:1 0 auto;padding-bottom:72px}
 .s-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
@@ -216,6 +220,8 @@ input.s-input[type="date"]{display:flex;align-items:center}
    the contents beside the text, the section being read marked. Inside
    the shell none of this applies. */
 html[data-site] .topbar{display:none}
+/* the bar drawn in their HTML is the website's: in the app's web view it never shows */
+html:not([data-site]) .s-bar{display:none}
 html[data-site] .doc{flex:1 0 auto;padding-top:32px;padding-bottom:56px}
 html[data-site] .doc h2{scroll-margin-top:calc(var(--s-bar) + var(--safe-t) + 20px)}
 html[data-site] .doc .toc a:not(.btn):not(.link):not(.go){text-decoration:none}
@@ -227,7 +233,9 @@ html[data-site] .doc .toc a:not(.btn):not(.link):not(.go){text-decoration:none}
 }
 @media (min-width:1100px){
   html[data-site] main.doc{max-width:1080px;display:grid;grid-template-columns:232px minmax(0,1fr);gap:48px;align-items:start}
-  html[data-site] .doc-aside{display:block;position:sticky;top:calc(var(--s-bar) + var(--safe-t) + 32px)}
+  /* The text holds its column from the first paint; the contents arrive beside it, not in front of it. */
+  html[data-site] main.doc > .doc-card{grid-column:2;grid-row:1}
+  html[data-site] .doc-aside{display:block;grid-column:1;grid-row:1;position:sticky;top:calc(var(--s-bar) + var(--safe-t) + 32px)}
   html[data-site] .doc-aside .eyebrow{margin:8px 0 12px}
   html[data-site] .doc-aside .toc a{min-height:36px;margin:0 -10px;padding:0 10px;border-radius:8px;font-size:.875rem;color:var(--ink-2)}
   html[data-site] .doc-aside .toc a[aria-current]{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}

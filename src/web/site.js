@@ -2,7 +2,7 @@
    the foot, the way to /login and back, and calls made as the person
    signed in. Every page of the website imports this; the app's pages do not. */
 
-import { api, store, dropSession, endSession, authReturn } from '/api.js';
+import { api, store, dropSession, endSession, authReturn, IDESH_LIVE } from '/api.js';
 
 /**
  * Text into markup, for everything a page draws from what people wrote: a
@@ -239,6 +239,23 @@ const NAV = [
  * The header and the foot, around a page's own <main>. `active` names the
  * header link to mark. On a phone the links fold into a menu under the bar:
  * a button at the end opens it, Esc or a press outside closes it.
+ *
+ * A page draws the bar in its own HTML too, so the first paint already has
+ * it and nothing under it moves when this one comes: the same height, the
+ * wordmark and the links, no account and no menu button yet —
+ *
+ *   <header class="s-bar" data-static><div class="s-wrap"><a class="s-word" href="/">Basu</a>
+ *     <nav class="s-nav" aria-label="Цэс"><a href="/home">Нүүр</a><a href="/shop">Зах</a>
+ *     <a href="/orders">Миний захиалга</a><a href="/dashboard">Бизнест</a></nav>
+ *     <div class="s-right"></div></div></header>
+ *
+ * (`aria-current="page"` on the page's own link). This one takes its place;
+ * a page without one gets the bar put in front of everything.
+ *
+ * The foot comes once the page has drawn what it was loading — nothing in
+ * its <main> still `aria-busy="true"` (or after a few seconds, whatever the
+ * page is doing). Put in under a skeleton, it sat in the first screen and was
+ * pushed out of it when the page filled.
  */
 export function mountFrame(active) {
   const link = ([key, href, label, icon], withIcon) =>
@@ -286,8 +303,22 @@ export function mountFrame(active) {
     if (!drawer.hidden && !drawer.contains(event.relatedTarget) && event.relatedTarget !== burger) fold(false);
   });
 
-  document.body.prepend(bar);
-  document.body.append(foot);
+  const drawn = document.querySelector('header.s-bar[data-static]');
+  if (drawn) drawn.replaceWith(bar);
+  else document.body.prepend(bar);
+  // Asked once the page's own script has drawn its first shapes (a microtask on: it runs on until it awaits).
+  queueMicrotask(() => {
+    const loading = () => Boolean(document.querySelector('main [aria-busy="true"]'));
+    if (!loading()) return void document.body.append(foot);
+    const put = () => {
+      watch.disconnect();
+      clearTimeout(late);
+      if (!foot.isConnected) document.body.append(foot);
+    };
+    const watch = new MutationObserver(() => !loading() && put());
+    watch.observe(document.querySelector('main') ?? document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['aria-busy'] });
+    const late = setTimeout(put, 8000);
+  });
   return accountSlot(bar.querySelector('#s-account'));
 }
 
@@ -315,6 +346,41 @@ export const statePill = (state, word) =>
   `<span class="s-pill" data-state="${esc(state)}"${ORDER_TONE[state] ? ` data-tone="${ORDER_TONE[state]}"` : ''}>${esc(word)}</span>`;
 
 /**
+ * A cancelled order that is still going on says what its money waits for:
+ * the guest's bank account — a step that is theirs, in the tone that asks for
+ * one — or Basu's transfer.
+ */
+export const refundPill = (refund) =>
+  refund === 'needs_account'
+    ? '<span class="s-pill" data-state="CANCELLED" data-tone="hold">Данс оруулна уу</span>'
+    : '<span class="s-pill" data-state="CANCELLED" data-tone="route">Буцаалт хүлээгдэж байна</span>';
+
+/**
+ * What of the person's is still going on — «Идэвхтэй» on /home and /orders
+ * alike: the meat paid for and not yet in their hands (IDESH_LIVE), and a
+ * cancelled order whose money is still on its way back. The server's own
+ * live list (GET /v1/idesh, the app's launcher's) carries both; it keeps a
+ * handed-over order too, until it closes, which the website counts as done.
+ * Each order comes with `refund`: null, or for a cancelled one its refund's
+ * state, asked of the order itself — «needs_account» while it waits for the
+ * guest's bank account, «due» while it waits for Basu's transfer. Nothing,
+ * when it cannot be asked.
+ */
+export async function stillGoing() {
+  const token = store.guestToken;
+  const ask = (path) => (token ? api(path, { token }).catch(() => null) : Promise.resolve(null));
+  const live = (await ask('/v1/idesh'))?.orders ?? [];
+  return Promise.all(
+    live
+      .filter((o) => IDESH_LIVE.includes(o.state) || o.state === 'CANCELLED')
+      .map(async (o) => (o.state === 'CANCELLED' ? { ...o, refund: (await ask(`/v1/idesh/${o.id}`))?.refund?.state ?? 'due' } : { ...o, refund: null })),
+  );
+}
+
+/** An animal's photo at the size a row or a card shows it — not the landing's large one. */
+export const meatPhoto = (kind) => `/brand/meat/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}-480.webp`;
+
+/**
  * An empty place that says what it is for and gives the one next step:
  * `actions` are [label, href, 'dark' | 'line'] — at most one dark.
  */
@@ -327,16 +393,33 @@ export function siteEmpty({ icon = 'info', title, text = '', actions = [], card 
     </div>`);
 }
 
-/** How an идэш goes, in the words the front page uses: for wherever somebody is about to start one. */
-export function howToBuy() {
-  return el(`
+/** What the paying step says, while money can be taken and while it cannot. */
+export const PAY_STEP = { open: 'Өөрийн банкны аппаас нэг удаа төлнө.', closed: 'Онлайн төлбөр одоогоор хаалттай байна.' };
+
+/**
+ * How an идэш goes, in the words the front page uses: for wherever somebody
+ * is about to start one. The paying step says how it stands: while online
+ * payment is closed (the listings' `payments_open`) it is not offered as
+ * something to do now. `paymentsOpen` when the page has asked already;
+ * without it, the listings are asked here.
+ */
+export function howToBuy({ paymentsOpen } = {}) {
+  const box = el(`
     <section class="s-how" aria-labelledby="s-how-title">
       <h2 id="s-how-title">Хэрхэн захиалах вэ</h2>
       <ol>
         <li><b>Зараа сонгоно</b><span>Мал, хэмжээ, авах өдөр, хүргэлтээ сонгоно.</span></li>
-        <li><b>QPay-ээр төлнө</b><span>Өөрийн банкны аппаас нэг удаа төлнө.</span></li>
+        <li data-pay><b>QPay-ээр төлнө</b><span>${paymentsOpen === false ? PAY_STEP.closed : PAY_STEP.open}</span></li>
         <li><b>Нийлүүлэгч бэлтгэнэ</b><span>Төлбөр орсны дараа мал нядалж, махыг бэлтгэнэ.</span></li>
         <li><b>Хүлээн авна</b><span>Хаалган дээрээ, эсвэл нийлүүлэгчийн цэгээс кодоо хэлээд авна.</span></li>
       </ol>
     </section>`);
+  if (paymentsOpen === undefined) {
+    api('/v1/idesh/listings')
+      .then((answer) => {
+        if (answer?.payments_open === false) box.querySelector('[data-pay] span').textContent = PAY_STEP.closed;
+      })
+      .catch(() => {});
+  }
+  return box;
 }
