@@ -4127,6 +4127,9 @@ describe('a first password, where money is about to go', () => {
       // The account's popup, without asking for the password just chosen.
       await until(screen, 'the account popup', () => Boolean(d.querySelector('#bank-change [name="bank_account"]')));
       expect(d.querySelector('#bank-change [name="password"]')).toBeNull();
+      // The change reaches every owner as their notices do — by email first — so no message is promised: SMS is off.
+      expect(d.querySelector('#bank-change')?.textContent).toContain('Солигдсон тухай эзэн бүрт мэдэгдэл ирнэ.');
+      expect(d.querySelector('#bank-change')?.textContent).not.toMatch(/мессеж|SMS/);
       await answerPopup(screen, { bank_name: 'Хаан банк', bank_account: '5011223344', bank_holder: 'Малчин Бат' });
       await until(screen, 'the new account on the card', () => (d.querySelector('#bank')?.textContent ?? '').includes('5011223344'));
     } finally {

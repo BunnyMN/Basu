@@ -1663,7 +1663,7 @@ async function changeBank(b, password = null) {
       { name: 'bank_account', label: 'Дансны дугаар', inputmode: 'text', autocomplete: 'off', placeholder: 'MN12 0005 0050 1234 5678', hint: 'IBAN (MN + 18 орон) эсвэл дансны дугаар (6–20 орон).', value: b.bank_account ?? '', required: true, attrs: { autocapitalize: 'characters', spellcheck: 'false' } },
       { name: 'bank_holder', label: 'Данс эзэмшигчийн нэр', value: b.bank_holder ?? '', required: true, wide: true },
       ...(password ? [] : [{ name: 'password', label: 'Таны нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true, hint: 'Мөнгө очих газар солигдож байгаа тул өөрийн нууц үгээр баталгаажуулна.' }]),
-      { type: 'note', text: 'Basu санхүү шинэ дансыг гэрээтэй тулгаж баталгаажуулах хүртэл олголт хийгдэхгүй. Солигдсоныг эзэн бүрт мессежээр мэдэгдэнэ.' },
+      { type: 'note', text: 'Basu санхүү шинэ дансыг гэрээтэй тулгаж баталгаажуулах хүртэл олголт хийгдэхгүй. Солигдсон тухай эзэн бүрт мэдэгдэл ирнэ.' },
     ],
     submit: 'Хадгалах',
     onSubmit: async (v) => {
@@ -1704,11 +1704,6 @@ const SETTLE_WORD = { paid: ['paid', 'Шилжүүлсэн'], approved: ['queued
 const settleState = (t) => SETTLE_WORD[t.state] ?? ['', t.state];
 
 /**
- * What the supplier is owed and what has been sent: one line per order,
- * with the rate and the account the contract names. The list is ops's to
- * act on; here it is the supplier's to check.
- */
-/**
  * When a handed-over order's payout appears: a day after the handover the
  * order closes and its payout line opens (src/idesh, `housekeeping`); Basu
  * then sends it on a working day.
@@ -1717,6 +1712,11 @@ const PAYOUT_AFTER_MS = 24 * 60 * 60 * 1000;
 /** The day a handed-over order's payout line opens, in Ulaanbaatar: «10-р сарын 4». */
 const payoutDay = (o) => (o.handed_at ? dayOfStamp(new Date(Date.parse(o.handed_at) + PAYOUT_AFTER_MS).toISOString()) : '');
 
+/**
+ * What the supplier is owed and what has been sent: one line per order,
+ * with the rate and the account the contract names. The list is ops's to
+ * act on; here it is the supplier's to check.
+ */
 async function renderMoney(bank = false) {
   const box = document.getElementById('money');
   if (!box) return;
