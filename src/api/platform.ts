@@ -38,7 +38,7 @@ import {
 import { addEmailFirst, badRequest, leaveTheDeskFirst, noSuchSession, sendError, signInAgain } from './errors.js';
 import { limits } from './hardening.js';
 import { deskSeatFor, seatedAtTheDesk } from './ops.js';
-import type { Ctx } from '../ports.js';
+import { topupsOpen, type Ctx } from '../ports.js';
 
 /**
  * The platform's own HTTP surface: who you are, what you have, what you were
@@ -351,6 +351,9 @@ export async function registerPlatformRoutes(
     return {
       balance_mnt: statement.balanceMnt,
       currency: statement.currency,
+      // Whether a top-up can be asked for here at all, so the app can leave
+      // the button out rather than offer one that is refused as closed.
+      topups_open: topupsOpen(ctx.payments),
       next: statement.nextCursor ?? null,
       lines: statement.lines.map((line) => ({
         id: line.transferId,

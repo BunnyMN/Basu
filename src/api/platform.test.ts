@@ -186,6 +186,20 @@ describe('the wallet', () => {
     }
   });
 
+  it('says whether a top-up can be asked for, so the app offers none that would be refused', async () => {
+    const token = await signIn();
+    const open = await app.inject({ method: 'GET', url: '/v1/wallet', headers: auth(token) });
+    expect(open.json().topups_open).toBe(true);
+    const closed = await buildServer({ ...ctx, payments: new ClosedPaymentProvider() });
+    try {
+      const shut = await closed.inject({ method: 'GET', url: '/v1/wallet', headers: auth(token) });
+      expect(shut.statusCode).toBe(200);
+      expect(shut.json()).toMatchObject({ balance_mnt: 0, currency: 'MNT', topups_open: false, lines: [] });
+    } finally {
+      await closed.close();
+    }
+  });
+
   it('spends the balance on lunch, and says so in the statement', async () => {
     const token = await signIn();
     await topUp(token, 50_000);

@@ -214,6 +214,15 @@ export class ClosedPaymentProvider implements PaymentProvider {
   }
 }
 
+/**
+ * Whether money can be asked for at all. False exactly where a top-up would
+ * be refused as PAYMENTS_CLOSED: a production server with no key, which gets
+ * the closed provider above. Wire takes money, and so does the demo's fake.
+ */
+export function topupsOpen(provider: PaymentProvider): boolean {
+  return !(provider instanceof ClosedPaymentProvider);
+}
+
 export class PaymentsClosed extends Error {
   constructor() {
     super('payments are not configured on this server');
