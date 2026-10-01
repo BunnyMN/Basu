@@ -101,6 +101,12 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var
 /* A menu is read, so the sheet is paper, not glass: the map under a
    frosted menu showed through behind every dish as a grey smudge. */
 #sheet{background:var(--surface)}
+/* Never over the bar: with the status bar's inset the bar is 111pt tall,
+   and 88% of the screen reached into it. */
+@media (max-width:899px){#sheet{max-height:min(88dvh,calc(100dvh - var(--bar-h) - var(--safe-t) - 12px))}}
+/* Closed, the sheet waits below the screen — and its upward shadow did not:
+   it lay along the bottom edge of every page as a dark band. */
+#sheet:not([data-open]){box-shadow:none}
 .sheet > .body > .empty{border-top:0;padding:20px}
 .sheet > .body > .empty .btn{margin-top:12px}
 .sheet .note{margin:16px 20px}
@@ -957,8 +963,9 @@ async function openVenue(venue) {
     $('sheet-body').replaceChildren(trouble);
     return;
   }
-  // Somebody tapped another pin while this menu was on its way.
-  if (gone || state.venue?.id !== venue.id || state.orderId) return;
+  // Somebody tapped another pin while this menu was on its way. (A guest
+  // with a lunch already running may still open a menu and order another.)
+  if (gone || state.venue?.id !== venue.id) return;
   state.menu = items;
   state.slots = slots;
   state.clock = { server: Date.parse(now) || Date.now(), local: Date.now() };
@@ -1338,7 +1345,13 @@ async function showStatus(force) {
   $('scrim').dataset.open = '1';
   $('sheet-name').textContent = `№${order.code}`;
   $('sheet-name').classList.add('mono'); // a code, not a name
-  $('sheet-sub').textContent = [order.restaurant?.name ?? state.venue?.name, order.table && `Ширээ ${order.table}`]
+  // Where, when to be there, and which table: the arrival time is the
+  // guest's half of the plan, so it is said here as what it is.
+  $('sheet-sub').textContent = [
+    order.restaurant?.name ?? state.venue?.name,
+    order.slot_starts_at && `${hhmm(order.slot_starts_at)}-д ирнэ`,
+    order.table && `Ширээ ${order.table}`,
+  ]
     .filter(Boolean)
     .join(' · ');
   $('sheet-walk').textContent = '';
@@ -1353,7 +1366,10 @@ async function showStatus(force) {
     ready: ['READY', 'SERVED', 'CLOSED'].includes(order.state),
     served: ['SERVED', 'CLOSED'].includes(order.state),
   };
-  const when = { placed: order.slot_starts_at, fired: order.fire_at, ready: order.ready_at };
+  // A time stands only beside the step it is the time of. The arrival slot
+  // used to stand beside «Захиалга баталгаажлаа», which read as the moment
+  // the order was confirmed.
+  const when = { fired: order.fire_at, ready: order.ready_at };
 
   // The eyebrow says where the order stands, in the timeline's own words. A
   // finished negative outcome names itself, and the big line is then what

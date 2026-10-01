@@ -1689,6 +1689,46 @@ describe('өвлийн идэш', () => {
     expect(storage.getItem('basu.guest')).toBeNull();
   });
 
+  it('says the connection is lost rather than waiting for ever, and draws the stalls once it is back', async () => {
+    storage.removeItem('basu.guest');
+    let down = true;
+    const dom = await openPage('idesh.html', '', (path) =>
+      down && path === '/v1/idesh/listings' ? Promise.reject(new TypeError('Failed to fetch')) : undefined,
+    );
+    const d = dom.window.document;
+    await until(dom, 'the failure, said', () => d.getElementById('blank')?.getAttribute('data-kind') === 'offline' && !(d.getElementById('blank') as HTMLElement).hidden);
+    expect(text(dom)).toContain('Холболт тасарлаа');
+    // Not a skeleton waiting for an answer that is not coming.
+    expect(d.querySelector('#listings[aria-busy="true"]')).toBeNull();
+    expect(d.querySelector('#blank [data-home]')).toBeTruthy();
+
+    down = false;
+    (d.querySelector('#blank [data-retry]') as HTMLElement).click();
+    await until(dom, 'the stalls', () => d.querySelectorAll('.listing').length >= seeded.listings);
+    expect((d.getElementById('blank') as HTMLElement).hidden).toBe(true);
+  });
+
+  it('says plainly when nothing is on sale, and draws no filter that filters nothing', async () => {
+    storage.removeItem('basu.guest');
+    const market = (listings: unknown[]) =>
+      new Response(JSON.stringify({ today: '2026-10-01', listings }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const empty = await openPage('idesh.html', '', (path) => (path === '/v1/idesh/listings' ? market([]) : undefined));
+    const d = empty.window.document;
+    await until(empty, 'the empty market', () => d.getElementById('blank')?.getAttribute('data-kind') === 'none' && !(d.getElementById('blank') as HTMLElement).hidden);
+    expect(text(empty)).toContain('Одоогоор зар алга');
+    expect((d.getElementById('kinds') as HTMLElement).hidden).toBe(true);
+    // What happens after a purchase is said even while there is nothing to buy.
+    expect((d.getElementById('how') as HTMLElement).hidden).toBe(false);
+
+    // Two stalls of one kind — production's market: a list, and no «Бүгд» over it.
+    const { listings } = (await (await fetch(`${base}/v1/idesh/listings`)).json()) as { listings: Array<{ kind: string }> };
+    const beef = listings.filter((l) => l.kind === 'beef').slice(0, 2);
+    const two = await openPage('idesh.html', '', (path) => (path === '/v1/idesh/listings' ? market(beef) : undefined));
+    await until(two, 'two stalls', (doc) => doc.querySelectorAll('.listing').length === 2);
+    expect((two.window.document.getElementById('kinds') as HTMLElement).hidden).toBe(true);
+    expect(two.window.document.querySelector('#tally')?.textContent).toMatch(/^2 зар · \d+ гэрээт нийлүүлэгч$/);
+  });
+
   it('says who is signed in, and signs out for real', async () => {
     await ownGuest('+97699004014');
     const token = storage.getItem('basu.guest')!;
