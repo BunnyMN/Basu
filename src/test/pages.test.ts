@@ -1062,6 +1062,19 @@ describe('the kitchen display', () => {
     expect(ticket.textContent).toContain('Хүлээн авах');
     expect(ticket.textContent).toContain('Татгалзах');
 
+    // Refusing sends the guest's money back and cannot be undone: it asks
+    // first, and «Болих» leaves the ticket where it was.
+    ([...ticket.querySelectorAll('button')].find((b) => b.textContent?.includes('Татгалзах')) as HTMLElement).click();
+    await until(kds, 'the question', (d) => Boolean(d.querySelector('#reject-order')));
+    expect(kds.window.document.querySelector('#reject-order')?.textContent).toContain('бүтнээр');
+    (kds.window.document.querySelector('#reject-order [data-cancel]') as HTMLElement).click();
+    await until(kds, 'the question to go', (d) => !d.querySelector('.sheet.popup[data-open]'));
+    expect(
+      [...kds.window.document.querySelectorAll('.ticket')].some(
+        (t) => t.textContent?.includes('Хуушуур') && t.textContent?.includes('Хүлээн авах'),
+      ),
+    ).toBe(true);
+
     // Accepting moves it out of "awaiting the restaurant" and gives the chef
     // the two controls that matter for a ticket that is now scheduled.
     (
@@ -2067,14 +2080,18 @@ describe('өвлийн идэш', () => {
     await until(screen, 'our order', () => Boolean(ticket()));
     expect(ticket()!.textContent).toContain('Танд очих');
     (ticket()!.querySelector('[data-a="cancel"]') as HTMLElement).click();
-    const reasons = ticket()!.querySelector('.reasons')!;
-    expect(reasons.querySelector('[data-a="confirm"]')).toHaveProperty('disabled', true);
-    const pick = reasons.querySelector('input[value="guest_asked"]') as HTMLInputElement;
+    // Why, asked in a popup over the board: the reason decides the money.
+    await until(screen, 'the reasons', (d) => Boolean(d.querySelector('#cancel-order .reasons')));
+    const asked = screen.window.document.querySelector('#cancel-order')!;
+    const confirm = asked.querySelector('[data-submit]') as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    const pick = asked.querySelector('.reasons input[value="guest_asked"]') as HTMLInputElement;
     pick.checked = true;
     pick.dispatchEvent(new screen.window.Event('change', { bubbles: true }));
-    // Before slaughter: everything back, and the screen says so before the press.
-    expect(reasons.querySelector('.money')?.textContent).toContain('бүтнээр');
-    (reasons.querySelector('[data-a="confirm"]') as HTMLElement).click();
+    // Before slaughter: everything back, and the popup says so before the press.
+    expect(asked.querySelector('.reasons .refund')?.textContent).toContain('бүтнээр');
+    expect(confirm.disabled).toBe(false);
+    confirm.click();
     await until(screen, 'the ticket to go', () => !ticket());
 
     /* the guest: told, and asked where the money goes */
@@ -2167,6 +2184,19 @@ describe('өвлийн идэш', () => {
     expect(guest.window.document.querySelector('.status .big')?.textContent).toBe('Мах бэлтгэгдэж байна');
     expect(guest.window.document.querySelectorAll('.timeline li[data-done]')).toHaveLength(2);
     expect(guest.window.document.querySelector('#screen-foot a[href^="tel:"]')).toBeTruthy();
+
+    // Ready, then handed over. Handing over cannot be taken back, so it asks
+    // first — with the code the guest's phone shows, to check against.
+    const press = (label: string) =>
+      ([...ticket().querySelectorAll('button')].find((b) => b.textContent?.includes(label)) as HTMLElement).click();
+    press('Бэлэн боллоо');
+    await until(screen, 'the meat to be ready', () => ticket()?.getAttribute('data-lane') === 'ready');
+    press('Хүлээлгэн өгсөн');
+    await until(screen, 'the code to check', (d) => d.querySelector('#hand-order .hand-code b')?.textContent === code);
+    expect(ticket()?.getAttribute('data-lane')).toBe('ready');
+    (screen.window.document.querySelector('#hand-order [data-submit]') as HTMLElement).click();
+    await until(screen, 'the ticket to be done', () => !ticket());
+    await until(guest, 'the guest to have it', (d) => d.querySelector('.status')?.getAttribute('data-s') === 'HANDED');
   });
 
   it('lets a supplier run their own stall from their screen', async () => {
@@ -2177,19 +2207,11 @@ describe('өвлийн идэш', () => {
     await until(screen, 'the stall', (d) => d.querySelectorAll('.stall .row[data-listing]').length > 0);
     const before = screen.window.document.querySelectorAll('.stall .row[data-listing]').length;
     expect(before).toBeGreaterThan(0);
-    expect(screen.window.document.querySelector('.new h3')?.textContent).toBe('Шинэ зар нэмэх');
 
-    const form = screen.window.document.querySelector('.new')!;
-    const set = (name: string, value: string) => {
-      const input = form.querySelector(`[name="${name}"]`) as HTMLInputElement;
-      input.value = value;
-    };
-    set('title', 'Хонь, шинэ зар');
-    set('price_mnt', '400000');
-    set('approx_kg', '35');
-    set('quantity', '5');
-    set('origin', 'Архангай');
-    (form.querySelector('#add') as HTMLElement).click();
+    // The page only shows the stall; a new listing is a popup from its head.
+    (screen.window.document.querySelector('#add') as HTMLElement).click();
+    await until(screen, 'the new listing', (d) => d.querySelector('#listing-new h2')?.textContent === 'Шинэ зар нэмэх');
+    await answerPopup(screen, { title: 'Хонь, шинэ зар', price_mnt: '400000', approx_kg: '35', quantity: '5', origin: 'Архангай' });
 
     await until(screen, 'the new row', (d) =>
       d.querySelectorAll('.stall .row[data-listing]').length === before + 1,
@@ -2204,6 +2226,96 @@ describe('өвлийн идэш', () => {
     const guest = await openPage('idesh.html');
     await until(guest, 'the new stall', (d) =>
       [...d.querySelectorAll('.listing .name')].some((n) => n.textContent === 'Хонь, шинэ зар'),
+    );
+  });
+
+  /** The supplier's stall, open, with its «Зар нэмэх» at hand. */
+  async function stallOf(phone: string): Promise<JSDOM> {
+    const screen = await ownerScreen(phone);
+    await until(screen, 'the module', (d) => Boolean(d.querySelector('.tabs button[data-tab="stall"]')));
+    (screen.window.document.querySelector('.tabs button[data-tab="stall"]') as HTMLElement).click();
+    await until(screen, 'the stall', (d) => Boolean(d.querySelector('.stall .row[data-listing]') && d.querySelector('#add')));
+    return screen;
+  }
+  const rowNamed = (dom: JSDOM, title: string) =>
+    [...dom.window.document.querySelectorAll('.stall .row[data-listing]')].find((r) => r.querySelector('.name')?.textContent?.includes(title));
+  /** Type into the open popup's fields, the way answerPopup does, without pressing its button. */
+  const fill = (sheet: Element, values: Record<string, string>) => {
+    for (const [name, value] of Object.entries(values)) (sheet.querySelector(`[name="${name}"]`) as HTMLInputElement).value = value;
+  };
+  const refusal = (sheet: Element) => (sheet.querySelector('.popup-error') as HTMLElement | null)?.hidden === false;
+
+  it('takes a listing’s numbers as typed: a half kilo stays a half, and a count kept in wholes refuses a fraction', async () => {
+    const screen = await stallOf(seeded.suppliers[0]!.phone);
+    const d = screen.window.document;
+
+    // A weight with a decimal point is that weight, not ten times it; a price
+    // grouped in thousands is the thousands.
+    (d.querySelector('#add') as HTMLElement).click();
+    await answerPopup(screen, { title: 'Хонь, хагас кг', price_mnt: '410 000', approx_kg: '38.5', quantity: '3', origin: 'Төв' });
+    await until(screen, 'the new row', (doc) => Boolean(rowNamed(screen, 'Хонь, хагас кг')) && !doc.querySelector('.sheet.popup[data-open]'));
+    expect(rowNamed(screen, 'Хонь, хагас кг')!.querySelector('.sub')?.textContent).toContain('~38.5 кг');
+    expect(rowNamed(screen, 'Хонь, хагас кг')!.querySelector('.num')?.textContent).toBe('410,000₮толгой бүр');
+
+    // Kilos are sold in whole kilos: «2.5» and «120.5» are refused in words,
+    // the field said wrong is the one the cursor goes to, and nothing is sent.
+    const before = d.querySelectorAll('.stall .row[data-listing]').length;
+    (d.querySelector('#add') as HTMLElement).click();
+    await until(screen, 'the popup', (doc) => Boolean(doc.querySelector('#listing-new [name="unit"]')));
+    const sheet = d.querySelector('#listing-new')!;
+    const unit = sheet.querySelector('[name="unit"]') as HTMLSelectElement;
+    unit.value = 'kg';
+    unit.dispatchEvent(new screen.window.Event('change', { bubbles: true }));
+    fill(sheet, { title: 'Үхрийн мах, кг', price_mnt: '24000', min_qty: '2.5', quantity: '120.5', origin: 'Төв' });
+    (sheet.querySelector('[data-submit]') as HTMLElement).click();
+    await until(screen, 'the minimum refused', () => refusal(sheet));
+    expect(sheet.querySelector('.popup-error')?.textContent).toContain('Доод захиалгыг бүхэл кг-аар бичнэ үү.');
+    expect(d.activeElement?.getAttribute('name')).toBe('min_qty');
+    fill(sheet, { min_qty: '2' });
+    (sheet.querySelector('[data-submit]') as HTMLElement).click();
+    await until(screen, 'the amount refused', () => sheet.querySelector('.popup-error')?.textContent?.includes('бүхэл тоогоор') ?? false);
+    expect(sheet.querySelector('.popup-error')?.textContent).toContain('Хэдэн кг байгааг бүхэл тоогоор бичнэ үү.');
+    expect(d.activeElement?.getAttribute('name')).toBe('quantity');
+    expect(sheet.querySelector('[name="quantity"]')?.getAttribute('aria-invalid')).toBe('true');
+    (sheet.querySelector('[data-cancel]') as HTMLElement).click();
+    await until(screen, 'the popup to go', (doc) => !doc.querySelector('.sheet.popup[data-open]'));
+    expect(d.querySelectorAll('.stall .row[data-listing]')).toHaveLength(before);
+  });
+
+  it('offers delivery only once it is ticked, and then asks what it costs — when adding a listing and when changing one', async () => {
+    const screen = await stallOf(seeded.suppliers[0]!.phone);
+    const d = screen.window.document;
+
+    // Off until ticked: no fee to type, nothing promised to the whole city.
+    (d.querySelector('#add') as HTMLElement).click();
+    await until(screen, 'the popup', (doc) => Boolean(doc.querySelector('#listing-new [name="delivers"]')));
+    const adding = d.querySelector('#listing-new')!;
+    expect((adding.querySelector('[name="delivers"]') as HTMLInputElement).checked).toBe(false);
+    expect((adding.querySelector('[name="delivery_fee_mnt"]') as HTMLInputElement).disabled).toBe(true);
+    expect((adding.querySelector('[name="delivery_fee_mnt"]')!.closest('.field') as HTMLElement).hidden).toBe(true);
+    await answerPopup(screen, { title: 'Хонь, өөрөө авна', price_mnt: '300000', approx_kg: '28', quantity: '4', origin: 'Төв' });
+    await until(screen, 'the pick-up listing', (doc) => Boolean(rowNamed(screen, 'Хонь, өөрөө авна')) && !doc.querySelector('.sheet.popup[data-open]'));
+    expect(rowNamed(screen, 'Хонь, өөрөө авна')!.querySelector('.sub')?.textContent).toContain('хүргэхгүй');
+
+    // Changing it: a listing that did not deliver has no fee to keep, so
+    // ticking delivery asks for one rather than promising it free.
+    (rowNamed(screen, 'Хонь, өөрөө авна')!.querySelector('[data-a="edit"]') as HTMLElement).click();
+    await until(screen, 'the edit', (doc) => Boolean(doc.querySelector('#listing-edit [name="delivers"]')));
+    const editing = d.querySelector('#listing-edit')!;
+    const delivers = editing.querySelector('[name="delivers"]') as HTMLInputElement;
+    const fee = editing.querySelector('[name="delivery_fee_mnt"]') as HTMLInputElement;
+    expect(fee.value).toBe('');
+    delivers.checked = true;
+    delivers.dispatchEvent(new screen.window.Event('change', { bubbles: true }));
+    expect(fee.disabled).toBe(false);
+    (editing.querySelector('[data-submit]') as HTMLElement).click();
+    await until(screen, 'the fee asked for', () => refusal(editing));
+    expect(editing.querySelector('.popup-error')?.textContent).toContain('Хүргэлтийн төлбөрөө бичнэ үү');
+    expect(d.activeElement).toBe(fee);
+    fee.value = '15000';
+    (editing.querySelector('[data-submit]') as HTMLElement).click();
+    await until(screen, 'the delivery kept', (doc) =>
+      !doc.querySelector('.sheet.popup[data-open]') && (rowNamed(screen, 'Хонь, өөрөө авна')?.querySelector('.sub')?.textContent?.includes('хүргэлт 15,000₮') ?? false),
     );
   });
 });
