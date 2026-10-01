@@ -614,9 +614,14 @@ const kinds = (o) => [o.restaurant && 'Ресторан', o.supplier && 'Ний�
  * A name worth greeting by: the one the person chose, not the number the
  * account fell back on, which the server shows in its place.
  */
-const realName = (name) => (name && !/^[+\d\s·.-]+$/.test(name) ? name : null);
+const realName = (name) => (name && !/^[+\d\s·.-]+$/.test(name) && !/·{3}$/.test(name) ? name : null);
 /** A person in a table: the name they chose, or — with none, where the server shows «···0001» — said so quietly; their number is in the next column. */
 const personName = (name) => (realName(name) ? `<b>${esc(name)}</b>` : '<span class="dt-unnamed">Нэр оруулаагүй</span>');
+/**
+ * A guest in a list or on a file, as markup: their name, or — with none, where the server shows «···0013»
+ * or «bat···» — said so quietly, as the guests' and the team's tables say it; the number is beside it.
+ */
+const guestName = (name) => (realName(name) ? esc(name) : '<span class="dt-unnamed">Нэр оруулаагүй</span>');
 
 function renderMeHome(view) {
   const account = access.account ?? {};
@@ -3248,7 +3253,7 @@ async function renderLunches(view) {
         key: 'guest',
         label: 'Зочин',
         value: (o) => `${o.guest ?? ''} ${o.guest_phone ?? ''}`,
-        render: (o) => dtCell.twoHtml(esc(o.guest ?? 'зочин'), o.guest_phone ? dtCell.phone(o.guest_phone) : ''),
+        render: (o) => dtCell.twoHtml(guestName(o.guest), o.guest_phone ? dtCell.phone(o.guest_phone) : ''),
       },
       { key: 'slot_starts_at', label: 'Цаг', render: (o) => dtCell.when(o.slot_starts_at) },
       {
@@ -3392,7 +3397,7 @@ async function openLunch(id, from = { label: 'Хоолны захиалга', go
   const page = el(`
     <div class="detail">
       <div class="card detail-facts"><div class="facts">
-        <div><span class="lab">Зочин</span><b>${esc(o.guest ?? 'зочин')}</b><span class="fact-sub">${o.guest_phone ? tel(o.guest_phone) : ''}</span></div>
+        <div><span class="lab">Зочин</span><b>${guestName(o.guest)}</b><span class="fact-sub">${o.guest_phone ? tel(o.guest_phone) : ''}</span></div>
         <div><span class="lab">Ширээ</span><b>${o.table ? esc(o.table) : '—'}</b><span class="fact-sub">${o.seated_at ? `суусан ${clockOf(o.seated_at)}` : 'суугаагүй'}</span></div>
         <div><span class="lab">Гал</span><b class="mono">${o.fire_at ? clockOf(o.fire_at) : '—'}</b><span class="fact-sub">${fire}</span></div>
         <div><span class="lab">Бэлэн</span><b class="mono">${o.ready_at ? clockOf(o.ready_at) : '—'}</b><span class="fact-sub">${o.eta_at ? `зочин ирэх ${clockOf(o.eta_at)}` : ''}</span></div>
@@ -3419,7 +3424,7 @@ async function openLunch(id, from = { label: 'Хоолны захиалга', go
     if (r) await openVenue(r, here);
   };
   const links = related([
-    o.guest_id && hasPage('guests') ? { label: o.guest ?? 'Зочин', sub: 'Зочны хуудас: түрийвч, захиалгууд', go: () => openGuest(o.guest_id, here) } : null,
+    o.guest_id && hasPage('guests') ? { label: realName(o.guest) ?? 'Зочин', sub: 'Зочны хуудас: түрийвч, захиалгууд', go: () => openGuest(o.guest_id, here) } : null,
     hasPage('venues') ? { label: o.restaurant.name, sub: 'Рестораны хуудас: гал тогоо, цэс', go: () => venue().catch((error) => toast(error.message, 'bad')) } : null,
   ]);
   if (links) page.querySelector('.detail-rail').append(links);
@@ -3816,7 +3821,7 @@ async function notifyLog() {
         key: 'guest',
         label: 'Хэнд',
         value: (m) => `${m.guest ?? ''} ${m.guest_phone ?? ''}`,
-        render: (m) => dtCell.twoHtml(esc(m.guest ?? 'зочин'), m.guest_phone ? dtCell.phone(m.guest_phone) : ''),
+        render: (m) => dtCell.twoHtml(guestName(m.guest), m.guest_phone ? dtCell.phone(m.guest_phone) : ''),
       },
       { key: 'channel', label: 'Суваг', value: (m) => (m.channel === 'sms' ? 'SMS' : m.channel === 'email' ? 'Имэйл' : 'Push') },
       {
@@ -4104,7 +4109,7 @@ function renderOrders(view) {
         key: 'guest',
         label: 'Зочин',
         value: (o) => `${o.guest ?? ''} ${o.guest_phone ?? ''}`,
-        render: (o) => dtCell.twoHtml(esc(o.guest ?? 'зочин'), o.guest_phone ? dtCell.phone(o.guest_phone) : ''),
+        render: (o) => dtCell.twoHtml(guestName(o.guest), o.guest_phone ? dtCell.phone(o.guest_phone) : ''),
       },
       {
         key: 'receive_on',
@@ -4199,7 +4204,7 @@ async function openOrder(id, from = { label: 'Захиалгууд', go: () => s
   const page = el(`
     <div class="detail">
       <div class="card detail-facts"><div class="facts">
-        <div><span class="lab">Зочин</span><b>${esc(o.guest ?? 'зочин')}</b><span class="fact-sub">${o.guest_phone ? tel(o.guest_phone) : ''}</span></div>
+        <div><span class="lab">Зочин</span><b>${guestName(o.guest)}</b><span class="fact-sub">${o.guest_phone ? tel(o.guest_phone) : ''}</span></div>
         <div><span class="lab">${o.receive === 'delivery' ? 'Хүргэлтээр' : 'Өөрөө очиж авна'}</span><b class="nowrap">${dayLabel(o.receive_on)}</b><span class="fact-sub">${o.receive === 'delivery' ? `${esc(o.address)} · <span class="mono nowrap">${esc(phoneText(o.address_phone))}</span>` : 'нийлүүлэгчийн авах цэгээс'}</span></div>
         <div><span class="lab">Зочин төлсөн</span><b>${money(o.total_mnt)}</b><span class="fact-sub">${o.delivery_fee_mnt ? `хүргэлт ${mnt(o.delivery_fee_mnt)} орсон` : 'хүргэлтгүй'}</span></div>
         <div><span class="lab">Нийлүүлэгчид очих</span><b>${money(o.payout_mnt)}</b><span class="fact-sub">шимтгэл хассан</span></div>
@@ -4217,7 +4222,7 @@ async function openOrder(id, from = { label: 'Захиалгууд', go: () => s
   if (d.settlements.length) moneyBox.append(settlementTable(d.settlements, false).el);
   else moneyBox.append(el(`<div class="card empty">${o.state === 'CANCELLED' || o.state === 'REFUNDED' ? 'Буцаалт үүсээгүй байна.' : 'Олголт хүлээлгэн өгснөөс хойш нэг хоногийн дараа үүснэ.'}</div>`));
   const links = related([
-    guestId && hasPage('guests') ? { label: o.guest ?? 'Зочин', sub: 'Зочны хуудас: түрийвч, захиалгууд', go: () => openGuest(guestId, here) } : null,
+    guestId && hasPage('guests') ? { label: realName(o.guest) ?? 'Зочин', sub: 'Зочны хуудас: түрийвч, захиалгууд', go: () => openGuest(guestId, here) } : null,
     hasPage('suppliers') && cache.suppliers.some((s) => s.id === o.supplier.id) ? { label: o.supplier.name, sub: 'Нийлүүлэгчийн хуудас: гэрээ, данс, зар', go: () => openSupplier(o.supplier.id, here) } : null,
   ]);
   if (links) page.querySelector('.detail-rail').append(links);
@@ -4614,7 +4619,7 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
       orders = dataTable({
         columns: [
           { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(`<span class="mono">№${esc(o.code)}</span>`, esc(`${o.title} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}`)) },
-          { key: 'guest', label: 'Зочин', value: (o) => `${o.guest ?? ''} ${o.guest_phone ?? ''}`, render: (o) => dtCell.twoHtml(esc(o.guest ?? 'зочин'), o.guest_phone ? dtCell.phone(o.guest_phone) : '') },
+          { key: 'guest', label: 'Зочин', value: (o) => `${o.guest ?? ''} ${o.guest_phone ?? ''}`, render: (o) => dtCell.twoHtml(guestName(o.guest), o.guest_phone ? dtCell.phone(o.guest_phone) : '') },
           { key: 'receive_on', label: 'Өдөр', render: (o) => dtCell.twoHtml(`<span class="mono nowrap">${dayLabel(o.receive_on)}</span>`, o.receive === 'delivery' ? 'хүргэлт' : 'өөрөө авна'), phone: false },
           { key: 'state', label: 'Төлөв', value: (o) => STATE_WORD[o.state] ?? o.state, render: (o) => dtCell.pill(o.state, STATE_WORD[o.state] ?? o.state) },
           { key: 'total_mnt', label: 'Дүн', align: 'end', numeric: true, render: (o) => dtCell.money(o.total_mnt) },
@@ -4683,7 +4688,7 @@ function settlementTable(rows, withFilters = true, opensOn = 'open') {
         key: 'who',
         label: 'Хэнд',
         value: (t) => (t.kind === 'payout' ? t.supplier?.name ?? '' : t.guest?.name ?? 'Зочин'),
-        render: (t) => dtCell.two(t.kind === 'payout' ? t.supplier?.name ?? '' : t.guest?.name ?? 'Зочин', t.kind === 'payout' ? 'олголт · нийлүүлэгч' : 'буцаалт · зочин'),
+        render: (t) => dtCell.twoHtml(t.kind === 'payout' ? esc(t.supplier?.name ?? '') : guestName(t.guest?.name), t.kind === 'payout' ? 'олголт · нийлүүлэгч' : 'буцаалт · зочин'),
       },
       { key: 'order_code', label: 'Захиалга', render: (t) => dtCell.twoHtml(`<span class="mono">№${esc(t.order_code)}</span>`, esc(t.memo ?? '')) },
       {
@@ -4729,7 +4734,7 @@ function settlementTable(rows, withFilters = true, opensOn = 'open') {
     ] : [],
     actions: (t) => {
       if (t.state !== 'due' || !t.bank_verified || !can('desk.pay:approve')) return null;
-      const who = t.kind === 'payout' ? t.supplier?.name ?? 'Нийлүүлэгч' : t.guest?.name ?? 'Зочин';
+      const who = t.kind === 'payout' ? t.supplier?.name ?? 'Нийлүүлэгч' : realName(t.guest?.name) ?? 'Зочин';
       const line = `<b>${mnt(t.amount_mnt)}</b> → ${esc(who)}<br>${esc(t.bank_name ?? '')} · <span class="mono">${esc(t.bank_account ?? '')}</span> · ${esc(t.bank_holder ?? '')}<br><small class="muted">№${esc(t.order_code)} · ${t.kind === 'payout' ? 'олголт' : 'буцаалт'}</small>`;
       if (!t.approved_at) {
         // Two people, not one: releasing the money and sending it are different

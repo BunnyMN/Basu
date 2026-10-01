@@ -2785,6 +2785,42 @@ describe('нийлүүлэгч болох', () => {
     expect(ours()!.querySelector('.pill')?.textContent).toBe('Дууссан');
   });
 
+  it('says a guest with no name quietly in the lunch, order and message lists, as the guests’ table does', async () => {
+    // Signed up with a number and nothing else: the server calls them «···8032» where a name would go.
+    await ownGuest('+97699008032');
+    await orderFromMap(await openPage('dine.html'), pairedVenue, 'Цуйван', '12:30');
+    const code = await buyPickup(await openPage('idesh.html'));
+    const desk = await openPage('ops.html', '', undefined, device());
+    await until(desk, 'the secret prefilled', (d) => Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value));
+    clickText(desk, '.pair button', 'Нэвтрэх');
+    const doc = desk.window.document;
+    await until(desk, 'the overview', (d) => Boolean(d.querySelector('#now')));
+    const theirs = (selector: string) => [...doc.querySelectorAll(selector)].filter((r) => r.textContent?.includes('+976 9900 8032'));
+    const quiet = (rows: Element[]) => {
+      expect(rows.length).toBeGreaterThan(0);
+      for (const row of rows) {
+        expect(row.querySelector('.dt-two .dt-unnamed')?.textContent).toBe('Нэр оруулаагүй');
+        expect(row.textContent).not.toContain('···');
+      }
+    };
+
+    await opsTab(desk, 'lunches');
+    await until(desk, 'their lunch', () => theirs('#lunches tr[data-lunch]').length > 0);
+    quiet(theirs('#lunches tr[data-lunch]'));
+
+    await opsTab(desk, 'orders');
+    await until(desk, 'their идэш', () => theirs('#orders tr[data-order]').some((r) => r.textContent?.includes(`№${code}`)));
+    quiet(theirs('#orders tr[data-order]'));
+    // On the order's own file, too: the facts say it, the related link is the guest's file.
+    (theirs('#orders tr[data-order]').find((r) => r.textContent?.includes(`№${code}`)) as HTMLElement).click();
+    await until(desk, 'the order', (d) => Boolean(d.querySelector('.detail .facts')));
+    expect(doc.querySelector('.detail .facts')?.textContent).toContain('Нэр оруулаагүй');
+    expect(doc.querySelector('.detail')?.textContent).not.toContain('···');
+
+    await opsTab(desk, 'notify');
+    await until(desk, 'what they were told', () => theirs('#messages tr[data-message]').length > 0);
+    quiet(theirs('#messages tr[data-message]'));
+  });
 
   it('opens the books: the checks, every account, then the movements with a CSV to take away', async () => {
     const desk = await openPage('ops.html', '', undefined, device());
