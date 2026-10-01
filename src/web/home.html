@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#FFFFFF">
 <title>Миний Basu</title>
+<meta name="robots" content="noindex">
 <link rel="icon" href="/brand/favicon.png">
 <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
 <link rel="stylesheet" href="/app.css">
@@ -12,12 +13,13 @@
 <style>
 /* Home, on the website: the apps inside Basu as the tiles the phone shows —
    the same art, larger — and, for somebody signed in, what of theirs is
-   going on right now. The phone's launcher is /app; this is the browser's. */
+   going on right now. With nothing going on, it says what to do next. The
+   phone's launcher is /app; this is the browser's. */
 
 .h-apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:20px;margin:0;padding:0;list-style:none}
 .h-apps li{display:flex}
 .h-apps .h-app{flex:1}
-.h-app{display:flex;flex-direction:column;align-items:center;gap:14px;padding:28px 16px 22px;border:1px solid var(--line);border-radius:22px;background:#fff;color:inherit;text-decoration:none;text-align:center;transition:border-color var(--dur),transform 140ms var(--ease),box-shadow var(--dur)}
+.h-app{display:flex;flex-direction:column;align-items:center;gap:14px;padding:28px 16px 22px;border:1px solid var(--line);border-radius:22px;background:var(--surface);box-shadow:var(--shadow);color:inherit;text-decoration:none;text-align:center;-webkit-tap-highlight-color:transparent;transition:border-color var(--dur),transform 140ms var(--ease),box-shadow var(--dur)}
 @media (hover:hover){.h-app:hover{border-color:var(--line-2);box-shadow:0 18px 36px -24px rgba(18,58,44,.28)}}
 .h-app:active{transform:scale(.985)}
 .h-app .tile{width:120px;height:120px;border-radius:28px;overflow:hidden;box-shadow:0 10px 24px -14px rgba(22,21,20,.45),0 0 0 1px rgba(22,21,20,.06)}
@@ -27,21 +29,25 @@
 .h-app .s-pill{margin-top:2px}
 @media (max-width:520px){.h-apps{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.h-app .tile{width:92px;height:92px;border-radius:22px}.h-app{padding:22px 10px 18px}}
 
-.h-sec{display:flex;justify-content:space-between;align-items:baseline;gap:16px;margin:44px 0 14px}
-.h-sec h2{margin:0;font-size:1.25rem;letter-spacing:-.015em}
-.h-sec a{font-size:.9375rem;font-weight:600;color:var(--ink);text-decoration:underline;text-underline-offset:.2em}
-.h-live{border:1px solid var(--line);border-radius:18px;overflow:hidden}
-.h-row{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:16px;align-items:center;padding:14px 18px;background:#fff;color:inherit;text-decoration:none}
+.h-live{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow)}
+.h-row{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:16px;align-items:center;min-height:76px;padding:14px 18px;color:inherit;text-decoration:none}
 .h-row + .h-row{border-top:1px solid var(--line)}
 @media (hover:hover){a.h-row:hover{background:var(--surface-2)}}
-.h-row img{width:64px;height:48px;border-radius:10px;object-fit:cover}
+a.h-row:active{background:var(--surface-2)}
+.h-row img{width:64px;height:48px;border-radius:10px;object-fit:cover;background:var(--surface-2)}
 .h-row b{display:block;font-weight:600;line-height:1.35}
-.h-row small{display:block;margin-top:2px;font-size:.875rem;color:var(--ink-2)}
-.h-row .end{text-align:right}
-.h-row .end .when{display:block;font-family:var(--mono);font-weight:600}
-.h-row .end .s-pill{margin-top:6px}
+.h-row small{display:block;margin-top:2px;font-size:.875rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.h-row small .mono{font-size:.8125rem;color:var(--ink-3)}
+.h-row .end{display:flex;flex-direction:column;align-items:flex-end;gap:6px;text-align:right}
+.h-when{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1;color:var(--ink)}
+.h-when small{display:inline;margin:0 0 0 6px;font-family:var(--sans);font-size:.75rem;font-weight:500;color:var(--ink-3)}
+@media (max-width:560px){
+  .h-row{grid-template-columns:56px minmax(0,1fr);align-items:start}
+  .h-row img{width:56px;height:44px}
+  .h-row .end{grid-column:2;flex-direction:row-reverse;flex-wrap:wrap-reverse;justify-content:flex-end;align-items:center;gap:6px 10px}
+}
+.h-next{margin-top:32px}
 .h-hello{margin:0}
-@media (max-width:560px){.h-row{grid-template-columns:56px minmax(0,1fr)}.h-row img{width:56px;height:44px}.h-row .end{grid-column:2;display:flex;align-items:center;gap:10px;text-align:left}.h-row .end .s-pill{margin-top:0}}
 </style>
 </head>
 <body>
@@ -49,16 +55,17 @@
   <div class="s-wrap">
     <section class="s-head"><h1 id="hi">Миний Basu</h1><p class="h-hello">Өнөөдөр юу хийх вэ?</p></section>
     <ul class="h-apps" id="apps" aria-label="Аппууд"></ul>
-    <section id="live" hidden>
-      <div class="h-sec"><h2>Идэвхтэй захиалга</h2><a href="/orders">Бүгд</a></div>
+    <section id="live" hidden aria-labelledby="live-title">
+      <div class="s-sec"><h2 id="live-title">Идэвхтэй захиалга</h2><a href="/orders">Бүх захиалга</a></div>
       <div class="h-live" id="live-list"></div>
     </section>
+    <div class="h-next" id="home-next"></div>
   </div>
 </main>
 
 <script type="module">
 import { api, store, dayShort, IDESH_HEADLINE } from '/api.js';
-import { mountFrame, esc, el } from '/site.js';
+import { mountFrame, esc, el, loginUrl, siteEmpty, howToBuy, statePill } from '/site.js';
 
 const person = await mountFrame('home');
 const $ = (id) => document.getElementById(id);
@@ -83,8 +90,32 @@ const tile = (t) =>
       </a></li>`);
 for (const t of TILES) $('apps').append(tile(t));
 
+/** What comes after the tiles when nothing of theirs is going on: one next step, and how ordering goes. */
+function nothingGoing(signedIn) {
+  $('home-next').replaceChildren(
+    signedIn
+      ? siteEmpty({
+          icon: 'orders',
+          title: 'Идэвхтэй захиалга алга',
+          text: 'Өвлийн идшээ захиалахад явц нь энд харагдана: төлсөн, бэлтгэж байна, бэлэн, хүлээлгэн өгсөн. Өмнөх захиалгууд «Миний захиалга»-д бий.',
+          actions: [['Зар үзэх', '/shop', 'dark'], ['Миний захиалга', '/orders']],
+          card: true,
+        })
+      : siteEmpty({
+          icon: 'person',
+          title: 'Нэвтэрвэл захиалгаа эндээс хянана',
+          text: 'Зар үзэхэд нэвтрэх шаардлагагүй. Захиалга төлөх үед л нэвтэрнэ.',
+          actions: [['Зар үзэх', '/shop', 'dark'], ['Нэвтрэх', loginUrl('/home')]],
+          card: true,
+        }),
+    howToBuy(),
+  );
+}
+
 const token = store.guestToken;
-if (token) {
+if (!token || !person) {
+  nothingGoing(false);
+} else {
   // The supplier's tile, for the few who are one.
   api('/v1/supplier/me', { token })
     .then(({ supplier }) => {
@@ -98,19 +129,24 @@ if (token) {
     const going = orders.filter((o) => o.state !== 'DRAFT');
     if (going.length) {
       const PHOTO = (kind) => `/brand/meat/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}.webp`;
+      // The day in the corner says what it is the day of.
+      const dayWord = (o) => (o.state === 'HANDED' ? 'авсан' : o.receive === 'delivery' ? 'хүргэх' : 'авах');
       $('live-list').replaceChildren(
         ...going.map((o) =>
           el(`<a class="h-row" href="/orders/${o.id}" data-order="${o.id}">
                 <img src="${PHOTO(o.kind)}" alt="" loading="lazy" width="64" height="48">
-                <span><b>${esc(o.title)} × ${o.qty}</b><small>№${esc(o.code)} · ${esc(o.supplier.name)} · ${IDESH_HEADLINE[o.state]?.[1] ?? ''}</small></span>
-                <span class="end"><span class="when">${o.state === 'CANCELLED' ? '—' : dayShort(o.receive_on)}</span><span class="s-pill">${esc(IDESH_HEADLINE[o.state]?.[0] ?? o.state)}</span></span>
+                <span><b>${esc(o.title)} × ${o.qty}</b><small><span class="mono">№${esc(o.code)}</span> · ${esc(o.supplier.name)}</small></span>
+                <span class="end">${o.state === 'CANCELLED' ? '' : `<span class="h-when">${dayShort(o.receive_on)}<small>${dayWord(o)}</small></span>`}${statePill(o.state, IDESH_HEADLINE[o.state]?.[0] ?? o.state)}</span>
               </a>`),
         ),
       );
       $('live').hidden = false;
+    } else {
+      nothingGoing(true);
     }
   } catch {
-    // Nothing to show is not an error on a home page.
+    // Nothing to show is not an error on a home page; the next step still is.
+    nothingGoing(true);
   }
 }
 </script>

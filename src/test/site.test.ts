@@ -150,6 +150,19 @@ describe('a call refused as signed out', () => {
     }
   });
 
+  it('keeps the session, and the page, when what was refused is a password the person typed', async () => {
+    for (const code of ['BAD_PASSWORD', 'BAD_CREDENTIALS']) {
+      const page = await aPage();
+      const call = page.authed('/v1/idesh/x/refund-account', { method: 'POST' });
+      page.calls[0]!.refuse(code);
+      // The caller still hears of it, to say so where the password was typed.
+      await expect(call, code).rejects.toMatchObject({ status: 401, code });
+      expect(page.store.guestToken, code).toBe('old');
+      expect(page.ended, code).toEqual([]);
+      expect(page.left, code).toBe(0);
+    }
+  });
+
   it('never forgets, ends or leaves a sign-in made while the call was out', async () => {
     for (const code of ['SIGN_IN_AGAIN', 'UNAUTHORIZED']) {
       const page = await aPage();

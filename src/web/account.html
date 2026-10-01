@@ -7,43 +7,62 @@
 <title>Бүртгэл — Basu</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="/brand/favicon.png">
+<link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
 <link rel="stylesheet" href="/app.css">
 <link rel="stylesheet" href="/site.css">
 <style>
 /* The account, on the website: the name others see, how the person gets
-   back in, where they are signed in, and the way out. */
+   back in, where they are signed in, and the way out. The page shows; a
+   change is made in a popup. */
 
-.sa{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;max-width:760px}
-.sa-card{padding:26px}
-.sa-card h2{margin:0 0 4px;font-size:1.125rem;letter-spacing:-.01em}
-.sa-card > p{margin:0 0 18px;color:var(--ink-2);line-height:1.55}
-.s-field > .sa-name{display:flex;gap:10px;align-items:flex-start;margin:0;font-size:inherit;font-weight:400}
-.sa-name .s-input{flex:1}
-.sa-facts{margin:18px 0 0;border-top:1px solid var(--line)}
-.sa-facts div{display:grid;grid-template-columns:160px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);font-size:.9375rem}
+.sa{display:grid;grid-template-columns:minmax(0,1fr);max-width:760px}
+.sa .s-sec:first-child{margin-top:0}
+.sa-card{padding:4px 24px}
+.sa-facts{margin:0}
+.sa-facts div{display:grid;grid-template-columns:160px 1fr;gap:12px;align-items:baseline;padding:14px 0;font-size:.9375rem}
+.sa-facts div + div{border-top:1px solid var(--line)}
 .sa-facts dt{color:var(--ink-3)}
 .sa-facts dd{margin:0;font-weight:500;overflow-wrap:anywhere}
+.sa-facts dd.none{color:var(--ink-3);font-weight:400}
+.sa-facts dd .mono{font-size:.875rem}
+/* accountWays (api.js) draws its own rows in a card: that card is the card here */
 .sa-ways .section{margin:0}
 .sa-ways .section-label{display:none}
-.sa-sessions{margin:0;padding:0;list-style:none;border-top:1px solid var(--line)}
-.sa-sessions li{display:flex;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid var(--line)}
+.sa-ways [data-rows]{border-radius:18px}
+.sa-ways [data-rows] > .row{padding:16px 24px}
+/* app.css's `[data-rows] > .row{border:0}` outweighs its own hairline between rows; said again here until it is fixed there */
+.sa-ways [data-rows] > .row + .row{border-top:1px solid var(--line)}
+@media (pointer:coarse){.sa-ways .btn[data-size="sm"]{min-height:44px}}
+.sa-sessions{margin:0;padding:0;list-style:none}
+.sa-sessions li{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:68px;padding:12px 0}
+.sa-sessions li + li{border-top:1px solid var(--line)}
 .sa-sessions b{display:block;font-weight:600}
 .sa-sessions small{display:block;margin-top:2px;font-size:.8125rem;color:var(--ink-3)}
-.sa-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
-@media (max-width:560px){.sa-facts div{grid-template-columns:1fr;gap:2px}.sa-name{flex-direction:column}.sa-name .s-btn{width:100%}}
+.sa-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:14px 0 18px;border-top:1px solid var(--line)}
+.sa-foot p{margin:0;font-size:.875rem;color:var(--ink-3)}
+.sa-out{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px;margin-top:40px;padding:20px 24px}
+.sa-out p{margin:0;font-size:.9375rem;color:var(--ink-2)}
+.sa-out p b{display:block;color:var(--ink)}
+@media (max-width:560px){
+  .sa-card{padding:4px 18px}
+  .sa-facts div{grid-template-columns:1fr;gap:2px}
+  .sa-ways [data-rows] > .row{padding:14px 18px}
+  .sa-out{padding:18px}
+  .sa-out .s-btn{width:100%}
+}
 </style>
 </head>
 <body>
 <main class="s-main">
   <div class="s-wrap">
     <section class="s-head"><h1>Бүртгэл</h1><p>Таны нэр, нэвтрэх арга, нэвтэрсэн төхөөрөмжүүд.</p></section>
-    <div class="sa" id="sa"><span class="s-skel" style="height:260px"></span></div>
+    <div class="sa" id="sa" role="status" aria-busy="true"><span class="s-skel" style="height:220px;border-radius:18px"></span></div>
   </div>
 </main>
 
 <script type="module">
-import { store, accountWays } from '/api.js';
-import { mountFrame, requireSignIn, authed, esc, el, say, signOut } from '/site.js';
+import { store, accountWays, popup, confirmPopup, whatWentWrong } from '/api.js';
+import { mountFrame, requireSignIn, authed, esc, el, say, signOut, nameOf, phoneShown } from '/site.js';
 
 const token = requireSignIn();
 void mountFrame('account');
@@ -53,45 +72,74 @@ const since = (iso) => {
   const d = new Date(iso);
   return `${d.getFullYear()} оны ${d.getMonth() + 1}-р сарын ${d.getDate()}`;
 };
+/** When a device was last seen, the way a person says it: today, yesterday, or the day. */
 const seen = (iso) => {
-  if (!iso) return 'Одоохондоо';
+  if (!iso) return 'Сая';
   const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const ago = Math.round((day(new Date()) - day(d)) / 86400000);
+  if (ago === 0) return `Өнөөдөр ${hm}`;
+  if (ago === 1) return `Өчигдөр ${hm}`;
+  return `${d.getMonth() + 1}-р сарын ${d.getDate()}, ${hm}`;
 };
+const OUT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3"/><path d="M10 16l-4-4 4-4M6 12h10"/></svg>';
 
 async function draw() {
   const me = await authed('/v1/me');
-  const profile = el(`
-    <form class="s-card sa-card" novalidate>
-      <h2>Профайл</h2>
-      <p>Нийлүүлэгч захиалгад тань энэ нэрийг харна.</p>
-      <label class="s-field" style="margin:0"><span>Нэр</span>
-        <span class="sa-name"><input class="s-input" name="name" autocomplete="name" placeholder="Таны нэр" value="${esc(me.display_name ?? '')}"><button class="s-btn s-btn-dark" type="submit">Хадгалах</button></span></label>
-      <dl class="sa-facts">
-        <div><dt>Имэйл</dt><dd>${esc(me.email ?? '—')}</dd></div>
-        <div><dt>Утас</dt><dd>${esc(me.phone ?? '—')}</dd></div>
-        <div><dt>Бүртгүүлсэн</dt><dd>${since(me.member_since)}</dd></div>
-      </dl>
-    </form>`);
-  profile.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const button = profile.querySelector('[type="submit"]');
-    button.setAttribute('data-busy', '');
-    try {
-      await authed('/v1/me', { method: 'PATCH', body: { display_name: profile.elements.name.value.trim() || null } });
-      say('Нэр хадгалагдлаа.');
-    } catch (error) {
-      say(error.message, 'bad');
-    } finally {
-      button.removeAttribute('data-busy');
-    }
-  });
+  const fact = (label, value, mono = false) =>
+    `<div><dt>${label}</dt>${value ? `<dd>${mono ? `<span class="mono">${esc(value)}</span>` : esc(value)}</dd>` : '<dd class="none">—</dd>'}</div>`;
 
-  const ways = el('<div class="s-card sa-card sa-ways"><h2>Нэвтрэх арга</h2><p>Нууц үгээ мартвал имэйлээр сэргээнэ.</p></div>');
+  const profileHead = el('<div class="s-sec"><h2>Профайл</h2><button class="s-btn s-btn-line s-btn-sm" type="button" id="edit-name">Нэр засах</button></div>');
+  const profile = el(`
+    <div class="s-card sa-card">
+      <dl class="sa-facts">
+        ${fact('Нэр', me.display_name)}
+        ${fact('Имэйл', me.email)}
+        ${fact('Утас', me.phone ? phoneShown(me.phone) : null, true)}
+        ${fact('Бүртгүүлсэн', since(me.member_since))}
+      </dl>
+    </div>`);
+  profileHead.querySelector('#edit-name').addEventListener('click', () =>
+    void popup({
+      title: 'Нэр засах',
+      sub: 'Нийлүүлэгч захиалгад тань энэ нэрийг харна.',
+      width: 460,
+      fields: [{ name: 'name', label: 'Нэр', value: me.display_name ?? '', autocomplete: 'name', placeholder: 'Таны нэр', wide: true }],
+      onSubmit: async (v) => {
+        try {
+          await authed('/v1/me', { method: 'PATCH', body: { display_name: v.name || null } });
+        } catch (error) {
+          throw new Error(whatWentWrong(error));
+        }
+        say('Нэр хадгалагдлаа.', 'good');
+        // The corner says the new name too.
+        const named = nameOf({ ...me, display_name: v.name || null });
+        for (const node of document.querySelectorAll('.s-acct > button span, .s-menu .who b')) node.textContent = named;
+        await draw();
+      },
+    }),
+  );
+
+  const waysHead = el('<div class="s-sec"><h2>Нэвтрэх арга</h2></div>');
+  const ways = el('<div class="sa-ways"></div>');
   ways.append(accountWays({ token: store.guestToken }));
 
-  const devices = el('<div class="s-card sa-card"><h2>Нэвтэрсэн төхөөрөмж</h2><p>Танихгүй төхөөрөмж байвал бусдаас нь гараарай.</p><ul class="sa-sessions" id="sessions"></ul><div class="sa-row"><button class="s-btn s-btn-line" type="button" id="others">Бусад бүх төхөөрөмжөөс гарах</button><button class="s-btn s-btn-dark" type="button" id="out">Гарах</button></div></div>');
-  box.replaceChildren(profile, ways, devices);
+  const devicesHead = el('<div class="s-sec"><h2>Нэвтэрсэн төхөөрөмж</h2></div>');
+  const devices = el(`<div class="s-card sa-card">
+      <ul class="sa-sessions" id="sessions"></ul>
+      <div class="sa-foot">
+        <p id="others-why">Танихгүй төхөөрөмж байвал бусдаас нь гараарай.</p>
+        <button class="s-btn s-btn-line s-btn-sm" type="button" id="others">Бусад бүх төхөөрөмжөөс гарах</button>
+      </div>
+    </div>`);
+  const out = el(`<div class="s-card sa-out">
+      <p><b>Энэ төхөөрөмжөөс гарах</b>Дараа нь Google, имэйл эсвэл нууц үгээрээ дахин нэвтэрнэ.</p>
+      <button class="s-btn s-btn-line" type="button" id="out">${OUT}<span>Гарах</span></button>
+    </div>`);
+  box.removeAttribute('aria-busy');
+  box.removeAttribute('role');
+  box.replaceChildren(profileHead, profile, waysHead, ways, devicesHead, devices, out);
 
   const paintSessions = async () => {
     const { sessions } = await authed('/v1/me/sessions');
@@ -101,30 +149,43 @@ async function draw() {
         el(`<li><div><b>${esc(s.label || 'Төхөөрөмж')}</b><small>Сүүлд: ${seen(s.last_seen_at ?? s.created_at)}</small></div>${s.current ? '<span class="s-pill" data-tone="ready">Энэ төхөөрөмж</span>' : ''}</li>`),
       ),
     );
-    devices.querySelector('#others').disabled = sessions.filter((s) => !s.current).length === 0;
+    const others = sessions.filter((s) => !s.current).length;
+    devices.dataset.others = String(others);
+    // With nothing else signed in, the button is not drawn as a grey dead end: the line says why.
+    devices.querySelector('#others').disabled = others === 0;
+    devices.querySelector('#others').hidden = others === 0;
+    devices.querySelector('#others-why').textContent = others
+      ? 'Танихгүй төхөөрөмж байвал бусдаас нь гараарай.'
+      : 'Зөвхөн энэ төхөөрөмж дээр нэвтэрсэн байна.';
   };
   await paintSessions();
-  devices.querySelector('#others').addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-    button.setAttribute('data-busy', '');
-    try {
-      const { revoked } = await authed('/v1/me/sessions/revoke', { method: 'POST' });
-      say(revoked ? `${revoked} төхөөрөмжөөс гаргалаа.` : 'Өөр төхөөрөмж алга.');
-      await paintSessions();
-    } catch (error) {
-      say(error.message, 'bad');
-    } finally {
-      button.removeAttribute('data-busy');
-    }
-  });
-  devices.querySelector('#out').addEventListener('click', () => void signOut());
+  // Signing every other device out cannot be taken back: it is asked first, saying how many.
+  devices.querySelector('#others').addEventListener('click', () =>
+    void confirmPopup({
+      title: 'Бусад төхөөрөмжөөс гарах',
+      text: `Энэ төхөөрөмжөөс бусад <b>${esc(devices.dataset.others)}</b> төхөөрөмж дээрх нэвтрэлт хаагдана. Тэнд дахин нэвтрэх хүртэл Basu-д орохгүй. Энэ төхөөрөмж нэвтэрсэн хэвээр үлдэнэ.`,
+      ok: 'Бусдаас гаргах',
+      danger: true,
+      onConfirm: async () => {
+        let revoked;
+        try {
+          ({ revoked } = await authed('/v1/me/sessions/revoke', { method: 'POST' }));
+        } catch (error) {
+          throw new Error(whatWentWrong(error));
+        }
+        say(revoked ? `${revoked} төхөөрөмжөөс гаргалаа.` : 'Өөр төхөөрөмж алга.', 'good');
+        await paintSessions();
+      },
+    }),
+  );
+  out.querySelector('#out').addEventListener('click', () => void signOut());
 }
 
 if (token) {
   try {
     await draw();
   } catch (error) {
-    if (error.status !== 401) say(error.message, 'bad');
+    if (error.status !== 401) say(whatWentWrong(error), 'bad');
   }
 }
 </script>

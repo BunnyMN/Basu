@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#FFFFFF">
+<meta name="theme-color" content="#123A2C">
 <title>Нэвтрэх — Basu</title>
 <meta name="description" content="Basu-д нэвтэрч өвлийн идшээ захиалаарай.">
 <meta name="robots" content="noindex">
@@ -12,68 +12,89 @@
 <link rel="stylesheet" href="/app.css">
 <link rel="stylesheet" href="/site.css">
 <style>
-/* The door. Half the screen is the meat, on black, and says what Basu is;
+/* The door. Half the screen is the meat, on pine, and says what Basu is;
    the other half asks one thing at a time — an address, then the code that
-   went to it — and nothing else. On a phone the picture becomes a band. */
+   went to it — and nothing else. On a phone the picture becomes a short band
+   so the first field and its button sit in the first screen. Pinned light,
+   like the rest of the website. */
 
-.l{flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-height:100vh}
+.l{position:relative;flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-height:100vh;min-height:100dvh}
 .l-art{position:relative;overflow:hidden;background:var(--deep);color:#fff}
 .l-art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:46% 50%}
-.l-art::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(18,58,44,.6) 0%,rgba(18,58,44,0) 28%,rgba(18,58,44,0) 48%,rgba(18,58,44,.92) 100%)}
-.l-art .s-word{position:absolute;z-index:1;top:32px;left:40px;color:#fff;font-size:1.5rem}
+.l-art::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(18,58,44,.6) 0%,rgba(18,58,44,0) 28%,rgba(18,58,44,0) 48%,rgba(18,58,44,.92) 100%);
+  background:linear-gradient(180deg,color-mix(in srgb,var(--deep) 60%,transparent) 0%,transparent 28%,transparent 48%,color-mix(in srgb,var(--deep) 92%,transparent) 100%)}
+.l-art .s-word{position:absolute;z-index:1;top:calc(24px + var(--safe-t));left:40px;color:#fff;font-size:1.5rem}
 .l-say{position:absolute;z-index:1;left:40px;right:40px;bottom:44px}
 .l-kick{display:inline-flex;align-items:center;gap:8px;margin-bottom:14px;padding:5px 12px;border-radius:999px;background:rgba(255,255,255,.12);font-style:normal;font-size:.8125rem;font-weight:500}
 .l-kick::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--hi)}
 .l-say b{display:block;font-size:clamp(2.2rem,3.6vw,3.25rem);font-weight:600;line-height:1.02;letter-spacing:-.035em}
-.l-say span{display:block;margin-top:14px;max-width:26em;font-size:1rem;line-height:1.6;color:rgba(255,255,255,.72)}
+.l-say span{display:block;margin-top:14px;max-width:26em;font-size:1rem;line-height:1.6;color:rgba(255,255,255,.76)}
 
-.l-pane{display:flex;flex-direction:column;padding:28px clamp(24px,5vw,72px) 32px;background:#fff}
-.l-top{display:flex;justify-content:space-between;align-items:center;min-height:40px}
-.l-top .s-word{visibility:hidden}
-.l-home{display:inline-flex;align-items:center;gap:6px;margin-left:auto;font-size:.875rem;font-weight:500;color:var(--ink-2);text-decoration:none}
+.l-pane{display:flex;flex-direction:column;padding:calc(20px + var(--safe-t)) clamp(24px,5vw,72px) calc(28px + var(--safe-b));background:var(--surface)}
+.l-top{display:flex;justify-content:flex-end;align-items:center;min-height:44px}
+.l-home{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 4px;font-size:.875rem;font-weight:500;color:var(--ink-2);text-decoration:none}
 .l-home svg{width:16px;height:16px}
 @media (hover:hover){.l-home:hover{color:var(--ink)}}
-.l-body{flex:1;display:flex;flex-direction:column;justify-content:center;width:100%;max-width:400px;margin:0 auto;padding:40px 0}
+.l-body{flex:1;display:flex;flex-direction:column;justify-content:center;width:100%;max-width:400px;margin:0 auto;padding:32px 0}
 .l-body h1{margin:0;font-size:2rem;line-height:1.1;letter-spacing:-.03em}
 .l-lead{margin:10px 0 28px;font-size:1rem;line-height:1.6;color:var(--ink-2)}
 .l-lead b{color:var(--ink);overflow-wrap:anywhere}
 .l-google svg{width:20px;height:20px}
+/* a narrow phone wraps the words rather than pushing the page sideways */
+.l-google{white-space:normal;text-align:center;line-height:1.25;padding-top:10px;padding-bottom:10px}
 .l-or{display:flex;align-items:center;gap:14px;margin:22px 0;font-size:.8125rem;color:var(--ink-3)}
 .l-or::before,.l-or::after{content:"";flex:1;height:1px;background:var(--line)}
-.l-alt{display:flex;justify-content:center;gap:20px;margin:22px 0 0;font-size:.9375rem}
+.l-alt{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 20px;margin:18px 0 0;font-size:.9375rem}
+.l-alt .s-link{display:inline-flex;align-items:center;min-height:44px}
 .l-step[hidden]{display:none}
-.l-back{display:inline-flex;align-items:center;gap:6px;margin:0 0 22px;padding:0;border:0;background:none;font:inherit;font-size:.875rem;font-weight:500;color:var(--ink-2);cursor:pointer}
+.l-back{display:inline-flex;align-items:center;gap:6px;min-height:44px;margin:-8px 0 12px -4px;padding:0 4px;border:0;background:none;font:inherit;font-size:.875rem;font-weight:500;color:var(--ink-2);cursor:pointer}
 .l-back svg{width:16px;height:16px}
 @media (hover:hover){.l-back:hover{color:var(--ink)}}
-.l-legal{margin:36px 0 0;font-size:.8125rem;line-height:1.6;color:var(--ink-3)}
+.l-legal{margin:32px 0 0;font-size:.8125rem;line-height:1.6;color:var(--ink-3)}
 .l-legal a{color:var(--ink-2);text-decoration:underline;text-underline-offset:.2em}
+/* an error said between the field and its button */
+.l-step form .s-error{margin:-4px 0 16px}
 
 /* six boxes for the code: one real input over them, so paste and the
    phone's «from Messages» both land whole */
 .l-otp{position:relative;display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:0 0 14px}
-.l-otp i{display:grid;place-items:center;aspect-ratio:1/1.12;border:1px solid var(--line-2);border-radius:14px;font-family:var(--mono);font-size:1.5rem;font-weight:600;font-style:normal;color:var(--ink);transition:border-color var(--dur),box-shadow var(--dur)}
+.l-otp i{display:grid;place-items:center;aspect-ratio:1/1.12;border:1px solid var(--line-2);border-radius:14px;background:var(--surface);font-family:var(--mono);font-size:1.5rem;font-weight:600;font-style:normal;color:var(--ink);transition:border-color var(--dur),box-shadow var(--dur)}
 .l-otp i[data-on]{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.l-otp[data-bad] i{border-color:var(--stop)}
 .l-otp input{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;color:transparent;caret-color:transparent;font-size:16px;outline:none;letter-spacing:40px}
 .l-otp input::selection{background:transparent}
-.l-again{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.875rem;color:var(--ink-3)}
+.l-otp input:disabled{cursor:progress}
+.l-again{display:flex;flex-wrap:wrap;align-items:center;gap:0 14px;font-size:.875rem;color:var(--ink-3)}
+.l-again .s-link{display:inline-flex;align-items:center;min-height:44px}
 
-.l-eye{position:relative}
+.l-eye{position:relative;display:block}
 .l-eye .s-input{padding-right:52px}
-.l-eye button{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:40px;height:40px;border:0;border-radius:10px;background:none;color:var(--ink-3);cursor:pointer}
+.l-eye button{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:40px;height:40px;border:0;border-radius:10px;background:none;color:var(--ink-3);cursor:pointer}
 .l-eye button svg{width:20px;height:20px}
+.l-eye button[aria-pressed="true"]{color:var(--accent-ink)}
 .l-demo{margin:28px 0 0;padding:14px;border:1px dashed var(--line-2);border-radius:14px}
 .l-demo p{margin:0 0 10px;font-size:.8125rem;color:var(--ink-3)}
 
 @media (max-width:900px){
-  .l{grid-template-columns:1fr;grid-template-rows:auto 1fr}
-  .l-art{height:34vh;min-height:220px}
-  .l-art .s-word{top:20px;left:24px}
-  .l-say{left:24px;right:24px;bottom:24px}
-  .l-say b{font-size:1.9rem}
+  .l{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr}
+  .l-art{height:calc(clamp(176px,27vh,232px) + var(--safe-t))}
+  .l-art .s-word{top:calc(14px + var(--safe-t));left:24px}
+  .l-say{left:24px;right:24px;bottom:20px}
+  .l-kick{margin-bottom:10px}
+  .l-say b{font-size:1.75rem}
   .l-say span{display:none}
-  .l-pane{padding:16px 24px 28px}
-  .l-body{justify-content:flex-start;padding:24px 0}
+  /* the way home rides on the picture, so the form starts at the top of the pane */
+  .l-top{position:absolute;z-index:2;top:calc(8px + var(--safe-t));right:16px}
+  .l-home{color:#fff}
+  .l-pane{padding:4px 24px calc(28px + var(--safe-b))}
+  .l-body{justify-content:flex-start;padding:24px 0 8px}
   .l-body h1{font-size:1.75rem}
+  .l-lead{margin-bottom:24px}
+}
+@media (max-width:900px) and (max-height:700px){
+  .l-art{height:calc(152px + var(--safe-t))}
+  .l-kick{display:none}
 }
 </style>
 </head>
@@ -96,9 +117,9 @@
         <a class="s-btn s-btn-line s-btn-lg s-btn-block l-google" id="google" hidden><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Google-ээр үргэлжлүүлэх</a>
         <div class="l-or" id="or" hidden>эсвэл</div>
         <form id="email-form" novalidate hidden>
-          <label class="s-field"><span>Имэйл хаяг</span><input class="s-input" name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com"></label>
-          <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="submit">Үргэлжлүүлэх</button>
+          <label class="s-field"><span>Имэйл хаяг</span><input class="s-input" name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com" aria-describedby="email-error"></label>
           <p class="s-error" id="email-error" role="alert"></p>
+          <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="submit">Үргэлжлүүлэх</button>
         </form>
         <div class="l-alt"><button class="s-link" type="button" data-go="password">Нууц үгээр нэвтрэх</button></div>
       </div>
@@ -108,9 +129,9 @@
         <button class="l-back" type="button" data-go="start"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Буцах</button>
         <h1>Имэйлээ шалгана уу</h1>
         <p class="l-lead"><b id="sent-to"></b> хаяг руу 6 оронтой код илгээлээ. 10 минут хүчинтэй.</p>
-        <div class="l-otp" id="otp"><i></i><i></i><i></i><i></i><i></i><i></i><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-label="Имэйлд ирсэн 6 оронтой код"></div>
+        <div class="l-otp" id="otp"><i></i><i></i><i></i><i></i><i></i><i></i><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-label="Имэйлд ирсэн 6 оронтой код" aria-describedby="code-error"></div>
         <p class="s-error" id="code-error" role="alert"></p>
-        <div class="l-again"><span>Ирээгүй юу? Spam хавтсаа шалгаарай.</span><button class="s-link" type="button" id="resend">Код дахин авах</button></div>
+        <div class="l-again"><span id="again-hint">Ирээгүй юу? Спам хавтсаа шалгаарай.</span><button class="s-link" type="button" id="resend">Код дахин авах</button></div>
       </div>
 
       <!-- 3 · a password -->
@@ -119,10 +140,10 @@
         <h1>Нууц үгээр нэвтрэх</h1>
         <p class="l-lead">Бүртгэлтэй имэйл эсвэл утасны дугаар, нууц үгээ оруулна уу.</p>
         <form id="pw-form" novalidate>
-          <label class="s-field"><span>Имэйл эсвэл утасны дугаар</span><input class="s-input" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com · 8811 2233"></label>
-          <label class="s-field"><span>Нууц үг</span><span class="l-eye"><input class="s-input" name="password" type="password" autocomplete="current-password" placeholder="Нууц үг"><button type="button" data-eye aria-label="Нууц үгийг харах"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
-          <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="submit">Нэвтрэх</button>
+          <label class="s-field"><span>Имэйл эсвэл утасны дугаар</span><input class="s-input" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com · 8811 2233" aria-describedby="pw-error"></label>
+          <label class="s-field"><span>Нууц үг</span><span class="l-eye"><input class="s-input" name="password" type="password" autocomplete="current-password" placeholder="Нууц үг" aria-describedby="pw-error"><button type="button" data-eye aria-label="Нууц үгийг харах" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
           <p class="s-error" id="pw-error" role="alert"></p>
+          <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="submit">Нэвтрэх</button>
         </form>
         <div class="l-alt"><button class="s-link" type="button" data-go="forgot" id="to-forgot">Нууц үгээ мартсан уу?</button><button class="s-link" type="button" data-go="signup" id="to-signup" hidden>Бүртгүүлэх</button></div>
       </div>
@@ -133,11 +154,11 @@
         <h1>Нууц үг сэргээх</h1>
         <p class="l-lead" id="forgot-lead">Бүртгэлтэй имэйл эсвэл утасны дугаараа бичнэ үү. Бүртгэлийн имэйл рүү тань код илгээнэ.</p>
         <form id="forgot-form" novalidate>
-          <label class="s-field" data-f="login"><span>Имэйл эсвэл утасны дугаар</span><input class="s-input" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com · 8811 2233"></label>
-          <label class="s-field" data-f="code" hidden><span>Имэйлд ирсэн код</span><input class="s-input" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 оронтой код"></label>
-          <label class="s-field" data-f="password" hidden><span>Шинэ нууц үг <small>— дор хаяж 8 тэмдэгт</small></span><input class="s-input" name="password" type="password" autocomplete="new-password" placeholder="Шинэ нууц үг"></label>
-          <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="submit" id="forgot-go">Код авах</button>
+          <label class="s-field" data-f="login"><span>Имэйл эсвэл утасны дугаар</span><input class="s-input" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com · 8811 2233" aria-describedby="forgot-error"></label>
+          <label class="s-field" data-f="code" hidden><span>Имэйлд ирсэн код</span><span class="l-otp" data-otp><i></i><i></i><i></i><i></i><i></i><i></i><input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-describedby="forgot-error"></span></label>
+          <label class="s-field" data-f="password" hidden><span>Шинэ нууц үг <small>— дор хаяж 8 тэмдэгт</small></span><span class="l-eye"><input class="s-input" name="password" type="password" autocomplete="new-password" placeholder="Шинэ нууц үг" aria-describedby="forgot-error"><button type="button" data-eye aria-label="Нууц үгийг харах" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
           <p class="s-error" id="forgot-error" role="alert"></p>
+          <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="submit" id="forgot-go">Код авах</button>
         </form>
       </div>
 
@@ -148,10 +169,10 @@
         <p class="l-lead">Утасны дугаар, өөрийн сонгосон нууц үгээр бүртгэл үүснэ.</p>
         <form id="signup-form" novalidate>
           <label class="s-field"><span>Нэр</span><input class="s-input" name="name" autocomplete="name" placeholder="Таны нэр"></label>
-          <label class="s-field"><span>Утасны дугаар</span><input class="s-input" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="8811 2233"></label>
-          <label class="s-field"><span>Нууц үг <small>— дор хаяж 8 тэмдэгт</small></span><input class="s-input" name="password" type="password" autocomplete="new-password" placeholder="Нууц үг сонгох"></label>
-          <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="submit">Бүртгүүлэх</button>
+          <label class="s-field"><span>Утасны дугаар</span><span class="s-affix"><i>+976</i><input class="s-input" name="phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="8811 2233" aria-describedby="signup-error"></span></label>
+          <label class="s-field"><span>Нууц үг <small>— дор хаяж 8 тэмдэгт</small></span><span class="l-eye"><input class="s-input" name="password" type="password" autocomplete="new-password" placeholder="Нууц үг сонгох" aria-describedby="signup-error"><button type="button" data-eye aria-label="Нууц үгийг харах" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
           <p class="s-error" id="signup-error" role="alert"></p>
+          <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="submit">Бүртгүүлэх</button>
         </form>
       </div>
 
@@ -166,7 +187,7 @@
 </main>
 
 <script type="module">
-import { api, store, authReturn, authMethods, takeSession } from '/api.js';
+import { api, store, authReturn, authMethods, takeSession, whatWentWrong } from '/api.js';
 import { safeNext } from '/site.js';
 
 const $ = (id) => document.getElementById(id);
@@ -191,20 +212,54 @@ const arrive = () => {
  */
 const forgot = new URLSearchParams(location.search).has('forgot');
 
+// Sent here on the way to pay, or to an order: the door says so, and that it brings them back.
+const why = next.startsWith('/shop/')
+  ? 'Захиалгаа төлөхийн тулд нэвтэрнэ үү — дараа нь шууд захиалга руугаа буцна.'
+  : next.startsWith('/orders')
+    ? 'Захиалгаа харахын тулд нэвтэрнэ үү.'
+    : next.startsWith('/account')
+      ? 'Бүртгэлээ харахын тулд нэвтэрнэ үү.'
+      : null;
+if (why) document.querySelector('.l-step[data-step="start"] .l-lead').textContent = `${why} Анх удаа бол бүртгэл автоматаар үүснэ.`;
+// From a stall, the way out of the door is back to that stall, not the front page.
+if (next.startsWith('/shop/')) {
+  const home = document.querySelector('.l-home');
+  home.href = next;
+  home.lastChild.textContent = 'Зар руу буцах';
+}
+
 /* ── one step on screen at a time ──────────────────────────────────── */
 
 let methods = { password: true, email: false, google: false };
 function go(step) {
   for (const box of document.querySelectorAll('.l-step')) box.hidden = box.dataset.step !== step;
   for (const error of document.querySelectorAll('.s-error')) error.textContent = '';
+  for (const marked of document.querySelectorAll('[aria-invalid]')) marked.removeAttribute('aria-invalid');
   // Without an email door, the password is where one starts: nothing to go back to.
   $('pw-back').hidden = step === 'password' && !methods.email && !methods.google;
-  const first = document.querySelector(`.l-step[data-step="${step}"] input:not([hidden])`);
+  const first = document.querySelector(`.l-step[data-step="${step}"] label:not([hidden]) input, .l-step[data-step="${step}"] .l-otp input`);
   requestAnimationFrame(() => first?.focus());
 }
 for (const button of document.querySelectorAll('[data-go]')) {
   button.addEventListener('click', () => go(button.dataset.go));
 }
+
+/**
+ * What is wrong, said under the field it is about: the field in the stop
+ * colour and the words between it and its button, until it is typed in again.
+ */
+function flagField(input, box, message) {
+  for (const marked of document.querySelectorAll('[aria-invalid]')) marked.removeAttribute('aria-invalid');
+  box.textContent = message;
+  input.setAttribute('aria-invalid', 'true');
+  input.focus();
+}
+document.addEventListener('input', (event) => {
+  if (!event.target.hasAttribute?.('aria-invalid')) return;
+  event.target.removeAttribute('aria-invalid');
+  const box = event.target.form?.querySelector('.s-error');
+  if (box) box.textContent = '';
+});
 
 const busy = async (button, work, errorBox) => {
   if (button.hasAttribute('data-busy')) return;
@@ -213,7 +268,7 @@ const busy = async (button, work, errorBox) => {
   try {
     await work();
   } catch (error) {
-    errorBox.textContent = error.message;
+    errorBox.textContent = whatWentWrong(error);
   } finally {
     button.removeAttribute('data-busy');
   }
@@ -223,39 +278,71 @@ const signedIn = (token) => {
   arrive();
 };
 
+/* ── six boxes for a code ──────────────────────────────────────────── */
+
+/** The boxes show what the one input under them holds, the next empty one lit. */
+function paintOtp(box) {
+  const input = box.querySelector('input');
+  const digits = input.value;
+  [...box.querySelectorAll('i')].forEach((cell, i) => {
+    cell.textContent = digits[i] ?? '';
+    cell.toggleAttribute('data-on', document.activeElement === input && i === Math.min(digits.length, 5));
+  });
+}
+for (const box of document.querySelectorAll('.l-otp')) {
+  const input = box.querySelector('input');
+  input.addEventListener('input', () => {
+    input.value = input.value.replace(/\D/g, '').slice(0, 6);
+    box.removeAttribute('data-bad');
+    paintOtp(box);
+  });
+  input.addEventListener('focus', () => paintOtp(box));
+  input.addEventListener('blur', () => paintOtp(box));
+}
+
 /* ── a code by email ───────────────────────────────────────────────── */
 
 let sentTo = null;
+let waitTimer = null;
+/** «Код дахин авах» rests for a while after each letter, and says for how long. */
+function restResend(seconds = 45) {
+  const button = $('resend');
+  let left = seconds;
+  clearInterval(waitTimer);
+  const tick = () => {
+    if (left <= 0) {
+      clearInterval(waitTimer);
+      button.disabled = false;
+      button.textContent = 'Код дахин авах';
+      return;
+    }
+    button.disabled = true;
+    button.textContent = `Дахин авах · 0:${String(left).padStart(2, '0')}`;
+    left -= 1;
+  };
+  tick();
+  waitTimer = setInterval(tick, 1000);
+}
 async function sendCode(address) {
   await api('/v1/auth/email/start', { method: 'POST', body: { email: address } });
   sentTo = address;
   $('sent-to').textContent = address;
+  restResend();
 }
 $('email-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const field = event.target.elements.email;
   const address = field.value.trim();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
-    $('email-error').textContent = 'Имэйл хаягаа зөв бичнэ үү.';
-    field.focus();
-    return;
-  }
+  if (!address) return flagField(field, $('email-error'), 'Имэйл хаягаа бичнэ үү.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) return flagField(field, $('email-error'), 'Имэйл хаягаа зөв бичнэ үү — жишээ нь нэр@gmail.com.');
   void busy(event.submitter ?? event.target.querySelector('button'), async () => {
     await sendCode(address);
     $('code').value = '';
-    paintCells();
+    paintOtp($('otp'));
     go('code');
   }, $('email-error'));
 });
 
-const cells = [...$('otp').querySelectorAll('i')];
-function paintCells() {
-  const digits = $('code').value;
-  cells.forEach((cell, i) => {
-    cell.textContent = digits[i] ?? '';
-    cell.toggleAttribute('data-on', document.activeElement === $('code') && i === Math.min(digits.length, 5));
-  });
-}
 async function checkCode() {
   const typed = $('code').value;
   if (typed.length !== 6) return;
@@ -265,26 +352,24 @@ async function checkCode() {
     const { token } = await api('/v1/auth/email/verify', { method: 'POST', body: { email: sentTo, code: typed, device: DEVICE } });
     signedIn(token);
   } catch (error) {
-    $('code-error').textContent = error.message;
+    $('code-error').textContent = whatWentWrong(error);
+    $('otp').setAttribute('data-bad', '');
     $('code').value = '';
     $('code').disabled = false;
     $('code').focus();
-    paintCells();
+    paintOtp($('otp'));
   }
 }
 $('code').addEventListener('input', () => {
-  $('code').value = $('code').value.replace(/\D/g, '').slice(0, 6);
-  paintCells();
+  if ($('code').value.length) $('code-error').textContent = '';
   void checkCode();
 });
-$('code').addEventListener('focus', paintCells);
-$('code').addEventListener('blur', paintCells);
 $('resend').addEventListener('click', () =>
   void busy($('resend'), async () => {
     await sendCode(sentTo);
     $('code-error').textContent = '';
-    $('resend').textContent = 'Дахин илгээлээ';
-    setTimeout(() => ($('resend').textContent = 'Код дахин авах'), 4000);
+    $('again-hint').textContent = 'Шинэ код илгээлээ. Спам хавтсаа ч шалгаарай.';
+    $('code').focus();
   }, $('code-error')),
 );
 
@@ -293,15 +378,17 @@ $('resend').addEventListener('click', () =>
 for (const eye of document.querySelectorAll('[data-eye]')) {
   eye.addEventListener('click', () => {
     const input = eye.previousElementSibling;
-    input.type = input.type === 'password' ? 'text' : 'password';
-    eye.setAttribute('aria-label', input.type === 'password' ? 'Нууц үгийг харах' : 'Нууц үгийг нуух');
+    const shown = input.type === 'password';
+    input.type = shown ? 'text' : 'password';
+    eye.setAttribute('aria-pressed', String(shown));
+    eye.setAttribute('aria-label', shown ? 'Нууц үгийг нуух' : 'Нууц үгийг харах');
   });
 }
 $('pw-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const { login, password } = event.target.elements;
-  if (!login.value.trim()) return login.focus();
-  if (!password.value) return password.focus();
+  if (!login.value.trim()) return flagField(login, $('pw-error'), 'Имэйл эсвэл утасны дугаараа бичнэ үү.');
+  if (!password.value) return flagField(password, $('pw-error'), 'Нууц үгээ бичнэ үү.');
   void busy(event.target.querySelector('[type="submit"]'), async () => {
     const { token } = await api('/v1/auth/login', {
       method: 'POST',
@@ -314,30 +401,36 @@ $('pw-form').addEventListener('submit', (event) => {
 /* ── a forgotten password ──────────────────────────────────────────── */
 
 let resetFor = null;
+const resetCode = document.querySelector('#forgot-form [data-otp]');
+// Six digits in, the new password is next.
+resetCode.querySelector('input').addEventListener('input', (event) => {
+  if (event.target.value.length === 6) $('forgot-form').elements.password.focus();
+});
 $('forgot-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const form = event.target;
   const { login, code, password } = form.elements;
   const button = $('forgot-go');
   if (!resetFor) {
-    if (!login.value.trim()) return login.focus();
+    if (!login.value.trim()) return flagField(login, $('forgot-error'), 'Имэйл эсвэл утасны дугаараа бичнэ үү.');
     void busy(button, async () => {
       const { to } = await api('/v1/auth/password/code', { method: 'POST', body: { login: login.value.trim(), purpose: 'reset' } });
       resetFor = login.value.trim();
-      $('forgot-lead').textContent = `${to} хаяг руу код илгээлээ. Кодоо болон шинэ нууц үгээ оруулна уу.`;
+      $('forgot-lead').textContent = `${to} хаяг руу 6 оронтой код илгээлээ. Кодоо болон шинэ нууц үгээ оруулна уу.`;
       form.querySelector('[data-f="login"]').hidden = true;
       form.querySelector('[data-f="code"]').hidden = false;
       form.querySelector('[data-f="password"]').hidden = false;
       button.textContent = 'Нууц үгээ шинэчлэх';
+      paintOtp(resetCode);
       code.focus();
     }, $('forgot-error'));
     return;
   }
-  if (code.value.replace(/\D/g, '').length !== 6) return code.focus();
-  if (password.value.length < 8) {
-    $('forgot-error').textContent = 'Нууц үг дор хаяж 8 тэмдэгт байх ёстой.';
-    return password.focus();
+  if (code.value.replace(/\D/g, '').length !== 6) {
+    resetCode.setAttribute('data-bad', '');
+    return flagField(code, $('forgot-error'), 'Имэйлд ирсэн 6 оронтой кодоо оруулна уу.');
   }
+  if (password.value.length < 8) return flagField(password, $('forgot-error'), 'Нууц үг дор хаяж 8 тэмдэгт байх ёстой.');
   void busy(button, async () => {
     const { token } = await api('/v1/auth/password', {
       method: 'POST',
@@ -352,11 +445,8 @@ $('forgot-form').addEventListener('submit', (event) => {
 $('signup-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const { name, phone, password } = event.target.elements;
-  if (!phone.value.trim()) return phone.focus();
-  if (password.value.length < 8) {
-    $('signup-error').textContent = 'Нууц үг дор хаяж 8 тэмдэгт байх ёстой.';
-    return password.focus();
-  }
+  if (phone.value.replace(/\D/g, '').length < 8) return flagField(phone, $('signup-error'), 'Утасны дугаараа 8 оронтойгоор бичнэ үү.');
+  if (password.value.length < 8) return flagField(password, $('signup-error'), 'Нууц үг дор хаяж 8 тэмдэгт байх ёстой.');
   void busy(event.target.querySelector('[type="submit"]'), async () => {
     const { token } = await api('/v1/auth/register', {
       method: 'POST',

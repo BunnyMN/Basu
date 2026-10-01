@@ -7,6 +7,18 @@
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0F1110">
 <title>Өвлийн идэш · Үйлчилгээний нөхцөл</title>
 <link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/site.css">
+<script>
+/* In a browser this is a page of the website: its header and its foot, and
+   light, like every page of the website. In the phone app (the shell's web
+   view) it keeps the app's own bar and follows the phone's theme. Set before
+   the body is drawn, so nothing shows and then changes. */
+if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.basu)) {
+  document.documentElement.setAttribute('data-site', '');
+  document.documentElement.setAttribute('data-theme', 'light');
+  for (const meta of document.querySelectorAll('meta[name="theme-color"]')) meta.setAttribute('content', '#FFFFFF');
+}
+</script>
 <style>
 /* Layout only. Faces, colours, radii and weights come from app.css (.doc, .topbar). */
 .toc .n{flex:none;width:28px}
@@ -85,6 +97,40 @@ document.getElementById('back').addEventListener('click', (event) => {
     history.back();
   }
 });
+
+// In a browser: the website's header and foot around the page, and on a wide
+// screen the contents beside the text with the section in view marked. The
+// shell's web view never loads the website's parts.
+if (document.documentElement.hasAttribute('data-site')) {
+  const { mountFrame } = await import('/site.js');
+  void mountFrame(null);
+  const toc = document.querySelector('.doc-card .toc');
+  if (toc) {
+    const aside = document.createElement('aside');
+    aside.className = 'doc-aside';
+    aside.setAttribute('aria-label', 'Агуулга');
+    aside.innerHTML = '<div class="eyebrow">Агуулга</div>';
+    aside.append(toc.cloneNode(true));
+    document.querySelector('main.doc').prepend(aside);
+    const links = new Map([...aside.querySelectorAll('a[href^="#"]')].map((a) => [a.getAttribute('href').slice(1), a]));
+    if ('IntersectionObserver' in window) {
+      const reading = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            for (const a of links.values()) a.removeAttribute('aria-current');
+            links.get(entry.target.id)?.setAttribute('aria-current', 'true');
+          }
+        },
+        { rootMargin: '-12% 0px -70% 0px' },
+      );
+      for (const id of links.keys()) {
+        const heading = document.getElementById(id);
+        if (heading) reading.observe(heading);
+      }
+    }
+  }
+}
 </script>
 </body>
 </html>
