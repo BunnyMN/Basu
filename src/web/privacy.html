@@ -26,7 +26,8 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 .doc-foot .back{margin-top:0}
 /* The support block is the first thing a person who tapped «Support» needs. */
 .help{display:grid;gap:10px;padding:16px;margin:0 0 20px;border-radius:var(--r-ctl);background:var(--surface-2);border:1px solid var(--line)}
-.help b{font-size:var(--t-title-3);font-weight:600;color:var(--ink)}
+/* The block's own title only: a word in bold inside its lines stays at the line's size. */
+.help > b{font-size:var(--t-title-3);font-weight:600;color:var(--ink)}
 .help p{margin:0;font-size:var(--t-body);line-height:1.5;color:var(--ink-2);max-width:62ch}
 .help a{font-weight:500}
 /* What we keep, and for how long: label left, plain answer right. */

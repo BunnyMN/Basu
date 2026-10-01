@@ -49,6 +49,11 @@ html[data-site] body{background:var(--bg);min-height:100vh;min-height:100dvh;dis
 .s-link{display:inline;background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--accent-ink);text-decoration:underline;text-underline-offset:.22em;text-decoration-thickness:1px;cursor:pointer}
 .s-link[disabled]{color:var(--ink-3);text-decoration:none;cursor:default;font-weight:500}
 
+/* A popup or a sheet on the website (api.js popup(), confirmPopup(), signInSheet()) wears
+   the website's buttons: pills, as every other button on these pages — not the app's
+   rounded rectangles. A text-only link stays a link; an icon button stays its circle. */
+html[data-site] .sheet .btn:not([data-v="link"]):not([data-icon]){border-radius:999px;padding-inline:20px}
+
 /* ── fields ──────────────────────────────────────────────────────── */
 .s-field{display:block;margin:0 0 16px}
 .s-field > span:first-child{display:block;margin:0 0 8px;font-size:.875rem;font-weight:600;color:var(--ink)}
