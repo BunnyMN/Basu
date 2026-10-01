@@ -144,8 +144,9 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var
 .item > .end{gap:8px}
 .item[data-off] .money{color:var(--ink-3)}
 .item[data-off] .lead img{opacity:.6}
-.qty{display:inline-flex;align-items:stretch;height:40px;border:1px solid var(--line-2);border-radius:var(--r-ctl);background:var(--surface);overflow:hidden}
-.qty button{width:40px;padding:0;border:0;background:none;color:var(--ink-2);display:grid;place-items:center}
+/* 44 × 44 per press, the target the thumb needs (the stepper was 40 tall) */
+.qty{display:inline-flex;align-items:stretch;height:44px;border:1px solid var(--line-2);border-radius:var(--r-ctl);background:var(--surface);overflow:hidden}
+.qty button{width:44px;padding:0;border:0;background:none;color:var(--ink-2);display:grid;place-items:center}
 .qty button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
 .qty button:active{background:var(--surface-2);color:var(--ink)}
 @media (hover:hover){.qty button:hover{background:var(--surface-2);color:var(--ink)}}
