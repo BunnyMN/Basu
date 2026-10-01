@@ -216,6 +216,9 @@ struct ProfileView: View {
               .font(.sans(15, .medium))
               .foregroundStyle(platform.me?.displayName == nil ? Color.ink3 : Color.ink)
               .lineLimit(1)
+              // The row's own word keeps its width; the name gives way.
+              .minimumScaleFactor(0.6)
+              .layoutPriority(-1)
             Chevron(size: 13).foregroundStyle(Color.ink3)
           }
           .padding(.horizontal, 16)
@@ -660,7 +663,8 @@ struct RowLabel: View {
       Image(systemName: symbol)
         .font(.sans(16))
         .foregroundStyle(tint)
-        .frame(width: 24)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .frame(minWidth: 24)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 2) {
         Text(title)

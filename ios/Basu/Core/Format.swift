@@ -124,4 +124,26 @@ enum Format {
   static func when(_ date: Date, now: Date = .now) -> String {
     calendar.isDate(date, inSameDayAs: now) ? hhmm(date) : day.string(from: date)
   }
+
+  /// The same, for VoiceOver: «10/1» is read out as a fraction, so a day is
+  /// said in words.
+  static func whenSpoken(_ date: Date, now: Date = .now) -> String {
+    calendar.isDate(date, inSameDayAs: now) ? hhmm(date) : dayWords(date)
+  }
+
+  /// A line as VoiceOver should say it. The marks that separate words on the
+  /// screen — «·», «×» — are pauses, not words, and «№7001» is «дугаар 7001».
+  static func spoken(_ text: String) -> String {
+    text
+      .replacingOccurrences(of: "№", with: "дугаар ")
+      .replacingOccurrences(of: " · ", with: ", ")
+      .replacingOccurrences(of: "·", with: ",")
+      .replacingOccurrences(of: " ×", with: " ")
+      .replacingOccurrences(of: "×", with: " ")
+  }
+
+  /// Money as VoiceOver should say it: the digits and the word, not the sign.
+  static func moneySpoken(_ value: Int) -> String {
+    "\(grouped(abs(value))) төгрөг"
+  }
 }

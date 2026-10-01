@@ -76,54 +76,31 @@ struct WideButton: View {
 struct OfflineBanner: View {
   let retry: () async -> Void
   @State private var trying = false
+  @Environment(\.dynamicTypeSize) private var typeSize
 
   private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: BasuMetric.button, style: .continuous) }
 
   var body: some View {
-    HStack(alignment: .center, spacing: 10) {
-      Image(systemName: "wifi.slash")
-        .font(.sans(15))
-        .foregroundStyle(Color.hold)
-        .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: 2) {
-        Text("Холболт тасарлаа")
-          .font(.sans(13.5, .semibold))
-          .foregroundStyle(Color.ink)
-        Text("Интернэтээ шалгаад дахин оролдоно уу.")
-          .font(.sans(12))
-          .foregroundStyle(Color.ink2)
-          .fixedSize(horizontal: false, vertical: true)
-      }
-      Spacer(minLength: 6)
-      // The only thing to do here, so a thumb's worth of it: a capsule in a
-      // 44-point target, not eleven points of mono.
-      Button {
-        Task {
-          trying = true
-          await retry()
-          trying = false
-        }
-      } label: {
-        ZStack {
-          if trying {
-            ProgressView().controlSize(.small)
-          } else {
-            Text("Дахин")
-              .font(.sans(14, .semibold))
-              .foregroundStyle(Color.accentInk)
+    // At the largest text sizes the words take the whole width and «Дахин»
+    // goes under them: beside them, both broke mid-word («Холбол/т», «Дах/ин»).
+    Group {
+      if typeSize.isAccessibilitySize {
+        VStack(alignment: .leading, spacing: 10) {
+          HStack(alignment: .firstTextBaseline, spacing: 10) {
+            mark
+            words
           }
+          again
         }
-        .padding(.horizontal, 14)
-        .frame(minWidth: 64, minHeight: 34)
-        .background(Color.surface, in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.holdLine, lineWidth: BasuMetric.hairline))
-        .frame(minHeight: BasuMetric.minTarget)
-        .contentShape(Rectangle())
+      } else {
+        HStack(alignment: .center, spacing: 10) {
+          mark
+          words
+          Spacer(minLength: 6)
+          again
+            .padding(.vertical, -5)
+        }
       }
-      .buttonStyle(.plain)
-      .disabled(trying)
-      .padding(.vertical, -5)
-      .accessibilityIdentifier("offline.retry")
     }
     .padding(12)
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -138,6 +115,59 @@ struct OfflineBanner: View {
         NSLog("Basu: no answer from \(Endpoint.base.absoluteString) — is `npm run dev` running?")
       #endif
     }
+  }
+
+  private var mark: some View {
+    Image(systemName: "wifi.slash")
+      .font(.sans(15))
+      .foregroundStyle(Color.hold)
+      .accessibilityHidden(true)
+  }
+
+  private var words: some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text("Холболт тасарлаа")
+        .font(.sans(13.5, .semibold))
+        .foregroundStyle(Color.ink)
+        .fixedSize(horizontal: false, vertical: true)
+      Text("Интернэтээ шалгаад дахин оролдоно уу.")
+        .font(.sans(12))
+        .foregroundStyle(Color.ink2)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  /// The only thing to do here, so a thumb's worth of it: a capsule in a
+  /// 44-point target, not eleven points of mono — and never narrower than
+  /// the word on it.
+  private var again: some View {
+    Button {
+      Task {
+        trying = true
+        await retry()
+        trying = false
+      }
+    } label: {
+      ZStack {
+        if trying {
+          ProgressView().controlSize(.small)
+        } else {
+          Text("Дахин")
+            .font(.sans(14, .semibold))
+            .foregroundStyle(Color.accentInk)
+            .fixedSize()
+        }
+      }
+      .padding(.horizontal, 14)
+      .frame(minWidth: 64, minHeight: 34)
+      .background(Color.surface, in: Capsule())
+      .overlay(Capsule().strokeBorder(Color.holdLine, lineWidth: BasuMetric.hairline))
+      .frame(minHeight: BasuMetric.minTarget)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .disabled(trying)
+    .accessibilityIdentifier("offline.retry")
   }
 }
 

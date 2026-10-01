@@ -56,6 +56,14 @@ final class SupplierFlowTests: XCTestCase {
     XCTAssertTrue(page.waitForExistence(timeout: 15))
     let home = page.buttons["Basu нүүр"]
     XCTAssertTrue(home.waitForExistence(timeout: 20), "inside the app the corner button is the way home")
+    // A supplier who has never been asked about notifications is asked as
+    // the counter opens (`PushAsk`): its one button, then iOS's own sheet.
+    let ask = app.buttons["push.continue"]
+    if ask.waitForExistence(timeout: 3) {
+      ask.tap()
+      let alert = XCUIApplication(bundleIdentifier: "com.apple.springboard").alerts.firstMatch
+      if alert.waitForExistence(timeout: 5) { alert.buttons.element(boundBy: 0).tap() }
+    }
     shot("1-supplier-page")
 
     // ── one tap, and the launcher ────────────────────────────────────

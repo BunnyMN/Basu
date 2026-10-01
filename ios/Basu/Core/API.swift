@@ -38,8 +38,9 @@ enum Endpoint {
   }()
 }
 
-/// Which ways in the server has open.
-struct AuthMethods: Decodable, Sendable, Equatable {
+/// Which ways in the server has open. Kept on the phone too (`Session`), so
+/// the way in can be drawn before the server answers.
+struct AuthMethods: Codable, Sendable, Equatable {
   let password: Bool
   let email: Bool
   let google: Bool
@@ -209,7 +210,13 @@ struct API: Sendable {
   /// A server that does not answer is taken to have what every one of them
   /// has: Apple and the phone. Google and email wait until it says so.
   func authMethods() async -> AuthMethods {
-    (try? await send(.init(path: "/v1/auth/methods"), as: AuthMethods.self)) ?? .unknown
+    await authMethodsIfAnswered() ?? .unknown
+  }
+
+  /// The same, or nil when the server did not answer — so a guess is never
+  /// remembered as its answer.
+  func authMethodsIfAnswered() async -> AuthMethods? {
+    try? await send(.init(path: "/v1/auth/methods"), as: AuthMethods.self)
   }
 
   /// The code goes to the inbox, never back here.

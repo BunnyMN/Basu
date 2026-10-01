@@ -123,8 +123,8 @@ extension LiveIdesh {
       status: liveStatus,
       destination: AppCatalogue.idesh.destination(order: id),
       spoken: cancelled
-        ? "Идэш, \(supplier.name), \(what), захиалга \(code), \(state.word.lowercased())"
-        : "Идэш, \(supplier.name), \(Format.dayWords(receiveOn))-нд \(label), \(what), захиалга \(code), \(state.word.lowercased())",
+        ? "Идэш, \(supplier.name), \(meat), \(amount), захиалга \(code), \(state.word.lowercased())"
+        : "Идэш, \(supplier.name), \(Format.dayWords(receiveOn))-нд \(label), \(meat), \(amount), захиалга \(code), \(state.word.lowercased())",
       extra: nil,
     )
   }

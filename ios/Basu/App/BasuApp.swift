@@ -117,6 +117,8 @@ struct RootView: View {
         lock.admitted()
         // In now: signing out later lands on the way in, not on browsing.
         model.browsing = false
+        // The token APNs gave at launch had nobody to belong to; now it has.
+        Task { await PushRegistrar.shared.registerIfAllowed() }
       } else {
         tab = .home
         path = []

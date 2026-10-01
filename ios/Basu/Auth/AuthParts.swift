@@ -41,7 +41,10 @@ struct AuthField<Content: View>: View {
       Image(systemName: symbol)
         .font(.sans(16))
         .foregroundStyle(active ? Color.accent : Color.ink3)
-        .frame(width: 22)
+        // Its own width, at least 22: fixed at 22, the largest text sizes drew
+        // the mark over the words beside it.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .frame(minWidth: 22)
         .accessibilityHidden(true)
       content
         .font(.sans(16))
@@ -290,7 +293,8 @@ struct AuthValue: View {
       Image(systemName: symbol)
         .font(.sans(16))
         .foregroundStyle(Color.ink3)
-        .frame(width: 22)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .frame(minWidth: 22)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 2) {
         Text(label)

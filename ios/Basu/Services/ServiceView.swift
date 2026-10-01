@@ -28,7 +28,8 @@ import WebKit
    ИДЭВХТЭЙ card, the lock screen and the widget catch up at once rather than
    on the next poll. The poll is still there for what the page cannot know.
    The first time something is running, it is also the moment to ask whether
-   its progress may come to the lock screen (`PushAsk`).
+   its progress may come to the lock screen (`PushAsk`) — or, for a supplier,
+   the moment their counter opens.
 
  Nothing else. The page does not know it is inside an app beyond the one
  message handler, and a page that works in Safari works here.
@@ -60,9 +61,12 @@ struct ServiceView: View {
 
       ServiceWeb(page: page)
         .ignoresSafeArea()
-        // A page that could not be reached has nothing to touch, and a blank
-        // web view under the thumb kept the edge swipe from leaving.
+        // A page that could not be reached has nothing to show or touch: a
+        // proxy's «502 Bad Gateway» showed through under the banner, and a
+        // blank web view under the thumb kept the edge swipe from leaving.
+        .opacity(page.unreachable ? 0 : 1)
         .allowsHitTesting(!page.unreachable)
+        .accessibilityHidden(page.unreachable)
         .accessibilityIdentifier("service.\(app)")
 
       if !page.loaded && !page.unreachable && slow {
@@ -100,16 +104,22 @@ struct ServiceView: View {
     .background(InteractivePop(enabled: !page.walksItsOwnHistory))
     // Whatever happened in the sheet, the page is waiting for an answer.
     .sheet(isPresented: $signingIn, onDismiss: { page.deliver(token: session.token) }) {
-      SignInSheet(reason: "Захиалгаа дуусгахын тулд нэвтэрнэ үү — сонгосон зүйлс тань хэвээр үлдэнэ.")
+      // A guest asked mid-order hears why and that nothing was lost; the
+      // supplier's counter asking again has no order to speak of.
+      SignInSheet(reason: isSupplier ? nil : "Захиалгаа дуусгахын тулд нэвтэрнэ үү — сонгосон зүйлс тань хэвээр үлдэнэ.")
     }
     .sheet(isPresented: $askingPush) {
-      PushAsk {
+      PushAsk(audience: isSupplier ? .supplier : .guest) {
         askingPush = false
         Task { await PushRegistrar.shared.askIfNeeded() }
-      } later: {
-        PushRegistrar.shared.later()
-        askingPush = false
       }
+    }
+    // The supplier's counter is where new orders arrive, and push is how they
+    // reach a supplier who is not looking: asked as it opens, not after an
+    // order of their own they will never place.
+    .onChange(of: page.loaded) { _, loaded in
+      guard loaded, isSupplier else { return }
+      Task { await offerPush() }
     }
     .onAppear {
       page.home = back
@@ -139,11 +149,16 @@ struct ServiceView: View {
     }
   }
 
-  /// Something of the guest's is running — just paid for, as a rule — and
-  /// iOS has never been asked: the moment the question is about something.
+  private var isSupplier: Bool { app == AppCatalogue.supplier.id }
+
+  /// The moment the question is about something, if iOS has never put it: a
+  /// guest's order running — just paid for, as a rule — or a supplier's
+  /// counter open.
   private func offerPush() async {
-    guard session.isSignedIn, !signingIn, !(model.live.isEmpty && model.liveIdesh.isEmpty) else { return }
+    guard session.isSignedIn, !signingIn, !askingPush else { return }
+    guard isSupplier || !(model.live.isEmpty && model.liveIdesh.isEmpty) else { return }
     guard await PushRegistrar.shared.shouldOffer() else { return }
+    PushRegistrar.shared.markOffered()
     askingPush = true
   }
 }
@@ -214,8 +229,12 @@ final class ServicePage: NSObject {
   /// load leaves an entry behind, and the swipe must still leave the app.
   var walksItsOwnHistory: Bool { canGoBack && loaded && !unreachable }
 
-  private func edgeFollows() {
+  /// What the page's state decides in UIKit: who has the edge swipe, and
+  /// whether VoiceOver may read the page at all — an unreachable one is a
+  /// proxy's «502 Bad Gateway» or a blank, never something to read out.
+  private func follow() {
     edge?.isEnabled = walksItsOwnHistory
+    webView.isHidden = unreachable
   }
 
   var home: (() -> Void)?
@@ -266,7 +285,7 @@ final class ServicePage: NSObject {
     watching = webView.observe(\.canGoBack, options: [.initial, .new]) { [weak self] web, _ in
       MainActor.assumeIsolated {
         self?.canGoBack = web.canGoBack
-        self?.edgeFollows()
+        self?.follow()
       }
     }
   }
@@ -305,7 +324,7 @@ final class ServicePage: NSObject {
   func reload() {
     unreachable = false
     loaded = false
-    edgeFollows()
+    follow()
     if let pending { webView.load(pending) } else { webView.reload() }
   }
 
@@ -437,6 +456,9 @@ extension ServicePage: WKNavigationDelegate {
   ) async -> WKNavigationResponsePolicy {
     if response.isForMainFrame {
       failedAnswer = ((response.response as? HTTPURLResponse)?.statusCode ?? 200) >= 500
+      // A proxy's «502 Bad Gateway» is never drawn, nor read out: the load
+      // fails here, and the shell says the server is not answering.
+      if failedAnswer { return .cancel }
     }
     return .allow
   }
@@ -452,20 +474,21 @@ extension ServicePage: WKNavigationDelegate {
     } else {
       unreachable = true
     }
-    edgeFollows()
+    follow()
   }
 
   func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-    // A cancelled load is this file's own doing (see above), not an outage.
-    if (error as NSError).code == NSURLErrorCancelled { return }
+    // A cancelled load is this file's own doing (see above), not an outage —
+    // unless what was cancelled was the server's error page.
+    if (error as NSError).code == NSURLErrorCancelled, !failedAnswer { return }
     unreachable = true
-    edgeFollows()
+    follow()
   }
 
   func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
     if (error as NSError).code == NSURLErrorCancelled { return }
     unreachable = true
-    edgeFollows()
+    follow()
   }
 }
 

@@ -43,17 +43,27 @@ struct BehaviourTests {
   // MARK: - asking for notifications
 
   @Test func notificationsAreAskedForOnlyWhileIOSHasNeverAsked() {
-    let now = Date(timeIntervalSince1970: 2_000_000)
-    #expect(PushRegistrar.offerDue(status: .notDetermined, laterAt: nil, now: now))
+    #expect(PushRegistrar.offerDue(status: .notDetermined))
     // A no in iOS is an answer; a yes needs no question.
-    #expect(!PushRegistrar.offerDue(status: .denied, laterAt: nil, now: now))
-    #expect(!PushRegistrar.offerDue(status: .authorized, laterAt: nil, now: now))
+    #expect(!PushRegistrar.offerDue(status: .denied))
+    #expect(!PushRegistrar.offerDue(status: .authorized))
+    #expect(!PushRegistrar.offerDue(status: .provisional))
   }
 
-  @Test func laterHoldsForAWeek() {
-    let said = Date(timeIntervalSince1970: 2_000_000)
-    #expect(!PushRegistrar.offerDue(status: .notDetermined, laterAt: said, now: said.addingTimeInterval(3 * 24 * 3600)))
-    #expect(PushRegistrar.offerDue(status: .notDetermined, laterAt: said, now: said.addingTimeInterval(8 * 24 * 3600)))
+  @MainActor
+  @Test func theShellsScreenOnceARunDoesNotStopTheProfilesAsk() async {
+    let registrar = PushRegistrar()
+    registrar.markOffered()
+    // The screen went up; its one button, or the profile's, still asks iOS.
+    #expect(registrar.offered)
+    #expect(!registrar.asked)
+    #expect(await registrar.shouldOffer() == false)
+  }
+
+  @Test func aLineIsSaidInWordsNotMarks() {
+    #expect(Format.spoken("Хонины мах, кг-аар · №7001.") == "Хонины мах, кг-аар, дугаар 7001.")
+    #expect(Format.spoken("Үхрийн мах ×15") == "Үхрийн мах 15")
+    #expect(Format.moneySpoken(-128_000) == "128,000 төгрөг")
   }
 
   // MARK: - which pages an app may show

@@ -97,6 +97,7 @@ struct HomeView: View {
         .font(.sans(27, .semibold))
         .tracking(-0.025 * 27)
         .foregroundStyle(Color.ink)
+        .lineLimit(1)
         .padding(.top, 8)
       Spacer(minLength: 8)
       if session.isSignedIn {
@@ -105,6 +106,9 @@ struct HomeView: View {
         signIn
       }
     }
+    // A bar, like the system's: past this the wordmark and «Нэвтрэх» broke
+    // mid-word against each other.
+    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
   }
 
   private var signIn: some View {

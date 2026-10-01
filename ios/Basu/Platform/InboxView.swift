@@ -158,9 +158,24 @@ struct MessageRow: View {
     .background(message.read ? Color.clear : Color.unread)
     .overlay(alignment: .top) { Hairline() }
     .contentShape(Rectangle())
-    .accessibilityElement(children: .combine)
+    // Said in words: combined, the row read out «№» and «·» one by one, and
+    // a day as a fraction.
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(spoken)
     .accessibilityValue(message.read ? "уншсан" : "уншаагүй")
     .accessibilityIdentifier("inbox.\(message.template)")
+  }
+
+  private var spoken: String {
+    [
+      message.source.capitalized,
+      message.channel == "sms" ? "SMS" : nil,
+      Format.whenSpoken(message.at),
+      Format.spoken(message.title ?? "Basu"),
+      Format.spoken(message.body),
+    ]
+    .compactMap { $0 }
+    .joined(separator: ", ")
   }
 }
 

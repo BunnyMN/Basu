@@ -79,8 +79,14 @@ struct SignInSheet: View {
   /// here does not turn the sheet into the account view: it closes with the
   /// doors still on it.
   @State private var arrivedSignedIn: Bool?
-  /// Asked of the server when the sheet opens; nil until it answers.
-  @State private var methods: AuthMethods?
+  /// Asked of the server when the sheet opens. Until it answers, what it said
+  /// last time, so a slow network does not draw the way in a door at a time;
+  /// nil only the first time, when the doors' places are kept instead.
+  @State private var methods: AuthMethods? = Session.rememberedMethods()
+  @State private var methodsAsked = false
+  /// Google's button grows with the text and Apple's must not be smaller:
+  /// the height Google's took, for Apple's to take too.
+  @State private var doorHeight: CGFloat = BasuMetric.controlHeight
   @State private var busy: Busy?
   @State private var trouble: String?
   @State private var troubleAt: Spot = .email
@@ -202,7 +208,10 @@ struct SignInSheet: View {
       if arrivedSignedIn == nil { arrivedSignedIn = session.isSignedIn }
     }
     .task {
-      guard methods == nil else { return }
+      // Asked once a sheet, whatever was remembered: the doors drawn from
+      // last time are replaced by today's as soon as the server says.
+      guard !methodsAsked else { return }
+      methodsAsked = true
       let open = await session.methods()
       methods = open
       // A server with no door but the password: the password is the sheet.
@@ -289,9 +298,13 @@ struct SignInSheet: View {
           endPoint: .bottom,
         )
       }
+      // The picture fills past the band when the band is small; clipped to
+      // the eye but not to the thumb, it lay over «Бүртгэлгүйгээр үзэх».
+      .allowsHitTesting(false)
       .accessibilityHidden(true)
     }
     .clipShape(shape)
+    .contentShape(shape)
     .overlay(shape.strokeBorder(Color.line, lineWidth: BasuMetric.hairline))
     .padding(.top, 8)
     .accessibilityElement(children: .ignore)
@@ -407,6 +420,9 @@ struct SignInSheet: View {
 
           if methods?.google == true {
             GoogleButton(busy: busy == .google) { Task { await signInWithGoogle() } }
+              .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                doorHeight = max(BasuMetric.controlHeight, $0)
+              }
               .accessibilityIdentifier("signin.google")
           }
 
@@ -419,6 +435,10 @@ struct SignInSheet: View {
               .padding(.vertical, 4)
           }
           emailDoor
+        } else if methods == nil {
+          // The first time, before the server has said which doors it has:
+          // their places, so the card does not grow under the thumb.
+          DoorsPlaceholder()
         }
       }
       .disabled(busy != nil && codeSentTo == nil)
@@ -465,7 +485,8 @@ struct SignInSheet: View {
       Task { await signInWithApple(result) }
     }
     .signInWithAppleButtonStyle(.white)
-    .frame(height: BasuMetric.controlHeight)
+    // Never smaller than the other doors (Apple's rule), however large the text.
+    .frame(height: doorHeight)
     .clipShape(shape)
     .overlay {
       if colorScheme == .light {
@@ -1182,6 +1203,26 @@ private struct StatusBarBackdrop: View {
   }
 }
 
+/**
+ Where Google's door and the email door go, before the server has said it has
+ them — only ever the first time; after that the doors it had last time are
+ drawn. Shapes, not words: nothing here can be pressed.
+ */
+private struct DoorsPlaceholder: View {
+  var body: some View {
+    let shape = RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous)
+    VStack(spacing: 12) {
+      shape.fill(Color.sunk.opacity(0.8)).frame(height: BasuMetric.controlHeight)
+      Rectangle().fill(Color.line).frame(height: BasuMetric.hairline).padding(.vertical, 12)
+      shape.fill(Color.sunk.opacity(0.8)).frame(height: BasuMetric.controlHeight)
+      shape.fill(Color.sunk.opacity(0.5)).frame(height: BasuMetric.controlHeight)
+    }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("Уншиж байна")
+    .accessibilityIdentifier("signin.doorsLoading")
+  }
+}
+
 /// A rule, a word, a rule — between the one-tap doors and the typed one.
 private struct OrLine: View {
   let words: String
@@ -1211,7 +1252,8 @@ private struct WayButton: View {
         Image(systemName: symbol)
           .font(.sans(15, .medium))
           .foregroundStyle(Color.accent)
-          .frame(width: 22)
+          .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+          .frame(minWidth: 22)
           .accessibilityHidden(true)
         VStack(alignment: .leading, spacing: 2) {
           Text(title)

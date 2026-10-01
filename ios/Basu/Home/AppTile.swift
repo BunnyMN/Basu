@@ -36,6 +36,10 @@ struct AppTile: View {
             .fixedSize(horizontal: false, vertical: true)
             .multilineTextAlignment(.leading)
         }
+        // The tile is 92 points wide at every size; past this a word no
+        // longer fits under it and broke in the middle («урьдч/илж»).
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        .minimumScaleFactor(0.8)
       }
       .frame(maxWidth: .infinity, alignment: .leading)
       .contentShape(Rectangle())

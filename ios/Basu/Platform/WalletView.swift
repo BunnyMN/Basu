@@ -103,7 +103,10 @@ struct WalletView: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("wallet.retry")
       }
-      Text("Захиалгын төлбөр эндээс хасагдана. Дутвал зөрүүг QPay-ээр төлнө.")
+      // The second sentence is a promise only while money can come in.
+      Text(platform.topupsOpen
+        ? "Захиалгын төлбөр эндээс хасагдана. Дутвал зөрүүг QPay-ээр төлнө."
+        : "Захиалгын төлбөр эндээс хасагдана.")
         .font(.sans(13.5))
         .lineSpacing(13.5 * 0.5 - 3)
         .foregroundStyle(Color.ink2)
@@ -438,8 +441,22 @@ struct StatementRow: View {
       }
       .padding(.vertical, 14)
     }
-    .accessibilityElement(children: .combine)
+    // Said in words: the row combined read out «№», «·» and «₮» one by one.
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(spoken(shown))
     .accessibilityIdentifier("wallet.line.\(line.kind)")
+  }
+
+  private func spoken(_ shown: WalletLine.Shown) -> String {
+    let money = Format.moneySpoken(line.amountMnt) + (line.amountMnt < 0 ? " хасагдсан" : " орсон")
+    let parts = [
+      shown.title,
+      Format.spoken(shown.detail),
+      shown.number.map { "захиалга \($0)" },
+      money,
+      Format.whenSpoken(line.at),
+    ]
+    return parts.compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: ", ")
   }
 
   /// A real minus sign, not a hyphen: the two sit at different heights and a
