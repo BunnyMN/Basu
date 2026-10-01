@@ -476,8 +476,16 @@ function signInCard() {
   return card;
 }
 
+/**
+ * Off the module's frame — the door, the application, a refusal: the page
+ * follows the device's light or dark again. Only the desk frame, and its
+ * shape while the seat is asked (`waiting`), is pinned light.
+ */
+const unpinned = () => document.documentElement.removeAttribute('data-theme');
+
 /** The front door: a person, signed in as themselves. */
 function showLanding() {
+  unpinned();
   if (shell.present) {
     askShell();
     return;
@@ -497,6 +505,7 @@ function showLanding() {
  * message.
  */
 async function showApply() {
+  unpinned();
   root.replaceChildren();
   const person = token();
   if (!person) {
@@ -2339,11 +2348,13 @@ async function boot() {
     return;
   } catch (error) {
     if (error.status === 403) {
+      unpinned();
       root.replaceChildren(notHere(error.message));
       return;
     }
     if (error.status !== 401) {
       toast(error.message, 'bad');
+      unpinned();
       root.replaceChildren(cannotReach(error.message));
       return;
     }
