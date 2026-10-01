@@ -128,6 +128,9 @@ describe('the desk cannot lock itself out', () => {
     expect((await call('DELETE', `/v1/ops/roles/desk/${key}`, DESK())).json().error.code).toBe('IN_USE');
     const unused = (await call('POST', '/v1/ops/roles/desk', DESK(), { name: 'Хоосон', permissions: [] })).json().key;
     expect((await call('DELETE', `/v1/ops/roles/desk/${unused}`, DESK())).statusCode).toBe(204);
+    // Gone, the record still says which one, by the name it had.
+    const audit = (await call('GET', '/v1/ops/audit', DESK())).json().audit as Array<{ action: string; note: string | null }>;
+    expect(audit.find((a) => a.action === 'role.delete')?.note).toBe('Basu-гийн ширээ · Хоосон');
   });
 
   it('lets nobody but the admin write into a role what they do not hold themselves', async () => {
@@ -225,6 +228,11 @@ describe('a business role Basu writes', () => {
     const log = (await call('GET', `/v1/orgs/${orgId}/log`, owner)).json().log as Array<{ action: string; role_name: string | null }>;
     expect(log.map((e) => e.action)).toContain('roles');
     expect(log.find((e) => e.action === 'added' && e.role_name === 'Кассир')).toBeTruthy();
+
+    // The desk's record says it in words a person reads: whose role, its name, the business — never a key.
+    const audit = (await call('GET', '/v1/ops/audit', DESK())).json().audit as Array<{ action: string; note: string | null }>;
+    expect(audit.find((a) => a.action === 'role.create' && a.note?.includes('Кассир'))?.note).toBe('Байгууллага · Кассир · 4 эрх');
+    expect(audit.find((a) => a.action === 'org.roles')?.note).toBe('Туул мах · Кассир');
   });
 
   it('lets the desk set anybody’s role at a business — its head too — and never leaves it without one', async () => {
@@ -240,6 +248,9 @@ describe('a business role Basu writes', () => {
     expect((await call('GET', '/v1/supplier/money', staff)).statusCode).toBe(200);
     const view = (await call('GET', `/v1/ops/orgs/${orgId}/access`, DESK())).json();
     expect(view.members.map((m: { role_name: string }) => m.role_name).sort()).toEqual(['Эзэн', 'Эзэн']);
+    // The record names the person and the role, never their ids and keys.
+    const audit = (await call('GET', '/v1/ops/audit', DESK())).json().audit as Array<{ action: string; note: string | null }>;
+    expect(audit.find((a) => a.action === 'org.member_role')?.note).toBe('Хэрлэн мах · Бат → Эзэн');
   });
 });
 
@@ -295,6 +306,9 @@ describe('the menu Basu arranges', () => {
 
     expect((await call('DELETE', `/v1/ops/menus/desk/links/${key}`, DESK())).statusCode).toBe(204);
     expect(pages((await workspace(worker, 'desk')).menu)).not.toContain(key);
+    // The record names the link that went, not its key.
+    const audit = (await call('GET', '/v1/ops/audit', DESK())).json().audit as Array<{ action: string; note: string | null }>;
+    expect(audit.find((a) => a.action === 'menu.link_remove')?.note).toBe('Basu-гийн ширээ · Гарын авлага → https://basu.mn/help');
     const after = (await call('GET', '/v1/ops/access/desk', DESK())).json().roles.find((r: { key: string }) => r.key === 'ops');
     expect(after.permissions).not.toContain(`desk.${key}`);
     expect((await call('POST', '/v1/ops/menus/desk/links', DESK(), { name: 'Муу', href: 'javascript:alert(1)' })).statusCode).toBe(400);

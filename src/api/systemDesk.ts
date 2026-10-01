@@ -183,7 +183,15 @@ export function registerSystemDesk(app: FastifyInstance, ctx: Ctx, { desk, who, 
   app.put<{ Params: { key: string }; Body: { value?: unknown } }>('/v1/ops/system/settings/:key', desk('desk.system:manage'), async (request, reply) => {
     try {
       const saved = await setSetting(request.params.key, request.body?.value, who(request));
-      await audit(request, { action: 'setting.change', targetKind: 'setting', targetId: NIL, note: `${saved.key} = ${String(saved.value)}` });
+      // Said by the label the system page shows it under, the unit after the value: «Онцгой зарын үнэ: 25,000 ₮», «Ширээний зарлал: «…»».
+      const [, name = saved.label, unit = ''] = /^(.*), ([^,]+)$/.exec(saved.label) ?? [];
+      const value =
+        typeof saved.value === 'number'
+          ? `${saved.value.toLocaleString('en-US')}${unit ? ` ${unit}` : ''}`
+          : String(saved.value ?? '') === ''
+            ? 'хоосон'
+            : `«${String(saved.value)}»`;
+      await audit(request, { action: 'setting.change', targetKind: 'setting', targetId: NIL, note: `${name}: ${value}` });
       return reply.send({ key: saved.key, value: saved.value, updated_by: saved.updatedBy, updated_at: iso(saved.updatedAt) });
     } catch (error) {
       if (error instanceof SettingError) return badRequest(reply, error.code === 'UNKNOWN' ? 'Ийм тохиргоо алга.' : 'Утга буруу байна.', error.message);

@@ -121,7 +121,9 @@ describe('the books at the desk', () => {
 
     const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() })).json().audit;
     expect(audit.map((a: { action: string }) => a.action)).toEqual(['ledger.export', 'ledger.export']);
-    expect(audit[1]).toMatchObject({ target_kind: 'ledger', note: 'transfers .. (2)' });
+    // Said to a person: what went out, over which days, how many lines.
+    expect(audit[1]).toMatchObject({ target_kind: 'ledger', note: 'Гүйлгээ · бүх хугацаа · 2 мөр' });
+    expect(audit[0]).toMatchObject({ target_kind: 'ledger', note: 'Цэнэглэлт · бүх хугацаа · 1 мөр' });
 
     // Nobody without a seat reads the books, let alone carries them out.
     expect((await app.inject({ method: 'GET', url: '/v1/ops/money/transfers.csv' })).statusCode).toBe(401);
@@ -183,6 +185,6 @@ describe('the books at the desk', () => {
 
     const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() })).json().audit;
     expect(audit.map((a: { action: string }) => a.action)).toEqual(['receipt.retry', 'ledger.checks']);
-    expect(audit[1].note).toContain('issued 1');
+    expect(audit[1].note).toBe('дэвтрийн зөрүү 0 · е-баримт дутуу 1 · гаргасан 1, амжилтгүй 0');
   });
 });

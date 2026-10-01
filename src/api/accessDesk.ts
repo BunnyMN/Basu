@@ -50,6 +50,19 @@ function scopeOf(raw: string): Scope | null {
   return raw === 'desk' || raw === 'org' ? raw : null;
 }
 
+/**
+ * Whose roles and menu a line in the desk's record is about, in the words of
+ * the roles page's own switch (ops.html SCOPE_WORD). The record says what a
+ * person reads — a role's and a module's name, never its key.
+ */
+const SCOPE_WORD: Record<Scope, string> = { desk: 'Basu-гийн ширээ', org: 'Байгууллага' };
+
+/** A role's name by its key, in one scope; the key itself only for a role that is not there. */
+async function roleNames(scope: Scope): Promise<(key: string) => string> {
+  const named = new Map((await rolesOf(scope)).map((r) => [r.key, r.name]));
+  return (key) => named.get(key) ?? key;
+}
+
 /** An access refusal, in the words the desk reads. */
 function refusal(reply: FastifyReply, error: unknown): FastifyReply {
   if (!(error instanceof AccessError)) return sendError(reply, error);
@@ -112,7 +125,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
           ...(body.head !== undefined ? { head: body.head } : {}),
           by: who(request),
         });
-        await audit(request, { action: 'role.create', targetKind: 'role', targetId: NIL, note: `${scope} · ${role.name} · ${role.permissions.length} эрх` });
+        await audit(request, { action: 'role.create', targetKind: 'role', targetId: NIL, note: `${SCOPE_WORD[scope]} · ${role.name} · ${role.permissions.length} эрх` });
         return reply.status(201).send({ key: role.key, name: role.name });
       } catch (error) {
         return refusal(reply, error);
@@ -141,7 +154,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
           ...(body.head !== undefined ? { head: body.head } : {}),
           by: who(request),
         });
-        await audit(request, { action: 'role.update', targetKind: 'role', targetId: NIL, note: `${scope} · ${role.name} · ${role.permissions.length} эрх` });
+        await audit(request, { action: 'role.update', targetKind: 'role', targetId: NIL, note: `${SCOPE_WORD[scope]} · ${role.name} · ${role.permissions.length} эрх` });
         return reply.send({ key: role.key, name: role.name, permissions: role.permissions });
       } catch (error) {
         return refusal(reply, error);
@@ -156,8 +169,10 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
     try {
       const held = (await usage(scope)).get(request.params.key) ?? 0;
       if (held > 0) throw new AccessError('IN_USE', `${held} hold or wait for this role`);
+      // Its name, read while it is still there to read.
+      const name = (await roleNames(scope))(request.params.key);
       await deleteRole(scope, request.params.key);
-      await audit(request, { action: 'role.delete', targetKind: 'role', targetId: NIL, note: `${scope} · ${request.params.key}` });
+      await audit(request, { action: 'role.delete', targetKind: 'role', targetId: NIL, note: `${SCOPE_WORD[scope]} · ${name}` });
       return reply.status(204).send();
     } catch (error) {
       return refusal(reply, error);
@@ -174,7 +189,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
       if (!scope) return badRequest(reply, 'Хамрах хүрээ буруу.', 'scope is desk or org');
       try {
         const layout = await saveLayout(scope, request.body ?? {}, who(request));
-        await audit(request, { action: 'menu.save', targetKind: 'menu', targetId: NIL, note: scope });
+        await audit(request, { action: 'menu.save', targetKind: 'menu', targetId: NIL, note: SCOPE_WORD[scope] });
         return reply.send(layout);
       } catch (error) {
         return refusal(reply, error);
@@ -187,7 +202,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
     if (!scope) return badRequest(reply, 'Хамрах хүрээ буруу.', 'scope is desk or org');
     try {
       const module = await addModule(scope, { name: request.body?.name ?? '', ...(request.body?.icon ? { icon: request.body.icon } : {}), by: who(request) });
-      await audit(request, { action: 'menu.module', targetKind: 'menu', targetId: NIL, note: `${scope} · ${module.name}` });
+      await audit(request, { action: 'menu.module', targetKind: 'menu', targetId: NIL, note: `${SCOPE_WORD[scope]} · ${module.name}` });
       return reply.status(201).send(module);
     } catch (error) {
       return refusal(reply, error);
@@ -198,8 +213,9 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
     const scope = scopeOf(request.params.scope);
     if (!scope) return badRequest(reply, 'Хамрах хүрээ буруу.', 'scope is desk or org');
     try {
+      const name = (await layoutOf(scope)).modules.find((m) => m.key === request.params.key)?.name ?? request.params.key;
       await removeModule(scope, request.params.key);
-      await audit(request, { action: 'menu.module_remove', targetKind: 'menu', targetId: NIL, note: `${scope} · ${request.params.key}` });
+      await audit(request, { action: 'menu.module_remove', targetKind: 'menu', targetId: NIL, note: `${SCOPE_WORD[scope]} · ${name}` });
       return reply.status(204).send();
     } catch (error) {
       return refusal(reply, error);
@@ -221,7 +237,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
           ...(body.icon ? { icon: body.icon } : {}),
           by: who(request),
         });
-        await audit(request, { action: 'menu.link', targetKind: 'menu', targetId: NIL, note: `${scope} · ${page.name} → ${page.href}` });
+        await audit(request, { action: 'menu.link', targetKind: 'menu', targetId: NIL, note: `${SCOPE_WORD[scope]} · ${page.name} → ${page.href}` });
         return reply.status(201).send(page);
       } catch (error) {
         return refusal(reply, error);
@@ -233,8 +249,9 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
     const scope = scopeOf(request.params.scope);
     if (!scope) return badRequest(reply, 'Хамрах хүрээ буруу.', 'scope is desk or org');
     try {
+      const link = (await layoutOf(scope)).pages.find((p) => p.key === request.params.key && p.href);
       await removeLink(scope, request.params.key);
-      await audit(request, { action: 'menu.link_remove', targetKind: 'menu', targetId: NIL, note: `${scope} · ${request.params.key}` });
+      await audit(request, { action: 'menu.link_remove', targetKind: 'menu', targetId: NIL, note: `${SCOPE_WORD[scope]} · ${link ? `${link.name} → ${link.href}` : request.params.key}` });
       return reply.status(204).send();
     } catch (error) {
       return refusal(reply, error);
@@ -275,7 +292,8 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
     const keys = Array.isArray(request.body?.keys) ? request.body!.keys!.map(String) : [];
     const chosen = await setChosenRoles(org.id, keys, who(request));
     await noteRolesChanged({ orgId: org.id, desk: who(request), at: ctx.clock.now() });
-    await audit(request, { action: 'org.roles', targetKind: 'org', targetId: org.id, note: `${org.name} · ${chosen.join(', ') || 'нэмэлт үүрэггүй'}` });
+    const role = await roleNames('org');
+    await audit(request, { action: 'org.roles', targetKind: 'org', targetId: org.id, note: `${org.name} · ${chosen.map(role).join(', ') || 'нэмэлт үүрэггүй'}` });
     return reply.send({ chosen });
   });
 
@@ -288,7 +306,17 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
       if (typeof role !== 'string' || !role) return badRequest(reply, 'Үүргээ сонгоно уу.', 'role is required');
       try {
         await setRole({ orgId: request.params.id, guestId: request.params.guestId, role, by: who(request), desk: who(request), now: ctx.clock.now() });
-        await audit(request, { action: 'org.member_role', targetKind: 'org', targetId: request.params.id, note: `${request.params.guestId} → ${role}` });
+        // Who, by the name their account chose (else the address or number it signs in with), and the role by its name.
+        const guestId = request.params.guestId;
+        const [names, contacts, roleName, org] = await Promise.all([displayNamesFor([guestId]), contactsFor([guestId]), roleNames('org'), orgById(request.params.id)]);
+        const phone = contacts.get(guestId)?.phone?.replace(/^\+976(\d{4})(\d{4})$/, '+976 $1 $2');
+        const person = names.get(guestId) ?? contacts.get(guestId)?.email ?? phone ?? 'нэргүй хүн';
+        await audit(request, {
+          action: 'org.member_role',
+          targetKind: 'org',
+          targetId: request.params.id,
+          note: `${org ? `${org.name} · ` : ''}${person} → ${roleName(role)}`,
+        });
         return reply.send({ guest_id: request.params.guestId, role });
       } catch (error) {
         return orgRefusal(reply, error);

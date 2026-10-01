@@ -133,7 +133,12 @@ describe('the machine', () => {
     const system = (await app.inject({ method: 'GET', url: '/v1/ops/system', headers: desk() })).json();
     expect(system.settings.find((s: { key: string }) => s.key === 'desk_banner')).toMatchObject({ value: 'Маргааш 10:00-д QPay-тэй уулзана', updated_by: 'ops:Демо' });
     const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() })).json().audit;
-    expect(audit[0]).toMatchObject({ action: 'setting.change', target_kind: 'setting', note: 'desk_banner = Маргааш 10:00-д QPay-тэй уулзана' });
+    // Said by the label the page shows it under, never the key.
+    expect(audit[0]).toMatchObject({ action: 'setting.change', target_kind: 'setting', note: 'Ширээний зарлал: «Маргааш 10:00-д QPay-тэй уулзана»' });
+    // A number with its unit after it (set to what it already was: other suites read these knobs).
+    expect((await app.inject({ method: 'PUT', url: '/v1/ops/system/settings/push_unit_mnt', headers: desk(), payload: { value: 0 } })).statusCode).toBe(200);
+    const price = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() })).json().audit[0];
+    expect(price.note).toBe('Нэг push-ийн үнэ: 0 ₮');
     // Nobody without a seat, and nobody below admin, turns a knob.
     expect((await app.inject({ method: 'PUT', url: '/v1/ops/system/settings/desk_banner', payload: { value: 'x' } })).statusCode).toBe(401);
   });

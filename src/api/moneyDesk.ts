@@ -143,6 +143,14 @@ function windowOf(query: { from?: unknown; to?: unknown }): Window | null {
 
 const noSuchDay = (reply: FastifyReply) => badRequest(reply, 'Огноо буруу байна.', 'from and to are days, YYYY-MM-DD');
 
+/**
+ * An export, as the desk's record says it to a person: what was carried
+ * out, over which days, and how many lines — «Гүйлгээ · 2026-09-01 – 2026-09-30
+ * · 12 мөр», «Цэнэглэлт · бүх хугацаа · 3 мөр».
+ */
+const exported = (what: string, window: Window, rows: number): string =>
+  `${what} · ${window.from || window.to ? `${window.from ?? '…'} – ${window.to ?? '…'}` : 'бүх хугацаа'} · ${rows} мөр`;
+
 export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, audit }: MoneyGuards): void {
   /** The books at a glance: the checks, and every named account. */
   app.get('/v1/ops/money', desk('desk.money'), async () => {
@@ -192,7 +200,7 @@ export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, audit 
     if (!window) return noSuchDay(reply);
     const transfers = await transfersForDesk(transferFilter(request.query, window, 5000));
     const names = await namesFor(transfers.flatMap((t) => [t.from, t.to]));
-    await audit(request, { action: 'ledger.export', targetKind: 'ledger', targetId: LEDGER_ID, note: `transfers ${window.from ?? ''}..${window.to ?? ''} (${transfers.length})` });
+    await audit(request, { action: 'ledger.export', targetKind: 'ledger', targetId: LEDGER_ID, note: exported('Гүйлгээ', window, transfers.length) });
     return sendCsv(
       reply,
       `basu-transfers-${window.from ?? 'all'}-${window.to ?? 'all'}.csv`,
@@ -233,7 +241,7 @@ export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, audit 
     if (!window) return noSuchDay(reply);
     const topups = await topupsForDesk(topupFilter(request.query, window, 5000));
     const contacts = await contactsFor(topups.map((t) => t.guestId));
-    await audit(request, { action: 'ledger.export', targetKind: 'ledger', targetId: LEDGER_ID, note: `topups ${window.from ?? ''}..${window.to ?? ''} (${topups.length})` });
+    await audit(request, { action: 'ledger.export', targetKind: 'ledger', targetId: LEDGER_ID, note: exported('Цэнэглэлт', window, topups.length) });
     return sendCsv(
       reply,
       `basu-topups-${window.from ?? 'all'}-${window.to ?? 'all'}.csv`,
@@ -274,7 +282,8 @@ export function registerMoneyDesk(app: FastifyInstance, ctx: Ctx, { desk, audit 
       action: 'ledger.checks',
       targetKind: 'ledger',
       targetId: LEDGER_ID,
-      note: `drift ${ledger.drift} · receipts gap ${receipts.gap} · issued ${pushed.issued}, failed ${pushed.failed}`,
+      // The same words the money page's toast says them in.
+      note: `дэвтрийн зөрүү ${ledger.drift} · е-баримт дутуу ${receipts.gap} · гаргасан ${pushed.issued}, амжилтгүй ${pushed.failed}`,
     });
     return { ledger, receipts, pushed };
   });
