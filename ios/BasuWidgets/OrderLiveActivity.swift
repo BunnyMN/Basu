@@ -59,8 +59,9 @@ struct ExpandedIsland: View {
             .font(BasuFont.sans(15, .semibold))
             .foregroundStyle(BasuColor.onLock)
             .lineLimit(1)
+          // Words, so the sans, as on the lock screen card.
           Text(state.stageLabel)
-            .font(BasuFont.mono(11.5))
+            .font(BasuFont.sans(11.5))
             .foregroundStyle(dim)
             .lineLimit(1)
         }
@@ -136,7 +137,10 @@ struct LockScreenCard: View {
   }
 }
 
-/// `ИРЭХ` — mono 9/500, tracked 0.14em.
+/// The time label — what the time over it is the time of (`ИРЭХ`): sans
+/// 11/500, uppercase, tracked 0.06em, as on the launcher's live row. A word,
+/// so the sans; and nothing anybody has to read is set under 11 — at mono 9
+/// it was a smudge under the time.
 struct UnitLabel: View {
   let text: String
   let colour: Color
@@ -147,9 +151,9 @@ struct UnitLabel: View {
   }
 
   var body: some View {
-    Text(text)
-      .font(BasuFont.mono(9, .medium))
-      .tracking(9 * 0.14)
+    Text(text.uppercased())
+      .font(BasuFont.sans(11, .medium))
+      .tracking(11 * 0.06)
       .foregroundStyle(colour)
   }
 }
