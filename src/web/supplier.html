@@ -102,9 +102,6 @@
 .ticket[data-lane="ready"] .top{background:var(--ready-soft);border-color:var(--ready-line);color:var(--ready)}
 .ticket .top .dot{margin:0}
 .ticket .top .id{font-family:var(--mono);font-size:var(--t-body-lg);font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink);margin-left:4px}
-.ticket .top .day{margin-left:auto;white-space:nowrap;color:var(--ink-2)}
-.ticket .top .day[data-s="hold"]{color:var(--hold);font-weight:600}
-.ticket .top .day[data-s="stop"]{color:var(--stop);font-weight:600}
 .ticket .body{padding:14px 16px 16px}
 .ticket .what{font-size:var(--t-row);font-weight:600;line-height:var(--lh-snug);color:var(--ink)}
 .ticket .facts-rows{margin-top:6px}
@@ -188,6 +185,8 @@
 .reasons .reason input{flex:none;margin:0}
 .reasons .refund{margin:12px 0 0;font-size:var(--t-body);line-height:1.5;color:var(--ink-2)}
 .reasons .refund b{color:var(--ink);font-weight:600}
+/* a field a popup refused looks refused — the stop tone wins over the field's own border */
+.sheet .field :is(input,textarea,select)[aria-invalid="true"]{border-color:var(--stop);box-shadow:0 0 0 3px var(--stop-soft)}
 /* the confirming step of a cancel is a filled red button; disabled, it must look it */
 #cancel-order [data-submit][disabled]{background:var(--surface-2);border-color:var(--line);color:var(--ink-3);cursor:not-allowed}
 .hand-code b{font-size:2.5rem;letter-spacing:.14em}
@@ -524,6 +523,8 @@ async function showApply() {
 }
 
 /** The banks a person in Ulaanbaatar has an account at, most common first. */
+/** A bank account as people write it: the plain number, or the IBAN with its MN and two check digits. */
+const ACCOUNT = /^(MN\d{2})?\d{6,20}$/;
 const BANKS = ['Хаан банк', 'Голомт банк', 'Худалдаа хөгжлийн банк', 'Хас банк', 'Төрийн банк', 'Капитрон банк', 'Ариг банк', 'Богд банк', 'М банк'];
 
 /**
@@ -600,8 +601,8 @@ function applyForm(needsPhone = false) {
     }
     say('address', v('address').length < 4 ? 'Зочин ирж авах газраа бичнэ үү.' : null);
     say('tin', v('tin') && !/^\d{7,10}$/.test(v('tin')) ? 'ТТД 7–10 оронтой тоо байна.' : null);
-    const account = v('bank_account').replace(/\s+/g, '');
-    say('bank_account', account && !/^\d{6,20}$/.test(account) ? 'Дансны дугаар 6–20 оронтой тоо байна.' : null);
+    const account = v('bank_account').replace(/\s+/g, '').toUpperCase();
+    say('bank_account', account && !ACCOUNT.test(account) ? 'Дансны дугаар 6–20 оронтой тоо, эсвэл MN-ээр эхэлсэн IBAN байна.' : null);
     wrong[0]?.focus();
     return wrong.length === 0;
   };
@@ -623,7 +624,7 @@ function applyForm(needsPhone = false) {
           address: v('address'),
           about: v('about'),
           bank_name: v('bank_name'),
-          bank_account: v('bank_account').replace(/\s+/g, ''),
+          bank_account: v('bank_account').replace(/\s+/g, '').toUpperCase(),
           bank_holder: v('bank_holder'),
         },
       });
@@ -677,7 +678,7 @@ function statusCard(a, needsPhone = false) {
   } else if (a.state === 'contracted') {
     const open = el('<button class="btn" data-v="primary" data-size="lg" type="button" id="open">Нийлүүлэгчийн хэсэг рүү орох</button>');
     open.addEventListener('click', () => boot());
-    inner.append(open, el('<p class="cap">Ажилтнуудаа dashboard-ын «Ажилтнууд» хэсгээс нэмж, эрх өгнө — тэд өөрсдийн бүртгэлээр нэвтэрнэ.</p>'));
+    inner.append(open, el('<p class="cap">Ажилтнуудаа Бизнес хэсгийн «Ажилтнууд» хуудаснаас нэмж, эрх өгнө — тэд өөрсдийн бүртгэлээр нэвтэрнэ.</p>'));
   } else if (a.state === 'declined') {
     const again = el('<button class="btn" data-v="primary" data-size="lg" type="button" id="again">Дахин хүсэлт гаргах</button>');
     again.addEventListener('click', () => root.replaceChildren(applyForm(needsPhone)));
@@ -767,7 +768,8 @@ function renderBoard(data) {
     n.textContent = data.supplier?.name ?? 'Нийлүүлэгч';
   }
   connection(true);
-  const sig = JSON.stringify([data.today, data.lanes, (data.listings ?? []).map((l) => [l.id, l.active, l.remaining])]);
+  const noShows = (data.lanes.ready ?? []).map((t) => Boolean(t.no_show_from && new Date(t.no_show_from) <= new Date()));
+  const sig = JSON.stringify([data.today, data.lanes, noShows, (data.listings ?? []).map((l) => [l.id, l.active, l.remaining])]);
   if (sig === boardSig && board.dataset.ready) return;
   boardSig = sig;
 
@@ -834,13 +836,11 @@ function renderTicket(ticket, lane, { page = false } = {}) {
   const live = lane in LANE_STATE;
   const away = live ? dayAway(ticket.receive_on) : null;
   const urgent = away && (away.tone === 'hold' || away.tone === 'stop');
-  const corner = away && (away.tone || away.word === 'Маргааш') ? `<span class="day" data-s="${away.tone}">${away.word}</span>` : '';
   const node = el(`
     <article class="card ticket" data-lane="${lane}"${urgent ? ' data-due' : ''}>
       ${page ? '' : `<div class="top">
         <span class="dot"${STATE_TONE[state] ? ` data-tone="${STATE_TONE[state]}"` : ''}></span><span>${STATE_WORD[state] ?? ''}</span>
         <span class="id">№${esc(ticket.code)}</span>
-        ${corner}
       </div>`}
       <div class="body">
         <div class="what">${esc(ticket.title)} ×${esc(ticket.qty)}${ticket.unit === 'kg' ? ' кг' : ''}</div>
@@ -1035,7 +1035,10 @@ function connection(ok) {
       strip.hidden = true;
       delete strip.dataset.stale;
     }
-    if (board) delete board.dataset.stale;
+    if (board) {
+      delete board.dataset.stale;
+      board.removeAttribute('inert');
+    }
     return;
   }
   if (!strip) return;
@@ -1043,7 +1046,10 @@ function connection(ok) {
   strip.querySelector('.mono').textContent = at;
   strip.dataset.stale = '1';
   strip.hidden = false;
-  if (board) board.dataset.stale = '1';
+  if (board) {
+    board.dataset.stale = '1';
+    board.setAttribute('inert', '');
+  }
 }
 
 async function refreshBoard() {
@@ -1062,6 +1068,8 @@ async function refreshBoard() {
 
 /** A listing's state in a word: what a guest can do with it now. */
 const listingState = (l) => (!l.active ? ['off', 'Зогссон'] : l.remaining <= 0 ? ['gone', 'Дууссан'] : ['active', 'Идэвхтэй']);
+/** What a listing says about delivery: its fee, free, or none. */
+const deliveryWord = (l) => (l.delivers ? (l.delivery_fee_mnt ? `хүргэлт ${mnt(l.delivery_fee_mnt)}` : 'хүргэлт үнэгүй') : 'хүргэхгүй');
 /** «Хонь · бүтэн, ~38 кг · Архангай, Их тамир» — what the listing is, after its title. */
 const listingWhat = (l) =>
   `${KIND[l.kind] ?? l.kind} · ${l.unit === 'whole' ? `бүтэн, ~${l.approx_kg} кг` : `кг-аар, доод тал нь ${l.min_qty} кг`} · ${esc(l.origin)}`;
@@ -1122,7 +1130,7 @@ function renderRow(l) {
     <div class="card row" data-listing="${esc(l.id)}"${l.active ? '' : ' data-off'}>
       <span class="main">
         <span class="name title">${esc(l.title)}${listingMarks(l)}</span>
-        <span class="sub">${listingWhat(l)}</span>
+        <span class="sub">${listingWhat(l)} · ${deliveryWord(l)}</span>
         <span class="nums">
           <span class="num">${money(l.price_mnt)}<small>${kg ? '1 кг' : 'толгой бүр'}</small></span>
           <span class="num">${esc(l.remaining)}${kg ? ' кг' : ''}<small>үлдсэн, нийт ${esc(l.quantity)}</small></span>
@@ -1211,10 +1219,18 @@ async function reloadStall() {
   }
 }
 
-/** Digits as a number: a person types «460 000» or «460,000» as often as «460000». */
-const whole = (value) => {
-  const digits = String(value ?? '').replace(/[\s,.'’]/g, '');
-  return digits === '' ? NaN : Number(digits);
+/**
+ * A number as a person types it. «460 000», «460,000» and «460.000» are four
+ * hundred and sixty thousand — a dot or a comma before groups of exactly
+ * three digits is a thousands mark — while «38.5» and «38,5» are thirty-eight
+ * and a half. Anything else is NaN, and the check that reads it says so in
+ * words. Where the stall counts in wholes (a price, how many, a minimum), a
+ * decimal is refused there rather than rounded or multiplied here.
+ */
+const asNumber = (value) => {
+  const s = String(value ?? '').trim().replace(/[\s'’]/g, '');
+  if (s === '') return NaN;
+  return /^\d{1,3}([.,]\d{3})+$/.test(s) ? Number(s.replace(/[.,]/g, '')) : Number(s.replace(',', '.'));
 };
 /** The day a week from today, for a new listing's ready day. */
 function weekFrom(day) {
@@ -1274,16 +1290,53 @@ function noKeyboard(sheet) {
   if (sheet && typeof matchMedia === 'function' && matchMedia('(pointer:coarse)').matches) sheet.focus();
 }
 
-/** What the server would refuse, said in words about the listing rather than «the order changed». */
-function checkListing(v, { unit, sold = 0 }) {
-  const price = whole(v.price_mnt);
-  if (!Number.isInteger(price) || price <= 0) throw new Error('Үнээ төгрөгөөр, бүхэл тоогоор бичнэ үү.');
-  if (unit === 'whole' && v.approx_kg !== undefined && !(whole(v.approx_kg) > 0)) throw new Error('Нэг толгойн ойролцоо жинг кг-аар бичнэ үү.');
-  const qty = whole(v.quantity);
-  if (!Number.isInteger(qty) || qty < 0) throw new Error(`Хэдэн ${unit === 'kg' ? 'кг' : 'толгой'} байгааг бүхэл тоогоор бичнэ үү.`);
-  if (qty < sold) throw new Error(`Аль хэдийн ${sold} зарагдсан — нийт тоо ${sold}-аас бага байж болохгүй.`);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(v.ready_from ?? '')) throw new Error('Бэлэн болох өдрөө сонгоно уу.');
-  if (v.delivers && v.delivery_fee_mnt !== undefined && !(whole(v.delivery_fee_mnt) >= 0)) throw new Error('Хүргэлтийн төлбөрөө бичнэ үү — үнэгүй хүргэх бол 0.');
+/** A refusal that knows its field, so the popup can take the person there before it says why. */
+const refuse = (field, message) => Object.assign(new Error(message), { field });
+
+/**
+ * Check a popup's answer. A refusal marks its field and puts the cursor in
+ * it, then the popup says why over the fields; typing takes the mark away.
+ */
+function guard(sheet, check) {
+  try {
+    return check();
+  } catch (error) {
+    const input = error.field ? sheet?.querySelector(`[name="${error.field}"]`) : null;
+    if (input) {
+      input.setAttribute('aria-invalid', 'true');
+      input.addEventListener('input', () => input.removeAttribute('aria-invalid'), { once: true });
+      input.focus();
+    }
+    throw error;
+  }
+}
+
+/**
+ * What the server would refuse, said in words about the listing rather than
+ * «the order changed». A past ready day is refused for a new listing, and for
+ * an old one only when it is the day being changed.
+ */
+function checkListing(v, { unit, sold = 0, day = null, keptDay = null }) {
+  const price = asNumber(v.price_mnt);
+  if (!Number.isInteger(price) || price <= 0) throw refuse('price_mnt', 'Үнээ төгрөгөөр, бүхэл тоогоор бичнэ үү.');
+  if (unit === 'whole' && v.approx_kg !== undefined && !(asNumber(v.approx_kg) > 0)) {
+    throw refuse('approx_kg', 'Нэг толгойн ойролцоо жинг кг-аар бичнэ үү, жишээ нь 38.5.');
+  }
+  if (unit === 'kg' && v.min_qty) {
+    const least = asNumber(v.min_qty);
+    if (!Number.isInteger(least) || least <= 0) throw refuse('min_qty', 'Доод захиалгыг бүхэл кг-аар бичнэ үү.');
+  }
+  const qty = asNumber(v.quantity);
+  if (!Number.isInteger(qty) || qty < 0) throw refuse('quantity', `Хэдэн ${unit === 'kg' ? 'кг' : 'толгой'} байгааг бүхэл тоогоор бичнэ үү.`);
+  if (qty < sold) throw refuse('quantity', `Аль хэдийн ${sold} зарагдсан — нийт тоо ${sold}-аас бага байж болохгүй.`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v.ready_from ?? '')) throw refuse('ready_from', 'Бэлэн болох өдрөө сонгоно уу.');
+  if (day && v.ready_from < day && v.ready_from !== keptDay) {
+    throw refuse('ready_from', 'Бэлэн болох өдөр өнгөрсөн байна — өнөөдөр эсвэл дараах өдрийг сонгоно уу.');
+  }
+  if (v.delivers) {
+    const fee = asNumber(v.delivery_fee_mnt);
+    if (!Number.isInteger(fee) || fee < 0) throw refuse('delivery_fee_mnt', 'Хүргэлтийн төлбөрөө бичнэ үү — үнэгүй хүргэх бол 0.');
+  }
   return { price, qty };
 }
 
@@ -1293,7 +1346,7 @@ function checkListing(v, { unit, sold = 0 }) {
  * looked at twice must not promise free delivery to the whole city.
  */
 async function addListing() {
-  const day = weekFrom(await knowToday());
+  const day = await knowToday();
   const done = popup({
     id: 'listing-new',
     title: 'Шинэ зар нэмэх',
@@ -1304,20 +1357,19 @@ async function addListing() {
       { name: 'unit', label: 'Яаж зарах', type: 'select', options: [['whole', 'Бүтэн мал'], ['kg', 'Кг-аар']], value: 'whole' },
       { name: 'title', label: 'Гарчиг', required: true, wide: true, hint: 'Зочид энэ нэрээр харна. Жишээ нь: Хонь, залуу ирэг.' },
       { name: 'price_mnt', label: 'Нэг толгойн үнэ', inputmode: 'numeric', required: true },
-      { name: 'approx_kg', label: 'Ойролцоо жин', inputmode: 'numeric', hint: 'Бодит жин зөрсөн ч үнэ өөрчлөгдөхгүй.' },
+      { name: 'approx_kg', label: 'Ойролцоо жин', inputmode: 'decimal', hint: 'Бодит жин зөрсөн ч үнэ өөрчлөгдөхгүй.' },
       { name: 'min_qty', label: 'Доод захиалга', inputmode: 'numeric', hint: 'Зочин хамгийн багадаа хэдэн кг авах вэ.' },
       { name: 'quantity', label: 'Хэдэн толгой байгаа', inputmode: 'numeric', required: true },
-      { name: 'ready_from', label: 'Бэлэн болох өдөр', type: 'date', value: day, required: true },
+      { name: 'ready_from', label: 'Бэлэн болох өдөр', type: 'date', value: weekFrom(day), required: true },
       { name: 'origin', label: 'Гарал', required: true, wide: true, hint: 'Мах хаанаас ирж байгаа: аймаг, сум, эсвэл хотын махны газар.' },
       { type: 'checks', label: 'Хүргэлт', options: [['delivers', 'Хүргэлт хийнэ', false, { hint: 'Хүргэлтийн үйлчилгээгээр зочны хаяг руу хүргүүлнэ — төлбөр нь бүтнээрээ танд.' }]] },
       { name: 'delivery_fee_mnt', label: 'Хүргэлтийн төлбөр', inputmode: 'numeric', hint: 'Үнэгүй хүргэх бол 0.' },
       { name: 'note', label: 'Тайлбар (заавал биш)', type: 'textarea', placeholder: 'Толгой, дотор мөнтэйгээ…' },
     ],
     submit: 'Зар нэмэх',
-    onSubmit: async (v) => {
+    onSubmit: async (v, box) => {
       const unit = v.unit;
-      if (v.delivers && v.delivery_fee_mnt === '') throw new Error('Хүргэлтийн төлбөрөө бичнэ үү — үнэгүй хүргэх бол 0.');
-      const { price, qty } = checkListing(v, { unit });
+      const { price, qty } = guard(box.el, () => checkListing(v, { unit, day }));
       const body = {
         kind: v.kind,
         unit,
@@ -1327,11 +1379,11 @@ async function addListing() {
         origin: v.origin,
         ready_from: v.ready_from,
         delivers: Boolean(v.delivers),
-        delivery_fee_mnt: v.delivers ? whole(v.delivery_fee_mnt) : 0,
+        delivery_fee_mnt: v.delivers ? asNumber(v.delivery_fee_mnt) : 0,
         note: v.note ?? '',
       };
-      if (unit === 'whole') body.approx_kg = whole(v.approx_kg);
-      else body.min_qty = whole(v.min_qty) > 0 ? whole(v.min_qty) : 1;
+      if (unit === 'whole') body.approx_kg = asNumber(v.approx_kg);
+      else body.min_qty = v.min_qty ? asNumber(v.min_qty) : 1;
       await sup('/v1/supplier/listings', { method: 'POST', body });
       return true;
     },
@@ -1366,6 +1418,7 @@ async function addListing() {
 async function editListing(l) {
   if (!may('org.idesh.stall:edit')) return;
   const kg = l.unit === 'kg';
+  const day = await knowToday();
   const done = popup({
     id: 'listing-edit',
     title: 'Зар засах',
@@ -1377,13 +1430,14 @@ async function editListing(l) {
       { name: 'quantity', label: kg ? 'Нийт хэдэн кг' : 'Нийт хэдэн толгой', inputmode: 'numeric', value: String(l.quantity), required: true, hint: l.sold ? `${l.sold} нь зарагдсан — үүнээс бага болгохгүй.` : 'Одоогоор зарагдаагүй.' },
       { name: 'ready_from', label: 'Бэлэн болох өдөр', type: 'date', value: l.ready_from, required: true },
       { type: 'checks', label: 'Хүргэлт', options: [['delivers', 'Хүргэлт хийнэ', Boolean(l.delivers)]] },
-      { name: 'delivery_fee_mnt', label: 'Хүргэлтийн төлбөр', inputmode: 'numeric', value: String(l.delivery_fee_mnt ?? 0), hint: 'Үнэгүй хүргэх бол 0.' },
+      // A listing that did not deliver offers no fee to keep: ticking delivery asks for one, never assumes 0.
+      { name: 'delivery_fee_mnt', label: 'Хүргэлтийн төлбөр', inputmode: 'numeric', value: l.delivers ? String(l.delivery_fee_mnt ?? 0) : '', hint: 'Үнэгүй хүргэх бол 0.' },
       { name: 'note', label: 'Тайлбар (заавал биш)', type: 'textarea', value: l.note ?? '' },
       { type: 'checks', label: 'Зочдод', options: [['active', 'Зочдод харагдана', Boolean(l.active), { hint: 'Арилгавал зар зогсож, шинэ захиалга авахгүй. Авсан захиалга хэвээр.' }]] },
     ],
     submit: 'Хадгалах',
-    onSubmit: async (v) => {
-      const { price, qty } = checkListing({ ...v, approx_kg: undefined }, { unit: l.unit, sold: l.sold ?? 0 });
+    onSubmit: async (v, box) => {
+      const { price, qty } = guard(box.el, () => checkListing({ ...v, approx_kg: undefined }, { unit: l.unit, sold: l.sold ?? 0, day, keptDay: l.ready_from }));
       await sup(`/v1/supplier/listings/${l.id}`, {
         method: 'PATCH',
         body: {
@@ -1392,7 +1446,7 @@ async function editListing(l) {
           quantity: qty,
           ready_from: v.ready_from,
           delivers: Boolean(v.delivers),
-          ...(v.delivers ? { delivery_fee_mnt: whole(v.delivery_fee_mnt) } : {}),
+          ...(v.delivers ? { delivery_fee_mnt: asNumber(v.delivery_fee_mnt) } : {}),
           note: v.note ?? '',
           active: Boolean(v.active),
         },
@@ -1562,13 +1616,25 @@ async function changeBank(b) {
       { type: 'note', text: 'Basu санхүү шинэ дансыг гэрээтэй тулгаж баталгаажуулах хүртэл олголт хийгдэхгүй. Солигдсоныг эзэн бүрт мессежээр мэдэгдэнэ.' },
     ],
     submit: 'Хадгалах',
-    onSubmit: async (v) => {
-      const account = v.bank_account.replace(/\s+/g, '');
-      if (!/^\d{6,20}$/.test(account)) throw new Error('Дансны дугаар 6–20 оронтой тоо байна.');
-      await sup('/v1/supplier/profile', {
-        method: 'PATCH',
-        body: { bank_name: v.bank_name, bank_account: account, bank_holder: v.bank_holder, password: v.password },
+    onSubmit: async (v, box) => {
+      const account = v.bank_account.replace(/\s+/g, '').toUpperCase();
+      guard(box.el, () => {
+        if (!ACCOUNT.test(account)) throw refuse('bank_account', 'Дансны дугаар 6–20 оронтой тоо, эсвэл MN-ээр эхэлсэн IBAN байна.');
       });
+      try {
+        await sup('/v1/supplier/profile', {
+          method: 'PATCH',
+          body: { bank_name: v.bank_name, bank_account: account, bank_holder: v.bank_holder, password: v.password },
+        });
+      } catch (error) {
+        // The only thing this change can say «the state changed» about is the number's form: the server keeps digits alone.
+        if (error.code === 'WRONG_STATE') {
+          throw guard(box.el, () => {
+            throw refuse('bank_account', 'Энэ дансны дугаарыг хадгалж чадсангүй. MN-гүйгээр, зөвхөн тоогоор бичээд дахин оролдоно уу.');
+          });
+        }
+        throw error;
+      }
       return true;
     },
   });
@@ -2305,7 +2371,7 @@ function notHere(message) {
         ${brand()}
         <h2>Нээх эрхгүй байна</h2>
         <p class="lead">${esc(message)} Энэ байгууллагын нийлүүлэгчийн хэсэгт та ажилладаггүй байна.</p>
-        <a class="btn" data-v="primary" data-size="lg" href="/dashboard">Dashboard руу буцах</a>
+        <a class="btn" data-v="primary" data-size="lg" href="/dashboard">Бизнес рүү буцах</a>
       </div>
     </div>`);
   card.append(doorFoot(true));

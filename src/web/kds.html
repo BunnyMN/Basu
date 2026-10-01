@@ -186,7 +186,7 @@ async function showDoor() {
   boardSig = '';
   const card = el(`
     <div class="door card">
-      <span class="eyebrow">Basu · Гал тогоо</span>
+      <span class="eyebrow">Basu</span>
       <h2>Гал тогоо</h2>
       <p>Өөрийн бүртгэлээр нэвтэрнэ үү. Рестораны эзэн эсвэл менежер танд эрх өгсөн байх ёстой.</p>
       <div data-doors></div>
@@ -236,9 +236,9 @@ function showNotHere() {
   boardSig = '';
   root.replaceChildren(el(`
     <div class="door card">
-      <span class="eyebrow">Basu · Гал тогоо</span>
+      <span class="eyebrow">Basu</span>
       <h2>Гал тогоо нээх эрхгүй</h2>
-      <p>Энэ бүртгэл аль ч рестораны ажилтан биш байна. Рестораны эзэн эсвэл менежер dashboard-ын «Ажилтнууд» хэсгээс танд эрх өгнө.</p>
+      <p>Энэ бүртгэл аль ч рестораны ажилтан биш байна. Рестораны эзэн эсвэл менежер Бизнес хэсгийн «Ажилтнууд» хуудаснаас танд эрх өгнө.</p>
       <button class="btn" data-size="lg" type="button" id="other">Өөр бүртгэлээр нэвтрэх</button>
     </div>`));
   root.querySelector('#other').addEventListener('click', signOut);
@@ -298,6 +298,8 @@ function renderBoard(data) {
 
   const board = frame.querySelector('.board');
   const picker = frame.querySelector('.lanes');
+  // When the board last looked is said once, under the first empty lane — not in every one.
+  let saidWhen = false;
   for (const lane of LANES) {
     const tickets = data.lanes[lane.key] ?? [];
     const column = el(`
@@ -308,7 +310,8 @@ function renderBoard(data) {
     const stack = column.querySelector('.stack');
 
     if (!tickets.length) {
-      stack.append(el(`<div class="none empty" data-center><b>${lane.none}</b><span class="upd">шинэчилсэн <span class="mono">${esc(data.now)}</span></span></div>`));
+      stack.append(el(`<div class="none empty" data-center><b>${lane.none}</b>${saidWhen ? '' : `<span class="upd">шинэчилсэн <span class="mono">${esc(data.now)}</span></span>`}</div>`));
+      saidWhen = true;
     }
 
     for (const ticket of tickets) stack.append(renderTicket(ticket, lane.key));
@@ -358,7 +361,10 @@ function fresh() {
   const strip = document.querySelector('.stale-strip');
   if (strip) strip.hidden = true;
   const board = document.querySelector('.board');
-  if (board) delete board.dataset.stale;
+  if (board) {
+    delete board.dataset.stale;
+    board.removeAttribute('inert');
+  }
 }
 
 /**
@@ -524,8 +530,12 @@ async function refreshBoard() {
       strip.querySelector('.mono').textContent = lastNow;
       strip.hidden = false;
     }
+    // Out of reach of the keyboard and a screen reader too, not only of a finger.
     const board = document.querySelector('.board');
-    if (board) board.dataset.stale = '1';
+    if (board) {
+      board.dataset.stale = '1';
+      board.setAttribute('inert', '');
+    }
   }
 }
 
