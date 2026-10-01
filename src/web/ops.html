@@ -42,6 +42,14 @@ p{margin:0}
 .nowrap{white-space:nowrap}
 .dt-unnamed{font-weight:400;color:var(--ink-3)}
 .skel-line{display:block;width:40%;height:14px}
+/* a file while its answer is on the way: a title, a line, the facts card, rows */
+.file-skel{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.file-skel .skel-h1{display:block;width:min(320px,70%);height:28px}
+.file-skel > .skel{background:var(--sunk)}   /* on the ground, not in a card: the plate a shade darker so it shows */
+.skel-card{margin-top:22px;padding:4px 16px}
+.skel-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;margin-top:10px;padding:20px}
+.skel-facts .skel{display:block;height:40px}
+@media (max-width:600px){.skel-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .page-head + .kpi-band.band-gap,.kpi-band.band-gap{margin-bottom:24px}
 
 /* a person's own corner: the first visit, and their businesses as rows */
@@ -1929,15 +1937,16 @@ async function renderMenus(view) {
  */
 async function openOrgAccess(orgId) {
   const view = nav.view;
-  view.replaceChildren();
-  window.scrollTo(0, 0);
+  const wanted = opening(view, { label: 'Байгууллагууд', go: () => show('orgs') });
   let data;
   try {
     data = await ops(`/v1/ops/orgs/${orgId}/access`);
   } catch (error) {
     toast(error.message, 'bad');
-    return show('orgs');
+    return wanted() ? show('orgs') : undefined;
   }
+  if (!wanted()) return;
+  view.replaceChildren();
   const deciding = can('desk.orgs:access');
   const org = data.org;
   // The list's row knows who registered it and how many work there; the business's own answer is the rest.
@@ -2546,19 +2555,44 @@ function backTo(view, from) {
   view.append(b);
 }
 
+/**
+ * A file on its way: the way back and the shape of what is coming, drawn the
+ * moment the row is pressed, so the press answers before the server does.
+ * Returns whether this file is still the one wanted when its answer comes —
+ * a second press in the meantime wins, and a page left meanwhile stays left.
+ */
+let fileSeq = 0;
+function opening(view, from) {
+  const mine = ++fileSeq;
+  const page = tab;
+  view.replaceChildren();
+  window.scrollTo(0, 0);
+  backTo(view, from);
+  view.append(el(`
+    <div class="file-skel" role="status" aria-busy="true" aria-label="Ачаалж байна">
+      <span class="skel skel-h1"></span><span class="skel skel-line"></span>
+      <div class="card skel-facts"><span class="skel"></span><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
+    </div>`));
+  view.lastElementChild.append(el('<div class="card skel-card"></div>'));
+  view.lastElementChild.lastElementChild.append(busy());
+  return () => mine === fileSeq && tab === page && view.isConnected;
+}
+
 async function openGuest(id, from = { label: 'Зочид', go: () => show('guests') }) {
   const view = document.getElementById('view');
+  const wanted = opening(view, from);
   let f;
   try {
     f = await ops(`/v1/ops/guests/${id}`);
   } catch (error) {
     toast(error.message, 'bad');
+    if (wanted()) from.go();
     return;
   }
+  if (!wanted()) return;
   const g = f.guest;
   const closed = Boolean(g.closed_at);
   view.replaceChildren();
-  window.scrollTo(0, 0);
   backTo(view, from);
   view.append(head(
     `${esc(g.name ?? (closed ? 'Хаагдсан бүртгэл' : 'Нэргүй зочин'))}${closed ? ' <span class="pill" data-s="off">хаагдсан</span>' : ''}`,
@@ -3010,16 +3044,18 @@ function related(links) {
 
 async function openLunch(id, from = { label: 'Хоолны захиалга', go: () => show('lunches') }) {
   const view = document.getElementById('view');
+  const wanted = opening(view, from);
   let d;
   try {
     d = await ops(`/v1/ops/dine/orders/${id}`);
   } catch (error) {
     toast(error.message, 'bad');
+    if (wanted()) from.go();
     return;
   }
+  if (!wanted()) return;
   const o = d.order;
   view.replaceChildren();
-  window.scrollTo(0, 0);
   backTo(view, from);
   view.append(head(`№${esc(o.code)} <span class="pill" data-s="${esc(o.state)}">${esc(DINE_WORD[o.state] ?? o.state)}</span>`, `${esc(o.restaurant.name)} · ${when(o.slot_starts_at)} ${clockOf(o.slot_starts_at)} · ${esc(o.party_size)} хүн`));
   const here = { label: `№${o.code}`, go: () => openLunch(id, from) };
@@ -3809,18 +3845,20 @@ async function loadOrders(table) {
 /** One order, its money, its story — and the three things ops may do to it. */
 async function openOrder(id, from = { label: 'Захиалгууд', go: () => show('orders') }) {
   const view = document.getElementById('view');
+  const wanted = opening(view, from);
   let d;
   try {
     d = await ops(`/v1/ops/orders/${id}`);
   } catch (error) {
     toast(error.message, 'bad');
+    if (wanted()) from.go();
     return;
   }
+  if (!wanted()) return;
   const o = d.order;
   const live = ['PAID', 'PREPARING', 'READY', 'DISPATCHED'].includes(o.state);
   const manage = can('desk.orders:manage');
   view.replaceChildren();
-  window.scrollTo(0, 0);
   backTo(view, from);
   view.append(head(`№${esc(o.code)} <span class="pill" data-s="${esc(o.state)}">${esc(STATE_WORD[o.state] ?? o.state)}</span>`, `${esc(o.title)} ×${esc(o.qty)}${o.unit === 'kg' ? ' кг' : ''} · ${esc(o.supplier.name)}`));
   const here = { label: `№${o.code}`, go: () => openOrder(id, from) };
