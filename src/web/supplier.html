@@ -214,21 +214,7 @@
 .money-sum{margin-bottom:16px}
 .money-page .cards,.profile-page .cards{margin-bottom:24px}
 .settle-list .row .amt .chip{margin-top:4px}
-
-/* ── what a place holds before it holds anything ──
-   The same markup as api.js's coming emptyState() (.empty-state, .es-*): until
-   app.css carries it, these are its look, at no specificity, so app.css wins
-   the moment it lands. */
-:where(.empty-state){display:flex;flex-direction:column;align-items:center;text-align:center;padding:40px 24px;margin:0;color:var(--ink-2)}
-:where(.empty-state[data-frame]){background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow)}
-:where(.empty-state .es-mark){display:grid;place-items:center;width:48px;height:48px;flex:none;margin:0 0 14px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2)}
-:where(.empty-state .es-mark svg){width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-:where(.empty-state[data-tone="accent"] .es-mark){background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink)}
-:where(.empty-state .es-title){display:block;margin:0;font-size:var(--t-row);font-weight:600;line-height:var(--lh-snug);color:var(--ink);text-wrap:balance}
-:where(.empty-state .es-text){display:block;margin:6px 0 0;max-width:46ch;font-size:var(--t-body);line-height:1.5;color:var(--ink-2);text-wrap:pretty}
-:where(.empty-state .es-text:empty){display:none}
-:where(.empty-state .es-act){display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:18px}
-:where(.empty-state[data-size="sm"]){padding:24px 16px}
+/* What a place holds before it holds anything is app.css's .empty-state (the markup blank() draws). */
 </style>
 </head>
 <body>
