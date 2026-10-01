@@ -58,9 +58,23 @@ describe('security headers', () => {
     expect(hashes.length).toBeGreaterThanOrEqual(5);
     expect(hashes.every((h) => /^'sha256-[A-Za-z0-9+/=]+'$/.test(h))).toBe(true);
     const csp = contentSecurityPolicy(hashes);
-    expect(csp).not.toContain("'unsafe-inline' https://cdnjs");
+    // Scripts by hash alone: no inline allowance, no host. (Styles keep theirs — MapLibre's sheet on cdnjs.)
+    const scriptSrc = /script-src([^;]*)/.exec(csp)![1]!;
+    expect(scriptSrc).not.toContain("'unsafe-inline'");
+    expect(scriptSrc).not.toContain('https://cdnjs');
     expect(csp).toMatch(/script-src 'self' 'sha256-/);
     expect(csp).toContain("connect-src 'self'");
+  });
+
+  it('takes fonts from us alone, now that no page asks Google for one', () => {
+    const csp = contentSecurityPolicy(inlineScriptHashes(webRoot), externalScripts(webRoot));
+    expect(csp).toContain("font-src 'self' data:;");
+    expect(csp).not.toMatch(/fonts\.googleapis\.com|fonts\.gstatic\.com/);
+    // MapLibre's stylesheet, on the two map pages, is the one style from elsewhere.
+    expect(/style-src([^;]*)/.exec(csp)![1]!.trim()).toBe("'self' 'unsafe-inline' https://cdnjs.cloudflare.com");
+    for (const [page, html] of [...pages(), ...['app.css', 'site.css'].map((f) => [f, readFileSync(join(webRoot, f), 'utf8')] as [string, string])]) {
+      expect(html, page).not.toMatch(/fonts\.(googleapis|gstatic)\.com/);
+    }
   });
 
   it('names the exact CDN file the pages load, never the CDN host', () => {

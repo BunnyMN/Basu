@@ -30,6 +30,27 @@ try {
   check('X-Frame-Options: DENY', h.get('x-frame-options') === 'DENY');
   check('Referrer-Policy', Boolean(h.get('referrer-policy')));
 
+  // nginx gzips only HTML, and passes an answer that already says how it is
+  // encoded on as it is: the API sends the rest as the build compressed it
+  // (src/api/webFiles.ts). An nginx that drops Accept-Encoding on its way
+  // in, or a build that skipped the step, sends these whole.
+  for (const path of ['/app.css', '/api.js']) {
+    const r = await fetch(`${base}${path}`, { headers: { 'accept-encoding': 'br, gzip' } });
+    const encoding = r.headers.get('content-encoding') ?? '';
+    await r.arrayBuffer();
+    check(`${path} шахагдаж ирнэ (br/gzip)`, /^(br|gzip)$/.test(encoding), encoding || 'шахаагүй');
+  }
+  // A font cut keeps its name only as long as its bytes, so it is kept a year.
+  const css = await (await fetch(`${base}/app.css`)).text();
+  const font = /url\("?(\/fonts\/[^")]+\.woff2)/.exec(css)?.[1];
+  let fontCache = '';
+  if (font) {
+    const r = await fetch(`${base}${font}`);
+    fontCache = r.headers.get('cache-control') ?? '';
+    await r.arrayBuffer();
+  }
+  check('фонт нэг жил кэштэй (immutable)', fontCache.includes('immutable'), font ? `${font}: ${fontCache}` : 'app.css-д фонт алга');
+
   for (const path of ['/dev/ops-token', '/dev/clock', '/dev/suppliers', '/dev/kitchens']) {
     const r = await head(path);
     check(`демо зам хаалттай ${path}`, r.status === 404, `HTTP ${r.status}`);

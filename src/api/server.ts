@@ -42,6 +42,7 @@ import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import { need } from './guards.js';
 import { errorHandler, limits, securityHeaders, tooManyRequests } from './hardening.js';
 import { rememberAnswers } from './idempotency.js';
+import { cacheControlUnder } from './webFiles.js';
 import { registerMapRoutes } from './tiles.js';
 import { registerDishRoutes } from './dishes.js';
 import { registerRouteRoutes } from './route.js';
@@ -113,6 +114,12 @@ export interface ServerOptions {
    * production: it would let anyone move the kitchen's idea of time.
    */
   dev?: boolean;
+  /**
+   * Where the pages are served from: the web folder beside this file —
+   * src/web under tsx, dist/web once built, with its text compressed beside
+   * it. A test points it at a built copy.
+   */
+  webRoot?: string;
 }
 
 export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promise<FastifyInstance> {
@@ -123,7 +130,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
 
   // Every response, the same headers; every address, a ceiling on how often
   // it may knock. See src/api/hardening.ts.
-  const webRoot = join(dirname(fileURLToPath(import.meta.url)), '..', 'web');
+  const webRoot = options.webRoot ?? join(dirname(fileURLToPath(import.meta.url)), '..', 'web');
   securityHeaders(app, webRoot);
   const rate = limits();
   await app.register(rateLimit, {
@@ -866,7 +873,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
 
   /* ── the pages ──────────────────────────────────────────────────── */
 
-  await mountPages(app);
+  await mountPages(app, webRoot);
 
   /* ── development only ───────────────────────────────────────────── */
 
@@ -882,15 +889,24 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
  * guest on the production server opens the same `/idesh` a walkthrough does.
  * What differs between the two is only what the pages find when they ask
  * for the developer's shortcuts under `/dev`, which production never mounts.
+ *
+ * Every file, a page sent by its own route included, goes out as the
+ * smallest copy the browser reads — the `.br` or `.gz` the build wrote
+ * beside it, the file itself when there is none or the browser named
+ * neither — marked `Vary: Accept-Encoding`, and kept by the browser as long
+ * as `cacheControl` says (src/api/webFiles.ts).
  */
-async function mountPages(app: FastifyInstance): Promise<void> {
+async function mountPages(app: FastifyInstance, root: string): Promise<void> {
   const staticPlugin = await import('@fastify/static');
-  const { fileURLToPath } = await import('node:url');
-  const { dirname, join } = await import('node:path');
 
   await app.register(staticPlugin.default, {
-    root: join(dirname(fileURLToPath(import.meta.url)), '..', 'web'),
+    root,
     prefix: '/',
+    preCompressed: true,
+    setHeaders: (reply, path) => {
+      const keep = cacheControlUnder(root, path);
+      if (keep) reply.header('cache-control', keep);
+    },
   });
 
   // `/` is the Basu home screen; the dine-in pre-order app is one icon on it.
