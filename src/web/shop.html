@@ -26,6 +26,10 @@
    foot that carries the total and the way to it. Open to anybody; paying
    asks who you are. */
 
+/* Until site.js puts the bar in, its room is kept: the page no longer drops by
+   the bar's height a moment after it is drawn (CLS 0.05 on a desk). */
+body:not(:has(> .s-bar)){padding-top:calc(var(--s-bar) + var(--safe-t) + 1px)}
+
 .sh-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:20px 40px}
 .sh-trust{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
 .sh-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px 24px;padding:0 0 20px;border-bottom:1px solid var(--line);margin-bottom:28px}
@@ -62,12 +66,28 @@
 .sh-card b{font-size:1.0625rem;font-weight:600;line-height:1.35}
 .sh-card .who{margin-top:3px;font-size:.875rem;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sh-meta{margin-top:6px;font-size:.8125rem;line-height:1.45;color:var(--ink-3)}
-.sh-card .price{margin-top:auto;padding-top:10px;font-size:1.25rem}
+/* the price at the foot of every card, level across a row; under it what the price is for —
+   a whole animal's rough weight and what that makes a kilo, so two stalls compare at a glance */
+.sh-card .buy{margin-top:auto;padding-top:10px}
+.sh-card .price{display:block;font-size:1.25rem}
 .sh-card .price small{font-family:var(--sans);font-size:.8125rem;font-weight:500;color:var(--ink-3)}
+.sh-card .per{display:block;margin-top:2px;font-size:.8125rem;line-height:1.45;color:var(--ink-2)}
 .sh-skel .ph{display:block;aspect-ratio:4/3;border-radius:16px}
 .sh-skel .l1{height:18px;margin-top:16px;width:70%}
 .sh-skel .l2{height:14px;margin-top:10px;width:45%}
 .sh-skel .l3{height:20px;margin-top:14px;width:35%}
+/* while the market loads the filter bar keeps its place, its chips drawn as shapes: nothing jumps when they come */
+.sh-bar .s-chips .s-skel{flex:none;width:76px;height:40px;border-radius:999px}
+.sh-bar .s-chips .s-skel:first-child{width:92px}
+@media (pointer:coarse){.sh-bar .s-chips .s-skel{height:44px}}
+
+/* Payments closed: said calmly, before anybody fills a form or signs in, with what can be done meanwhile.
+   Neutral, not the stop colour — nothing went wrong on the person's side. */
+.sh-closed{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);font-size:.875rem;line-height:1.55;color:var(--ink-2)}
+.sh-closed svg{width:20px;height:20px;flex:none;margin-top:1px;color:var(--ink-3)}
+.sh-closed b{display:block;margin-bottom:2px;font-size:.9375rem;font-weight:600;line-height:1.4;color:var(--ink)}
+.sh-closed a{color:var(--ink);font-weight:500;text-decoration:underline;text-underline-offset:.2em;overflow-wrap:anywhere}
+.sh-grid > .sh-closed{grid-column:1/-1;margin-bottom:-6px}
 
 /* a stall's own page: the picture and its facts, the order box beside them, what to know under them */
 .sd-title{margin:4px 0 0}
@@ -149,7 +169,15 @@
 .sd-review dt{color:var(--ink-3)}
 .sd-review dd{margin:0;font-weight:500;overflow-wrap:anywhere}
 .sd-review dd small{display:block;font-weight:400;color:var(--ink-2)}
+/* the courier's number is read in one go: never broken over two lines */
+.sd-review .sd-tel{white-space:nowrap}
 .sd-actions{display:grid;gap:10px;margin-top:18px}
+/* why the button above is grey, right under it */
+.sd-why{margin:0;font-size:.8125rem;line-height:1.5;color:var(--ink-2);text-align:center}
+.sd-why[hidden]{display:none}
+.sd-buy .sh-closed{margin-top:16px}
+.sd-wallet{margin:12px 0 0;font-size:.875rem;line-height:1.5;color:var(--ink-2)}
+.sd-review .sh-closed,.sd-review .sd-wallet{margin:0 0 16px}
 .sd-after{margin:16px 0 0;padding:0;list-style:none}
 .sd-after li{display:grid;grid-template-columns:18px 1fr;gap:10px;padding:4px 0;font-size:.875rem;line-height:1.5;color:var(--ink-2)}
 .sd-after svg{width:16px;height:16px;margin-top:2px;color:var(--ready)}
@@ -157,8 +185,8 @@
 .sd-gone b{font-size:1.0625rem}
 .sd-gone p{margin:0;color:var(--ink-2);line-height:1.55}
 
-/* a stall while it loads */
-.sd-wait{padding-top:8px}
+/* a stall while it loads: at least a screen tall, so the foot never starts on screen and then jumps away */
+.sd-wait{padding-top:8px;min-height:calc(100vh - var(--s-bar) - 60px);min-height:calc(100svh - var(--s-bar) - 60px)}
 .sd-wait .t{height:40px;width:min(420px,70%)}
 .sd-wait .w{height:20px;width:min(320px,55%);margin-top:16px}
 .sd-wait .g{display:grid;grid-template-columns:minmax(0,7fr) minmax(340px,5fr);gap:40px;margin-top:24px}
@@ -177,6 +205,7 @@
   .sd-dock .what .s-money{display:block;font-size:1.1875rem;line-height:1.2}
   .sd-dock .what small{display:block;margin-top:2px;font-size:.8125rem;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .sd-dock .s-btn{flex:none;min-width:148px}
+  .sd-dock[data-closed] .what small{color:var(--ink)}
 }
 </style>
 </head>
@@ -186,7 +215,7 @@
 </main>
 
 <script type="module">
-import { api, store, mnt, KIND, dayLabel, whatWentWrong } from '/api.js';
+import { api, store, mnt, KIND, dayLabel, whatWentWrong, phoneText, phoneInput } from '/api.js';
 import { mountFrame, authed, loginUrl, esc, el, siteEmpty, howToBuy, tugrik } from '/site.js';
 
 // Open to anybody: the stalls are shown to all, and only paying asks who you are.
@@ -194,6 +223,21 @@ void mountFrame('shop');
 const page = document.getElementById('page');
 
 const PHOTO = (kind) => `/brand/meat/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}.webp`;
+/**
+ * The same photo at the widths it is shown at, so a phone's card does not
+ * fetch the 960 a desk's stall needs: the copies sit beside it as
+ * `sheep-480.webp` and `sheep-720.webp`.
+ */
+const SRCSET = (kind) => {
+  const at = PHOTO(kind).slice(0, -'.webp'.length);
+  return `${at}-480.webp 480w, ${at}-720.webp 720w, ${at}.webp 960w`;
+};
+/** A card's width: one column up to 588px, two up to 895, three up to 1185, then four of the page's 1120. */
+const CARD_SIZES = '(max-width: 588px) calc(100vw - 40px), (max-width: 895px) calc(50vw - 42px), (max-width: 1185px) calc(33vw - 40px), 265px';
+/** A VIP card is two of them wide from 600px. */
+const VIP_SIZES = '(max-width: 599px) calc(100vw - 40px), (max-width: 895px) calc(100vw - 60px), (max-width: 1185px) calc(67vw - 50px), 552px';
+/** A stall's photo: the whole page on a phone, seven twelfths of it beside the order box on a desk. */
+const STALL_SIZES = '(max-width: 960px) calc(100vw - 40px), (max-width: 1200px) calc(58vw - 50px), 630px';
 const unitWord = (l) => (l.unit === 'whole' ? 'толгой' : 'кг');
 const MARK = {
   shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>',
@@ -206,18 +250,121 @@ const MARK = {
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
   minus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5h.01"/></svg>',
 };
 
 let market = { today: null, listings: [] };
+/** The market's answer is in: before it, a filter changed only waits for it. */
+let loaded = false;
 /** An animal's name as the owner of a thing: «Хонины зар». */
 const OF_KIND = { sheep: 'Хонины', goat: 'Ямааны', beef: 'Үхрийн', horse: 'Адууны' };
+
+/* ── whether money can be taken ───────────────────────────────────── */
+
+/**
+ * Whether this server can take money now (`payments_open`, on the market's
+ * answer and on every stall's), and, while it cannot, what the signed-in
+ * person holds in their Basu wallet — the one way an order is still paid for
+ * then (the server sells to a wallet that covers the whole order). Said
+ * before anybody fills in the form or signs in: it used to be learnt at the
+ * last press of «Төлөх», after signing in, five minutes in.
+ */
+const pay = { open: true, wallet: null };
+const canPay = (amount) => pay.open || (pay.wallet !== null && pay.wallet >= amount);
+const CLOSED = 'Онлайн төлбөр одоогоор хаалттай байна.';
+
+/** The calm word on it, with what can be done meanwhile: no dates, nothing promised. */
+function closedNote() {
+  return el(`<div class="sh-closed" role="note">${MARK.info}<div><b>${CLOSED}</b>Одоохондоо зарыг үзэж, харьцуулж болно. Асуух зүйл байвал <a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a> хаягаар бичээрэй.</div></div>`);
+}
+
+/** While payments are closed, the signed-in person's wallet: what it holds, or nothing known. */
+async function lookAtWallet() {
+  pay.wallet = null;
+  const token = store.guestToken;
+  if (pay.open || !token) return;
+  try {
+    pay.wallet = (await api('/v1/wallet', { token })).balance_mnt ?? null;
+  } catch {
+    // Not known: the order waits for payments to open, as anybody's does.
+  }
+}
+
+/* ── the way back to the market ────────────────────────────────────── */
+
+/**
+ * «‹ Бүх зар» goes back to the market as the person left it: its address
+ * (the animal, delivery, the order) and how far down they were, kept for the
+ * tab when a card is opened. It used to be the whole market from its top.
+ */
+const BACK = 'basu.shop.back';
+function keptBack() {
+  try {
+    const kept = JSON.parse(sessionStorage.getItem(BACK) ?? 'null');
+    // Only the market's own address is ever followed from storage.
+    return kept && typeof kept.url === 'string' && /^\/shop(\?[a-z0-9=&]*)?$/.test(kept.url) ? kept : null;
+  } catch {
+    return null;
+  }
+}
+function keepBack(extra = {}) {
+  try {
+    sessionStorage.setItem(BACK, JSON.stringify({ url: location.pathname + location.search, y: Math.round(window.scrollY || 0), ...extra }));
+  } catch {
+    // Without storage the way back is the whole market, from its top.
+  }
+}
+/** The crumb on a stall's page, to the market it was opened from. */
+function crumb() {
+  const kept = keptBack();
+  const link = el(`<a class="s-crumb" href="${esc(kept?.url ?? '/shop')}">${MARK.back}Бүх зар</a>`);
+  link.addEventListener('click', () => {
+    const now = keptBack();
+    if (!now) return;
+    try {
+      sessionStorage.setItem(BACK, JSON.stringify({ ...now, go: true }));
+    } catch {
+      // nothing kept
+    }
+  });
+  return link;
+}
+/** Back on the market from a stall (the crumb, or the browser's back): where the person was. */
+function comeBack() {
+  const kept = keptBack();
+  if (!kept || kept.url !== location.pathname + location.search) return;
+  const how = performance.getEntriesByType?.('navigation')?.[0]?.type;
+  if (!kept.go && how !== 'back_forward') return;
+  try {
+    sessionStorage.setItem(BACK, JSON.stringify({ ...kept, go: false }));
+  } catch {
+    // nothing kept
+  }
+  if (kept.y > 0) window.scrollTo(0, kept.y);
+}
 
 /* ── the market ────────────────────────────────────────────────────── */
 
 // The animal can come in the address (the front page's four photos link to their own) —
 // one of the four by name, never whatever an object answers to («?kind=constructor»).
-const asked = new URLSearchParams(location.search).get('kind');
-const view = { kind: asked && Object.hasOwn(KIND, asked) ? asked : 'all', sort: 'suggested', delivers: false };
+// So do the delivery filter and the order, so the way back from a stall finds them.
+const SORTS = ['suggested', 'soon', 'cheap', 'dear'];
+const query = new URLSearchParams(location.search);
+const asked = query.get('kind');
+const view = {
+  kind: asked && Object.hasOwn(KIND, asked) ? asked : 'all',
+  sort: SORTS.includes(query.get('sort')) ? query.get('sort') : 'suggested',
+  delivers: query.get('delivery') === '1',
+};
+/** The market's address for what it shows, so a reload, a shared link and «‹ Бүх зар» show the same. */
+function showInAddress() {
+  const q = new URLSearchParams();
+  if (view.kind !== 'all') q.set('kind', view.kind);
+  if (view.delivers) q.set('delivery', '1');
+  if (view.sort !== 'suggested') q.set('sort', view.sort);
+  const said = q.toString();
+  history.replaceState(null, '', said ? `/shop?${said}` : '/shop');
+}
 
 function drawMarket() {
   page.replaceChildren(
@@ -229,8 +376,8 @@ function drawMarket() {
             <li class="s-pill">${MARK.undo}Нядлахаас өмнө бүтэн буцаалт</li>
           </ul>
         </section>`),
-    el(`<div class="sh-bar" id="sh-bar" hidden>
-          <div class="s-chips" id="kinds" role="group" aria-label="Малын төрөл"></div>
+    el(`<div class="sh-bar" id="sh-bar">
+          <div class="s-chips" id="kinds" role="group" aria-label="Малын төрөл">${'<span class="s-skel" aria-hidden="true"></span>'.repeat(5)}</div>
           <div class="sh-tools">
             <label class="sh-check"><input type="checkbox" id="delivers"${view.delivers ? ' checked' : ''}>Хүргэлттэй</label>
             <select class="sh-sort" id="sort" aria-label="Эрэмбэ">
@@ -247,13 +394,19 @@ function drawMarket() {
   document.getElementById('sort').value = view.sort;
   document.getElementById('sort').addEventListener('change', (e) => {
     view.sort = e.target.value;
-    paintGrid();
+    showInAddress();
+    if (loaded) paintGrid();
   });
   document.getElementById('delivers').addEventListener('change', (e) => {
     view.delivers = e.target.checked;
-    paintGrid();
+    showInAddress();
+    if (loaded) paintGrid();
   });
   const grid = document.getElementById('grid');
+  // A card opened: where the market was, for the way back.
+  grid.addEventListener('click', (event) => {
+    if (event.target.closest('.sh-card')) keepBack();
+  });
   for (let i = 0; i < 6; i++) {
     grid.append(el('<div class="sh-skel" aria-hidden="true"><span class="s-skel ph"></span><span class="s-skel l1"></span><span class="s-skel l2"></span><span class="s-skel l3"></span></div>'));
   }
@@ -269,7 +422,7 @@ function paintKinds() {
     button.addEventListener('click', () => {
       view.kind = key;
       // The choice is in the address, so a shared or reloaded link shows the same.
-      history.replaceState(null, '', key === 'all' ? '/shop' : `/shop?kind=${key}`);
+      showInAddress();
       paintKinds();
       paintGrid();
     });
@@ -308,6 +461,8 @@ function paintGrid() {
     );
     return;
   }
+  // Payments closed: said over the cards, before a stall is opened.
+  if (!pay.open) grid.append(closedNote());
   const list = shown();
   if (!list.length) {
     const none = el(`<div class="s-empty s-card">
@@ -320,7 +475,7 @@ function paintGrid() {
       view.kind = 'all';
       view.delivers = false;
       document.getElementById('delivers').checked = false;
-      history.replaceState(null, '', '/shop');
+      showInAddress();
       paintKinds();
       paintGrid();
     });
@@ -329,9 +484,16 @@ function paintGrid() {
   }
   for (const [i, l] of list.entries()) {
     const gone = l.remaining === 0;
+    // Under the price, what it is for: a whole animal's rough weight and what
+    // that makes a kilo — two stalls compare without opening either — or the
+    // least a stall sells by the kilo.
+    const kg = Number(l.approx_kg);
+    const per = l.unit === 'whole'
+      ? kg > 0 ? `≈${kg} кг · ≈${mnt(Math.round(l.price_mnt / kg / 100) * 100)}/кг` : ''
+      : `доод тал нь ${l.min_qty} кг`;
     grid.append(
       el(`<a class="sh-card" href="/shop/${esc(l.id)}" data-id="${esc(l.id)}" data-kind="${esc(l.kind)}"${l.tier ? ` data-tier="${esc(l.tier)}"` : ''}${gone ? ' data-gone' : ''}>
-            <span class="ph"><img src="${PHOTO(l.kind)}" alt="" loading="${i < 4 ? 'eager' : 'lazy'}" decoding="async" width="960" height="720">
+            <span class="ph"><img src="${PHOTO(l.kind)}" srcset="${SRCSET(l.kind)}" sizes="${l.tier === 'vip' ? VIP_SIZES : CARD_SIZES}" alt="" loading="${i < 4 ? 'eager' : 'lazy'}"${i === 0 ? ' fetchpriority="high"' : ''} decoding="async" width="960" height="720">
               <span class="tags">${
                 l.tier ? `<span class="s-pill" data-tone="${l.tier === 'vip' ? 'vip' : 'pine'}">${l.tier === 'vip' ? '★ VIP' : `${MARK.check}Онцгой`}</span>` : '<span></span>'
               }${l.delivers ? `<span class="s-pill" data-tone="hi">${MARK.truckSm}Хүргэлттэй</span>` : ''}</span></span>
@@ -339,7 +501,7 @@ function paintGrid() {
               <b>${esc(l.title)}</b>
               <span class="who">${esc(l.supplier.name)} · ${esc(l.origin)}</span>
               <span class="sh-meta">${dayLabel(l.ready_from)}-нөөс бэлэн · ${gone ? 'дууссан' : `${l.remaining} ${unitWord(l)} үлдсэн`}</span>
-              <span class="price s-money">${tugrik(l.price_mnt)}<small> / ${unitWord(l)}</small></span>
+              <span class="buy"><span class="price s-money">${tugrik(l.price_mnt)}<small> / ${unitWord(l)}</small></span>${per ? `<span class="per">${per}</span>` : ''}</span>
             </span>
           </a>`),
     );
@@ -481,17 +643,17 @@ function drawStall(l) {
   const unit = unitWord(l);
 
   page.replaceChildren(
-    el(`<a class="s-crumb" href="/shop">${MARK.back}Бүх зар</a>`),
+    crumb(),
     el(`<div class="sd-title">
           <h1>${esc(l.title)}</h1>
           <div class="sd-who">${l.tier ? `<span class="s-pill" data-tone="${l.tier === 'vip' ? 'vip' : 'pine'}">${l.tier === 'vip' ? '★ VIP' : 'Онцгой'}</span>` : ''}${l.supplier.contracted ? `<span class="s-pill" data-tone="brand">${MARK.check}Гэрээт нийлүүлэгч</span>` : ''}<span>${esc(l.supplier.name)} · ${esc(l.origin)}</span></div>
         </div>`),
     el(`<div class="sd">
           <div class="sd-media">
-            <figure class="sd-photo"><img src="${PHOTO(l.kind)}" alt="${esc(KIND[l.kind] ?? '')} — жишээ зураг" width="960" height="720"><figcaption>Жишээ зураг</figcaption></figure>
+            <figure class="sd-photo"><img src="${PHOTO(l.kind)}" srcset="${SRCSET(l.kind)}" sizes="${STALL_SIZES}" fetchpriority="high" decoding="async" alt="${esc(KIND[l.kind] ?? '')} — жишээ зураг" width="960" height="720"><figcaption>Жишээ зураг</figcaption></figure>
             <div class="sd-facts">
               <div><span>Үнэ</span><b class="s-money">${tugrik(l.price_mnt)}<small>/ ${unit}</small></b></div>
-              <div><span>${whole ? 'Ойролцоо жин' : 'Доод захиалга'}</span><b>${whole ? `~${l.approx_kg} кг` : `${l.min_qty} кг`}</b></div>
+              <div><span>${whole ? 'Ойролцоо жин' : 'Доод захиалга'}</span><b>${whole ? `≈${l.approx_kg} кг` : `${l.min_qty} кг`}</b></div>
               <div><span>Бэлэн болох</span><b>${dayLabel(l.ready_from)}</b></div>
               <div><span>Үлдсэн</span><b>${l.remaining} ${unit}</b></div>
             </div>
@@ -521,10 +683,14 @@ function drawStall(l) {
       <button class="s-btn s-btn-dark" type="button">Захиалах</button>
     </div>`);
   document.body.append(dock);
-  const dockSays = (what, label) => {
+  /** The bar at the foot: the total, a line under it, the way on — grey, with the reason as that line, while there is none. */
+  const dockSays = (what, label, shut = false) => {
     dock.querySelector('[data-total]').innerHTML = tugrik(total());
     dock.querySelector('[data-what]').textContent = what;
-    dock.querySelector('button').textContent = label;
+    const button = dock.querySelector('button');
+    button.textContent = label;
+    button.disabled = shut;
+    dock.toggleAttribute('data-closed', shut);
   };
   const toBox = () => {
     const top = buy.getBoundingClientRect().top + window.scrollY - (document.querySelector('.s-bar')?.offsetHeight ?? 0) - 12;
@@ -559,6 +725,7 @@ function drawStall(l) {
       el(`<div>
             <div class="sd-price"><span class="s-money">${tugrik(l.price_mnt)}</span><small>/ ${unit}</small></div>
             <p class="sd-sub">${whole ? `Нэг толгой ойролцоогоор ${l.approx_kg} кг` : `Доод тал нь ${l.min_qty} кг`} · ${l.remaining} ${unit} үлдсэн</p>
+            <div id="closed-slot"></div>
             <div class="sd-form">
               <div class="sd-q">
                 <span id="qty-label">${whole ? 'Хэдэн толгой' : 'Хэдэн кг'}</span>
@@ -583,7 +750,7 @@ function drawStall(l) {
               </div>
               <div class="sd-sum" id="sum"></div>
               <span class="s-error" id="form-error" role="alert"></span>
-              <div class="sd-actions"><button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="button" id="next">Үргэлжлүүлэх</button></div>
+              <div class="sd-actions"><button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="button" id="next" aria-describedby="next-why">Захиалах</button><p class="sd-why" id="next-why" hidden></p></div>
               <p class="sd-fine">Мах бэлэн болсон өдөр нийлүүлэгч утсаар холбогдож цагаа тохирно.</p>
             </div>
           </div>`),
@@ -599,7 +766,20 @@ function drawStall(l) {
         <div><span>${form.qty} ${unit} × ${mnt(l.price_mnt)}</span><span class="s-money">${tugrik(l.price_mnt * form.qty)}</span></div>
         ${form.receive === 'delivery' ? `<div><span>Хүргэлт</span><span class="s-money">${tugrik(l.delivery_fee_mnt)}</span></div>` : ''}
         <div class="total"><span>Нийт</span><span class="s-money">${tugrik(total())}</span></div>`;
-      dockSays(`${form.qty} ${unit} · ${form.receive === 'delivery' ? 'хүргүүлнэ' : 'очиж авна'}`, 'Захиалах');
+      // Payments closed: said at the top of the box, before anything is filled
+      // in, and the button grey with its reason under it. A wallet that covers
+      // this total still pays, so the box says that instead.
+      const able = canPay(total());
+      const slot = buy.querySelector('#closed-slot');
+      if (pay.open) slot.replaceChildren();
+      else if (able) slot.replaceChildren(el('<p class="sd-wallet">Онлайн төлбөр одоогоор хаалттай ч Basu түрийвч тань энэ захиалгад хүрэлцэнэ — түүнээсээ төлнө.</p>'));
+      else if (!slot.querySelector('.sh-closed')) slot.replaceChildren(closedNote());
+      buy.querySelector('#next').disabled = !able;
+      const why = buy.querySelector('#next-why');
+      why.hidden = able;
+      why.textContent = able ? '' : 'Онлайн төлбөр хаалттай тул одоохондоо захиалах боломжгүй.';
+      if (able) dockSays(`${form.qty} ${unit} · ${form.receive === 'delivery' ? 'хүргүүлнэ' : 'очиж авна'}`, 'Захиалах');
+      else dockSays('Онлайн төлбөр хаалттай', 'Захиалах', true);
     };
     /**
      * What stops the order going on, said under the field it is about: the
@@ -656,11 +836,14 @@ function drawStall(l) {
       form.address = e.target.value;
       typed(e);
     });
+    // «9911 2233» as it is typed, after the +976 in front of it; sent without the space.
+    phoneInput(buy.querySelector('#phone'));
     buy.querySelector('#phone').addEventListener('input', (e) => {
       form.phone = e.target.value;
       typed(e);
     });
     buy.querySelector('#next').addEventListener('click', () => {
+      if (!canPay(total())) return;
       const problem = !form.receiveOn || form.receiveOn < earliest(l)
         ? [buy.querySelector('#when'), `Өдрөө сонгоно уу — хамгийн эрт ${dayLabel(earliest(l))}.`]
         : form.receive === 'delivery' && !form.address.trim()
@@ -679,14 +862,18 @@ function drawStall(l) {
   /** Before any money moves, the whole order once. */
   function paintReview() {
     const delivery = form.receive === 'delivery';
+    // Back at the review after signing in while payments are closed, and the
+    // wallet short of the total: said here too, and «Төлөх» grey with its reason.
+    const able = canPay(total());
     buy.replaceChildren(
       el(`<div class="sd-review">
             <h2>Захиалгаа шалгана уу</h2>
             <p class="sd-sub">Төлөхөөс өмнө нэг харна уу.</p>
+            ${pay.open ? '' : able ? '<p class="sd-wallet">Онлайн төлбөр одоогоор хаалттай тул Basu түрийвчнээсээ төлнө.</p>' : '<div id="closed-slot"></div>'}
             <dl>
               <div><dt>Зар</dt><dd>${esc(l.title)}<small>${esc(l.supplier.name)}</small></dd></div>
               <div><dt>Хэмжээ</dt><dd>${form.qty} ${unit}</dd></div>
-              <div><dt>Авах арга</dt><dd>${delivery ? 'Хүргүүлнэ' : 'Өөрөө очиж авна'}<small>${esc(delivery ? `${form.address} · ${form.phone}` : l.supplier.pickup_address)}</small></dd></div>
+              <div><dt>Авах арга</dt><dd>${delivery ? 'Хүргүүлнэ' : 'Өөрөө очиж авна'}<small>${delivery ? `${esc(form.address)} · <span class="sd-tel">${esc(phoneText(form.phone))}</span>` : esc(l.supplier.pickup_address)}</small></dd></div>
               <div><dt>Өдөр</dt><dd>${dayLabel(form.receiveOn)}</dd></div>
             </dl>
             <div class="sd-sum">
@@ -696,7 +883,8 @@ function drawStall(l) {
             </div>
             <p class="s-error" id="pay-error" role="alert"></p>
             <div class="sd-actions">
-              <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="button" id="pay">${store.guestToken ? `Төлөх · ${mnt(total())}` : 'Нэвтэрч төлөх →'}</button>
+              <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="button" id="pay"${able ? '' : ' disabled aria-describedby="pay-why"'}>${store.guestToken ? `Төлөх · ${mnt(total())}` : 'Нэвтэрч төлөх →'}</button>
+              ${able ? '' : '<p class="sd-why" id="pay-why">Онлайн төлбөр хаалттай тул одоохондоо төлөх боломжгүй.</p>'}
               <button class="s-btn s-btn-line s-btn-block" type="button" id="edit">Засах</button>
             </div>
             ${store.guestToken ? '' : '<p class="sd-fine">Нэвтэрмэгц энэ захиалга руугаа буцна — сонголт тань хадгалагдана.</p>'}
@@ -708,12 +896,15 @@ function drawStall(l) {
             <p class="sd-fine">Төлснөөр <a href="/terms" target="_blank" rel="noopener">үйлчилгээний нөхцөл</a>-ийг зөвшөөрнө.</p>
           </div>`),
     );
-    dockSays('Нийт төлөх', 'Шалгаад төлөх');
+    buy.querySelector('#closed-slot')?.replaceChildren(closedNote());
+    dockSays(able ? 'Нийт төлөх' : 'Онлайн төлбөр хаалттай', 'Төлөх', !able);
     buy.querySelector('#edit').addEventListener('click', () => {
       paintForm();
       keepInView();
     });
     buy.querySelector('#pay').addEventListener('click', async (event) => {
+      // Nothing to pay with: never on to a sign-in that ends at «хаалттай».
+      if (!canPay(total())) return;
       // Somebody browsing without an account signs in here, and comes back to this order.
       if (!store.guestToken) {
         try {
@@ -780,6 +971,7 @@ function drawStall(l) {
 
 async function load() {
   market = await api('/v1/idesh/listings');
+  pay.open = market.payments_open !== false;
 }
 
 /** What a page that could not be drawn says, with the way to try again. */
@@ -790,16 +982,18 @@ const stallId = location.pathname.match(/^\/shop\/([0-9a-f-]{36})$/)?.[1];
 if (stallId) {
   // While it comes: blocks in the shape of the page, so nothing jumps when it lands.
   page.replaceChildren(
-    el(`<a class="s-crumb" href="/shop">${MARK.back}Бүх зар</a>`),
+    crumb(),
     el(`<div class="sd-wait" role="status" aria-busy="true" aria-label="Зар ачаалж байна"><span class="s-skel t"></span><span class="s-skel w"></span><div class="g"><span class="s-skel p"></span><span class="s-skel b"></span></div></div>`),
   );
   try {
-    const [{ listing, today }] = await Promise.all([api(`/v1/idesh/listings/${stallId}`), load()]);
+    const [{ listing, today, payments_open: open }] = await Promise.all([api(`/v1/idesh/listings/${stallId}`), load()]);
     market.today = today;
+    pay.open = open !== false;
+    await lookAtWallet();
     drawStall(listing);
   } catch (error) {
     page.replaceChildren(
-      el(`<a class="s-crumb" href="/shop">${MARK.back}Бүх зар</a>`),
+      crumb(),
       error.status === 404 || error.status === 400
         ? siteEmpty({
             icon: 'shop',
@@ -815,9 +1009,13 @@ if (stallId) {
   drawMarket();
   try {
     await load();
+    loaded = true;
     paintKinds();
     paintGrid();
+    comeBack();
   } catch (error) {
+    // Nothing to filter: the bar that held its place goes with the skeleton.
+    document.getElementById('sh-bar').hidden = true;
     const grid = document.getElementById('grid');
     grid.removeAttribute('aria-busy');
     grid.replaceChildren(couldNot(error, location.pathname + location.search));

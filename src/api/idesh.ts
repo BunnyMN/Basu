@@ -61,7 +61,7 @@ import { confirmPassword, contactsFor, resolveGuest } from '../platform/identity
 import { enqueue } from '../platform/notify/index.js';
 import { LONE_OWNER_PERMISSIONS, grants, headRoles, type Grants } from '../platform/access/index.js';
 import { accessIn, membersOf } from '../platform/org/index.js';
-import type { Ctx } from '../ports.js';
+import { topupsOpen, type Ctx } from '../ports.js';
 import { shapeOrder, shapeSettlement, shapeSummary } from './shapes.js';
 import { holds, knownId, need, needAny, UUID } from './guards.js';
 
@@ -272,15 +272,23 @@ export async function registerIdeshRoutes(
    * needed — ordering and paying (`/v1/idesh`, guarded below). What a stall
    * shows is what its card shows: no phone, no bank, nothing of the owner. */
 
+  /*
+   * `payments_open`: whether this server can take money for an order at all —
+   * false in production until a payment provider is configured. A stall says
+   * so before anybody fills in its form or signs in, rather than at the last
+   * press. A wallet that covers the whole order still pays for it (the
+   * server allows that whatever this says); the page asks the wallet then.
+   */
   app.get('/v1/idesh/listings', async () => ({
     today: dayOf(ctx.clock.now()),
+    payments_open: topupsOpen(ctx.payments),
     listings: (await openListings(ctx.clock.now())).map(shapeListing),
   }));
 
   app.get<{ Params: { id: string } }>('/v1/idesh/listings/:id', { preHandler: anIdeshId }, async (request, reply) => {
     const listing = await listingById(request.params.id, ctx.clock.now());
     if (!listing) return sendError(reply, new IdeshError('NOT_FOUND', 'no such listing'));
-    return reply.send({ today: dayOf(ctx.clock.now()), listing: shapeListing(listing) });
+    return reply.send({ today: dayOf(ctx.clock.now()), payments_open: topupsOpen(ctx.payments), listing: shapeListing(listing) });
   });
 
   /* ── the guest ─────────────────────────────────────────────────── */

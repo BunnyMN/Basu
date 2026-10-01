@@ -13,7 +13,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F3EE">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0F1110">
-<title>Basu — өвлийн идэш</title>
+<title>Өвлийн идэш — Basu</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.css" integrity="sha512-KIMsMWIdnoG9OwZa+oaIafmbDonqck1UCmq+/zcUi2aaZ97N9QE6TqpTM+n36EO40HGh64hU/375zxtjx7WTyQ==" crossorigin="anonymous">
 <link rel="stylesheet" href="/app.css">
 <style>
@@ -188,10 +188,15 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 /* a refused payment, said above the button it is about, until the next tap */
 .why[data-tone="stop"]{align-items:flex-start;color:var(--stop);font-weight:500}
 .why[data-tone="stop"] svg{margin-top:1px}
+/* payments closed: said on the stall and on the review, before any sign-in — calm, not the stop colour */
+#closed{margin:16px var(--s-5) 0}
+#closed a{font-weight:500;overflow-wrap:anywhere}
 
 /* the stall */
-.hero{height:220px;background:var(--surface-2);overflow:hidden}
+.hero{position:relative;height:220px;background:var(--surface-2);overflow:hidden}
 .hero img{width:100%;height:100%;object-fit:cover;display:block}
+/* the photos are Basu's, not this supplier's meat: said on the picture, quietly, as on the website */
+.hero .sample{position:absolute;left:12px;bottom:12px;padding:4px 10px;border-radius:var(--r-pill);background:rgba(18,26,21,.55);color:#fff;font-size:var(--t-cap);font-weight:500;line-height:1.3;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 .head{padding:20px var(--s-5) 0}
 .head .from{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:var(--t-body-lg);color:var(--ink-2)}
 .head .bits{margin-top:6px;font-size:var(--t-cap)}
@@ -461,7 +466,36 @@ const state = {
   map: null,
   /** Which screen is up: null, 'detail', 'review' or 'status'. */
   screen: null,
+  /** Whether the server can take money now (`payments_open` on the stalls' answer). */
+  paymentsOpen: true,
+  /** While it cannot: what the signed-in guest holds in their Basu wallet, or null for not known. */
+  wallet: null,
 };
+
+/**
+ * Whether an order of this much can be paid for now. Production with no
+ * payment provider still sells to a wallet that covers the whole order —
+ * the server allows it — and to nothing else. Said on the stall and on the
+ * review, before anybody signs in: it used to be learnt at «Төлөх», after
+ * the sign-in sheet.
+ */
+const canPay = (amount) => state.paymentsOpen || (state.wallet !== null && state.wallet >= amount);
+const CLOSED = 'Онлайн төлбөр одоогоор хаалттай байна.';
+
+/** While payments are closed, the signed-in guest's wallet — never a sign-in for it. */
+async function lookAtWallet() {
+  const token = store.guestToken;
+  if (state.paymentsOpen || !token) {
+    state.wallet = null;
+    return;
+  }
+  try {
+    const { balance_mnt: held } = await api('/v1/wallet', { token });
+    if (store.guestToken === token) state.wallet = held ?? null;
+  } catch {
+    state.wallet = null;
+  }
+}
 
 /**
  * The page is on its way out. A request already in flight still lands after
@@ -560,6 +594,9 @@ async function loadListings() {
   const { today, listings } = answer;
   state.today = today;
   state.listings = listings;
+  state.paymentsOpen = answer.payments_open !== false;
+  await lookAtWallet();
+  if (gone) return false;
   paintKinds();
   paintListings();
   return true;
@@ -688,7 +725,7 @@ function phoneShown(raw) {
 
 /** «бүтэн · ~38 кг» / «1 кг · доод тал нь 20 кг» — what the price is for. */
 function priceFor(l) {
-  return l.unit === 'whole' ? `бүтэн · ~${l.approx_kg} кг` : `1 кг · доод тал нь ${l.min_qty} кг`;
+  return l.unit === 'whole' ? `бүтэн · ≈${l.approx_kg} кг` : `1 кг · доод тал нь ${l.min_qty} кг`;
 }
 
 /**
@@ -849,9 +886,9 @@ function openListing(l) {
   renderDetail();
 }
 
-/** The same picture, larger, at the top of the screen. */
+/** The same picture, larger, at the top of the screen — Basu's photo of the animal, and said so. */
 function hero(kind) {
-  const box = el(`<div class="hero"><img src="${PHOTO(kind)}" alt="" width="560" height="220"></div>`);
+  const box = el(`<div class="hero"><img src="${PHOTO(kind)}" alt="${escapeHtml(KIND[kind] ?? '')} — жишээ зураг" width="560" height="220"><span class="sample" aria-hidden="true">Жишээ зураг</span></div>`);
   box.querySelector('img').addEventListener('error', () => box.remove());
   return box;
 }
@@ -891,7 +928,7 @@ function renderDetail({ replace = false } = {}) {
     el(`<div class="facts card">
           <div><span class="lab">Үнэ</span><b>${money(l.price_mnt)}<small> / ${unitWord(l)}</small></b></div>
           <div><span class="lab">${l.unit === 'whole' ? 'Ойролцоо жин' : 'Доод захиалга'}</span><b><span class="mn">${
-            l.unit === 'whole' ? `~${l.approx_kg}` : `${l.min_qty}`
+            l.unit === 'whole' ? `≈${l.approx_kg}` : `${l.min_qty}`
           }</span> кг</b></div>
           <div><span class="lab">Бэлэн болох</span><b>${dayLabel(l.ready_from)}</b></div>
           <div><span class="lab">Үлдсэн</span><b><span class="mn">${l.remaining}</span> ${unitWord(l)}</b></div>
@@ -1117,16 +1154,37 @@ function renderFoot() {
   foot.replaceChildren();
   if (!l || !f || l.remaining === 0 || state.screen !== 'detail') return;
 
-  const needs = missing();
-  if (needs) foot.append(el(`<p class="why">${MARK.warn}${needs}</p>`));
+  const able = canPay(total());
+  sayClosed(!able, $('screen-body').querySelector('.facts'));
+  // What stops the order, over its button: payments first — nothing typed fixes that.
+  const needs = able ? missing() : null;
+  if (!able) foot.append(el(`<p class="why" data-calm>${MARK.info}${CLOSED}</p>`));
+  else if (needs) foot.append(el(`<p class="why">${MARK.warn}${needs}</p>`));
   const row = el(`
     <div class="foot-row">
       <div class="sum"><span>${f.qty} ${unitWord(l)}${f.receive === 'delivery' ? ' + хүргэлт' : ''} · нийт</span><b>${money(total())}</b></div>
-      <button class="btn" data-v="primary" type="button" id="next"${needs ? ' disabled' : ''}>Үргэлжлүүлэх${MARK.next}</button>
+      <button class="btn" data-v="primary" type="button" id="next"${needs || !able ? ' disabled' : ''}>Захиалах${MARK.next}</button>
     </div>`);
   row.querySelector('#next').addEventListener('click', () => renderReview());
   foot.append(row);
 }
+
+/**
+ * The card that says payments are closed, and what can be done meanwhile —
+ * after `after` on the screen, or taken away once the order can be paid
+ * for (a wallet that covers a smaller one). No dates, nothing promised.
+ */
+function sayClosed(on, after) {
+  const there = $('screen-body').querySelector('#closed');
+  if (!on) {
+    there?.remove();
+    return;
+  }
+  if (there || !after) return;
+  after.after(closedCard());
+}
+const closedCard = () =>
+  el(`<div class="note callout" id="closed" role="note">${MARK.info}<span><b>${CLOSED}</b>Одоохондоо зарыг үзэж, харьцуулж болно. Асуух зүйл байвал <a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a> хаягаар бичээрэй.</span></div>`);
 
 /* ── the review, before any money moves ──────────────────────────── */
 
@@ -1163,14 +1221,22 @@ function renderReview({ replace = false } = {}) {
     el(`<p class="terms">Төлснөөр <a href="/terms" id="terms">үйлчилгээний нөхцөл</a>-ийг зөвшөөрнө.</p>`),
   );
 
+  // Payments closed and the wallet short of it: said first, before the order.
+  const able = canPay(total());
+  if (!able) body.prepend(closedCard());
+
   const foot = $('screen-foot');
   foot.replaceChildren();
+  if (!able) foot.append(el(`<p class="why" data-calm>${MARK.info}${CLOSED}</p>`));
   const row = el(`
     <div class="foot-row">
-      <div class="sum"><span>Түрийвчнээс · дутвал QPay</span><b>${money(total())}</b></div>
-      <button class="btn" data-v="primary" type="button" id="pay">Төлөх</button>
+      <div class="sum"><span>${state.paymentsOpen ? 'Түрийвчнээс · дутвал QPay' : 'Түрийвчнээс'}</span><b>${money(total())}</b></div>
+      <button class="btn" data-v="primary" type="button" id="pay"${able ? '' : ' disabled'}>Төлөх</button>
     </div>`);
-  row.querySelector('#pay').addEventListener('click', placeOrder);
+  row.querySelector('#pay').addEventListener('click', () => {
+    // Nothing to pay with: never on to a sign-in that ends at «хаалттай».
+    if (canPay(total())) void placeOrder();
+  });
   foot.append(row);
 }
 
@@ -1369,9 +1435,15 @@ const STEPS = [
   },
   {
     key: 'preparing',
-    word: 'Бэлтгэж байна',
+    /**
+     * «Бэлтгэж байна» only once the supplier has started (and «Бэлтгэсэн»
+     * after): right after paying, the ringed step said the meat was being
+     * prepared before anybody had touched it. Until then it is the step
+     * ahead, and what it waits for.
+     */
+    word: (o, done) => (!done ? 'Бэлтгэл' : o.state === 'PREPARING' ? 'Бэлтгэж байна' : 'Бэлтгэсэн'),
     done: (o, at) => `Нийлүүлэгч ${at}-д эхэлсэн`,
-    next: () => 'Нийлүүлэгч мал нядалж, махыг бэлтгэнэ',
+    next: () => 'Нийлүүлэгч бэлтгэхийг хүлээж байна',
   },
   {
     key: 'ready',
@@ -1645,7 +1717,7 @@ async function showStatus(force, { replace = false } = {}) {
       timeline.append(
         el(`<li${when ? ' data-done' : ''}${isNext ? ' data-next' : ''}>
               <span class="d">${MARK.check}<i></i></span>
-              <span class="w">${step.word}<span class="s">${when ? step.done(order, clock) : step.next(order)}</span></span>
+              <span class="w">${typeof step.word === 'function' ? step.word(order, Boolean(when)) : step.word}<span class="s">${when ? step.done(order, clock) : step.next(order)}</span></span>
               ${when && step.aside ? `<span class="t">${clock}</span>` : ''}
             </li>`),
       );

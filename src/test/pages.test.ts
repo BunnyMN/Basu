@@ -677,6 +677,18 @@ const signingInAs = (phone: string) => (path: string) =>
 
 /** What a page says when the network, not the server, let a request down. */
 const CONNECTION_LOST = 'Холболт тасарлаа. Дахин оролдоно уу.';
+/** What a stall says, before anything is filled in, while the server cannot take money. */
+const PAYMENTS_CLOSED = 'Онлайн төлбөр одоогоор хаалттай байна.';
+
+/** Money into a guest's Basu wallet, the way a top-up goes in while payments are open. */
+async function topUp(token: string, amountMnt: number): Promise<void> {
+  const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+  const started = await fetch(`${base}/v1/wallet/topup`, { method: 'POST', headers, body: JSON.stringify({ amount_mnt: amountMnt }) });
+  expect(started.status, await started.clone().text()).toBe(200);
+  const { topup_id: id } = (await started.json()) as { topup_id: string };
+  const settled = await fetch(`${base}/v1/wallet/topup/${id}/settle`, { method: 'POST', headers: { authorization: `Bearer ${token}` } });
+  expect(settled.status, await settled.clone().text()).toBe(200);
+}
 
 /** What a page says when the order bought is the one from before the person changed it. */
 const EARLIER_ORDER = 'Өмнөх захиалга тань төлөгдсөн байна';
@@ -1420,32 +1432,210 @@ describe('the website', () => {
     expect(s.getElementById('when')?.getAttribute('value')).toBe('2026-09-12" data-planted="1');
   });
 
-  it('says payments are closed over «Төлөх», and sets nothing aside for an order nobody can pay for', async () => {
-    await ownGuest('+97699005032');
+  it('says payments are closed before anything is filled in or signed into, and sets nothing aside', async () => {
+    storage.removeItem('basu.guest');
     const id = await fullestStall();
     const left = async () => ((await (await fetch(`${base}/v1/idesh/listings/${id}`)).json()) as { listing: { remaining: number } }).listing.remaining;
     const before = await left();
-    // Production with no payment provider, and a new account's empty wallet.
+    // Production with no payment provider, and somebody just looking.
     const open = ctx.payments;
     ctx.payments = new ClosedPaymentProvider();
     try {
-      const stall = await reviewAtStall(undefined, id);
+      // The market says it over the cards, before a stall is opened…
+      const market = await openPage('shop.html');
+      const d = market.window.document;
+      await until(market, 'the cards', () => d.querySelectorAll('.sh-card').length > 0);
+      expect(d.querySelector('#grid .sh-closed b')?.textContent).toBe(PAYMENTS_CLOSED);
+
+      // …and a stall at the top of its order box, with what can be done meanwhile:
+      // the address to write to, no date, nothing promised.
+      const stall = await openPage('shop.html', `/${id}`);
       const s = stall.window.document;
-      const pay = () => s.getElementById('pay') as HTMLButtonElement;
-      pay().click();
-      await until(stall, 'the reason, said', () => (s.getElementById('pay-error')?.textContent ?? '') !== '' && !pay().hasAttribute('data-busy'));
-      expect(s.getElementById('pay-error')?.textContent).toBe('Онлайн төлбөр одоогоор хаалттай байна.');
-      // Over the button it is about, where the eye is — not under «Засах».
-      const error = s.getElementById('pay-error')!;
-      expect(error.compareDocumentPosition(pay()) & stall.window.Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-      // Pressed again, the same answer — and still nothing held: the stall keeps every animal it had.
-      pay().click();
-      await until(stall, 'the second answer', () => !pay().hasAttribute('data-busy'));
+      await until(stall, 'the order form', () => Boolean(s.getElementById('next')));
+      expect(s.querySelector('#buy .sh-closed b')?.textContent).toBe(PAYMENTS_CLOSED);
+      expect(s.querySelector('#buy .sh-closed a[href="mailto:basuappmn@gmail.com"]')).toBeTruthy();
+      // «Захиалах» is grey, with the reason right under it…
+      const next = s.getElementById('next') as HTMLButtonElement;
+      expect(next.textContent).toBe('Захиалах');
+      expect(next.disabled).toBe(true);
+      expect((s.getElementById('next-why') as HTMLElement).hidden).toBe(false);
+      expect(s.getElementById('next-why')?.textContent).toContain('хаалттай');
+      // …and so is the bar at the thumb's.
+      expect((s.querySelector('.sd-dock button') as HTMLButtonElement).disabled).toBe(true);
+      expect(s.querySelector('.sd-dock [data-what]')?.textContent).toBe('Онлайн төлбөр хаалттай');
+      // Pressed anyway: no review, no way on to a sign-in that would end at «хаалттай».
+      const gone = departures(stall);
+      next.click();
+      expect(s.getElementById('pay')).toBeNull();
+      expect(gone.count).toBe(0);
       expect(await left()).toBe(before);
+    } finally {
+      ctx.payments = open;
+    }
+  });
+
+  it('says it at the review somebody comes back to after signing in, and keeps «Төлөх» grey', async () => {
+    await ownGuest('+97699005032');
+    const id = await fullestStall();
+    const open = ctx.payments;
+    ctx.payments = new ClosedPaymentProvider();
+    try {
+      // Back from the sign-in with the order kept, the walkthrough's way — and a new account's empty wallet.
+      const stall = await openPage('shop.html', `/${id}`);
+      stall.window.sessionStorage.setItem(`basu.shop.${id}`, JSON.stringify({ qty: 1, receive: 'pickup', receiveOn: '2099-01-01', review: true }));
+      const s = stall.window.document;
+      await until(stall, 'the review', () => Boolean(s.getElementById('pay')));
+      const pay = s.getElementById('pay') as HTMLButtonElement;
+      expect(pay.disabled).toBe(true);
+      expect(s.querySelector('.sd-review .sh-closed b')?.textContent).toBe(PAYMENTS_CLOSED);
+      expect(s.getElementById('pay-why')?.textContent).toContain('хаалттай');
+      // Over the button it is about's foot, where the eye is — not under «Засах».
+      expect(pay.compareDocumentPosition(s.getElementById('pay-why')!) & stall.window.Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(s.getElementById('pay-why')!.compareDocumentPosition(s.getElementById('edit')!) & stall.window.Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      pay.click();
+      await settled(stall, 'whatever the press asked');
       expect(await ideshOf('+97699005032')).toEqual({ orders: 0, payments: 0 });
     } finally {
       ctx.payments = open;
     }
+  });
+
+  it('still sells to a wallet that covers the order while payments are closed, and says it pays from there', async () => {
+    await ownGuest('+97699005034');
+    const token = storage.getItem('basu.guest')!;
+    // Money put into Basu while payments were open.
+    await topUp(token, 2_000_000);
+    await topUp(token, 2_000_000);
+    const id = await fullestStall();
+    const open = ctx.payments;
+    ctx.payments = new ClosedPaymentProvider();
+    try {
+      const stall = await openPage('shop.html', `/${id}`);
+      const s = stall.window.document;
+      await until(stall, 'the order form', () => Boolean(s.getElementById('next')));
+      expect((s.getElementById('next') as HTMLButtonElement).disabled).toBe(false);
+      expect(s.querySelector('#buy .sh-closed')).toBeNull();
+      expect(s.querySelector('#buy .sd-wallet')?.textContent).toContain('түрийвч');
+      (s.getElementById('next') as HTMLButtonElement).click();
+      await until(stall, 'the review', () => Boolean(s.getElementById('pay')));
+      expect((s.getElementById('pay') as HTMLButtonElement).disabled).toBe(false);
+      const left = departures(stall);
+      (s.getElementById('pay') as HTMLButtonElement).click();
+      await until(stall, 'the way to the order', () => left.count > 0);
+      expect(await ideshOf('+97699005034')).toEqual({ orders: 1, payments: 1 });
+    } finally {
+      ctx.payments = open;
+    }
+  });
+
+  it('keeps the filter bar in its place while the market loads, and draws none for an empty market', async () => {
+    storage.removeItem('basu.guest');
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const market = await openPage('shop.html', '', (path) => (path === '/v1/idesh/listings' ? held.then(() => fetch(`${base}${path}`)) : undefined));
+    const d = market.window.document;
+    await until(market, 'the frame of the market', () => Boolean(d.getElementById('sh-bar')));
+    // Laid out from the start, its chips as shapes: the cards do not jump down when it fills in.
+    expect((d.getElementById('sh-bar') as HTMLElement).hidden).toBe(false);
+    expect(d.querySelectorAll('#kinds .s-skel').length).toBeGreaterThan(0);
+    // A filter changed before the answer waits for it, rather than calling the market empty.
+    (d.getElementById('delivers') as HTMLInputElement).click();
+    expect(d.querySelector('#grid .s-empty')).toBeNull();
+    release();
+    await until(market, 'the cards', () => d.querySelectorAll('.sh-card').length > 0);
+    expect(d.querySelectorAll('#kinds .s-skel')).toHaveLength(0);
+    expect((d.getElementById('sh-bar') as HTMLElement).hidden).toBe(false);
+
+    const none = await openPage('shop.html', '', (path) =>
+      path === '/v1/idesh/listings'
+        ? new Response(JSON.stringify({ today: '2026-10-01', payments_open: true, listings: [] }), { status: 200, headers: { 'content-type': 'application/json' } })
+        : undefined,
+    );
+    await until(none, 'the empty market', (doc) => Boolean(doc.querySelector('#grid .s-empty')));
+    expect((none.window.document.getElementById('sh-bar') as HTMLElement).hidden).toBe(true);
+  });
+
+  it('says on a whole animal’s card roughly what it weighs and what that makes a kilo', async () => {
+    storage.removeItem('basu.guest');
+    const { listings } = (await (await fetch(`${base}/v1/idesh/listings`)).json()) as {
+      listings: Array<{ id: string; unit: string; approx_kg: number; price_mnt: number; min_qty: number }>;
+    };
+    const market = await openPage('shop.html');
+    const d = market.window.document;
+    await until(market, 'the cards', () => d.querySelectorAll('.sh-card').length >= listings.length);
+    for (const l of listings) {
+      const per = d.querySelector(`.sh-card[data-id="${l.id}"] .per`)?.textContent;
+      if (l.unit === 'whole') {
+        const kilo = Math.round(l.price_mnt / l.approx_kg / 100) * 100;
+        expect(per).toBe(`≈${l.approx_kg} кг · ≈${kilo.toLocaleString('mn-MN')}₮/кг`);
+      } else {
+        expect(per).toBe(`доод тал нь ${l.min_qty} кг`);
+      }
+    }
+    // The photo comes at the width it is shown at; the first is asked for first.
+    const first = d.querySelector('.sh-card img') as HTMLImageElement;
+    expect(first.getAttribute('srcset')).toMatch(/^\/brand\/meat\/(sheep|goat|beef|horse)-480\.webp 480w, \/brand\/meat\/\1-720\.webp 720w, \/brand\/meat\/\1\.webp 960w$/);
+    expect(first.getAttribute('sizes')).toBeTruthy();
+    expect(first.getAttribute('fetchpriority')).toBe('high');
+    expect(d.querySelectorAll('.sh-card img[fetchpriority]')).toHaveLength(1);
+  });
+
+  it('keeps the market’s filter in its address, and «‹ Бүх зар» goes back to it', async () => {
+    storage.removeItem('basu.guest');
+    const market = await openPage('shop.html', '?kind=beef&delivery=1&sort=cheap');
+    const d = market.window.document;
+    await until(market, 'the cards', () => d.querySelectorAll('.sh-card').length > 0);
+    expect((d.getElementById('delivers') as HTMLInputElement).checked).toBe(true);
+    expect((d.getElementById('sort') as HTMLSelectElement).value).toBe('cheap');
+    expect([...d.querySelectorAll('.sh-card')].every((c) => c.getAttribute('data-kind') === 'beef')).toBe(true);
+    // Another animal keeps the rest of the address.
+    (d.querySelector('#kinds [data-kind="all"]') as HTMLButtonElement).click();
+    expect(market.window.location.search).toBe('?delivery=1&sort=cheap');
+    (d.querySelector('#kinds [data-kind="beef"]') as HTMLButtonElement).click();
+    expect(market.window.location.search).toBe('?kind=beef&delivery=1&sort=cheap');
+
+    // A card opened keeps where the market was…
+    const card = d.querySelector('.sh-card') as HTMLAnchorElement;
+    card.click();
+    const kept = market.window.sessionStorage.getItem('basu.shop.back');
+    expect(JSON.parse(kept!)).toMatchObject({ url: '/shop?kind=beef&delivery=1&sort=cheap' });
+
+    // …and the stall's crumb goes back there, not to the whole market.
+    const stall = await openPage('shop.html', `/${card.getAttribute('data-id')}`);
+    stall.window.sessionStorage.setItem('basu.shop.back', kept!);
+    await until(stall, 'the stall', (doc) => Boolean(doc.querySelector('.sd-title')));
+    expect(stall.window.document.querySelector('.s-crumb')?.getAttribute('href')).toBe('/shop?kind=beef&delivery=1&sort=cheap');
+    expect(stall.window.document.querySelector('.s-crumb')?.textContent).toBe('Бүх зар');
+    // Anything else kept there is never followed.
+    const odd = await openPage('shop.html', `/${card.getAttribute('data-id')}`);
+    odd.window.sessionStorage.setItem('basu.shop.back', JSON.stringify({ url: 'https://elsewhere.example/', y: 0 }));
+    await until(odd, 'the stall', (doc) => Boolean(doc.querySelector('.sd-title')));
+    expect(odd.window.document.querySelector('.s-crumb')?.getAttribute('href')).toBe('/shop');
+  });
+
+  it('reads the courier’s number back the way people read it, on the review', async () => {
+    storage.removeItem('basu.guest');
+    const { listings } = (await (await fetch(`${base}/v1/idesh/listings`)).json()) as {
+      listings: Array<{ id: string; delivers: boolean; remaining: number }>;
+    };
+    const delivering = listings.find((l) => l.delivers && l.remaining > 0)!;
+    const stall = await openPage('shop.html', `/${delivering.id}`);
+    const s = stall.window.document;
+    await until(stall, 'the order form', () => Boolean(s.getElementById('next')));
+    (s.querySelector('.sd-way[data-r="delivery"]') as HTMLButtonElement).click();
+    const type = (id: string, value: string) => {
+      const input = s.getElementById(id) as HTMLInputElement;
+      input.value = value;
+      input.dispatchEvent(new stall.window.Event('input', { bubbles: true }));
+    };
+    type('address', 'Баянзүрх дүүрэг, 26-р хороо, 15-р байр, 48 тоот');
+    type('phone', '99112233');
+    // Grouped as it is typed, after the +976 in front of it.
+    expect((s.getElementById('phone') as HTMLInputElement).value).toBe('9911 2233');
+    (s.getElementById('next') as HTMLButtonElement).click();
+    await until(stall, 'the review', () => Boolean(s.getElementById('pay')));
+    expect(s.querySelector('.sd-review')?.textContent).toContain('+976 9911 2233');
+    expect(s.querySelector('.sd-review')?.textContent).not.toContain('99112233');
   });
 
   it('shows the market as cards, filters it, and orders from a stall', async () => {
@@ -1792,6 +1982,10 @@ describe('өвлийн идэш', () => {
     expect(dom.window.document.querySelectorAll('.step').length).toBe(3);
     const next = dom.window.document.querySelector('#next') as HTMLButtonElement;
     expect(next.disabled).toBe(false);
+    // One verb for starting an order, as on the website.
+    expect(next.textContent).toBe('Захиалах');
+    // The photo is Basu's, not this supplier's meat, and says so.
+    expect(dom.window.document.querySelector('.hero .sample')?.textContent).toBe('Жишээ зураг');
     next.click();
     // Nothing is charged before the person has seen the whole order once.
     await until(dom, 'the review', (d) => Boolean(d.querySelector('#pay')));
@@ -1913,6 +2107,10 @@ describe('өвлийн идэш', () => {
     expect(dom.window.document.querySelector('.panel a[href^="tel:"]')).toBeTruthy();
     // A pickup has no «Замд» step to leave undone.
     expect(dom.window.document.querySelectorAll('.timeline li')).toHaveLength(4);
+    // Right after paying the supplier has not started: the step ahead waits for them, it does not say «Бэлтгэж байна».
+    const ahead = dom.window.document.querySelector('.timeline li[data-next]');
+    expect(ahead?.textContent).toContain('Нийлүүлэгч бэлтгэхийг хүлээж байна');
+    expect(ahead?.textContent).not.toContain('Бэлтгэж байна');
     expect(dom.window.document.querySelector('#screen-sub')?.textContent).toContain(title);
 
     // …and it sits on the home screen beside whatever lunch there is.
@@ -1929,6 +2127,56 @@ describe('өвлийн идэш', () => {
     const back = await openPage('idesh.html', card.getAttribute('href')!.slice('/idesh'.length));
     await until(back, 'the status', (d) => Boolean(d.querySelector('.status')));
     expect(back.window.document.querySelector('#screen-title')?.textContent).toMatch(/^№\d{4}$/);
+  });
+
+  it('says payments are closed on the stall, before any sign-in, and greys «Захиалах» with the reason', async () => {
+    storage.removeItem('basu.guest');
+    const id = await fullestStall();
+    const open = ctx.payments;
+    ctx.payments = new ClosedPaymentProvider();
+    try {
+      const dom = await openPage('idesh.html');
+      const d = dom.window.document;
+      await until(dom, 'the stalls', () => Boolean(d.querySelector(`.listing[data-id="${id}"]`)));
+      (d.querySelector(`.listing[data-id="${id}"]`) as HTMLElement).click();
+      await until(dom, 'the stall screen', () => Boolean(d.querySelector('#next')));
+      expect(d.querySelector('#closed b')?.textContent).toBe(PAYMENTS_CLOSED);
+      expect(d.querySelector('#closed a[href="mailto:basuappmn@gmail.com"]')).toBeTruthy();
+      expect((d.querySelector('#next') as HTMLButtonElement).disabled).toBe(true);
+      expect(d.querySelector('#screen-foot .why')?.textContent).toBe(PAYMENTS_CLOSED);
+      // Nobody was asked to sign in on the way to being told.
+      expect(storage.getItem('basu.guest')).toBeNull();
+      expect(d.querySelector('#pay')).toBeNull();
+    } finally {
+      ctx.payments = open;
+    }
+  });
+
+  it('sells from a wallet that covers the order while payments are closed, and says that is where it pays from', async () => {
+    await ownGuest('+97699004032');
+    const token = storage.getItem('basu.guest')!;
+    await topUp(token, 2_000_000);
+    await topUp(token, 2_000_000);
+    const id = await fullestStall();
+    const open = ctx.payments;
+    ctx.payments = new ClosedPaymentProvider();
+    try {
+      const dom = await openPage('idesh.html');
+      const d = dom.window.document;
+      await until(dom, 'the stalls', () => Boolean(d.querySelector(`.listing[data-id="${id}"]`)));
+      (d.querySelector(`.listing[data-id="${id}"]`) as HTMLElement).click();
+      await until(dom, 'the stall screen', () => Boolean(d.querySelector('#next')));
+      expect(d.querySelector('#closed')).toBeNull();
+      (d.querySelector('#next') as HTMLButtonElement).click();
+      await until(dom, 'the review', () => Boolean(d.querySelector('#pay')));
+      // No QPay to fall back on: the wallet, and only the wallet.
+      expect(d.querySelector('#screen-foot .sum span')?.textContent).toBe('Түрийвчнээс');
+      (d.querySelector('#pay') as HTMLButtonElement).click();
+      await until(dom, 'the status', () => Boolean(d.querySelector('.status')));
+      expect(d.querySelector('.status .big')?.textContent).toBe('Захиалга баталгаажлаа');
+    } finally {
+      ctx.payments = open;
+    }
   });
 
   it('sells one animal when the answer to the order is lost and Pay is tapped again', async () => {
@@ -1955,7 +2203,7 @@ describe('өвлийн идэш', () => {
     expect(await ideshOf('+97699004016')).toEqual({ orders: 1, payments: 1 });
   });
 
-  it('says payments are closed above Pay, and sets nothing aside for an order nobody can pay for', async () => {
+  it('says payments are closed above «Захиалах» to a guest whose wallet is short, and sets nothing aside', async () => {
     await ownGuest('+97699004031');
     const id = await fullestStall();
     const left = async () => ((await (await fetch(`${base}/v1/idesh/listings/${id}`)).json()) as { listing: { remaining: number } }).listing.remaining;
@@ -1965,14 +2213,22 @@ describe('өвлийн идэш', () => {
     ctx.payments = new ClosedPaymentProvider();
     try {
       const dom = await openPage('idesh.html');
-      await chooseOne(dom, id);
       const d = dom.window.document;
-      const pay = () => d.querySelector('#pay') as HTMLButtonElement;
-      const why = () => d.querySelector('#screen-foot .why[data-tone="stop"]');
-      pay().click();
-      await until(dom, 'the reason, said', () => Boolean(why()) && !pay().disabled);
-      expect(why()?.textContent).toBe('Онлайн төлбөр одоогоор хаалттай байна.');
-      expect(why()!.compareDocumentPosition(pay()) & dom.window.Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      await until(dom, 'the stalls', () => Boolean(d.querySelector(`.listing[data-id="${id}"]`)));
+      (d.querySelector(`.listing[data-id="${id}"]`) as HTMLElement).click();
+      await until(dom, 'the stall screen', () => Boolean(d.querySelector('#next')));
+      // Said on the stall, before a question is answered — not at «Төлөх».
+      expect(d.querySelector('#closed b')?.textContent).toBe(PAYMENTS_CLOSED);
+      const next = d.querySelector('#next') as HTMLButtonElement;
+      expect(next.disabled).toBe(true);
+      const why = d.querySelector('#screen-foot .why');
+      expect(why?.textContent).toBe(PAYMENTS_CLOSED);
+      expect(why!.compareDocumentPosition(next) & dom.window.Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      // More of it is no nearer: the reason stays, the button stays grey.
+      (d.querySelector('#step-qty [data-d="1"]') as HTMLButtonElement).click();
+      expect((d.querySelector('#next') as HTMLButtonElement).disabled).toBe(true);
+      next.click();
+      expect(d.querySelector('#pay')).toBeNull();
       expect(await left()).toBe(before);
       expect(await ideshOf('+97699004031')).toEqual({ orders: 0, payments: 0 });
     } finally {
