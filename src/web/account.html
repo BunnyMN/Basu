@@ -66,7 +66,7 @@
 
 <script type="module">
 import { store, accountWays, popup, confirmPopup, whatWentWrong } from '/api.js';
-import { mountFrame, requireSignIn, authed, esc, el, say, signOut, nameOf, phoneShown } from '/site.js';
+import { mountFrame, requireSignIn, authed, esc, el, say, signOut, nameOf, phoneShown, siteEmpty } from '/site.js';
 
 const token = requireSignIn();
 void mountFrame('account');
@@ -194,7 +194,12 @@ if (token) {
   try {
     await draw();
   } catch (error) {
-    if (error.status !== 401) say(whatWentWrong(error), 'bad');
+    // Said where the account would be, with the way to try again — not a toast over a skeleton that never fills.
+    if (error.status !== 401) {
+      box.removeAttribute('aria-busy');
+      box.removeAttribute('role');
+      box.replaceChildren(siteEmpty({ icon: 'alert', title: 'Бүртгэлийг ачаалж чадсангүй', text: whatWentWrong(error), actions: [['Дахин ачаалах', '/account', 'dark']], card: true }));
+    }
   }
 }
 </script>

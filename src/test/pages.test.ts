@@ -1368,6 +1368,10 @@ describe('the website', () => {
     const stranger = await openPage('home.html');
     const d = stranger.window.document;
     await until(stranger, 'the tiles', () => d.querySelectorAll('.h-app').length >= 2);
+    // «Миний Basu» in the phone's menu, as in the account's menu and the foot; the bar, where four links and a name share a line, says «Нүүр».
+    expect(d.querySelector('#s-drawer a[href="/home"]')?.textContent).toBe('Миний Basu');
+    expect(d.querySelector('.s-nav a[href="/home"]')?.textContent).toBe('Нүүр');
+    expect(d.querySelector('.s-nav a[href="/home"]')?.getAttribute('aria-current')).toBe('page');
     // The same art as the phone's launcher, going where a browser can use it.
     expect(d.querySelector('[data-app="idesh"] img')?.getAttribute('src')).toBe('/brand/idesh-tile.webp');
     expect(d.querySelector('[data-app="idesh"]')?.getAttribute('href')).toBe('/shop');
@@ -3939,6 +3943,23 @@ describe('a first password, on the account page', () => {
     expect((page.window.document.querySelector('.account-ways [data-open="email"]') as HTMLElement).hidden).toBe(false);
   });
 
+  it('says in place, with the way to try again, when the account page cannot be loaded', async () => {
+    const page = await openPage(
+      'account.html',
+      '',
+      (path) => (path === '/v1/me/sessions' ? new Response(JSON.stringify({ error: { code: 'INTERNAL', message_mn: 'Түр алдаа гарлаа.' } }), { status: 500, headers: { 'content-type': 'application/json' } }) : undefined),
+      device(await devLogin('+97688060003', 'Вэб')),
+    );
+    const d = page.window.document;
+    await until(page, 'the trouble, said', () => Boolean(d.querySelector('#sa .s-empty')));
+    expect(d.querySelector('#sa .s-empty b')?.textContent).toBe('Бүртгэлийг ачаалж чадсангүй');
+    expect(d.querySelector('#sa .s-empty p')?.textContent).toBe('Түр алдаа гарлаа.');
+    expect(d.querySelector('#sa .s-empty a[href="/account"]')?.textContent).toBe('Дахин ачаалах');
+    // No skeleton left standing, and the page is not said to be loading any more.
+    expect(d.querySelector('#sa .s-skel')).toBeNull();
+    expect(d.getElementById('sa')?.hasAttribute('aria-busy')).toBe(false);
+  });
+
   it('opens the button in the letter that says a password changed on the step that replaces it, signed in or not', async () => {
     ctx.mailer = new FakeMailer();
     try {
@@ -4225,6 +4246,27 @@ describe('paying, said as it stands', () => {
     await until(home, 'the way it goes, said as it stands', (d) => d.querySelector('.s-how [data-pay] span')?.textContent === 'Онлайн төлбөр одоогоор хаалттай байна.');
     const front = await openPage('index.html', '', closed, device());
     await until(front, 'the front page’s steps, said as they stand', (d) => d.querySelector('#how [data-pay] span')?.textContent === 'Онлайн төлбөр одоогоор хаалттай байна.');
+  });
+
+  it('says the market’s paying step from the market’s own answer, asking for the listings once — and a stall only for itself', async () => {
+    const asked: string[] = [];
+    const market = await openPage('shop.html', '', (path) => {
+      if (path.startsWith('/v1/idesh/listings')) asked.push(path);
+      return closed(path);
+    }, device());
+    await until(market, 'the way it goes, said as it stands', (d) => d.querySelector('.s-how [data-pay] span')?.textContent === 'Онлайн төлбөр одоогоор хаалттай байна.');
+    await settled(market, 'the market');
+    expect(asked).toEqual(['/v1/idesh/listings']);
+
+    const id = await fullestStall();
+    const stallAsked: string[] = [];
+    const stall = await openPage('shop.html', `/${id}`, (path) => {
+      if (path.startsWith('/v1/idesh/listings')) stallAsked.push(path);
+      return undefined;
+    }, device());
+    await until(stall, 'the order form', (d) => Boolean(d.getElementById('next')));
+    await settled(stall, 'the stall');
+    expect(stallAsked).toEqual([`/v1/idesh/listings/${id}`]);
   });
 });
 

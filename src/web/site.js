@@ -228,8 +228,15 @@ export async function accountSlot(slot) {
 
 /* ── the frame ─────────────────────────────────────────────────────── */
 
+/**
+ * The website's places: [key, href, name, icon, the bar's word when it is
+ * shorter]. /home is «Миний Basu» — in the phone's menu, the account's menu
+ * and the foot. The bar alone says «Нүүр»: from 761px, where the links show
+ * in it, beside «Миний захиалга» and a long name in the corner (an address,
+ * a number) «Миний Basu» broke onto two lines up to about 830px.
+ */
 const NAV = [
-  ['home', '/home', 'Нүүр', 'home'],
+  ['home', '/home', 'Миний Basu', 'home', 'Нүүр'],
   ['shop', '/shop', 'Зах', 'shop'],
   ['orders', '/orders', 'Миний захиалга', 'orders'],
   ['business', '/dashboard', 'Бизнест', 'business'],
@@ -258,8 +265,8 @@ const NAV = [
  * pushed out of it when the page filled.
  */
 export function mountFrame(active) {
-  const link = ([key, href, label, icon], withIcon) =>
-    `<a href="${href}"${key === active ? ' aria-current="page"' : ''}>${withIcon ? ICON[icon] : ''}${label}</a>`;
+  const link = ([key, href, label, icon, short], withIcon) =>
+    `<a href="${href}"${key === active ? ' aria-current="page"' : ''}>${withIcon ? `${ICON[icon]}${label}` : (short ?? label)}</a>`;
   const bar = el(`
     <header class="s-bar">
       <div class="s-wrap">
