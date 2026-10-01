@@ -45,17 +45,18 @@ export async function overviewAt(now: Date) {
   const due = settlements.filter((t) => t.state === 'due').length;
   const needsAccount = settlements.filter((t) => t.state === 'needs_account').length;
 
+  // Each said in the desk's own words — no machine's name in English — with the section that answers it.
   const alerts: Alert[] = [];
-  if (wallet.drift !== 0) alerts.push({ level: 'bad', text: `Ledger тэнцэхгүй байна: зөрүү ${mnt(wallet.drift)}. Гараар бичсэн нэг талын бичилт орсон.`, tab: 'money' });
-  if (dine.late > 0) alerts.push({ level: 'bad', text: `Гал тавих ${dine.late} ажил хугацаанаасаа хоцорч байна. Scheduler ажиллаж байгаа эсэхийг шалга.` });
-  if (notify.stuck > 0) alerts.push({ level: 'bad', text: `${notify.stuck} мэдэгдэл 10 минутаас дээш дараалалд гацсан. Relay ажиллахгүй байна.` });
-  if (notify.failed.today > 0) alerts.push({ level: 'warn', text: `Өнөөдөр ${notify.failed.today} мэдэгдэл илгээгдэж чадсангүй.` });
-  if (wallet.receipts.failed > 0) alerts.push({ level: 'warn', text: `${wallet.receipts.failed} е-баримт гаргаж чадсангүй. PosAPI-г шалга.`, tab: 'money' });
-  if (wallet.topups.stuck > 0) alerts.push({ level: 'warn', text: `${wallet.topups.stuck} цэнэглэлт хагас цагаас дээш хүлээгдэж байна. QPay callback ирэхгүй байж магадгүй.`, tab: 'money' });
-  if (dine.held > 0) alerts.push({ level: 'warn', text: `Хоолны ${dine.held} захиалга түр зогсоосон байна.` });
-  if (dine.restaurants.offline > 0) alerts.push({ level: 'warn', text: `${dine.restaurants.offline} рестораны гал тогоо хаалттай — захиалга авахгүй.` });
-  if (due > 0) alerts.push({ level: 'warn', text: `Шилжүүлэх ${due} мөнгө хүлээж байна.`, tab: 'pay' });
-  if (applied > 0) alerts.push({ level: 'info', text: `${applied} нийлүүлэгчийн өргөдөл хариу хүлээж байна.`, tab: 'suppliers' });
+  if (wallet.drift !== 0) alerts.push({ level: 'bad', text: `Дэвтэр тэнцэхгүй байна: зөрүү ${mnt(wallet.drift)}. Гараар нэг талын бичилт орсон байна.`, tab: 'money' });
+  if (dine.late > 0) alerts.push({ level: 'bad', text: `Гал тавих ${dine.late} ажил хугацаанаасаа хоцорч байна. Хуваарьлагч ажиллаж байгаа эсэхийг шалгана уу.`, tab: 'system' });
+  if (notify.stuck > 0) alerts.push({ level: 'bad', text: `${notify.stuck} мэдэгдэл 10 минутаас дээш дараалалд гацсан. Мэдэгдэл илгээгч ажиллахгүй байна.`, tab: 'notify' });
+  if (notify.failed.today > 0) alerts.push({ level: 'warn', text: `Өнөөдөр ${notify.failed.today} мэдэгдэл илгээгдэж чадсангүй.`, tab: 'notify' });
+  if (wallet.receipts.failed > 0) alerts.push({ level: 'warn', text: `${wallet.receipts.failed} е-баримт гаргаж чадсангүй. Е-баримтын холболтыг шалгана уу.`, tab: 'money' });
+  if (wallet.topups.stuck > 0) alerts.push({ level: 'warn', text: `${wallet.topups.stuck} цэнэглэлт хагас цагаас дээш хүлээгдэж байна. QPay-ээс төлбөрийн мэдэгдэл ирэхгүй байж магадгүй.`, tab: 'money' });
+  if (dine.held > 0) alerts.push({ level: 'warn', text: `Хоолны ${dine.held} захиалга түр зогсоосон байна.`, tab: 'lunches' });
+  if (dine.restaurants.offline > 0) alerts.push({ level: 'warn', text: `${dine.restaurants.offline} рестораны гал тогоо хаалттай — захиалга авахгүй.`, tab: 'venues' });
+  if (due > 0) alerts.push({ level: 'warn', text: `${due} олголт, буцаалт шилжүүлэхийг хүлээж байна.`, tab: 'pay' });
+  if (applied > 0) alerts.push({ level: 'info', text: `${applied} нийлүүлэгчийн хүсэлт хариу хүлээж байна.`, tab: 'suppliers' });
   if (needsAccount > 0) alerts.push({ level: 'info', text: `${needsAccount} буцаалт зочны дансыг хүлээж байна.`, tab: 'pay' });
 
   return {

@@ -90,6 +90,12 @@ describe('somebody who has only just signed in', () => {
     expect(seen.workspaces[0]!.name).toBe('Шинэ');
   });
 
+  it('calls a corner with no name by its number, read as a number is read', async () => {
+    const made = await app.inject({ method: 'POST', url: '/v1/auth/register', payload: { phone: '+97699120002', password: PASSWORD } });
+    const seen = await access(made.json().token as string);
+    expect(seen.workspaces[0]!.name).toBe('+976 9912 0002');
+  });
+
   it('is nobody to the endpoint without a session', async () => {
     expect((await app.inject({ method: 'GET', url: '/v1/access' })).statusCode).toBe(401);
   });
@@ -264,7 +270,7 @@ describe('the desk', () => {
     const viewer = await member('+97699000011', 'Харагч', 'viewer');
 
     const financeDesk = (await access(finance)).workspaces.find((w) => w.kind === 'desk')!;
-    expect(financeDesk.sub).toBe('Ops · Санхүү');
+    expect(financeDesk.sub).toBe('Ширээ · Санхүү');
     expect(financeDesk.menu.map((g) => g.label)).toEqual([null, 'Платформ', 'Идэш', 'Байгууллага', 'Удирдлага']);
     expect(pages(financeDesk.menu)).not.toContain('venues');
     expect((await call('GET', '/v1/ops/dine/restaurants', finance)).statusCode).toBe(403);
