@@ -270,16 +270,12 @@ p{margin:0}
 .table:has(tr[data-link]) th:last-child{padding-right:32px}
 .table td.end{text-align:right}
 .run-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}
-/* Six numbers in one row on a wide desk, two rows of three below that, two by two on a phone —
-   never five and an orphan over a grey gap; four numbers four across, then two by two. */
-.kpi-band:has(> .kpi:nth-child(6):last-child){grid-template-columns:repeat(6,minmax(0,1fr))}
-.kpi-band:has(> .kpi:nth-child(4):last-child){grid-template-columns:repeat(4,minmax(0,1fr))}
-@media (max-width:1400px){.kpi-band:has(> .kpi:nth-child(6):last-child){grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media (max-width:900px){.kpi-band:has(> .kpi:nth-child(4):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:640px){.kpi-band:has(> .kpi:nth-child(6):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* How many numbers sit in a row is app.css's (.kpi-band): six across from 1400px and three and three
+   below it, four across while the band is wider than 860px and two by two under that — measured on
+   the band, which beside the sidebar is about 320px narrower than the screen. */
 /* six across with a long figure in it (fitBands marks it): the whole row a size down together, so it
    stays in its cells and the row stays even */
-@media (min-width:1401px){
+@media (min-width:1400px){
   .kpi-band:has(> .kpi:nth-child(6):last-child):has(> .kpi[data-long]) > .kpi:not([data-word]) > b{font-size:var(--t-title-2)}
   .kpi-band:has(> .kpi:nth-child(6):last-child):has(> .kpi[data-long="2"]) > .kpi:not([data-word]) > b{font-size:var(--t-title-3)}
 }
