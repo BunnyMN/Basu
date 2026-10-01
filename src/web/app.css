@@ -9,13 +9,15 @@
    The faces are the ones the iOS app bundles, served from /fonts so that a
    WebView in a yurt with a thin connection never waits on Google. Three
    static cuts each; nothing heavier than 600 exists, so nothing can ask
-   for it. */
-@font-face{font-family:"Golos Text";font-weight:400;font-style:normal;font-display:swap;src:url("/fonts/GolosText-Regular.woff2") format("woff2")}
-@font-face{font-family:"Golos Text";font-weight:500;font-style:normal;font-display:swap;src:url("/fonts/GolosText-Medium.woff2") format("woff2")}
-@font-face{font-family:"Golos Text";font-weight:600;font-style:normal;font-display:swap;src:url("/fonts/GolosText-SemiBold.woff2") format("woff2")}
-@font-face{font-family:"JetBrains Mono";font-weight:400;font-style:normal;font-display:swap;src:url("/fonts/JetBrainsMono-Regular.woff2") format("woff2")}
-@font-face{font-family:"JetBrains Mono";font-weight:500;font-style:normal;font-display:swap;src:url("/fonts/JetBrainsMono-Medium.woff2") format("woff2")}
-@font-face{font-family:"JetBrains Mono";font-weight:600;font-style:normal;font-display:swap;src:url("/fonts/JetBrainsMono-SemiBold.woff2") format("woff2")}
+   for it. Each file keeps only the characters the pages print, every
+   OpenType feature intact, and is cached for a year under its name: a new
+   cut gets a new name (scripts/web-fonts.sh). */
+@font-face{font-family:"Golos Text";font-weight:400;font-style:normal;font-display:swap;src:url("/fonts/GolosText-Regular.v2.woff2") format("woff2")}
+@font-face{font-family:"Golos Text";font-weight:500;font-style:normal;font-display:swap;src:url("/fonts/GolosText-Medium.v2.woff2") format("woff2")}
+@font-face{font-family:"Golos Text";font-weight:600;font-style:normal;font-display:swap;src:url("/fonts/GolosText-SemiBold.v2.woff2") format("woff2")}
+@font-face{font-family:"JetBrains Mono";font-weight:400;font-style:normal;font-display:swap;src:url("/fonts/JetBrainsMono-Regular.v2.woff2") format("woff2")}
+@font-face{font-family:"JetBrains Mono";font-weight:500;font-style:normal;font-display:swap;src:url("/fonts/JetBrainsMono-Medium.v2.woff2") format("woff2")}
+@font-face{font-family:"JetBrains Mono";font-weight:600;font-style:normal;font-display:swap;src:url("/fonts/JetBrainsMono-SemiBold.v2.woff2") format("woff2")}
 
 /* ── tokens: light ────────────────────────────────────────────────── */
 :root{
