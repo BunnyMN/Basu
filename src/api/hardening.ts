@@ -23,9 +23,13 @@ import { sendError } from './errors.js';
  * file's hash too (`integrity`), and bytes that ever differ do not run.
  */
 
+/**
+ * Where a page may take a stylesheet from besides us: MapLibre's, on the two
+ * map pages. Fonts come from /fonts alone (scripts/web-fonts.sh); no page
+ * asks Google for one.
+ */
 const WEB_ORIGINS = {
-  styles: ['https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
-  fonts: ['https://fonts.gstatic.com'],
+  styles: ['https://cdnjs.cloudflare.com'],
 };
 
 /** `'sha256-…'` for every inline `<script>` in the pages under `webRoot`. */
@@ -69,7 +73,7 @@ export function contentSecurityPolicy(scriptHashes: string[], scriptFiles: strin
     "default-src 'self'",
     `script-src 'self' ${scriptFiles.join(' ')} ${scriptHashes.join(' ')}`.replace(/\s+/g, ' ').trim(),
     `style-src 'self' 'unsafe-inline' ${WEB_ORIGINS.styles.join(' ')}`,
-    `font-src 'self' data: ${WEB_ORIGINS.fonts.join(' ')}`,
+    "font-src 'self' data:",
     "img-src 'self' data: blob:",
     "connect-src 'self'",
     "worker-src 'self' blob:",
