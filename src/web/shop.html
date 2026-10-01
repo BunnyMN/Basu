@@ -26,10 +26,6 @@
    foot that carries the total and the way to it. Open to anybody; paying
    asks who you are. */
 
-/* Until site.js puts the bar in, its room is kept: the page no longer drops by
-   the bar's height a moment after it is drawn (CLS 0.05 on a desk). */
-body:not(:has(> .s-bar)){padding-top:calc(var(--s-bar) + var(--safe-t) + 1px)}
-
 .sh-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:20px 40px}
 .sh-trust{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
 .sh-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px 24px;padding:0 0 20px;border-bottom:1px solid var(--line);margin-bottom:28px}
