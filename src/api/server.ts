@@ -378,6 +378,11 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
         [request.params.id, request.query.date ?? null, ctx.clock.now()],
       );
       return {
+        // The server's own time, so the page can leave out the times that
+        // have begun: the phone's clock is the wrong one wherever the clock
+        // is not the wall's (the demo's lunch hour), and a slot is still
+        // `available` by capacity after it has started.
+        now: ctx.clock.now().toISOString(),
         slots: (rows as Array<{
           starts_at: Date;
           max_orders: number;

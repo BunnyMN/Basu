@@ -943,7 +943,10 @@ describe('the guest app', () => {
         const dom = await openPage('dine.html');
         await until(dom, 'the explanation', (d) => Boolean(d.querySelector('#map .note')));
         expect(text(dom)).toContain('нэг ч гал тогоо нээлттэй биш');
-        expect(dom.window.document.querySelector('.note a')?.getAttribute('href')).toBe('/kds');
+        // Said to the guest in the guest's words. The kitchen's own screen is
+        // staff's: a link to its sign-in inside the guest's app was a dead end.
+        expect(dom.window.document.querySelector('#map .note')?.textContent).toContain('захиалга авахгүй байна');
+        expect(dom.window.document.querySelector('a[href="/kds"]')).toBeNull();
         // The pins are still drawn — the map is not the thing that failed.
         expect(pins(dom).length).toBe(seeded.venues);
         expect(pins(dom).every((f) => !f.properties['open'])).toBe(true);
@@ -953,6 +956,71 @@ describe('the guest app', () => {
         await getPool().query('UPDATE dine.restaurant SET kitchen_seen_at = $2 WHERE id = $1', [r.id, r.kitchen_seen_at]);
       }
     }
+  });
+
+  it('says plainly when there is no restaurant at all: no map of other businesses, no kitchen door, a way on', async () => {
+    // What production showed its first guests: a city of other people's
+    // cafés with nothing of ours on it, and a link to the kitchen's sign-in.
+    storage.removeItem('basu.guest');
+    const none = () => new Response(JSON.stringify({ restaurants: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const dom = await openPage('dine.html', '', (path) => (path === '/v1/restaurants' ? none() : undefined));
+    const d = dom.window.document;
+    await until(dom, 'the empty page', () => d.getElementById('blank')?.getAttribute('data-kind') === 'none' && !(d.getElementById('blank') as HTMLElement).hidden);
+    expect(text(dom)).toContain('Одоогоор ресторан алга');
+    // The way on: the app that has something in it, and the way home.
+    expect(d.querySelector('#blank a[href="/idesh"]')).toBeTruthy();
+    expect(d.querySelector('#blank [data-home]')).toBeTruthy();
+    // No city downloaded for nobody: the map is not even made.
+    expect((dom.window as unknown as Record<string, unknown>)['__map']).toBeUndefined();
+    expect(d.querySelector('a[href="/kds"]')).toBeNull();
+  });
+
+  it('says the connection is lost rather than drawing a blank map, and draws the map once it is back', async () => {
+    storage.removeItem('basu.guest');
+    let down = true;
+    const dom = await openPage('dine.html', '', (path) =>
+      down && path === '/v1/restaurants' ? Promise.reject(new TypeError('Failed to fetch')) : undefined,
+    );
+    const d = dom.window.document;
+    await until(dom, 'the failure, said', () => d.getElementById('blank')?.getAttribute('data-kind') === 'offline' && !(d.getElementById('blank') as HTMLElement).hidden);
+    expect(text(dom)).toContain('Холболт тасарлаа');
+    expect(d.querySelector('#blank [data-home]')).toBeTruthy();
+    expect(pins(dom)).toHaveLength(0);
+
+    down = false;
+    (d.querySelector('#blank [data-retry]') as HTMLElement).click();
+    await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
+    expect((d.getElementById('blank') as HTMLElement).hidden).toBe(true);
+  });
+
+  it('offers only the times still ahead on the server’s clock', async () => {
+    // The demo's clock stands at 11:40 for this file. 11:30 has begun, and a
+    // lunch nobody can arrive for is not offered; noon is.
+    const dom = await openPage('dine.html');
+    await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
+    tapPin(dom, pairedVenue);
+    await until(dom, 'the times', (d) => d.querySelectorAll('.slot').length > 0);
+    const offered = [...dom.window.document.querySelectorAll('.slot')].map((s) => s.textContent?.trim());
+    expect(offered).not.toContain('11:30');
+    expect(offered).toContain('12:00');
+  });
+
+  it('asks before it cancels a paid lunch, says what happens to the money, and cancels on yes', async () => {
+    await ownGuest('+97699003013');
+    const dom = await openPage('dine.html');
+    await orderFromMap(dom, pairedVenue, 'Цуйван', '13:15');
+    const d = dom.window.document;
+    clickText(dom, '#sheet-foot button', 'Үнэгүй цуцлах');
+    await until(dom, 'the question', () => Boolean(d.querySelector('.sheet.popup[data-open]')));
+    const ask = d.querySelector('.sheet.popup[data-open]')!;
+    expect(ask.textContent).toContain('Захиалгаа цуцлах уу?');
+    expect(ask.textContent).toContain('бүтнээрээ буцаагдана');
+    // Asking cancels nothing.
+    expect(['CANCELLED', 'REFUNDED']).not.toContain(d.querySelector('.status')?.getAttribute('data-s'));
+    (ask.querySelector('[data-submit]') as HTMLElement).click();
+    await until(dom, 'the lunch, cancelled', () =>
+      ['CANCELLED', 'REFUNDED'].includes(d.querySelector('.status')?.getAttribute('data-s') ?? ''),
+    );
   });
 });
 
@@ -1680,6 +1748,46 @@ describe('өвлийн идэш', () => {
     expect(storage.getItem('basu.guest')).toBeNull();
   });
 
+  it('says the connection is lost rather than waiting for ever, and draws the stalls once it is back', async () => {
+    storage.removeItem('basu.guest');
+    let down = true;
+    const dom = await openPage('idesh.html', '', (path) =>
+      down && path === '/v1/idesh/listings' ? Promise.reject(new TypeError('Failed to fetch')) : undefined,
+    );
+    const d = dom.window.document;
+    await until(dom, 'the failure, said', () => d.getElementById('blank')?.getAttribute('data-kind') === 'offline' && !(d.getElementById('blank') as HTMLElement).hidden);
+    expect(text(dom)).toContain('Холболт тасарлаа');
+    // Not a skeleton waiting for an answer that is not coming.
+    expect(d.querySelector('#listings[aria-busy="true"]')).toBeNull();
+    expect(d.querySelector('#blank [data-home]')).toBeTruthy();
+
+    down = false;
+    (d.querySelector('#blank [data-retry]') as HTMLElement).click();
+    await until(dom, 'the stalls', () => d.querySelectorAll('.listing').length >= seeded.listings);
+    expect((d.getElementById('blank') as HTMLElement).hidden).toBe(true);
+  });
+
+  it('says plainly when nothing is on sale, and draws no filter that filters nothing', async () => {
+    storage.removeItem('basu.guest');
+    const market = (listings: unknown[]) =>
+      new Response(JSON.stringify({ today: '2026-10-01', listings }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const empty = await openPage('idesh.html', '', (path) => (path === '/v1/idesh/listings' ? market([]) : undefined));
+    const d = empty.window.document;
+    await until(empty, 'the empty market', () => d.getElementById('blank')?.getAttribute('data-kind') === 'none' && !(d.getElementById('blank') as HTMLElement).hidden);
+    expect(text(empty)).toContain('Одоогоор зар алга');
+    expect((d.getElementById('kinds') as HTMLElement).hidden).toBe(true);
+    // What happens after a purchase is said even while there is nothing to buy.
+    expect((d.getElementById('how') as HTMLElement).hidden).toBe(false);
+
+    // Two stalls of one kind — production's market: a list, and no «Бүгд» over it.
+    const { listings } = (await (await fetch(`${base}/v1/idesh/listings`)).json()) as { listings: Array<{ kind: string }> };
+    const beef = listings.filter((l) => l.kind === 'beef').slice(0, 2);
+    const two = await openPage('idesh.html', '', (path) => (path === '/v1/idesh/listings' ? market(beef) : undefined));
+    await until(two, 'two stalls', (doc) => doc.querySelectorAll('.listing').length === 2);
+    expect((two.window.document.getElementById('kinds') as HTMLElement).hidden).toBe(true);
+    expect(two.window.document.querySelector('#tally')?.textContent).toMatch(/^2 зар · \d+ гэрээт нийлүүлэгч$/);
+  });
+
   it('says who is signed in, and signs out for real', async () => {
     await ownGuest('+97699004014');
     const token = storage.getItem('basu.guest')!;
@@ -1771,8 +1879,10 @@ describe('өвлийн идэш', () => {
 
     pay().click();
     await until(dom, 'Pay again, after the lost answer', () => network.lost && !pay().disabled);
-    // In words the guest reads, not the browser's «Failed to fetch».
-    expect(dom.window.document.getElementById('toast')?.textContent).toBe(CONNECTION_LOST);
+    // In words the guest reads, not the browser's «Failed to fetch» — and
+    // above the button it is about, not in a toast lying over that button.
+    expect(dom.window.document.querySelector('#screen-foot .why[data-tone="stop"]')?.textContent).toBe(CONNECTION_LOST);
+    expect(dom.window.document.getElementById('toast')?.hasAttribute('data-show') ?? false).toBe(false);
     // Tapped twice, in a hurry: still one tap.
     pay().click();
     pay().click();
@@ -3348,26 +3458,32 @@ describe('Basu decides who may do what', () => {
   });
 
   it('renames a module and hides a page, and the sidebar follows the moment it is saved', async () => {
-    const desk = await theDesk();
-    await opsTab(desk, 'menus');
-    await until(desk, 'the menu', (d) => d.querySelectorAll('#menu-board .menu-mod').length >= 6);
-    const doc = desk.window.document;
-    // The page is read; each change is a popup, saved as it closes.
-    expect(doc.querySelector('#menu-board input')).toBeNull();
-    (doc.querySelector('.menu-mod[data-module="platform"] [data-edit-mod]') as HTMLElement).click();
-    await answerPopup(desk, { name: 'Үндсэн үйлчилгээ' });
-    await until(desk, 'the sidebar renamed', (d) => d.querySelector('.nav-mod[data-group="platform"] .mod .t')?.textContent === 'Үндсэн үйлчилгээ');
-    await until(desk, 'the menu again', (d) => Boolean(d.querySelector('.menu-page[data-page="reviews"] [data-edit-page]')));
-    (doc.querySelector('.menu-page[data-page="reviews"] [data-edit-page]') as HTMLElement).click();
-    await answerPopup(desk, { shown: '0' });
-    await until(desk, 'the page gone from the sidebar', (d) => !d.querySelector('.tabs [data-tab="reviews"]'));
-    expect(doc.querySelector('.menu-page[data-page="reviews"]')?.hasAttribute('data-off')).toBe(true);
-    // Put it back for whoever comes next.
-    await fetch(`${base}/v1/ops/menus/desk`, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json', authorization: `Bearer ${await deskToken()}` },
-      body: JSON.stringify({ modules: [{ key: 'platform', name: 'Платформ' }], pages: [{ key: 'reviews', hidden: false }] }),
-    });
+    try {
+      const desk = await theDesk();
+      await opsTab(desk, 'menus');
+      await until(desk, 'the menu', (d) => d.querySelectorAll('#menu-board .menu-mod').length >= 6);
+      const doc = desk.window.document;
+      // The page is read; each change is a popup, saved as it closes.
+      expect(doc.querySelector('#menu-board input')).toBeNull();
+      (doc.querySelector('.menu-mod[data-module="platform"] [data-edit-mod]') as HTMLElement).click();
+      await answerPopup(desk, { name: 'Үндсэн үйлчилгээ' });
+      await until(desk, 'the sidebar renamed', (d) => d.querySelector('.nav-mod[data-group="platform"] .mod .t')?.textContent === 'Үндсэн үйлчилгээ');
+      await until(desk, 'the menu again', (d) => Boolean(d.querySelector('.menu-page[data-page="reviews"] [data-edit-page]')));
+      (doc.querySelector('.menu-page[data-page="reviews"] [data-edit-page]') as HTMLElement).click();
+      await answerPopup(desk, { shown: '0' });
+      await until(desk, 'the page gone from the sidebar', (d) => !d.querySelector('.tabs [data-tab="reviews"]'));
+      // The board is drawn again from the server after the save; the sidebar
+      // can be quicker than it, so wait for the board's own redraw.
+      await until(desk, 'the board to mark it hidden', (d) => Boolean(d.querySelector('.menu-page[data-page="reviews"][data-off]')));
+      expect(doc.querySelector('.menu-page[data-page="reviews"]')?.hasAttribute('data-off')).toBe(true);
+    } finally {
+      // Put it back for whoever comes next — also when the test above failed.
+      await fetch(`${base}/v1/ops/menus/desk`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json', authorization: `Bearer ${await deskToken()}` },
+        body: JSON.stringify({ modules: [{ key: 'platform', name: 'Платформ' }], pages: [{ key: 'reviews', hidden: false }] }),
+      });
+    }
   });
 
   it('opens a business from the desk and gives somebody there another role', async () => {

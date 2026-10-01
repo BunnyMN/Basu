@@ -26,13 +26,23 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
    Layout only. Colour, type, radius, buttons, chips, rows, fields and cards
    all come from app.css; this sheet says where things sit. */
 
+/* ── the bar ─────────────────────────────────────────────────────── */
+/* One bar, the one the stall screens and the lunch map have: «‹ Basu» on
+   the leading edge, the title in the middle. On the list it behaves the
+   way a phone's own large title does — clear over the ground while the
+   big «Өвлийн идэш» is in view, glass with the small title once that has
+   scrolled under it. The bar owns the top inset, so nothing below adds it
+   again the day the shell draws the page edge to edge. */
+#bar{transition:background-color var(--dur) var(--ease),border-color var(--dur) var(--ease)}
+#bar .title{opacity:1;transition:opacity var(--dur) var(--ease)}
+#bar[data-flat]{background:transparent;border-bottom-color:transparent;-webkit-backdrop-filter:none;backdrop-filter:none}
+#bar[data-flat] .title{opacity:0}
+/* a later look that failed: one line under the bar, over the list and over a stall's screen alike */
+#stale{position:fixed;left:0;right:0;top:calc(var(--bar-h) + var(--safe-t));z-index:calc(var(--z-sheet) + 1)}
+
 /* ── the list ────────────────────────────────────────────────────── */
-.home{
-  display:inline-flex;align-items:center;gap:2px;min-height:var(--target);margin-left:-4px;padding:0 8px 0 4px;
-  color:var(--accent-ink);font-size:var(--t-body-lg);font-weight:500;text-decoration:none;
-}
-.home svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.top{padding-top:0;margin-bottom:20px}
+#list.wrap{padding-top:0}
+.top.page-head[data-large]{padding-top:4px;margin-bottom:20px}
 .top .sub{margin-bottom:0}
 
 /* the three promises: one card, hairline rows; three columns on a wide screen */
@@ -74,10 +84,12 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 /* Every stall here is under contract — the tally above the list says so once
    (5.5); the row keeps its mark in the DOM and not on the screen. */
 .listing .from .verified{display:none}
-/* one meta line: place · day · delivery. The dot trails each item, so a
+/* one meta line: day · place · delivery — the day first, because it is
+   what a buyer plans around and the end of a cut line is where it used to
+   be. It may wrap to a second line; the dot trails each item, so a
    wrapped run never starts a line with a lone «·». */
-.bits{display:block;font-size:var(--t-pill);line-height:1.4;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bits span{white-space:nowrap}
+.bits{display:flex;flex-wrap:wrap;font-size:var(--t-pill);line-height:1.4;color:var(--ink-3)}
+.bits span{white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .bits span:not(:last-child)::after{content:"·";margin:0 6px;color:var(--ink-3)}
 .bits svg{display:none}
 /* A stall's row is two lines: the picture and the words, then stock and
@@ -102,12 +114,36 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 .listing[data-gone] .money{color:var(--ink-3)}
 .listing[data-gone] .art img{filter:grayscale(1)}
 
+/* ── nothing to show, or no way to ask ───────────────────────────── */
+/* In the list's place, in the flow of the page: a mark, what happened, the
+   way on. Never a lone «Бүгд» over two grey lines, never a skeleton that
+   waits for ever. */
+.blank{display:flex;flex-direction:column;align-items:center;text-align:center;padding:28px 8px 12px}
+.blank .plate{width:64px;height:64px;margin:0 0 18px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent-ink)}
+.blank .plate svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.blank[data-kind="offline"] .plate{background:var(--surface-2);color:var(--ink-3);border:1px solid var(--line)}
+.blank h2{font-size:var(--t-title-3);line-height:var(--lh-snug);letter-spacing:0}
+.blank p{margin:8px 0 0;font-size:var(--t-body);line-height:var(--lh-body);color:var(--ink-2);max-width:34ch}
+.blank .acts{display:flex;flex-direction:column;gap:8px;width:100%;max-width:320px;margin-top:22px}
+.blank .acts .btn{width:100%}
+
+/* ── how it goes ─────────────────────────────────────────────────── */
+/* Three lines under the stalls for somebody buying a winter's meat for the
+   first time: what happens after the tap, in order. True for every stall. */
+.how{margin:32px 0 0}
+.how .section-title{margin:0 0 12px}
+.how ol{list-style:none;margin:0;padding:0;counter-reset:how}
+.how ol > li{display:grid;grid-template-columns:28px minmax(0,1fr);column-gap:12px;align-items:start;padding:12px 16px;counter-increment:how}
+.how ol > li::before{content:counter(how);grid-column:1;grid-row:1 / span 2;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);font-family:var(--mono);font-size:var(--t-cap);font-weight:600;color:var(--ink-2)}
+.how li b{grid-column:2;font-size:var(--t-body-lg);font-weight:600;line-height:1.35;color:var(--ink)}
+.how li span{grid-column:2;font-size:var(--t-cap);line-height:1.45;color:var(--ink-2);margin-top:2px}
+
 /* two columns on a desk: the promises and my orders stay put, the stalls scroll */
 @media (min-width:900px){
   .wrap{max-width:960px;display:grid;grid-template-columns:minmax(280px,5fr) minmax(0,7fr);column-gap:32px;align-items:start}
   /* pinned only while it is short: a column of thirteen orders scrolls with the page instead */
-  .intro:has(.mine:not([data-any])){position:sticky;top:24px}
-  .market{padding-top:44px}
+  .intro:has(.mine:not([data-any])){position:sticky;top:calc(var(--bar-h) + var(--safe-t) + 12px)}
+  .market{padding-top:12px}
 }
 
 /* ── the screen ──────────────────────────────────────────────────── */
@@ -149,6 +185,9 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 .foot-row .btn{flex:none;min-width:46%;min-height:var(--h-lg)}
 .why{display:flex;align-items:center;gap:6px;margin:0 0 10px;font-size:var(--t-cap);line-height:1.4;color:var(--ink-3)}
 .why svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+/* a refused payment, said above the button it is about, until the next tap */
+.why[data-tone="stop"]{align-items:flex-start;color:var(--stop);font-weight:500}
+.why[data-tone="stop"] svg{margin-top:1px}
 
 /* the stall */
 .hero{height:220px;background:var(--surface-2);overflow:hidden}
@@ -162,6 +201,8 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 .facts .lab{display:block;margin-bottom:6px}
 .facts b{display:block;font-size:var(--t-body-lg);font-weight:600;line-height:1.3;font-variant-numeric:tabular-nums}
 .facts b small{font-size:var(--t-cap);font-weight:400;color:var(--ink-2)}
+/* the number in the mono, the unit beside it in the sans (2.2) */
+.facts b .mn{font-weight:600}
 .note{margin:16px var(--s-5) 0}
 
 /* one question per step, numbered, hairline between them */
@@ -198,9 +239,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 .choice[disabled] .dot{background:var(--surface-2)}
 
 .mapbox{position:relative;height:190px;margin-top:4px;border:1px solid var(--line-2);border-radius:var(--r-ctl);overflow:hidden;background:var(--surface-2)}
-/* until mapStyle.js has a dark palette, the light tiles are dimmed under a dark theme (3.4) */
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .mapbox::after{content:"";position:absolute;inset:0;z-index:1;background:var(--bg);opacity:.35;pointer-events:none}}
-:root[data-theme="dark"] .mapbox::after{content:"";position:absolute;inset:0;z-index:1;background:var(--bg);opacity:.35;pointer-events:none}
+/* mapStyle.js draws the night itself now: no veil over daylight tiles. */
 .mapbox .tip{
   position:absolute;left:10px;bottom:10px;z-index:2;padding:5px 10px;border-radius:var(--r-sm);
   background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);font-size:var(--t-cap);color:var(--ink-2);
@@ -229,7 +268,8 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 .status .mark{width:48px;height:48px;border-radius:50%;margin:0 auto 14px;display:grid;place-items:center;background:var(--ready-soft);color:var(--ready)}
 .status .mark svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .status[data-s="PAID"] .mark,.status[data-s="DISPATCHED"] .mark{background:var(--route-soft);color:var(--route)}
-.status[data-s="PREPARING"] .mark{background:var(--accent-soft);color:var(--accent-ink)}
+/* the meat being prepared is honey, as its chip is and as the launcher's dot is */
+.status[data-s="PREPARING"] .mark{background:var(--hi-soft);color:var(--hi-ink)}
 /* a finished negative outcome is not an alarm: neutral, not red */
 .status[data-s="CLOSED"] .mark,.status[data-s="CANCELLED"] .mark,.status[data-s="REFUNDED"] .mark{background:var(--surface-2);color:var(--ink-3)}
 .status .big{font-size:var(--t-headline);font-weight:600;line-height:var(--lh-tight);letter-spacing:-.015em;text-wrap:balance}
@@ -266,11 +306,17 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 </head>
 <body>
 
+<header class="topbar" id="bar" data-flat>
+  <a class="home" href="/app" id="home" aria-label="Basu нүүр"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Basu</a>
+  <div class="title" aria-hidden="true"><b>Өвлийн идэш</b></div>
+  <span class="act"></span>
+</header>
+<div class="stale-strip" id="stale" role="status" hidden>Холболт тасарлаа — дахин холбогдож байна…</div>
+
 <main class="wrap" id="list">
   <div class="intro">
-  <a class="home" href="/app" id="home" aria-label="Basu нүүр"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Basu</a>
   <div class="top page-head" data-large>
-    <h1>Өвлийн идэш</h1>
+    <h1 id="title">Өвлийн идэш</h1>
     <p class="sub">Гэрээт малчин, махны газраас.</p>
     <p class="me" id="me" hidden><span>Нэвтэрсэн: <b id="me-name"></b></span><button class="link" type="button" id="sign-out">Гарах</button></p>
   </div>
@@ -297,6 +343,17 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
     <li><span class="skel-row" aria-hidden="true"><span class="skel"></span><span class="skel-lines"><span class="skel"></span><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></span></li>
     <li><span class="skel-row" aria-hidden="true"><span class="skel"></span><span class="skel-lines"><span class="skel"></span><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></span></li>
   </ul>
+  <section class="blank" id="blank" aria-live="polite" hidden></section>
+
+  <!-- What happens after the tap, for somebody doing this for the first time. -->
+  <section class="how" id="how" hidden>
+    <h2 class="section-title">Хэрхэн авах вэ?</h2>
+    <ol data-rows>
+      <li><b>Зараа сонгоод төлнө</b><span>Үнэ нь зар дээр бичсэнээрээ эцсийнх — нэг удаа, бүтнээр нь төлнө.</span></li>
+      <li><b>Нийлүүлэгч бэлтгэнэ</b><span>Төлбөр орсны дараа малаа нядалж, махыг бэлтгэнэ. Явц нь энд харагдана.</span></li>
+      <li><b>Кодоо хэлээд авна</b><span>Өөрөө очиж, эсвэл гэртээ хүргүүлж авна. Нийлүүлэгч кодыг тань сонсоод махыг өгнө.</span></li>
+    </ol>
+  </section>
   </div>
 </main>
 
@@ -316,7 +373,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js" integrity="sha512-hoXlvOdSmh58mppUyZHZsscHkR/yXl6zLpTMTNwA6IZ61DpeaCNjosRu1WJ2DeIpkfW5MsJJ9H89zjV4IBGqRw==" crossorigin="anonymous"></script>
 <script type="module">
 import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, KIND, dayLabel, dayShort, signInSheet, dropSession, whatWentWrong } from '/api.js';
-import { mapStyle, ULAANBAATAR } from '/mapStyle.js';
+import { mapStyle, mapTheme, onMapTheme, repaintMap, ULAANBAATAR } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (html) => {
@@ -386,9 +443,13 @@ const MARK = {
   minus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg>',
   plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>',
   next: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
+  info: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5h.01"/></svg>',
+  offline: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 8.8a14 14 0 0 1 5-2.9M21.5 8.8A14 14 0 0 0 12 5c-.7 0-1.4 0-2 .1M5.5 12.4a9 9 0 0 1 3.4-2M18.5 12.4a9 9 0 0 0-3.2-1.9M9 15.9a4.5 4.5 0 0 1 6 0M12 19.5h.01M3 3l18 18"/></svg>',
 };
 
 const state = {
+  /** The stalls have been drawn once: a later failure leaves them standing. */
+  loaded: false,
   today: null,
   listings: [],
   kind: 'all',
@@ -409,6 +470,33 @@ const state = {
  * awaits the server and then touches the page checks this first.
  */
 let gone = false;
+
+/** Back to the shell's launcher — or, in a browser, the web one. */
+function goHome() {
+  if (shell.present) shell.post({ type: 'home' });
+  else location.href = '/app';
+}
+
+/**
+ * The bar is clear while the large title is in view and glass, with the
+ * small title, once the large one has gone under it — the phone's own
+ * large-title behaviour. Read on scroll, at most once a frame.
+ */
+let barFrame = 0;
+function settleBar() {
+  barFrame = 0;
+  const bar = $('bar');
+  const title = $('title');
+  // Glass as soon as the big title starts under the bar, not once it is all
+  // gone: between the two it drew over «‹ Basu» on a clear bar.
+  const under = title.getBoundingClientRect().top < bar.getBoundingClientRect().bottom;
+  bar.toggleAttribute('data-flat', !under);
+}
+addEventListener('scroll', () => {
+  if (!barFrame) barFrame = requestAnimationFrame(settleBar);
+}, { passive: true });
+// A page that opens already scrolled (restored, or reloaded mid-list) gets the right bar at once.
+barFrame = requestAnimationFrame(settleBar);
 
 /* ── signing in ──────────────────────────────────────────────────── */
 
@@ -448,14 +536,84 @@ async function guestApi(path, options = {}) {
  */
 async function loadListings() {
   const token = store.guestToken;
-  const answer = await api('/v1/idesh/listings');
-  if (gone) return;
+  let answer;
+  try {
+    answer = await api('/v1/idesh/listings');
+  } catch (error) {
+    if (gone) return false;
+    // Nothing drawn yet: the skeleton must not wait for ever. Stalls already
+    // on the screen stay; they are still what was on sale a moment ago, and
+    // the strip under the bar says they may be out of date.
+    if (!state.loaded) showBlank('offline');
+    else showStale(true);
+    return false;
+  }
+  if (gone) return false;
+  showStale(false);
+  state.loaded = true;
   if (token) void paintMe(token);
   const { today, listings } = answer;
   state.today = today;
   state.listings = listings;
   paintKinds();
   paintListings();
+  return true;
+}
+
+/**
+ * The block in the list's place. `none`: nothing on sale — said, with when
+ * stalls usually come, and the way home. `offline`: the server out of reach
+ * — said in words, with a retry and the way home.
+ */
+const BLANK = {
+  none: {
+    plate: () => MARK.day,
+    title: 'Одоогоор зар алга',
+    text: 'Нийлүүлэгчид өвлийн идшээ ихэвчлэн 10–11-р сард зарладаг. Шинэ зар гармагц энд харагдана.',
+    act: '',
+  },
+  offline: {
+    plate: () => MARK.offline,
+    title: 'Холболт тасарлаа',
+    text: 'Интернэтээ шалгаад дахин оролдоно уу. Холбогдмогц зарууд өөрөө гарч ирнэ.',
+    act: '<button class="btn" data-v="primary" data-size="lg" type="button" data-retry>Дахин оролдох</button>',
+  },
+};
+
+function showBlank(kind) {
+  const what = BLANK[kind];
+  const box = $('blank');
+  box.dataset.kind = kind;
+  box.innerHTML = `
+    <div class="plate" aria-hidden="true">${what.plate()}</div>
+    <h2>${what.title}</h2>
+    <p>${what.text}</p>
+    <div class="acts">${what.act}<button class="btn"${what.act ? ' data-v="quiet"' : ''} data-size="lg" type="button" data-home>Нүүр рүү буцах</button></div>`;
+  box.querySelector('[data-home]').addEventListener('click', goHome);
+  box.querySelector('[data-retry]')?.addEventListener('click', (event) => {
+    const button = event.currentTarget;
+    button.dataset.busy = '1';
+    void Promise.all([loadListings(), loadMine()]).then(([ok]) => {
+      if (ok) void resume();
+      else delete button.dataset.busy;
+    });
+  });
+  box.hidden = false;
+  // Nothing to filter and nothing to count; and while the server is out of
+  // reach, nothing to explain yet either.
+  $('listings').replaceChildren();
+  $('listings').removeAttribute('aria-busy');
+  $('listings').hidden = true;
+  $('kinds').hidden = true;
+  $('tally-row').hidden = true;
+  $('how').hidden = kind === 'offline';
+}
+
+function hideBlank() {
+  $('blank').hidden = true;
+  delete $('blank').dataset.kind;
+  $('listings').hidden = false;
+  $('tally-row').hidden = false;
 }
 
 /**
@@ -492,6 +650,10 @@ function paintKinds() {
   const box = $('kinds');
   box.replaceChildren();
   const present = new Set(state.listings.map((l) => l.kind));
+  // A filter that can only say «all» filters nothing: it is drawn when two
+  // kinds of animal are on sale, not for one, and not for none.
+  box.hidden = present.size < 2;
+  if (present.size < 2) state.kind = 'all';
   const options = [['all', 'Бүгд'], ...Object.entries(KIND).filter(([k]) => present.has(k))];
   for (const [key, label] of options) {
     const button = el(
@@ -508,16 +670,41 @@ function paintKinds() {
 
 const unitWord = (l) => (l.unit === 'whole' ? 'толгой' : 'кг');
 
+/**
+ * A Mongolian number the way it is read back: «+976 9911 2233». What was
+ * typed is what is sent; this is only how it is shown. Anything that is not
+ * eight digits (with or without 976) is shown as it was written.
+ */
+function phoneShown(raw) {
+  const digits = String(raw ?? '').replace(/[\s()-]/g, '');
+  const m = /^(?:\+?976)?(\d{4})(\d{4})$/.exec(digits);
+  return m ? `+976 ${m[1]} ${m[2]}` : String(raw ?? '');
+}
+
 /** «бүтэн · ~38 кг» / «1 кг · доод тал нь 20 кг» — what the price is for. */
 function priceFor(l) {
   return l.unit === 'whole' ? `бүтэн · ~${l.approx_kg} кг` : `1 кг · доод тал нь ${l.min_qty} кг`;
 }
 
-/** «Улаанбаатар · 9-р сарын 20-нөөс · Хүргэлттэй» — one run, no whitespace between the items so the dots space evenly. */
-function bits(l, day) {
+/**
+ * «9-р сарын 20-нөөс · Улаанбаатар · Хүргэлттэй» — the day first, because it
+ * is what a buyer plans around; one run, no whitespace between the items so
+ * the dots space evenly. In the list the origin is left out (`where: false`)
+ * only when the supplier's name already says the place (`placeInName`).
+ */
+/**
+ * «Архангай · Доржийн хот айл» selling meat from «Архангай, Их тамир» says
+ * the place twice; «GH impex» selling «Хөвсгөл тайга» says it nowhere else.
+ */
+function placeInName(l) {
+  const place = String(l.origin ?? '').split(/[,·]/)[0].trim();
+  return !place || l.supplier.name.includes(place);
+}
+
+function bits(l, day, { where = true } = {}) {
   return [
-    `<span>${MARK.pin}${escapeHtml(l.origin)}</span>`,
     `<span>${MARK.day}${day}</span>`,
+    where ? `<span>${MARK.pin}${escapeHtml(l.origin)}</span>` : '',
     l.delivers ? `<span>${MARK.truck}Хүргэлттэй</span>` : '',
   ].join('');
 }
@@ -533,10 +720,16 @@ function paintListings() {
     ? `${state.listings.length} зар · ${suppliers} гэрээт нийлүүлэгч`
     : '';
 
+  // How it goes is worth saying wherever the stalls are, and most of all
+  // where there are few of them.
+  $('how').hidden = false;
+  if (!state.listings.length) {
+    showBlank('none');
+    return;
+  }
+  hideBlank();
   if (!shown.length) {
-    list.append(
-      el(`<li class="empty">Одоогоор зар алга.<br>Өвлийн идэшний зар 10–11-р сард гарна.</li>`),
-    );
+    list.append(el(`<li class="empty">Энэ төрлийн зар одоогоор алга.</li>`));
     return;
   }
   for (const l of shown) {
@@ -548,11 +741,11 @@ function paintListings() {
         <button class="listing row" type="button" data-kind="${escapeHtml(l.kind)}" data-id="${escapeHtml(l.id)}"${l.tier ? ` data-tier="${escapeHtml(l.tier)}"` : ''}${gone_ ? ' data-gone' : ''} data-chev>
           <span class="art lead"><img src="${PHOTO(l.kind)}" alt="" loading="lazy" width="64" height="64"></span>
           <span class="who main">
-            <span class="name title">${l.tier ? `<i class="tier chip" data-size="sm" data-tone="${l.tier === 'vip' ? 'hi' : 'accent'}" data-strong>${l.tier === 'vip' ? '★ VIP' : 'Онцгой'}</i> ` : ''}${escapeHtml(l.title)}</span>
+            <span class="name title">${l.tier ? `<i class="tier chip" data-size="sm" data-tone="${l.tier === 'vip' ? 'hi' : 'accent'}" data-strong>${l.tier === 'vip' ? 'VIP' : 'Онцгой'}</i> ` : ''}${escapeHtml(l.title)}</span>
             <span class="from">${
               l.supplier.contracted ? `<i class="verified badge">${MARK.check}Гэрээт</i>` : ''
             }${escapeHtml(l.supplier.name)}</span>
-            <span class="bits">${bits(l, `${dayLabel(l.ready_from)}-нөөс`)}</span>
+            <span class="bits">${bits(l, `${dayLabel(l.ready_from)}-нөөс`, { where: !placeInName(l) })}</span>
           </span>
           <span class="row">
             <span class="left chip"${gone_ ? ' data-gone' : low ? ' data-low data-tone="hold" data-strong' : ''}>${
@@ -629,7 +822,7 @@ addEventListener('popstate', (event) => {
   // Walking back onto a face that is still meaningful redraws it in place.
   if (face === 'detail' && state.listing) renderDetail({ replace: true });
   else if (face === 'review' && state.listing) renderReview({ replace: true });
-  else if (face === 'status' && state.orderId) void showStatus(true, { replace: true });
+  else if (face === 'status' && state.orderId) void showStatus(true, { replace: true }).catch((error) => toast(whatWentWrong(error), 'bad'));
   else closeScreen();
 });
 
@@ -692,11 +885,11 @@ function renderDetail({ replace = false } = {}) {
   body.append(
     el(`<div class="facts card">
           <div><span class="lab">Үнэ</span><b>${money(l.price_mnt)}<small> / ${unitWord(l)}</small></b></div>
-          <div><span class="lab">${l.unit === 'whole' ? 'Ойролцоо жин' : 'Доод захиалга'}</span><b class="mn">${
-            l.unit === 'whole' ? `~${l.approx_kg} кг` : `${l.min_qty} кг`
-          }</b></div>
+          <div><span class="lab">${l.unit === 'whole' ? 'Ойролцоо жин' : 'Доод захиалга'}</span><b><span class="mn">${
+            l.unit === 'whole' ? `~${l.approx_kg}` : `${l.min_qty}`
+          }</span> кг</b></div>
           <div><span class="lab">Бэлэн болох</span><b>${dayLabel(l.ready_from)}</b></div>
-          <div><span class="lab">Үлдсэн</span><b class="mn">${l.remaining} ${unitWord(l)}</b></div>
+          <div><span class="lab">Үлдсэн</span><b><span class="mn">${l.remaining}</span> ${unitWord(l)}</b></div>
         </div>`),
   );
 
@@ -810,25 +1003,46 @@ function whereStep(f) {
       <div class="q section-title"><span class="n">4</span><b>Хаана хүргэх вэ?</b></div>
       <div class="field">
         <label for="address">Хаяг</label>
-        <textarea id="address" placeholder="Дүүрэг, хороолол, байр, орц, тоот">${escapeHtml(f.address)}</textarea>
+        <textarea id="address" autocomplete="street-address" aria-describedby="address-help" placeholder="Дүүрэг, хороолол, байр, орц, тоот">${escapeHtml(f.address)}</textarea>
+        <small class="help" id="address-help" aria-live="polite">Хүргэгч энэ хаягаар ирнэ.</small>
       </div>
       <div class="field">
         <label for="phone">Хүргэгчийн залгах утас</label>
-        <input type="tel" id="phone" inputmode="tel" placeholder="+976 XXXX XXXX" value="${escapeHtml(f.phone)}">
+        <input type="tel" id="phone" inputmode="tel" autocomplete="tel" aria-describedby="phone-help" placeholder="+976 XXXX XXXX" value="${escapeHtml(f.phone)}">
+        <small class="help" id="phone-help" aria-live="polite">Хүргэгч ирэхийн өмнө энэ дугаар руу залгана.</small>
       </div>
       <div class="field">
         <label>Газрын зураг дээр цэг <span class="opt">— заавал биш, хүргэгчид тусална</span></label>
         <div class="mapbox" id="mapbox"><span class="tip" id="maptip">Байшингаа дарж цэг тавина уу</span></div>
       </div>
     </div>`);
-  where.querySelector('#address').addEventListener('input', (e) => {
-    f.address = e.target.value;
-    renderFoot();
-  });
-  where.querySelector('#phone').addEventListener('input', (e) => {
-    f.phone = e.target.value;
-    renderFoot();
-  });
+  /**
+   * Said under the field, once the person has been in it and left it empty —
+   * never before they have had a chance to fill it in. The bar under the
+   * screen says the same until both are there.
+   */
+  const watch = (id, why, quiet, hint) => {
+    const input = where.querySelector(`#${id}`);
+    const help = where.querySelector(`#${id}-help`);
+    const say = (problem) => {
+      if (problem) {
+        input.setAttribute('aria-invalid', 'true');
+        help.setAttribute('data-error', '');
+      } else {
+        input.removeAttribute('aria-invalid');
+        help.removeAttribute('data-error');
+      }
+      help.textContent = problem ?? hint;
+    };
+    input.addEventListener('blur', () => say(input.value.trim() ? null : why));
+    input.addEventListener('input', (e) => {
+      f[quiet] = e.target.value;
+      if (e.target.value.trim()) say(null);
+      renderFoot();
+    });
+  };
+  watch('address', 'Хаягаа бичнэ үү.', 'address', 'Хүргэгч энэ хаягаар ирнэ.');
+  watch('phone', 'Залгах утсаа бичнэ үү.', 'phone', 'Хүргэгч ирэхийн өмнө энэ дугаар руу залгана.');
   return where;
 }
 
@@ -841,13 +1055,23 @@ function whereStep(f) {
 /** A token's current value, for the one thing CSS cannot paint: the map. */
 const tone = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
+/** The phone changed appearance with the delivery map open: the map, and its pin, follow. */
+onMapTheme((theme) => {
+  const map = state.map;
+  if (!map?.getLayer?.('drop-pin')) return;
+  repaintMap(map, theme);
+  map.setPaintProperty('drop-pin', 'circle-color', tone('--accent'));
+  map.setPaintProperty('drop-pin', 'circle-stroke-color', tone('--surface'));
+});
+
 function mountMap(container) {
   dropMap();
   if (typeof maplibregl === 'undefined') return;
   const f = state.form;
   const map = new maplibregl.Map({
     container,
-    style: mapStyle(),
+    // In the phone's theme: the night palette at night, not daylight under a veil.
+    style: mapStyle(mapTheme()),
     center: f.lon ? [f.lon, f.lat] : [ULAANBAATAR.lon, ULAANBAATAR.lat],
     zoom: 13.2,
     attributionControl: false,
@@ -868,7 +1092,7 @@ function mountMap(container) {
     f.lon = Number(event.lngLat.lng.toFixed(6));
     map.getSource(PIN)?.setData(pinData());
     const tip = document.getElementById('maptip');
-    if (tip) tip.textContent = 'Цэг тавигдлаа ✓';
+    if (tip) tip.textContent = 'Цэг тавигдлаа — өөр газар дарж засна';
   });
   function pinData() {
     return {
@@ -911,9 +1135,9 @@ function renderReview({ replace = false } = {}) {
   body.append(
     el(`<div class="review card">
           <div class="r"><span>Зар</span><b>${escapeHtml(l.title)}<small>${escapeHtml(l.supplier.name)}</small></b></div>
-          <div class="r"><span>Хэд</span><b class="mono">${f.qty} ${unitWord(l)}</b></div>
+          <div class="r"><span>Хэд</span><b><span class="mn">${f.qty}</span> ${unitWord(l)}</b></div>
           <div class="r"><span>Авах арга</span><b>${delivery ? 'Гэрт хүргүүлнэ' : 'Өөрөө очиж авна'}<small>${
-            delivery ? `${escapeHtml(f.address)} · ${escapeHtml(f.phone)}` : escapeHtml(l.supplier.pickup_address)
+            delivery ? `${escapeHtml(f.address)} · <span class="mn">${escapeHtml(phoneShown(f.phone))}</span>` : escapeHtml(l.supplier.pickup_address)
           }</small></b></div>
           <div class="r"><span>Өдөр</span><b>${dayLabel(f.receiveOn)}</b></div>
         </div>`),
@@ -1078,6 +1302,7 @@ async function placeOrder() {
   const button = $('pay');
   button.disabled = true;
   button.textContent = 'Түр хүлээнэ үү…';
+  $('screen-foot').querySelector('.why[data-tone="stop"]')?.remove();
   const body = orderBody();
   let paid = false;
   try {
@@ -1099,13 +1324,25 @@ async function placeOrder() {
     // moment ago, and is told why this one is on the screen.
     if (bought.what !== JSON.stringify(body)) toast('Өмнөх захиалга тань төлөгдсөн байна.');
   } catch (error) {
-    toast(whatWentWrong(error), 'bad');
+    const said = whatWentWrong(error);
     // Paid for, and only the look at it failed: a bought animal never offers
     // its Pay button again. The button stays busy, and the next poll draws
-    // the order in the review's place as soon as the network lets it.
-    if (paid) return;
+    // the order in the review's place as soon as the network lets it; the
+    // toast is the only place to say so.
+    if (paid) {
+      toast(said, 'bad');
+      return;
+    }
     button.disabled = false;
     button.textContent = 'Төлөх';
+    // Not paid: the reason is said where the press was, above the button,
+    // until the next press — not in a toast, which lay over the button for
+    // three seconds and swallowed the tap that would have tried again.
+    if (!gone && button.isConnected) {
+      const why = el(`<p class="why" data-tone="stop" role="alert">${MARK.warn}<span></span></p>`);
+      why.querySelector('span').textContent = said;
+      button.closest('.foot-row')?.before(why);
+    }
   }
 }
 
@@ -1264,6 +1501,10 @@ function refundPanel(order) {
           : holder.value.trim().length < 2
             ? 'Данс эзэмшигчийн нэрээ бичнэ үү.'
             : null;
+      // A hint while the form is being filled in, calm; the server's refusal
+      // (below) is the only thing said in the stop colour.
+      delete why.dataset.tone;
+      why.setAttribute('data-calm', '');
       why.hidden = !problem;
       if (problem) why.innerHTML = `${MARK.warn}${problem}`;
       send.disabled = Boolean(problem);
@@ -1290,7 +1531,13 @@ function refundPanel(order) {
           send.disabled = false;
           return;
         }
-        toast(error.message, 'bad');
+        // Said by the button it is about, in words, not only in a toast.
+        why.hidden = false;
+        why.removeAttribute('data-calm');
+        why.dataset.tone = 'stop';
+        why.innerHTML = `${MARK.warn}<span></span>`;
+        why.querySelector('span').textContent = whatWentWrong(error);
+        toast(whatWentWrong(error), 'bad');
         send.disabled = false;
       }
     });
@@ -1314,6 +1561,7 @@ async function showStatus(force, { replace = false } = {}) {
   if (!state.orderId) return;
   const order = await guestApi(`/v1/idesh/${state.orderId}`);
   if (gone || !state.orderId) return;
+  showStale(false);
   // The attempt that bought this order is over: the order is on the screen.
   if (attempt?.order === order.id) attempt = null;
 
@@ -1400,7 +1648,7 @@ async function showStatus(force, { replace = false } = {}) {
     el(`<div class="line">${MARK.pin}<div>
           <span class="lab">${delivery ? 'Хүргэх хаяг' : 'Авах цэг'}</span>
           <div class="v">${escapeHtml(delivery ? order.address : order.pickup_address)}${
-            delivery ? `<small>Залгах утас: <span class="mono">${escapeHtml(order.address_phone)}</span></small>` : ''
+            delivery ? `<small>Залгах утас: <span class="mn">${escapeHtml(phoneShown(order.address_phone))}</span></small>` : ''
           }</div>
         </div></div>`),
   );
@@ -1414,7 +1662,7 @@ async function showStatus(force, { replace = false } = {}) {
           <div class="v">${escapeHtml(order.supplier.name)}<span class="badge">${MARK.check}Гэрээт</span>
             <small>Basu шалгаж, гэрээ байгуулсан.${
               order.supplier_phone
-                ? ` Асуух зүйл байвал шууд залгаарай: <a class="tel mn" href="tel:${escapeHtml(order.supplier_phone)}">${MARK.phone}${escapeHtml(order.supplier_phone)}</a>`
+                ? ` Асуух зүйл байвал шууд залгаарай: <a class="tel mn" href="tel:${escapeHtml(order.supplier_phone)}">${MARK.phone}${escapeHtml(phoneShown(order.supplier_phone))}</a>`
                 : ''
             }</small>
           </div>
@@ -1449,7 +1697,7 @@ async function showStatus(force, { replace = false } = {}) {
             <div class="t">Таны баталгаа</div>
             <div>${MARK.check}<span><b>Үнэ эцсийнх.</b> Бодит жин зөрсөн ч нэмж төлөхгүй.</span></div>
             <div>${MARK.check}<span><b>Гэрээт нийлүүлэгч.</b> Basu шалгаж, гэрээ байгуулсан.</span></div>
-            <div>${MARK.check}<span><b>Санал зөрвөл</b> нийлүүлэгчтэй ярина; тэр цуцалбал мөнгө түрийвчинд бүтнээр буцна.</span></div>
+            <div>${MARK.check}<span><b>Санал зөрвөл</b> нийлүүлэгчтэй ярина; тэр цуцалбал мөнгө банкны данс руу тань буцна.</span></div>
           </div>`),
     );
   }
@@ -1461,7 +1709,7 @@ async function showStatus(force, { replace = false } = {}) {
   foot.replaceChildren();
   if (live && order.supplier_phone) {
     foot.append(
-      el(`<p class="why" data-calm>${MARK.warn}Өөрчлөх, цуцлах бол нийлүүлэгчтэй ярина уу — цуцлахыг тэр хийнэ.</p>`),
+      el(`<p class="why" data-calm>${MARK.info}Өөрчлөх, цуцлах бол нийлүүлэгчтэй ярина уу.</p>`),
       el(`<a class="btn" data-size="lg" href="tel:${escapeHtml(order.supplier_phone)}">${MARK.phone}Нийлүүлэгч рүү залгах</a>`),
     );
   }
@@ -1479,10 +1727,20 @@ async function loadMine() {
   try {
     const { orders } = await guestApi('/v1/idesh');
     if (gone) return;
+    showStale(false);
     paintMine(orders);
-  } catch {
-    if (!gone) paintMine([]);
+  } catch (error) {
+    if (gone) return;
+    // Nobody signed in any more: nothing of theirs to show. The network out:
+    // what is on the screen stays, with the strip saying it may be old.
+    if (error.status === 401 || error.code === 'SIGN_IN') paintMine([]);
+    else showStale(true);
   }
+}
+
+/** The server stopped answering a page that is already drawn: one line under the bar until it answers again. */
+function showStale(on) {
+  $('stale').hidden = !on;
 }
 
 function paintMine(orders) {
@@ -1510,7 +1768,10 @@ function paintMine(orders) {
       state.form = null;
       state.orderId = order.id;
       rendered = null;
-      void showStatus(true);
+      void showStatus(true).catch((error) => {
+        state.orderId = null;
+        toast(whatWentWrong(error), 'bad');
+      });
     });
     list.append(card);
   }
@@ -1529,24 +1790,46 @@ async function resume() {
   // «../» in its place would send that session wherever the rest of it pointed.
   const wanted = new URLSearchParams(location.search).get('order');
   if (!wanted || !/^[0-9a-f-]{36}$/.test(wanted) || !store.guestToken) return;
+  if (state.screen === 'status' && state.orderId === wanted) return;
   state.orderId = wanted;
   rendered = null;
-  await showStatus(true);
+  try {
+    await showStatus(true);
+  } catch (error) {
+    // The order could not be looked at: said, and the stalls stay usable.
+    // A retry, or the network coming back, asks again.
+    if (gone) return;
+    state.orderId = null;
+    toast(whatWentWrong(error), 'bad');
+  }
+}
+
+/** Whatever the last attempt could not draw, asked for again. */
+async function catchUp() {
+  if (!state.loaded) {
+    // An offline start drew neither the stalls nor «Миний идэш»: both, now.
+    const [ok] = await Promise.all([loadListings(), loadMine()]);
+    if (ok) await resume();
+  } else if (!state.screen) {
+    await loadMine();
+  }
 }
 
 // No demo clock strip here. Its buttons are the lunch service's — arm at
 // 12:14, fire at 12:21 — and an идэш is measured in days, not minutes. The
 // strip stays on the food pages, where it is the whole demo.
-void Promise.all([loadListings(), loadMine()]).then(resume);
+void Promise.all([loadListings(), loadMine()]).then(([ok]) => (ok ? resume() : undefined));
 
 const poll = setInterval(() => {
   if (document.hidden) return;
-  if (state.orderId && state.screen === 'status') void showStatus();
+  if (state.orderId && state.screen === 'status') void showStatus().catch(() => showStale(true));
   // An order behind the review is one paid for whose first look was lost:
   // it takes the review's place, as it would have after the tap.
-  else if (state.orderId && state.screen === 'review') void showStatus(true, { replace: true });
-  else if (!state.screen) void loadMine();
+  else if (state.orderId && state.screen === 'review') void showStatus(true, { replace: true }).catch(() => showStale(true));
+  else if (!state.screen) void catchUp();
 }, 4000);
+// The phone found its network again: ask now rather than at the next tick.
+addEventListener('online', () => void catchUp());
 addEventListener('pagehide', () => {
   clearInterval(poll);
   gone = true;
