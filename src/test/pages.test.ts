@@ -3359,6 +3359,76 @@ describe('who sees what', () => {
     expect(open.window.document.querySelector('#payments-closed')).toBeNull();
   });
 
+  it('says the same on the supplier’s home on the dashboard, and nothing while payments are open or nobody answers', async () => {
+    const owner = await account('+97688030095', 'Оюун');
+    const orgId = await business(owner, 'Хаалттай гэр · тест', { supplier: true });
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+    const closedByListings = (path: string) => (path.startsWith('/v1/idesh/listings') ? json({ today: '2026-09-02', listings: [], payments_open: false }) : undefined);
+    const closedByWallet = (path: string) =>
+      path.startsWith('/v1/idesh/listings')
+        ? json({ today: '2026-09-02', listings: [] })
+        : path.startsWith('/v1/wallet')
+          ? json({ balance_mnt: 0, currency: 'MNT', topups_open: false, next: null, lines: [] })
+          : undefined;
+    for (const closed of [closedByListings, closedByWallet]) {
+      const home = await openPage('ops.html', `#${orgId}/home`, closed, device(owner));
+      await until(home, 'the note', (d) => Boolean(d.querySelector('#org-notes:not([hidden]) #payments-closed')));
+      const d = home.window.document;
+      expect(d.querySelector('#payments-closed')?.textContent).toContain('төлбөр түр хаалттай');
+      // Said before the numbers and what the business still lacks.
+      expect(d.querySelector('#org-notes')!.compareDocumentPosition(d.querySelector('#nudges')!) & home.window.Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    // Open — or nobody answering — says nothing of it.
+    const down = (path: string) => (path.startsWith('/v1/idesh/listings') || path.startsWith('/v1/wallet') ? json({ error: { code: 'DOWN', message_mn: 'Түр саатал.' } }, 503) : undefined);
+    for (const answer of [undefined, down]) {
+      const home = await openPage('ops.html', `#${orgId}/home`, answer, device(owner));
+      await until(home, 'the home', (d) => d.querySelectorAll('#nudges .nudge').length === 2 && !d.querySelector('#org-notes'));
+      expect(home.window.document.querySelector('#payments-closed')).toBeNull();
+    }
+  });
+
+  it('says on a guest whose own number a delivery’s number found that it was the delivery’s, and dates the order’s story by Ulaanbaatar’s day', async () => {
+    const buyer = await account('+97688030097', 'Нараа');
+    const { listings, today } = (await (await fetch(`${base}/v1/idesh/listings`)).json()) as {
+      today: string;
+      listings: Array<{ id: string; delivers: boolean; unit: string; remaining: number; ready_from: string }>;
+    };
+    const stall = listings.find((l) => l.delivers && l.unit === 'whole' && l.remaining > 0)!;
+    const made = await fetch(`${base}/v1/idesh`, {
+      method: 'POST',
+      headers: as(buyer),
+      body: JSON.stringify({ listing_id: stall.id, qty: 1, receive: 'delivery', receive_on: stall.ready_from > today ? stall.ready_from : today, address: 'Сүхбаатар, 1-р хороо', address_phone: '+976 9907 5522' }),
+    });
+    const order = (await made.json()) as { id: string; code: string };
+    expect(made.status, JSON.stringify(order)).toBe(201);
+    expect((await fetch(`${base}/v1/idesh/${order.id}/pay`, { method: 'POST', headers: as(buyer), body: '{}' })).status).toBe(200);
+    // Made and paid at 07:15 in Ulaanbaatar: 23:15 the day before in UTC, the first ten characters of the stamp.
+    await getPool().query(`UPDATE idesh.order_event SET created_at = '2026-09-01T23:15:00Z' WHERE order_id = $1`, [order.id]);
+
+    const desk = await openPage('ops.html', '', undefined, device(await deskToken()));
+    const doc = desk.window.document;
+    await opsTab(desk, 'guests');
+    await until(desk, 'the guests', (d) => Boolean(d.querySelector('#guests .dt-search input')));
+    const q = doc.querySelector('#guests .dt-search input') as HTMLInputElement;
+    q.value = '9907 5522';
+    q.dispatchEvent(new desk.window.Event('input', { bubbles: true }));
+    await until(desk, 'the buyer', (d) => {
+      const rows = [...d.querySelectorAll('#guests tr[data-guest]')];
+      return rows.length === 1 && Boolean(rows[0]!.textContent?.includes('Нараа'));
+    });
+    // Their own number, and under it why the row is there: the number the desk typed was the delivery's.
+    const row = doc.querySelector('#guests tr[data-guest] td:nth-child(2)')!;
+    expect(row.textContent).toContain('+976 8803 0097');
+    expect(row.textContent).toContain('хүргэлтийн утсаар олдсон: +976 9907 5522');
+
+    await opsTab(desk, 'orders');
+    await until(desk, 'the order', (d) => Boolean(d.querySelector(`#orders tr[data-order="${order.id}"]`)));
+    (doc.querySelector(`#orders tr[data-order="${order.id}"]`) as HTMLElement).click();
+    await until(desk, 'the story', (d) => d.querySelectorAll('.detail .story li').length >= 2);
+    const times = [...doc.querySelectorAll('.detail .story li .t')].map((t) => t.textContent);
+    expect(times.every((t) => t === '9-р сарын 2 07:15'), times.join(' | ')).toBe(true);
+  });
+
   it('finds a caller who signed up by email by the number they gave for a delivery, on the guests and on the orders', async () => {
     const mailer = new FakeMailer();
     ctx.mailer = mailer;
@@ -3412,7 +3482,7 @@ describe('who sees what', () => {
     });
     const guest = doc.querySelector('#guests tr[data-guest]')!;
     expect(guest.textContent).toContain('+976 9907 4411');
-    expect(guest.textContent).toContain('хүргэлтийн утас');
+    expect(guest.textContent).toContain('хүргэлтийн утсаар олдсон');
 
     // The orders: a search looks through every order, ended ones too, and the guest with no name is their address.
     await opsTab(desk, 'orders');
@@ -3447,6 +3517,11 @@ describe('who sees what', () => {
     (doc.querySelector('#member-new [name="role"]') as HTMLSelectElement).value = 'viewer';
     (doc.querySelector('#member-new [data-submit]') as HTMLElement).click();
     await until(desk, 'the new member in the table', (d) => [...d.querySelectorAll('#members tr[data-member]')].some((r) => r.textContent?.includes('Сонгосон ажилтан')));
+    // Signed up with a phone and a password: the seat keeps no number, and the table shows the one the account typed, said to be unproved.
+    const seated = [...doc.querySelectorAll('#members tr[data-member]')].find((r) => r.textContent?.includes('Сонгосон ажилтан'))!;
+    expect(seated.textContent).toContain('+976 8803 0051');
+    expect(seated.textContent).toContain('баталгаагүй');
+    expect(seated.textContent).not.toContain('Баталгаажсан утас, имэйл алга');
 
     // The person opens the dashboard and the desk is there, in the role given.
     const theirs = await openPage('ops.html', '', undefined, device(chosen));
@@ -4202,6 +4277,23 @@ describe('Facebook’s and Instagram’s own browsers', () => {
     await until(elsewhere, 'the door', (doc) => doc.documentElement.hasAttribute('data-ready'));
     expect(elsewhere.window.document.documentElement.hasAttribute('data-in-app')).toBe(false);
     expect((elsewhere.window.document.getElementById('google') as HTMLElement).hidden).toBe(false);
+  });
+
+  it('paint the dashboard’s door before its script without a Google slot, so the door does not shrink when it lands', async () => {
+    // The first paint is the HTML and the classic script in its head, before the page's module has arrived.
+    const html = await readFile(join(WEB, 'ops.html'), 'utf8');
+    const head = /<script>([\s\S]*?)<\/script>/.exec(html)![1]!;
+    const firstPaint = (userAgent?: string) => {
+      const dom = new JSDOM(html, { url: `${base}/dashboard`, runScripts: 'outside-only', pretendToBeVisual: true });
+      if (userAgent) Object.defineProperty(dom.window.navigator, 'userAgent', { value: userAgent, configurable: true });
+      dom.window.eval(head);
+      const shown = (selector: string) => dom.window.getComputedStyle(dom.window.document.querySelector(selector)!).display !== 'none';
+      return { inApp: dom.window.document.documentElement.hasAttribute('data-in-app'), google: shown('.shell-ways .sw-google'), or: shown('.shell-ways .sw-or'), line: shown('.shell-ways .sw-inapp') };
+    };
+    // Facebook's browser: no Google and no «эсвэл»; the line saying where Google works, under «Код авах».
+    expect(firstPaint(FACEBOOK)).toEqual({ inApp: true, google: false, or: false, line: true });
+    // Anywhere else: Google leads, as the door will.
+    expect(firstPaint()).toEqual({ inApp: false, google: true, or: true, line: false });
   });
 
   it('leave Google out of the doors in a popup or on a card too', async () => {

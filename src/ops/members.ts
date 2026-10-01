@@ -119,6 +119,22 @@ export async function linkByProof(
   return memberForAccount(input.guestId, db);
 }
 
+/**
+ * The accounts sitting in each of these seats, the first to sit first — to show the desk who a seat is, and
+ * nothing more. A seat is found, named and linked only by what an account proved (`linkByProof`,
+ * `seatAccount`); what these accounts merely typed never comes back in here.
+ */
+export async function accountsOfSeats(memberIds: readonly string[], db: Db = getPool()): Promise<Map<string, string[]>> {
+  if (!memberIds.length) return new Map();
+  const { rows } = await db.query<{ member_id: string; guest_id: string }>(
+    'SELECT member_id, guest_id FROM ops.member_account WHERE member_id = ANY($1) ORDER BY linked_at, guest_id',
+    [memberIds],
+  );
+  const seats = new Map<string, string[]>();
+  for (const r of rows) seats.set(r.member_id, [...(seats.get(r.member_id) ?? []), r.guest_id]);
+  return seats;
+}
+
 /** The seat each of these accounts sits in, if any — to mark, in a list of people, who is at the desk already. */
 export async function seatsOfAccounts(guestIds: readonly string[], db: Db = getPool()): Promise<Map<string, Member>> {
   if (!guestIds.length) return new Map();
