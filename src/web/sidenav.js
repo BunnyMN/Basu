@@ -91,7 +91,7 @@ export function navHref(href) {
  * `select(key)` marks the open page, `badge(key, n, hot)` sets a count, and
  * `title(text)` names the page in the phone's bar.
  */
-export function deskFrame({ workspaces, current, account, brand = 'Dashboard', home = '/', onPage, onWorkspace, onSignOut, actions = [], onAction = () => {} }) {
+export function deskFrame({ workspaces, current, account, brand = 'Бизнес', home = '/', onPage, onWorkspace, onSignOut, actions = [], onAction = () => {} }) {
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const icon = (name) => NAV_ICON[name] ?? NAV_ICON.overview;
   /** Two letters that stand for a name: the first of its first two words. */
@@ -160,7 +160,10 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', h
    * Whose session this is, said plainly at the foot (and at the end of the
    * phone's bar): the name, and under it the address or the number it signs
    * in with. A number reads in the mono, «+976 9911 2233»; an address in the
-   * sans, which fits the foot. Without a name the contact is the name.
+   * sans, which fits the foot. Without a name the address (or number) is the
+   * one thing that says who it is: it takes the whole second line and wraps
+   * rather than being cut short, under a quiet «Нэвтэрсэн», and the round
+   * mark is a person — never two letters of an address.
    */
   const byPhone = Boolean(account && !account.email && account.phone);
   const contactText = account
@@ -168,11 +171,14 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', h
       ? String(account.phone).replace(/^\+?976(\d{4})(\d{4})$/, '+976 $1 $2')
       : account.email || account.phone || ''
     : '';
-  const who = account ? account.name || contactText || 'Нэргүй' : 'Демо';
-  const contactLine = account ? (account.name ? contactText : '') : 'Хуваалцсан нууц үг';
-  const whoMono = byPhone && !account.name;
-  /** The round mark: the name's first letters, or a person when the name is a number. */
-  const avatarMark = /\p{L}/u.test(who) ? esc(initials(who)) : NAV_ICON.person;
+  const named = Boolean(account?.name);
+  const unnamed = Boolean(account && !named && contactText);
+  const who = account ? (named ? account.name : unnamed ? 'Нэвтэрсэн' : 'Нэргүй') : 'Демо';
+  const contactLine = account ? contactText : 'Хуваалцсан нууц үг';
+  /** What a tooltip shows and a reader hears: the name and the contact, or the contact alone. */
+  const whole = unnamed ? contactText : contactLine ? `${who} · ${contactLine}` : who;
+  /** The round mark: the name's first letters, or a person when there is no name to take them from. */
+  const avatarMark = (named || !account) && /\p{L}/u.test(who) ? esc(initials(who)) : NAV_ICON.person;
 
   const t = document.createElement('template');
   t.innerHTML = `
@@ -180,7 +186,7 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', h
       <header class="deskbar">
         <button class="nav-open" type="button" aria-label="Цэс" aria-controls="sidebar" aria-expanded="false">${NAV_ICON.burger}</button>
         <div class="deskbar-t"><b data-title></b><span>${esc(current.name)}</span></div>
-        <button class="deskbar-me" type="button" aria-label="${esc(`Нэвтэрсэн: ${who}${contactLine ? ` · ${contactLine}` : ''}`)}" title="${esc(contactLine ? `${who} · ${contactLine}` : who)}" aria-controls="sidebar"><span aria-hidden="true">${avatarMark}</span></button>
+        <button class="deskbar-me" type="button" aria-label="${esc(`Нэвтэрсэн: ${whole}`)}" title="${esc(whole)}" aria-controls="sidebar"><span aria-hidden="true">${avatarMark}</span></button>
       </header>
       <aside class="side sidebar" id="sidebar" aria-label="Хажуугийн цэс">
         <div class="brand">${
@@ -207,9 +213,9 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', h
           </div>
         </div>
         <nav class="tabs" aria-label="Хэсгүүд">${groups}</nav>
-        <div class="acct" title="${esc(contactLine ? `${who} · ${contactLine}` : who)}">
+        <div class="acct" title="${esc(whole)}">
           <span class="av" aria-hidden="true">${avatarMark}</span>
-          <span class="who"><b${whoMono ? ' data-mono' : ''}>${esc(who)}</b>${contactLine ? `<small${byPhone ? ' data-mono' : ''}>${esc(contactLine)}</small>` : ''}</span>
+          <span class="who"><b${unnamed ? ' data-quiet' : ''}>${esc(who)}</b>${contactLine ? `<small${byPhone ? ' data-mono' : ''}${unnamed ? ' data-whole' : ''}>${esc(contactLine)}</small>` : ''}</span>
           <button class="out" type="button" id="out" aria-label="Гарах" title="Гарах">${NAV_ICON.out}</button>
         </div>
       </aside>

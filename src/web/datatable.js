@@ -127,7 +127,9 @@ export const dtCell = {
  * first `setRows` the table shows the shape of what is coming, at the size of
  * the rows that will replace it. A list with nothing in it at all (and
  * nothing searched or filtered) shows its empty block without a header row;
- * a search that finds nothing says so and offers to clear the search.
+ * a search or a filter that finds nothing — here or on the server — says
+ * «Олдсонгүй» and offers to take it back: «Хайлтыг цэвэрлэх», «Шүүлтүүрийг
+ * цэвэрлэх» (every filter back to its first choice).
  */
 export function dataTable(options) {
   const {
@@ -231,14 +233,21 @@ export function dataTable(options) {
 
   /* ── the toolbar ── */
 
+  /** Each filter's control, shown a choice made from elsewhere — every filter cleared at once — and its control for the focus. */
+  const dtShown = {};
   for (const f of filters) {
     if (f.kind === 'select') {
       const select = dtEl(`<select class="input dt-select" aria-label="${dtEsc(f.label)}">${f.options.map(([v, w]) => `<option value="${dtEsc(v)}">${dtEsc(w)}</option>`).join('')}</select>`);
       select.value = chosen[f.key];
       select.addEventListener('change', () => refilter(f.key, select.value));
       $('.dt-filters').append(select);
+      dtShown[f.key] = (value) => {
+        select.value = String(value);
+        return select;
+      };
     } else {
       const seg = dtEl(`<div class="seg dt-seg" role="group" aria-label="${dtEsc(f.label)}"></div>`);
+      const buttons = [];
       for (const [v, w] of f.options) {
         const b = dtEl(`<button type="button" data-v="${dtEsc(v)}"${v === chosen[f.key] ? ' data-on' : ''}>${dtEsc(w)}</button>`);
         b.addEventListener('click', () => {
@@ -246,10 +255,17 @@ export function dataTable(options) {
           refilter(f.key, v);
         });
         seg.append(b);
+        buttons.push([b, v]);
       }
       $('.dt-filters').append(seg);
+      dtShown[f.key] = (value) => {
+        for (const [b, v] of buttons) b.toggleAttribute('data-on', v === value);
+        return buttons.find(([, v]) => v === value)?.[0] ?? null;
+      };
     }
   }
+  /** A filter's first choice: the list as it opens, and what «Шүүлтүүрийг цэвэрлэх» goes back to. */
+  const dtFirst = (f) => f.initial ?? f.options[0]?.[0];
   function refilter(key, value) {
     chosen[key] = value;
     state = { ...state, pagination: { ...state.pagination, pageIndex: 0 } };
@@ -257,6 +273,25 @@ export function dataTable(options) {
     if (!filters.find((f) => f.key === key)?.test) onFilter?.({ ...chosen });
     sync();
     draw();
+  }
+  /** Every filter back to its first choice, in one go: one fetch when a server's filter was among them. */
+  function unfilter() {
+    let server = false;
+    let first = null;
+    for (const f of filters) {
+      if (chosen[f.key] === dtFirst(f)) continue;
+      chosen[f.key] = dtFirst(f);
+      const control = dtShown[f.key]?.(chosen[f.key]) ?? null;
+      first ??= control;
+      if (!f.test) server = true;
+    }
+    state = { ...state, pagination: { ...state.pagination, pageIndex: 0 } };
+    dtRemember(stateKey, { sort: state.sorting, size: state.pagination.pageSize, filters: chosen });
+    if (server) onFilter?.({ ...chosen });
+    sync();
+    draw();
+    // The button pressed is gone with the row it stood in: the keyboard goes to the first filter it moved.
+    first?.focus?.();
   }
 
   const input = $('.dt-search input');
@@ -321,33 +356,42 @@ export function dataTable(options) {
     if (!rows.length) {
       const nothing = all.length === 0;
       const query = input?.value.trim() ?? '';
+      // What narrowed it: a search, and the filters off their first choice.
+      const moved = filters.filter((f) => chosen[f.key] !== dtFirst(f));
       // Nothing at all and nothing narrowing it: the block alone, without a header of columns over nothing.
-      const narrowed = Boolean(query) || filters.some((f) => chosen[f.key] !== (f.initial ?? f.options[0]?.[0]));
-      root.toggleAttribute('data-empty', nothing && !narrowed);
+      const blank = nothing && !query && !moved.length;
+      root.toggleAttribute('data-empty', blank);
       // …and, when every filter is this table's own (the server holds nothing more to filter in), no search or filters over it either.
-      root.toggleAttribute('data-bare', nothing && !narrowed && !onSearch && filters.every((f) => f.test));
+      root.toggleAttribute('data-bare', blank && !onSearch && filters.every((f) => f.test));
       const tr = dtEl(
         `<tr class="dt-empty"><td colspan="${columns.length + (actions ? 1 : 0)}"><div class="empty-state" data-size="sm"><span class="es-mark" aria-hidden="true">${
-          nothing ? empty.icon ?? DT_EMPTY : DT_FOUND_NONE
-        }</span><b class="es-title">${dtEsc(nothing ? empty.title : 'Олдсонгүй')}</b><span class="es-text">${dtEsc(
-          nothing ? empty.text ?? '' : 'Хайлт, шүүлтүүрээ өөрчилж үзнэ үү.',
+          blank ? empty.icon ?? DT_EMPTY : DT_FOUND_NONE
+        }</span><b class="es-title">${dtEsc(blank ? empty.title : 'Олдсонгүй')}</b><span class="es-text">${dtEsc(
+          blank ? empty.text ?? '' : filters.length ? 'Хайлт, шүүлтүүрээ өөрчилж үзнэ үү.' : 'Хайлтаа өөрчилж үзнэ үү.',
         )}</span></div></td></tr>`,
       );
       const box = tr.querySelector('.empty-state');
-      // The next step: the page's own (an «add» button), or — for a search that found nothing — clearing it.
-      let next = null;
-      if (nothing && empty.action instanceof Node) next = empty.action;
-      else if (!nothing && query && input) {
-        next = dtEl('<button type="button" class="btn" data-size="sm">Хайлтыг цэвэрлэх</button>');
-        next.addEventListener('click', () => {
+      // The next step: the page's own on a blank list (an «add» button); on a search or a filter that found
+      // nothing — here or on the server — taking it back.
+      const next = [];
+      if (blank && empty.action instanceof Node) next.push(empty.action);
+      if (!blank && query && input) {
+        const clear = dtEl('<button type="button" class="btn" data-size="sm" data-clear="search">Хайлтыг цэвэрлэх</button>');
+        clear.addEventListener('click', () => {
           input.value = '';
           input.dispatchEvent(new Event('input'));
           input.focus();
         });
+        next.push(clear);
       }
-      if (next) {
+      if (!blank && moved.length) {
+        const reset = dtEl('<button type="button" class="btn" data-size="sm" data-clear="filters">Шүүлтүүрийг цэвэрлэх</button>');
+        reset.addEventListener('click', unfilter);
+        next.push(reset);
+      }
+      if (next.length) {
         const act = dtEl('<div class="es-act"></div>');
-        act.append(next);
+        act.append(...next);
         box.append(act);
       }
       tbody.append(tr);

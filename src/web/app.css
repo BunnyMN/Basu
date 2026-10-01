@@ -53,6 +53,7 @@
   --ready:#136A4B; --ready-soft:#DCEDE6; --ready-line:#9CCBB7;
   --hold:#7E6113;  --hold-soft:#F1E9D2;  --hold-line:#D9C48A;
   --stop:#9B2226;  --stop-soft:#F7DEDE;  --stop-line:#E0A9A9; --on-stop:#FFFFFF;
+  --stop-fill:#9B2226; --on-stop-fill:#FFFFFF;   /* a filled destructive button (dark: a deeper red, white words, 5:1) */
   --unread:#E4EDF5; --star:var(--hold);
 
   /* depth: one resting shadow (native y1 b2), one for things that float,
@@ -141,6 +142,7 @@
     --ready:#57C295; --ready-soft:#0F2620; --ready-line:#1F4A3A;
     --hold:#DAB65A;  --hold-soft:#2A2312;  --hold-line:#4E4222;
     --stop:#F08A8D;  --stop-soft:#2E1416;  --stop-line:#5A2A2C; --on-stop:#2A0B0C;
+    --stop-fill:#C9393E; --on-stop-fill:#FFFFFF;
     --unread:#16232E;
     --shadow:0 1px 2px rgba(0,0,0,.40);
     --shadow-float:0 1px 2px rgba(0,0,0,.40),0 14px 36px -12px rgba(0,0,0,.70);
@@ -167,6 +169,7 @@
   --ready:#57C295; --ready-soft:#0F2620; --ready-line:#1F4A3A;
   --hold:#DAB65A;  --hold-soft:#2A2312;  --hold-line:#4E4222;
   --stop:#F08A8D;  --stop-soft:#2E1416;  --stop-line:#5A2A2C; --on-stop:#2A0B0C;
+  --stop-fill:#C9393E; --on-stop-fill:#FFFFFF;
   --unread:#16232E;
   --shadow:0 1px 2px rgba(0,0,0,.40);
   --shadow-float:0 1px 2px rgba(0,0,0,.40),0 14px 36px -12px rgba(0,0,0,.70);
@@ -233,7 +236,7 @@ hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 /* Mono is for numerals, codes, timestamps and the eyebrow label — never
    for buttons, inputs, chips or prose. */
 .mono,code,.tick,.mn,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
-input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.code{font-family:var(--mono);font-variant-numeric:tabular-nums}
+input[type="tel"],input[type="number"],input[inputmode="numeric"],input[inputmode="decimal"],input.code{font-family:var(--mono);font-variant-numeric:tabular-nums}
 .money{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink)}
 .money[data-tone="credit"]{color:var(--ready)}
 .money[data-tone="debit"]{color:var(--stop)}
@@ -351,8 +354,8 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
 .btn:where([data-v="quiet"],.quiet):active{background:var(--press)}
 .btn:where([data-v="danger"]){--spin:var(--stop);background:transparent;border-color:var(--stop-line);color:var(--stop)}
 .btn:where([data-v="danger"]):active{background:var(--stop-soft)}
-.btn:where([data-v="danger"][data-fill]){--spin:var(--on-stop);background:var(--stop);border-color:var(--stop);color:var(--on-stop);font-weight:600}
-.btn:where([data-v="danger"][data-fill]):active{background:var(--stop);filter:brightness(.94)}
+.btn:where([data-v="danger"][data-fill]){--spin:var(--on-stop-fill);background:var(--stop-fill);border-color:var(--stop-fill);color:var(--on-stop-fill);font-weight:600}
+.btn:where([data-v="danger"][data-fill]):active{background:var(--stop-fill);filter:brightness(.94)}
 .btn:where([data-v="link"]){min-height:0;padding:0;border:0;background:none;color:var(--accent-ink);font-size:var(--t-cap);border-radius:var(--r-xs)}
 .btn:where([data-v="link"]):active{background:none;transform:none;text-decoration:underline;text-underline-offset:.15em}
 @media (hover:hover){
@@ -360,7 +363,7 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
   .btn:where([data-v="primary"]):hover{background:var(--accent-hover);border-color:var(--accent-hover)}
   .btn:where([data-v="quiet"],.quiet):hover{background:var(--hover);border-color:transparent;color:var(--ink)}
   .btn:where([data-v="danger"]):hover{background:var(--stop-soft);border-color:var(--stop-line)}
-  .btn:where([data-v="danger"][data-fill]):hover{background:var(--stop);border-color:var(--stop);filter:brightness(1.06)}
+  .btn:where([data-v="danger"][data-fill]):hover{background:var(--stop-fill);border-color:var(--stop-fill);filter:brightness(1.06)}
   .btn:where([data-v="link"]):hover{background:none;border-color:transparent;text-decoration:underline;text-underline-offset:.15em}
 }
 /* Disabled is a real state, not 45% opacity: a filled red at half alpha reads
@@ -507,11 +510,13 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
   -webkit-appearance:none;appearance:none;transition:border-color var(--dur),box-shadow var(--dur),background-color var(--dur);
 }
 ::placeholder{color:var(--ink-3);opacity:1}
-/* A number typed is a number shown: phone, amount, quantity in the mono. The
-   hint inside stays in the sans — it is words, not a value. */
-.field :where(input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"]),
-.input:is([type="tel"],[inputmode="numeric"],[inputmode="decimal"]){font-family:var(--mono);font-variant-numeric:tabular-nums}
-:is(input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"]):not(.code)::placeholder{font-family:var(--sans)}
+/* A number typed is a number shown: phone, amount, quantity in the mono — and
+   its placeholder with it, so «8801 0011» reads as the digits that replace it. */
+.field :where(input[type="tel"],input[type="number"],input[inputmode="numeric"],input[inputmode="decimal"]),
+.input:is([type="tel"],[type="number"],[inputmode="numeric"],[inputmode="decimal"]){font-family:var(--mono);font-variant-numeric:tabular-nums}
+/* …but a placeholder of words on a number field («7–10 орон», «6 оронтой код») stays in the sans: every
+   Mongolian word has one of these vowels, and no digit, mask («XXXX») or dot («······») has any */
+:is(input[type="tel"],input[type="number"],input[inputmode="numeric"],input[inputmode="decimal"]):is([placeholder*="а"],[placeholder*="о"],[placeholder*="у"],[placeholder*="э"],[placeholder*="ө"],[placeholder*="ү"],[placeholder*="и"],[placeholder*="ы"],[placeholder*="е"])::placeholder{font-family:var(--sans)}
 @media (hover:hover){
   .input:not(:focus,:disabled,[readonly],[aria-invalid="true"]):hover,
   .field :where(input:not([type="checkbox"],[type="radio"]),select,textarea):not(:focus,:disabled,[readonly],[aria-invalid="true"]):hover{border-color:var(--ink-3)}
@@ -545,7 +550,7 @@ input.search::-webkit-search-cancel-button{-webkit-appearance:none;appearance:no
 .affix > i{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-style:normal;font-size:var(--t-body);color:var(--ink-3);pointer-events:none}
 .affix > i[data-start]{right:auto;left:14px;font-family:var(--mono);font-size:var(--ctl-fs);font-variant-numeric:tabular-nums;color:var(--ink-3)}
 .affix:has(> i[data-start]) > input{padding-left:calc(14px + var(--start,4ch) + 8px);padding-right:14px}
-.affix:has(> i[data-start]) > input:not([type="tel"],[inputmode="numeric"],[inputmode="decimal"]){--start:1.2em}
+.affix:has(> i[data-start]) > input:not([type="tel"],[type="number"],[inputmode="numeric"],[inputmode="decimal"]){--start:1.2em}
 /* codes: sign-in, hand-over — one big tracked input, not eight boxes */
 input.code{width:100%;
   min-height:64px;font-size:2rem;font-weight:600;letter-spacing:.32em;text-indent:.32em;text-align:center;
@@ -702,8 +707,21 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 /* six numbers: one row on a wide desk, three and three below it — not five and an orphan */
 .kpi-band:has(> :nth-child(6):last-child){grid-template-columns:repeat(3,minmax(0,1fr))}
 @media (min-width:1400px){.kpi-band:has(> :nth-child(6):last-child){grid-template-columns:repeat(6,minmax(0,1fr))}}
-/* any count: the last cell takes what is left of its row, so the band's grey never shows through a hole */
-.kpi-band > :last-child{grid-column-end:-1}
+/* five numbers: one row on a wide desk (as six), three over two below it — both rows full (six tracks: the
+   first three cells two wide, the last two three wide) — never four and an orphan over the band's grey */
+.kpi-band:has(> :nth-child(5):last-child){grid-template-columns:repeat(5,minmax(0,1fr))}
+@media (min-width:641px) and (max-width:1399px){
+  .kpi-band:has(> :nth-child(5):last-child){grid-template-columns:repeat(6,minmax(0,1fr))}
+  .kpi-band:has(> :nth-child(5):last-child) > :nth-child(-n+3){grid-column:span 2}
+  .kpi-band:has(> :nth-child(5):last-child) > :nth-child(n+4){grid-column:span 3}
+}
+/* four numbers: four in a row while the band is wider than 860px (a seven-digit sum still on one line),
+   two by two below that — not three and one (the clamp flips the track's minimum from a quarter to a half) */
+.kpi-band:has(> :nth-child(4):last-child){grid-template-columns:repeat(auto-fit,minmax(clamp(calc(25% - 1px),(860px - 100%) * 999,calc(50% - 1px)),1fr))}
+/* seven or more: rows that fill themselves — each cell at least 200px (150 on a phone), the last row's cells
+   sharing its whole width — so no count leaves a hole */
+.kpi-band:has(> :nth-child(7)){display:flex;flex-wrap:wrap}
+.kpi-band:has(> :nth-child(7)) > *{flex:1 1 200px}
 .kpi-band > .kpi{
   background:var(--surface);border:0;border-radius:0;box-shadow:none;padding:16px 20px;min-height:104px;
   display:flex;flex-direction:column;justify-content:flex-start;gap:6px;
@@ -726,8 +744,14 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 .kpi-band .kpi[data-word][data-tone="warn"] b::before{background:var(--hold)}
 .kpi-band .kpi[data-word][data-tone="bad"] b::before{background:var(--stop)}
 .kpi-band .kpi[data-word][data-tone] b{color:var(--ink)}
+/* a phone: two columns (one under 300px); an odd count's last cell takes the whole last row, and so does
+   an even count's when the first cell already took a row of its own ([data-span]) */
 @media (max-width:640px){
-  .kpi-band,.kpi-band:has(> :nth-child(6):last-child){grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .kpi-band,.kpi-band:has(> :nth-child(6):last-child),.kpi-band:has(> :nth-child(5):last-child),.kpi-band:has(> :nth-child(4):last-child){grid-template-columns:repeat(auto-fit,minmax(max(150px,calc(50% - 1px)),1fr))}
+  .kpi-band > :last-child:nth-child(odd){grid-column:1 / -1}
+  .kpi-band:has(> [data-span]:first-child) > :last-child:nth-child(odd){grid-column:auto}
+  .kpi-band:has(> [data-span]:first-child) > :last-child:nth-child(even){grid-column:1 / -1}
+  .kpi-band:has(> :nth-child(7)) > *{flex-basis:150px}
   .kpi-band .kpi b{font-size:var(--t-title-2)}
   .kpi-band .kpi[data-word] b{font-size:var(--t-title-3);min-height:calc(var(--t-title-2) * 1.1)}
   .kpi-band > .kpi[data-span]{grid-column:1 / -1}
@@ -904,6 +928,8 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 .acct .who small{grid-column:2 / 4;grid-row:2;align-self:start;min-width:0;margin-top:1px;font-size:var(--t-pill);line-height:1.4;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .acct .who small[data-mono]{font-family:var(--mono);font-size:var(--t-meta);font-variant-numeric:tabular-nums}
 .acct .who b[data-mono]{font-family:var(--mono);font-weight:500;font-variant-numeric:tabular-nums}
+.acct .who b[data-quiet]{font-weight:500;color:var(--ink-3)}
+.acct .who small[data-whole]{white-space:normal;overflow-wrap:anywhere;text-overflow:clip;color:var(--ink)}
 .acct .av svg,.deskbar-me span svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .acct .out{grid-column:3;grid-row:1;justify-self:end;display:inline-grid;place-items:center;width:30px;height:30px;margin:-2px -2px -2px 0;padding:0;border:0;border-radius:var(--r-sm);background:none;color:var(--ink-3)}
 .acct .out svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
@@ -1101,8 +1127,8 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
 .ways [data-code]{margin:0 0 12px}
 /* what went wrong, said right over the button that will try again */
-.ways-say{display:flex;align-items:flex-start;gap:6px;margin:0 0 12px;font-size:var(--t-cap);font-weight:500;line-height:1.45;color:var(--stop)}
-.ways-say::before{content:"";flex:none;width:14px;height:14px;margin-top:2px;background:currentColor;-webkit-mask:var(--mask-alert) center/contain no-repeat;mask:var(--mask-alert) center/contain no-repeat}
+.ways .ways-say{display:flex;align-items:flex-start;gap:6px;margin:0 0 12px;font-size:var(--t-cap);font-weight:500;line-height:1.45;color:var(--stop)}
+.ways .ways-say::before{content:"";flex:none;width:14px;height:14px;margin-top:2px;background:currentColor;-webkit-mask:var(--mask-alert) center/contain no-repeat;mask:var(--mask-alert) center/contain no-repeat}
 .ways .cap{margin:-4px 0 14px}
 .ways .again{display:flex;justify-content:space-between;gap:12px;margin-top:4px}
 .ways .again .link{font-size:var(--t-cap)}
@@ -1134,12 +1160,13 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
   border-radius:var(--r-md);background:var(--ink);color:var(--ink-inverse);
   font-family:var(--sans);font-size:var(--t-body);font-weight:500;line-height:1.4;text-align:left;
   box-shadow:var(--shadow-float);cursor:default;-webkit-user-select:none;user-select:none;
-  transform:translate(-50%,16px);opacity:0;visibility:hidden;pointer-events:none;
-  transition:transform 220ms var(--ease),opacity 180ms var(--ease),visibility 0s linear 220ms;
+  transform:translate(-50%,16px);opacity:0;pointer-events:none;
+  transition:transform 220ms var(--ease),opacity 180ms var(--ease);
 }
+.toast-old:not([data-show]){visibility:hidden}
 #toast[data-show],.toast-old[data-show]{
-  transform:translate(-50%,var(--toast-y,0px));opacity:1;visibility:visible;pointer-events:auto;
-  transition:transform 220ms var(--ease),opacity 180ms var(--ease),visibility 0s;
+  transform:translate(-50%,var(--toast-y,0px));opacity:1;pointer-events:auto;
+  transition:transform 220ms var(--ease),opacity 180ms var(--ease);
 }
 .toast-old[data-show]{opacity:.92}
 #toast[data-kind]::before,.toast-old[data-kind]::before{
@@ -1484,10 +1511,10 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
   .dt-table tr.dt-row > td:first-child{grid-column:1;grid-row:1;display:block;padding:0 0 8px;text-align:left}
   .dt-table tr.dt-row > td:first-child::before,.dt-table tr.dt-row > td.dt-act::before{content:none}
   .dt-table tr.dt-row > td:first-child + td{border-top:1px solid var(--line);padding-top:10px}
-  .dt-table tr.dt-row > td.dt-act{grid-column:2;grid-row:1;justify-content:flex-end;flex-wrap:wrap;gap:6px;width:auto;padding:0}
+  .dt-table tr.dt-row > td.dt-act{grid-column:2;grid-row:1;justify-content:flex-end;flex-wrap:wrap;gap:6px;width:auto;padding:0 0 8px}
   .dt-table tr.dt-row > td.dt-act > * + *{margin-left:0}
   /* two or more actions are a row of their own at the foot of the card */
-  .dt-table tr.dt-row > td.dt-act:has(> :nth-child(2)){grid-column:1 / -1;grid-row:auto;padding-top:10px}
+  .dt-table tr.dt-row > td.dt-act:has(> :nth-child(2)){grid-column:1 / -1;grid-row:auto;padding:10px 0 0}
   .dt-table tr.dt-row > td.dt-act .btn{min-height:36px}
   .dt-table tr.dt-row > td[data-phone="off"]{display:none}
   .dt-table tr.dt-empty,.dt-table tr.dt-skel{display:block;margin:0 0 8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow)}

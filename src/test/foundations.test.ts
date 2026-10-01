@@ -138,18 +138,18 @@ describe('a popup', () => {
 });
 
 describe('a toast', () => {
-  it('keeps the newest words in #toast, puts the one before it up a step, and keeps three at most', () => {
-    window.toast('Хадгалагдлаа.', 'good');
-    const newest = document.getElementById('toast')!;
-    expect(newest.textContent).toBe('Хадгалагдлаа.');
-    expect(newest.getAttribute('role')).toBe('status');
-    expect(newest.dataset.kind).toBe('good');
+  it('keeps the newest words in #toast, puts the one before it up a step, and keeps three at most — trouble the longest', () => {
     window.toast('Холболт тасарлаа.', 'bad');
+    const newest = document.getElementById('toast')!;
+    expect(newest.textContent).toBe('Холболт тасарлаа.');
+    expect(newest.getAttribute('role')).toBe('status');
+    expect(newest.dataset.kind).toBe('bad');
+    window.toast('Хадгалагдлаа.', 'good');
     window.toast('Шинэ захиалга ирлээ.', 'info');
     window.toast('Дахиад нэг.');
     expect(document.getElementById('toast')!.textContent).toBe('Дахиад нэг.');
     expect(document.getElementById('toast')!.dataset.kind).toBeUndefined();
-    // the first word has gone (three at most); the two after it are copies, in the order they came
+    // three at most: the oldest calm word went, not the older trouble; the copies stay in the order they came
     const older = [...document.querySelectorAll('.toast-old[data-show]')];
     expect(older.map((t) => t.textContent)).toEqual(['Холболт тасарлаа.', 'Шинэ захиалга ирлээ.']);
     expect(older.every((t) => t.getAttribute('aria-hidden') === 'true' && !t.id && !t.getAttribute('role'))).toBe(true);
@@ -249,6 +249,12 @@ describe('a field and a number', () => {
     await tick(300);
     void window.popup({ title: 'Нэр засах', fields: [{ name: 'name', label: 'Нэр' }] });
     expect(document.activeElement).toBe(field('name'));
+    (open().querySelector('[data-cancel]') as HTMLElement).click();
+    await tick(300);
+    // on a touch screen the default is the popup itself: the phone's keyboard waits for a tap on a field
+    window.matchMedia = ((query: string) => ({ matches: query.includes('coarse'), media: query, addEventListener() {}, removeEventListener() {} })) as unknown as typeof window.matchMedia;
+    void window.popup({ title: 'Нэр засах', fields: [{ name: 'name', label: 'Нэр' }] });
+    expect(document.activeElement).toBe(open());
   });
 
   it('groups a popup’s phone field the same way', () => {
@@ -264,6 +270,7 @@ describe('a lunch state’s word', () => {
     expect(window.headlineWord('SCHEDULED')).toBe('Хүлээн авсан');
     expect(window.headlineWord('ARMED')).toBe('Хөдлөх цаг');
     expect(window.headlineWord('COOKING')).toBe('Гал дээр');
+    expect(window.headlineWord('RESLOTTED')).toBe('Цаг шилжсэн');
     expect(window.headlineWord('READY')).toBe(window.HEADLINE.READY[0]);
     expect(window.headlineWord('NOT_A_STATE')).toBe('');
     // dine reads a missing headline as «say the time»: these stay out of HEADLINE
@@ -285,11 +292,25 @@ describe('the desk', () => {
     expect(named.querySelector('.acct .who small')?.textContent).toBe('basuappmn@gmail.com');
     expect(named.querySelector('.deskbar-me')?.getAttribute('aria-label')).toBe('Нэвтэрсэн: Ганхүлэг · basuappmn@gmail.com');
 
-    // a number with no name is the name, read as a number
+    expect(named.querySelector('.acct .av')?.textContent).toBe('Г');
+    // the business's desk, by its own word under the wordmark
+    expect(named.querySelector('.brand-home span')?.textContent).toBe('Бизнес');
+
+    // with no name, the number or the address is who it is: the whole second line, never cut short,
+    // under a quiet «Нэвтэрсэн», and a person for the mark — not two letters of an address
     const byPhone = frame({ phone: '+97688010001' }).root;
-    expect(byPhone.querySelector('.acct .who b')?.textContent).toBe('+976 8801 0001');
-    expect(byPhone.querySelector('.acct .who b')?.hasAttribute('data-mono')).toBe(true);
-    expect(byPhone.querySelector('.acct .who small')).toBeNull();
+    expect(byPhone.querySelector('.acct .who b')?.textContent).toBe('Нэвтэрсэн');
+    expect(byPhone.querySelector('.acct .who b')?.hasAttribute('data-quiet')).toBe(true);
+    const number = byPhone.querySelector('.acct .who small');
+    expect(number?.textContent).toBe('+976 8801 0001');
+    expect(number?.hasAttribute('data-mono')).toBe(true);
+    expect(number?.hasAttribute('data-whole')).toBe(true);
+    const byMail = frame({ email: 'basuappmn@gmail.com' }).root;
+    expect(byMail.querySelector('.acct .who small')?.textContent).toBe('basuappmn@gmail.com');
+    expect(byMail.querySelector('.acct .who small')?.hasAttribute('data-whole')).toBe(true);
+    expect(byMail.querySelector('.acct .av svg')).not.toBeNull();
+    expect(byMail.querySelector('.deskbar-me svg')).not.toBeNull();
+    expect(byMail.querySelector('.deskbar-me')?.getAttribute('aria-label')).toBe('Нэвтэрсэн: basuappmn@gmail.com');
   });
 
   it('keeps a server-side filter on an empty list — another choice may hold rows', () => {
@@ -322,5 +343,46 @@ describe('the desk', () => {
     (t.el.querySelector('.dt-empty .es-act .btn') as HTMLElement).click();
     expect(search.value).toBe('');
     expect(t.el.querySelectorAll('tbody tr.dt-row')).toHaveLength(2);
+  });
+
+  it('offers to take back a search the server answered with nothing, and filters that left nothing', async () => {
+    const asked: string[] = [];
+    const t = window.dataTable({ columns: [{ key: 'name', label: 'Нэр' }], onSearch: (q: string) => asked.push(q), empty: { title: 'Хүн алга', text: '' } });
+    document.body.append(t.el);
+    t.setRows([{ name: 'Бат' }]);
+    const search = t.el.querySelector('.dt-search input') as HTMLInputElement;
+    search.value = 'байхгүй';
+    search.dispatchEvent(new window.Event('input'));
+    t.setRows([]); // the server's answer
+    expect(t.el.hasAttribute('data-empty')).toBe(false);
+    expect(t.el.querySelector('.dt-empty .es-title')?.textContent).toBe('Олдсонгүй');
+    (t.el.querySelector('.dt-empty [data-clear="search"]') as HTMLElement).click();
+    expect(search.value).toBe('');
+    await tick(300);
+    expect(asked).toEqual(['']);
+
+    const fetched: Array<Record<string, string>> = [];
+    const f = window.dataTable({
+      columns: [{ key: 'name', label: 'Нэр' }],
+      filters: [
+        { key: 'open', label: 'Төлөв', options: [['all', 'Бүгд'], ['open', 'Нээлттэй']], test: (r: { open?: boolean }, v: string) => v === 'all' || Boolean(r.open) },
+        { key: 'scope', label: 'Хүрээ', kind: 'select', options: [['live', 'Идэвхтэй'], ['all', 'Бүгд']] },
+      ],
+      onFilter: (v: Record<string, string>) => fetched.push(v),
+    });
+    document.body.append(f.el);
+    f.setRows([{ name: 'Бат' }]);
+    ([...f.el.querySelectorAll('.dt-seg button')].find((b) => b.textContent === 'Нээлттэй') as HTMLElement).click();
+    const scope = f.el.querySelector('.dt-select') as HTMLSelectElement;
+    scope.value = 'all';
+    scope.dispatchEvent(new window.Event('change'));
+    expect(f.el.querySelector('.dt-empty .es-title')?.textContent).toBe('Олдсонгүй');
+    expect(f.el.querySelector('.dt-empty [data-clear="search"]')).toBeNull();
+    (f.el.querySelector('.dt-empty [data-clear="filters"]') as HTMLElement).click();
+    // every filter back to its first choice, the server asked once for its own
+    expect(fetched).toEqual([{ open: 'open', scope: 'all' }, { open: 'all', scope: 'live' }]);
+    expect(f.el.querySelector('.dt-seg button[data-on]')?.textContent).toBe('Бүгд');
+    expect(scope.value).toBe('live');
+    expect(f.el.querySelectorAll('tbody tr.dt-row')).toHaveLength(1);
   });
 });

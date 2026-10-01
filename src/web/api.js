@@ -397,7 +397,9 @@ export function signInDoors({
 
   const checkCode = async () => {
     const typed = code.value.replace(/\D/g, '');
+    // A new try starts clean: the last try's «Код буруу байна.» is not this one's answer.
     emailSay(null);
+    fieldError(code, null);
     if (typed.length !== 6) {
       fieldError(code, 'Имэйлд ирсэн 6 оронтой кодоо бичнэ үү.');
       code.focus();
@@ -535,6 +537,7 @@ export function signInDoors({
     if (pw.go.hasAttribute('data-busy')) return;
     setBusy(pw.go);
     pwSay(null);
+    fieldError(pw.code, null);
     try {
       await work();
     } catch (error) {
@@ -756,6 +759,8 @@ export function accountWays({ token }) {
     $('[data-open="email"]').hidden = Boolean(me.email);
     // A first password's code goes to the address, so with none there is nothing to press yet.
     $('[data-open="password"]').hidden = !me.has_password && !me.email;
+    // A wrong or spent code is said under the code field, as on the sign-in doors; any other refusal over the fields.
+    const atCode = (error) => (error instanceof ApiError && /CODE|EXPIRED/.test(error.code ?? '') ? Object.assign(error, { field: 'code' }) : error);
 
     // An address: typed, a code sent to it, the code typed back — two steps of one popup.
     $('[data-open="email"]').addEventListener('click', () => {
@@ -784,7 +789,7 @@ export function accountWays({ token }) {
           }
           const code = v.code.replace(/\D/g, '');
           if (code.length !== 6) throw Object.assign(new Error('Имэйлд ирсэн 6 оронтой кодоо бичнэ үү.'), { field: 'code' });
-          await api('/v1/me/email', { method: 'POST', token, body: { email: sentTo, code } });
+          await api('/v1/me/email', { method: 'POST', token, body: { email: sentTo, code } }).catch((error) => Promise.reject(atCode(error)));
           toast('Имэйл холбогдлоо.', 'good');
           await draw();
         },
@@ -856,7 +861,7 @@ export function accountWays({ token }) {
           const code = v.code.replace(/\D/g, '');
           if (code.length !== 6) throw Object.assign(new Error('Имэйлд ирсэн 6 оронтой кодоо бичнэ үү.'), { field: 'code' });
           if (v.next.length < 8) throw Object.assign(new Error('Нууц үг дор хаяж 8 тэмдэгт байх ёстой.'), { field: 'next' });
-          const { revoked } = await api('/v1/me/password', { method: 'POST', token, body: { next: v.next, code } });
+          const { revoked } = await api('/v1/me/password', { method: 'POST', token, body: { next: v.next, code } }).catch((error) => Promise.reject(atCode(error)));
           await saved(revoked);
         },
       });
@@ -1080,12 +1085,13 @@ function popupMissing(control) {
  * form holds still. `steps: 2` puts «Алхам 1/2» over the title, and each
  * `step()` that draws new fields moves it on. `danger` makes the button the
  * filled red of a step that cannot be undone. `focus` is where the keyboard
- * goes when a step is drawn: 'field' (the first field, the default), 'sheet'
- * (the popup itself), or 'auto' (the field where there is a mouse, the popup
- * on a touch screen — the phone's keyboard stays down until a field is
- * tapped). Closed without an answer, the promise resolves to null.
+ * goes when a step is drawn: 'auto' (the default: the first field where there
+ * is a mouse, the popup itself on a touch screen — the phone's keyboard stays
+ * down until a field is tapped), 'field' (the first field everywhere) or
+ * 'sheet' (the popup itself everywhere). Closed without an answer, the
+ * promise resolves to null.
  */
-export function popup({ title, sub = '', fields = [], submit = 'Хадгалах', cancel = 'Болих', danger = false, width = 560, steps = 0, focus = 'field', onSubmit = async () => true, id = null }) {
+export function popup({ title, sub = '', fields = [], submit = 'Хадгалах', cancel = 'Болих', danger = false, width = 560, steps = 0, focus = 'auto', onSubmit = async () => true, id = null }) {
   return new Promise((resolve) => {
     // Where the keyboard goes when a step is drawn: its first field, or — on a touch screen with
     // focus 'auto', or anywhere with 'sheet' — the popup itself, so a phone's keyboard does not
@@ -1315,7 +1321,7 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
  * step that cannot be undone when `danger`. Resolves to what
  * `onConfirm(reason)` returned, or null when the person said no.
  */
-export function confirmPopup({ title, text = '', ok = 'Тийм', cancel = 'Болих', danger = false, reason = null, focus = 'field', onConfirm = async () => true }) {
+export function confirmPopup({ title, text = '', ok = 'Тийм', cancel = 'Болих', danger = false, reason = null, focus = 'auto', onConfirm = async () => true }) {
   const fields = [];
   if (text) fields.push({ type: 'note', html: text });
   if (reason) {
@@ -1417,7 +1423,8 @@ export function toast(message, kind) {
     old.addEventListener('click', () => toastDrop(old));
     document.body.append(old);
     toastOld.unshift(old);
-    while (toastOld.length > 2) toastDrop(toastOld[toastOld.length - 1]);
+    // Three at most: the oldest goes first, unless it is trouble and a calmer word is there to go instead.
+    while (toastOld.length > 2) toastDrop([...toastOld].reverse().find((x) => x.dataset.kind !== 'bad') ?? toastOld[toastOld.length - 1]);
     old.toastTimer = setTimeout(() => toastDrop(old), 2600);
   }
   el.textContent = message;
@@ -1742,6 +1749,7 @@ export const LUNCH_WORD = {
   SCHEDULED: 'Хүлээн авсан',
   ARMED: 'Хөдлөх цаг',
   COOKING: 'Гал дээр',
+  RESLOTTED: 'Цаг шилжсэн',
 };
 
 /** A lunch state's word: HEADLINE's, or LUNCH_WORD's for a state HEADLINE names by a time; never the raw name. */
