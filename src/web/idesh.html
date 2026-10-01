@@ -1601,26 +1601,36 @@ function refundPanel(order) {
     };
     // The password typed after a refusal is the next try: the refusal goes, and the button wakes, as it is typed.
     for (const input of [bank, account, holder, otp]) input.addEventListener('input', check);
-    /** The account, confirmed with `password`; a refusal of the password opens its field. */
-    const submit = async (password) => {
+    /**
+     * The account, confirmed with `password`; a refusal of the password opens
+     * its field. `chosen`: the password was set just now, and the one word at
+     * the end says both were kept. True once the account is in, null if not.
+     */
+    const submit = async (password, chosen = false) => {
       send.disabled = true;
       try {
         await guestApi(`/v1/idesh/${state.orderId}/refund-account`, {
           method: 'POST',
           body: { bank_name: bank.value, bank_account: account.value, bank_holder: holder.value, password: password || undefined },
         });
-        toast('Данс бүртгэгдлээ. Шилжүүлмэгц мэдэгдэл ирнэ.');
+        toast(chosen ? 'Нууц үг, данс хоёулаа хадгалагдлаа. Шилжүүлмэгц мэдэгдэл ирнэ.' : 'Данс бүртгэгдлээ. Шилжүүлмэгц мэдэгдэл ирнэ.');
         shell.ordersChanged();
         if (!gone) await Promise.all([showStatus(true), loadMine()]);
+        return true;
       } catch (error) {
         if (error.code === 'PASSWORD_REQUIRED' || error.code === 'BAD_PASSWORD') {
           // Money is about to be sent to this account: prove it is still you.
           otpStep.hidden = false;
           otp.focus();
           why.hidden = false;
-          why.innerHTML = `${MARK.warn}${error.code === 'BAD_PASSWORD' ? 'Нууц үг буруу байна.' : 'Нууц үгээ оруулаад дахин дарна уу.'}`;
+          // Asked for, it is a calm word; refused, it is said in the stop colour — until the next key (check, above).
+          const wrong = error.code === 'BAD_PASSWORD';
+          why.toggleAttribute('data-calm', !wrong);
+          if (wrong) why.dataset.tone = 'stop';
+          else delete why.dataset.tone;
+          why.innerHTML = `${MARK.warn}${wrong ? 'Нууц үг буруу байна.' : 'Нууц үгээ оруулаад дахин дарна уу.'}`;
           send.disabled = false;
-          return;
+          return null;
         }
         // Said by the button it is about, in words, not only in a toast.
         why.hidden = false;
@@ -1630,6 +1640,7 @@ function refundPanel(order) {
         why.querySelector('span').textContent = whatWentWrong(error);
         toast(whatWentWrong(error), 'bad');
         send.disabled = false;
+        return null;
       }
     };
     send.addEventListener('click', async () => {
@@ -1642,10 +1653,13 @@ function refundPanel(order) {
             token: store.guestToken,
             email: me.email,
             why: 'Мөнгө тань руу очих дансыг нууц үгээр баталгаажуулдаг. Таны бүртгэлд нууц үг алга — нэг удаа тохируулмагц данс шууд илгээгдэнэ.',
+            // One word at the end, from the account, for the password and the account both.
+            quiet: true,
             // Set just now — or already set elsewhere (null), and then asked for in its field.
-            then: ({ password }) => submit(password ?? ''),
+            then: ({ password }) => submit(password ?? '', Boolean(password)),
           });
-          if (done === null) check();
+          // Closed before the account went: the button wakes as the form stands. A refusal woke it already, saying why.
+          if (done === null && send.disabled) check();
           return;
         }
       }

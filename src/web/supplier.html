@@ -1631,7 +1631,9 @@ function bankCard(b) {
  * passwordPopup) — and goes straight on to the account, the password just
  * chosen in hand, rather than being sent to the profile to find the way.
  * `password` is that one: it confirms the account without being asked for
- * again.
+ * again, and the one word at the end says both were kept. A wrong password
+ * typed here is said under its field. Resolves to true once the account is
+ * kept, null when a popup was closed first.
  */
 async function changeBank(b, password = null) {
   let me = null;
@@ -1643,14 +1645,15 @@ async function changeBank(b, password = null) {
     }
   }
   if (me && !me.has_password) {
-    await passwordPopup({
+    return passwordPopup({
       token: token(),
       email: me.email,
       why: 'Олголт очих дансыг өөрийн нууц үгээр баталгаажуулна — утсаа алдсан ч мөнгө тань өөр данс руу явахгүй. Таны бүртгэлд нууц үг алга: эхлээд тохируулаад, дараа нь дансаа оруулна.',
+      // One word at the end, from the account's popup, for the password and the account both.
+      quiet: true,
       // Set just now — or already set in another tab (null), and then asked for in the account's popup.
       then: ({ password: chosen }) => changeBank(b, chosen ?? null),
     });
-    return;
   }
   const done = popup({
     id: 'bank-change',
@@ -1679,6 +1682,8 @@ async function changeBank(b, password = null) {
         // The server takes the same forms the application does; the one thing this change can say
         // «the state changed» about is the number's form, said under it in the page's own words.
         if (error.code === 'WRONG_STATE') throw refuse('bank_account', badForm);
+        // A wrong password under the field it was typed in, not over the bank's name.
+        if (error.code === 'BAD_PASSWORD') throw refuse('password', 'Нууц үг буруу байна.');
         throw error;
       }
       return true;
@@ -1693,9 +1698,10 @@ async function changeBank(b, password = null) {
     bankInput.setAttribute('autocomplete', 'off');
     sheet.append(el(`<datalist id="popup-banks">${BANK_NAMES.map((name) => `<option value="${name}">`).join('')}</datalist>`));
   }
-  if (!(await done)) return;
-  toast('Данс хадгалагдлаа. Basu санхүү шалгаж баталгаажуулна.', 'good');
+  if (!(await done)) return null;
+  toast(password ? 'Нууц үг, данс хоёулаа хадгалагдлаа. Basu санхүү шалгаж баталгаажуулна.' : 'Данс хадгалагдлаа. Basu санхүү шалгаж баталгаажуулна.', 'good');
   show(tab);
+  return true;
 }
 
 /* ── the money ───────────────────────────────────────────────────── */

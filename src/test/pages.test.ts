@@ -1940,9 +1940,12 @@ describe('the website', () => {
     await until(page, 'the way to give an account', () => Boolean(d.querySelector('[data-account]')));
     (d.querySelector('[data-account]') as HTMLElement).click();
     await answerPopup(page, { bank: 'Хаан банк', account: '5012345678', holder: 'Туршилт Хүн', password: 'буруу нууц үг' });
-    const refusal = () => d.querySelector('.sheet.popup[data-open] .popup-error') as HTMLElement | null;
-    await until(page, 'the refusal in the popup', () => refusal()?.hidden === false);
-    expect(refusal()!.textContent).toContain('Нууц үг буруу байна.');
+    const sheet = () => d.querySelector('.sheet.popup[data-open]') as HTMLElement | null;
+    const typed = () => sheet()?.querySelector('[name="password"]') as HTMLInputElement | null;
+    await until(page, 'the refusal under the password', () => typed()?.getAttribute('aria-invalid') === 'true');
+    // Said under the field it was typed in — not over the bank's name at the top of the popup.
+    expect(typed()!.closest('.field')?.querySelector('.help[data-error]')?.textContent).toBe('Нууц үг буруу байна.');
+    expect((sheet()!.querySelector('.popup-error') as HTMLElement).hidden).toBe(true);
     // A typo in the password is not a session that ended: still signed in, still here, the popup open for another try.
     expect(storage.getItem('basu.guest')).toBe(token);
     expect(d.querySelector('.sheet.popup[data-open]')).not.toBeNull();
@@ -3855,6 +3858,8 @@ describe('a first password, on the account page', () => {
       await answerPopup(page, { code: mailer.codeFor('tuya@example.mn')!, next: 'туяагийн нууц үг' });
 
       await until(page, 'the row to say it is set', () => passwordRow(page)?.textContent?.includes('Тохируулсан.') ?? false);
+      // Set for itself, with no step after it to say so, the password says it was kept.
+      expect(page.window.document.getElementById('toast')?.textContent).toContain('Нууц үг хадгалагдлаа.');
       const signedIn = await fetch(`${base}/v1/auth/login`, {
         method: 'POST',
         headers: json,
@@ -4025,6 +4030,9 @@ describe('a first password, where money is about to go', () => {
       expect(popupOnTop(page)!.querySelector('[name="password"]')).toBeNull();
       await answerPopup(page, { bank: 'Хаан банк', account: '5012345678', holder: 'Сараа Бат' });
       await until(page, 'the account on the order', () => !d.querySelector('[data-account]') && (d.querySelector('.od-refund')?.textContent ?? '').includes('5012345678'));
+      // One word at the end for both — not the password's toast left standing under the account's.
+      expect(d.querySelector('.s-toast')?.textContent).toBe('Нууц үг, данс хоёулаа хадгалагдлаа. Шилжүүлмэгц мэдэгдэл ирнэ.');
+      expect(d.getElementById('toast')?.hasAttribute('data-show') ?? false).toBe(false);
 
       // The password is the account's now: it signs in.
       const signedIn = await fetch(`${base}/v1/auth/login`, { method: 'POST', headers: json, body: JSON.stringify({ login: 'saraa@example.mn', password: 'сараагийн нууц үг' }) });
@@ -4061,6 +4069,9 @@ describe('a first password, where money is about to go', () => {
       await until(page, 'the letter', () => passwordLetters(mailer, 'tsetseg@example.mn') === 1);
       await answerPopup(page, { code: mailer.codeFor('tsetseg@example.mn')!, next: 'цэцэгийн нууц үг' });
       await until(page, 'the account to be kept', (d) => d.querySelector('#refund')?.textContent?.includes('5098765432') ?? false);
+      // One word at the end for both: no toast of the password's own stacked under it.
+      expect(page.window.document.getElementById('toast')?.textContent).toBe('Нууц үг, данс хоёулаа хадгалагдлаа. Шилжүүлмэгц мэдэгдэл ирнэ.');
+      expect(page.window.document.querySelector('.toast-old')).toBeNull();
       expect(page.window.document.querySelector('#refund')?.textContent).toContain('мэдэгдэл');
       expect(page.window.document.querySelector('#refund')?.textContent).not.toContain('SMS');
     } finally {
@@ -4083,16 +4094,22 @@ describe('a first password, where money is about to go', () => {
     type('bank', 'Хаан банк');
     type('account', '5012345678');
     type('holder', 'Туршилт Хүн');
-    // An account with a password is asked for it, in its own field, and a wrong one is refused there.
+    // An account with a password is asked for it, in its own field — calmly — and a wrong one is refused there, in the stop colour.
     send.click();
     await until(page, 'the password field', (d) => !(d.querySelector('#otp-step') as HTMLElement).hidden && !send.disabled);
+    const why = form.querySelector('#refund-why') as HTMLElement;
+    expect(why.hasAttribute('data-calm')).toBe(true);
+    expect(why.dataset.tone).toBeUndefined();
     type('otp', 'буруу нууц үг');
     send.click();
-    await until(page, 'the refusal', () => (form.querySelector('#refund-why')?.textContent ?? '').includes('Нууц үг буруу') && !send.disabled);
-    // Cleared, the button waits and says why; typed again, it wakes and the refusal goes.
+    await until(page, 'the refusal', () => (why.textContent ?? '').includes('Нууц үг буруу') && !send.disabled);
+    expect(why.dataset.tone).toBe('stop');
+    expect(why.hasAttribute('data-calm')).toBe(false);
+    // Cleared, the button waits and says why, calm again; typed again, it wakes and the refusal goes.
     type('otp', '');
     expect(send.disabled).toBe(true);
-    expect(form.querySelector('#refund-why')?.textContent).toContain('Нууц үгээ бичнэ үү.');
+    expect(why.textContent).toContain('Нууц үгээ бичнэ үү.');
+    expect(why.dataset.tone).toBeUndefined();
     type('otp', GUEST_PASSWORD);
     expect(send.disabled).toBe(false);
     expect((form.querySelector('#refund-why') as HTMLElement).hidden).toBe(true);
@@ -4115,6 +4132,10 @@ describe('a first password, where money is about to go', () => {
 
       // An address first, then the password — never «go to the profile» and back.
       await until(screen, 'the address popup', () => popupOnTop(screen)?.querySelector('h2')?.textContent === 'Имэйл холбох');
+      // Saying why an address, when the button said «Данс нэмэх»: the account takes a password, and its code comes by email.
+      const reason = popupOnTop(screen)!.querySelector('.popup-text')?.textContent ?? '';
+      expect(reason).toContain('Олголт очих дансыг өөрийн нууц үгээр баталгаажуулна');
+      expect(reason).toContain('Нууц үгийн код имэйлээр ирдэг');
       await answerPopup(screen, { email: 'malchin@example.mn' });
       await until(screen, 'the address letter', () => Boolean(mailer.codeFor('malchin@example.mn')));
       await answerPopup(screen, { code: mailer.codeFor('malchin@example.mn')! });
@@ -4132,9 +4153,36 @@ describe('a first password, where money is about to go', () => {
       expect(d.querySelector('#bank-change')?.textContent).not.toMatch(/мессеж|SMS/);
       await answerPopup(screen, { bank_name: 'Хаан банк', bank_account: '5011223344', bank_holder: 'Малчин Бат' });
       await until(screen, 'the new account on the card', () => (d.querySelector('#bank')?.textContent ?? '').includes('5011223344'));
+      // One word at the end for the password and the account both, not two toasts one over the other.
+      expect(d.getElementById('toast')?.textContent).toBe('Нууц үг, данс хоёулаа хадгалагдлаа. Basu санхүү шалгаж баталгаажуулна.');
+      expect([...d.querySelectorAll('.toast-old')].some((t) => t.textContent?.includes('Нууц үг хадгалагдлаа'))).toBe(false);
+
+      // With the password now on the account, a wrong one typed for the next change is said under its own field.
+      (d.querySelector('#bank-edit') as HTMLElement).click();
+      await until(screen, 'the account popup asking for the password', () => Boolean(d.querySelector('#bank-change[data-open] [name="password"]')));
+      await answerPopup(screen, { bank_account: '5011223355', password: 'буруу нууц үг' });
+      const typed = () => d.querySelector('#bank-change [name="password"]') as HTMLInputElement | null;
+      await until(screen, 'the refusal under the password', () => typed()?.getAttribute('aria-invalid') === 'true');
+      expect(typed()!.closest('.field')?.querySelector('.help[data-error]')?.textContent).toBe('Нууц үг буруу байна.');
+      expect((d.querySelector('#bank-change .popup-error') as HTMLElement).hidden).toBe(true);
     } finally {
       delete ctx.mailer;
     }
+  });
+
+  it('says why an address comes first when an account with only a phone number gives its refund account on the website', async () => {
+    const token = await devLogin('+97699005093', 'Вэб');
+    const id = await cancelledFor(token, 'web-refund-no-address');
+    const page = await openPage('orders.html', `/${id}`, undefined, device(token));
+    const d = page.window.document;
+    await until(page, 'the way to give an account', () => Boolean(d.querySelector('.od-refund [data-account]')));
+    // Before the press: no password, and no address for its code to go to — and what happens here about it.
+    expect(d.querySelector('.od-refund .s-note')?.textContent).toContain('түүний код очих имэйл ч алга');
+    (d.querySelector('[data-account]') as HTMLElement).click();
+    await until(page, 'the address popup', () => popupOnTop(page)?.querySelector('h2')?.textContent === 'Имэйл холбох');
+    const reason = popupOnTop(page)!.querySelector('.popup-text')?.textContent ?? '';
+    expect(reason).toContain('Мөнгө тань руу очих дансыг нууц үгээр баталгаажуулдаг');
+    expect(reason).toContain('Нууц үгийн код имэйлээр ирдэг');
   });
 });
 
