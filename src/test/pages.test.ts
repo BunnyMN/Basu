@@ -1312,9 +1312,9 @@ describe('the website', () => {
     const shop = await openPage('shop.html');
     const d = shop.window.document;
     await until(shop, 'the cards', () => d.querySelectorAll('.sh-card').length >= seeded.listings);
-    // The account is in the corner, by name or number.
+    // The account is in the corner, by name or number — the number the way people read it.
     await until(shop, 'the account', () => Boolean(d.querySelector('.s-acct')));
-    expect(d.querySelector('.s-acct')?.textContent).toContain('+97699005002');
+    expect(d.querySelector('.s-acct')?.textContent).toContain('+976 9900 5002');
 
     (d.querySelector('#kinds [data-kind="beef"]') as HTMLButtonElement).click();
     const beef = [...d.querySelectorAll('.sh-card')];
