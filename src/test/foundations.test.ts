@@ -446,6 +446,9 @@ describe('the desk', () => {
     const byMail = frame({ email: 'basuappmn@gmail.com' }).root;
     expect(byMail.querySelector('.acct .who small')?.textContent).toBe('basuappmn@gmail.com');
     expect(byMail.querySelector('.acct .who small')?.hasAttribute('data-whole')).toBe(true);
+    // wrapped, the address goes to its next line before its «@», as the desk's tables break one — never mid-word
+    expect(byMail.querySelector('.acct .who small')?.innerHTML).toBe('basuappmn<wbr>@gmail.com');
+    expect(number?.innerHTML).toBe('+976 8801 0001');
     expect(byMail.querySelector('.acct .av svg')).not.toBeNull();
     expect(byMail.querySelector('.deskbar-me svg')).not.toBeNull();
     expect(byMail.querySelector('.deskbar-me')?.getAttribute('aria-label')).toBe('Нэвтэрсэн: basuappmn@gmail.com');

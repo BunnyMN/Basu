@@ -931,7 +931,7 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 .acct .who small[data-mono]{font-family:var(--mono);font-size:var(--t-meta);font-variant-numeric:tabular-nums}
 .acct .who b[data-mono]{font-family:var(--mono);font-weight:500;font-variant-numeric:tabular-nums}
 .acct .who b[data-quiet]{font-weight:500;color:var(--ink-3)}
-.acct .who small[data-whole]{white-space:normal;overflow-wrap:anywhere;text-overflow:clip;color:var(--ink)}
+.acct .who small[data-whole]{white-space:normal;overflow-wrap:break-word;text-overflow:clip;color:var(--ink)}   /* an address wraps before its «@» (sidenav.js puts a <wbr> there), inside a word only when it cannot fit */
 .acct .av svg,.deskbar-me span svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .acct .out{grid-column:3;grid-row:1;justify-self:end;display:inline-grid;place-items:center;width:30px;height:30px;margin:-2px -2px -2px 0;padding:0;border:0;border-radius:var(--r-sm);background:none;color:var(--ink-3)}
 .acct .out svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}

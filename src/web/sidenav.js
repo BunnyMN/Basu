@@ -177,6 +177,12 @@ export function deskFrame({ workspaces, current, account, brand = 'Бизнес'
   const contactLine = account ? contactText : 'Хуваалцсан нууц үг';
   /** What a tooltip shows and a reader hears: the name and the contact, or the contact alone. */
   const whole = unnamed ? contactText : contactLine ? `${who} · ${contactLine}` : who;
+  /**
+   * The contact as markup: an address that wraps goes to its next line before its «@», as the desk's
+   * tables break one (ops.html emailHtml) — never in the middle of a word («basuappm / n@gmail.com»).
+   */
+  const at = byPhone ? -1 : contactLine.lastIndexOf('@');
+  const contactHtml = at > 0 ? `${esc(contactLine.slice(0, at))}<wbr>@${esc(contactLine.slice(at + 1))}` : esc(contactLine);
   /** The round mark: the name's first letters, or a person when there is no name to take them from. */
   const avatarMark = (named || !account) && /\p{L}/u.test(who) ? esc(initials(who)) : NAV_ICON.person;
 
@@ -215,7 +221,7 @@ export function deskFrame({ workspaces, current, account, brand = 'Бизнес'
         <nav class="tabs" aria-label="Хэсгүүд">${groups}</nav>
         <div class="acct" title="${esc(whole)}">
           <span class="av" aria-hidden="true">${avatarMark}</span>
-          <span class="who"><b${unnamed ? ' data-quiet' : ''}>${esc(who)}</b>${contactLine ? `<small${byPhone ? ' data-mono' : ''}${unnamed ? ' data-whole' : ''}>${esc(contactLine)}</small>` : ''}</span>
+          <span class="who"><b${unnamed ? ' data-quiet' : ''}>${esc(who)}</b>${contactLine ? `<small${byPhone ? ' data-mono' : ''}${unnamed ? ' data-whole' : ''}>${contactHtml}</small>` : ''}</span>
           <button class="out" type="button" id="out" aria-label="Гарах" title="Гарах">${NAV_ICON.out}</button>
         </div>
       </aside>
