@@ -943,7 +943,10 @@ describe('the guest app', () => {
         const dom = await openPage('dine.html');
         await until(dom, 'the explanation', (d) => Boolean(d.querySelector('#map .note')));
         expect(text(dom)).toContain('нэг ч гал тогоо нээлттэй биш');
-        expect(dom.window.document.querySelector('.note a')?.getAttribute('href')).toBe('/kds');
+        // Said to the guest in the guest's words. The kitchen's own screen is
+        // staff's: a link to its sign-in inside the guest's app was a dead end.
+        expect(dom.window.document.querySelector('#map .note')?.textContent).toContain('захиалга авахгүй байна');
+        expect(dom.window.document.querySelector('a[href="/kds"]')).toBeNull();
         // The pins are still drawn — the map is not the thing that failed.
         expect(pins(dom).length).toBe(seeded.venues);
         expect(pins(dom).every((f) => !f.properties['open'])).toBe(true);
@@ -953,6 +956,71 @@ describe('the guest app', () => {
         await getPool().query('UPDATE dine.restaurant SET kitchen_seen_at = $2 WHERE id = $1', [r.id, r.kitchen_seen_at]);
       }
     }
+  });
+
+  it('says plainly when there is no restaurant at all: no map of other businesses, no kitchen door, a way on', async () => {
+    // What production showed its first guests: a city of other people's
+    // cafés with nothing of ours on it, and a link to the kitchen's sign-in.
+    storage.removeItem('basu.guest');
+    const none = () => new Response(JSON.stringify({ restaurants: [] }), { status: 200, headers: { 'content-type': 'application/json' } });
+    const dom = await openPage('dine.html', '', (path) => (path === '/v1/restaurants' ? none() : undefined));
+    const d = dom.window.document;
+    await until(dom, 'the empty page', () => d.getElementById('blank')?.getAttribute('data-kind') === 'none' && !(d.getElementById('blank') as HTMLElement).hidden);
+    expect(text(dom)).toContain('Одоогоор ресторан алга');
+    // The way on: the app that has something in it, and the way home.
+    expect(d.querySelector('#blank a[href="/idesh"]')).toBeTruthy();
+    expect(d.querySelector('#blank [data-home]')).toBeTruthy();
+    // No city downloaded for nobody: the map is not even made.
+    expect((dom.window as unknown as Record<string, unknown>)['__map']).toBeUndefined();
+    expect(d.querySelector('a[href="/kds"]')).toBeNull();
+  });
+
+  it('says the connection is lost rather than drawing a blank map, and draws the map once it is back', async () => {
+    storage.removeItem('basu.guest');
+    let down = true;
+    const dom = await openPage('dine.html', '', (path) =>
+      down && path === '/v1/restaurants' ? Promise.reject(new TypeError('Failed to fetch')) : undefined,
+    );
+    const d = dom.window.document;
+    await until(dom, 'the failure, said', () => d.getElementById('blank')?.getAttribute('data-kind') === 'offline' && !(d.getElementById('blank') as HTMLElement).hidden);
+    expect(text(dom)).toContain('Холболт тасарлаа');
+    expect(d.querySelector('#blank [data-home]')).toBeTruthy();
+    expect(pins(dom)).toHaveLength(0);
+
+    down = false;
+    (d.querySelector('#blank [data-retry]') as HTMLElement).click();
+    await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
+    expect((d.getElementById('blank') as HTMLElement).hidden).toBe(true);
+  });
+
+  it('offers only the times still ahead on the server’s clock', async () => {
+    // The demo's clock stands at 11:40 for this file. 11:30 has begun, and a
+    // lunch nobody can arrive for is not offered; noon is.
+    const dom = await openPage('dine.html');
+    await until(dom, 'pins on the map', () => pins(dom).length >= seeded.venues);
+    tapPin(dom, pairedVenue);
+    await until(dom, 'the times', (d) => d.querySelectorAll('.slot').length > 0);
+    const offered = [...dom.window.document.querySelectorAll('.slot')].map((s) => s.textContent?.trim());
+    expect(offered).not.toContain('11:30');
+    expect(offered).toContain('12:00');
+  });
+
+  it('asks before it cancels a paid lunch, says what happens to the money, and cancels on yes', async () => {
+    await ownGuest('+97699003013');
+    const dom = await openPage('dine.html');
+    await orderFromMap(dom, pairedVenue, 'Цуйван', '13:15');
+    const d = dom.window.document;
+    clickText(dom, '#sheet-foot button', 'Үнэгүй цуцлах');
+    await until(dom, 'the question', () => Boolean(d.querySelector('.sheet.popup[data-open]')));
+    const ask = d.querySelector('.sheet.popup[data-open]')!;
+    expect(ask.textContent).toContain('Захиалгаа цуцлах уу?');
+    expect(ask.textContent).toContain('бүтнээрээ буцаагдана');
+    // Asking cancels nothing.
+    expect(['CANCELLED', 'REFUNDED']).not.toContain(d.querySelector('.status')?.getAttribute('data-s'));
+    (ask.querySelector('[data-submit]') as HTMLElement).click();
+    await until(dom, 'the lunch, cancelled', () =>
+      ['CANCELLED', 'REFUNDED'].includes(d.querySelector('.status')?.getAttribute('data-s') ?? ''),
+    );
   });
 });
 
