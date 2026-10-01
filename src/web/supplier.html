@@ -7,7 +7,8 @@
 <meta name="theme-color" content="#0F1110" media="(prefers-color-scheme: dark)">
 <title>Нийлүүлэгч — Basu</title>
 <link rel="stylesheet" href="/app.css">
-<script src="/vendor/table-core.js"></script>
+<!-- Read only when a table is drawn (datatable.js): never in the way of the first paint. -->
+<script defer src="/vendor/table-core.js"></script>
 <style>
 /* ── The supplier's own app ─────────────────────────────────────────
    For a person with a knife in one hand and a phone in the other, and for
@@ -53,6 +54,9 @@
 .status[data-s="declined"] .big::before{background:var(--stop)}
 .status .cap{margin-top:6px;max-width:44ch;font-size:var(--t-body)}
 .door .stepper{margin:16px 0 4px}
+/* under the steps: how long it usually takes, and the address to write to meanwhile */
+.door .wait-note{margin:12px 0 0;padding-top:14px;border-top:1px solid var(--line);font-size:var(--t-cap);line-height:1.5;color:var(--ink-2);text-wrap:pretty}
+.door .wait-note a{color:var(--accent-ink);text-decoration:underline;text-underline-offset:.15em;overflow-wrap:anywhere}
 .door .card > .btn[data-size="lg"]{margin-top:20px}
 /* a field the page refused, said where it is — the stop tone wins over the field's own border */
 .door .field :is(input,textarea)[aria-invalid="true"]{border-color:var(--stop);box-shadow:0 0 0 3px var(--stop-soft)}
@@ -84,6 +88,9 @@
 #board[data-stale]{opacity:.55;transition:opacity var(--dur) var(--ease)}
 
 /* ── today ── */
+/* what stands between the supplier and their orders or money, before the numbers: one line each */
+.today-notes{display:grid;gap:10px;margin-bottom:16px}
+.today-notes .note-act{margin-top:8px}
 .stats{margin-bottom:24px}
 .group{margin-top:28px}
 .group:first-child{margin-top:0}
@@ -663,10 +670,18 @@ function applyForm(needsPhone = false) {
 }
 
 const APPLICATION = {
-  applied: ['Хүлээгдэж байна', 'Basu хүсэлтийг тань үзэж байна. Хариуг энд, мөн имэйл эсвэл мессежээр мэдэгдэнэ.'],
+  applied: ['Хүлээгдэж байна', 'Basu хүсэлтийг тань үзэж байна. Хариу энд гарч, танд мэдэгдэл очно.'],
   contracted: ['Батлагдлаа', 'Та гэрээт нийлүүлэгч боллоо.'],
   declined: ['Татгалзсан', ''],
 };
+
+/**
+ * How long Basu's yes usually takes, and who to ask while waiting: in plain
+ * words, never a date nobody can promise. The dashboard's waiting card says
+ * the same (ops.html, WAIT_WORDS).
+ */
+const WAIT_WORDS =
+  'Шалгалт ихэвчлэн ажлын нэг, хоёр өдөр болдог. Асуух зүйл байвал <a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a> хаягаар бичээрэй.';
 
 /** The day of a timestamp in Ulaanbaatar: «10-р сарын 1» in a sentence, «10/1» where it is set as a figure. */
 const dayOfStamp = (iso) => (iso ? dayLabel(new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ulaanbaatar' })) : '');
@@ -688,13 +703,15 @@ function statusCard(a, needsPhone = false) {
   card.append(doorFoot(true));
   const inner = card.querySelector('.card');
   if (a.state === 'applied') {
-    // What happens next, so waiting is a step on a road rather than silence.
+    // What happens next, so waiting is a step on a road rather than silence — how long it usually
+    // takes, said as usual and never as a date, and who to ask meanwhile.
     inner.append(el(`
       <ol class="stepper">
         <li data-done><span class="w">Хүсэлт илгээсэн</span><span class="t">${esc(dayFigure(a.applied_at))}</span></li>
         <li data-next><span class="w">Basu шалгаж байна<span class="s">Утсаар холбогдож, мэдээллийг тань тулгана.</span></span><span class="t"></span></li>
         <li><span class="w">Гэрээ байгуулна<span class="s">Дараа нь зараа оруулж, захиалга авна.</span></span><span class="t"></span></li>
       </ol>`));
+    inner.append(el(`<p class="wait-note" id="wait-note">${WAIT_WORDS}</p>`));
   } else if (a.state === 'contracted') {
     const open = el('<button class="btn" data-v="primary" data-size="lg" type="button" id="open">Нийлүүлэгчийн хэсэг рүү орох</button>');
     open.addEventListener('click', () => boot());
@@ -832,7 +849,7 @@ function nothingToDo(listings) {
   return blank({
     icon: ICON.check,
     title: 'Одоогоор хийх ажил алга',
-    text: `${live} зар зочдод харагдаж байна. Шинэ захиалга ирэхэд энд гарч, танд мессеж ирнэ.`,
+    text: `${live} зар зочдод харагдаж байна. Шинэ захиалга ирэхэд энд гарч, танд мэдэгдэл очно.`,
     action: may('org.idesh.stall') ? { label: 'Зараа харах', onClick: () => show('stall') } : null,
   });
 }
@@ -931,7 +948,8 @@ function renderTicket(ticket, lane, { page = false } = {}) {
     buttons.append(button);
   };
   if (lane === 'paid') {
-    add('Бэлтгэж эхлэх', 'prepare', { primary: true });
+    // Starting is the slaughter: it changes what a cancel gives back, so it asks first.
+    add('Бэлтгэж эхлэх', 'prepare', { primary: true, confirm: () => startPreparing(ticket) });
     cancel(['guest_asked', 'cannot_fulfil', 'vet']);
   } else if (lane === 'preparing') {
     add('Бэлэн боллоо', 'ready', { primary: true });
@@ -971,6 +989,33 @@ async function handOver(ticket) {
       { type: 'note', text: '«Хүлээлгэн өгсөн» дарснаар захиалга дуусч, танд очих мөнгө тооцогдоно. Буцаах боломжгүй.' },
     ],
     submit: 'Хүлээлгэн өгсөн',
+    onSubmit: async () => true,
+  });
+  return Boolean(answer);
+}
+
+/**
+ * «Бэлтгэж эхлэх» is the animal committed: from that press a cancel on the
+ * guest's side leaves the supplier a tenth of the meat price, and the animal
+ * does not go back on sale. One tap must not do that unseen — the popup says
+ * what changes, in money, before it is said.
+ */
+async function startPreparing(ticket) {
+  const meat = ticket.total_mnt - (ticket.receive === 'delivery' ? ticket.delivery_fee_mnt ?? 0 : 0);
+  const kept = Math.round((meat * FORFEIT_PCT) / 100);
+  const answer = await popup({
+    id: 'prepare-order',
+    title: 'Бэлтгэж эхлэх',
+    sub: `<span class="mn">№${esc(ticket.code)}</span> · ${esc(ticket.title)} ×${esc(ticket.qty)}${ticket.unit === 'kg' ? ' кг' : ''}${ticket.guest ? ` · ${esc(ticket.guest)}` : ''}`,
+    width: 480,
+    fields: [
+      { type: 'note', text: 'Бэлтгэж эхэлбэл малыг нядалсанд тооцно: буцаах боломжгүй, мал зар руу буцахгүй. Зочинд «бэлтгэгдэж эхэллээ» гэж мэдэгдэнэ.' },
+      {
+        type: 'note',
+        html: `Үүнээс хойш зочны шалтгаанаар цуцлагдвал махны үнийн ${FORFEIT_PCT}% — <b>${money(kept)}</b> танд үлдэнэ. Мал эмнэлгийн шалгалт унах, эсвэл та биелүүлж чадахгүй болбол зочинд бүтнээр нь буцаана.`,
+      },
+    ],
+    submit: 'Бэлтгэж эхлэх',
     onSubmit: async () => true,
   });
   return Boolean(answer);
@@ -1074,7 +1119,12 @@ function connection(ok) {
 
 async function refreshBoard() {
   try {
+    const drawn = boardSig;
     renderBoard(await sup('/v1/supplier/board'));
+    // The day's numbers move with the work: an order handed over is one less to do and the season's
+    // money more — asked again whenever the board changed after its first drawing, by a press here or
+    // by somebody at another screen, never on a poll that found nothing new.
+    if (drawn && boardSig !== drawn) void renderHome();
   } catch (error) {
     if (error.status === 401) {
       signOut();
@@ -1662,13 +1712,30 @@ const settleState = (t) => SETTLE_WORD[t.state] ?? ['', t.state];
  * with the rate and the account the contract names. The list is ops's to
  * act on; here it is the supplier's to check.
  */
-async function renderMoney() {
+/**
+ * When a handed-over order's payout appears: a day after the handover the
+ * order closes and its payout line opens (src/idesh, `housekeeping`); Basu
+ * then sends it on a working day.
+ */
+const PAYOUT_AFTER_MS = 24 * 60 * 60 * 1000;
+/** The day a handed-over order's payout line opens, in Ulaanbaatar: «10-р сарын 4». */
+const payoutDay = (o) => (o.handed_at ? dayOfStamp(new Date(Date.parse(o.handed_at) + PAYOUT_AFTER_MS).toISOString()) : '');
+
+async function renderMoney(bank = false) {
   const box = document.getElementById('money');
   if (!box) return;
   let data;
   let profile = null;
+  let handed = [];
   try {
-    [data, profile] = await Promise.all([sup('/v1/supplier/money'), sup('/v1/supplier/profile').catch(() => null)]);
+    [data, profile, handed] = await Promise.all([
+      sup('/v1/supplier/money'),
+      sup('/v1/supplier/profile').catch(() => null),
+      // Handed over and not closed yet: money on its way, though no payout line holds it so far.
+      may('org.idesh.orders')
+        ? sup('/v1/supplier/orders?scope=live&q=').then((r) => r.orders.filter((o) => o.state === 'HANDED' && typeof o.payout_mnt === 'number')).catch(() => [])
+        : [],
+    ]);
   } catch (error) {
     if (error.status === 401) return signOut();
     box.replaceChildren(blank({ icon: ICON.money, size: 'sm', title: 'Тооцоо ачаалж чадсангүй', text: error.message }));
@@ -1679,13 +1746,27 @@ async function renderMoney() {
   const owed = due.reduce((sum, t) => sum + t.amount_mnt, 0);
   const paidOnes = data.settlements.filter((t) => t.state === 'paid');
   const paid = paidOnes.reduce((sum, t) => sum + t.amount_mnt, 0);
+  // The soonest first: the one whose line opens next.
+  const coming = handed.slice().sort((a, b) => String(a.handed_at).localeCompare(String(b.handed_at)));
+  const comingSum = coming.reduce((sum, o) => sum + o.payout_mnt, 0);
 
   const parts = [];
+  const cells = [];
+  if (coming.length) {
+    cells.push(el(`<div class="card stat kpi" id="coming-sum"><div class="lab">Удахгүй олгох</div><b>${money(comingSum)}</b><span>${coming.length} захиалга · ${esc(payoutDay(coming[0]))}-нөөс</span></div>`));
+  }
   if (data.settlements.length) {
-    parts.push(el(`<div class="money-sum kpis kpi-band">
-      <div class="card stat kpi"><div class="lab">Basu шилжүүлэх</div><b>${money(owed)}</b><span>${due.length ? `${due.length} олголт хүлээгдэж байна` : 'бүгд шилжсэн'}</span></div>
-      <div class="card stat kpi"><div class="lab">Шилжүүлсэн</div><b>${money(paid)}</b><span>${paidOnes.length ? `${paidOnes.length} олголт, нийт` : 'одоогоор алга'}</span></div>
-    </div>`));
+    cells.push(
+      el(`<div class="card stat kpi"><div class="lab">Basu шилжүүлэх</div><b>${money(owed)}</b><span>${due.length ? `${due.length} олголт хүлээгдэж байна` : 'бүгд шилжсэн'}</span></div>`),
+      el(`<div class="card stat kpi"><div class="lab">Шилжүүлсэн</div><b>${money(paid)}</b><span>${paidOnes.length ? `${paidOnes.length} олголт, нийт` : 'одоогоор алга'}</span></div>`),
+    );
+  }
+  if (cells.length) {
+    // Three on a phone: what comes next on a line of its own, the two that are settled under it.
+    if (cells.length === 3) cells[0].setAttribute('data-span', '');
+    const band = el('<div class="money-sum kpis kpi-band"></div>');
+    band.append(...cells);
+    parts.push(band);
   }
   const cards = el('<div class="cards"></div>');
   cards.append(
@@ -1698,16 +1779,57 @@ async function renderMoney() {
       </dl>
     </section>`),
   );
-  parts.push(cards, el('<div class="section-label">Олголтууд</div>'));
+  parts.push(cards);
+  // «When does Basu pay me?» right after a handover: the order, what it brings, and the day its payout line opens.
+  if (coming.length) {
+    parts.push(el('<div class="section-label">Удахгүй олгох</div>'));
+    const comingAt = (o) => `${esc(dayOfStamp(o.handed_at))}-нд хүлээлгэн өгсөн · олголт ${esc(payoutDay(o))}-нөөс`;
+    if (isDesk()) {
+      parts.push(
+        dataTable({
+          columns: [
+            { key: 'code', label: '№', render: (o) => `<span class="mono">№${esc(o.code)}</span>` },
+            { key: 'title', label: 'Юуны', value: (o) => `${o.title} ${o.qty}`, render: (o) => what(o) },
+            { key: 'handed_at', label: 'Хүлээлгэн өгсөн', render: (o) => esc(dayOfStamp(o.handed_at)) },
+            { key: 'opens', label: 'Олголт гарах', sortValue: (o) => o.handed_at, render: (o) => `${esc(payoutDay(o))}-нөөс` },
+            { key: 'payout_mnt', label: 'Танд', align: 'end', numeric: true, render: (o) => money(o.payout_mnt) },
+          ],
+          search: false,
+          rowAttrs: (o) => ({ 'data-coming': o.id }),
+          sort: { key: 'opens', desc: false },
+          noun: 'захиалга',
+          rows: coming,
+        }).el,
+      );
+    } else {
+      const list = el('<div class="list settle-list" data-rows id="coming"></div>');
+      for (const o of coming) {
+        list.append(
+          el(`<div class="card line row" data-coming="${esc(o.id)}">
+                <span class="main">
+                  <span class="name title"><span class="mn">№${esc(o.code)}</span> · ${what(o)}</span>
+                  <span class="sub">${comingAt(o)}</span>
+                </span>
+                <span class="end"><span class="amt val">${money(o.payout_mnt)}</span><span class="chip" data-size="sm" data-s="queued">Удахгүй</span></span>
+              </div>`),
+        );
+      }
+      parts.push(list);
+    }
+  }
+  // The lines Basu holds: shown when there are any — or, with nothing on its way either, what this place is for.
+  if (data.settlements.length || !coming.length) parts.push(el('<div class="section-label">Олголтууд</div>'));
   if (!data.settlements.length) {
-    parts.push(
-      blank({
-        icon: ICON.money,
-        frame: true,
-        title: 'Одоогоор олголт алга',
-        text: 'Захиалга хүлээлгэн өгснөөс хойш нэг хоногт олголт энд гарч, Basu ажлын өдөрт таны данс руу шилжүүлнэ.',
-      }),
-    );
+    if (!coming.length) {
+      parts.push(
+        blank({
+          icon: ICON.money,
+          frame: true,
+          title: 'Одоогоор олголт алга',
+          text: 'Захиалга хүлээлгэн өгснөөс хойш нэг хоногт олголт энд гарч, Basu ажлын өдөрт таны данс руу шилжүүлнэ.',
+        }),
+      );
+    }
   } else if (isDesk()) {
     parts.push(
       dataTable({
@@ -1746,6 +1868,8 @@ async function renderMoney() {
     parts.push(list);
   }
   box.replaceChildren(...parts);
+  // Sent here by the business's «Данс нэмэх»: the account's popup, over the page it changes.
+  if (bank && may('org.idesh.profile:bank')) void changeBank(data);
 }
 
 /** «9/8 14:05» for a timestamp the supplier reads across a list. */
@@ -1764,8 +1888,22 @@ const TABS = [
   { key: 'money', label: 'Мөнгө', icon: ICON.money, nav: 'pay', needs: 'org.idesh.money' },
   { key: 'profile', label: 'Профайл', icon: ICON.profile, nav: 'person', needs: 'org.idesh.profile' },
 ];
-/** The tab to open: the one the address names — the dashboard links straight to one — else today. */
-let tab = location.hash.slice(1) || 'today';
+/**
+ * The tab to open: the one the address names — the dashboard links straight
+ * to one — else today. After it, what the dashboard's button said it would
+ * open there, once: `#stall/new` the new listing's popup, `#profile/bank` or
+ * `#money/bank` the payout account's — so «Зар нэмэх» on the business's home
+ * is one press, not a second one on this page.
+ */
+const [linkedTab, linkedAsk] = location.hash.slice(1).split('/');
+let tab = linkedTab || 'today';
+let asked = linkedAsk ?? null;
+/** What the address asked for on arrival, taken once: a redraw of the same tab later opens nothing. */
+function arrival() {
+  const ask = asked;
+  asked = null;
+  return { add: ask === 'new' && tab === 'stall', bank: ask === 'bank' && (tab === 'profile' || tab === 'money') };
+}
 /** The desk frame's handles, when the page is at a desk. */
 let deskNav = null;
 
@@ -1863,7 +2001,7 @@ function openModule() {
   });
   root.replaceChildren(frame);
   applyDesk();
-  show(tab);
+  show(tab, arrival());
   void countWork();
 }
 
@@ -1933,7 +2071,7 @@ async function openDesk(tabs) {
   document.documentElement.setAttribute('data-theme', 'light');
   root.replaceChildren(frame.root);
   applyDesk();
-  show(tab);
+  show(tab, arrival());
   void countWork();
 }
 
@@ -1942,7 +2080,7 @@ function toDashboard(hash) {
   location.href = `/dashboard${hash}`;
 }
 
-function show(key, { add = false } = {}) {
+function show(key, { add = false, bank = false } = {}) {
   tab = key;
   onActed = null;
   history.replaceState(null, '', `${location.pathname}${location.search}#${key}`);
@@ -1957,7 +2095,7 @@ function show(key, { add = false } = {}) {
   const view = document.getElementById('view');
   view.replaceChildren();
   window.scrollTo(0, 0);
-  ({ today: renderToday, orders: renderOrders, stall: (v) => renderStallTab(v, add), money: renderMoneyTab, profile: renderProfile })[key]?.(view);
+  ({ today: renderToday, orders: renderOrders, stall: (v) => renderStallTab(v, add), money: (v) => renderMoneyTab(v, bank), profile: (v) => renderProfile(v, bank) })[key]?.(view);
 }
 
 /* today: the numbers, then the work */
@@ -1967,32 +2105,99 @@ function renderToday(view) {
   view.append(
     el(pageHead('Өнөөдөр', '&nbsp;', 'today-line')),
     el('<div class="stale-strip" id="conn" role="status" hidden>Холболт тасарсан — сүүлд <span class="mono">—</span>-д шинэчилсэн. Дахин холбогдож байна…</div>'),
+    el('<div class="today-notes" id="notes" hidden></div>'),
     el('<div class="stats kpis kpi-band" id="home" hidden></div>'),
     el(`<div id="board"><div class="board-skel" role="status" aria-busy="true" aria-label="Ачаалж байна">${'<div class="card"><span class="skel" data-h="band"></span><span class="skel" data-w="60"></span><span class="skel" data-w="80"></span><span class="skel" data-w="40"></span><span class="skel" data-h="btn"></span></div>'.repeat(2)}</div></div>`),
   );
   void renderHome();
+  void renderNotes();
   void refreshBoard().then(() => {
     const line = document.getElementById('today-line');
     if (line && today) line.textContent = dayLong(today);
   });
 }
 
-async function renderHome() {
-  const box = document.getElementById('home');
+/**
+ * Whether guests can pay on Basu at all just now. The listings say so when
+ * they carry it (`payments_open`); else the wallet's top-ups, which the same
+ * payment provider opens and closes. Null when neither said — and then
+ * nothing is said either.
+ */
+async function paymentsOpen() {
+  try {
+    const listed = await api('/v1/idesh/listings', { token: token() });
+    if (typeof listed?.payments_open === 'boolean') return listed.payments_open;
+  } catch {
+    // The wallet is asked instead.
+  }
+  try {
+    const wallet = await api('/v1/wallet', { token: token() });
+    if (typeof wallet?.topups_open === 'boolean') return wallet.topups_open;
+  } catch {
+    // Nobody said: the day says nothing about it.
+  }
+  return null;
+}
+
+/**
+ * What stands between the supplier and their orders or their money, said on
+ * the day's first screen rather than only deep in a tab: payments closed on
+ * Basu — which is why no order comes, however good the listings — and no
+ * account for the payouts to go to.
+ */
+async function renderNotes() {
+  if (!document.getElementById('notes')) return;
+  const [open, held] = await Promise.all([
+    paymentsOpen(),
+    may('org.idesh.money') ? sup('/v1/supplier/money').catch(() => null) : null,
+  ]);
+  const box = document.getElementById('notes');
   if (!box) return;
+  const notes = [];
+  if (open === false) {
+    notes.push(el('<div class="callout" data-k="info" id="payments-closed"><span>Basu дээр төлбөр түр хаалттай тул зочид одоогоор захиалга өгч чадахгүй байна. Төлбөр нээгдмэгц шинэ захиалга энд гарна.</span></div>'));
+  }
+  if (held && !held.bank_account) {
+    const note = el('<div class="callout" data-k="warn" id="bank-missing"><b>Олголт очих данс алга</b><span>Данс нэмэхгүй бол хүлээлгэн өгсөн захиалгын мөнгийг тань шилжүүлж чадахгүй.</span></div>');
+    if (may('org.idesh.profile:bank')) {
+      const add = el('<button class="btn" type="button" id="bank-add">Данс нэмэх</button>');
+      add.addEventListener('click', () => void changeBank(held));
+      const act = el('<div class="note-act"></div>');
+      act.append(add);
+      note.append(act);
+    } else {
+      note.querySelector('span').textContent += ' Дансыг эзэн нь Профайл хэсгээс нэмнэ.';
+    }
+    notes.push(note);
+  }
+  box.replaceChildren(...notes);
+  box.hidden = !notes.length;
+}
+
+/** The latest asking of the day's numbers: an answer that comes back after a newer one is not drawn. */
+let homeAsked = 0;
+
+async function renderHome() {
+  if (!document.getElementById('home')) return;
+  const mine = ++homeAsked;
   let h;
   try {
     h = await sup('/v1/supplier/home');
   } catch {
-    box.remove();
+    if (mine === homeAsked) document.getElementById('home')?.remove();
     return;
   }
-  if (!document.getElementById('home')) return;
+  const box = document.getElementById('home');
+  if (!box || mine !== homeAsked) return;
   today = h.today ?? today;
   const todo = h.lanes.paid + h.lanes.preparing + h.lanes.ready + h.lanes.dispatched;
   setTodo(todo);
-  // Nothing yet — three zeros say less than the empty day below them.
-  if (!todo && !h.season.handed && !h.season.payout_mnt) return;
+  // Nothing yet — three zeros say less than the empty day below them (and a band drawn before is put away).
+  if (!todo && !h.season.handed && !h.season.payout_mnt) {
+    box.hidden = true;
+    box.replaceChildren();
+    return;
+  }
   // The same numbers under the same names and lines as the business's home on the dashboard: one place, one way of saying it.
   const due = [h.due_today ? `${h.due_today} нь өнөөдөр авна` : '', h.overdue ? `${h.overdue} нь хоцорсон` : ''].filter(Boolean).join(' · ');
   const cells = [
@@ -2230,9 +2435,9 @@ async function renderStallTab(view, add = false) {
   }
 }
 
-function renderMoneyTab(view) {
+function renderMoneyTab(view, bank = false) {
   view.append(el(pageHead('Миний мөнгө', 'Хүлээлгэн өгсөн захиалга бүрийн олголт энд.')), el('<div class="money-page" id="money"><div class="kpis kpi-band skel-kpis" role="status" aria-busy="true"><div class="kpi"><span class="skel skel-kpi"></span></div><div class="kpi"><span class="skel skel-kpi"></span></div></div></div>'));
-  void renderMoney();
+  void renderMoney(bank);
 }
 
 /* the profile: how they are found, where the money goes */
@@ -2243,7 +2448,7 @@ function renderMoneyTab(view) {
  * first; only an owner the account, with their own password, and only a seat
  * that holds the money sees it at all. Staff read the details.
  */
-async function renderProfile(view) {
+async function renderProfile(view, bank = false) {
   let p;
   try {
     p = await sup('/v1/supplier/profile');
@@ -2293,6 +2498,8 @@ async function renderProfile(view) {
   // The person's own account. Most owners came in by phone, and an address is
   // their only way back from a forgotten password.
   if (seat) view.append(accountWays({ token: token() }));
+  // Sent here by the business's «Данс нэмэх»: the account's popup, over the page it changes.
+  if (bank && seesBank && may('org.idesh.profile:bank')) void changeBank(p);
 }
 
 /** How guests find the supplier: its name, where they collect, what it sells — in one popup. */

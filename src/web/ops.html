@@ -6,7 +6,23 @@
 <meta name="theme-color" content="#F4F3EE">
 <title>Бизнес — Basu</title>
 <link rel="stylesheet" href="/app.css">
-<script src="/vendor/table-core.js"></script>
+<!-- The page's own module comes last in this long file: what it imports is fetched beside the file, not after it. -->
+<link rel="modulepreload" href="/api.js">
+<link rel="modulepreload" href="/sidenav.js">
+<link rel="modulepreload" href="/datatable.js">
+<!-- Read only when a table is drawn (datatable.js), and run before the page's own module: never in the way of the first paint. -->
+<script defer src="/vendor/table-core.js"></script>
+<script>
+/* Which first shape the page paints while its own script (most of this file) is still on its way: the door,
+   or — for somebody signed in on this browser, or back from Google — the frame; and the door for registering a business. */
+try {
+  const shape = document.documentElement;
+  if (localStorage.getItem('basu.guest') || /[#&]auth_code=/.test(location.hash)) shape.setAttribute('data-signed', '');
+  if (/[?&]join=business(&|$)/.test(location.search)) shape.setAttribute('data-join', '');
+} catch {
+  /* storage closed to the page: the door's shape, which is what most first visits see */
+}
+</script>
 <style>
 /* ── The desk ──────────────────────────────────────────────────────
    Two or three people, all day, at a computer. Tokens, type, buttons,
@@ -15,7 +31,24 @@
 p{margin:0}
 
 /* the door: one card in the middle of the ground, the way back home under it */
-.door{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:var(--s-7) var(--gutter)}
+.door,.door-shell{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:var(--s-7) var(--gutter)}
+/* the first paint, in the HTML before the script: only the shape this visit will see, at the sizes of what
+   replaces it — the door's words as they are, its ways in as bars of their heights (Google, «эсвэл», the
+   address, its hint, «Код авах», the password fold) — so nothing moves when the real door lands */
+:root[data-signed] .door-shell,:root:not([data-signed]) .boot-shell{display:none}
+.door-shell [data-joining],:root[data-join] .door-shell [data-plain]{display:none}
+:root[data-join] .door-shell [data-joining]{display:inline}
+.shell-ways{display:flex;flex-direction:column}
+.shell-ways .skel{min-height:0;flex:none}
+.shell-ways .sw-lead{height:14px;width:72%;margin:3px 0 19px}
+.shell-ways .sw-btn{height:52px;border-radius:var(--r-ctl)}
+.shell-ways .sw-or{height:12px;width:22%;align-self:center;margin:21px 0}
+.shell-ways .sw-label{height:14px;width:24%;margin-bottom:9px}
+.shell-ways .sw-input{height:44px;border-radius:var(--r-ctl)}
+.shell-ways .sw-hint{height:14px;width:86%;margin:13px 0 35px}
+.shell-ways .sw-fold{height:14px;width:46%;align-self:center;margin:35px 0 12px}
+/* a phone's card is narrow enough that the line over the ways in takes two lines */
+@media (max-width:480px){.shell-ways .sw-lead{margin-bottom:39px}}
 .door-card{width:100%;max-width:440px;padding:32px 32px 28px}
 .door-brand{display:inline-flex;align-items:baseline;gap:10px;margin:0 0 28px;color:var(--ink);text-decoration:none}
 .door-brand .wordmark{font-size:24px}
@@ -41,6 +74,8 @@ p{margin:0}
 .section-note{margin:-2px 0 12px;font-size:var(--t-cap);line-height:1.5;color:var(--ink-2);max-width:90ch}
 .nowrap{white-space:nowrap}
 .dt-unnamed{font-weight:400;color:var(--ink-3)}
+/* an address breaks before its «@» (a <wbr>), and inside a word only when it cannot fit at all */
+.dt-email{overflow-wrap:break-word;word-break:normal}
 .skel-line{display:block;width:40%;height:14px}
 /* a file while its answer is on the way: a title, a line, the facts card, rows */
 .file-skel{display:flex;flex-direction:column;gap:10px;margin-top:6px}
@@ -124,7 +159,14 @@ p{margin:0}
 .org-wait-head{margin-bottom:12px}
 .org-wait-lead{font-size:var(--t-body-lg);line-height:1.55;color:var(--ink-2);max-width:62ch;margin:0 0 16px}
 .org-steps{max-width:520px;margin:0}
+/* under the steps: how long it usually takes, and the address to write to meanwhile */
+.org-wait-note{max-width:62ch;margin:18px 0 0;padding-top:16px;border-top:1px solid var(--line);font-size:var(--t-cap);line-height:1.5;color:var(--ink-2)}
+.org-wait-note a{color:var(--accent-ink);text-decoration:underline;text-underline-offset:.15em;overflow-wrap:anywhere}
 .nudge{display:flex;align-items:center;gap:16px 24px;flex-wrap:wrap;margin-top:24px;padding:18px 20px}
+/* what a supplier still lacks, one card each, stacked */
+.nudges{display:grid;gap:12px;margin-top:24px}
+.nudges:empty{display:none}
+.nudges > .nudge{margin-top:0}
 .nudge-copy{flex:1 1 320px;min-width:0}
 .nudge-copy b{display:block;font-size:var(--t-row);font-weight:600;color:var(--ink)}
 .nudge-copy span{display:block;margin-top:2px;font-size:var(--t-body);line-height:1.5;color:var(--ink-2)}
@@ -326,12 +368,14 @@ p{margin:0}
 /* a file — one order, one guest, one supplier, one business: the facts across the top, the
    sections down the left, and on the right a rail with what can be done and the files around
    it, which stays in view while the left scrolls. On a narrow screen: facts, rail, sections. */
-.detail{display:grid;grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"facts facts" "main rail";gap:0 24px;align-items:start}
+.detail{display:grid;grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"facts facts" "wide wide" "main rail";gap:0 24px;align-items:start}
 .detail > .detail-facts{grid-area:facts}
+/* a table the file needs whole — an order's payouts and refunds — across both columns, under the facts */
+.detail > .detail-wide{grid-area:wide;min-width:0}
 .detail > .detail-main{grid-area:main;min-width:0}
 .detail > .detail-rail{grid-area:rail;position:sticky;top:24px;margin-top:32px;min-width:0}
 @media (max-width:1100px){
-  .detail{grid-template-columns:minmax(0,1fr);grid-template-areas:"facts" "rail" "main"}
+  .detail{grid-template-columns:minmax(0,1fr);grid-template-areas:"facts" "wide" "rail" "main"}
   .detail > .detail-rail{position:static}
 }
 .detail-rail > .section-label:not(:first-child),.detail-rail > .rail-sec{margin-top:24px}
@@ -390,10 +434,27 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 </style>
 </head>
 <body>
-<div id="root"></div>
+<!-- The first paint, before the script below has arrived: the door's brand, title and line as the door draws
+     them (showToken, JOIN_LINE — keep them in step), or the frame's shape for somebody signed in. -->
+<div id="root">
+  <div class="door-shell" role="status" aria-busy="true" aria-label="Ачаалж байна">
+    <div class="card door-card">
+      <a class="door-brand" href="/" aria-label="Basu-гийн нүүр хуудас"><span class="wordmark">Basu</span><span class="door-place">Бизнес</span></a>
+      <h2><span data-plain>Нэвтрэх</span><span data-joining>Бизнесээ бүртгүүлэх</span></h2>
+      <p class="door-for"><span data-plain>Байгууллагаа Basu дээр удирдах газар. Basu-д нэвтэрдэг бүртгэлээрээ орно.</span><span data-joining>Нэвтэрмэгц бүртгэлийн цонх нээгдэнэ: бизнесийнхээ нэр, утас, хаягийг бөглөөд илгээнэ. Basu шалгаж баталмагц зар, захиалгаа эндээс удирдана.</span></p>
+      <div class="shell-ways" aria-hidden="true"><span class="skel sw-lead"></span><span class="skel sw-btn"></span><span class="skel sw-or"></span><span class="skel sw-label"></span><span class="skel sw-input"></span><span class="skel sw-hint"></span><span class="skel sw-btn"></span><span class="skel sw-fold"></span></div>
+    </div>
+    <a class="door-home" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Basu-гийн нүүр хуудас</a>
+  </div>
+  <div class="boot boot-shell" role="status" aria-busy="true" aria-label="Ачаалж байна">
+    <aside class="boot-side"><span class="skel boot-brand"></span><span class="skel boot-ws"></span><span class="skel boot-nav"></span><span class="skel boot-nav"></span><span class="skel boot-nav"></span><span class="skel boot-nav"></span><span class="skel boot-nav"></span><span class="skel boot-nav"></span><span class="skel boot-nav"></span></aside>
+    <div class="boot-bar"><span class="skel"></span><span class="skel"></span></div>
+    <div class="boot-main"><div class="page"><div class="boot-page"><div class="boot-head"><span class="skel"></span><span class="skel"></span></div></div></div></div>
+  </div>
+</div>
 
 <script type="module">
-import { api, ApiError, store, toast, mnt, money, KIND, HEADLINE, LUNCH_WORD, IDESH_STATE, IDESH_LIVE, headlineWord, dayLabel, signInDoors, accountWays, authReturn, takeSession, dropSession, popup, confirmPopup, phoneText, skeleton, emptyState, whatWentWrong } from '/api.js';
+import { api, ApiError, store, toast, mnt, money, KIND, HEADLINE, LUNCH_WORD, IDESH_STATE, IDESH_LIVE, headlineWord, dayLabel, signInDoors, authMethods, accountWays, authReturn, takeSession, dropSession, popup, confirmPopup, phoneText, skeleton, emptyState, whatWentWrong } from '/api.js';
 import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -424,7 +485,8 @@ const STAR = '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 
 /** A number to ring: read the way people read it, «+976 9911 2233»; dialled as it is stored. */
 const tel = (phone) => `<a class="tel mono" href="tel:${esc(phone)}">${PHONE}${esc(phoneText(phone))}</a>`;
 /** What somebody signs in with, in a table cell: a number as a number is read, an address as it is. */
-const contactCell = (value) => (!value ? dtCell.none() : /^\+?[\d\s-]{8,}$/.test(String(value)) ? dtCell.phone(value) : esc(value));
+const contactCell = (value) =>
+  !value ? dtCell.none() : /^\+?[\d\s-]{8,}$/.test(String(value)) ? dtCell.phone(value) : String(value).includes('@') ? emailHtml(value) : esc(value);
 /** Three rows of the shape that is coming, while it loads. */
 const busy = () => el(`<div role="status" aria-busy="true">${'<div class="skel-row"><span class="skel"></span><span class="skel-lines"><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></div>'.repeat(3)}</div>`);
 /** The dot's tone on the story: red for a cancellation, blue for on the road, green for handed over. */
@@ -527,11 +589,51 @@ let doorWhy = null;
 /** The latest drawing of the door: two calls noticing at once draw it once. */
 let doorDrawn = 0;
 
+/**
+ * Somebody who came to register a business — the front page's «Бизнесээ
+ * бүртгүүлэх» opens /dashboard?join=business: the door says so, and once
+ * signed in the registration popup opens by itself. Kept for this tab across
+ * a trip to Google, which comes back to /dashboard with no question — for a
+ * sign-in's while, not for whoever signs in on this tab next week.
+ */
+const JOIN_KEY = 'basu.dash.join';
+const JOIN_KEPT_MS = 15 * 60 * 1000;
+function joining() {
+  if (new URLSearchParams(location.search).get('join') === 'business') {
+    try {
+      sessionStorage.setItem(JOIN_KEY, String(Date.now()));
+    } catch {
+      /* a private window keeps nothing: the address still says it */
+    }
+    return true;
+  }
+  try {
+    const since = Number(sessionStorage.getItem(JOIN_KEY));
+    return since > 0 && Date.now() - since < JOIN_KEPT_MS;
+  } catch {
+    return false;
+  }
+}
+/** The wish answered once: a reload, or the next visit, opens the dashboard as it is. */
+function joined() {
+  try {
+    sessionStorage.removeItem(JOIN_KEY);
+  } catch {
+    /* nothing kept */
+  }
+  if (new URLSearchParams(location.search).has('join')) history.replaceState(null, '', `${location.pathname}${location.hash}`);
+}
+/** What the door says to somebody who came to register: what happens next, in one line. */
+const JOIN_LINE = 'Нэвтэрмэгц бүртгэлийн цонх нээгдэнэ: бизнесийнхээ нэр, утас, хаягийг бөглөөд илгээнэ. Basu шалгаж баталмагц зар, захиалгаа эндээс удирдана.';
+
 async function showToken() {
   const drawing = ++doorDrawn;
-  // Whoever was here is gone at once; until the door is known, its card's shape — never a blank page.
-  if (!root.querySelector(':scope > .boot-door')) root.replaceChildren(doorSkeleton());
-  // The demo hands its secret out; anywhere else a member signs in by phone.
+  // Whoever was here is gone at once; until the door is known, its card's shape — or the page's own first
+  // paint of it (the brand, the title, the line), when that is still up — never a blank page.
+  if (!root.querySelector(':scope > :is(.boot-door, .door-shell)')) root.replaceChildren(doorSkeleton());
+  // The demo hands its secret out; anywhere else a member signs in by phone. Production answers the probe
+  // 404 every time, so which doors are open is asked beside it, not after it (signInDoors reads the same answer).
+  void authMethods();
   const demo = await api('/dev/ops-token').catch(() => null);
   if (drawing !== doorDrawn) return;
   const door = el('<div class="door"></div>');
@@ -571,11 +673,13 @@ async function showToken() {
     return;
   }
   // The real door. Whoever comes here runs a business on Basu or works at Basu's desk; the same sign-in as the website.
+  // Somebody who came to register a business is told that is what this is, and what happens once they are in.
+  const join = joining();
   const card = el(`
-    <div class="card door-card">
+    <div class="card door-card"${join ? ' data-join' : ''}>
       ${mark}
-      <h2>Нэвтрэх</h2>
-      <p class="door-for">Байгууллагаа Basu дээр удирдах газар. Basu-д нэвтэрдэг бүртгэлээрээ орно.</p>
+      <h2>${join ? 'Бизнесээ бүртгүүлэх' : 'Нэвтрэх'}</h2>
+      <p class="door-for">${join ? JOIN_LINE : 'Байгууллагаа Basu дээр удирдах газар. Basu-д нэвтэрдэг бүртгэлээрээ орно.'}</p>
       ${why}
       <p id="door-lead">Нэвтэрнэ үү.</p>
       <div data-doors></div>
@@ -622,6 +726,20 @@ const personName = (name) => (realName(name) ? `<b>${esc(name)}</b>` : '<span cl
  * or «bat···» — said so quietly, as the guests' and the team's tables say it; the number is beside it.
  */
 const guestName = (name) => (realName(name) ? esc(name) : '<span class="dt-unnamed">Нэр оруулаагүй</span>');
+/**
+ * An address in a narrow place — a table cell, a file's facts: it may go to the next line before its «@», never
+ * in the middle of a word («baatar.mah@g / mail.com»).
+ */
+const emailHtml = (email) => {
+  const s = String(email ?? '');
+  const at = s.lastIndexOf('@');
+  return `<span class="dt-email">${at > 0 ? `${esc(s.slice(0, at))}<wbr>@${esc(s.slice(at + 1))}` : esc(s)}</span>`;
+};
+/**
+ * A guest on a call or in a list: the name they chose; with none, the address they signed in with — what tells
+ * one email sign-up from another — and only with neither, said quietly that there is no name.
+ */
+const guestWho = (name, email) => (realName(name) ? esc(name) : email ? emailHtml(email) : '<span class="dt-unnamed">Нэр оруулаагүй</span>');
 
 function renderMeHome(view) {
   const account = access.account ?? {};
@@ -687,6 +805,7 @@ function renderMeHome(view) {
   view.append(section);
 
   if (wanted === 'new-org') void orgPopup();
+  else if (wanted === 'join-business') void orgPopup({ supplier: true });
   wanted = null;
 }
 
@@ -802,8 +921,12 @@ function seenAt(iso) {
   return `${d.getMonth() + 1}-р сарын ${d.getDate()}, ${hm}`;
 }
 
-/** Registering a business, in a popup: its owner is whoever sends it; Basu approves it. */
-function orgPopup() {
+/**
+ * Registering a business, in a popup: its owner is whoever sends it; Basu
+ * approves it. `supplier` ticks «Идэшний нийлүүлэгч» for somebody who came
+ * from the front page's «Бизнесээ бүртгүүлэх».
+ */
+function orgPopup({ supplier = false } = {}) {
   return popup({
     title: 'Байгууллага бүртгүүлэх',
     sub: 'Та энэ байгууллагын эзэн болно. Basu шалгаж баталсны дараа ажилтнуудаа нэмж, ажлаа эхэлнэ.',
@@ -815,7 +938,7 @@ function orgPopup() {
         type: 'checks',
         label: 'Юу хийдэг вэ',
         options: [
-          ['supplier', 'Идэшний нийлүүлэгч', false, { hint: 'Мал, мах зарж, зочинд хүлээлгэн өгнө' }],
+          ['supplier', 'Идэшний нийлүүлэгч', supplier, { hint: 'Мал, мах зарж, зочинд хүлээлгэн өгнө' }],
           ['restaurant', 'Ресторан', false, { hint: 'Зочид урьдчилж хоол захиална' }],
         ],
         hint: 'Хоёуланг нь сонгож болно.',
@@ -827,7 +950,8 @@ function orgPopup() {
     ],
     submit: 'Бүртгүүлэх',
     onSubmit: async (v) => {
-      if (!v.restaurant && !v.supplier) throw new Error('Ресторан эсвэл нийлүүлэгч — дор хаяж нэгийг сонгоно уу.');
+      // Said under the boxes themselves, and the first box takes the focus — over the fields it was out of sight.
+      if (!v.restaurant && !v.supplier) throw Object.assign(new Error('Юу хийдгээ сонгоно уу: идэшний нийлүүлэгч, ресторан эсвэл хоёулаа.'), { field: 'supplier' });
       const made = await ops('/v1/orgs', {
         method: 'POST',
         body: { name: v.name, restaurant: v.restaurant, supplier: v.supplier, phone: v.phone, tin: v.tin, address: v.address, about: v.about },
@@ -868,6 +992,14 @@ const DOOR_WORD = {
   log: 'Хэн хэнийг нэмж, үүрэг өөрчилсөн',
 };
 
+/**
+ * How long Basu's yes usually takes, and who to ask while waiting: in plain
+ * words, never a date nobody can promise. The supplier's waiting card says the
+ * same (supplier.html, WAIT_WORDS).
+ */
+const WAIT_WORDS =
+  'Шалгалт ихэвчлэн ажлын нэг, хоёр өдөр болдог. Асуух зүйл байвал <a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a> хаягаар бичээрэй.';
+
 /** A row of steps — what is done, what is happening, what comes — drawn as the stepper. */
 const steps = (list) =>
   `<ol class="story stepper org-steps">${list
@@ -887,9 +1019,10 @@ async function renderOrgHome(view) {
         <p class="org-wait-lead">Бүртгэлийг тань Basu-гийн баг шалгаж байна. Батлагдмагц энд таны хэсгүүд нээгдэж, танд мэдэгдэл очно.</p>
         ${steps([
           ['done', 'Бүртгэл илгээсэн', 'Та эзэн нь болно'],
-          ['next', 'Basu шалгаж байна', 'Нэр, утас, хаягийг тулгана'],
-          ['', 'Ажилтнаа нэмэх', 'Менежер, ажилтан, нягтландаа үүрэг өгнө'],
-        ])}`;
+          ['next', 'Basu шалгаж байна', 'Утсаар холбогдож нэр, утас, хаягийг тулгана'],
+          ['', w.kinds?.supplier ? 'Зар, дансаа нэмэх' : 'Ажилтнаа нэмэх', w.kinds?.supplier ? 'Эхний зараа тавьж, олголт очих дансаа оруулна' : 'Менежер, ажилтан, нягтландаа үүрэг өгнө'],
+        ])}
+        <p class="org-wait-note" id="wait-note">${WAIT_WORDS}</p>`;
     } else if (w.state === 'declined') {
       body.innerHTML = `
         <div class="org-wait-head"><span class="pill" data-s="off">Татгалзсан</span></div>
@@ -912,6 +1045,8 @@ async function renderOrgHome(view) {
       .then((h) => {
         if (!band.isConnected) return;
         const todo = h.lanes.paid + h.lanes.preparing + h.lanes.ready + h.lanes.dispatched;
+        // A business that has sold nothing yet: four zeros say less than the steps under them (the supplier's Today keeps the same rule).
+        if (!todo && !h.season.handed && !h.season.payout_mnt) return band.remove();
         const due = [h.due_today ? `${h.due_today} нь өнөөдөр авна` : '', h.overdue ? `${h.overdue} нь хоцорсон` : ''].filter(Boolean).join(' · ');
         const cells = [
           `<div class="card kpi"${h.overdue ? ' data-tone="warn"' : ''}><div class="lab">Хийх ажил</div><b>${todo}</b><span>${todo ? due || 'хүлээлгэн өгөөгүй захиалга' : 'одоогоор хийх захиалга алга'}</span></div>`,
@@ -947,20 +1082,49 @@ async function renderOrgHome(view) {
     grid.querySelector('.org-doors').append(card);
   }
   view.append(grid);
-  // A supplier nobody can find yet: the one step that changes it, before the doors.
+  // What a supplier still lacks before it can sell and be paid — no listing guests can see, no account for its
+  // payouts — said before the doors, each with the button that opens its popup on the supplier's page at once
+  // (`#stall/new`, `#profile/bank`), never a page where the person has to press again. One pine button: the first.
+  const nudges = el('<div class="nudges" id="nudges"></div>');
+  grid.before(nudges);
   const stall = w.kinds?.supplier && can('org.idesh.stall:edit') ? navHref(orgLink('idesh.stall')?.href) : null;
-  if (stall) {
-    atOrg('/v1/supplier/listings')
-      .then(({ listings }) => {
-        if (!grid.isConnected || listings.some((l) => l.active)) return;
-        grid.before(el(`
-          <div class="card nudge">
-            <div class="nudge-copy"><b>Зочдод харагдах зар алга</b><span>Эхний зараа нэмбэл зочид таныг Basu дээр олж захиална: мал, үнэ, хэдийд бэлэн болохыг бичнэ.</span></div>
-            <a class="btn" data-v="primary" href="${esc(stall)}">Зар нэмэх</a>
-          </div>`));
-      })
-      .catch(() => {});
-  }
+  const bankAt = navHref((orgLink('idesh.profile') ?? orgLink('idesh.money'))?.href);
+  const holdsMoney = w.kinds?.supplier && can('org.idesh.money');
+  void Promise.all([
+    stall ? atOrg('/v1/supplier/listings').then(({ listings }) => !listings.some((l) => l.active)).catch(() => false) : false,
+    holdsMoney ? atOrg('/v1/supplier/money').then((m) => !m.bank_account).catch(() => false) : false,
+  ]).then(([noListing, noAccount]) => {
+    if (!nudges.isConnected) return;
+    const say = [];
+    if (noListing) {
+      say.push({
+        id: 'nudge-listing',
+        title: 'Зочдод харагдах зар алга',
+        text: 'Эхний зараа нэмбэл зочид таныг Basu дээр олж захиална: мал, үнэ, хэдийд бэлэн болохыг бичнэ.',
+        href: `${stall}/new`,
+        label: 'Зар нэмэх',
+      });
+    }
+    if (noAccount) {
+      const canAdd = can('org.idesh.profile:bank') && bankAt;
+      say.push({
+        id: 'nudge-bank',
+        title: 'Олголт очих данс алга',
+        text: canAdd
+          ? 'Данс нэмэхгүй бол хүлээлгэн өгсөн захиалгын мөнгийг тань шилжүүлж чадахгүй.'
+          : 'Данс нэмэхгүй бол хүлээлгэн өгсөн захиалгын мөнгийг шилжүүлж чадахгүй. Дансыг эзэн нь нэмнэ.',
+        href: canAdd ? `${bankAt}/bank` : null,
+        label: 'Данс нэмэх',
+      });
+    }
+    nudges.replaceChildren(
+      ...say.map((n, i) => {
+        const card = el(`<div class="card nudge" id="${n.id}"><div class="nudge-copy"><b>${esc(n.title)}</b><span>${esc(n.text)}</span></div></div>`);
+        if (n.href) card.append(el(`<a class="btn"${i === 0 ? ' data-v="primary"' : ''} href="${esc(n.href)}">${esc(n.label)}</a>`));
+        return card;
+      }),
+    );
+  });
   const you = el(`<p class="org-you">Та энэ байгууллагад <b>${esc(w.role_label)}</b> үүрэгтэй.${orgLink('roles') ? ' <a class="link" href="#" data-roles>Хэн юу хийж болохыг харах</a>' : ''}</p>`);
   you.querySelector('[data-roles]')?.addEventListener('click', (e) => {
     e.preventDefault();
@@ -1281,29 +1445,35 @@ async function renderOrgsDesk(view) {
   view.append(head('Байгууллагууд', 'Ресторан, нийлүүлэгчийн бүртгэл. Батлахад бүртгүүлсэн хүн эзэн нь болно.'));
   const decides = can('desk.orgs:decide');
   const table = dataTable({
+    // Narrow enough for «Батлах» and «Татгалзах» to stand in view at 1280: what a business is rides under its
+    // name, and how many people it has under its state, rather than a column each.
     columns: [
-      { key: 'name', label: 'Байгууллага', width: '26%', render: (o) => dtCell.two(o.name, o.about ?? '') },
-      { key: 'kind', label: 'Төрөл', value: (o) => kinds(o).join(', ') },
+      {
+        key: 'name',
+        label: 'Байгууллага',
+        width: '28%',
+        value: (o) => `${o.name} ${kinds(o).join(', ')}`,
+        render: (o) => dtCell.two(o.name, [kinds(o).join(', '), o.about].filter(Boolean).join(' · ')),
+      },
       {
         key: 'applicant',
         label: 'Бүртгүүлсэн',
         value: (o) => `${o.applicant ?? ''} ${o.phone ?? ''}`,
-        // An applicant with no name is shown by the number they signed in with, read as a number
-        // is read — «+976 9800 0010» — as is the business's own number under it.
+        // Who registered it, by how they sign in: an address broken before its «@» rather than inside a word,
+        // a number read as a number is read — «+976 9800 0010» — as is the business's own number under it.
         render: (o) =>
           dtCell.twoHtml(
-            realName(o.applicant) ? esc(o.applicant) : dtCell.phone(o.applicant),
+            String(o.applicant ?? '').includes('@') ? emailHtml(o.applicant) : realName(o.applicant) ? esc(o.applicant) : dtCell.phone(o.applicant),
             o.phone && o.phone !== o.applicant ? dtCell.phone(o.phone) : '',
           ),
       },
       { key: 'tin', label: 'ТТД', render: (o) => dtCell.mono(o.tin), phone: false },
-      { key: 'members', label: 'Хүн', align: 'end', numeric: true, render: (o) => dtCell.num(o.members) },
       { key: 'created_at', label: 'Бүртгэгдсэн', render: (o) => dtCell.when(o.created_at), phone: false },
       {
         key: 'state',
         label: 'Төлөв',
         value: (o) => (ORG_STATE[o.state] ?? ['off', o.state])[1],
-        render: (o) => dtCell.pill(...(ORG_STATE[o.state] ?? ['off', o.state])),
+        render: (o) => dtCell.twoHtml(dtCell.pill(...(ORG_STATE[o.state] ?? ['off', o.state])), o.state === 'active' ? `${esc(o.members)} хүн` : ''),
       },
     ],
     search: { placeholder: 'Нэр, хүн, утас, ТТД…' },
@@ -2685,7 +2855,8 @@ async function renderOverview(view) {
     const sold = (count, sales, cancelled, none) => (count ? `${mnt(sales)} борлуулалт${cancelled ? ` · ${cancelled} цуцлагдсан` : ''}` : none);
     const refunds = t(w.refunds.mnt) + t(v.idesh.refund_mnt);
     flow.replaceChildren(
-      cell('Шинэ зочин', t(v.guests.joined), `${t(v.guests.active)} хүн апп нээсэн`),
+      // Who used Basu in the period, signed in — on the app or the website alike, as the census counts them.
+      cell('Шинэ зочин', t(v.guests.joined), `${t(v.guests.active)} хүн апп эсвэл вэбээр нэвтэрч орсон`),
       cell('Идэшний захиалга', t(v.idesh.paid), sold(t(v.idesh.paid), t(v.idesh.sales_mnt), t(v.idesh.cancelled), 'төлсөн захиалга алга')),
       cell('Хоолны захиалга', t(v.dine.placed), sold(t(v.dine.placed), t(v.dine.sales_mnt), t(v.dine.cancelled), 'захиалга алга')),
       cell('Цэнэглэлт', money(t(w.topups.settled_mnt)), t(w.topups.settled) ? `${t(w.topups.settled)} удаа${t(w.topups.failed) ? ` · ${t(w.topups.failed)} амжилтгүй` : ''}` : 'цэнэглэлт алга'),
@@ -2727,7 +2898,7 @@ const PLATFORM_WORD = { ios: 'iPhone', android: 'Android', web: 'Вэб' };
 let guestQ = '';
 
 function renderGuests(view) {
-  view.append(head('Зочид', 'Утас, имэйл, нэрээр хайж, мөр дээр дарж зочны хуудсыг нээнэ.'));
+  view.append(head('Зочид', 'Утас, имэйл, нэрээр хайна — хүргэлтэд өгсөн утсаар ч олдоно.'));
   const table = dataTable({
     columns: [
       {
@@ -2743,8 +2914,14 @@ function renderGuests(view) {
             : dtCell.twoHtml(`<span class="dt-unnamed">${g.closed_at ? 'Хаагдсан бүртгэл' : 'Нэр оруулаагүй'}</span>`, esc(ways));
         },
       },
-      { key: 'phone', label: 'Утас', value: (g) => `${g.phone ?? ''} ${phoneText(g.phone ?? '')}`, render: (g) => dtCell.phone(g.phone) },
-      { key: 'email', label: 'Имэйл', render: (g) => (g.email ? esc(g.email) : dtCell.none()) },
+      {
+        key: 'phone',
+        label: 'Утас',
+        value: (g) => `${g.phone ?? ''} ${phoneText(g.phone ?? '')} ${g.delivery_phone ?? ''}`,
+        // Somebody with no number of their own, found by the one they gave for a delivery: that number, said as such.
+        render: (g) => (g.phone || !g.delivery_phone ? dtCell.phone(g.phone) : dtCell.twoHtml(dtCell.phone(g.delivery_phone), 'хүргэлтийн утас')),
+      },
+      { key: 'email', label: 'Имэйл', render: (g) => (g.email ? emailHtml(g.email) : dtCell.none()) },
       { key: 'joined_at', label: 'Бүртгүүлсэн', render: (g) => dtCell.when(g.joined_at) },
       {
         key: 'state',
@@ -4096,6 +4273,10 @@ async function renderStats(view) {
 /* ── every order ── */
 
 let orderFilter = { scope: 'live', supplier: '', day: '', q: '' };
+/** The scope the list was on before a search widened it to «Бүгд», to go back to once the search is cleared. */
+let scopeBeforeSearch = null;
+/** The search, not the person, is moving the scope: their own choice is not forgotten for it. */
+let movingScope = false;
 
 function renderOrders(view) {
   const suppliers = cache.suppliers.filter((s) => s.state === 'contracted');
@@ -4108,8 +4289,12 @@ function renderOrders(view) {
       {
         key: 'guest',
         label: 'Зочин',
-        value: (o) => `${o.guest ?? ''} ${o.guest_phone ?? ''}`,
-        render: (o) => dtCell.twoHtml(guestName(o.guest), o.guest_phone ? dtCell.phone(o.guest_phone) : ''),
+        value: (o) => `${o.guest ?? ''} ${o.guest_email ?? ''} ${o.guest_phone ?? ''} ${o.address_phone ?? ''}`,
+        // With no name, the address they signed in with; with no number of their own, the one given for the delivery.
+        render: (o) => {
+          const ring = o.guest_phone ?? (o.receive === 'delivery' ? o.address_phone : null);
+          return dtCell.twoHtml(guestWho(o.guest, o.guest_email), ring ? dtCell.phone(ring) : '');
+        },
       },
       {
         key: 'receive_on',
@@ -4122,6 +4307,25 @@ function renderOrders(view) {
     search: { placeholder: 'Код, утас, зочин, нийлүүлэгч, мах…' },
     onSearch: (q) => {
       orderFilter.q = q;
+      // Somebody on the phone about their order: it may have ended, and «Идэвхтэй» would hide it. While a search
+      // is typed it looks through every order; cleared, the list goes back to the scope it was on.
+      const seg = (v) => table.el.querySelector(`.dt-seg button[data-v="${v}"]`);
+      if (q && orderFilter.scope !== 'all' && seg('all')) {
+        const was = orderFilter.scope;
+        movingScope = true;
+        seg('all').click();
+        movingScope = false;
+        scopeBeforeSearch = was;
+        return;
+      }
+      if (!q && scopeBeforeSearch && orderFilter.scope === 'all' && seg(scopeBeforeSearch)) {
+        const back = scopeBeforeSearch;
+        scopeBeforeSearch = null;
+        movingScope = true;
+        seg(back).click();
+        movingScope = false;
+        return;
+      }
       void loadOrders(table);
     },
     filters: [
@@ -4135,6 +4339,8 @@ function renderOrders(view) {
       },
     ],
     onFilter: (f) => {
+      // A scope chosen by hand is the person's: the search no longer moves it back.
+      if (!movingScope) scopeBeforeSearch = null;
       orderFilter.scope = f.scope;
       orderFilter.supplier = f.supplier;
       void loadOrders(table);
@@ -4188,8 +4394,8 @@ async function openOrder(id, from = { label: 'Захиалгууд', go: () => s
   backTo(view, from);
   view.append(head(`№${esc(o.code)} <span class="pill" data-s="${esc(o.state)}">${esc(STATE_WORD[o.state] ?? o.state)}</span>`, `${esc(o.title)} ×${esc(o.qty)}${o.unit === 'kg' ? ' кг' : ''} · ${esc(o.supplier.name)}`));
   const here = { label: `№${o.code}`, go: () => openOrder(id, from) };
-  // Who bought it: the story's first line is the guest's own, by their account.
-  const guestId = d.events.map((e) => /^guest:([0-9a-f-]{36})$/.exec(e.actor ?? '')?.[1]).find(Boolean) ?? null;
+  // Who bought it: the order says (the story's first line is the guest's own, by their account, as before).
+  const guestId = o.guest_id ?? d.events.map((e) => /^guest:([0-9a-f-]{36})$/.exec(e.actor ?? '')?.[1]).find(Boolean) ?? null;
   const acts = live && manage
     ? `<h2 class="section-label">Үйлдэл</h2><div class="card" id="acts">
         <div class="card-body acts">
@@ -4204,25 +4410,28 @@ async function openOrder(id, from = { label: 'Захиалгууд', go: () => s
   const page = el(`
     <div class="detail">
       <div class="card detail-facts"><div class="facts">
-        <div><span class="lab">Зочин</span><b>${guestName(o.guest)}</b><span class="fact-sub">${o.guest_phone ? tel(o.guest_phone) : ''}</span></div>
+        <div><span class="lab">Зочин</span><b>${guestWho(o.guest, o.guest_email)}</b><span class="fact-sub">${o.guest_phone ? tel(o.guest_phone) : ''}</span></div>
         <div><span class="lab">${o.receive === 'delivery' ? 'Хүргэлтээр' : 'Өөрөө очиж авна'}</span><b class="nowrap">${dayLabel(o.receive_on)}</b><span class="fact-sub">${o.receive === 'delivery' ? `${esc(o.address)} · <span class="mono nowrap">${esc(phoneText(o.address_phone))}</span>` : 'нийлүүлэгчийн авах цэгээс'}</span></div>
         <div><span class="lab">Зочин төлсөн</span><b>${money(o.total_mnt)}</b><span class="fact-sub">${o.delivery_fee_mnt ? `хүргэлт ${mnt(o.delivery_fee_mnt)} орсон` : 'хүргэлтгүй'}</span></div>
         <div><span class="lab">Нийлүүлэгчид очих</span><b>${money(o.payout_mnt)}</b><span class="fact-sub">шимтгэл хассан</span></div>
         ${o.cancel_reason ? `<div><span class="lab">Цуцлалт</span><b>${esc(REASON[o.cancel_reason] ?? o.cancel_reason)}</b><span class="fact-sub">буцаалт ${mnt(o.refund_mnt ?? 0)}${o.forfeit_mnt ? ` · суутгал ${mnt(o.forfeit_mnt)}` : ''}</span></div>` : ''}
       </div></div>
+      ${d.settlements.length ? '<section class="section detail-wide"><h2 class="section-label">Мөнгө</h2><div id="money"></div></section>' : ''}
       <aside class="detail-rail">${acts}</aside>
       <div class="detail-main">
-        <section class="section"><h2 class="section-label">Мөнгө</h2><div id="money"></div></section>
+        ${d.settlements.length ? '' : '<section class="section"><h2 class="section-label">Мөнгө</h2><div id="money"></div></section>'}
         <section class="section"><h2 class="section-label">Явц</h2><div class="card card-body"><ol class="story stepper" data-stepper>${d.events
           .map((e) => step(e.type, EVENT_WORD[e.type] ?? e.type, `${actorWord(e.actor)}${e.payload?.reason ? ` · ${REASON[e.payload.reason] ?? e.payload.reason}` : ''}${e.payload?.state ? ` · ${STATE_WORD[e.payload.state] ?? ''}` : ''}`, e.at))
           .join('')}</ol></div></section>
       </div>
     </div>`);
   const moneyBox = page.querySelector('#money');
-  if (d.settlements.length) moneyBox.append(settlementTable(d.settlements, false).el);
+  // The order's own payouts and refunds across the file's whole width, above its story and its actions: six
+  // columns and the button to release them never squeezed beside the rail. The order column would only say this order.
+  if (d.settlements.length) moneyBox.append(settlementTable(d.settlements, false, 'open', { hide: ['order_code'] }).el);
   else moneyBox.append(el(`<div class="card empty">${o.state === 'CANCELLED' || o.state === 'REFUNDED' ? 'Буцаалт үүсээгүй байна.' : 'Олголт хүлээлгэн өгснөөс хойш нэг хоногийн дараа үүснэ.'}</div>`));
   const links = related([
-    guestId && hasPage('guests') ? { label: realName(o.guest) ?? 'Зочин', sub: 'Зочны хуудас: түрийвч, захиалгууд', go: () => openGuest(guestId, here) } : null,
+    guestId && hasPage('guests') ? { label: realName(o.guest) ?? o.guest_email ?? 'Зочин', sub: 'Зочны хуудас: түрийвч, захиалгууд', go: () => openGuest(guestId, here) } : null,
     hasPage('suppliers') && cache.suppliers.some((s) => s.id === o.supplier.id) ? { label: o.supplier.name, sub: 'Нийлүүлэгчийн хуудас: гэрээ, данс, зар', go: () => openSupplier(o.supplier.id, here) } : null,
   ]);
   if (links) page.querySelector('.detail-rail').append(links);
@@ -4285,7 +4494,7 @@ const supplierState = (s) => (s.state === 'contracted' ? (s.active ? ['contracte
 const approveSupplier = (s, done) =>
   confirmPopup({
     title: 'Нийлүүлэгчийг батлах',
-    text: `<b>${esc(s.name)}</b> гэрээт нийлүүлэгч болно. Хүсэлт гаргасан хүн эзэн нь болж, өөрийн бүртгэлээр /supplier-д нэвтэрнэ — SMS очно.`,
+    text: `<b>${esc(s.name)}</b> гэрээт нийлүүлэгч болно. Хүсэлт гаргасан хүн эзэн нь болж, өөрийн бүртгэлээр /supplier-д нэвтэрнэ — түүнд Basu-д мэдэгдэл очно.`,
     ok: 'Батлах',
     onConfirm: async () => {
       await ops(`/v1/ops/suppliers/${s.id}/approve`, { method: 'POST', body: {} });
@@ -4298,7 +4507,7 @@ const approveSupplier = (s, done) =>
 const declineSupplier = (s, done) =>
   confirmPopup({
     title: 'Хүсэлтийг татгалзах',
-    text: `<b>${esc(s.name)}</b>-ийн хүсэлтийг татгалзана. Шалтгааныг SMS-ээр илгээнэ; засаад дахин хүсэж болно.`,
+    text: `<b>${esc(s.name)}</b>-ийн хүсэлтийг татгалзана. Шалтгааныг нь хүсэлт гаргагчид мэдэгдлээр илгээнэ; засаад дахин хүсэж болно.`,
     ok: 'Татгалзах',
     danger: true,
     reason: { label: 'Шалтгаан', placeholder: 'ТТД баталгаажаагүй, хаяг тодорхойгүй…', required: true },
@@ -4619,7 +4828,7 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
       orders = dataTable({
         columns: [
           { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(`<span class="mono">№${esc(o.code)}</span>`, esc(`${o.title} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}`)) },
-          { key: 'guest', label: 'Зочин', value: (o) => `${o.guest ?? ''} ${o.guest_phone ?? ''}`, render: (o) => dtCell.twoHtml(guestName(o.guest), o.guest_phone ? dtCell.phone(o.guest_phone) : '') },
+          { key: 'guest', label: 'Зочин', value: (o) => `${o.guest ?? ''} ${o.guest_email ?? ''} ${o.guest_phone ?? ''}`, render: (o) => dtCell.twoHtml(guestWho(o.guest, o.guest_email), o.guest_phone ? dtCell.phone(o.guest_phone) : '') },
           { key: 'receive_on', label: 'Өдөр', render: (o) => dtCell.twoHtml(`<span class="mono nowrap">${dayLabel(o.receive_on)}</span>`, o.receive === 'delivery' ? 'хүргэлт' : 'өөрөө авна'), phone: false },
           { key: 'state', label: 'Төлөв', value: (o) => STATE_WORD[o.state] ?? o.state, render: (o) => dtCell.pill(o.state, STATE_WORD[o.state] ?? o.state) },
           { key: 'total_mnt', label: 'Дүн', align: 'end', numeric: true, render: (o) => dtCell.money(o.total_mnt) },
@@ -4641,7 +4850,7 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
     const payouts = hasPage('pay') ? cache.settlements.filter((t) => t.kind === 'payout' && t.supplier?.id === s.id) : [];
     if (payouts.length) {
       const box = el('<section class="section"><h2 class="section-label">Олголт</h2></section>');
-      box.append(settlementTable(payouts, false).el);
+      box.append(settlementTable(payouts, false, 'open', { hide: ['who'] }).el);
       main.append(box);
     }
 
@@ -4681,8 +4890,9 @@ const settlementState = (t) =>
  * where it stands — and on a row that is due, the one half of the two-person
  * release this member may press. The whole list on «Олголт», one order's on its page.
  */
-function settlementTable(rows, withFilters = true, opensOn = 'open') {
+function settlementTable(rows, withFilters = true, opensOn = 'open', { hide = [] } = {}) {
   return dataTable({
+    // In a file, the column that would only name the file itself — its order, its supplier — is left out.
     columns: [
       {
         key: 'who',
@@ -4714,7 +4924,7 @@ function settlementTable(rows, withFilters = true, opensOn = 'open') {
       },
       { key: 'created_at', label: 'Үүссэн', render: (t) => dtCell.when(t.created_at), phone: false },
       { key: 'amount_mnt', label: 'Дүн', align: 'end', numeric: true, render: (t) => dtCell.money(t.amount_mnt) },
-    ],
+    ].filter((c) => !hide.includes(c.key)),
     search: withFilters ? { placeholder: 'Нэр, захиалга, данс…' } : false,
     filters: withFilters ? [
       {
@@ -4884,13 +5094,23 @@ async function renderPromotions(view) {
 
 function renderPay(view) {
   const due = cache.settlements.filter((t) => t.state === 'due');
+  // Only a line with an account checked against the contract can be sent; the rest of what is due waits as a
+  // refund waits for the guest's account — counted there, not here.
+  const ready = due.filter((t) => t.bank_account && t.bank_verified);
+  const unchecked = due.filter((t) => !(t.bank_account && t.bank_verified));
   const waiting = cache.settlements.filter((t) => t.state === 'needs_account');
   const paid = cache.settlements.filter((t) => t.state === 'paid');
+  const sum = (rows) => rows.reduce((s, t) => s + t.amount_mnt, 0);
+  const held = [
+    waiting.length ? `${waiting.length} буцаалт — зочин дансаа оруулаагүй` : '',
+    unchecked.length ? `${unchecked.length} олголт — данс баталгаажаагүй` : '',
+  ].filter(Boolean);
   view.append(head('Олголт, буцаалт', 'Нийлүүлэгчийн олголт, зочны буцаалт. Нэг хүн батлаж, өөр хүн шилжүүлнэ.'));
-  view.append(el(`<div class="kpis kpi-band">
-    <div class="card kpi"${due.length ? ' data-tone="warn"' : ''}><div class="lab">Шилжүүлэх</div><b>${money(due.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${due.length ? `${due.length} олголт, буцаалт данс бэлэн` : 'одоо шилжүүлэх зүйл алга'}</span></div>
-    <div class="card kpi"><div class="lab">Данс хүлээж буй</div><b>${money(waiting.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${waiting.length ? `${waiting.length} буцаалт — зочин дансаа оруулаагүй` : 'данс хүлээж буй буцаалт алга'}</span></div>
-    <div class="card kpi"><div class="lab">Шилжүүлсэн, 30 хоног</div><b>${money(paid.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${paid.length ? `${paid.length} удаа` : 'сүүлийн 30 хоногт шилжүүлээгүй'}</span></div>
+  // Money is never coloured: the figures stay ink, whatever waits behind them.
+  view.append(el(`<div class="kpis kpi-band" id="pay-sum">
+    <div class="card kpi"><div class="lab">Шилжүүлэх</div><b>${money(sum(ready))}</b><span>${ready.length ? `${ready.length} олголт, буцаалт — данс бэлэн` : 'одоо шилжүүлэх зүйл алга'}</span></div>
+    <div class="card kpi"><div class="lab">Данс хүлээж буй</div><b>${money(sum(waiting) + sum(unchecked))}</b><span>${held.length ? held.join(' · ') : 'данс хүлээж буй мөр алга'}</span></div>
+    <div class="card kpi"><div class="lab">Шилжүүлсэн, 30 хоног</div><b>${money(sum(paid))}</b><span>${paid.length ? `${paid.length} удаа` : 'сүүлийн 30 хоногт шилжүүлээгүй'}</span></div>
   </div>`));
   // The table opens on what is to be done; with nothing to send, on what waits, else on everything —
   // unless this person chose a view before, which the table remembers.
@@ -5067,7 +5287,12 @@ async function renderMembers(view) {
         key: 'contact',
         label: 'Утас, имэйл',
         value: (m) => `${m.phone ?? ''} ${m.email ?? ''}`,
-        render: (m) => dtCell.twoHtml(m.phone ? dtCell.phone(m.phone) : esc(m.email ?? '—'), m.phone && m.email ? esc(m.email) : ''),
+        // A seat keeps only a number or an address its account proved: with neither, the cell says so rather than «—».
+        render: (m) =>
+          dtCell.twoHtml(
+            m.phone ? dtCell.phone(m.phone) : m.email ? emailHtml(m.email) : '<span class="dt-unnamed">Баталгаажсан утас, имэйл алга</span>',
+            m.phone && m.email ? emailHtml(m.email) : '',
+          ),
       },
       { key: 'role', label: 'Үүрэг', value: (m) => roleNames.get(m.role) ?? m.role },
       { key: 'state', label: 'Төлөв', value: (m) => memberState(m)[1], render: (m) => dtCell.pill(...memberState(m)) },
@@ -5097,21 +5322,22 @@ async function renderMembers(view) {
           },
           'data-v="quiet" data-size="sm" data-a="role"',
         ),
+        // Said as what it does — the desk closes to them — not «Хаах», which every popup's corner says too.
         button(
-          m.active ? 'Хаах' : 'Нээх',
+          m.active ? 'Ширээнээс гаргах' : 'Ширээнд буцаах',
           () =>
             confirmPopup({
-              title: m.active ? 'Гишүүнийг хаах' : 'Гишүүнийг нээх',
+              title: m.active ? 'Ширээнээс гаргах' : 'Ширээнд буцаах',
               // Off closes the desk to them at once, and only the desk: an open dashboard drops to their own
               // corner at its next step, and their account and sign-ins are theirs.
               text: m.active
                 ? `<b>${esc(m.name)}</b> Basu-гийн ширээнд шууд орохоо болино — нээлттэй байгаа ширээ нь ч дараагийн алхамд хаагдана. Бүртгэл нь хэвээр, Basu-гийн вэб, апп-д нэвтэрсэн хэвээр үлдэнэ. Дараа нь дахин нээж болно.`
                 : `<b>${esc(m.name)}</b> ${esc(roleNames.get(m.role) ?? m.role)} үүргээрээ ширээнд дахин орно.`,
-              ok: m.active ? 'Хаах' : 'Нээх',
+              ok: m.active ? 'Ширээнээс гаргах' : 'Ширээнд буцаах',
               danger: m.active,
               onConfirm: async () => {
                 await ops(`/v1/ops/members/${m.id}/active`, { method: 'POST', body: { active: !m.active } });
-                toast(m.active ? `${m.name} хаагдлаа.` : `${m.name} нээгдлээ.`, 'good');
+                toast(m.active ? `${m.name} ширээнээс гарлаа.` : `${m.name} ширээнд буцаж орлоо.`, 'good');
                 show('members');
               },
             }),
@@ -5168,8 +5394,15 @@ let bootedAs = null;
  */
 async function boot() {
   // The shape of what is coming, drawn before anything is asked: the frame for somebody signed in on this
-  // browser, the door's card for anybody else — never a blank page while the first answer is on its way.
-  root.replaceChildren(token() ? frameSkeleton() : doorSkeleton());
+  // browser, the door's card for anybody else — never a blank page while the first answer is on its way. The
+  // page's own first paint of the door (its brand, title and line, in the HTML before this script) stays up
+  // until the door itself replaces it.
+  // Back from Google counts as signed in already: the code in the address becomes the session in a moment.
+  if (token() || /[#&]auth_code=/.test(location.hash)) root.replaceChildren(frameSkeleton());
+  else {
+    document.documentElement.removeAttribute('data-signed');
+    root.replaceChildren(root.querySelector(':scope > .door-shell') ?? doorSkeleton());
+  }
   // Back from Google, the code in the address is claimed first, and the
   // session it becomes is this browser's person, whoever was signed in here
   // before (api.js, authReturn).
@@ -5192,6 +5425,16 @@ async function boot() {
   }
   // Somebody is signed in and the server took it: whatever the door last said is past.
   doorWhy = null;
+  // Came to register a business: their own corner, the registration popup open on it, «Идэшний нийлүүлэгч» ticked.
+  if (joining()) {
+    joined();
+    const corner = access.workspaces.find((x) => x.kind === 'me');
+    if (corner) {
+      wanted = 'join-business';
+      open(corner, 'home');
+      return;
+    }
+  }
   const { w, page } = choose(location.hash);
   open(w, page);
 }
