@@ -258,6 +258,44 @@ describe('the contract’s terms and the list to pay', () => {
     expect(rows[0]).toMatchObject({ state: 'applied', bank_name: 'Хаан банк', bank_account: '5012345678' });
   });
 
+  it('writes an account in at the desk the way the supplier’s own page saves it, and refuses the rest', async () => {
+    await signIn('+97688010011');
+    const made = await app.inject({
+      method: 'POST',
+      url: '/v1/ops/suppliers',
+      headers: desk(),
+      payload: { name: 'Говь-Алтай · Бат', phone: '+97688010011', address: 'Есөн булаг', bank_name: 'Хаан банк', bank_account: 'mn12 0005 0050 1234 5678', bank_holder: 'Д. Бат' },
+    });
+    expect(made.statusCode, made.body).toBe(201);
+    const suppliers = async () => (await app.inject({ method: 'GET', url: '/v1/ops/suppliers', headers: desk() })).json().suppliers as Array<{ id: string; phone: string; bank_account: string | null }>;
+    const row = async () => (await suppliers()).find((s) => s.id === made.json().id);
+    // Read aloud in groups, in either case: the spaces go, the MN stays.
+    expect(await row()).toMatchObject({ bank_account: 'MN120005005012345678' });
+
+    // A supplier registered with an account that is not one is not registered at all.
+    await signIn('+97688010012');
+    const wrongly = await app.inject({
+      method: 'POST',
+      url: '/v1/ops/suppliers',
+      headers: desk(),
+      payload: { name: 'Баян-Өлгий · Сараа', phone: '+97688010012', address: 'Өлгий хот', bank_name: 'Хаан банк', bank_account: 'MN12 0005 0050 1234', bank_holder: 'Сараа' },
+    });
+    expect(wrongly.statusCode).toBe(409);
+    expect(wrongly.json().error.code).toBe('WRONG_STATE');
+    expect((await suppliers()).some((s) => s.phone === '+97688010012')).toBe(false);
+
+    // The contract's terms, changed: the same rule, and nothing changed by a refusal.
+    for (const wrong of ['MN12 345', 'MN12 0005 0050 1234', 'MN12 0005 0050 1234 5678 9', 'MNXX12345678', '12345', 'дансны дугаар']) {
+      const refused = await app.inject({ method: 'PATCH', url: `/v1/ops/suppliers/${made.json().id}`, headers: desk(), payload: { bank_account: wrong } });
+      expect(refused.statusCode, wrong).toBe(409);
+      expect(refused.json().error.code, wrong).toBe('WRONG_STATE');
+    }
+    expect(await row()).toMatchObject({ bank_account: 'MN120005005012345678' });
+    const plain = await app.inject({ method: 'PATCH', url: `/v1/ops/suppliers/${made.json().id}`, headers: desk(), payload: { bank_account: '5012 3456 78' } });
+    expect(plain.statusCode, plain.body).toBe(200);
+    expect(plain.json()).toMatchObject({ bank_account: '5012345678' });
+  });
+
   it('starts with nothing to pay, and refuses to pay what is not there', async () => {
     const empty = await app.inject({ method: 'GET', url: '/v1/ops/settlements', headers: auth(opsToken()!) });
     expect(empty.json()).toEqual({ settlements: [] });
@@ -673,5 +711,31 @@ describe('an account nobody has checked', () => {
     expect(nothing.statusCode).toBe(200);
     const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() })).json().audit;
     expect(audit[0]).toMatchObject({ action: 'supplier.bank_verify', target_id: supplierId });
+  });
+});
+
+describe('an id at the desk that is not one', () => {
+  it('is no supplier, order, listing, payout or promotion: 404, never a 500', async () => {
+    for (const id of ['not-an-id', '------------------------------------']) {
+      const asked = [
+        ['approving', 'POST', `/v1/ops/suppliers/${id}/approve`, {}],
+        ['declining', 'POST', `/v1/ops/suppliers/${id}/decline`, { reason: 'ТТД алга' }],
+        ['the terms', 'PATCH', `/v1/ops/suppliers/${id}`, { commission_pct: 3 }],
+        ['its listings', 'GET', `/v1/ops/suppliers/${id}/listings`, undefined],
+        ['off the market', 'POST', `/v1/ops/suppliers/${id}/active`, { active: false, note: 'гэрээ дууссан' }],
+        ['the account checked', 'POST', `/v1/ops/suppliers/${id}/bank-verify`, {}],
+        ['an order', 'GET', `/v1/ops/orders/${id}`, undefined],
+        ['cancelling it', 'POST', `/v1/ops/orders/${id}/cancel`, { reason: 'guest_asked', note: 'утсаар' }],
+        ['a listing hidden', 'POST', `/v1/ops/listings/${id}/hide`, { note: 'буруу үнэ' }],
+        ['a payout approved', 'POST', `/v1/ops/settlements/${id}/approve`, {}],
+        ['a payout sent', 'POST', `/v1/ops/settlements/${id}/paid`, { reference: 'ХААН-1' }],
+        ['a promotion ended', 'POST', `/v1/ops/promotions/${id}/end`, { note: 'буруу зар' }],
+      ] as const;
+      for (const [what, method, url, payload] of asked) {
+        const response = await app.inject({ method, url, headers: desk(), ...(payload ? { payload } : {}) });
+        expect(response.statusCode, `${what} at «${id}»: ${response.body}`).toBe(404);
+        expect(response.json().error.code, what).toBe('NOT_FOUND');
+      }
+    }
   });
 });

@@ -47,3 +47,22 @@ export const needAny = (...permissions: string[]): Guard => {
 
 /** Whether this request's seat holds a permission — for what a route leaves out of an answer rather than refuses. */
 export const holds = (request: FastifyRequest, permission: string): boolean => Boolean(request.grants?.has(permission));
+
+/** An id as the database writes one. */
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The `:id` in an address, looked at before anything reads it. One that is
+ * not an id at all is no such thing, and is answered as the route answers
+ * an id nobody has (`missing`) — never handed on to Postgres, which fails
+ * the query: a 500, «Алдаа гарлаа», for a link with a typo in it. A route
+ * takes it after its own guard, so a stranger is still asked who they are
+ * first; a route without an `:id` passes straight through.
+ */
+export const knownId = (missing: (reply: FastifyReply) => FastifyReply): Guard => {
+  return async (request, reply) => {
+    const id = (request.params as { id?: unknown } | undefined)?.id;
+    if (id === undefined || (typeof id === 'string' && UUID.test(id))) return undefined;
+    return missing(reply);
+  };
+};

@@ -1,6 +1,6 @@
 import { getPool, tx, type Db } from '../db/pool.js';
 import { contactsFor, displayNamesFor } from '../platform/identity/index.js';
-import { collect, LedgerError, queueReceipt, receiptsFor } from '../platform/ledger/index.js';
+import { assertCollectable, collect, LedgerError, queueReceipt, receiptsFor } from '../platform/ledger/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
 import { IdeshError } from './errors.js';
@@ -111,7 +111,8 @@ export interface CreatedIdesh {
  * moves under a `sold + qty <= quantity` guard — so two guests reaching for
  * the last sheep are settled by the database, not by whichever request read
  * the count first. A draft nobody pays for gives the animal back after half
- * an hour (see `housekeeping`).
+ * an hour (see `housekeeping`). One nobody could pay for is never made: with
+ * payments closed, the wallet must cover the whole total, or PAYMENTS_CLOSED.
  */
 export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<CreatedIdesh> {
   const now = ctx.clock.now();
@@ -166,6 +167,12 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
       { qty: input.qty, receive: input.receive, receiveOn: input.receiveOn },
       today,
     );
+
+    // An order nobody can pay for holds nothing. On a server with no payment
+    // provider a draft the guest's wallet does not cover could never be paid,
+    // and it held its animal for half an hour all the same: a few curious
+    // presses of «Төлөх» made a live stall read «Энэ зар дууссан» to everybody.
+    await assertCollectable(ctx, { guestId: input.guestId, amountMnt: priced.totalMnt }, client);
 
     // The CHECK on the table does the enforcing; this reads the outcome.
     const taken = await client.query<{ id: string }>(

@@ -955,7 +955,7 @@ function renderDetail({ replace = false } = {}) {
   const when = el(`
     <div class="step" id="step-when">
       <div class="q section-title"><span class="n">3</span><b></b></div>
-      <input type="date" class="input" id="when" min="${earliest(l)}" value="${f.receiveOn}" aria-label="Өдөр">
+      <input type="date" class="input" id="when" min="${escapeHtml(earliest(l))}" value="${escapeHtml(f.receiveOn)}" aria-label="Өдөр">
       <div class="help">Хамгийн эрт <b>${dayLabel(earliest(l))}</b> — мах тэр өдрөөс бэлэн. Дараа нь нийлүүлэгч утсаар цагийг тохирно.</div>
     </div>`);
   when.querySelector('input').addEventListener('change', (event) => {
@@ -1493,11 +1493,12 @@ function refundPanel(order) {
     const send = panel.querySelector('#send-account');
     const why = panel.querySelector('#refund-why');
     const check = () => {
-      const digits = account.value.replace(/\s+/g, '');
+      // The rule the server holds every account to: the number, or the IBAN — MN and eighteen digits.
+      const number = account.value.replace(/\s+/g, '').toUpperCase();
       const problem = !bank.value.trim()
         ? 'Банкаа сонгоно уу.'
-        : !/^\d{6,20}$/.test(digits)
-          ? 'Дансны дугаар 6–20 оронтой тоо.'
+        : !/^(MN\d{18}|\d{6,20})$/.test(number)
+          ? 'Дансны дугаар 6–20 оронтой тоо, эсвэл MN-ээр эхэлсэн IBAN байна.'
           : holder.value.trim().length < 2
             ? 'Данс эзэмшигчийн нэрээ бичнэ үү.'
             : null;

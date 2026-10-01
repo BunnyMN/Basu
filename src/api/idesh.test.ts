@@ -4,7 +4,7 @@ import { closePool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
-import { createListing, housekeeping, registerSupplier, type Listing } from '../idesh/index.js';
+import { createListing, housekeeping, registerSupplier, supplierById, type Listing } from '../idesh/index.js';
 import { ClosedPaymentProvider, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
 import { setSetting } from '../ops/index.js';
@@ -351,25 +351,72 @@ describe('ordering', () => {
     expect(listing.json().listing.sold).toBe(1);
   });
 
-  it('says payments are closed in their own words, not «try again», on a server with no provider', async () => {
+  it('says payments are closed in their own words, not «try again», on a server with no provider — and holds nothing', async () => {
     const closed = await buildServer({ ...ctx, payments: new ClosedPaymentProvider() }, { dev: true });
     try {
       const token = await signIn();
-      const created = await closed.inject({
-        method: 'POST',
-        url: '/v1/idesh',
-        headers: auth(token),
-        payload: { listing_id: sheep.id, qty: 1, receive: 'pickup', receive_on: '2026-09-12' },
-      });
-      expect(created.statusCode, created.body).toBe(201);
-      const paid = await closed.inject({ method: 'POST', url: `/v1/idesh/${created.json().id}/pay`, headers: auth(token) });
-      expect(paid.statusCode).toBe(503);
-      expect(paid.json().error).toMatchObject({ code: 'PAYMENTS_CLOSED', message_mn: 'Онлайн төлбөр одоогоор хаалттай байна.' });
+      // Pressed by as many curious visitors as the stall has sheep, and once
+      // more: each refused before anything is set aside. A draft made anyway
+      // held its sheep for half an hour, and five of them read «Энэ зар
+      // дууссан» on a stall nobody had bought from.
+      for (let press = 0; press <= sheep.quantity; press++) {
+        const created = await closed.inject({
+          method: 'POST',
+          url: '/v1/idesh',
+          headers: auth(press % 2 ? await signIn(`+9769900120${press}`) : token),
+          payload: { listing_id: sheep.id, qty: 1, receive: 'pickup', receive_on: '2026-09-12' },
+        });
+        expect(created.statusCode, created.body).toBe(503);
+        expect(created.json().error).toMatchObject({ code: 'PAYMENTS_CLOSED', message_mn: 'Онлайн төлбөр одоогоор хаалттай байна.' });
+      }
+      const stall = await closed.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}` });
+      expect(stall.json().listing).toMatchObject({ sold: 0, remaining: 5 });
       // Nothing was taken and nothing was ordered.
-      const live = await closed.inject({ method: 'GET', url: '/v1/idesh', headers: auth(token) });
-      expect(live.json().orders).toEqual([]);
+      const all = await closed.inject({ method: 'GET', url: '/v1/idesh?scope=all', headers: auth(token) });
+      expect(all.json().orders).toEqual([]);
       const wallet = await closed.inject({ method: 'GET', url: '/v1/wallet', headers: auth(token) });
       expect(wallet.json().balance_mnt).toBe(0);
+      // Half an hour on there is no draft to give back: none was ever made.
+      clock.advanceMinutes(31);
+      expect((await housekeeping(ctx)).expired).toBe(0);
+    } finally {
+      await closed.close();
+    }
+  });
+
+  it('still sells from a wallet that covers the whole order when there is no provider, and only then', async () => {
+    const token = await signIn();
+    // Money the guest already holds in Basu, put there while payments were open.
+    await topUp(token, 470_000);
+    const closed = await buildServer({ ...ctx, payments: new ClosedPaymentProvider() }, { dev: true });
+    try {
+      const order = (receive: 'pickup' | 'delivery') =>
+        closed.inject({
+          method: 'POST',
+          url: '/v1/idesh',
+          headers: auth(token),
+          payload: {
+            listing_id: sheep.id,
+            qty: 1,
+            receive,
+            receive_on: '2026-09-12',
+            ...(receive === 'delivery' ? { address: 'Баянзүрх, 26-р хороо, 12-р байр', address_phone: '+97699112233' } : {}),
+          },
+        });
+      // Brought to the door it is 485 000 ₮, more than the wallet holds: refused, and nothing held for it.
+      const delivered = await order('delivery');
+      expect(delivered.statusCode, delivered.body).toBe(503);
+      expect(delivered.json().error.code).toBe('PAYMENTS_CLOSED');
+      expect((await closed.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}` })).json().listing.sold).toBe(0);
+
+      // Collected it is 460 000 ₮, which the wallet covers: ordered, and paid from the wallet alone.
+      const collected = await order('pickup');
+      expect(collected.statusCode, collected.body).toBe(201);
+      const paid = await closed.inject({ method: 'POST', url: `/v1/idesh/${collected.json().id}/pay`, headers: auth(token) });
+      expect(paid.statusCode, paid.body).toBe(200);
+      const wallet = await closed.inject({ method: 'GET', url: '/v1/wallet', headers: auth(token) });
+      expect(wallet.json().balance_mnt).toBe(10_000);
+      expect((await closed.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}` })).json().listing).toMatchObject({ sold: 1, remaining: 4 });
     } finally {
       await closed.close();
     }
@@ -467,6 +514,36 @@ describe('ordering', () => {
     });
     expect(named.statusCode, named.body).toBe(200);
     expect(named.json().refund).toMatchObject({ state: 'due', bank_account: '5012345678', amount_mnt: 460_000 });
+  });
+
+  it('takes a refund’s account in the forms a supplier’s account takes: the number, or the IBAN with MN', async () => {
+    const token = await signIn();
+    await topUp(token, 500_000);
+    const { id } = await placeAndPay(token);
+    const cancelled = await app.inject({
+      method: 'POST',
+      url: `/v1/supplier/orders/${id}/cancel`,
+      headers: auth(await atCounter(supplierId)),
+      payload: { reason: 'guest_asked' },
+    });
+    expect(cancelled.statusCode, cancelled.body).toBe(200);
+    const name = (bank_account: string) =>
+      app.inject({
+        method: 'POST',
+        url: `/v1/idesh/${id}/refund-account`,
+        headers: auth(token),
+        payload: { bank_name: 'Хаан банк', bank_account, bank_holder: 'Бат', password: PASSWORD },
+      });
+    // An IBAN is MN and eighteen digits, twenty in all; anything shorter or longer is not one.
+    for (const wrong of ['MN12 0005 0050 1234', 'MN12 0005 0050 1234 5678 9', 'MNXX12345678', 'GB12345678', '12345', 'дансны дугаар']) {
+      const refused = await name(wrong);
+      expect(refused.statusCode, wrong).toBe(409);
+      expect(refused.json().error.code, wrong).toBe('WRONG_STATE');
+    }
+    // Read aloud in groups, in either case: the spaces go, the MN stays.
+    const iban = await name('mn12 0005 0050 1234 5678');
+    expect(iban.statusCode, iban.body).toBe(200);
+    expect(iban.json().refund).toMatchObject({ state: 'due', bank_account: 'MN120005005012345678' });
   });
 });
 
@@ -702,13 +779,72 @@ describe('the supplier’s own module', () => {
     const plain = await change('5012 3456 78');
     expect(plain.statusCode, plain.body).toBe(200);
     expect(plain.json().bank_account).toBe('5012345678');
-    // Anything else is still refused, and nothing is changed by it.
-    for (const wrong of ['MN12 345', 'MNXX12345678', 'GB12345678', '12345', 'дансны дугаар']) {
+    // Anything else is still refused, and nothing is changed by it — an IBAN
+    // is twenty characters, MN and eighteen digits, never fewer or more.
+    for (const wrong of ['MN12 345', 'MN12 0005 0050 1234', 'MN12 0005 0050 1234 5678 9', 'MNXX12345678', 'GB12345678', '12345', 'дансны дугаар']) {
       const refused = await change(wrong);
       expect(refused.statusCode, wrong).toBe(409);
       expect(refused.json().error.code, wrong).toBe('WRONG_STATE');
     }
     const kept = await app.inject({ method: 'GET', url: '/v1/supplier/money', headers: auth(owner) });
     expect(kept.json().bank_account).toBe('5012345678');
+  });
+});
+
+describe('an account on an application', () => {
+  it('is taken the way the supplier’s own change takes it: the spaces gone, the MN kept, the rest refused', async () => {
+    const applicant = await signIn('+97699001177');
+    const apply = (bank_account: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/v1/supplier/apply',
+        headers: auth(applicant),
+        payload: { name: 'Завхан · Бат', address: 'Хархорин зах', bank_name: 'Хаан банк', bank_account, bank_holder: 'Бат' },
+      });
+    // Refused before anything is written: the person may correct it and ask again.
+    for (const wrong of ['MN12 345', 'MN12 0005 0050 1234', 'MNXX12345678', 'GB12345678', '12345', 'дансны дугаар']) {
+      const refused = await apply(wrong);
+      expect(refused.statusCode, wrong).toBe(409);
+      expect(refused.json().error.code, wrong).toBe('WRONG_STATE');
+    }
+    const asked = await apply('mn12 0005 0050 1234 5678');
+    expect(asked.statusCode, asked.body).toBe(201);
+    // What finance holds up against the contract is the account as the supplier's own page would save it.
+    expect((await supplierById(asked.json().id))?.bankAccount).toBe('MN120005005012345678');
+  });
+});
+
+describe('an id that is not one', () => {
+  it('is nothing of anybody’s: 404 at every идэш address that takes one, never a 500', async () => {
+    const guest = await signIn();
+    const owner = await atCounter(supplierId);
+    for (const id of ['not-an-id', '------------------------------------', '7001']) {
+      const asked = [
+        ['a listing', app.inject({ method: 'GET', url: `/v1/idesh/listings/${id}` })],
+        ['an order', app.inject({ method: 'GET', url: `/v1/idesh/${id}`, headers: auth(guest) })],
+        ['paying', app.inject({ method: 'POST', url: `/v1/idesh/${id}/pay`, headers: auth(guest) })],
+        [
+          'a refund’s account',
+          app.inject({
+            method: 'POST',
+            url: `/v1/idesh/${id}/refund-account`,
+            headers: auth(guest),
+            payload: { bank_name: 'Хаан банк', bank_account: '5012345678', bank_holder: 'Бат', password: PASSWORD },
+          }),
+        ],
+        ['the supplier’s order', app.inject({ method: 'GET', url: `/v1/supplier/orders/${id}`, headers: auth(owner) })],
+        ['moving it along', app.inject({ method: 'POST', url: `/v1/supplier/orders/${id}/prepare`, headers: auth(owner), payload: {} })],
+        ['the supplier’s listing', app.inject({ method: 'PATCH', url: `/v1/supplier/listings/${id}`, headers: auth(owner), payload: { price_mnt: 470_000 } })],
+        ['putting it first', app.inject({ method: 'POST', url: `/v1/supplier/listings/${id}/promote`, headers: auth(owner), payload: { tier: 'vip' } })],
+        ['paying for that', app.inject({ method: 'POST', url: `/v1/supplier/promotions/${id}/settle`, headers: auth(owner) })],
+      ] as const;
+      for (const [what, answer] of asked) {
+        const response = await answer;
+        expect(response.statusCode, `${what} at «${id}»: ${response.body}`).toBe(404);
+        expect(response.json().error.code, what).toBe('NOT_FOUND');
+      }
+    }
+    // A stranger is still asked who they are before anything else.
+    expect((await app.inject({ method: 'GET', url: '/v1/idesh/not-an-id' })).statusCode).toBe(401);
   });
 });

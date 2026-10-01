@@ -4,6 +4,7 @@ import { accrue, payOut } from '../platform/ledger/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
 import { IdeshError } from './errors.js';
+import { bankAccountOf } from './suppliers.js';
 import { mode } from '../mode.js';
 import { seal, unseal } from '../secret.js';
 
@@ -110,10 +111,11 @@ export async function setRefundAccount(
   db: Db = getPool(),
 ): Promise<void> {
   const name = bank.bankName.trim();
-  const account = bank.bankAccount.replace(/\s+/g, '');
   const holder = bank.bankHolder.trim();
   if (name.length < 2) throw new IdeshError('WRONG_STATE', 'a refund needs a bank');
-  if (!/^\d{6,20}$/.test(account)) throw new IdeshError('WRONG_STATE', 'an account number is 6 to 20 digits');
+  // The rule a supplier's account is held to: the number, or the IBAN with MN.
+  const account = bankAccountOf(bank.bankAccount);
+  if (!account) throw new IdeshError('WRONG_STATE', 'a refund needs an account number');
   if (holder.length < 2) throw new IdeshError('WRONG_STATE', 'a refund needs the account holder');
 
   const { rowCount } = await db.query(

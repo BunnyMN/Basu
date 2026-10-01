@@ -28,6 +28,26 @@ export interface BankDetails {
   bankHolder?: string | null | undefined;
 }
 
+/**
+ * A bank account as people write it: the plain number, 6 to 20 digits, or
+ * the IBAN — MN, two check digits, the bank's four and the account's twelve,
+ * twenty characters in all. Spaces are only how it was read aloud, and an mn
+ * is an MN. One rule wherever an account is typed — the application, the desk's
+ * register and edit, the supplier's own change, a guest's refund — so an
+ * account taken in one place is never refused, or kept otherwise, in another.
+ */
+const BANK_ACCOUNT = /^(MN\d{18}|\d{6,20})$/;
+const accountOf = (typed: string | null | undefined) => typed?.replace(/\s+/g, '').toUpperCase() || null;
+
+/** The account as it is kept — null when none was typed — or a refusal, before anything is written. */
+export function bankAccountOf(typed: string | null | undefined): string | null {
+  const account = accountOf(typed);
+  if (account && !BANK_ACCOUNT.test(account)) {
+    throw new IdeshError('WRONG_STATE', 'an account is 6 to 20 digits, or an IBAN: MN and eighteen digits');
+  }
+  return account;
+}
+
 export interface SupplierInput extends BankDetails {
   name: string;
   phone: string;
@@ -51,6 +71,7 @@ export async function registerSupplier(input: SupplierInput & { ownerId: string 
 }
 
 async function insertContracted(input: SupplierInput & { ownerId: string }, db: Db): Promise<string> {
+  const account = bankAccountOf(input.bankAccount);
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO idesh.supplier
        (name, phone, ebarimt_merchant_tin, pickup_address, lat, lon, state, contracted_at,
@@ -64,7 +85,7 @@ async function insertContracted(input: SupplierInput & { ownerId: string }, db: 
       input.lat ?? null,
       input.lon ?? null,
       input.bankName?.trim() || null,
-      seal(input.bankAccount?.replace(/\s+/g, '')),
+      seal(account),
       seal(input.bankHolder?.trim()),
       input.ownerId,
     ],
@@ -261,6 +282,7 @@ export async function applySupplier(ctx: Ctx, input: ApplicationInput): Promise<
   if (input.merchantTin && !/^\d{7,10}$/.test(input.merchantTin)) {
     throw new IdeshError('WRONG_STATE', 'a TIN is seven to ten digits');
   }
+  const account = bankAccountOf(input.bankAccount);
 
   const contact = (await contactsFor([input.guestId])).get(input.guestId);
   if (!contact) throw new IdeshError('NOT_FOUND', 'no such guest');
@@ -285,7 +307,7 @@ export async function applySupplier(ctx: Ctx, input: ApplicationInput): Promise<
         input.guestId,
         ctx.clock.now(),
         input.bankName?.trim() || null,
-        seal(input.bankAccount?.replace(/\s+/g, '')),
+        seal(account),
         seal(input.bankHolder?.trim()),
       ],
     );
@@ -512,14 +534,6 @@ export interface ProfileEdit extends BankDetails {
 }
 
 /**
- * A bank account as people write it: the plain number, or the IBAN with its
- * MN and two check digits — what the application takes, so an account taken
- * there can be saved again here. Spaces are only how it was read aloud.
- */
-const BANK_ACCOUNT = /^(MN\d{2})?\d{6,20}$/;
-const accountOf = (typed: string | null | undefined) => typed?.replace(/\s+/g, '').toUpperCase() || null;
-
-/**
  * What a supplier may change about themselves: how they are named and
  * found, and where the money goes. A changed account comes back flagged —
  * the caller tells the owner and finance checks it before anything is paid
@@ -534,10 +548,7 @@ export async function updateSupplierProfile(
   if (edit.pickupAddress !== undefined && edit.pickupAddress.trim().length < 4) {
     throw new IdeshError('WRONG_STATE', 'a supplier needs a pickup address');
   }
-  const account = accountOf(edit.bankAccount);
-  if (account && !BANK_ACCOUNT.test(account)) {
-    throw new IdeshError('WRONG_STATE', 'an account is 6 to 20 digits, or MN, two check digits and the number');
-  }
+  const account = bankAccountOf(edit.bankAccount);
   const bankChanged = await bankWouldChange(supplierId, edit, db);
   const { rowCount } = await db.query(
     `UPDATE idesh.supplier
@@ -617,6 +628,7 @@ export async function updateSupplier(supplierId: string, patch: SupplierPatch, d
   if (patch.merchantTin && !/^\d{7,14}$/.test(patch.merchantTin)) {
     throw new IdeshError('WRONG_STATE', 'a TIN is seven to fourteen digits');
   }
+  const account = bankAccountOf(patch.bankAccount);
   const { rowCount } = await db.query(
     `UPDATE idesh.supplier
         SET commission_pct       = COALESCE($2, commission_pct),
@@ -630,7 +642,7 @@ export async function updateSupplier(supplierId: string, patch: SupplierPatch, d
       supplierId,
       patch.commissionPct ?? null,
       patch.bankName?.trim() || null,
-      seal(patch.bankAccount?.replace(/\s+/g, '')),
+      seal(account),
       seal(patch.bankHolder?.trim()),
       patch.merchantTin?.trim() || null,
     ],

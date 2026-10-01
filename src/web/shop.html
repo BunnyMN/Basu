@@ -214,9 +214,10 @@ const OF_KIND = { sheep: 'Хонины', goat: 'Ямааны', beef: 'Үхрий
 
 /* ── the market ────────────────────────────────────────────────────── */
 
-// The animal can come in the address (the front page's four photos link to their own).
+// The animal can come in the address (the front page's four photos link to their own) —
+// one of the four by name, never whatever an object answers to («?kind=constructor»).
 const asked = new URLSearchParams(location.search).get('kind');
-const view = { kind: asked && KIND[asked] ? asked : 'all', sort: 'suggested', delivers: false };
+const view = { kind: asked && Object.hasOwn(KIND, asked) ? asked : 'all', sort: 'suggested', delivers: false };
 
 function drawMarket() {
   page.replaceChildren(
@@ -575,7 +576,7 @@ function drawStall(l) {
                   <button class="sd-way" type="button" role="radio" data-r="delivery"${l.delivers ? '' : ' disabled'}><i></i><span><b>Хүргүүлнэ</b><small>${l.delivers ? 'Нийлүүлэгч таны хаяг руу хүргэнэ' : 'Энэ нийлүүлэгч хүргэдэггүй'}</small></span><em>${l.delivers ? `+<span class="s-money">${tugrik(l.delivery_fee_mnt)}</span>` : ''}</em></button>
                 </div>
               </div>
-              <label class="s-field"><span id="when-label">Очиж авах өдөр</span><input class="s-input" type="date" id="when" min="${earliest(l)}" value="${form.receiveOn}" aria-describedby="when-help"><small class="s-help" id="when-help">Хамгийн эрт ${dayLabel(earliest(l))}</small></label>
+              <label class="s-field"><span id="when-label">Очиж авах өдөр</span><input class="s-input" type="date" id="when" min="${esc(earliest(l))}" value="${esc(form.receiveOn)}" aria-describedby="when-help"><small class="s-help" id="when-help">Хамгийн эрт ${dayLabel(earliest(l))}</small></label>
               <div id="where" hidden>
                 <label class="s-field"><span>Хүргэх хаяг</span><textarea class="s-input" id="address" rows="3" autocomplete="street-address" placeholder="Дүүрэг, хороо, байр, орц, тоот">${esc(form.address)}</textarea></label>
                 <label class="s-field"><span>Хүргэгчийн залгах утас</span><span class="s-affix"><i>+976</i><input class="s-input" id="phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="9911 2233" value="${esc(form.phone)}"></span></label>
@@ -693,11 +694,11 @@ function drawStall(l) {
               ${delivery ? `<div><span>Хүргэлт</span><span class="s-money">${tugrik(l.delivery_fee_mnt)}</span></div>` : ''}
               <div class="total"><span>Нийт төлөх</span><span class="s-money">${tugrik(total())}</span></div>
             </div>
+            <p class="s-error" id="pay-error" role="alert"></p>
             <div class="sd-actions">
               <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="button" id="pay">${store.guestToken ? `Төлөх · ${mnt(total())}` : 'Нэвтэрч төлөх →'}</button>
               <button class="s-btn s-btn-line s-btn-block" type="button" id="edit">Засах</button>
             </div>
-            <p class="s-error" id="pay-error" role="alert"></p>
             ${store.guestToken ? '' : '<p class="sd-fine">Нэвтэрмэгц энэ захиалга руугаа буцна — сонголт тань хадгалагдана.</p>'}
             <ul class="sd-after">
               <li>${MARK.check}<span>Төлбөр орсны дараа нийлүүлэгч малыг нядалж бэлтгэнэ.</span></li>
@@ -748,7 +749,8 @@ function drawStall(l) {
         location.href = `/orders/${bought.id}?new=1${bought.what === JSON.stringify(body) ? '' : '&earlier=1'}`;
       } catch (error) {
         // A review drawn again since this press has a press of its own to
-        // speak for; this one's words go under its own button, if it is there.
+        // speak for; this one's words go over its own button, if it is there —
+        // where the eye is, as on /idesh, not under «Засах» where it went unread.
         if (!button.isConnected) return;
         button.removeAttribute('data-busy');
         buy.querySelector('#pay-error').textContent = whatWentWrong(error);

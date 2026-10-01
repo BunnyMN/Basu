@@ -63,7 +63,7 @@ import { LONE_OWNER_PERMISSIONS, grants, headRoles, type Grants } from '../platf
 import { accessIn, membersOf } from '../platform/org/index.js';
 import type { Ctx } from '../ports.js';
 import { shapeOrder, shapeSettlement, shapeSummary } from './shapes.js';
-import { holds, need, needAny } from './guards.js';
+import { holds, knownId, need, needAny, UUID } from './guards.js';
 
 /**
  * Өвлийн идэш over HTTP: the guest's side under /v1/idesh, the supplier's
@@ -93,10 +93,18 @@ const ORG_HEADER = 'x-basu-org';
 function orgOf(request: FastifyRequest): string | null {
   const sent = request.headers[ORG_HEADER];
   const value = Array.isArray(sent) ? sent[0] : sent;
-  return value && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value) ? value.toLowerCase() : null;
+  return value && UUID.test(value) ? value.toLowerCase() : null;
 }
 
 type Guard = (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
+
+/**
+ * A listing, an order, a promotion by an id that is not one: nothing of
+ * anybody's, 404, as one that is not there is. Every route here takes it
+ * after its own guard (`guarded`, `asSupplierMay`), so a route added later
+ * cannot leave it out; the desk's идэш routes take it too (`deskOnOne`).
+ */
+export const anIdeshId = knownId((reply) => sendError(reply, new IdeshError('NOT_FOUND', 'that is not an id')));
 
 function bearer(request: FastifyRequest): string | undefined {
   const header = request.headers.authorization;
@@ -211,7 +219,7 @@ export async function registerIdeshRoutes(
   ctx: Ctx,
   opts: { requireGuest: Guard; dev: boolean },
 ): Promise<void> {
-  const guarded = { preHandler: opts.requireGuest };
+  const guarded = { preHandler: [opts.requireGuest, anIdeshId] };
 
   /**
    * What a person may do at a supplier: what their role opens at its
@@ -249,9 +257,9 @@ export async function registerIdeshRoutes(
    * the money, only an owner or a manager changes the details. The table is
    * `platform/access`'s.
    */
-  const asSupplierMay = (permission: string) => ({ preHandler: [requireSupplier, need(permission)] });
+  const asSupplierMay = (permission: string) => ({ preHandler: [requireSupplier, need(permission), anIdeshId] });
   /** A supplier route two pages read from: either opens it. */
-  const asSupplierMayAny = (...permissions: string[]) => ({ preHandler: [requireSupplier, needAny(...permissions)] });
+  const asSupplierMayAny = (...permissions: string[]) => ({ preHandler: [requireSupplier, needAny(...permissions), anIdeshId] });
   /** What a seat without the money sees of an amount that is the supplier's own: nothing. */
   const moneyFor = (request: FastifyRequest, value: number | null | undefined) => (holds(request, 'org.idesh.money') ? value ?? null : null);
 
@@ -269,7 +277,7 @@ export async function registerIdeshRoutes(
     listings: (await openListings(ctx.clock.now())).map(shapeListing),
   }));
 
-  app.get<{ Params: { id: string } }>('/v1/idesh/listings/:id', async (request, reply) => {
+  app.get<{ Params: { id: string } }>('/v1/idesh/listings/:id', { preHandler: anIdeshId }, async (request, reply) => {
     const listing = await listingById(request.params.id, ctx.clock.now());
     if (!listing) return sendError(reply, new IdeshError('NOT_FOUND', 'no such listing'));
     return reply.send({ today: dayOf(ctx.clock.now()), listing: shapeListing(listing) });
