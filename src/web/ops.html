@@ -393,7 +393,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 <div id="root"></div>
 
 <script type="module">
-import { api, ApiError, store, toast, mnt, money, KIND, HEADLINE, LUNCH_WORD, IDESH_HEADLINE, headlineWord, dayLabel, signInDoors, accountWays, authReturn, takeSession, dropSession, popup, confirmPopup, phoneText, skeleton, emptyState, whatWentWrong } from '/api.js';
+import { api, ApiError, store, toast, mnt, money, KIND, HEADLINE, LUNCH_WORD, IDESH_STATE, IDESH_LIVE, headlineWord, dayLabel, signInDoors, accountWays, authReturn, takeSession, dropSession, popup, confirmPopup, phoneText, skeleton, emptyState, whatWentWrong } from '/api.js';
 import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -442,14 +442,11 @@ const step = (type, title, sub, at) =>
   `<li data-done${STORY_K[type] ? ` data-k="${STORY_K[type]}"` : ''}><span class="w">${esc(title)}<span class="s">${esc(sub)}</span></span><span class="t">${when(at)} ${clockOf(at)}</span></li>`;
 const STATE = { applied: 'хүлээгдэж байна', contracted: 'гэрээт', declined: 'татгалзсан' };
 /**
- * An идэш's state in a chip: the word the guest, the supplier and the website say for it (api.js's
- * IDESH_HEADLINE: «Төлсөн» … «Хүлээлгэн өгсөн»); an order that ended reads as where it stands, as on
- * the website and the supplier's screen — «Цуцлагдсан», not the guest's news «Цуцлагдлаа».
+ * An идэш's state in a chip: the one word the guest, the supplier and the website say for it —
+ * api.js's IDESH_STATE, «Төлсөн» … «Хүлээлгэн өгсөн», and where an order that ended stands:
+ * «Дууссан», «Цуцлагдсан», not the guest's news «Цуцлагдлаа».
  */
-const STATE_WORD = {
-  ...Object.fromEntries(['PAID', 'PREPARING', 'READY', 'DISPATCHED', 'HANDED'].map((k) => [k, IDESH_HEADLINE[k][0]])),
-  CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан', REFUNDED: 'Буцаасан',
-};
+const STATE_WORD = IDESH_STATE;
 const EVENT_WORD = {
   CREATED: 'Үүссэн', PAID: 'Төлсөн', PREPARING: 'Бэлтгэж эхэлсэн', READY: 'Бэлэн болсон', DISPATCHED: 'Замд гарсан',
   HANDED: 'Хүлээлгэн өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан', REFUND_DUE: 'Буцаалт үүссэн', REFUNDED: 'Буцаалт шилжүүлсэн', RESENT: 'Мэдэгдэл дахин илгээсэн',
@@ -2711,14 +2708,14 @@ async function renderOverview(view) {
 /* ── the guests ── */
 
 /**
- * A lunch's state in a chip: the guest's own word for it (api.js's HEADLINE, and LUNCH_WORD by
- * headlineWord — a scheduled lunch is «Хүлээн авсан», on the fire «Гал дээр», moved «Цаг шилжсэн»);
- * where the guest's word is news or a wish — «Цуцлагдлаа», «Сайхан хооллоорой» — where the order
- * stands, in the form the идэш chips say it.
+ * A lunch's state in a chip: the one word the guest's pages and the launcher say for it — api.js's
+ * headlineWord, LUNCH_WORD before HEADLINE: accepted «Баталгаажсан», scheduled «Хүлээн авсан», on the
+ * fire «Гал дээр», moved «Цаг шилжсэн», and where one that ended stands — «Цуцлагдсан», «Үйлчилсэн»,
+ * not the guest's news or wish. A draft is unpaid, as an идэш's is.
  */
 const DINE_WORD = {
+  DRAFT: IDESH_STATE.DRAFT,
   ...Object.fromEntries([...Object.keys(HEADLINE), ...Object.keys(LUNCH_WORD)].map((k) => [k, headlineWord(k)])),
-  ACCEPTED: 'Батлагдсан', SERVED: 'Үйлчилсэн', CLOSED: 'Дууссан', CANCELLED: 'Цуцлагдсан', REFUNDED: 'Буцаасан',
 };
 const LINE_WORD = { topup: 'Цэнэглэлт', purchase: 'Төлбөр', refund: 'Буцаалт', promotion: 'Урамшуулал', adjustment: 'Залруулга' };
 const PLATFORM_WORD = { ios: 'iPhone', android: 'Android', web: 'Вэб' };
@@ -2854,7 +2851,7 @@ async function openGuest(id, from = { label: 'Зочид', go: () => show('guest
   // A file opened from here comes back here.
   const here = { label: g.name ?? 'Зочин', go: () => openGuest(id, from) };
   const liveDine = f.dine_orders.filter((o) => DINE_LIVE.includes(o.state)).length;
-  const liveIdesh = f.idesh_orders.filter((o) => ['PAID', 'PREPARING', 'READY', 'DISPATCHED'].includes(o.state)).length;
+  const liveIdesh = f.idesh_orders.filter((o) => IDESH_LIVE.includes(o.state)).length;
   const ways = (g.ways ?? []).map((w) => WAY_WORD[w] ?? w).join(', ');
   const page = el(`
     <div class="detail">
@@ -4180,7 +4177,7 @@ async function openOrder(id, from = { label: 'Захиалгууд', go: () => s
   }
   if (!wanted()) return;
   const o = d.order;
-  const live = ['PAID', 'PREPARING', 'READY', 'DISPATCHED'].includes(o.state);
+  const live = IDESH_LIVE.includes(o.state);
   const manage = can('desk.orders:manage');
   view.replaceChildren();
   backTo(view, from);

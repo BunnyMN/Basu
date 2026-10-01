@@ -2743,6 +2743,49 @@ describe('нийлүүлэгч болох', () => {
     expect([...doc.querySelectorAll('.section > h2')].map((h) => h.textContent)).toEqual(expect.arrayContaining(['Хоол', 'Явц']));
   });
 
+  it('names a lunch’s and an идэш’s state in the one word the guest’s pages, the launcher and the supplier say', async () => {
+    // api.js's words (headlineWord, IDESH_STATE), written out on purpose: a word of the desk's own for a
+    // state — «Батлагдсан», «Хаагдсан», «Өгсөн» — reads one order as two and fails here.
+    const LUNCH: Record<string, string> = {
+      PLACED: 'Хүлээгдэж байна', ACCEPTED: 'Баталгаажсан', SCHEDULED: 'Хүлээн авсан', ARMED: 'Хөдлөх цаг', HELD: 'Хүлээж байна',
+      FIRED: 'Гал дээр', COOKING: 'Гал дээр', READY: 'Бэлэн', SERVED: 'Үйлчилсэн', RESLOTTED: 'Цаг шилжсэн',
+      CLOSED: 'Дууссан', CANCELLED: 'Цуцлагдсан', REFUNDED: 'Буцаасан', REJECTED: 'Татгалзсан', NO_SHOW: 'Ирээгүй',
+    };
+    const IDESH: Record<string, string> = {
+      PAID: 'Төлсөн', PREPARING: 'Бэлтгэж байна', READY: 'Бэлэн', DISPATCHED: 'Замд', HANDED: 'Хүлээлгэн өгсөн',
+      CLOSED: 'Дууссан', CANCELLED: 'Цуцлагдсан', REFUNDED: 'Буцаасан',
+    };
+    const desk = await openPage('ops.html', '', undefined, device());
+    await until(desk, 'the secret prefilled', (d) => Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value));
+    clickText(desk, '.pair button', 'Нэвтрэх');
+    const doc = desk.window.document;
+    // The desk's first page drawn: a tab pressed while it still loads would draw its page twice.
+    await until(desk, 'the overview', (d) => Boolean(d.querySelector('#now')));
+    const said = (list: string) => [...doc.querySelectorAll(`#${list} tbody .pill`)].map((p) => [(p as HTMLElement).dataset['s'], p.textContent]);
+
+    // Every lunch, going on and over: the demo's history closed some, other tests left some on the fire.
+    await opsTab(desk, 'lunches');
+    await until(desk, 'the lunches', (d) => Boolean(d.querySelector('#lunches .dt-seg button[data-v="all"]')));
+    (doc.querySelector('#lunches .dt-seg button[data-v="all"]') as HTMLElement).click();
+    await until(desk, 'a lunch that is over', (d) => Boolean(d.querySelector('#lunches tbody .pill[data-s="CLOSED"]')));
+    for (const [state, word] of said('lunches')) expect(word, state).toBe(LUNCH[state!]);
+    expect(doc.querySelector('#lunches tbody .pill[data-s="CLOSED"]')?.textContent).toBe('Дууссан');
+
+    // An идэш of this test's own, bought and over — closed, as the scheduler closes one a day after the
+    // handover — among whatever else is going on.
+    await ownGuest('+97699008031');
+    const code = await buyPickup(await openPage('idesh.html'));
+    await getPool().query(`UPDATE idesh.idesh_order SET state = 'CLOSED', closed_at = now() WHERE code = $1`, [code]);
+    await opsTab(desk, 'orders');
+    await until(desk, 'the идэш orders', (d) => Boolean(d.querySelector('#orders .dt-seg button[data-v="all"]')));
+    (doc.querySelector('#orders .dt-seg button[data-v="all"]') as HTMLElement).click();
+    const ours = () => [...doc.querySelectorAll('#orders tr[data-order]')].find((r) => r.textContent?.includes(`№${code}`));
+    await until(desk, 'the идэш that is over', () => Boolean(ours()));
+    for (const [state, word] of said('orders')) expect(word, state).toBe(IDESH[state!]);
+    expect(ours()!.querySelector('.pill')?.textContent).toBe('Дууссан');
+  });
+
+
   it('opens the books: the checks, every account, then the movements with a CSV to take away', async () => {
     const desk = await openPage('ops.html', '', undefined, device());
     await until(desk, 'the secret prefilled', (d) =>
