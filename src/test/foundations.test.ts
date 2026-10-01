@@ -28,7 +28,7 @@ beforeEach(async () => {
   const nav = strip(await readFile(join(WEB, 'sidenav.js'), 'utf8'));
   const tables = strip(await readFile(join(WEB, 'datatable.js'), 'utf8'));
   window.eval(
-    `${api}\n${nav}\n${tables}\nObject.assign(window, { popup, confirmPopup, toast, emptyState, skeleton, fieldError, setBusy, phoneText, phoneInput, deskFrame, dataTable, HEADLINE, headlineWord });`,
+    `${api}\n${nav}\n${tables}\nObject.assign(window, { popup, confirmPopup, toast, emptyState, skeleton, fieldError, setBusy, phoneText, phoneInput, moneyInput, moneyValue, deskFrame, dataTable, HEADLINE, headlineWord, IDESH_HEADLINE, IDESH_STATE, IDESH_LIVE });`,
   );
 });
 
@@ -263,6 +263,126 @@ describe('a field and a number', () => {
     field('phone').dispatchEvent(new window.Event('input', { bubbles: true }));
     expect(field('phone').value).toBe('8801 0011');
   });
+
+  it('groups money in thousands as it is typed, and reads it back as a number', () => {
+    expect(window.moneyValue('1,250,000')).toBe(1250000);
+    expect(window.moneyValue('1 250 000₮')).toBe(1250000);
+    expect(window.moneyValue('0')).toBe(0);
+    expect(window.moneyValue('')).toBeNaN();
+    expect(window.moneyValue('38.5')).toBeNaN();
+
+    document.body.innerHTML = '<input inputmode="numeric">';
+    const input = window.moneyInput(document.querySelector('input')) as HTMLInputElement;
+    const cases: Array<[string, string]> = [
+      ['4600', '4,600'],
+      ['460000', '460,000'],
+      ['1250000', '1,250,000'],
+      ['460 000₮', '460,000'],
+      ['007', '7'],
+      ['0', '0'],
+      ['', ''],
+    ];
+    for (const [typed, shown] of cases) {
+      input.value = typed;
+      input.dispatchEvent(new window.Event('input'));
+      expect(input.value).toBe(shown);
+    }
+  });
+
+  it('hands its answer a money field’s digits, ₮ beside it, so a page reading a number reads one', async () => {
+    let got: Record<string, unknown> | null = null;
+    void window.popup({
+      title: 'Үнэ',
+      fields: [{ name: 'price_mnt', label: 'Үнэ', format: 'money', value: '460000', required: true }],
+      onSubmit: (values: Record<string, unknown>) => {
+        got = values;
+        return true;
+      },
+    });
+    expect(field('price_mnt').value).toBe('460,000');
+    expect(field('price_mnt').getAttribute('inputmode')).toBe('numeric');
+    expect(field('price_mnt').closest('.affix')?.querySelector('i')?.textContent).toBe('₮');
+    field('price_mnt').value = '1250000';
+    field('price_mnt').dispatchEvent(new window.Event('input', { bubbles: true }));
+    expect(field('price_mnt').value).toBe('1,250,000');
+    (open().querySelector('[data-submit]') as HTMLElement).click();
+    await tick();
+    expect(got).toEqual({ price_mnt: '1250000' });
+  });
+
+  it('heads a group of fields with a section that sends nothing', async () => {
+    let got: Record<string, unknown> | null = null;
+    void window.popup({
+      title: 'Нийлүүлэгч бүртгэх',
+      fields: [
+        { name: 'name', label: 'Нэр' },
+        { type: 'section', label: 'Олголт очих данс', text: 'Хүлээлгэн өгсөн захиалга бүрийн мөнгө энд очно.' },
+        { name: 'bank_account', label: 'Дансны дугаар' },
+      ],
+      onSubmit: (values: Record<string, unknown>) => {
+        got = values;
+        return true;
+      },
+    });
+    const section = open().querySelector('.fields > .popup-section') as HTMLElement;
+    expect(section.hasAttribute('data-wide')).toBe(true);
+    expect(section.querySelector('h3')?.textContent).toBe('Олголт очих данс');
+    expect(section.querySelector('p')?.textContent).toBe('Хүлээлгэн өгсөн захиалга бүрийн мөнгө энд очно.');
+    (open().querySelector('[data-submit]') as HTMLElement).click();
+    await tick();
+    expect(got).toEqual({ name: '', bank_account: '' });
+  });
+
+  it('lets a field follow another: onChange on drawing and on every change, a field shown only when it applies, a hint that follows', async () => {
+    const heard: unknown[] = [];
+    let got: Record<string, unknown> | null = null;
+    void window.popup({
+      title: 'Буцаалт авах данс',
+      fields: [
+        {
+          name: 'bank',
+          label: 'Банк',
+          type: 'select',
+          options: [['', '—'], ['khan', 'Хаан банк'], ['other', 'Бусад банк']],
+          onChange: (bank: string, form: { show: (name: string, on: boolean) => void; hint: (name: string, text: string) => void }) => {
+            heard.push(bank);
+            form.show('other', bank === 'other');
+            form.hint('bank', bank ? '' : 'Мөнгө орох банкаа сонгоно уу.');
+          },
+        },
+        { name: 'other', label: 'Банкны нэр', required: true },
+      ],
+      onSubmit: (values: Record<string, unknown>) => {
+        got = values;
+        return true;
+      },
+    });
+    // Drawn: heard once, the bank's name put away, the hint said.
+    expect(heard).toEqual(['']);
+    expect((field('other').closest('.field') as HTMLElement).hidden).toBe(true);
+    expect(field('other').disabled).toBe(true);
+    expect(field('bank').closest('.field')?.querySelector('.help')?.textContent).toBe('Мөнгө орох банкаа сонгоно уу.');
+
+    const bank = field('bank') as unknown as HTMLSelectElement;
+    bank.value = 'other';
+    bank.dispatchEvent(new window.Event('input', { bubbles: true }));
+    bank.dispatchEvent(new window.Event('change', { bubbles: true }));
+    // A select is heard once per move, not once per event.
+    expect(heard).toEqual(['', 'other']);
+    expect((field('other').closest('.field') as HTMLElement).hidden).toBe(false);
+    expect(field('bank').closest('.field')?.querySelector('.help')).toBeNull();
+
+    // Shown, it is required again; put away, it is neither required nor sent.
+    (open().querySelector('[data-submit]') as HTMLElement).click();
+    await tick();
+    expect(errorUnder('other')).toBe('Бөглөнө үү.');
+    bank.value = 'khan';
+    bank.dispatchEvent(new window.Event('change', { bubbles: true }));
+    expect(errorUnder('other')).toBeNull();
+    (open().querySelector('[data-submit]') as HTMLElement).click();
+    await tick();
+    expect(got).toEqual({ bank: 'khan' });
+  });
 });
 
 describe('a lunch state’s word', () => {
@@ -275,6 +395,24 @@ describe('a lunch state’s word', () => {
     expect(window.headlineWord('NOT_A_STATE')).toBe('');
     // dine reads a missing headline as «say the time»: these stay out of HEADLINE
     expect(window.HEADLINE.SCHEDULED).toBeUndefined();
+  });
+
+  it('names a state on a chip where the headline is a sentence', () => {
+    expect(window.headlineWord('CANCELLED')).toBe('Цуцлагдсан');
+    expect(window.HEADLINE.CANCELLED[0]).toBe('Цуцлагдлаа');
+    expect(window.headlineWord('SERVED')).toBe('Үйлчилсэн');
+  });
+});
+
+describe('an идэш’s state', () => {
+  it('has one word on every page — the chip’s — beside the status page’s sentence', () => {
+    expect(window.IDESH_STATE.HANDED).toBe('Хүлээлгэн өгсөн');
+    expect(window.IDESH_STATE.CANCELLED).toBe('Цуцлагдсан');
+    expect(window.IDESH_HEADLINE.CANCELLED[0]).toBe('Цуцлагдлаа');
+    // Every state the headline knows has a word of its own.
+    for (const state of Object.keys(window.IDESH_HEADLINE)) expect(window.IDESH_STATE[state]).toBeTruthy();
+    // «Идэвхтэй» is paid and not yet handed over, everywhere.
+    expect(window.IDESH_LIVE).toEqual(['PAID', 'PREPARING', 'READY', 'DISPATCHED']);
   });
 });
 

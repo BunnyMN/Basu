@@ -1069,6 +1069,12 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 .popup .popup-error{margin:0 0 16px}
 .popup .popup-text{margin:0 0 16px;font-size:var(--t-body-lg);line-height:1.5;color:var(--ink-2)}
 .popup .popup-text b{color:var(--ink);font-weight:600}
+/* A heading inside a long form (popup type 'section'): a hairline over it, the
+   group's name in the ink at body size, one line under it if it needs one. */
+.popup .popup-section{margin:4px 0 14px;padding-top:18px;border-top:1px solid var(--line)}
+.popup .fields > .popup-section:first-child{margin-top:0;padding-top:0;border-top:0}
+.popup .popup-section h3{margin:0;font-size:var(--t-body-lg);font-weight:600;line-height:1.3;letter-spacing:0;color:var(--ink)}
+.popup .popup-section p{margin:4px 0 0;max-width:60ch;font-size:var(--t-cap);line-height:1.45;color:var(--ink-2)}
 .popup .popup-static > div{font-size:var(--t-body-lg);color:var(--ink)}
 .popup .popup-checks{display:flex;flex-wrap:wrap;gap:4px 24px}
 .popup .popup-checks small{display:block;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}

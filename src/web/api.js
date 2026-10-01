@@ -889,11 +889,13 @@ const popupAttrs = (attrs = {}) =>
 /** One field of a popup's form, as the design system draws a field. */
 function popupField(f, n) {
   const id = `popup-${n}-${f.name ?? Math.random().toString(36).slice(2)}`;
-  const wide = f.wide || ['textarea', 'checks', 'icons', 'static', 'note', 'pick'].includes(f.type) ? ' data-wide' : '';
+  const wide = f.wide || ['textarea', 'checks', 'icons', 'static', 'note', 'pick', 'section'].includes(f.type) ? ' data-wide' : '';
   const hint = f.hint ? `<small class="help" id="${id}-hint">${popupEsc(f.hint)}</small>` : '';
   const described = f.hint ? ` aria-describedby="${id}-hint"` : '';
   const req = f.required ? ' required' : '';
   if (f.type === 'note') return `<p class="popup-text"${wide}>${f.html ?? popupEsc(f.text)}</p>`;
+  // A heading over the fields after it, in a long form: «Олголт очих данс», a line under it if it needs one.
+  if (f.type === 'section') return `<div class="popup-section"${wide}><h3>${popupEsc(f.label)}</h3>${f.text ? `<p>${popupEsc(f.text)}</p>` : ''}</div>`;
   if (f.type === 'static') return `<div class="field popup-static"${wide}><span>${popupEsc(f.label)}</span><div>${f.html ?? popupEsc(f.value)}</div></div>`;
   if (f.type === 'checks') {
     // [name, word, on, { disabled, hint }] — a box that is fixed stays drawn, greyed, and is not sent.
@@ -930,18 +932,21 @@ function popupField(f, n) {
     return `<label class="field"${wide} for="${id}"><span>${popupEsc(f.label)}</span><textarea id="${id}" name="${popupEsc(f.name)}" placeholder="${popupEsc(f.placeholder ?? '')}"${req}${described}${popupAttrs(f.attrs)}>${popupEsc(f.value ?? '')}</textarea>${hint}</label>`;
   }
   const type = f.type ?? 'text';
-  // A phone types digits on a phone's own keypad unless the page said otherwise.
-  const inputmode = f.inputmode ?? (type === 'tel' ? 'tel' : '');
+  const isMoney = f.format === 'money';
+  // A phone types digits on a phone's own keypad unless the page said otherwise; money is digits too.
+  const inputmode = f.inputmode ?? (type === 'tel' ? 'tel' : isMoney ? 'numeric' : '');
   const attrs = [
     `type="${popupEsc(type)}"`,
     inputmode ? `inputmode="${popupEsc(inputmode)}"` : '',
-    f.autocomplete ? `autocomplete="${popupEsc(f.autocomplete)}"` : '',
+    f.autocomplete ? `autocomplete="${popupEsc(f.autocomplete)}"` : isMoney ? 'autocomplete="off"' : '',
     type === 'email' || inputmode === 'email' ? 'autocapitalize="none" spellcheck="false"' : '',
+    isMoney ? 'data-format="money"' : '',
   ].filter(Boolean).join(' ');
   const input = `<input id="${id}" name="${popupEsc(f.name)}" ${attrs} value="${popupEsc(f.value ?? '')}" placeholder="${popupEsc(f.placeholder ?? '')}"${req}${described}${popupAttrs(f.attrs)}>`;
-  // A unit after the digits (₮, кг) or a start before them (+976): one value, read as one.
-  const control = f.unit
-    ? `<span class="affix">${input}<i aria-hidden="true">${popupEsc(f.unit)}</i></span>`
+  // A unit after the digits (₮, кг) or a start before them (+976): one value, read as one. Money says ₮ unless told otherwise.
+  const unit = f.unit ?? (isMoney ? '₮' : '');
+  const control = unit
+    ? `<span class="affix">${input}<i aria-hidden="true">${popupEsc(unit)}</i></span>`
     : f.prefix
       ? `<span class="affix"><i data-start aria-hidden="true">${popupEsc(f.prefix)}</i>${input}</span>`
       : input;
@@ -1063,15 +1068,32 @@ function popupMissing(control) {
  * from the bottom, its foot pinned within the thumb's reach.
  *
  * `fields` draw the form — { name, label, type: text | email | tel | number |
- * date | textarea | select | checks | icons | pick | static | note, value,
- * placeholder, options, required, hint, wide, inputmode, autocomplete, unit
- * (₮, кг after the value), prefix (+976 before it), format ('phone': the
- * digits grouped «9911 2233» as they are typed — phoneInput), attrs ({
- * maxlength, min, step, pattern }) }; a pick also takes `search(q)` and `empty` (see
- * `mountPick`). All of it is text, escaped here, except three things that are
+ * date | textarea | select | checks | icons | pick | static | note | section,
+ * value, placeholder, options, required, hint, wide, inputmode, autocomplete,
+ * unit (₮, кг after the value), prefix (+976 before it), format ('phone': the
+ * digits grouped «9911 2233» as they are typed — phoneInput; 'money': the
+ * tögrög grouped «1,250,000» as they are typed, ₮ after them — moneyInput),
+ * attrs ({ maxlength, min, step, pattern }), onChange }; a pick also takes
+ * `search(q)` and `empty` (see `mountPick`). A section is a heading over the
+ * fields after it in a long form — { type: 'section', label, text } — and
+ * sends nothing. All of it is text, escaped here, except three things that are
  * markup because they carry a name in bold or a code in mono: `sub`, and a
  * note's or a static's `html`. Whoever fills those escapes what a person
  * wrote.
+ *
+ * A money field hands `onSubmit` its bare digits («1250000»), so a page that
+ * reads the value as a number reads it as before; whoever reads the input
+ * itself reads it with `moneyValue(input.value)`.
+ *
+ * `onChange(value, form)` on a field is called once when the field is drawn
+ * and again whenever it changes — as it is typed, or as a select, a box or a
+ * choice moves. `value` is what the field holds now (a checks field: {
+ * name: ticked }); `form` is { values, el, show(name, on), hint(name, text),
+ * label(name, words) }: everything the form holds now, the popup, and three
+ * ways to make the form follow the answer — a field shown only when it
+ * applies (hidden, it is not sent either), the hint under a field, a field's
+ * label. «Бусад банк» chosen shows the field for the bank's name; a role
+ * chosen says under the select what it may do.
  *
  * `onSubmit(values, popup)` does the work: what it returns closes the popup
  * and is what the promise resolves to; `false` keeps it open (a first step
@@ -1134,6 +1156,72 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
       node.focus?.();
     };
 
+    /** What the form holds now: a popup's answer, and what a field's onChange is given. */
+    function values() {
+      const out = {};
+      for (const input of sheet.querySelectorAll('.fields [name]:not(:disabled)')) {
+        if (input.type === 'radio') {
+          if (input.checked) out[input.name] = input.value;
+          continue;
+        }
+        // A password is what was typed, spaces and all; money is its digits, «1,250,000» sent as «1250000».
+        out[input.name] = input.type === 'checkbox' ? input.checked : input.type === 'password' ? input.value : input.dataset.format === 'money' ? moneyDigits(input.value) : input.value.trim();
+      }
+      return out;
+    }
+
+    /** The fields drawn now that asked to hear about a change, by the names of their controls. */
+    let watched = new Map();
+    /** A field's own value: a checks field's boxes as { name: ticked }, anything else as the answer sends it. */
+    const valueOf = (f) => {
+      const now = values();
+      if (f.type === 'checks') return Object.fromEntries(f.options.map(([name]) => [name, Boolean(now[name])]));
+      return now[f.name] ?? (f.type === 'icons' ? null : '');
+    };
+    /** Show a field or put it away; put away, it is not sent and not required. */
+    const show = (name, on) => {
+      const node = control(name);
+      if (!node) return;
+      const field = node.closest('.field');
+      for (const each of field ? field.querySelectorAll('[name]') : [node]) each.disabled = !on;
+      if (field) field.hidden = !on;
+      if (!on) fieldError(node, null);
+    };
+    /** The hint under a field, said anew — or taken away with no words. An error standing there stays in front of it. */
+    const hintAt = (name, text) => {
+      const node = control(name);
+      const field = node?.closest('.field');
+      if (!field) return;
+      let line = field.querySelector(':scope > .help:not([data-error])');
+      if (!text) {
+        line?.remove();
+        if (!field.querySelector(':scope > .help[data-error]')) node.removeAttribute('aria-describedby');
+        return;
+      }
+      if (!line) {
+        line = document.createElement('small');
+        line.className = 'help';
+        line.id = `${node.id || `popup-${n}-${name}`}-hint`;
+        const error = field.querySelector(':scope > .help[data-error]');
+        if (error) line.hidden = true;
+        field.insertBefore(line, error);
+        if (!error) node.setAttribute('aria-describedby', line.id);
+      }
+      line.textContent = text;
+    };
+    /** A field's label, said anew: «Нэг толгойн үнэ» becomes «1 кг-ийн үнэ» when the unit does. */
+    const labelAt = (name, words) => {
+      const label = control(name)?.closest('.field')?.querySelector(':scope > span');
+      if (label) label.textContent = words;
+    };
+    const tell = (f) => {
+      try {
+        f.onChange(valueOf(f), { values: values(), el: sheet, show, hint: hintAt, label: labelAt });
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
     let at = 1;
     const drawSteps = () => {
       const box = $('.popup-steps');
@@ -1158,10 +1246,16 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
       }
       if (next.fields) {
         $('.fields').innerHTML = next.fields.map((f) => popupField(f, n)).join('');
+        watched = new Map();
         for (const f of next.fields) {
           if (f.type === 'pick') mountPick([...sheet.querySelectorAll('[data-pick]')].find((box) => box.dataset.pick === f.name), f);
           if (f.format === 'phone') phoneInput(control(f.name));
+          if (f.format === 'money') moneyInput(control(f.name));
+          if (typeof f.onChange !== 'function') continue;
+          for (const name of f.type === 'checks' ? f.options.map(([box]) => box) : [f.name]) watched.set(name, f);
         }
+        // Drawn: each field that follows an answer hears it once, so the form starts as it would after a change.
+        for (const f of new Set(watched.values())) tell(f);
       }
       if (next.submit !== undefined) go.textContent = next.submit;
       if (next.danger !== undefined) {
@@ -1179,19 +1273,6 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
     drawn = true;
     $('[data-cancel]').textContent = cancel;
 
-    const values = () => {
-      const out = {};
-      for (const input of sheet.querySelectorAll('.fields [name]:not(:disabled)')) {
-        if (input.type === 'radio') {
-          if (input.checked) out[input.name] = input.value;
-          continue;
-        }
-        // A password is what was typed, spaces and all.
-        out[input.name] = input.type === 'checkbox' ? input.checked : input.type === 'password' ? input.value : input.value.trim();
-      }
-      return out;
-    };
-
     // A field that was wrong is right again as soon as it is touched.
     const mend = (e) => {
       const field = e.target.closest?.('.field');
@@ -1200,6 +1281,15 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
     };
     form.addEventListener('input', mend);
     form.addEventListener('change', mend);
+    // A field with an onChange hears its own changes: what is typed as it is typed; a select, a box or a choice once it moves.
+    const heard = (e) => {
+      const f = watched.get(e.target?.name);
+      if (!f) return;
+      const moves = e.target.tagName === 'SELECT' || e.target.type === 'checkbox' || e.target.type === 'radio';
+      if ((e.type === 'change') === moves) tell(f);
+    };
+    form.addEventListener('input', heard);
+    form.addEventListener('change', heard);
 
     let closed = false;
     const close = (answer) => {
@@ -1603,6 +1693,50 @@ export function phoneText(value) {
   return m ? `+976 ${m[1]} ${m[2]}` : raw;
 }
 
+/**
+ * A money field that groups the tögrög in thousands — «1,250,000» — while
+ * they are typed or pasted, the caret kept where it was: the amount reads as
+ * `mnt()` writes it, and a zero too many shows before it is sent. Whole
+ * tögrög: anything but digits falls away. What the field holds is then text,
+ * not a number — read it with `moneyValue(input.value)`. A popup's money
+ * field (`format: 'money'`) does this itself and hands `onSubmit` the digits.
+ */
+export function moneyInput(input) {
+  if (!input) return input;
+  const group = () => {
+    const was = input.value;
+    const caret = input.selectionStart ?? was.length;
+    const digitsBefore = was.slice(0, caret).replace(/\D/g, '').length;
+    const digits = was.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+    const next = digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    if (next === was) return;
+    input.value = next;
+    let at = 0;
+    for (let seen = 0; at < next.length && seen < digitsBefore; at++) if (/\d/.test(next[at])) seen++;
+    if (document.activeElement === input) input.setSelectionRange(at, at);
+  };
+  input.addEventListener('input', group);
+  group();
+  return input;
+}
+
+/**
+ * An amount as it was typed, as a number: «1,250,000», «1 250 000₮» and
+ * «1250000» are all 1250000. Anything that is not whole tögrög — empty,
+ * «38.5», words — is NaN, so the check reading it says so in words rather
+ * than sending a guess.
+ */
+export function moneyValue(text) {
+  const bare = String(text ?? '').replace(/[\s,'’₮]/g, '');
+  return /^\d+$/.test(bare) ? Number(bare) : NaN;
+}
+
+/** What a popup sends for a money field: its digits, ungrouped — or, when it is not whole tögrög, the words as typed for the page's own check to refuse. */
+function moneyDigits(text) {
+  const bare = String(text ?? '').replace(/[\s,'’₮]/g, '');
+  return /^\d+$/.test(bare) ? bare.replace(/^0+(?=\d)/, '') : String(text ?? '').trim();
+}
+
 /* ── avatar ────────────────────────────────────────────────────────── */
 
 /**
@@ -1739,22 +1873,30 @@ export const HEADLINE = {
 };
 
 /**
- * The word for the lunch states HEADLINE leaves out on purpose: dine's status
- * reads a missing entry as «say the time» (12:21, with «Энэ цагт гал дээр
- * гарна» under it), so these stay apart from HEADLINE. A chip, a launcher row
- * or anything else that has no room for the time says the word instead — never
- * the state's name in English. `headlineWord(state)` is the one to call.
+ * A lunch state's one word where there is room for a word and no more — a
+ * chip, a launcher row, a list. Two kinds of state need one here. Those
+ * HEADLINE leaves out on purpose: dine's status reads a missing entry as «say
+ * the time» (12:21, with «Энэ цагт гал дээр гарна» under it), so they stay
+ * apart from HEADLINE. And those whose HEADLINE is a sentence, said once on
+ * the status screen — «Цуцлагдлаа», «Сайхан хооллоорой» — where a chip names
+ * the state: «Цуцлагдсан», «Үйлчилсэн». Never the state's name in English.
+ * `headlineWord(state)` is the one to call.
  */
 export const LUNCH_WORD = {
+  ACCEPTED: 'Баталгаажсан',
   SCHEDULED: 'Хүлээн авсан',
   ARMED: 'Хөдлөх цаг',
   COOKING: 'Гал дээр',
   RESLOTTED: 'Цаг шилжсэн',
+  SERVED: 'Үйлчилсэн',
+  CLOSED: 'Дууссан',
+  CANCELLED: 'Цуцлагдсан',
+  REFUNDED: 'Буцаасан',
 };
 
-/** A lunch state's word: HEADLINE's, or LUNCH_WORD's for a state HEADLINE names by a time; never the raw name. */
+/** A lunch state's chip word: LUNCH_WORD's, else HEADLINE's own word; never the raw name. */
 export function headlineWord(state) {
-  return HEADLINE[state]?.[0] ?? LUNCH_WORD[state] ?? '';
+  return LUNCH_WORD[state] ?? HEADLINE[state]?.[0] ?? '';
 }
 
 /**
@@ -1772,6 +1914,32 @@ export const IDESH_HEADLINE = {
   CANCELLED: ['Цуцлагдлаа', 'Мөнгө буцаагдана'],
   REFUNDED: ['Буцаагдлаа', 'Мөнгө таны данс руу орлоо'],
 };
+
+/**
+ * An идэш's state in one word — the chip, the pill, the list row, the state
+ * band on a supplier's card — the same word on the website, the launcher, the
+ * supplier's screen and the desk, so one order never reads as two. The
+ * sentence a status page leads with is IDESH_HEADLINE's («Цуцлагдлаа», and
+ * what happens next under it); the state's name is this: «Цуцлагдсан».
+ */
+export const IDESH_STATE = {
+  DRAFT: 'Төлөгдөөгүй',
+  PAID: 'Төлсөн',
+  PREPARING: 'Бэлтгэж байна',
+  READY: 'Бэлэн',
+  DISPATCHED: 'Замд',
+  HANDED: 'Хүлээлгэн өгсөн',
+  CLOSED: 'Дууссан',
+  CANCELLED: 'Цуцлагдсан',
+  REFUNDED: 'Буцаасан',
+};
+
+/**
+ * The states an идэш is still going on in: paid for and not yet in the
+ * guest's hands. What every «Идэвхтэй» holds — /home's and /orders' alike;
+ * handed over, cancelled and refunded are done.
+ */
+export const IDESH_LIVE = ['PAID', 'PREPARING', 'READY', 'DISPATCHED'];
 
 /** What each kind of animal is called, and the word for one of it. */
 export const KIND = {
