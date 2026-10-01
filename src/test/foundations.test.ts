@@ -28,7 +28,7 @@ beforeEach(async () => {
   const nav = strip(await readFile(join(WEB, 'sidenav.js'), 'utf8'));
   const tables = strip(await readFile(join(WEB, 'datatable.js'), 'utf8'));
   window.eval(
-    `${api}\n${nav}\n${tables}\nObject.assign(window, { popup, confirmPopup, toast, emptyState, skeleton, fieldError, setBusy, phoneText, phoneInput, deskFrame, dataTable });`,
+    `${api}\n${nav}\n${tables}\nObject.assign(window, { popup, confirmPopup, toast, emptyState, skeleton, fieldError, setBusy, phoneText, phoneInput, deskFrame, dataTable, HEADLINE, headlineWord });`,
   );
 });
 
@@ -179,6 +179,25 @@ describe('an empty place', () => {
     expect(pressed).toBe(1);
   });
 
+  it('fills a whole screen with its next steps stacked, keeping the page’s own hooks on them', () => {
+    const box = window.emptyState({
+      icon: 'offline',
+      size: 'lg',
+      title: 'Basu-д холбогдож чадсангүй',
+      actions: [
+        { label: 'Дахин оролдох', primary: true, attrs: { 'data-retry': '' } },
+        { label: 'Нүүр рүү буцах', quiet: true, attrs: { 'data-home': '' } },
+      ],
+    }) as HTMLElement;
+    expect(box.dataset.size).toBe('lg');
+    const [retry, home] = [...box.querySelectorAll('.es-act .btn')] as HTMLElement[];
+    expect(retry?.hasAttribute('data-retry')).toBe(true);
+    expect(retry?.dataset.v).toBe('primary');
+    expect(home?.hasAttribute('data-home')).toBe(true);
+    expect(home?.dataset.v).toBe('quiet');
+    expect(home?.dataset.size).toBe('lg');
+  });
+
   it('has the shape of what is coming while it loads', () => {
     const rows = window.skeleton('rows', 3) as HTMLElement;
     expect(rows.getAttribute('aria-busy')).toBe('true');
@@ -240,6 +259,18 @@ describe('a field and a number', () => {
   });
 });
 
+describe('a lunch state’s word', () => {
+  it('is said for the states the headline names by a time, which dine keeps showing as a time', () => {
+    expect(window.headlineWord('SCHEDULED')).toBe('Хүлээн авсан');
+    expect(window.headlineWord('ARMED')).toBe('Хөдлөх цаг');
+    expect(window.headlineWord('COOKING')).toBe('Гал дээр');
+    expect(window.headlineWord('READY')).toBe(window.HEADLINE.READY[0]);
+    expect(window.headlineWord('NOT_A_STATE')).toBe('');
+    // dine reads a missing headline as «say the time»: these stay out of HEADLINE
+    expect(window.HEADLINE.SCHEDULED).toBeUndefined();
+  });
+});
+
 describe('the desk', () => {
   const access = {
     workspaces: [{ id: 'desk', kind: 'desk', name: 'Basu', sub: 'Ширээ · Админ' }],
@@ -261,6 +292,17 @@ describe('the desk', () => {
     expect(byPhone.querySelector('.acct .who small')).toBeNull();
   });
 
+  it('keeps a server-side filter on an empty list — another choice may hold rows', () => {
+    const t = window.dataTable({
+      columns: [{ key: 'name', label: 'Нэр' }],
+      filters: [{ key: 'scope', label: 'Хүрээ', options: [['live', 'Идэвхтэй'], ['all', 'Бүгд']] }],
+      onFilter: () => {},
+    });
+    t.setRows([]);
+    expect(t.el.hasAttribute('data-empty')).toBe(true);
+    expect(t.el.hasAttribute('data-bare')).toBe(false);
+  });
+
   it('shows an empty list as the empty block without a header row, and offers to clear a search that found nothing', () => {
     const t = window.dataTable({ columns: [{ key: 'name', label: 'Нэр' }], empty: { title: 'Хүн алга', text: 'Хүн нэмэхэд энд гарна.' } });
     document.body.append(t.el);
@@ -268,8 +310,11 @@ describe('the desk', () => {
     expect(t.el.hasAttribute('data-empty')).toBe(true);
     expect(t.el.querySelector('.dt-empty .es-title')?.textContent).toBe('Хүн алга');
 
+    // nothing the server holds could be filtered in: no search box over nothing
+    expect(t.el.hasAttribute('data-bare')).toBe(true);
     t.setRows([{ name: 'Бат' }, { name: 'Сараа' }]);
     expect(t.el.hasAttribute('data-empty')).toBe(false);
+    expect(t.el.hasAttribute('data-bare')).toBe(false);
     const search = t.el.querySelector('.dt-search input') as HTMLInputElement;
     search.value = 'байхгүй';
     search.dispatchEvent(new window.Event('input'));

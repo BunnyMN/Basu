@@ -1469,14 +1469,18 @@ const EMPTY_ICON = {
  *
  * `icon` is a name from EMPTY_ICON (inbox, search, orders, people, store,
  * bowl, wallet, bell, calendar, star, org, clock, truck, alert, offline) or
- * an svg string. `action` is { label, onClick | href, primary, icon (svg) }
- * or a node of the page's own. `html` stands in for `text` when the line
- * needs a name in bold — the caller escapes what a person wrote. `size: 'sm'`
- * for a panel or a short list, `frame: true` for a card of its own where it
- * stands alone on a page, `tone: 'accent' | 'stop'` to tint the mark (a first
- * step / could not load), `align: 'start'` to sit at the left.
+ * an svg string. `action` is { label, onClick | href, primary, quiet, icon
+ * (svg), attrs ({ 'data-retry': '' }) } or a node of the page's own;
+ * `actions` is a list of them, drawn in order (a page-level block stacks them
+ * full width: «Дахин оролдох» primary over «Нүүр рүү буцах» quiet). `html`
+ * stands in for `text` when the line needs a name in bold — the caller
+ * escapes what a person wrote. `size: 'sm'` for a panel or a short list,
+ * `'lg'` for a whole screen that has nothing (the app's «nothing on sale» or
+ * «cannot reach Basu»), `frame: true` for a card of its own where it stands
+ * alone on a page, `tone: 'accent' | 'stop'` to tint the mark (a first step /
+ * could not load; offline stays neutral), `align: 'start'` to sit at the left.
  */
-export function emptyState({ icon = 'inbox', title, text = '', html = '', action = null, size, tone, frame = false, align } = {}) {
+export function emptyState({ icon = 'inbox', title, text = '', html = '', action = null, actions = [], size, tone, frame = false, align } = {}) {
   const box = document.createElement('div');
   box.className = 'empty-state';
   if (size) box.dataset.size = size;
@@ -1488,20 +1492,26 @@ export function emptyState({ icon = 'inbox', title, text = '', html = '', action
   box.querySelector('.es-title').textContent = title ?? '';
   if (html) box.querySelector('.es-text').innerHTML = html;
   else box.querySelector('.es-text').textContent = text ?? '';
-  if (action) {
+  const steps = [...(action ? [action] : []), ...(actions ?? [])].filter(Boolean);
+  if (steps.length) {
     const act = document.createElement('div');
     act.className = 'es-act';
-    if (action instanceof Node) act.append(action);
-    else {
-      const b = document.createElement(action.href ? 'a' : 'button');
+    for (const a of steps) {
+      if (a instanceof Node) {
+        act.append(a);
+        continue;
+      }
+      const b = document.createElement(a.href ? 'a' : 'button');
       b.className = 'btn';
-      if (action.href) b.href = action.href;
+      if (a.href) b.href = a.href;
       else b.type = 'button';
-      if (action.primary) b.dataset.v = 'primary';
-      if (size === 'sm') b.dataset.size = 'sm';
-      b.innerHTML = action.icon ?? '';
-      b.append(document.createTextNode(action.label ?? ''));
-      if (action.onClick) b.addEventListener('click', action.onClick);
+      if (a.primary) b.dataset.v = 'primary';
+      else if (a.quiet) b.dataset.v = 'quiet';
+      if (size === 'sm' || size === 'lg') b.dataset.size = size;
+      for (const [name, value] of Object.entries(a.attrs ?? {})) b.setAttribute(name, value === true ? '' : String(value));
+      b.innerHTML = a.icon ?? '';
+      b.append(document.createTextNode(a.label ?? ''));
+      if (a.onClick) b.addEventListener('click', a.onClick);
       act.append(b);
     }
     box.append(act);
@@ -1722,6 +1732,24 @@ export const HEADLINE = {
 };
 
 /**
+ * The word for the lunch states HEADLINE leaves out on purpose: dine's status
+ * reads a missing entry as «say the time» (12:21, with «Энэ цагт гал дээр
+ * гарна» under it), so these stay apart from HEADLINE. A chip, a launcher row
+ * or anything else that has no room for the time says the word instead — never
+ * the state's name in English. `headlineWord(state)` is the one to call.
+ */
+export const LUNCH_WORD = {
+  SCHEDULED: 'Хүлээн авсан',
+  ARMED: 'Хөдлөх цаг',
+  COOKING: 'Гал дээр',
+};
+
+/** A lunch state's word: HEADLINE's, or LUNCH_WORD's for a state HEADLINE names by a time; never the raw name. */
+export function headlineWord(state) {
+  return HEADLINE[state]?.[0] ?? LUNCH_WORD[state] ?? '';
+}
+
+/**
  * The same, for an идэш. Shared for the same reason: the launcher and the
  * page put the same order in front of the same person.
  */
@@ -1734,7 +1762,7 @@ export const IDESH_HEADLINE = {
   HANDED: ['Хүлээлгэн өгсөн', 'Сайхан өвөлжөөрэй'],
   CLOSED: ['Дууслаа', 'Баярлалаа'],
   CANCELLED: ['Цуцлагдлаа', 'Мөнгө буцаагдана'],
-  REFUNDED: ['Буцаагдлаа', 'Мөнгө таны банкны данс руу шилжлээ'],
+  REFUNDED: ['Буцаагдлаа', 'Мөнгө таны данс руу орлоо'],
 };
 
 /** What each kind of animal is called, and the word for one of it. */

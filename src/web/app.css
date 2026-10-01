@@ -30,7 +30,6 @@
   --ground:linear-gradient(176deg,#F8F7F3 0%,#F4F3EE 46%,#ECEBE4 100%);
   --glass:rgba(255,255,255,.78); --blur:blur(12px) saturate(1.05);
   --scrim:rgba(18,26,21,.40);
-  --map-dim:0;            /* veil over light map tiles; .35 in dark until mapStyle.js has a dark palette */
 
   /* ink + lines: warm neutrals leaning to the pine, not blue-grey. ink-3 is
      5.3:1 on white and 4.8:1 on the ground; port the same values to BasuColor. */
@@ -133,7 +132,6 @@
     --ground:linear-gradient(176deg,#141815 0%,#0F1110 46%,#0A0C0B 100%);
     --glass:rgba(23,26,24,.76);
     --scrim:rgba(4,6,5,.60);
-    --map-dim:.35;
     --ink:#EEF1EC; --ink-2:#AEB5AD; --ink-3:#8D958C; --ink-inverse:#181916;
     --line:#29302B; --line-2:#39423C;
     --accent:#7CCBA2; --accent-ink:#8FD4AE; --accent-soft:#16271F; --accent-line:#2A4A3B;
@@ -160,7 +158,6 @@
   --ground:linear-gradient(176deg,#141815 0%,#0F1110 46%,#0A0C0B 100%);
   --glass:rgba(23,26,24,.76);
   --scrim:rgba(4,6,5,.60);
-  --map-dim:.35;
   --ink:#EEF1EC; --ink-2:#AEB5AD; --ink-3:#8D958C; --ink-inverse:#181916;
   --line:#29302B; --line-2:#39423C;
   --accent:#7CCBA2; --accent-ink:#8FD4AE; --accent-soft:#16271F; --accent-line:#2A4A3B;
@@ -286,6 +283,7 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
 .dot[data-tone="accent"]{background:var(--accent)}
 .dot[data-tone="ready"]{background:var(--ready)}
 .dot[data-tone="stop"]{background:var(--stop)}
+.dot[data-tone="hi"]{background:var(--hi)}
 .chev{display:inline-block;width:16px;height:16px;flex:none;background:var(--ink-3);-webkit-mask:var(--mask-chev) center/contain no-repeat;mask:var(--mask-chev) center/contain no-repeat}
 .glass{background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur)}
 .wrap{width:100%;max-width:var(--col);margin:0 auto;padding:calc(8px + var(--safe-t)) var(--gutter) calc(24px + var(--safe-b))}
@@ -701,6 +699,11 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
   display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;
   background:var(--line);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;box-shadow:var(--shadow);
 }
+/* six numbers: one row on a wide desk, three and three below it — not five and an orphan */
+.kpi-band:has(> :nth-child(6):last-child){grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (min-width:1400px){.kpi-band:has(> :nth-child(6):last-child){grid-template-columns:repeat(6,minmax(0,1fr))}}
+/* any count: the last cell takes what is left of its row, so the band's grey never shows through a hole */
+.kpi-band > :last-child{grid-column-end:-1}
 .kpi-band > .kpi{
   background:var(--surface);border:0;border-radius:0;box-shadow:none;padding:16px 20px;min-height:104px;
   display:flex;flex-direction:column;justify-content:flex-start;gap:6px;
@@ -724,7 +727,7 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 .kpi-band .kpi[data-word][data-tone="bad"] b::before{background:var(--stop)}
 .kpi-band .kpi[data-word][data-tone] b{color:var(--ink)}
 @media (max-width:640px){
-  .kpi-band{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .kpi-band,.kpi-band:has(> :nth-child(6):last-child){grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
   .kpi-band .kpi b{font-size:var(--t-title-2)}
   .kpi-band .kpi[data-word] b{font-size:var(--t-title-3);min-height:calc(var(--t-title-2) * 1.1)}
   .kpi-band > .kpi[data-span]{grid-column:1 / -1}
@@ -733,7 +736,7 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 /* ── page head ────────────────────────────────────────────────────── */
 .page-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
 .page-head h1{font-size:var(--t-title-2);line-height:var(--lh-tight);letter-spacing:-.015em}
-.page-head p{font-size:var(--t-cap);line-height:1.45;color:var(--ink-2);margin-top:4px;max-width:48ch}
+.page-head p{font-size:var(--t-cap);line-height:1.45;color:var(--ink-2);margin-top:4px;max-width:70ch}
 .page-head h1 .chip,.page-head h1 .pill{margin-left:10px;vertical-align:middle}
 .page-head .crumb{display:flex;align-items:center;gap:6px;font-size:var(--t-cap);font-weight:500;color:var(--ink-2);margin-bottom:6px}
 .page-head .crumb a{color:var(--accent-ink)}
@@ -755,6 +758,12 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 }
 .topbar[data-fixed]{position:fixed;left:0;right:0}
 .topbar[data-wide]{grid-template-columns:auto minmax(0,1fr) auto}
+/* Clear at rest over a page's own big title; glass, hairline and the small title once content scrolls
+   under it. The page toggles data-flat (an IntersectionObserver on its title, or scrollY > 0). */
+.topbar{transition:background-color var(--dur),border-color var(--dur)}
+.topbar .title{transition:opacity var(--dur)}
+.topbar[data-flat]{background:transparent;border-bottom-color:transparent;-webkit-backdrop-filter:none;backdrop-filter:none}
+.topbar[data-flat] .title{opacity:0}
 .topbar .back,.topbar .home{
   justify-self:start;display:inline-flex;align-items:center;gap:2px;min-width:44px;height:44px;padding:0 8px 0 4px;
   border:0;border-radius:var(--r-sm);background:none;color:var(--accent-ink);
@@ -950,12 +959,15 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 .scrim{position:fixed;inset:0;z-index:var(--z-scrim);background:var(--scrim);opacity:0;pointer-events:none;transition:opacity var(--dur)}
 .scrim[data-open]{opacity:1;pointer-events:auto}
 .sheet{
-  position:fixed;left:0;right:0;bottom:0;z-index:var(--z-sheet);max-height:88dvh;display:flex;flex-direction:column;
+  position:fixed;left:0;right:0;bottom:0;z-index:var(--z-sheet);display:flex;flex-direction:column;
+  max-height:min(88dvh,calc(100dvh - var(--safe-t) - var(--bar-h)));   /* never over a top bar and the status bar above it (the shell runs edge to edge) */
   background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
   border-top:1px solid var(--line);border-radius:var(--r-sheet) var(--r-sheet) 0 0;box-shadow:var(--shadow-sheet);
-  transform:translateY(102%);transition:transform var(--dur-sheet) var(--ease);
+  transform:translateY(102%);
+  /* closed, a sheet is out of sight and out of the tab order — after it has slid away */
+  visibility:hidden;transition:transform var(--dur-sheet) var(--ease),visibility 0s linear var(--dur-sheet);
 }
-.sheet[data-open]{transform:none}
+.sheet[data-open]{transform:none;visibility:visible;transition:transform var(--dur-sheet) var(--ease),visibility 0s}
 .sheet > .grip{display:flex;justify-content:center;padding:8px 0 2px;flex:none}
 .sheet > .grip i{width:36px;height:5px;border-radius:3px;background:var(--ink);opacity:.28}
 .sheet > header{display:grid;grid-template-columns:minmax(0,1fr) 44px;align-items:start;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line);flex:none}
@@ -990,11 +1002,12 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
     top:50%;left:50%;right:auto;bottom:auto;width:min(var(--sheet-w,640px),calc(100vw - 48px));max-height:min(88dvh,920px);overflow:hidden;
     background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-float);
     opacity:0;pointer-events:none;transform:translate(-50%,-48%) scale(.98);
-    transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease);
+    transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),visibility 0s linear var(--dur);
   }
-  .sheet[data-center][data-open]{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+  .sheet[data-center][data-open]{opacity:1;pointer-events:auto;transform:translate(-50%,-50%);transition:opacity var(--dur) var(--ease),transform var(--dur) var(--ease),visibility 0s}
   .sheet[data-center] > footer{padding-bottom:12px}
 }
+.sheet:not([data-open]){box-shadow:none}
 :root[data-modal-open]{overflow:hidden}
 .sheet[tabindex="-1"]:focus{outline:none}   /* the popup takes the focus so Esc and Tab work; the ring belongs to what is inside */
 
@@ -1182,6 +1195,15 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 .empty-state[data-size="sm"] .es-mark svg{width:20px;height:20px}
 .empty-state[data-size="sm"] .es-title{font-size:var(--t-body-lg)}
 .empty-state[data-size="sm"] .es-act{margin-top:14px}
+/* a whole screen with nothing on it (the app's «nothing on sale», «cannot reach Basu»): a bigger
+   mark, a title-2 line, its buttons stacked full width under it — the next step first */
+.empty-state[data-size="lg"]{padding:28px 8px 12px}
+.empty-state[data-size="lg"] .es-mark{width:64px;height:64px;margin-bottom:20px}
+.empty-state[data-size="lg"] .es-mark svg{width:30px;height:30px}
+.empty-state[data-size="lg"] .es-title{font-size:var(--t-title-2);line-height:1.2;letter-spacing:-.015em;max-width:20ch}
+.empty-state[data-size="lg"] .es-text{margin-top:10px;font-size:var(--t-body-lg);max-width:34ch}
+.empty-state[data-size="lg"] .es-act{flex-direction:column;flex-wrap:nowrap;width:100%;max-width:340px;margin-top:28px}
+.empty-state[data-size="lg"] .es-act .btn{width:100%}
 .empty-state[data-tone="accent"] .es-mark{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink)}
 .empty-state[data-tone="stop"] .es-mark{background:var(--stop-soft);border-color:var(--stop-line);color:var(--stop)}
 .empty-state[data-align="start"]{align-items:flex-start;text-align:left}
@@ -1303,13 +1325,6 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 .codebox b{display:block;font-family:var(--mono);font-size:2rem;font-weight:600;letter-spacing:.12em;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums;margin:0}
 .codebox small{display:block;font-size:var(--t-cap);color:var(--ink-2);margin-top:8px;line-height:1.4}
 
-/* ── map ──────────────────────────────────────────────────────────── */
-/* dine's #map and idesh's .mapbox add class map-dim. Until mapStyle.js has a
-   dark palette the light tiles are veiled by --map-dim (0 light, .35 dark);
-   the veil sits above the canvas, below MapLibre's controls, and takes no taps. */
-.map-dim{position:relative}
-.map-dim::after{content:"";position:absolute;inset:0;z-index:1;background:var(--bg);opacity:var(--map-dim);pointer-events:none}
-
 /* ── documents (terms, privacy) ───────────────────────────────────── */
 .doc{width:100%;max-width:var(--col);margin:0 auto;padding:16px var(--gutter) calc(32px + var(--safe-b))}
 .doc-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow);padding:24px 20px}
@@ -1428,6 +1443,7 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 .dt-empty td{padding:0;text-align:center}
 .dt-empty .empty-state{padding:40px 24px}
 .dt[data-empty] thead{display:none}   /* a wholly empty list: no header row of sortable columns over nothing */
+.dt[data-bare] :is(.dt-search,.dt-filters,.dt-count){display:none}   /* …and no search or filters over nothing (only when nothing the server holds could be filtered in) */
 /* loading: rows of the size that is coming, so nothing jumps when it lands */
 .dt-skel td{height:64px;padding-top:10px;padding-bottom:10px}
 .dt-skel td .skel{display:block;height:12px;max-width:160px;border-radius:6px}

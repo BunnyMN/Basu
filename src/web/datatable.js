@@ -314,6 +314,7 @@ export function dataTable(options) {
         .join('');
       for (let i = 0; i < 4; i++) tbody.append(dtEl(`<tr class="dt-skel">${cells}${actions ? '<td class="dt-act"><span class="skel"></span></td>' : ''}</tr>`));
       root.removeAttribute('data-empty');
+      root.removeAttribute('data-bare');
       return;
     }
     const rows = table.getRowModel().rows;
@@ -323,6 +324,8 @@ export function dataTable(options) {
       // Nothing at all and nothing narrowing it: the block alone, without a header of columns over nothing.
       const narrowed = Boolean(query) || filters.some((f) => chosen[f.key] !== (f.initial ?? f.options[0]?.[0]));
       root.toggleAttribute('data-empty', nothing && !narrowed);
+      // …and, when every filter is this table's own (the server holds nothing more to filter in), no search or filters over it either.
+      root.toggleAttribute('data-bare', nothing && !narrowed && !onSearch && filters.every((f) => f.test));
       const tr = dtEl(
         `<tr class="dt-empty"><td colspan="${columns.length + (actions ? 1 : 0)}"><div class="empty-state" data-size="sm"><span class="es-mark" aria-hidden="true">${
           nothing ? empty.icon ?? DT_EMPTY : DT_FOUND_NONE
@@ -351,6 +354,7 @@ export function dataTable(options) {
       return;
     }
     root.removeAttribute('data-empty');
+    root.removeAttribute('data-bare');
     for (const row of rows) {
       const r = row.original;
       const tr = document.createElement('tr');
