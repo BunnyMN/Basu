@@ -30,6 +30,8 @@
 .sa-ways .section-label{display:none}
 .sa-ways [data-rows]{border-radius:18px}
 .sa-ways [data-rows] > .row{padding:16px 24px}
+/* app.css's `[data-rows] > .row{border:0}` outweighs its own hairline between rows; said again here until it is fixed there */
+.sa-ways [data-rows] > .row + .row{border-top:1px solid var(--line)}
 .sa-sessions{margin:0;padding:0;list-style:none}
 .sa-sessions li{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:68px;padding:12px 0}
 .sa-sessions li + li{border-top:1px solid var(--line)}
