@@ -422,6 +422,27 @@ describe('ordering', () => {
     }
   });
 
+  it('says on the market and on every stall whether money can be taken, to anybody, before an account', async () => {
+    // A server that takes money says so…
+    const list = await app.inject({ method: 'GET', url: '/v1/idesh/listings' });
+    expect(list.json()).toMatchObject({ payments_open: true });
+    const one = await app.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}` });
+    expect(one.json()).toMatchObject({ payments_open: true, listing: { id: sheep.id } });
+
+    // …and production with no provider says it cannot, on the same answers a stranger gets.
+    const closed = await buildServer({ ...ctx, payments: new ClosedPaymentProvider() }, { dev: true });
+    try {
+      const market = await closed.inject({ method: 'GET', url: '/v1/idesh/listings' });
+      expect(market.statusCode).toBe(200);
+      expect(market.json()).toMatchObject({ payments_open: false });
+      expect(market.json().listings.length).toBeGreaterThan(0);
+      const stall = await closed.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}` });
+      expect(stall.json()).toMatchObject({ payments_open: false, listing: { id: sheep.id, remaining: 5 } });
+    } finally {
+      await closed.close();
+    }
+  });
+
   it('explains a refusal in Mongolian', async () => {
     const token = await signIn();
     const early = await app.inject({
