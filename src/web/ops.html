@@ -58,6 +58,38 @@ p{margin:0}
 @media (max-width:600px){.skel-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .page-head + .kpi-band.band-gap,.kpi-band.band-gap{margin-bottom:24px}
 
+/* the first moment, before anybody has answered: the shape of the frame — the sidebar, a page head, a
+   band of numbers, rows — or, for somebody not signed in, of the door's card; never a blank page */
+.boot{display:grid;grid-template-columns:var(--side) minmax(0,1fr);min-height:100dvh}
+.boot-side{display:flex;flex-direction:column;gap:12px;padding:18px 12px 12px;background:var(--surface);border-right:1px solid var(--line)}
+.boot-side .skel{height:14px}
+.boot-side .boot-brand{width:96px;height:20px;margin:0 8px 6px}
+.boot-side .boot-ws{height:54px;border-radius:var(--r-ctl)}
+.boot-side .boot-nav{width:70%;margin:6px 10px 0}
+.boot-side .boot-nav:nth-child(odd){width:54%}
+.boot-bar{display:none}
+.boot-head{display:flex;flex-direction:column;gap:10px;padding-top:6px}
+.boot-head .skel:first-child{width:min(260px,60%);height:26px;background:var(--sunk)}
+.boot-head .skel:last-child{width:min(420px,85%);height:14px;background:var(--sunk)}
+.boot-page > * + *,.overview-skel > * + *{margin-top:28px}
+.overview-skel{margin-top:32px}
+@media (max-width:900px){
+  .boot{grid-template-columns:minmax(0,1fr);align-content:start}
+  .boot-side{display:none}
+  .boot-bar{display:flex;align-items:center;gap:12px;min-height:calc(var(--bar-h) + var(--safe-t));padding:var(--safe-t) 16px 0;background:var(--surface);border-bottom:1px solid var(--line)}
+  .boot-bar .skel:first-child{width:24px;height:24px}
+  .boot-bar .skel:last-child{width:140px;height:16px}
+}
+.boot-door{min-height:100dvh;display:grid;place-items:center;padding:var(--s-7) var(--gutter)}
+.boot-door .card{display:flex;flex-direction:column;gap:14px;width:100%;max-width:440px;padding:32px}
+.boot-door .skel:nth-child(1){width:110px;height:24px;margin-bottom:12px}
+.boot-door .skel:nth-child(2){width:50%;height:26px}
+.boot-door .skel:nth-child(3){width:90%}
+.boot-door .skel:nth-child(n+4){height:44px;border-radius:var(--r-ctl)}
+/* the first answer did not come: said where the page would be, with the way to ask again */
+.boot-fail{min-height:100dvh;display:grid;place-items:center;padding:var(--s-7) var(--gutter)}
+.boot-fail > .empty-state{max-width:480px}
+
 /* a person's own corner: the first visit, and their businesses as rows */
 /* the first visit: what this place is for and the button on the left, the three steps on the right */
 #org-list > .first-run{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,380px);gap:32px;align-items:center;padding:32px}
@@ -105,9 +137,9 @@ p{margin:0}
 .page > .back{margin-bottom:4px}
 .page-head + .section{margin-top:0}
 .page-head + .kpi-band{margin-bottom:8px}
-.pair-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:0 16px;align-items:start}
+.pair-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:0 16px;align-items:start}   /* never wider than a 320px phone's column */
 /* a business's front page: a door to each of its parts, each saying what it is for */
-.org-doors{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;align-items:start}
+.org-doors{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:12px;align-items:start}
 .org-door{overflow:hidden}
 .org-door-head{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--line)}
 .org-door-head svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3)}
@@ -273,13 +305,10 @@ p{margin:0}
 /* How many numbers sit in a row is app.css's (.kpi-band): six across from 1400px and three and three
    below it, four across while the band is wider than 860px and two by two under that — measured on
    the band, which beside the sidebar is about 320px narrower than the screen. */
-/* six across with a long figure in it (fitBands marks it): the whole row a size down together, so it
-   stays in its cells and the row stays even */
-@media (min-width:1400px){
-  .kpi-band:has(> .kpi:nth-child(6):last-child):has(> .kpi[data-long]) > .kpi:not([data-word]) > b{font-size:var(--t-title-2)}
-  .kpi-band:has(> .kpi:nth-child(6):last-child):has(> .kpi[data-long="2"]) > .kpi:not([data-word]) > b{font-size:var(--t-title-3)}
-}
-@media (max-width:640px){.kpi-band > .kpi[data-long="2"] > b{font-size:var(--t-title-3)}}
+/* a figure wider than its cell — a seven-digit sum in six across at 1440 — (fitBands measures it): the
+   whole band a size down together, so every figure keeps clear of its cell's edges and the row stays even */
+.kpi-band[data-fit="1"] > .kpi:not([data-word]) > b{font-size:var(--t-title-2)}
+.kpi-band[data-fit="2"] > .kpi:not([data-word]) > b{font-size:var(--t-title-3)}
 /* Until app.css scopes `.kpi-band .kpi span` to `> span`: money() inside a
    KPI value keeps the value's size, weight and tone instead of the caption's. */
 .kpi-band .kpi b span{display:inline;font-size:inherit;color:inherit;line-height:inherit}
@@ -325,8 +354,21 @@ p{margin:0}
 /* the overview: the word left for everyone, then the things to do, one row each, its button at the end */
 .overview-banner{margin:0 0 8px}
 #alerts > .alert{min-height:52px;padding:8px 16px 8px 20px}
-#alerts .alert-text{flex:1;min-width:0}
+#alerts .alert-text{flex:1;min-width:0;overflow-wrap:anywhere}
+/* a phone: the sentence has the row's width, its button under it where the thumb finds it */
+@media (max-width:640px){
+  #alerts > .alert{display:grid;grid-template-columns:8px minmax(0,1fr);column-gap:12px;row-gap:10px;align-items:start;padding:14px 16px}
+  #alerts > .alert::before{margin-top:6px}
+  #alerts > .alert .btn{grid-column:2;justify-self:start;margin-left:0}
+}
 #queue{padding:12px 20px}
+/* the two small tables under the bands fit a 320px phone whole: tighter cells, the sums a step smaller */
+@media (max-width:640px){
+  :is(#cross,#msgs) .table :is(th,td){padding-left:8px;padding-right:8px}
+  :is(#cross,#msgs) .table :is(th,td):first-child{padding-left:12px;font-size:var(--t-cap)}
+  :is(#cross,#msgs) .table :is(th,td):last-child{padding-right:12px}
+  :is(#cross,#msgs) .table td.num{font-size:var(--t-cap)}
+}
 .section-label .btn{margin-left:auto}
 .section-label:has(.btn){align-items:center}
 .section-label .label-acts{display:flex;gap:6px;margin-left:auto}
@@ -351,7 +393,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 <div id="root"></div>
 
 <script type="module">
-import { api, ApiError, store, toast, mnt, money, KIND, HEADLINE, dayLabel, signInDoors, accountWays, authReturn, takeSession, dropSession, popup, confirmPopup } from '/api.js';
+import { api, ApiError, store, toast, mnt, money, KIND, HEADLINE, LUNCH_WORD, IDESH_HEADLINE, headlineWord, dayLabel, signInDoors, accountWays, authReturn, takeSession, dropSession, popup, confirmPopup, phoneText, skeleton, emptyState, whatWentWrong } from '/api.js';
 import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -376,12 +418,13 @@ const clockOf = (iso) => {
   const d = new Date(iso);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 };
-/** A date with its time, as one mono run: the table's "өнөөдөр 11:16". */
-const stamp = (iso) => `<span class="mono">${when(iso)} ${clockOf(iso)}</span>`;
 const CHEV = '<svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg>';
 const PHONE = '<svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>';
 const STAR = '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>';
-const tel = (phone) => `<a class="tel mono" href="tel:${esc(phone)}">${PHONE}${esc(phone)}</a>`;
+/** A number to ring: read the way people read it, «+976 9911 2233»; dialled as it is stored. */
+const tel = (phone) => `<a class="tel mono" href="tel:${esc(phone)}">${PHONE}${esc(phoneText(phone))}</a>`;
+/** What somebody signs in with, in a table cell: a number as a number is read, an address as it is. */
+const contactCell = (value) => (!value ? dtCell.none() : /^\+?[\d\s-]{8,}$/.test(String(value)) ? dtCell.phone(value) : esc(value));
 /** Three rows of the shape that is coming, while it loads. */
 const busy = () => el(`<div role="status" aria-busy="true">${'<div class="skel-row"><span class="skel"></span><span class="skel-lines"><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></div>'.repeat(3)}</div>`);
 /** The dot's tone on the story: red for a cancellation, blue for on the road, green for handed over. */
@@ -398,9 +441,14 @@ const STORY_K = {
 const step = (type, title, sub, at) =>
   `<li data-done${STORY_K[type] ? ` data-k="${STORY_K[type]}"` : ''}><span class="w">${esc(title)}<span class="s">${esc(sub)}</span></span><span class="t">${when(at)} ${clockOf(at)}</span></li>`;
 const STATE = { applied: 'хүлээгдэж байна', contracted: 'гэрээт', declined: 'татгалзсан' };
+/**
+ * An идэш's state in a chip: the word the guest, the supplier and the website say for it (api.js's
+ * IDESH_HEADLINE: «Төлсөн» … «Хүлээлгэн өгсөн»); an order that ended reads as where it stands, as on
+ * the website and the supplier's screen — «Цуцлагдсан», not the guest's news «Цуцлагдлаа».
+ */
 const STATE_WORD = {
-  PAID: 'Төлсөн', PREPARING: 'Бэлтгэж байна', READY: 'Бэлэн', DISPATCHED: 'Замд',
-  HANDED: 'Өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан', REFUNDED: 'Буцаасан',
+  ...Object.fromEntries(['PAID', 'PREPARING', 'READY', 'DISPATCHED', 'HANDED'].map((k) => [k, IDESH_HEADLINE[k][0]])),
+  CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан', REFUNDED: 'Буцаасан',
 };
 const EVENT_WORD = {
   CREATED: 'Үүссэн', PAID: 'Төлсөн', PREPARING: 'Бэлтгэж эхэлсэн', READY: 'Бэлэн болсон', DISPATCHED: 'Замд гарсан',
@@ -415,7 +463,62 @@ const actorWord = (a) =>
     : a.startsWith('supplier:owner:') ? 'нийлүүлэгчийн эзэн'
       : /^supplier:[a-z0-9-]+:[0-9a-f-]{36}$/.test(a) ? 'нийлүүлэгчийн ажилтан'
         : a.startsWith('supplier:') ? 'нийлүүлэгчийн дэлгэц'
-          : a.startsWith('ops') ? a.replace('ops:', 'ops · ') : 'систем';
+          : a.startsWith('ops') ? deskWho(a) : 'систем';
+/** Somebody at Basu's desk, in a story or a line of the record: «Basu · Бат». */
+function deskWho(actor) {
+  const name = String(actor).replace(/^ops:?/, '').trim();
+  return name ? `Basu · ${name}` : 'Basu';
+}
+/* ── the first moment ─────────────────────────────────────────────── */
+
+/** A shape that only waits: its own pieces say nothing to a reader — the box around them says it is loading. */
+const quiet = (node) => {
+  for (const n of [node, ...node.querySelectorAll('[role="status"]')]) ['role', 'aria-busy', 'aria-label'].forEach((a) => n.removeAttribute(a));
+  return node;
+};
+const busyBox = (html) => {
+  const box = el(html);
+  box.setAttribute('role', 'status');
+  box.setAttribute('aria-busy', 'true');
+  box.setAttribute('aria-label', 'Ачаалж байна');
+  return box;
+};
+/** A page on its way: a head, a band of numbers, rows — the overview's shape, which most first visits open on. */
+function pageSkeleton() {
+  const box = busyBox('<div class="boot-page"><div class="boot-head"><span class="skel"></span><span class="skel"></span></div></div>');
+  box.append(quiet(skeleton('kpis', 6)), quiet(skeleton('rows', 4)));
+  return box;
+}
+/** The frame on its way, for somebody signed in here: the sidebar, and the page beside it. */
+function frameSkeleton() {
+  const box = busyBox(`
+    <div class="boot">
+      <aside class="boot-side"><span class="skel boot-brand"></span><span class="skel boot-ws"></span>${'<span class="skel boot-nav"></span>'.repeat(7)}</aside>
+      <div class="boot-bar"><span class="skel"></span><span class="skel"></span></div>
+      <div class="boot-main"><div class="page"></div></div>
+    </div>`);
+  box.querySelector('.page').append(quiet(pageSkeleton()));
+  return box;
+}
+/** The door's card on its way, for anybody not signed in. */
+const doorSkeleton = () => busyBox(`<div class="boot-door"><div class="card">${'<span class="skel"></span>'.repeat(6)}</div></div>`);
+
+/** The first answer never came: said where the page would have been, with the way to ask again. */
+function bootFailed(error) {
+  const box = el('<div class="boot-fail"></div>');
+  box.append(
+    emptyState({
+      icon: 'alert',
+      tone: 'stop',
+      frame: true,
+      title: 'Basu-тай холбогдож чадсангүй',
+      text: whatWentWrong(error),
+      action: { label: 'Дахин оролдох', primary: true, onClick: () => boot() },
+    }),
+  );
+  root.replaceChildren(box);
+}
+
 /* ── the door ─────────────────────────────────────────────────────── */
 
 /**
@@ -429,7 +532,8 @@ let doorDrawn = 0;
 
 async function showToken() {
   const drawing = ++doorDrawn;
-  root.replaceChildren();
+  // Whoever was here is gone at once; until the door is known, its card's shape — never a blank page.
+  if (!root.querySelector(':scope > .boot-door')) root.replaceChildren(doorSkeleton());
   // The demo hands its secret out; anywhere else a member signs in by phone.
   const demo = await api('/dev/ops-token').catch(() => null);
   if (drawing !== doorDrawn) return;
@@ -466,7 +570,7 @@ async function showToken() {
     card.querySelector('button').addEventListener('click', submit);
     input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
     door.append(card, el(home));
-    root.append(door);
+    root.replaceChildren(door);
     return;
   }
   // The real door. Whoever comes here runs a business on Basu or works at Basu's desk; the same sign-in as the website.
@@ -492,7 +596,7 @@ async function showToken() {
     card.querySelector('#door-lead').textContent = `${ways[0].toUpperCase()}${ways.slice(1)} нэвтэрнэ үү.`;
   });
   door.append(card, el(home));
-  root.append(door);
+  root.replaceChildren(door);
 }
 
 /* ── a person's own corner ─────────────────────────────────────────── */
@@ -514,6 +618,8 @@ const kinds = (o) => [o.restaurant && 'Ресторан', o.supplier && 'Ний�
  * account fell back on, which the server shows in its place.
  */
 const realName = (name) => (name && !/^[+\d\s·.-]+$/.test(name) ? name : null);
+/** A person in a table: the name they chose, or — with none, where the server shows «···0001» — said so quietly; their number is in the next column. */
+const personName = (name) => (realName(name) ? `<b>${esc(name)}</b>` : '<span class="dt-unnamed">Нэр оруулаагүй</span>');
 
 function renderMeHome(view) {
   const account = access.account ?? {};
@@ -590,7 +696,7 @@ function deskSection() {
       <div class="card" data-rows id="front">
         <div class="row">
           <span class="lead"><span class="org-mark" data-desk aria-hidden="true">B</span></span>
-          <span class="main"><span class="title">Basu ops</span><span class="sub"></span></span>
+          <span class="main"><span class="title">Basu-гийн ширээ</span><span class="sub"></span></span>
           <span class="end" data-act></span>
         </div>
       </div>
@@ -604,13 +710,14 @@ function deskSection() {
 async function renderMeProfile(view) {
   const account = access.account ?? {};
   view.append(head('Профайл', 'Таны нэр, нэвтрэх арга, нэвтэрсэн төхөөрөмжүүд.'));
-  const unset = '<span class="kv-none">Оруулаагүй</span>';
+  // What is not there yet reads as the website's /account says it: a dash.
+  const unset = '<span class="kv-none">—</span>';
   const card = el(`
     <section class="section"><h2 class="section-label">Хувийн мэдээлэл</h2>
       <div class="card"><dl class="kv" id="me-facts">
         <div><dt>Нэр</dt><dd>${account.name ? esc(account.name) : `${unset}<small>Байгууллага, Basu-гийн ажилтнууд таныг нэрээр тань таньдаг.</small>`}</dd></div>
         <div><dt>Имэйл</dt><dd>${account.email ? esc(account.email) : unset}</dd></div>
-        <div><dt>Утас</dt><dd>${account.phone ? `<span class="mono">${esc(account.phone)}</span>` : unset}</dd></div>
+        <div><dt>Утас</dt><dd>${account.phone ? `<span class="mono">${esc(phoneText(account.phone))}</span>` : unset}</dd></div>
       </dl></div>
     </section>`);
   card.querySelector('.section-label').append(
@@ -635,38 +742,62 @@ async function renderMeProfile(view) {
   // The ways back into the account: an address to reset a forgotten password by, and the password itself.
   view.append(accountWays({ token: token() }));
 
-  const sessions = el(`
-    <section class="section"><h2 class="section-label">Нэвтэрсэн төхөөрөмжүүд</h2>
-      <div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Төхөөрөмж</th><th>Нэвтэрсэн</th><th>Сүүлд ашигласан</th></tr></thead><tbody id="sessions"><tr><td colspan="3" class="empty"><span class="skel skel-line"></span></td></tr></tbody></table></div></div>
-    </section>`);
-  sessions.querySelector('.section-label').append(
+  // Every device signed in as this person, in the website's words: its name, when it was last used, and
+  // «Энэ төхөөрөмж» on the one in hand. One row each, the dates short enough to stay on their line on a phone.
+  const sessions = el('<section class="section"><h2 class="section-label">Нэвтэрсэн төхөөрөмж</h2></section>');
+  const loading = skeleton('rows', 2);
+  loading.id = 'sessions';
+  sessions.append(loading);
+  const others = (n) =>
     button(
       'Бусад бүх төхөөрөмжөөс гарах',
       () =>
         confirmPopup({
-          title: 'Бусад бүх төхөөрөмжөөс гарах',
-          text: 'Энэ төхөөрөмжөөс бусад бүх газарт нэвтрэлт хаагдана. Тэнд дахин нэвтрэх шаардлагатай болно.',
-          ok: 'Гарах',
+          title: 'Бусад төхөөрөмжөөс гарах',
+          text: `Энэ төхөөрөмжөөс бусад <b>${n}</b> төхөөрөмж дээрх нэвтрэлт хаагдана. Тэнд дахин нэвтрэх хүртэл Basu-д орохгүй. Энэ төхөөрөмж нэвтэрсэн хэвээр үлдэнэ.`,
+          ok: 'Бусдаас гаргах',
           danger: true,
           onConfirm: async () => {
             const { revoked } = await ops('/v1/me/sessions/revoke', { method: 'POST' });
-            toast(revoked ? `${revoked} төхөөрөмжөөс гарлаа.` : 'Өөр төхөөрөмж алга.', 'good');
+            toast(revoked ? `${revoked} төхөөрөмжөөс гаргалаа.` : 'Өөр төхөөрөмж алга.', 'good');
             show('profile');
           },
         }),
       'data-size="sm" id="revoke-others"',
-    ),
-  );
+    );
   view.append(sessions);
   try {
     const { sessions: list } = await ops('/v1/me/sessions');
-    const body = sessions.querySelector('#sessions');
-    body.replaceChildren(...list.map((s) => el(`<tr><td><b>${esc(s.label ?? 'Төхөөрөмж')}</b>${s.current ? ' <span class="pill" data-size="sm" data-s="contracted">одоо энд</span>' : ''}</td><td>${stamp(s.created_at)}</td><td>${s.last_seen_at ? stamp(s.last_seen_at) : '—'}</td></tr>`)));
-    // Nothing else signed in: nothing to sign out of.
-    if (list.length < 2) sessions.querySelector('#revoke-others').remove();
+    if (tab !== 'profile' || !sessions.isConnected) return;
+    const rows = el('<div class="card" data-rows id="sessions"></div>');
+    rows.append(
+      ...list.map((s) =>
+        el(`
+          <div class="row" data-session>
+            <span class="main"><span class="title">${esc(s.label || 'Төхөөрөмж')}</span><span class="sub">Сүүлд: ${seenAt(s.last_seen_at ?? s.created_at)} · нэвтэрсэн ${when(s.created_at)}</span></span>
+            ${s.current ? '<span class="end"><span class="pill" data-size="sm" data-s="contracted">Энэ төхөөрөмж</span></span>' : ''}
+          </div>`),
+      ),
+    );
+    loading.replaceWith(rows);
+    // Somebody else signed in as them is one press away; with nothing else signed in, there is nothing to press.
+    const count = list.filter((s) => !s.current).length;
+    if (count) sessions.querySelector('.section-label').append(others(count));
   } catch (error) {
-    sessions.querySelector('#sessions').replaceChildren(el(`<tr><td colspan="3" class="empty">${esc(error.message)}</td></tr>`));
+    loading.replaceWith(el(`<div class="card empty" id="sessions">${esc(error.message)}</div>`));
   }
+}
+
+/** When a device was last used, the way the website's /account says it: «Өнөөдөр 11:16», «Өчигдөр 11:16», «10-р сарын 1, 11:16». */
+function seenAt(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const ago = Math.round((day(new Date()) - day(d)) / 86400000);
+  const hm = clockOf(iso);
+  if (ago === 0) return `Өнөөдөр ${hm}`;
+  if (ago === 1) return `Өчигдөр ${hm}`;
+  return `${d.getMonth() + 1}-р сарын ${d.getDate()}, ${hm}`;
 }
 
 /** Registering a business, in a popup: its owner is whoever sends it; Basu approves it. */
@@ -882,7 +1013,7 @@ async function renderOrgTeam(view) {
           const unproved = Boolean(who.phone && !who.phone_verified);
           const known = [
             who.email && `<span class="mono">${esc(who.email)}</span>`,
-            who.phone && `<span class="mono">${esc(who.phone)}</span>${unproved ? ' <em class="flag">баталгаагүй</em>' : ''}`,
+            who.phone && `<span class="mono">${esc(phoneText(who.phone))}</span>${unproved ? ' <em class="flag">баталгаагүй</em>' : ''}`,
           ].filter(Boolean).join(' · ');
           step({
             sub: unproved
@@ -907,8 +1038,8 @@ async function renderOrgTeam(view) {
 
   const team = dataTable({
     columns: [
-      { key: 'name', label: 'Нэр', value: (m) => m.name ?? '', render: (m) => `<b>${esc(m.name ?? '—')}</b>${m.you ? ' <small class="muted">(та)</small>' : ''}` },
-      { key: 'contact', label: 'Утас, имэйл', render: (m) => dtCell.mono(m.contact) },
+      { key: 'name', label: 'Нэр', value: (m) => m.name ?? '', render: (m) => `${personName(m.name)}${m.you ? ' <small class="muted">(та)</small>' : ''}` },
+      { key: 'contact', label: 'Утас, имэйл', render: (m) => contactCell(m.contact) },
       { key: 'role', label: 'Үүрэг', value: (m) => m.role_name },
     ],
     search: members.length > 8 ? { placeholder: 'Нэр, утас, имэйл…' } : false,
@@ -921,7 +1052,7 @@ async function renderOrgTeam(view) {
             () => {
               void popup({
                 title: 'Үүрэг солих',
-                sub: `${esc(m.name ?? '')} · <span class="mono">${esc(m.contact ?? '')}</span>`,
+                sub: `${esc(m.name ?? '')} · <span class="mono">${esc(phoneText(m.contact ?? ''))}</span>`,
                 width: 440,
                 id: 'team-role',
                 fields: [roleField(m.role)],
@@ -995,7 +1126,7 @@ async function renderOrgProfile(view) {
       <dl class="kv" id="org-facts">
         ${fact('Нэр', org.name)}
         <div><dt>Төрөл</dt><dd>${kinds(org).join(', ') || unset}</dd></div>
-        ${fact('Холбогдох утас', org.phone, true)}
+        ${fact('Холбогдох утас', org.phone ? phoneText(org.phone) : null, true)}
         ${fact('ТТД', org.tin, true)}
         ${fact('Хаяг', org.address)}
         ${org.about ? fact('Товч тайлбар', org.about) : ''}
@@ -1233,7 +1364,7 @@ const ICON_WORD = {
   suppliers: 'Дэлгүүр', audit: 'Цаг', shield: 'Бамбай', today: 'Хуанли', menu: 'Цэс', kitchen: 'Гал тогоо', truck: 'Машин',
   tag: 'Шошго', file: 'Файл',
 };
-const SCOPE_WORD = { desk: 'Basu ops', org: 'Байгууллага' };
+const SCOPE_WORD = { desk: 'Basu-гийн ширээ', org: 'Байгууллага' };
 let accessScope = localStorage.getItem('basu.ops.access') === 'org' ? 'org' : 'desk';
 /** The role the roles page opens on next: the one just made or saved. */
 let rolePick = null;
@@ -1961,7 +2092,12 @@ async function openOrgAccess(orgId, from = { label: 'Байгууллагууд'
   const wanted = opening(view, from);
   let data;
   try {
-    data = await ops(`/v1/ops/orgs/${orgId}/access`);
+    // A restaurant's business links to its kitchens: the desk's list of them, asked alongside when it has none yet.
+    const kitchens = hasPage('venues') && !venueCache.length && cache.orgs.find((o) => o.id === orgId)?.restaurant;
+    [data] = await Promise.all([
+      ops(`/v1/ops/orgs/${orgId}/access`),
+      kitchens ? ops('/v1/ops/dine/restaurants').then((r) => (venueCache = r.restaurants)).catch(() => null) : null,
+    ]);
   } catch (error) {
     toast(error.message, 'bad');
     return wanted() ? from.go() : undefined;
@@ -1973,64 +2109,78 @@ async function openOrgAccess(orgId, from = { label: 'Байгууллагууд'
   // The list's row knows who registered it and how many work there; the business's own answer is the rest.
   const listed = cache.orgs.find((o) => o.id === orgId) ?? {};
   const [tone, word] = ORG_STATE[org.state] ?? ['off', org.state];
-  const h = head(`${esc(org.name)} ${dtCell.pill(tone, word)}`, esc([kinds(org).join(', '), org.address].filter(Boolean).join(' · ')));
-  if (org.state === 'applied' && can('desk.orgs:decide')) {
-    // Decided here, the desk's own list moves too: the overview's «Хийх ажил» and the sidebar's count read it.
-    const again = async () => {
-      try {
-        cache.orgs = (await ops('/v1/ops/orgs')).orgs;
-        badges();
-      } catch {
-        /* the page below says what it can; the list catches up on the next refresh */
-      }
-      await openOrgAccess(orgId, from);
-    };
-    headActs(
-      h,
-      button('Татгалзах', () => declineOrg({ ...listed, ...org }, again), 'data-a="decline"'),
-      button('Батлах', () => approveOrg({ ...listed, ...org }, again), 'data-v="primary" data-a="approve"'),
-    );
-  }
   backTo(view, from);
-  view.append(h);
+  view.append(head(`${esc(org.name)} ${dtCell.pill(tone, word)}`, esc([kinds(org).join(', '), org.address].filter(Boolean).join(' · '))));
+  const here = { label: org.name, go: () => openOrgAccess(orgId, from) };
+  // Decided here, the desk's own list moves too: the overview's «Хийх ажил» and the sidebar's count read it.
+  const again = async () => {
+    try {
+      cache.orgs = (await ops('/v1/ops/orgs')).orgs;
+      badges();
+    } catch {
+      /* the page below says what it can; the list catches up on the next refresh */
+    }
+    await openOrgAccess(orgId, from);
+  };
   const unset = '<span class="kv-none">—</span>';
   // Who works there, the head counted apart: an owner is not staff.
   const heads = new Set(data.roles.filter((r) => r.head).map((r) => r.key));
   const owners = data.members.filter((m) => heads.has(m.role)).length;
   const peopleLine = [owners ? `эзэн ${owners}` : '', data.members.length - owners ? `ажилтан ${data.members.length - owners}` : ''].filter(Boolean).join(' · ') || 'хүн алга';
-  view.append(el(`
-    <div class="card facts-card"><div class="facts">
-      <div><span class="lab">Бүртгүүлсэн</span><b>${listed.applicant ? (realName(listed.applicant) ? esc(listed.applicant) : dtCell.phone(listed.applicant)) : unset}</b><span class="fact-sub">${when(org.created_at)}</span></div>
-      <div><span class="lab">Холбогдох утас</span><b>${org.phone ? tel(org.phone) : unset}</b></div>
-      <div><span class="lab">ТТД</span><b class="mono">${org.tin ? esc(org.tin) : unset}</b></div>
-      <div><span class="lab">${org.state === 'declined' ? 'Татгалзсан' : 'Батлагдсан'}</span><b>${org.decided_at ? when(org.decided_at) : unset}</b>${org.state === 'declined' && org.decline_reason ? `<span class="fact-sub">${esc(org.decline_reason)}</span>` : ''}</div>
-      <div><span class="lab">Хүмүүс</span><b>${data.members.length}</b><span class="fact-sub">${peopleLine}</span></div>
-    </div>${org.about ? `<div class="card-foot"><span class="cap">${esc(org.about)}</span></div>` : ''}</div>`));
-  // A supplier's business and its supplier file are one and the same to the desk: a step from one to the other.
+  // The file's shape, as every other: the business's facts across, its people and roles down the left, and on the
+  // right what may be done to it and the files around it.
+  const page = el(`
+    <div class="detail">
+      <div class="card detail-facts"><div class="facts">
+        <div><span class="lab">Бүртгүүлсэн</span><b>${listed.applicant ? (realName(listed.applicant) ? esc(listed.applicant) : dtCell.phone(listed.applicant)) : unset}</b><span class="fact-sub">${when(org.created_at)}</span></div>
+        <div><span class="lab">Холбогдох утас</span><b>${org.phone ? tel(org.phone) : unset}</b></div>
+        <div><span class="lab">ТТД</span><b class="mono">${org.tin ? esc(org.tin) : unset}</b></div>
+        <div><span class="lab">${org.state === 'declined' ? 'Татгалзсан' : 'Батлагдсан'}</span><b>${org.decided_at ? when(org.decided_at) : unset}</b>${org.state === 'declined' && org.decline_reason ? `<span class="fact-sub">${esc(org.decline_reason)}</span>` : ''}</div>
+        <div><span class="lab">Хүмүүс</span><b>${data.members.length}</b><span class="fact-sub">${peopleLine}</span></div>
+      </div>${org.about ? `<div class="card-foot"><span class="cap">${esc(org.about)}</span></div>` : ''}</div>
+      <aside class="detail-rail"></aside>
+      <div class="detail-main"></div>
+    </div>`);
+  const rail = page.querySelector('.detail-rail');
+  const main = page.querySelector('.detail-main');
+  const decides = org.state === 'applied' && can('desk.orgs:decide');
+  // The roles a business may hand out beyond everybody's, which the roles section below changes with its «Засах».
+  const choosable = data.roles.filter((r) => !r.everyone);
+  rail.append(
+    railActs(
+      [
+        decides && { label: 'Батлах', attrs: 'data-v="primary" data-a="approve"', onClick: () => approveOrg({ ...listed, ...org }, again), hint: 'Бүртгүүлсэн хүн эзэн нь болж, ажилтнуудаа өөрөө нэмнэ.' },
+        decides && { label: 'Татгалзах', attrs: 'data-a="decline"', onClick: () => declineOrg({ ...listed, ...org }, again), hint: 'Шалтгааныг нь бүртгүүлсэн хүн харж, засаад дахин бүртгүүлж болно.' },
+      ],
+      org.state === 'applied'
+        ? 'Бүртгэл батлах, татгалзах нь таны үүрэгт нээлттэй биш.'
+        : org.state === 'active'
+          ? !deciding
+            ? 'Батлагдсан байгууллага — хийх үйлдэл алга.'
+            : choosable.length
+              ? 'Хүний үүргийг доорх жагсаалтаас, нээлттэй үүргийг «Засах»-аас солино.'
+              : 'Хүний үүргийг доорх жагсаалтаас солино.'
+          : 'Татгалзсан бүртгэл — хийх үйлдэл алга.',
+    ),
+  );
+  // A supplier's business and its supplier file are one and the same to the desk, and so are its restaurants: a step from one to the other.
   const supplier = org.supplier ? cache.suppliers.find((s) => s.org_id === orgId) : null;
-  if (supplier && hasPage('suppliers')) {
-    const link = el(`
-      <section class="section"><h2 class="section-label">Холбоотой</h2>
-        <div class="card" data-rows>
-          <a class="row" href="#desk/suppliers" data-chev data-go-supplier>
-            <span class="main"><span class="title">Нийлүүлэгчийн хуудас</span><span class="sub">Гэрээ, данс, зарууд, захиалга</span></span>
-            <span class="end">${dtCell.pill(...supplierState(supplier))}</span>
-          </a>
-        </div>
-      </section>`);
-    link.querySelector('a').addEventListener('click', (e) => {
-      e.preventDefault();
-      void openSupplier(supplier.id, { label: org.name, go: () => openOrgAccess(orgId, from) });
-    });
-    view.append(link);
-  }
+  const kitchens = venueCache.filter((r) => r.org_id === orgId);
+  const links = related([
+    supplier && hasPage('suppliers')
+      ? { label: supplier.name, sub: 'Нийлүүлэгчийн хуудас: гэрээ, данс, зар', pill: dtCell.pill(...supplierState(supplier)), go: () => openSupplier(supplier.id, here) }
+      : null,
+    ...(hasPage('venues') ? kitchens.map((r) => ({ label: r.name, sub: 'Рестораны хуудас: гал тогоо, цэс', go: () => openVenue(r, here) })) : []),
+  ]);
+  if (links) rail.append(links);
+  view.append(page);
   const open = data.roles.filter((r) => r.open);
   const nameOf = (key) => data.roles.find((r) => r.key === key)?.name ?? key;
 
   const people = dataTable({
     columns: [
-      { key: 'name', label: 'Нэр', value: (m) => m.name ?? '', render: (m) => `<b>${esc(m.name ?? '—')}</b>` },
-      { key: 'contact', label: 'Утас, имэйл', render: (m) => dtCell.mono(m.contact) },
+      { key: 'name', label: 'Нэр', value: (m) => m.name ?? '', render: (m) => personName(m.name) },
+      { key: 'contact', label: 'Утас, имэйл', render: (m) => contactCell(m.contact) },
       { key: 'role', label: 'Үүрэг', value: (m) => m.role_name ?? nameOf(m.role) },
     ],
     search: data.members.length > 8 ? { placeholder: 'Нэр, утас, имэйл…' } : false,
@@ -2065,7 +2215,7 @@ async function openOrgAccess(orgId, from = { label: 'Байгууллагууд'
   people.el.setAttribute('data-people', '');
   const who = el('<section class="section"><h2 class="section-label">Хүмүүс, үүрэг</h2></section>');
   who.append(people.el);
-  view.append(who);
+  main.append(who);
 
   const roles = el(`
     <section class="section"><h2 class="section-label">Энэ байгууллагад нээлттэй үүрэг</h2>
@@ -2080,7 +2230,6 @@ async function openOrgAccess(orgId, from = { label: 'Байгууллагууд'
         .join('')}</div>
       <p class="page-note">«Бүх байгууллагад» үүргийг ямар ч байгууллага өгнө; бусдыг Basu сонгосон байгууллагад л нээнэ. Үүрэг бүр юу нээхийг «Үүрэг, эрх» хуудсанд засна.</p>
     </section>`);
-  const choosable = data.roles.filter((r) => !r.everyone);
   if (deciding && choosable.length) {
     roles.querySelector('.section-label').append(
       button(
@@ -2109,7 +2258,7 @@ async function openOrgAccess(orgId, from = { label: 'Байгууллагууд'
       ),
     );
   }
-  view.append(roles);
+  main.append(roles);
 }
 
 /* ── the frame: one sidebar for every place a person works ─────────── */
@@ -2205,8 +2354,11 @@ function open(w, page) {
   frame();
   tab = hasPage(page) ? page : remembered(w);
   nav.select(tab);
-  if (w.kind === 'desk') refresh();
-  else show(tab);
+  if (w.kind === 'desk') {
+    // The desk's lists come first (the badges and three pages read them): the page's shape meanwhile.
+    nav.view.replaceChildren(pageSkeleton());
+    refresh();
+  } else show(tab);
 }
 
 function frame() {
@@ -2233,19 +2385,33 @@ function frame() {
 }
 
 /**
- * A figure too long for its cell — ten million tugriks or more in one of six cells
- * across — is set a size down rather than run out of the cell or under the
- * next one. The band's own size stays for every figure that fits.
+ * A figure wider than its cell — a seven-digit sum in one of six cells across at
+ * 1440 — sets its whole band a size down, and a second if that is not enough,
+ * rather than run to the cell's edge or under the next one; measured, so it
+ * holds at any width and for any figure. The band's own size stays wherever
+ * every figure fits. Attributes only: the observer below watches children.
  */
 function fitBands(scope) {
-  for (const b of scope.querySelectorAll('.kpi-band > .kpi:not([data-word]) > b')) {
-    const n = b.textContent.trim().length;
-    const level = n >= 13 ? '2' : n >= 11 ? '1' : null;
-    if ((b.parentElement.getAttribute('data-long') ?? null) === level) continue;
-    if (level) b.parentElement.setAttribute('data-long', level);
-    else b.parentElement.removeAttribute('data-long');
+  for (const band of scope.querySelectorAll('.kpi-band')) {
+    if (!band.clientWidth) continue; // not laid out — hidden for now — so nothing to measure yet
+    const figures = [...band.querySelectorAll(':scope > .kpi:not([data-word]) > b')];
+    band.removeAttribute('data-fit');
+    let level = 0;
+    while (level < 2 && figures.some((b) => b.scrollWidth > b.clientWidth + 1)) {
+      level += 1;
+      band.setAttribute('data-fit', String(level));
+    }
   }
 }
+let fitting = 0;
+const refit = () => {
+  if (typeof requestAnimationFrame !== 'function') return;
+  cancelAnimationFrame(fitting);
+  fitting = requestAnimationFrame(() => nav && fitBands(nav.view));
+};
+// A window made narrower, or the figures' own face arriving after they were measured in a stand-in.
+addEventListener('resize', refit);
+document.fonts?.ready.then(refit);
 
 /** Ask again who the person is and where they work — after they changed it — and open `id` (or stay). */
 async function reload(id) {
@@ -2304,7 +2470,29 @@ async function refresh() {
       // The seat went while the page was open: ask again where this person works rather than throw them out.
       if (error.status === 401) return reload();
       if (error.status === 503) return signedOut();
-      toast(error.message, 'bad');
+      // On the way in, the page's shape is still up: the failure is said there, with the way to ask again.
+      const waiting = nav?.view.querySelector(':scope > .boot-page');
+      if (!waiting) {
+        toast(whatWentWrong(error), 'bad');
+        return;
+      }
+      waiting.replaceWith(
+        emptyState({
+          icon: 'alert',
+          tone: 'stop',
+          frame: true,
+          title: 'Хуудас ачаалж чадсангүй',
+          text: whatWentWrong(error),
+          action: {
+            label: 'Дахин оролдох',
+            primary: true,
+            onClick: () => {
+              nav.view.replaceChildren(pageSkeleton());
+              void refresh();
+            },
+          },
+        }),
+      );
       return;
     }
   }
@@ -2418,7 +2606,10 @@ const LEVEL_RANK = { bad: 0, warn: 1, info: 2 };
 
 async function renderOverview(view) {
   view.append(head('Самбар', 'Хийх ажил эхэндээ, дараа нь Basu-гийн өнөөдрийн байдал.'));
-  view.append(busy());
+  // The page's own shape while its numbers come: the things to do, then a band of six.
+  const waiting = busyBox('<div class="overview-skel"></div>');
+  waiting.append(quiet(skeleton('rows', 2)), quiet(skeleton('kpis', 6)));
+  view.append(waiting);
   let v;
   try {
     v = await ops('/v1/ops/overview');
@@ -2519,9 +2710,15 @@ async function renderOverview(view) {
 
 /* ── the guests ── */
 
+/**
+ * A lunch's state in a chip: the guest's own word for it (api.js's HEADLINE, and LUNCH_WORD by
+ * headlineWord — a scheduled lunch is «Хүлээн авсан», on the fire «Гал дээр», moved «Цаг шилжсэн»);
+ * where the guest's word is news or a wish — «Цуцлагдлаа», «Сайхан хооллоорой» — where the order
+ * stands, in the form the идэш chips say it.
+ */
 const DINE_WORD = {
-  ...Object.fromEntries(Object.entries(HEADLINE).map(([k, [w]]) => [k, w])),
-  ACCEPTED: 'Батлагдсан', SCHEDULED: 'Товлогдсон', ARMED: 'Бэлтгэлтэй', COOKING: 'Хийгдэж байна', SERVED: 'Үйлчилсэн', CLOSED: 'Дууссан',
+  ...Object.fromEntries([...Object.keys(HEADLINE), ...Object.keys(LUNCH_WORD)].map((k) => [k, headlineWord(k)])),
+  ACCEPTED: 'Батлагдсан', SERVED: 'Үйлчилсэн', CLOSED: 'Дууссан', CANCELLED: 'Цуцлагдсан', REFUNDED: 'Буцаасан',
 };
 const LINE_WORD = { topup: 'Цэнэглэлт', purchase: 'Төлбөр', refund: 'Буцаалт', promotion: 'Урамшуулал', adjustment: 'Залруулга' };
 const PLATFORM_WORD = { ios: 'iPhone', android: 'Android', web: 'Вэб' };
@@ -2544,7 +2741,7 @@ function renderGuests(view) {
             : dtCell.twoHtml(`<span class="dt-unnamed">${g.closed_at ? 'Хаагдсан бүртгэл' : 'Нэр оруулаагүй'}</span>`, esc(ways));
         },
       },
-      { key: 'phone', label: 'Утас', render: (g) => dtCell.mono(g.phone) },
+      { key: 'phone', label: 'Утас', value: (g) => `${g.phone ?? ''} ${phoneText(g.phone ?? '')}`, render: (g) => dtCell.phone(g.phone) },
       { key: 'email', label: 'Имэйл', render: (g) => (g.email ? esc(g.email) : dtCell.none()) },
       { key: 'joined_at', label: 'Бүртгүүлсэн', render: (g) => dtCell.when(g.joined_at) },
       {
@@ -2769,7 +2966,7 @@ async function openGuest(id, from = { label: 'Зочид', go: () => show('guest
     } else if (b.dataset.a === 'close') {
       void confirmPopup({
         title: 'Бүртгэл хаах',
-        text: `<b>${esc(g.phone ?? g.email ?? 'Энэ зочин')}</b>-ийн бүртгэл хаагдана. Нэр, утас арилна; захиалга, гүйлгээ бүртгэлд үлдэнэ. <b>Буцаах боломжгүй.</b>`,
+        text: `<b>${esc(g.phone ? phoneText(g.phone) : g.email ?? 'Энэ зочин')}</b>-ийн бүртгэл хаагдана. Нэр, утас арилна; захиалга, гүйлгээ бүртгэлд үлдэнэ. <b>Буцаах боломжгүй.</b>`,
         ok: 'Бүртгэл хаах',
         danger: true,
         reason: { label: 'Шалтгаан', placeholder: 'Зочин бичгээр хүссэн…', required: true },
@@ -2798,7 +2995,7 @@ const dineActor = (a) => {
   if (a.startsWith('guest:')) return 'зочин';
   if (a.startsWith('kitchen')) return 'гал тогоо';
   if (a.startsWith('kds:')) return 'гал тогооны дэлгэц';
-  if (a.startsWith('ops:')) return `ops · ${a.slice(4)}`;
+  if (a.startsWith('ops')) return deskWho(a);
   return { 'system:planner': 'төлөвлөгч', 'system:scheduler': 'хуваарьлагч' }[a] ?? a;
 };
 const stars = (n) => `<span class="stars" aria-label="${n} од">${Array.from({ length: 5 }, (_, i) => (i < n ? STAR : STAR.replace('<svg', '<svg data-off'))).join('')}</span>`;
@@ -2927,32 +3124,65 @@ async function openVenue(r, from = { label: 'Ресторан', go: () => show('
   window.scrollTo(0, 0);
   backTo(view, from);
   const manage = can('desk.venues:manage');
-  const h = head(
+  const here = { label: r.name, go: () => openVenue(r, from) };
+  view.append(head(
     `${esc(r.name)}${r.active ? '' : ` ${dtCell.pill('off', 'зогссон')}`}`,
     `${esc(r.slot_minutes)} минутын цагаар захиалга авна · ${r.auto_accept ? 'автоматаар батална' : 'гараар батална'}`,
-  );
-  if (manage) {
-    const again = async () => {
-      ({ restaurants: venueCache } = await ops('/v1/ops/dine/restaurants'));
-      const now = venueCache.find((x) => x.id === r.id);
-      if (now) await openVenue(now, from);
-    };
-    headActs(h, button(r.active ? 'Ресторан зогсоох' : 'Идэвхжүүлэх', () => toggleVenue(r, again), `data-a="active"${r.active ? '' : ' data-v="primary"'}`));
-  }
-  view.append(h);
+  ));
+  const again = async () => {
+    ({ restaurants: venueCache } = await ops('/v1/ops/dine/restaurants'));
+    const now = venueCache.find((x) => x.id === r.id);
+    if (now) await openVenue(now, from);
+  };
   const seen = !r.org_id ? 'байгууллагад холбогдоогүй' : r.kitchen_seen_at ? `сүүлд ${when(r.kitchen_seen_at)} ${clockOf(r.kitchen_seen_at)}` : 'хэзээ ч нээгээгүй';
-  view.append(el(`
-    <div class="card facts-card"><div class="facts">
-      <div><span class="lab">Гал тогоо</span><b>${r.online ? 'Нээлттэй' : 'Хаалттай'}</b><span class="fact-sub">${seen}</span></div>
-      <div><span class="lab">Өнөөдөр</span><b>${r.today.placed} захиалга</b><span class="fact-sub">${r.today.live} идэвхтэй · ${mnt(r.today.sales_mnt)}${r.today.held ? ` · ${r.today.held} түр зогссон` : ''}</span></div>
-      <div><span class="lab">Цэс</span><b>${r.menu.active}/${r.menu.total} хоол</b><span class="fact-sub">${r.menu.sold_out ? `${r.menu.sold_out} нь өнөөдөр дууссан` : 'бүгд бэлэн'}</span></div>
-      <div><span class="lab">Үнэлгээ</span><b>${r.rating ? `${stars(Math.round(r.rating.stars))} <span class="mono">${esc(r.rating.stars)}</span>` : '—'}</b><span class="fact-sub">${r.rating ? `${r.rating.count} үнэлгээ${r.rating.on_time_share === null ? '' : ` · цагтаа ${Math.round(r.rating.on_time_share * 100)}%`}` : 'үнэлгээ алга'}</span></div>
-      <div><span class="lab">ТТД</span><b class="mono">${r.merchant_tin ? esc(r.merchant_tin) : '<span class="ink-stop">алга</span>'}</b><span class="fact-sub">${r.merchant_tin ? 'е-баримт гарна' : 'е-баримт гарахгүй'}</span></div>
-    </div></div>`));
+  // The file's shape, as every other: the kitchen's facts across, its menu down the left, and on the right
+  // what may be done to it and the files around it.
+  const page = el(`
+    <div class="detail">
+      <div class="card detail-facts"><div class="facts">
+        <div><span class="lab">Гал тогоо</span><b>${r.online ? 'Нээлттэй' : 'Хаалттай'}</b><span class="fact-sub">${seen}</span></div>
+        <div><span class="lab">Өнөөдөр</span><b>${r.today.placed} захиалга</b><span class="fact-sub">${r.today.live} идэвхтэй · ${mnt(r.today.sales_mnt)}${r.today.held ? ` · ${r.today.held} түр зогссон` : ''}</span></div>
+        <div><span class="lab">Цэс</span><b>${r.menu.active}/${r.menu.total} хоол</b><span class="fact-sub">${r.menu.sold_out ? `${r.menu.sold_out} нь өнөөдөр дууссан` : 'бүгд бэлэн'}</span></div>
+        <div><span class="lab">Үнэлгээ</span><b>${r.rating ? `${stars(Math.round(r.rating.stars))} <span class="mono">${esc(r.rating.stars)}</span>` : '—'}</b><span class="fact-sub">${r.rating ? `${r.rating.count} үнэлгээ${r.rating.on_time_share === null ? '' : ` · цагтаа ${Math.round(r.rating.on_time_share * 100)}%`}` : 'үнэлгээ алга'}</span></div>
+        <div><span class="lab">ТТД</span><b class="mono">${r.merchant_tin ? esc(r.merchant_tin) : '<span class="ink-stop">алга</span>'}</b><span class="fact-sub">${r.merchant_tin ? 'е-баримт гарна' : 'е-баримт гарахгүй'}</span></div>
+      </div></div>
+      <aside class="detail-rail"></aside>
+      <div class="detail-main"></div>
+    </div>`);
+  const rail = page.querySelector('.detail-rail');
+  rail.append(
+    railActs(
+      [
+        manage && {
+          label: r.active ? 'Ресторан зогсоох' : 'Идэвхжүүлэх',
+          attrs: `data-a="active"${r.active ? '' : ' data-v="primary"'}`,
+          onClick: () => toggleVenue(r, again),
+          hint: r.active ? 'Зочдод харагдахаа болиж, шинэ захиалга авахгүй. Авсан захиалга хэвээр үргэлжилнэ.' : 'Дахин зочдод харагдаж, захиалга авна.',
+        },
+      ],
+      'Ресторан зогсоох, цэснээс хоол нуух нь таны үүрэгт нээлттэй биш.',
+    ),
+  );
+  // Its lunches, in the list that already filters by restaurant; the business it belongs to.
+  const links = related([
+    hasPage('lunches')
+      ? {
+          label: 'Хоолны захиалга',
+          sub: `${r.today.placed} нь өнөөдөр · ${r.today.live} идэвхтэй`,
+          go: () => {
+            lunchFilter = { ...lunchFilter, restaurant: r.id, scope: 'all' };
+            show('lunches');
+          },
+        }
+      : null,
+    r.org_id && hasPage('orgs') ? { label: 'Байгууллагын хуудас', sub: 'Хүмүүс, тэдний үүрэг, бүртгэлийн мэдээлэл', go: () => openOrgAccess(r.org_id, here) } : null,
+  ]);
+  if (links) rail.append(links);
+  view.append(page);
   const table = dataTable({
     columns: [
       { key: 'name', label: 'Хоол', render: (m) => `<b>${esc(m.name)}</b>` },
-      { key: 'station', label: 'Цех' },
+      { key: 'station', label: 'Цех', value: (m) => STATION_WORD[m.station] ?? m.station },
       { key: 'price_mnt', label: 'Үнэ', align: 'end', numeric: true, render: (m) => dtCell.money(m.price_mnt) },
       { key: 'prep_minutes', label: 'Бэлтгэх, мин', align: 'end', numeric: true, render: (m) => dtCell.num(m.prep_minutes) },
       {
@@ -2991,7 +3221,7 @@ async function openVenue(r, from = { label: 'Ресторан', go: () => show('
   table.el.id = 'menu';
   const menu = el('<section class="section"><h2 class="section-label">Цэс</h2></section>');
   menu.append(table.el);
-  view.append(menu);
+  page.querySelector('.detail-main').append(menu);
   try {
     table.setRows((await ops(`/v1/ops/dine/restaurants/${r.id}/menu`)).items);
   } catch (error) {
@@ -3021,7 +3251,7 @@ async function renderLunches(view) {
         key: 'guest',
         label: 'Зочин',
         value: (o) => `${o.guest ?? ''} ${o.guest_phone ?? ''}`,
-        render: (o) => dtCell.twoHtml(esc(o.guest ?? 'зочин'), o.guest_phone ? `<span class="mono">${esc(o.guest_phone)}</span>` : ''),
+        render: (o) => dtCell.twoHtml(esc(o.guest ?? 'зочин'), o.guest_phone ? dtCell.phone(o.guest_phone) : ''),
       },
       { key: 'slot_starts_at', label: 'Цаг', render: (o) => dtCell.when(o.slot_starts_at) },
       {
@@ -3091,10 +3321,45 @@ function related(links) {
   if (!shown.length) return null;
   const box = el('<section class="rail-sec related"><h2 class="section-label">Холбоотой</h2><div class="card" data-rows></div></section>');
   for (const l of shown) {
-    const row = el(`<button type="button" class="row" data-chev><span class="main"><span class="title">${esc(l.label)}</span><span class="sub">${esc(l.sub ?? '')}</span></span></button>`);
+    const row = el(`<button type="button" class="row" data-chev><span class="main"><span class="title">${esc(l.label)}</span><span class="sub">${esc(l.sub ?? '')}</span></span>${l.pill ? `<span class="end">${l.pill}</span>` : ''}</button>`);
     row.addEventListener('click', l.go);
     box.querySelector('[data-rows]').append(row);
   }
+  return box;
+}
+
+/**
+ * The rail's «Үйлдэл» on a file: each thing that may be done to it, a button
+ * with one line under it saying what it does — or, when nothing can be, one
+ * quiet line saying why. `acts` are [{ label, attrs, onClick, hint }] (a falsy
+ * one is left out); `'sep'` is the hairline between two kinds of act, drawn
+ * only with acts on both sides of it.
+ */
+function railActs(acts, none) {
+  const shown = acts.filter(Boolean).filter((a, i, all) => a !== 'sep' || (all.slice(0, i).some((x) => x !== 'sep') && all.slice(i + 1).some((x) => x !== 'sep') && all[i - 1] !== 'sep'));
+  const box = document.createDocumentFragment();
+  box.append(el('<h2 class="section-label">Үйлдэл</h2>'));
+  if (!shown.some((a) => a !== 'sep')) {
+    const note = el('<p class="rail-note" id="acts"></p>');
+    note.textContent = none;
+    box.append(note);
+    return box;
+  }
+  const card = el('<div class="card" id="acts"><div class="card-body acts"></div></div>');
+  const body = card.querySelector('.acts');
+  for (const a of shown) {
+    if (a === 'sep') {
+      body.append(el('<div class="sep"></div>'));
+      continue;
+    }
+    body.append(button(a.label, a.onClick, a.attrs ?? ''));
+    if (a.hint) {
+      const hint = el('<div class="hint"></div>');
+      hint.textContent = a.hint;
+      body.append(hint);
+    }
+  }
+  box.append(card);
   return box;
 }
 
@@ -3125,7 +3390,7 @@ async function openLunch(id, from = { label: 'Хоолны захиалга', go
           ${noShow ? '<div class="sep"></div><button class="btn" type="button" data-a="no-show">Зочин ирээгүй гэж тэмдэглэх</button><div class="hint">Ширээ суллагдана; мөнгө буцахгүй.</div>' : ''}
         </div>
       </div>`
-    : `<h2 class="section-label">Үйлдэл</h2><p class="rail-note" id="acts">${!manage ? 'Захиалгыг цуцлах, тэмдэглэх нь ops, админы ажил.' : DINE_LIVE.includes(o.state) ? 'Зочинд үйлчилсэн тул хийх үйлдэл алга.' : 'Дууссан захиалга — хийх үйлдэл алга.'}</p>`;
+    : `<h2 class="section-label">Үйлдэл</h2><p class="rail-note" id="acts">${!manage ? 'Захиалгыг цуцлах, тэмдэглэх нь таны үүрэгт нээлттэй биш.' : DINE_LIVE.includes(o.state) ? 'Зочинд үйлчилсэн тул хийх үйлдэл алга.' : 'Дууссан захиалга — хийх үйлдэл алга.'}</p>`;
   const fire = o.fired_at ? `гарсан ${clockOf(o.fired_at)}` : o.late ? '<span class="ink-stop">хоцорч байна</span>' : o.fire_mode ? esc(FIRE_WORD[o.fire_mode] ?? o.fire_mode) : 'товлоогүй';
   const page = el(`
     <div class="detail">
@@ -3432,7 +3697,7 @@ async function moneyTopups() {
         key: 'guest',
         label: 'Зочин',
         value: (t) => `${t.guest ?? ''} ${t.guest_phone ?? ''}`,
-        render: (t) => dtCell.twoHtml(esc(t.guest ?? 'зочин'), t.guest_phone ? `<span class="mono">${esc(t.guest_phone)}</span>` : ''),
+        render: (t) => dtCell.twoHtml(esc(t.guest ?? 'зочин'), t.guest_phone ? dtCell.phone(t.guest_phone) : ''),
       },
       { key: 'provider', label: 'Суваг', value: (t) => `${t.provider} ${t.provider_ref ?? ''}`, render: (t) => dtCell.twoHtml(esc(t.provider), t.provider_ref ? `<span class="mono">${esc(t.provider_ref)}</span>` : ''), phone: false },
       { key: 'state', label: 'Төлөв', value: (t) => TOPUP_WORD[t.state] ?? t.state, render: (t) => dtCell.pill(TOPUP_PILL[t.state] ?? 'off', TOPUP_WORD[t.state] ?? t.state) },
@@ -3554,7 +3819,7 @@ async function notifyLog() {
         key: 'guest',
         label: 'Хэнд',
         value: (m) => `${m.guest ?? ''} ${m.guest_phone ?? ''}`,
-        render: (m) => dtCell.twoHtml(esc(m.guest ?? 'зочин'), m.guest_phone ? `<span class="mono">${esc(m.guest_phone)}</span>` : ''),
+        render: (m) => dtCell.twoHtml(esc(m.guest ?? 'зочин'), m.guest_phone ? dtCell.phone(m.guest_phone) : ''),
       },
       { key: 'channel', label: 'Суваг', value: (m) => (m.channel === 'sms' ? 'SMS' : m.channel === 'email' ? 'Имэйл' : 'Push') },
       {
@@ -3646,7 +3911,6 @@ async function notifyVolume() {
 /* ── the machine ── */
 
 const FLAVOUR = { fake: 'туршилтын', real: 'бодит' };
-const REPORT_WORD = { armed: 'бэлтгэлд', planned: 'төлөвлөсөн', held: 'түр зогсоосон', fired: 'галласан', lateFires: 'хоцорсон', superseded: 'дахин төлөвлөсөн', relayed: 'outbox', notified: 'мэдэгдэл', receipts: 'е-баримт', abandoned: 'орхисон', ideshExpired: 'идэш хугацаа дууссан', ideshClosed: 'идэш хаагдсан', purged: 'цэвэрлэсэн', activitiesUpdated: 'карт шинэчилсэн', activitiesEnded: 'карт хаасан' };
 /** Against the server's own clock: in the demo it runs ahead of the wall. */
 const ago = (iso, nowIso) => {
   if (!iso) return 'хэзээ ч үгүй';
@@ -3686,7 +3950,7 @@ async function drawSystem() {
   const sch = s.scheduler;
   const page = el(`<div>
     <div class="kpis kpi-band" id="integrations">
-      <div class="card kpi" data-word data-tone="${sch.ok ? 'good' : 'bad'}"><div class="lab">Scheduler</div><b>${sch.ok ? 'ажиллаж байна' : 'зогссон'}</b><span>сүүлийн тойрог ${ago(sch.last_at, s.now)}${sch.last_took_ms !== null ? ` · ${sch.last_took_ms} мс` : ''} · сүүлийн цагт ${sch.ticks_last_hour} удаа${s.mode === 'demo' ? ' · туршилтын орчинд гараар' : ''}</span></div>
+      <div class="card kpi" data-word data-tone="${sch.ok ? 'good' : 'bad'}"><div class="lab">Хуваарьлагч</div><b>${sch.ok ? 'ажиллаж байна' : 'зогссон'}</b><span>сүүлийн тойрог ${ago(sch.last_at, s.now)}${sch.last_took_ms !== null ? ` · ${sch.last_took_ms} мс` : ''} · сүүлийн цагт ${sch.ticks_last_hour} удаа${s.mode === 'demo' ? ' · туршилтын орчинд гараар' : ''}</span></div>
       ${s.integrations.map((i) => `<div class="card kpi" data-word${i.flavour === 'fake' ? '' : i.ok ? ' data-tone="good"' : ' data-tone="bad"'} data-integration="${esc(i.key)}"><div class="lab">${esc(i.name)}</div><b>${i.flavour === 'fake' ? 'туршилтын' : i.ok ? 'хэвийн' : 'алдаатай'}</b><span>${i.detail.last_ok_at !== undefined ? `сүүлд ${ago(i.detail.last_ok_at, s.now)} · ` : ''}${Object.entries(i.detail).filter(([k]) => k !== 'last_ok_at').map(([k, v]) => `${{ pending: 'хүлээгдэж', stuck: 'гацсан', gap_mnt: 'зөрүү', queued: 'дараалалд', issued: 'гарсан', failed: 'амжилтгүй', sent_day: '24ц илгээсэн', failed_day: '24ц амжилтгүй' }[k] ?? esc(k)} ${k === 'gap_mnt' ? mnt(v) : esc(v)}`).join(' · ')}</span></div>`).join('')}
       <div class="card kpi"><div class="lab">Өгөгдлийн сан</div><b>${esc(s.database.size)}</b><span title="${esc(s.database.last_migration ?? '')}">${s.database.migrations} өөрчлөлт · сүүлийнх №${esc((s.database.last_migration ?? '—').split('_')[0])}</span></div>
     </div>
@@ -3700,7 +3964,7 @@ async function drawSystem() {
       </tbody></table></div></div>
       <h2 class="section-label">Сервер</h2><div class="card"><div class="table-wrap"><table class="table"><tbody>
         <tr><td>Орчин</td><td class="num"><span class="pill" data-s="${s.mode === 'production' ? 'contracted' : 'PAID'}">${s.mode === 'production' ? 'Бодит' : 'Туршилтын'}</span></td></tr>
-        <tr><td>Хувилбар</td><td class="num">${esc(s.version)} · node ${esc(s.node)}</td></tr>
+        <tr><td>Хувилбар</td><td class="num">${esc(s.version)} · Node.js ${esc(String(s.node ?? '').replace(/^v/, ''))}</td></tr>
         <tr><td>Асаасан</td><td class="num">${when(s.started_at)} ${clockOf(s.started_at)}</td></tr>
       </tbody></table></div></div>
       <h2 class="section-label">Идэшний дүрэм</h2><div class="card"><div class="table-wrap"><table class="table"><tbody>
@@ -3787,7 +4051,7 @@ async function renderStats(view) {
     columns: [
       { key: 'name', label: 'Нийлүүлэгч', width: '24%', render: (r) => `<b>${esc(r.name)}</b>${r.active ? '' : ` ${dtCell.pill('off', 'түр зогссон')}`}` },
       { key: 'paid', label: 'Төлсөн', align: 'end', numeric: true, render: (r) => dtCell.num(r.paid) },
-      { key: 'handed', label: 'Өгсөн', align: 'end', numeric: true, render: (r) => dtCell.num(r.handed) },
+      { key: 'handed', label: 'Хүлээлгэн өгсөн', align: 'end', numeric: true, render: (r) => dtCell.num(r.handed) },
       // Cancelled, and under it why: the supplier's own fault, guests who never came.
       {
         key: 'cancelled',
@@ -3843,7 +4107,7 @@ function renderOrders(view) {
         key: 'guest',
         label: 'Зочин',
         value: (o) => `${o.guest ?? ''} ${o.guest_phone ?? ''}`,
-        render: (o) => dtCell.twoHtml(esc(o.guest ?? 'зочин'), o.guest_phone ? `<span class="mono">${esc(o.guest_phone)}</span>` : ''),
+        render: (o) => dtCell.twoHtml(esc(o.guest ?? 'зочин'), o.guest_phone ? dtCell.phone(o.guest_phone) : ''),
       },
       {
         key: 'receive_on',
@@ -3934,12 +4198,12 @@ async function openOrder(id, from = { label: 'Захиалгууд', go: () => s
           <div class="hint">Хэдийг буцаахыг шалтгаан ба дүрэм тогтооно; хүн сонгохгүй.</div>
         </div>
       </div>`
-    : `<h2 class="section-label">Үйлдэл</h2><p class="rail-note" id="acts">${live ? 'Захиалгад үйлдэл хийх нь ops, админы ажил.' : 'Дууссан захиалга — хийх үйлдэл алга.'}</p>`;
+    : `<h2 class="section-label">Үйлдэл</h2><p class="rail-note" id="acts">${live ? 'Захиалгад үйлдэл хийх нь таны үүрэгт нээлттэй биш.' : 'Дууссан захиалга — хийх үйлдэл алга.'}</p>`;
   const page = el(`
     <div class="detail">
       <div class="card detail-facts"><div class="facts">
         <div><span class="lab">Зочин</span><b>${esc(o.guest ?? 'зочин')}</b><span class="fact-sub">${o.guest_phone ? tel(o.guest_phone) : ''}</span></div>
-        <div><span class="lab">${o.receive === 'delivery' ? 'Хүргэлтээр' : 'Өөрөө очиж авна'}</span><b class="nowrap">${dayLabel(o.receive_on)}</b><span class="fact-sub">${o.receive === 'delivery' ? `${esc(o.address)} · <span class="mono">${esc(o.address_phone)}</span>` : 'нийлүүлэгчийн авах цэгээс'}</span></div>
+        <div><span class="lab">${o.receive === 'delivery' ? 'Хүргэлтээр' : 'Өөрөө очиж авна'}</span><b class="nowrap">${dayLabel(o.receive_on)}</b><span class="fact-sub">${o.receive === 'delivery' ? `${esc(o.address)} · <span class="mono nowrap">${esc(phoneText(o.address_phone))}</span>` : 'нийлүүлэгчийн авах цэгээс'}</span></div>
         <div><span class="lab">Зочин төлсөн</span><b>${money(o.total_mnt)}</b><span class="fact-sub">${o.delivery_fee_mnt ? `хүргэлт ${mnt(o.delivery_fee_mnt)} орсон` : 'хүргэлтгүй'}</span></div>
         <div><span class="lab">Нийлүүлэгчид очих</span><b>${money(o.payout_mnt)}</b><span class="fact-sub">шимтгэл хассан</span></div>
         ${o.cancel_reason ? `<div><span class="lab">Цуцлалт</span><b>${esc(REASON[o.cancel_reason] ?? o.cancel_reason)}</b><span class="fact-sub">буцаалт ${mnt(o.refund_mnt ?? 0)}${o.forfeit_mnt ? ` · суутгал ${mnt(o.forfeit_mnt)}` : ''}</span></div>` : ''}
@@ -4043,6 +4307,26 @@ const declineSupplier = (s, done) =>
     },
   });
 
+/**
+ * A payout account as the server takes it: an IBAN — MN and 18 digits — or a
+ * plain account number of 6–20 digits, spaces aside, either case. Checked
+ * before anything is sent, so a wrong one is said under its own field and not
+ * as the server's word about something else.
+ */
+const BANK_RULE = /^(MN\d{18}|\d{6,20})$/;
+const BANK_SAID = 'IBAN бол MN-ээр эхэлсэн 20 тэмдэгт, эсвэл 6–20 оронтой дансны дугаар бичнэ үү.';
+const bankOk = (value) => BANK_RULE.test(String(value ?? '').replace(/\s+/g, '').toUpperCase());
+/** The account field, the same in both popups that take one: letters allowed (an IBAN starts MN), read in capitals. */
+const bankField = (value, hint) => ({
+  name: 'bank_account',
+  label: 'Данс',
+  value: value ?? '',
+  placeholder: '5012345678 эсвэл MN…',
+  autocomplete: 'off',
+  hint,
+  attrs: { autocapitalize: 'characters', spellcheck: 'false', maxlength: 40 },
+});
+
 /** A supplier the desk writes in straight away: the contract is signed, the owner has a Basu account. */
 const registerSupplier = () =>
   popup({
@@ -4060,16 +4344,20 @@ const registerSupplier = () =>
       { name: 'tin', label: 'ТТД', inputmode: 'numeric', placeholder: '7–10 орон', hint: 'Е-баримт энэ ТТД-аар гарна.' },
       { type: 'note', html: '<b>Олголт очих данс</b> — гэрээнд байгаа данс. Basu баталгаажуулсны дараа олголт энэ данс руу явна.' },
       { name: 'bank_name', label: 'Банк', placeholder: 'Хаан банк' },
-      { name: 'bank_account', label: 'Данс', inputmode: 'numeric', placeholder: '5012345678' },
+      bankField('', '6–20 оронтой дансны дугаар, эсвэл MN-ээр эхэлсэн IBAN.'),
       { name: 'bank_holder', label: 'Данс эзэмшигч', placeholder: 'Гэрээн дээрх нэр', wide: true },
     ],
     submit: 'Бүртгэх',
-    onSubmit: async (v) => {
+    onSubmit: async (v, p) => {
+      if (v.bank_account && !bankOk(v.bank_account)) {
+        p.fieldError('bank_account', BANK_SAID);
+        return false;
+      }
       const body = { name: v.name, phone: v.phone, owner: v.owner || undefined, tin: v.tin, address: v.address, bank_name: v.bank_name, bank_account: v.bank_account, bank_holder: v.bank_holder };
       if (v.lat) body.lat = Number(v.lat);
       if (v.lon) body.lon = Number(v.lon);
       const { owner } = await ops('/v1/ops/suppliers', { method: 'POST', body });
-      toast(`Бүртгэгдлээ. Эзэмшигч: ${owner.name ?? owner.email ?? owner.phone} — өөрийн бүртгэлээр /supplier-д орно.`, 'good');
+      toast(`Бүртгэгдлээ. Эзэмшигч: ${owner.name ?? owner.email ?? phoneText(owner.phone)} — өөрийн бүртгэлээр /supplier-д орно.`, 'good');
       await refresh();
     },
   });
@@ -4094,7 +4382,7 @@ function renderSuppliers(view) {
     const asked = dataTable({
       columns: [
         { key: 'name', label: 'Хүсэлт гаргагч', render: (s) => dtCell.two(s.name, s.about ?? '') },
-        { key: 'phone', label: 'Утас', render: (s) => dtCell.mono(s.phone) },
+        { key: 'phone', label: 'Утас', render: (s) => dtCell.phone(s.phone) },
         { key: 'merchant_tin', label: 'ТТД', render: (s) => dtCell.mono(s.merchant_tin), phone: false },
         { key: 'pickup_address', label: 'Авах цэг', phone: false },
         { key: 'applied_at', label: 'Ирсэн', render: (s) => dtCell.when(s.applied_at) },
@@ -4122,7 +4410,7 @@ function renderSuppliers(view) {
   const all = dataTable({
     columns: [
       { key: 'name', label: 'Нийлүүлэгч', render: (s) => dtCell.two(s.name, s.pickup_address) },
-      { key: 'phone', label: 'Утас', render: (s) => dtCell.mono(s.phone) },
+      { key: 'phone', label: 'Утас', value: (s) => `${s.phone ?? ''} ${phoneText(s.phone ?? '')}`, render: (s) => dtCell.phone(s.phone) },
       { key: 'merchant_tin', label: 'ТТД', render: (s) => (s.merchant_tin ? dtCell.mono(s.merchant_tin) : '<span class="ink-stop">алга</span>'), phone: false },
       { key: 'commission_pct', label: 'Шимтгэл', align: 'end', numeric: true, render: (s) => (s.state === 'declined' ? dtCell.none() : `<span class="dt-num">${s.commission_pct}%</span>`) },
       {
@@ -4186,116 +4474,102 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
   view.replaceChildren();
   window.scrollTo(0, 0);
   const [tone, word] = supplierState(s);
-  const h = head(`${esc(s.name)} ${dtCell.pill(tone, word)}`, `${tel(s.phone)} · ${esc(s.pickup_address)}`);
-
-  // What may be done to it: at the top right, each a popup.
-  if (s.state === 'applied' && runs) {
-    headActs(h, button('Татгалзах', () => declineSupplier(s, again), 'data-a="decline"'), button('Батлах', () => approveSupplier(s, again), 'data-v="primary" data-a="approve"'));
-  }
-  if (s.state === 'contracted' && runs) {
-    headActs(
-      h,
-      button(
-        s.active ? 'Түр зогсоох' : 'Идэвхжүүлэх',
-        () =>
-          confirmPopup({
-            title: s.active ? 'Нийлүүлэгчийг түр зогсоох' : 'Нийлүүлэгчийг идэвхжүүлэх',
-            text: s.active ? `<b>${esc(s.name)}</b>-ийн зарууд зочдод харагдахаа болино. Авсан захиалга хэвээр үргэлжилнэ.` : `<b>${esc(s.name)}</b>-ийн зарууд дахин зочдод харагдана.`,
-            ok: s.active ? 'Түр зогсоох' : 'Идэвхжүүлэх',
-            danger: s.active,
-            reason: { label: s.active ? 'Шалтгаан' : 'Тэмдэглэл', placeholder: 'Бүртгэлд үлдэнэ', required: s.active },
-            onConfirm: async (note) => {
-              await ops(`/v1/ops/suppliers/${s.id}/active`, { method: 'POST', body: { active: !s.active, note } });
-              toast(s.active ? 'Түр зогсоолоо.' : 'Идэвхжлээ.', 'good');
-              await again();
-            },
-          }),
-        `data-a="active"${s.active ? '' : ' data-v="primary"'}`,
-      ),
-    );
-  }
   backTo(view, from);
-  view.append(h);
+  view.append(head(`${esc(s.name)} ${dtCell.pill(tone, word)}`, `${tel(s.phone)} · ${esc(s.pickup_address)}`));
 
-  const terms = el(`
-    <section class="section"><h2 class="section-label">Гэрээ, данс</h2>
-      <div class="card"><div class="facts">
+  /** Off the guests' pages, or back on them: a reason for the record either way. */
+  const toggle = () =>
+    confirmPopup({
+      title: s.active ? 'Нийлүүлэгчийг түр зогсоох' : 'Нийлүүлэгчийг идэвхжүүлэх',
+      text: s.active ? `<b>${esc(s.name)}</b>-ийн зарууд зочдод харагдахаа болино. Авсан захиалга хэвээр үргэлжилнэ.` : `<b>${esc(s.name)}</b>-ийн зарууд дахин зочдод харагдана.`,
+      ok: s.active ? 'Түр зогсоох' : 'Идэвхжүүлэх',
+      danger: s.active,
+      reason: { label: s.active ? 'Шалтгаан' : 'Тэмдэглэл', placeholder: 'Бүртгэлд үлдэнэ', required: s.active },
+      onConfirm: async (note) => {
+        await ops(`/v1/ops/suppliers/${s.id}/active`, { method: 'POST', body: { active: !s.active, note } });
+        toast(s.active ? 'Түр зогсоолоо.' : 'Идэвхжлээ.', 'good');
+        await again();
+      },
+    });
+  /** A changed account pays out nothing until somebody holds it up against the contract. */
+  const verifyBank = () =>
+    confirmPopup({
+      title: 'Данс баталгаажуулах',
+      text: `<b>${esc(s.bank_name ?? '')} <span class="mono">${esc(s.bank_account)}</span></b> · ${esc(s.bank_holder ?? '')}<br>Гэрээний данстай таарч байна уу? Баталгаажсаны дараа олголт энэ данс руу явна.`,
+      ok: 'Таарч байна',
+      onConfirm: async () => {
+        await ops(`/v1/ops/suppliers/${s.id}/bank-verify`, { method: 'POST', body: { note: 'гэрээтэй тулгасан' } });
+        toast('Данс баталгаажлаа.', 'good');
+        await again();
+      },
+    });
+  /** The contract's terms: written in once it is signed, corrected here. */
+  const editTerms = () =>
+    popup({
+      title: 'Гэрээ, данс',
+      sub: esc(s.name),
+      width: 600,
+      fields: [
+        { name: 'commission_pct', label: 'Шимтгэл, %', inputmode: 'decimal', value: s.commission_pct },
+        { name: 'tin', label: 'ТТД', inputmode: 'numeric', placeholder: '7–14 орон', value: s.merchant_tin ?? '' },
+        { name: 'bank_name', label: 'Банк', value: s.bank_name ?? '' },
+        bankField(s.bank_account, '6–20 оронтой дугаар, эсвэл MN-ээр эхэлсэн IBAN. Данс өөрчлөгдвөл дахин баталгаажуулах хүртэл олголт гарахгүй.'),
+        { name: 'bank_holder', label: 'Данс эзэмшигч', value: s.bank_holder ?? '', wide: true },
+      ],
+      onSubmit: async (v, p) => {
+        if (v.bank_account && !bankOk(v.bank_account)) {
+          p.fieldError('bank_account', BANK_SAID);
+          return false;
+        }
+        const body = { tin: v.tin, bank_name: v.bank_name, bank_account: v.bank_account, bank_holder: v.bank_holder };
+        if (v.commission_pct !== '') body.commission_pct = Number(v.commission_pct);
+        await ops(`/v1/ops/suppliers/${s.id}`, { method: 'PATCH', body });
+        toast('Хадгалагдлаа.', 'good');
+        await again();
+      },
+    });
+
+  // The file's shape, as a guest's or an order's: the contract's facts across, its stall and its orders down the
+  // left, and on the right what may be done to it and the files around it.
+  const page = el(`
+    <div class="detail">
+      <div class="card detail-facts"><div class="facts">
         <div><span class="lab">${s.state === 'applied' ? 'Хүсэлт ирсэн' : s.state === 'declined' ? 'Татгалзсан' : 'Гэрээ'}</span><b class="nowrap">${when(s.state === 'applied' ? s.applied_at : s.state === 'declined' ? s.decided_at : s.contracted_at)}</b>${s.state === 'declined' && s.decline_reason ? `<span class="fact-sub">${esc(s.decline_reason)}</span>` : ''}</div>
         <div><span class="lab">Шимтгэл</span><b>${s.state === 'declined' ? '—' : `${s.commission_pct}%`}</b><span class="fact-sub">хүлээлгэн өгсөн захиалгаас</span></div>
         <div><span class="lab">ТТД</span><b class="mono">${s.merchant_tin ? esc(s.merchant_tin) : '—'}</b><span class="fact-sub">${s.merchant_tin ? 'е-баримт гарна' : '<span class="ink-stop">е-баримт гарахгүй</span>'}</span></div>
         <div><span class="lab">Олголт очих данс</span><b>${s.bank_account ? `${esc(s.bank_name ?? '')} <span class="mono">${esc(s.bank_account)}</span>` : '—'}</b><span class="fact-sub">${s.bank_account ? `${esc(s.bank_holder ?? '')} ${s.bank_verified ? dtCell.pill('verified', 'баталгаажсан') : dtCell.pill('warn', 'баталгаажаагүй')}` : 'данс оруулаагүй'}</span></div>
       </div></div>
-    </section>`);
-  const label = terms.querySelector('.section-label');
-  const tools = el('<span class="label-acts"></span>');
-  if (s.state === 'contracted' && s.bank_account && !s.bank_verified && signs) {
-    // A changed account pays out nothing until somebody holds it up against the contract.
-    tools.append(
-      button(
-        'Данс баталгаажуулах',
-        () =>
-          confirmPopup({
-            title: 'Данс баталгаажуулах',
-            text: `<b>${esc(s.bank_name ?? '')} <span class="mono">${esc(s.bank_account)}</span></b> · ${esc(s.bank_holder ?? '')}<br>Гэрээний данстай таарч байна уу? Баталгаажсаны дараа олголт энэ данс руу явна.`,
-            ok: 'Таарч байна',
-            onConfirm: async () => {
-              await ops(`/v1/ops/suppliers/${s.id}/bank-verify`, { method: 'POST', body: { note: 'гэрээтэй тулгасан' } });
-              toast('Данс баталгаажлаа.', 'good');
-              await again();
-            },
-          }),
-        'data-v="primary" data-size="sm" data-a="bank-verify"',
-      ),
-    );
-  }
-  if (s.state !== 'declined' && signs) {
-    // The contract's terms: written in once it is signed, corrected here.
-    tools.append(
-      button(
-        'Засах',
-        () =>
-          popup({
-            title: 'Гэрээ, данс',
-            sub: esc(s.name),
-            width: 600,
-            fields: [
-              { name: 'commission_pct', label: 'Шимтгэл, %', inputmode: 'decimal', value: s.commission_pct },
-              { name: 'tin', label: 'ТТД', inputmode: 'numeric', placeholder: '7–14 орон', value: s.merchant_tin ?? '' },
-              { name: 'bank_name', label: 'Банк', value: s.bank_name ?? '' },
-              { name: 'bank_account', label: 'Данс', inputmode: 'numeric', value: s.bank_account ?? '', hint: 'Данс өөрчлөгдвөл дахин баталгаажуулах хүртэл олголт гарахгүй.' },
-              { name: 'bank_holder', label: 'Данс эзэмшигч', value: s.bank_holder ?? '', wide: true },
-            ],
-            onSubmit: async (v) => {
-              const body = { tin: v.tin, bank_name: v.bank_name, bank_account: v.bank_account, bank_holder: v.bank_holder };
-              if (v.commission_pct !== '') body.commission_pct = Number(v.commission_pct);
-              await ops(`/v1/ops/suppliers/${s.id}`, { method: 'PATCH', body });
-              toast('Хадгалагдлаа.', 'good');
-              await again();
-            },
-          }),
-        'data-size="sm" data-a="terms"',
-      ),
-    );
-  }
-  if (tools.childElementCount) label.append(tools);
-  view.append(terms);
-  if (s.about) view.append(el(`<section class="section"><h2 class="section-label">Тухай</h2><div class="card"><div class="card-body">${esc(s.about)}</div></div></section>`));
-  // The business this supplier is the idesh side of: its people and their roles are kept there.
-  if (s.org_id && hasPage('orgs')) {
-    const link = el(`
-      <section class="section"><h2 class="section-label">Холбоотой</h2>
-        <div class="card" data-rows>
-          <a class="row" href="#desk/orgs" data-chev data-go-org>
-            <span class="main"><span class="title">Байгууллагын хуудас</span><span class="sub">Хүмүүс, тэдний үүрэг, бүртгэлийн мэдээлэл</span></span>
-          </a>
-        </div>
-      </section>`);
-    link.querySelector('a').addEventListener('click', (e) => {
-      e.preventDefault();
-      void openOrgAccess(s.org_id, { label: s.name, go: () => openSupplier(id, from) });
-    });
-    view.append(link);
-  }
+      <aside class="detail-rail"></aside>
+      <div class="detail-main"></div>
+    </div>`);
+  const rail = page.querySelector('.detail-rail');
+  const main = page.querySelector('.detail-main');
+  const asked = s.state === 'applied';
+  const contracted = s.state === 'contracted';
+  const unverified = contracted && Boolean(s.bank_account) && !s.bank_verified && signs;
+  rail.append(
+    railActs(
+      [
+        asked && runs && { label: 'Батлах', attrs: 'data-v="primary" data-a="approve"', onClick: () => approveSupplier(s, again), hint: 'Хүсэлт гаргасан хүн эзэн нь болж, өөрийн бүртгэлээр зараа тавьж эхэлнэ.' },
+        asked && runs && { label: 'Татгалзах', attrs: 'data-a="decline"', onClick: () => declineSupplier(s, again), hint: 'Шалтгааныг нь хүсэлт гаргагч харж, засаад дахин хүсэж болно.' },
+        unverified && { label: 'Данс баталгаажуулах', attrs: 'data-v="primary" data-a="bank-verify"', onClick: verifyBank, hint: 'Гэрээний данстай тулгасны дараа олголт энэ данс руу явна.' },
+        s.state !== 'declined' && signs && { label: 'Гэрээ, данс засах', attrs: 'data-a="terms"', onClick: editTerms, hint: 'Шимтгэл, ТТД, олголт очих данс.' },
+        'sep',
+        contracted && runs && {
+          label: s.active ? 'Түр зогсоох' : 'Идэвхжүүлэх',
+          attrs: `data-a="active"${!s.active && !unverified ? ' data-v="primary"' : ''}`,
+          onClick: toggle,
+          hint: s.active ? 'Зарууд нь зочдод харагдахаа болино; авсан захиалга хэвээр үргэлжилнэ.' : 'Зарууд нь дахин зочдод харагдана.',
+        },
+      ],
+      s.state === 'declined' ? 'Татгалзсан хүсэлт — хийх үйлдэл алга.' : 'Нийлүүлэгчид үйлдэл хийх нь таны үүрэгт нээлттэй биш.',
+    ),
+  );
+  // The business this supplier is the идэш side of: its people and their roles are kept there.
+  const links = related([s.org_id && hasPage('orgs') ? { label: 'Байгууллагын хуудас', sub: 'Хүмүүс, тэдний үүрэг, бүртгэлийн мэдээлэл', go: () => openOrgAccess(s.org_id, here) } : null]);
+  if (links) rail.append(links);
+  if (s.about) main.append(el(`<section class="section"><h2 class="section-label">Тухай</h2><div class="card"><div class="card-body">${esc(s.about)}</div></div></section>`));
+  view.append(page);
 
   if (s.state === 'contracted') {
     const listings = dataTable({
@@ -4335,7 +4609,7 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
     listings.el.id = 'listings';
     const section = el('<section class="section"><h2 class="section-label">Зарууд</h2></section>');
     section.append(listings.el);
-    view.append(section);
+    main.append(section);
 
     // What it sold: its orders, newest first, each opening its file — the same list the orders page asks for, for this supplier.
     let orders = null;
@@ -4343,7 +4617,7 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
       orders = dataTable({
         columns: [
           { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(`<span class="mono">№${esc(o.code)}</span>`, esc(`${o.title} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}`)) },
-          { key: 'guest', label: 'Зочин', value: (o) => `${o.guest ?? ''} ${o.guest_phone ?? ''}`, render: (o) => dtCell.twoHtml(esc(o.guest ?? 'зочин'), o.guest_phone ? `<span class="mono">${esc(o.guest_phone)}</span>` : '') },
+          { key: 'guest', label: 'Зочин', value: (o) => `${o.guest ?? ''} ${o.guest_phone ?? ''}`, render: (o) => dtCell.twoHtml(esc(o.guest ?? 'зочин'), o.guest_phone ? dtCell.phone(o.guest_phone) : '') },
           { key: 'receive_on', label: 'Өдөр', render: (o) => dtCell.twoHtml(`<span class="mono nowrap">${dayLabel(o.receive_on)}</span>`, o.receive === 'delivery' ? 'хүргэлт' : 'өөрөө авна'), phone: false },
           { key: 'state', label: 'Төлөв', value: (o) => STATE_WORD[o.state] ?? o.state, render: (o) => dtCell.pill(o.state, STATE_WORD[o.state] ?? o.state) },
           { key: 'total_mnt', label: 'Дүн', align: 'end', numeric: true, render: (o) => dtCell.money(o.total_mnt) },
@@ -4358,7 +4632,7 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
       orders.el.id = 'supplier-orders';
       const box = el('<section class="section"><h2 class="section-label">Захиалгууд</h2></section>');
       box.append(orders.el);
-      view.append(box);
+      main.append(box);
     }
 
     // What Basu owes it: the payouts the desk already holds, when there are any.
@@ -4366,7 +4640,7 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
     if (payouts.length) {
       const box = el('<section class="section"><h2 class="section-label">Олголт</h2></section>');
       box.append(settlementTable(payouts, false).el);
-      view.append(box);
+      main.append(box);
     }
 
     try {
@@ -4670,7 +4944,7 @@ const TARGET_WORD = {
 function auditWho(a) {
   const line = (text) => String(text ?? '').replace(/\s+/g, ' ').trim();
   const name = a.account ? line(a.account.name) : '';
-  const contact = a.account ? line(a.account.email ?? a.account.phone) : '';
+  const contact = a.account ? line(a.account.email ?? phoneText(a.account.phone)) : '';
   const label = a.session ? line(a.session.label) : '';
   const iso = a.session?.signed_in_at;
   const day = iso && new Date(iso);
@@ -4697,7 +4971,7 @@ async function renderAudit(view) {
         label: 'Хэн',
         sortValue: (a) => a.who.replace(/^ops:/, ''),
         // Beside the name, the search finds the account, the device, and the session by its id.
-        value: (a) => [a.who.replace(/^ops:/, ''), a.account?.name, a.account?.email, a.account?.phone, a.session?.label, a.session?.id].filter(Boolean).join(' '),
+        value: (a) => [a.who.replace(/^ops:/, ''), a.account?.name, a.account?.email, a.account?.phone, a.account?.phone && phoneText(a.account.phone), a.session?.label, a.session?.id].filter(Boolean).join(' '),
         render: auditWho,
       },
       { key: 'action', label: 'Үйлдэл', value: (a) => ACTION[a.action] ?? a.action, render: (a) => `<b>${ACTION[a.action] ?? esc(a.action)}</b>` },
@@ -4759,8 +5033,8 @@ async function renderMembers(view) {
                 search: async (q) =>
                   (await ops(`/v1/ops/people?q=${encodeURIComponent(q)}`)).people.map((p) => ({
                     value: p.id,
-                    title: p.email || p.name || p.phone || 'Нэргүй',
-                    sub: [p.email ? p.name : null, p.email || p.name ? p.phone : null].filter(Boolean).join(' · '),
+                    title: p.email || p.name || (p.phone && phoneText(p.phone)) || 'Нэргүй',
+                    sub: [p.email ? p.name : null, (p.email || p.name) && p.phone ? phoneText(p.phone) : null].filter(Boolean).join(' · '),
                     flag: p.phone && !p.phone_verified ? 'баталгаагүй' : null,
                     note: p.member ? (p.member.active ? `Гишүүн · ${roleNames.get(p.member.role) ?? p.member.role}` : 'Хаасан гишүүн') : '',
                     // Somebody at the desk already has a seat to change in the table, not a second one.
@@ -4791,7 +5065,7 @@ async function renderMembers(view) {
         key: 'contact',
         label: 'Утас, имэйл',
         value: (m) => `${m.phone ?? ''} ${m.email ?? ''}`,
-        render: (m) => dtCell.twoHtml(m.phone ? `<span class="mono">${esc(m.phone)}</span>` : esc(m.email ?? '—'), m.phone && m.email ? esc(m.email) : ''),
+        render: (m) => dtCell.twoHtml(m.phone ? dtCell.phone(m.phone) : esc(m.email ?? '—'), m.phone && m.email ? esc(m.email) : ''),
       },
       { key: 'role', label: 'Үүрэг', value: (m) => roleNames.get(m.role) ?? m.role },
       { key: 'state', label: 'Төлөв', value: (m) => memberState(m)[1], render: (m) => dtCell.pill(...memberState(m)) },
@@ -4806,7 +5080,7 @@ async function renderMembers(view) {
           () => {
             void popup({
               title: 'Үүрэг солих',
-              sub: `${esc(m.name)} · ${esc(m.email ?? m.phone ?? '')}`,
+              sub: `${esc(m.name)} · ${esc(m.email ?? phoneText(m.phone ?? ''))}`,
               width: 520,
               id: 'member-role',
               fields: [{ name: 'role', label: 'Үүрэг', type: 'select', options: roleOptions, value: m.role, wide: true, hint: roleList.find((r) => r.key === m.role)?.description || ' ' }],
@@ -4829,7 +5103,7 @@ async function renderMembers(view) {
               // Off closes the desk to them at once, and only the desk: an open dashboard drops to their own
               // corner at its next step, and their account and sign-ins are theirs.
               text: m.active
-                ? `<b>${esc(m.name)}</b> ops-ийн хэсэгт шууд орохоо болино — нээлттэй байгаа ops хэсэг нь ч дараагийн алхамд хаагдана. Бүртгэл нь хэвээр, Basu-гийн вэб, апп-д нэвтэрсэн хэвээр үлдэнэ. Дараа нь дахин нээж болно.`
+                ? `<b>${esc(m.name)}</b> Basu-гийн ширээнд шууд орохоо болино — нээлттэй байгаа ширээ нь ч дараагийн алхамд хаагдана. Бүртгэл нь хэвээр, Basu-гийн вэб, апп-д нэвтэрсэн хэвээр үлдэнэ. Дараа нь дахин нээж болно.`
                 : `<b>${esc(m.name)}</b> ${esc(roleNames.get(m.role) ?? m.role)} үүргээрээ ширээнд дахин орно.`,
               ok: m.active ? 'Хаах' : 'Нээх',
               danger: m.active,
@@ -4891,7 +5165,9 @@ let bootedAs = null;
  * or the one used last.
  */
 async function boot() {
-  root.replaceChildren();
+  // The shape of what is coming, drawn before anything is asked: the frame for somebody signed in on this
+  // browser, the door's card for anybody else — never a blank page while the first answer is on its way.
+  root.replaceChildren(token() ? frameSkeleton() : doorSkeleton());
   // Back from Google, the code in the address is claimed first, and the
   // session it becomes is this browser's person, whoever was signed in here
   // before (api.js, authReturn).
@@ -4902,11 +5178,14 @@ async function boot() {
     showToken();
     return;
   }
+  if (!root.querySelector(':scope > .boot')) root.replaceChildren(frameSkeleton());
   try {
     access = await ops('/v1/access');
   } catch (error) {
     if (error.status === 401 || error.status === 503) return signedOut(error);
-    toast(error.message, 'bad');
+    // The desk wants a fresh sign-in: its door is up already (`refused`).
+    if (error.code === 'SIGN_IN_AGAIN') return;
+    bootFailed(error);
     return;
   }
   // Somebody is signed in and the server took it: whatever the door last said is past.

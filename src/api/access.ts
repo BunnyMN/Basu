@@ -80,6 +80,9 @@ function bearer(request: FastifyRequest): string | undefined {
 const kindWords = (k: { supplier: boolean; restaurant: boolean }) =>
   [k.supplier && 'Нийлүүлэгч', k.restaurant && 'Ресторан'].filter(Boolean).join(', ');
 
+/** A Mongolian number the way people read it, «+976 9911 2233», where it stands for a name; anything else as it is. */
+const phoneShown = (phone: string) => phone.replace(/^\+976(\d{4})(\d{4})$/, '+976 $1 $2');
+
 /**
  * The table of who may do what: the pages of a scope as Basu laid them out,
  * each with what can be done on it, and the roles with what each opens.
@@ -133,7 +136,7 @@ export async function registerAccessRoutes(app: FastifyInstance, ctx: Ctx): Prom
         id: 'desk',
         kind: 'desk',
         name: 'Basu',
-        sub: `Ops · ${seat.roleName}`,
+        sub: `Ширээ · ${seat.roleName}`,
         role: seat.role,
         role_label: seat.roleName,
         seat: { id: seat.id, name: seat.name },
@@ -167,7 +170,7 @@ export async function registerAccessRoutes(app: FastifyInstance, ctx: Ctx): Prom
     workspaces.unshift({
       id: 'me',
       kind: 'me',
-      name: name ?? profile?.email ?? profile?.phone ?? 'Миний бүртгэл',
+      name: name ?? profile?.email ?? (profile?.phone ? phoneShown(profile.phone) : null) ?? 'Миний бүртгэл',
       sub: 'Миний бүртгэл',
       role: null,
       role_label: null,

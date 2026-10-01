@@ -2619,8 +2619,8 @@ describe('нийлүүлэгч болох', () => {
     const row = [...desk.window.document.querySelectorAll('#applied tr[data-supplier]')].find((r) =>
       r.textContent?.includes('Түмэн-Өлзий'),
     )!;
-    // The proved phone travels with the application, so ops can ring.
-    expect(row.textContent).toContain('+97688010011');
+    // The proved phone travels with the application, so ops can ring — read as a number is read.
+    expect(row.textContent).toContain('+976 8801 0011');
     (row.querySelector('[data-a="approve"]') as HTMLElement).click();
     await answerPopup(desk);
     await until(desk, 'the row to move', (d) =>
@@ -2649,6 +2649,24 @@ describe('нийлүүлэгч болох', () => {
     expect(desk.window.document.querySelector('#applied tr[data-supplier]')?.textContent).toContain('Завхан');
   });
 
+  it('says a payout account the server would refuse under its own field, before anything is sent', async () => {
+    const desk = await openPage('ops.html', '', undefined, device());
+    await until(desk, 'the secret prefilled', (d) => Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value));
+    clickText(desk, '.pair button', 'Нэвтрэх');
+    await opsTab(desk, 'suppliers');
+    await until(desk, 'the way to register one', (d) => Boolean(d.querySelector('#add-supplier')));
+    const count = async () => (await getPool().query<{ n: number }>('SELECT count(*)::int AS n FROM idesh.supplier')).rows[0]!.n;
+    const before = await count();
+    (desk.window.document.querySelector('#add-supplier') as HTMLElement).click();
+    // Neither an IBAN (MN and 18 digits) nor a plain 6–20 digit number.
+    await answerPopup(desk, { name: 'Дансны шалгалт · тест', phone: '9911 0099', address: 'Нарантуул', bank_name: 'Хаан банк', bank_account: 'MN12 3456' });
+    const field = () => desk.window.document.querySelector('#new-supplier [name="bank_account"]');
+    await until(desk, 'the word under the account', () => field()?.getAttribute('aria-invalid') === 'true');
+    expect(field()!.closest('.field')?.querySelector('.help[data-error]')?.textContent).toBe('IBAN бол MN-ээр эхэлсэн 20 тэмдэгт, эсвэл 6–20 оронтой дансны дугаар бичнэ үү.');
+    expect(desk.window.document.querySelector('#new-supplier[data-open]')).not.toBeNull();
+    expect(await count()).toBe(before);
+  });
+
   it('opens on the whole house: what needs somebody, what is held, what the day brought', async () => {
     const desk = await openPage('ops.html', '', undefined, device());
     await until(desk, 'the secret prefilled', (d) =>
@@ -2661,7 +2679,7 @@ describe('нийлүүлэгч болох', () => {
     expect(doc.querySelector('.tabs .mod .t')?.textContent).toBe('Платформ');
     // The seeded application is waiting, and the page says so before anything else.
     expect([...doc.querySelectorAll('#alerts .alert')].map((a) => a.textContent)).toEqual(
-      expect.arrayContaining([expect.stringContaining('нийлүүлэгчийн өргөдөл')]),
+      expect.arrayContaining([expect.stringContaining('нийлүүлэгчийн хүсэлт')]),
     );
     expect(doc.querySelector('#now')?.textContent).toContain('Зочдын түрийвч');
     expect(doc.querySelector('#cross')?.textContent).toContain('Борлуулалт');
@@ -2683,11 +2701,13 @@ describe('нийлүүлэгч болох', () => {
     q.dispatchEvent(new desk.window.Event('input', { bubbles: true }));
     await until(desk, 'one guest', (d) => d.querySelectorAll('#guests tr[data-guest]').length === 1);
     const row = desk.window.document.querySelector('#guests tr[data-guest]')!;
-    expect(row.textContent).toContain('+97699001122');
+    // The number reads the way people read it, in the row and on the file; the link still dials it whole.
+    expect(row.textContent).toContain('+976 9900 1122');
     (row as HTMLElement).click();
     await until(desk, 'the file', (d) => Boolean(d.querySelector('.detail .facts')));
     const doc = desk.window.document;
-    expect(doc.querySelector('.page-head')?.textContent).toContain('+97699001122');
+    expect(doc.querySelector('.page-head')?.textContent).toContain('+976 9900 1122');
+    expect(doc.querySelector('.page-head a.tel')?.getAttribute('href')).toBe('tel:+97699001122');
     expect(doc.querySelector('.facts')?.textContent).toContain('Түрийвч');
     expect([...doc.querySelectorAll('.section > h2')].map((h) => h.textContent)).toEqual(
       expect.arrayContaining(['Түрийвчийн хуулга', 'Хоолны захиалга', 'Идэшний захиалга', 'Мэдэгдэл']),
@@ -2755,7 +2775,7 @@ describe('нийлүүлэгч болох', () => {
 
     await opsTab(desk, 'system');
     await until(desk, 'the machine', (d) => d.querySelectorAll('#integrations [data-integration]').length === 4);
-    expect(doc.querySelector('#integrations .kpi')?.textContent).toContain('Scheduler');
+    expect(doc.querySelector('#integrations .kpi')?.textContent).toContain('Хуваарьлагч');
     // Read on the page; changed in a popup.
     expect(doc.querySelector('#settings [data-key="desk_banner"]')).not.toBeNull();
     expect(doc.querySelector('#settings input')).toBeNull();
@@ -2912,7 +2932,7 @@ describe('who sees what', () => {
     await until(desk, 'the question', (d) => Boolean(d.querySelector('.sheet.popup[data-open]')));
     const asked = [...doc.querySelectorAll('.sheet.popup[data-open]')].pop()!;
     expect(asked.textContent).toContain('нэвтэрсэн хэвээр үлдэнэ');
-    expect(asked.textContent).toContain('нээлттэй байгаа ops хэсэг нь ч дараагийн алхамд хаагдана');
+    expect(asked.textContent).toContain('нээлттэй байгаа ширээ нь ч дараагийн алхамд хаагдана');
     // The dashboard itself stays open for them: it drops to their own corner.
     expect(asked.textContent).not.toMatch(/нэвтрэлт нь хаагдана|dashboard нь ч/);
     (asked.querySelector('[data-submit]') as HTMLElement).click();
@@ -3424,10 +3444,10 @@ describe('the desk’s record', () => {
     await until(dash, 'their line in the record', (d) => Boolean(theirs(d)));
     const who = theirs(dash.window.document)!.querySelector('.dt-two')!;
     // The account by its number, the device by the name it gave — shown, never run — and when it signed in.
-    expect(who.querySelector('small')?.textContent).toMatch(/^\+97688039001 · <img src=x onerror="window\.__owned=1"> · \d{1,2}\/\d{1,2} \d{2}:\d{2}-д нэвтэрсэн$/);
+    expect(who.querySelector('small')?.textContent).toMatch(/^\+976 8803 9001 · <img src=x onerror="window\.__owned=1"> · \d{1,2}\/\d{1,2} \d{2}:\d{2}-д нэвтэрсэн$/);
     expect(dash.window.document.querySelector('#audit img')).toBeNull();
     expect((dash.window as unknown as { __owned?: number }).__owned).toBeUndefined();
-    expect(who.getAttribute('title')).toMatch(/^Бүртгэл: Түүхч, \+97688039001\nНэвтрэлт: <img src=x onerror="window.__owned=1">, .+-д нэвтэрсэн$/);
+    expect(who.getAttribute('title')).toMatch(/^Бүртгэл: Түүхч, \+976 8803 9001\nНэвтрэлт: <img src=x onerror="window.__owned=1">, .+-д нэвтэрсэн$/);
 
     // The seat was given with the demo's shared secret: nobody's account, so the name alone.
     const demo = [...dash.window.document.querySelectorAll('#audit tr.dt-row .dt-two')].find((c) => c.querySelector('b')?.textContent === 'Демо');
@@ -3489,7 +3509,7 @@ describe('the desk’s record', () => {
     expect(rows.map((r) => r.querySelector('td[data-label="Үйлдэл"]')?.textContent)).toEqual(['Нийлүүлэгч бүртгэсэн', 'Нийлүүлэгч бүртгэсэн']);
     // One account, the same device name, and two sign-ins three hours apart — read without hovering.
     const lines = rows.map((r) => r.querySelector('.dt-two small')?.textContent ?? '');
-    for (const line of lines) expect(line).toMatch(/^\+97688039011 · Ops · \d{1,2}\/\d{1,2} \d{2}:\d{2}-д нэвтэрсэн$/);
+    for (const line of lines) expect(line).toMatch(/^\+976 8803 9011 · Ops · \d{1,2}\/\d{1,2} \d{2}:\d{2}-д нэвтэрсэн$/);
     expect(new Set(lines).size).toBe(2);
   });
 
@@ -3507,9 +3527,9 @@ describe('the desk’s record', () => {
     // Two lines, the account's and the session's, each saying all it was given on one line.
     const hover = who.getAttribute('title')!.split('\n');
     expect(hover).toHaveLength(2);
-    expect(hover[0]).toBe('Бүртгэл: Хуурамч Нэвтрэлт: Оффисын компьютер, +97688039021');
+    expect(hover[0]).toBe('Бүртгэл: Хуурамч Нэвтрэлт: Оффисын компьютер, +976 8803 9021');
     expect(hover[1]).toMatch(/^Нэвтрэлт: Ops Бүртгэл: admin@basu\.mn, .+-д нэвтэрсэн$/);
-    expect(who.querySelector('small')?.textContent).toMatch(/^\+97688039021 · Ops Бүртгэл: admin@basu\.mn · \d{1,2}\/\d{1,2} \d{2}:\d{2}-д нэвтэрсэн$/);
+    expect(who.querySelector('small')?.textContent).toMatch(/^\+976 8803 9021 · Ops Бүртгэл: admin@basu\.mn · \d{1,2}\/\d{1,2} \d{2}:\d{2}-д нэвтэрсэн$/);
   });
 });
 
@@ -3637,7 +3657,7 @@ describe('a stranger’s words render as text, never as markup', () => {
   }
 
   it('draws an ops member’s name in an order’s story as text, not the markup they signed up with', async () => {
-    // The proven path: the story reads «ops · <name>», and the name is whatever
+    // The proven path: the story reads «Basu · <name>», and the name is whatever
     // the account chose. Left as markup it would run in the admin's dashboard,
     // with the admin's session, the next time the admin opened the order.
     await ownGuest('+97699007001');
@@ -3728,8 +3748,10 @@ describe('a stranger’s words render as text, never as markup', () => {
       const search = desk.window.document.querySelector('#member-new .popup-pick input[type="search"]') as HTMLInputElement;
       search.value = digits;
       search.dispatchEvent(new desk.window.Event('input', { bubbles: true }));
-      await until(desk, `the row for ${digits}`, (d) => [...d.querySelectorAll('#member-new .popup-pick-row')].some((r) => r.textContent?.includes(digits)));
-      return [...desk.window.document.querySelectorAll('#member-new .popup-pick-row')].find((r) => r.textContent?.includes(digits))!;
+      // The number in the row reads as a number is read: «+976 9900 7021».
+      const shown = `${digits.slice(0, 4)} ${digits.slice(4)}`;
+      await until(desk, `the row for ${digits}`, (d) => [...d.querySelectorAll('#member-new .popup-pick-row')].some((r) => r.textContent?.includes(shown)));
+      return [...desk.window.document.querySelectorAll('#member-new .popup-pick-row')].find((r) => r.textContent?.includes(shown))!;
     };
     expect((await find('99007021')).querySelector('.flag')?.textContent).toBe('баталгаагүй');
     expect((await find('99007022')).querySelector('.flag')).toBeNull();
@@ -3762,7 +3784,7 @@ describe('a stranger’s words render as text, never as markup', () => {
     await until(dash, 'the person found', (d) => Boolean(d.querySelector('#member-add .popup-static')));
     const found = dash.window.document.querySelector('#member-add .popup-static')!;
     expect(found.textContent).toContain('Тогооч Дулмаа');
-    expect(found.textContent).toContain('+97699007032');
+    expect(found.textContent).toContain('+976 9900 7032');
     expect(found.querySelector('.flag')?.textContent).toBe('баталгаагүй');
   });
 
