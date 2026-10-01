@@ -241,7 +241,7 @@
 <div id="root"></div>
 
 <script type="module">
-import { api, store, shell, toast, mnt, money, KIND, IDESH_STATE, dayLabel, dayShort, signInDoors, accountWays, authReturn, popup, dropSession } from '/api.js';
+import { api, store, shell, toast, mnt, money, KIND, IDESH_STATE, dayLabel, dayShort, signInDoors, accountWays, authReturn, popup, dropSession, whatWentWrong } from '/api.js';
 import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -2355,9 +2355,10 @@ async function boot() {
       return;
     }
     if (error.status !== 401) {
-      toast(error.message, 'bad');
+      // The card says it, in Mongolian: a dropped connection or a proxy's
+      // HTML page must never reach the person as the browser's English.
       unpinned();
-      root.replaceChildren(cannotReach(error.message));
+      root.replaceChildren(cannotReach(whatWentWrong(error)));
       return;
     }
   }
