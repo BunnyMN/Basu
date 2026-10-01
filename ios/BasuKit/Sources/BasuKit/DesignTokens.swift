@@ -159,14 +159,16 @@ public enum BasuFont {
     public static let stage          = sans(12.5, .medium)
     public static let caption        = sans(12, .regular)
 
-    // Mono labels
+    // Labels. Nothing anybody has to read is set under 11 — the web's floor
+    // (docs/design-system.md §2.2) — and words are sans; mono is for the
+    // digits and the short uppercase eyebrows.
     public static let meta           = mono(11.5, .regular)
     public static let timestamp      = mono(11, .regular)
-    public static let sectionLabel   = mono(10, .medium)     // ТҮРИЙВЧ — tracking 0.16em, uppercase
-    public static let sourceLabel    = mono(9.5, .medium)    // ХООЛ — tracking 0.14em
-    public static let appTag         = mono(9.5, .regular)
-    public static let unitLabel      = mono(9, .medium)      // СУУХ — tracking 0.14em
-    public static let channelChip    = mono(9, .medium)      // SMS — tracking 0.12em
+    public static let sectionLabel   = mono(11, .medium)     // ТҮРИЙВЧ — tracking 0.14em, uppercase
+    public static let sourceLabel    = mono(11, .medium)     // ХООЛ — tracking 0.12em
+    public static let appTag         = sans(12, .regular)    // урьдчилж захиал
+    public static let unitLabel      = sans(11, .medium)     // ИРЭХ, АВАХ — uppercase, beside a time
+    public static let channelChip    = mono(11, .medium)     // SMS — tracking 0.12em
 }
 
 public extension Text {
@@ -191,6 +193,8 @@ public enum BasuMetric {
     public static let islandExpanded: CGFloat = 40
     public static let badge: CGFloat       = 8
     public static let switchTrack: CGFloat = 16
+    /// A button, a banner, a chip of money: the web's `--r-ctl`.
+    public static let button: CGFloat      = 10
     public static let chip: CGFloat        = 2
     public static let avatarPlate: CGFloat = 0.28   // 28% of the plate's side
 

@@ -28,12 +28,38 @@ final class Platform {
   private(set) var toppingUp = false
   private(set) var trouble: String?
 
+  /**
+   Whether money can come in at all.
+
+   A production server with no payment key says no to every top-up, and its
+   no ends in a promise («Удахгүй нээгдэнэ») this app does not make. The
+   wallet's own answer says so up front when the server sends `topups_open`;
+   until it does, the first refusal is remembered — for a day, so the
+   amounts come back by themselves once payments open — and the wallet stops
+   offering a door that does not open.
+   */
+  private(set) var topupsOpen: Bool
+
   private let api: API
   private let session: Session
+  private let defaults: UserDefaults
 
-  init(api: API, session: Session) {
+  init(api: API, session: Session, defaults: UserDefaults = .standard) {
+    let key = "wallet.topupsClosedAt.\(api.base.host ?? ""):\(api.base.port ?? 443)"
     self.api = api
     self.session = session
+    self.defaults = defaults
+    closedKey = key
+    topupsOpen = !Self.refusalRemembered(defaults.object(forKey: key) as? Date)
+  }
+
+  /// Per server: a developer's own one takes money that the pilot does not.
+  private let closedKey: String
+
+  /// A refusal younger than a day still stands.
+  nonisolated static func refusalRemembered(_ at: Date?, now: Date = .now) -> Bool {
+    guard let at else { return false }
+    return now.timeIntervalSince(at) < 24 * 60 * 60
   }
 
   var balanceMnt: Int { me?.wallet.balanceMnt ?? wallet.balanceMnt }
@@ -70,8 +96,19 @@ final class Platform {
       wallet = try await api.wallet(token: token)
       walletLoaded = true
       trouble = nil
+      // The server's word, when it gives one, outranks what was remembered.
+      if let open = wallet.topupsOpen { noteTopups(open: open) }
     } catch {
       note(error)
+    }
+  }
+
+  private func noteTopups(open: Bool) {
+    topupsOpen = open
+    if open {
+      defaults.removeObject(forKey: closedKey)
+    } else {
+      defaults.set(Date.now, forKey: closedKey)
     }
   }
 
@@ -92,6 +129,7 @@ final class Platform {
         currency: page.currency,
         lines: wallet.lines + page.lines,
         next: page.next,
+        topupsOpen: page.topupsOpen,
       )
     } catch {
       note(error)
@@ -210,11 +248,11 @@ final class Platform {
 
    The server refuses while the wallet holds money or something is still
    running, and says which in Mongolian — so the refusal is shown rather than
-   guessed at here. Returns whether it went through.
+   guessed at here. Returns nil once it is closed, or that refusal, for the
+   profile to put in front of the person rather than at the foot of a page.
    */
-  @discardableResult
-  func closeAccount() async -> Bool {
-    guard let token = session.token else { return false }
+  func closeAccount() async -> String? {
+    guard let token = session.token else { return nil }
     do {
       try await api.closeAccount(token: token)
       session.signOut()
@@ -223,10 +261,9 @@ final class Platform {
       inbox = .empty
       sessions = []
       trouble = nil
-      return true
+      return nil
     } catch {
-      note(error)
-      return false
+      return (error as? APIError)?.message ?? "Бүртгэлийг хааж чадсангүй. Дахин оролдоно уу."
     }
   }
 
@@ -267,9 +304,15 @@ final class Platform {
         await UIApplication.shared.open(url)
       }
       _ = try await api.settleTopup(started.topupId, token: token)
+      noteTopups(open: true)
       await loadWallet()
       await refresh()
       return true
+    } catch let error as APIError where error.code == "PAYMENTS_CLOSED" {
+      // Not a failure of this tap, and not a thing to try again: the wallet
+      // says plainly that money cannot come in, and stops offering it.
+      noteTopups(open: false)
+      return false
     } catch {
       note(error)
       return false
@@ -301,13 +344,18 @@ final class Platform {
     await refresh()
   }
 
-  func save(displayName: String?, locale: String?) async {
-    guard let token = session.token else { return }
+  /// Returns whether it was kept, so the sheet it came from stays open with
+  /// the refusal rather than closing over it.
+  @discardableResult
+  func save(displayName: String?, locale: String?) async -> Bool {
+    guard let token = session.token else { return false }
     do {
       me = try await api.updateProfile(displayName: displayName, locale: locale, token: token)
       trouble = nil
+      return true
     } catch {
       note(error)
+      return false
     }
   }
 
@@ -344,6 +392,6 @@ final class Platform {
   private func note(_ error: Error) {
     // A screen that left before its answer came has nothing to be told.
     guard !(error is CancellationError) else { return }
-    trouble = (error as? APIError)?.message ?? "Алдаа гарлаа."
+    trouble = (error as? APIError)?.message ?? APIError.fallback
   }
 }

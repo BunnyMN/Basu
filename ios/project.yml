@@ -88,7 +88,7 @@ targets:
         # The order's progress on the lock screen and in the Dynamic Island.
         NSSupportsLiveActivities: true
         # Profile → Тохиргоо: the app lock (AppLock.swift).
-        NSFaceIDUsageDescription: Basu-г таныг л нээдэг байлгахын тулд Face ID ашиглана.
+        NSFaceIDUsageDescription: Basu-г зөвхөн та нээх боломжтой байлгахын тулд Face ID ашиглана.
         # basu://order/{id}, basu://wallet, basu://notifications
         CFBundleURLTypes:
           - CFBundleURLName: mn.basu.app$(BASU_ID_SUFFIX)
@@ -102,9 +102,10 @@ targets:
         # is a web page inside the shell, and its `navigator.geolocation` asks
         # through this string. Foreground only: the bands are reported while
         # the page is up.
+        # One register throughout: «тань», never «чинь».
         NSLocationWhenInUseUsageDescription: >-
-          Хэр ойрхон байгааг тань мэдвэл гал тогоо хоолыг чинь яг таарах цагт
-          нь тавина. Байршлыг зөвхөн захиалга явж байх үед асууна.
+          Хэр ойрхон байгааг тань мэдвэл гал тогоо хоолыг тань яг ирэх цагт тань
+          бэлэн болгоно. Байршлыг зөвхөн захиалга явж байх үед асууна.
         ITSAppUsesNonExemptEncryption: false
         # A developer's override for a debug build on a real phone: the app
         # talks to the pilot unless this says otherwise, and a phone launched

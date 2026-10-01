@@ -56,7 +56,18 @@ enum OrderState: String, Decodable, Sendable, Hashable {
     }
   }
 
-  var word: String { headline?.word ?? rawValue }
+  /// The state's one word, the web launcher's own: the headline's, or — for
+  /// the states the headline names by a time instead — the status sheet's.
+  /// Never the state's name in English.
+  var word: String {
+    if let headline { return headline.word }
+    switch self {
+    case .scheduled: return "Хүлээн авсан"
+    case .armed: return "Хөдлөх цаг"
+    case .cooking: return "Гал дээр"
+    default: return stage.label
+    }
+  }
 }
 
 struct VenueRef: Decodable, Sendable, Hashable {
@@ -87,10 +98,11 @@ struct LiveOrder: Decodable, Sendable, Identifiable, Hashable {
   }
 
   /// The time worth putting in the corner of the card, and what it is called.
+  /// The sitting is when the guest comes — «ирэх»; «суух» read as a riddle.
   var moment: (time: Date, label: String) {
     if let readyAt, state == .fired || state == .cooking { return (readyAt, "бэлэн") }
     if let fireAt, state != .ready, state != .served { return (fireAt, "гал") }
-    return (slotStartsAt, "суух")
+    return (slotStartsAt, "ирэх")
   }
 }
 
@@ -147,12 +159,14 @@ struct LiveIdesh: Decodable, Sendable, Identifiable, Hashable {
   let supplier: VenueRef
   let title: String
   let qty: Int
+  /// `kg` or `whole` — what `qty` counts. Nil from a server that predates it.
+  let unit: String?
   let totalMnt: Int
   let receive: String
   let receiveOnDay: String
 
   enum CodingKeys: String, CodingKey {
-    case id, code, state, supplier, title, qty, receive
+    case id, code, state, supplier, title, qty, unit, receive
     case totalMnt = "total_mnt"
     case receiveOnDay = "receive_on"
   }

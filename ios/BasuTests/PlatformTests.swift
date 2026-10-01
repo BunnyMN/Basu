@@ -171,6 +171,118 @@ struct PlatformTests {
     #expect(message.body.hasPrefix("Таны хоол"))
   }
 
+  @Test func anIdeshMessageNamesItsAppAndOpensItsOrder() throws {
+    let message = try decode(InboxMessage.self, """
+      {
+        "id": "aa11bb22-cc33-4d44-8e55-ff6600112233",
+        "title": "Идэш баталгаажлаа",
+        "body": "Хонины мах · №7001.",
+        "template": "idesh.paid",
+        "subject": "idesh",
+        "subject_id": "o7",
+        "channel": "push",
+        "state": "sent",
+        "at": "2026-09-02T04:14:00.000Z",
+        "read": false
+      }
+      """)
+    // Idesh is the product that is live; its messages were «BASU» and went nowhere.
+    #expect(message.source == "ИДЭШ")
+    #expect(message.destination == .app(id: "idesh", path: "/idesh?order=o7"))
+  }
+
+  @Test func aMessageThatDoesNotSayWhichOrderOpensItsApp() throws {
+    // The server leaves an идэш message's order out today (notify.enqueue
+    // writes only a lunch's); the app it came from still opens.
+    let message = try decode(InboxMessage.self, """
+      {
+        "id": "aa11bb22-cc33-4d44-8e55-ff6600112235",
+        "title": "Идэш баталгаажлаа",
+        "body": "Хонины мах · №7001.",
+        "template": "idesh.paid",
+        "subject": "idesh",
+        "subject_id": null,
+        "channel": "push",
+        "state": "sent",
+        "at": "2026-09-02T04:14:00.000Z",
+        "read": false
+      }
+      """)
+    #expect(message.destination == .app(id: "idesh", path: "/idesh"))
+  }
+
+  @Test func aSupplierHearsAboutTheirCounterNotTheGuestsPage() throws {
+    let message = try decode(InboxMessage.self, """
+      {
+        "id": "aa11bb22-cc33-4d44-8e55-ff6600112234",
+        "title": "Шинэ захиалга",
+        "body": "Шинэ захиалга №7001.",
+        "template": "supplier.order",
+        "subject": "idesh",
+        "subject_id": "o7",
+        "channel": "push",
+        "state": "sent",
+        "at": "2026-09-02T04:14:00.000Z",
+        "read": false
+      }
+      """)
+    #expect(message.source == "НИЙЛҮҮЛЭГЧ")
+    #expect(message.destination == .app(id: "supplier", path: "/supplier"))
+  }
+
+  // MARK: - the statement, said the way people read it
+
+  @Test func aPurchaseIsTitledByWhoItWasWithAndCarriesItsOrderNumber() {
+    let idesh = WalletLine.shown(kind: "purchase", memo: "Идэш · Улаанбаатар махны төв №7001")
+    #expect(idesh == .init(title: "Улаанбаатар махны төв", detail: "Идэш", number: "7001"))
+    let lunch = WalletLine.shown(kind: "purchase", memo: "Хоол · Бөмбөгөр Ресторан №0970")
+    #expect(lunch == .init(title: "Бөмбөгөр Ресторан", detail: "Хоол", number: "0970"))
+    // Only the app's name: the ledger's own word is all there is to say.
+    #expect(WalletLine.shown(kind: "purchase", memo: "Хоол") == .init(title: "Захиалга", detail: "Хоол", number: nil))
+  }
+
+  @Test func aTopUpSaysQPayNotBasuAndARefundKeepsItsWordFirst() {
+    #expect(WalletLine.shown(kind: "topup", memo: nil) == .init(title: "Цэнэглэлт", detail: "QPay", number: nil))
+    // Older top-ups wrote the provider in lower case; the line is the same.
+    #expect(WalletLine.shown(kind: "topup", memo: "qpay").detail == "QPay")
+    let refund = WalletLine.shown(kind: "refund", memo: "Хоол · Ресторан татгалзсан")
+    #expect(refund == .init(title: "Буцаалт", detail: "Хоол · Ресторан татгалзсан", number: nil))
+    let returned = WalletLine.shown(kind: "refund", memo: "Идэш · Буцаалт №7001")
+    #expect(returned == .init(title: "Буцаалт", detail: "Идэш", number: "7001"))
+  }
+
+  @Test func aMemoWithMoreAfterTheNumberKeepsIt() {
+    let paid = WalletLine.shown(kind: "accrual", memo: "Идэш · Олголт №7001 · Хаан банк")
+    #expect(paid == .init(title: "Олголт", detail: "Идэш · Хаан банк", number: "7001"))
+    // No memo at all is the platform's own.
+    #expect(WalletLine.shown(kind: "promotion", memo: nil) == .init(title: "Урамшуулал", detail: "Basu", number: nil))
+  }
+
+  // MARK: - what the server says it can do
+
+  @Test func smsIsOnlyWhereTheServerSaysSoAndAnOlderServerHasNone() throws {
+    let pilot = try decode(AuthMethods.self, #"{"password":true,"email":true,"google":true,"apple":true,"sms":false}"#)
+    #expect(pilot.sms == false)
+    let older = try decode(AuthMethods.self, #"{"password":true,"email":false,"google":false,"apple":true}"#)
+    #expect(older.sms == nil)
+    #expect(AuthMethods.unknown.sms == false)
+  }
+
+  @Test func theWalletMaySayWhetherMoneyCanComeIn() throws {
+    let silent = try decode(WalletStatement.self, #"{"balance_mnt":0,"currency":"MNT","next":null,"lines":[]}"#)
+    #expect(silent.topupsOpen == nil)
+    let closed = try decode(WalletStatement.self, #"{"balance_mnt":0,"currency":"MNT","next":null,"lines":[],"topups_open":false}"#)
+    #expect(closed.topupsOpen == false)
+  }
+
+  @Test func aRefusedTopUpIsRememberedForADayAndNoLonger() {
+    let refused = Date(timeIntervalSince1970: 1_000_000)
+    #expect(Platform.refusalRemembered(refused, now: refused.addingTimeInterval(60)))
+    #expect(Platform.refusalRemembered(refused, now: refused.addingTimeInterval(23 * 3600)))
+    #expect(!Platform.refusalRemembered(refused, now: refused.addingTimeInterval(25 * 3600)))
+    #expect(!Platform.refusalRemembered(nil))
+  }
+
   @Test func preferencesDefaultToTransactionalOnlyWhenNothingIsSaved() {
     #expect(NotifyPreferences.default.push)
     #expect(NotifyPreferences.default.sms)

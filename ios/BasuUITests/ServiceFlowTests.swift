@@ -106,7 +106,7 @@ final class ServiceFlowTests: XCTestCase {
     // Signed in, on the launcher; signed out, on the way in. Either way the
     // first screen says so.
     XCTAssertTrue(
-      app.staticTexts["Серверт холбогдож чадсангүй"].waitForExistence(timeout: 20),
+      app.staticTexts["Холболт тасарлаа"].waitForExistence(timeout: 20),
       "an unreachable server should say so on the first screen",
     )
     XCTAssertTrue(app.buttons["offline.retry"].exists, "…and offer to try again")
@@ -119,7 +119,7 @@ final class ServiceFlowTests: XCTestCase {
     guard app.landing() == .shell else { return }
     app.buttons["app.Хоол"].tap()
     XCTAssertTrue(
-      app.staticTexts["Серверт холбогдож чадсангүй"].waitForExistence(timeout: 20),
+      app.staticTexts["Холболт тасарлаа"].waitForExistence(timeout: 20),
       "an app that cannot load should say so",
     )
     shot("6-offline-in-app")

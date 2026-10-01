@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UserNotifications
 
 @testable import Basu
 
@@ -32,10 +33,66 @@ struct BehaviourTests {
     }
 
     // Before the kitchen has a time, the sitting is the appointment.
-    #expect(order(.placed, fireAt: nil, readyAt: nil).moment.label == "суух")
+    #expect(order(.placed, fireAt: nil, readyAt: nil).moment.label == "ирэх")
     // Once it does, the fire is the thing to walk towards.
     #expect(order(.scheduled, fireAt: fire, readyAt: nil).moment.time == fire)
     // And once it is cooking, what matters is when it lands on the table.
     #expect(order(.cooking, fireAt: fire, readyAt: ready).moment.time == ready)
+  }
+
+  // MARK: - asking for notifications
+
+  @Test func notificationsAreAskedForOnlyWhileIOSHasNeverAsked() {
+    let now = Date(timeIntervalSince1970: 2_000_000)
+    #expect(PushRegistrar.offerDue(status: .notDetermined, laterAt: nil, now: now))
+    // A no in iOS is an answer; a yes needs no question.
+    #expect(!PushRegistrar.offerDue(status: .denied, laterAt: nil, now: now))
+    #expect(!PushRegistrar.offerDue(status: .authorized, laterAt: nil, now: now))
+  }
+
+  @Test func laterHoldsForAWeek() {
+    let said = Date(timeIntervalSince1970: 2_000_000)
+    #expect(!PushRegistrar.offerDue(status: .notDetermined, laterAt: said, now: said.addingTimeInterval(3 * 24 * 3600)))
+    #expect(PushRegistrar.offerDue(status: .notDetermined, laterAt: said, now: said.addingTimeInterval(8 * 24 * 3600)))
+  }
+
+  // MARK: - which pages an app may show
+
+  @Test func anAppShowsItsOwnPagesAndTheTwoEveryPageLinksTo() {
+    #expect(ServicePage.belongs("/idesh", to: "/idesh"))
+    #expect(ServicePage.belongs("/idesh/anything", to: "/idesh"))
+    #expect(ServicePage.belongs("/terms", to: "/idesh"))
+    #expect(ServicePage.belongs("/privacy", to: "/dine"))
+    // The lunch page with no restaurant points to the winter-meat one, and back.
+    #expect(ServicePage.belongs("/idesh", to: "/dine"))
+    #expect(ServicePage.belongs("/dine", to: "/idesh"))
+    // The dashboard, the website's sign-in: Safari's.
+    #expect(!ServicePage.belongs("/dashboard", to: "/supplier"))
+    #expect(!ServicePage.belongs("/login", to: "/idesh"))
+    #expect(!ServicePage.belongs("/idesh", to: "/supplier"))
+    // A neighbour whose name starts the same is not the app's.
+    #expect(!ServicePage.belongs("/dineout", to: "/dine"))
+  }
+
+  @Test func theKitchensScreenIsNoGuestsPage() {
+    #expect(ServicePage.staffOnly("/kds"))
+    #expect(ServicePage.staffOnly("/kds/anything"))
+    #expect(!ServicePage.staffOnly("/kdsx"))
+    #expect(!ServicePage.belongs("/kds", to: "/dine"))
+  }
+
+  // MARK: - dates
+
+  @Test func aCornerDayIsTheWebsAndAKeptDateIsWrittenOut() throws {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = try #require(TimeZone(identifier: "Asia/Ulaanbaatar"))
+    let day = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 3, hour: 21)))
+    // The web's own `dayShort`; «10.03» would read as 10 March.
+    #expect(Format.day(day) == "10/3")
+    #expect(Format.date(day) == "2026 оны 10-р сарын 3")
+    #expect(Format.dayWords(day) == "10-р сарын 3")
+    // Today, a time; any other day, the day.
+    #expect(Format.when(day, now: day.addingTimeInterval(60)) == "21:00")
+    #expect(Format.when(day, now: day.addingTimeInterval(2 * 24 * 3600)) == "10/3")
   }
 }

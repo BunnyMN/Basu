@@ -2,7 +2,7 @@ import BasuKit
 import SwiftUI
 
 /**
- One tile on the launcher: the mark, the name, and one word about it.
+ One tile on the launcher: the mark, the name, and a few words about it.
 
  The Хоол tile is the supplied render, full-bleed at radius 18 with no inner
  margin and no plate edge. The rest are drawn glyphs on glass, and the tag
@@ -29,8 +29,9 @@ struct AppTile: View {
             // app name is an app somebody cannot find.
             .fixedSize(horizontal: false, vertical: true)
             .multilineTextAlignment(.leading)
+          // Words, so the sans — at 12, where 9.5 mono was a whisper.
           Text(app.tag)
-            .font(.mono(9.5))
+            .font(.sans(12))
             .foregroundStyle(Color.ink3)
             .fixedSize(horizontal: false, vertical: true)
             .multilineTextAlignment(.leading)

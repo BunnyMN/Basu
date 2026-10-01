@@ -44,8 +44,12 @@ struct AuthMethods: Decodable, Sendable, Equatable {
   let email: Bool
   let google: Bool
   let apple: Bool
+  /// A code by SMS — and with it SMS at all: a server with no gateway sends
+  /// none, and says so here. Nil from a server older than the field, which is
+  /// taken to have none either.
+  let sms: Bool?
 
-  static let unknown = AuthMethods(password: true, email: false, google: false, apple: true)
+  static let unknown = AuthMethods(password: true, email: false, google: false, apple: true, sms: false)
 }
 
 /// What a code for a password is for: a new account by email, or a
@@ -104,6 +108,10 @@ struct APIError: LocalizedError, Sendable {
     code: "OFFLINE",
     message: "Сүлжээ алга. Дахин оролдоно уу.",
   )
+
+  /// What is said when the server gave no reason of its own: never a status
+  /// code, which means nothing to whoever is holding the phone.
+  static let fallback = "Алдаа гарлаа. Дахин оролдоно уу."
 
   var isUnauthorised: Bool { status == 401 }
 }
@@ -332,9 +340,9 @@ struct API: Sendable {
       (data, response) = try await urlSession.data(for: urlRequest)
     } catch {
       // A request given up on — its screen closed, its task cancelled — is
-      // not a network that is down. Called «OFFLINE», it put «Серверт
-      // холбогдож чадсангүй» on the launcher, and hid the supplier's tile,
-      // every time somebody left a page inside the app.
+      // not a network that is down. Called «OFFLINE», it put the offline
+      // banner on the launcher, and hid the supplier's tile, every time
+      // somebody left a page inside the app.
       if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
         throw CancellationError()
       }
@@ -346,7 +354,11 @@ struct API: Sendable {
       if let envelope = try? JSONDecoder().decode(ErrorEnvelope.self, from: data) {
         throw APIError(status: status, code: envelope.error.code, message: envelope.error.message_mn)
       }
-      throw APIError(status: status, code: "HTTP_\(status)", message: "Алдаа гарлаа. (\(status))")
+      // No words of the server's own — a proxy's error page, a gateway that
+      // timed out. The person is told what to do; the number is for whoever
+      // reads the log.
+      NSLog("Basu: \(request.method) \(request.path) answered \(status) without an error body")
+      throw APIError(status: status, code: "HTTP_\(status)", message: APIError.fallback)
     }
 
     if T.self == Blank.self { return Blank() as! T }

@@ -61,10 +61,15 @@ struct WalletStatement: Decodable, Sendable, Equatable {
   let lines: [WalletLine]
   /// Pass back as `before` for the next page. `nil` when the list is done.
   let next: String?
+  /// Whether money can be put in right now. Not sent by the server yet: nil
+  /// is "not said", and the wallet goes by the last refusal instead (see
+  /// `Platform.topupsOpen`).
+  var topupsOpen: Bool? = nil
 
   enum CodingKeys: String, CodingKey {
     case currency, lines, next
     case balanceMnt = "balance_mnt"
+    case topupsOpen = "topups_open"
   }
 
   static let empty = WalletStatement(balanceMnt: 0, currency: "MNT", lines: [], next: nil)
@@ -94,7 +99,11 @@ struct Movement: Decodable, Sendable, Equatable {
     case subjectId = "subject_id"
   }
 
-  var title: String {
+  var title: String { Self.word(for: kind) }
+
+  /// The ledger's word for a kind of movement, in the language of the person
+  /// reading it. A kind the phone has never heard of is still a movement.
+  static func word(for kind: String) -> String {
     switch kind {
     case "topup": "Цэнэглэлт"
     case "purchase": "Захиалга"
@@ -139,25 +148,10 @@ struct WalletLine: Decodable, Sendable, Identifiable, Equatable {
     case subjectId = "subject_id"
   }
 
-  /**
-   Which app the movement came from.
-
-   The vertical writes its own label into the memo when it asks to be paid, so
-   the shell never has to know that «order» means lunch. A movement with no
-   memo is the platform's own — a top-up.
-   */
-  var source: String { memo?.isEmpty == false ? memo! : "Basu" }
-
-  /// The ledger's word for it, in the language of the person reading it.
-  var title: String {
-    switch kind {
-    case "topup": "Цэнэглэлт"
-    case "purchase": "Захиалга"
-    case "refund": "Буцаалт"
-    case "promotion": "Урамшуулал"
-    default: "Гүйлгээ"
-    }
-  }
+  /// The ledger's word for it, in the language of the person reading it. How
+  /// the statement says the rest — who, which app, which order — is
+  /// `WalletLine.shown`, read from the memo the vertical wrote.
+  var title: String { Movement.word(for: kind) }
 }
 
 struct TopupStarted: Decodable, Sendable {

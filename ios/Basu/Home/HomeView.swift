@@ -55,6 +55,7 @@ struct HomeView: View {
 
         if !live.isEmpty { liveSection }
         grid
+          .padding(.top, live.isEmpty && !model.offline ? 10 : 6)
       }
       .padding(.horizontal, BasuMetric.screenPadding)
       .padding(.top, 6)
@@ -178,15 +179,19 @@ struct HomeView: View {
     VStack(alignment: .leading, spacing: 9) {
       ForEach(bands) { band in
         VStack(alignment: .leading, spacing: 9) {
-          HStack(spacing: 12) {
-            SectionLabel(band.label)
-            Spacer(minLength: 8)
-            // Under seven icons a filter is slower than looking.
-            if band.id == bands.first?.id, iconCount >= AppCatalogue.searchThreshold {
-              SearchField(query: $query)
+          // A label names one band among others. Over the only band there is
+          // it named nothing — «АППУУД» above two apps.
+          if bands.count > 1 {
+            HStack(spacing: 12) {
+              SectionLabel(band.label)
+              Spacer(minLength: 8)
+              // Under seven icons a filter is slower than looking.
+              if band.id == bands.first?.id, iconCount >= AppCatalogue.searchThreshold {
+                SearchField(query: $query)
+              }
             }
+            .frame(minHeight: 22)
           }
-          .frame(minHeight: 22)
 
           LazyVGrid(
             columns: [GridItem(.adaptive(minimum: BasuMetric.tileMin), spacing: BasuMetric.gridGapX, alignment: .topLeading)],
@@ -236,47 +241,40 @@ struct SearchField: View {
 /**
  One live thing, as one row inside the card.
 
- Three lines on the left — the dot and the source, the title, the meta — and
- the moment on the right. A second line, separated by a hairline, only when
- the row is alone on the screen.
+ Three lines on the left — the dot and the source, the title, what is
+ happening — and the moment on the right, with a chevron because the row
+ opens the order. A second line, separated by a hairline, only when the row
+ is alone on the screen.
+
+ Words are in the sans and only the order's number in the mono: «№0970 ·
+ Хүлээгдэж байна» set entirely in mono read as a code. At the
+ accessibility sizes the moment moves under the words — beside them it took
+ the width and broke the restaurant's name a syllable to a line.
  */
 struct LiveRow: View {
   let item: LiveItem
+  @Environment(\.dynamicTypeSize) private var typeSize
 
   var body: some View {
     VStack(alignment: .leading, spacing: 9) {
-      HStack(alignment: .top, spacing: 14) {
-        VStack(alignment: .leading, spacing: 5) {
-          HStack(spacing: 7) {
-            Circle()
-              .fill(item.status.tint)
-              .frame(width: 6, height: 6)
-            SourceLabel(text: item.source)
+      if typeSize.isAccessibilitySize {
+        VStack(alignment: .leading, spacing: 8) {
+          words
+          HStack(alignment: .center, spacing: 8) {
+            moment
+            Spacer(minLength: 0)
+            Chevron(size: 12).foregroundStyle(Color.ink3)
           }
-          Text(item.title)
-            .font(.sans(15.5, .semibold))
-            .foregroundStyle(Color.ink)
-            .fixedSize(horizontal: false, vertical: true)
-            .multilineTextAlignment(.leading)
-          Text(item.meta)
-            .font(.mono(11.5))
-            .monospacedDigit()
-            .foregroundStyle(Color.ink3)
-            .fixedSize(horizontal: false, vertical: true)
-            .multilineTextAlignment(.leading)
         }
-        Spacer(minLength: 0)
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-          Text(item.timeLabel)
-            .font(.mono(9, .medium))
-            .tracking(9 * 0.14)
+      } else {
+        HStack(alignment: .top, spacing: 12) {
+          words
+          Spacer(minLength: 0)
+          moment
+          Chevron(size: 12)
             .foregroundStyle(Color.ink3)
-          Text(item.when)
-            .font(.mono(23, .semibold))
-            .monospacedDigit()
-            .foregroundStyle(Color.ink)
+            .padding(.top, 8)
         }
-        .fixedSize()
       }
 
       if let extra = item.extra {
@@ -301,7 +299,46 @@ struct LiveRow: View {
     .frame(maxWidth: .infinity, alignment: .leading)
     .overlay(alignment: .top) { Hairline() }
     .contentShape(Rectangle())
-    .accessibilityElement(children: .combine)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(item.spoken)
     .accessibilityIdentifier("live.\(item.id)")
+  }
+
+  private var words: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(spacing: 7) {
+        Circle()
+          .fill(item.status.tint)
+          .frame(width: 7, height: 7)
+        SourceLabel(text: item.source)
+      }
+      Text(item.title)
+        .font(.sans(15.5, .semibold))
+        .foregroundStyle(Color.ink)
+        .fixedSize(horizontal: false, vertical: true)
+        .multilineTextAlignment(.leading)
+      (Text("№\(item.code)").font(.mono(12)) + Text(" · \(item.detail)").font(.sans(13)))
+        .foregroundStyle(Color.ink2)
+        .fixedSize(horizontal: false, vertical: true)
+        .multilineTextAlignment(.leading)
+    }
+  }
+
+  /// The time over what it is the time of — the lock screen's own order, and
+  /// narrow enough that the name beside it keeps one line. Capped where the
+  /// corner still holds.
+  private var moment: some View {
+    VStack(alignment: .trailing, spacing: 1) {
+      Text(item.when)
+        .font(.mono(23, .semibold))
+        .monospacedDigit()
+        .foregroundStyle(Color.ink)
+      Text(item.timeLabel)
+        .font(.sans(11, .medium))
+        .tracking(11 * 0.06)
+        .foregroundStyle(Color.ink3)
+    }
+    .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+    .fixedSize()
   }
 }
