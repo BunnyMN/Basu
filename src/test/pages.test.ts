@@ -2764,8 +2764,10 @@ describe('нийлүүлэгч болох', () => {
     const said = (list: string) => [...doc.querySelectorAll(`#${list} tbody .pill`)].map((p) => [(p as HTMLElement).dataset['s'], p.textContent]);
 
     // Every lunch, going on and over: the demo's history closed some, other tests left some on the fire.
+    // A list's first answer lands before another is asked for: the later answer of two in flight is the one drawn.
+    const answered = (list: string) => (d: Document) => Boolean(d.querySelector(`#${list} .dt-seg`)) && !d.querySelector(`#${list} tbody tr.dt-skel`);
     await opsTab(desk, 'lunches');
-    await until(desk, 'the lunches', (d) => Boolean(d.querySelector('#lunches .dt-seg button[data-v="all"]')));
+    await until(desk, 'the lunches', answered('lunches'));
     (doc.querySelector('#lunches .dt-seg button[data-v="all"]') as HTMLElement).click();
     await until(desk, 'a lunch that is over', (d) => Boolean(d.querySelector('#lunches tbody .pill[data-s="CLOSED"]')));
     for (const [state, word] of said('lunches')) expect(word, state).toBe(LUNCH[state!]);
@@ -2777,7 +2779,7 @@ describe('нийлүүлэгч болох', () => {
     const code = await buyPickup(await openPage('idesh.html'));
     await getPool().query(`UPDATE idesh.idesh_order SET state = 'CLOSED', closed_at = now() WHERE code = $1`, [code]);
     await opsTab(desk, 'orders');
-    await until(desk, 'the идэш orders', (d) => Boolean(d.querySelector('#orders .dt-seg button[data-v="all"]')));
+    await until(desk, 'the идэш orders', answered('orders'));
     (doc.querySelector('#orders .dt-seg button[data-v="all"]') as HTMLElement).click();
     const ours = () => [...doc.querySelectorAll('#orders tr[data-order]')].find((r) => r.textContent?.includes(`№${code}`));
     await until(desk, 'the идэш that is over', () => Boolean(ours()));
