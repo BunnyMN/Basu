@@ -221,8 +221,8 @@ img{max-width:100%}
 a{color:var(--accent-ink);text-decoration:none}
 /* A link inside a sentence is pine and carries a hairline underline, so it
    reads as a link on a colour screen and on a grey one alike. */
-:where(p,.help,.cap,.callout,.doc li) a:not(.btn):not(.link):not(.go){text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.2em;text-decoration-color:color-mix(in srgb,currentColor 38%,transparent)}
-@media (hover:hover){:where(p,.help,.cap,.callout,.doc li) a:not(.btn):not(.link):not(.go):hover{text-decoration-color:currentColor}}
+:where(p,.help,.cap,.callout,.doc li) a:where(:not(.btn,.link,.go)){text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.2em;text-decoration-color:color-mix(in srgb,currentColor 38%,transparent)}
+@media (hover:hover){:where(p,.help,.cap,.callout,.doc li) a:where(:not(.btn,.link,.go)):hover{text-decoration-color:currentColor}}
 .doc .toc a{text-decoration:none}
 hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 /* Outline, not box-shadow: it never fights an element's own shadow and
@@ -430,6 +430,16 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
 @media (hover:hover){.card[data-link]:hover{background:var(--surface-2)}}
 :root[data-desk] .card-head{padding:14px 20px}
 :root[data-desk] .card-body{padding:20px}
+/* A card's facts: small labelled values in a grid (the desk's and the
+   supplier's «Мэдээлэл», a person's file), and a card's foot for its one or
+   two buttons. Written at one class's weight (:where), so a page's own copy
+   still decides until it is deleted; idesh's own .facts (a card itself) is
+   not a card's child and keeps its look.
+     <div class="card"><div class="facts"><div><span class="lab">ТТД</span><b>5012345</b></div>…</div><div class="card-foot">…</div></div> */
+:where(.card) > .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px 20px;padding:20px;font-size:var(--t-body);line-height:1.45;color:var(--ink-2)}
+:where(.card) > .facts :where(.lab){display:block;margin-bottom:4px}
+:where(.card) > .facts :where(b){font-size:var(--t-row);font-weight:600;color:var(--ink)}
+:where(.card) > .card-foot{padding:12px 20px;border-top:1px solid var(--line)}
 
 /* ── list rows ────────────────────────────────────────────────────── */
 /* The container carries the card look; rows are hairline-separated and own
@@ -450,6 +460,9 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
   background:none;border:0;border-radius:0;box-shadow:none;color:inherit;text-align:left;text-decoration:none;font:inherit;
   transition:background 120ms;
 }
+/* the hairline between rows outweighs the row's own border reset above (a div or a button row lost it) */
+[data-rows] > * + .row{border-top:1px solid var(--line)}
+[data-rows] > .section-label + .row{border-top:0}
 [data-rows] :where(a,button).row{cursor:pointer}
 [data-rows] :where(a,button).row:active{background:var(--surface-2)}
 @media (hover:hover){[data-rows] :where(a,button).row:hover{background:var(--surface-2)}}
@@ -729,7 +742,7 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 .page-head[data-large] h1{font-size:var(--t-title);letter-spacing:-.02em}
 .page-head[data-large] p{font-size:var(--t-body);max-width:36ch;margin-top:6px}
 /* the head's buttons: one primary, at most a quiet one beside it */
-.page-head .head-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.head-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 /* On a phone the line under the title still says what the page is for — two lines at most. */
 @media (max-width:600px){.page-head:not([data-large]) p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}}
 
@@ -1441,9 +1454,9 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 @media (max-width:720px){
   .dt-search{max-width:none}
   .dt-count{margin-left:0}
-  .dt-filters{flex:1 1 100%}
+  .dt-filters{flex:1 1 100%;min-width:0}
   .dt-seg{width:100%}
-  .dt-seg button{flex:1 1 auto;min-height:38px;padding:0 10px}
+  .dt-seg button{flex:1 1 auto;min-height:38px;padding:0 7px}
   .dt-wrap,.dt-wrap[data-scroll]{overflow:visible;background:none;border:0;border-radius:0;box-shadow:none}
   .dt-table,.dt-table tbody{display:block}
   .dt-table thead{display:none}

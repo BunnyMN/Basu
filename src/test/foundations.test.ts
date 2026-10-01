@@ -223,6 +223,15 @@ describe('a field and a number', () => {
     }
   });
 
+  it('leaves the keyboard down on open when asked to (focus: sheet), and gives the first field the focus by default', async () => {
+    void window.popup({ title: 'Нэр засах', focus: 'sheet', fields: [{ name: 'name', label: 'Нэр' }] });
+    expect(document.activeElement).toBe(open());
+    (open().querySelector('[data-cancel]') as HTMLElement).click();
+    await tick(300);
+    void window.popup({ title: 'Нэр засах', fields: [{ name: 'name', label: 'Нэр' }] });
+    expect(document.activeElement).toBe(field('name'));
+  });
+
   it('groups a popup’s phone field the same way', () => {
     void window.popup({ title: 'Утас', fields: [{ name: 'phone', label: 'Утас', type: 'tel', prefix: '+976', format: 'phone' }] });
     field('phone').value = '88010011';

@@ -382,7 +382,7 @@ export function signInDoors({
       fieldError(code, null);
       $('[data-code]').hidden = false;
       $('[data-again-row]').hidden = false;
-      hint.textContent = `${address} хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Spam хавтсаа шалгаарай.`;
+      hint.textContent = `${address} хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Спам хавтсаа шалгаарай.`;
       emailGo.textContent = 'Нэвтрэх';
       code.value = '';
       code.focus();
@@ -562,7 +562,7 @@ export function signInDoors({
       step = 'code';
       pw.code.value = '';
       draw();
-      say(`${to} хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Spam хавтсаа шалгаарай.`);
+      say(`${to} хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Спам хавтсаа шалгаарай.`);
       pw.code.focus();
     });
 
@@ -776,7 +776,7 @@ export function accountWays({ token }) {
             await api('/v1/me/email/code', { method: 'POST', token, body: { email: v.email, password: v.current || undefined } });
             sentTo = v.email;
             step({
-              sub: `<b>${popupEsc(sentTo)}</b> хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Spam хавтсаа шалгаарай.`,
+              sub: `<b>${popupEsc(sentTo)}</b> хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Спам хавтсаа шалгаарай.`,
               fields: [{ name: 'code', label: 'Имэйлд ирсэн код', inputmode: 'numeric', autocomplete: 'one-time-code', placeholder: '······', required: true, wide: true, attrs: { maxlength: 6 } }],
               submit: 'Баталгаажуулах',
             });
@@ -815,7 +815,7 @@ export function accountWays({ token }) {
         return;
       }
       let sentTo = null;
-      const sentSub = () => `<b>${popupEsc(sentTo)}</b> хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Spam хавтсаа шалгаарай.`;
+      const sentSub = () => `<b>${popupEsc(sentTo)}</b> хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Спам хавтсаа шалгаарай.`;
       void popup({
         title: 'Нууц үг тохируулах',
         sub: `Таныг мөн гэдгийг батлах 6 оронтой код <b>${popupEsc(me.email)}</b> хаяг руу илгээнэ. Бусад төхөөрөмж дээрх нэвтрэлт хаагдана, энэ хэвээр үлдэнэ.`,
@@ -1079,11 +1079,18 @@ function popupMissing(control) {
  * `popup.say(...)`. While the answer is on the way the button turns and the
  * form holds still. `steps: 2` puts «Алхам 1/2» over the title, and each
  * `step()` that draws new fields moves it on. `danger` makes the button the
- * filled red of a step that cannot be undone. Closed without an answer, the
- * promise resolves to null.
+ * filled red of a step that cannot be undone. `focus` is where the keyboard
+ * goes when a step is drawn: 'field' (the first field, the default), 'sheet'
+ * (the popup itself), or 'auto' (the field where there is a mouse, the popup
+ * on a touch screen — the phone's keyboard stays down until a field is
+ * tapped). Closed without an answer, the promise resolves to null.
  */
-export function popup({ title, sub = '', fields = [], submit = 'Хадгалах', cancel = 'Болих', danger = false, width = 560, steps = 0, onSubmit = async () => true, id = null }) {
+export function popup({ title, sub = '', fields = [], submit = 'Хадгалах', cancel = 'Болих', danger = false, width = 560, steps = 0, focus = 'field', onSubmit = async () => true, id = null }) {
   return new Promise((resolve) => {
+    // Where the keyboard goes when a step is drawn: its first field, or — on a touch screen with
+    // focus 'auto', or anywhere with 'sheet' — the popup itself, so a phone's keyboard does not
+    // rise over the popup before the person has read it.
+    const toField = () => focus === 'field' || (focus === 'auto' && !(typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches));
     const n = ++popupSeq;
     const opener = document.activeElement;
     const scrim = document.createElement('div');
@@ -1158,7 +1165,8 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
       }
       say(null);
       const first = sheet.querySelector('.fields input:not([type="checkbox"]):not([type="radio"]), .fields select, .fields textarea');
-      (first ?? go).focus?.();
+      if (toField()) (first ?? go).focus?.();
+      else if (drawn) sheet.focus?.();
     };
     let drawn = false;
     step({ title, sub, fields, submit, danger });
@@ -1297,7 +1305,7 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
     scrim.setAttribute('data-open', '');
     sheet.setAttribute('data-open', '');
     const first = sheet.querySelector('.fields input:not([type="checkbox"]):not([type="radio"]), .fields select, .fields textarea');
-    (first ?? sheet).focus();
+    (toField() && first ? first : sheet).focus();
   });
 }
 
@@ -1307,7 +1315,7 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
  * step that cannot be undone when `danger`. Resolves to what
  * `onConfirm(reason)` returned, or null when the person said no.
  */
-export function confirmPopup({ title, text = '', ok = 'Тийм', cancel = 'Болих', danger = false, reason = null, onConfirm = async () => true }) {
+export function confirmPopup({ title, text = '', ok = 'Тийм', cancel = 'Болих', danger = false, reason = null, focus = 'field', onConfirm = async () => true }) {
   const fields = [];
   if (text) fields.push({ type: 'note', html: text });
   if (reason) {
@@ -1323,7 +1331,7 @@ export function confirmPopup({ title, text = '', ok = 'Тийм', cancel = 'Бо
       wide: true,
     });
   }
-  return popup({ title, fields, submit: ok, cancel, danger, width: 480, onSubmit: (values) => onConfirm(values.reason ?? '', values) });
+  return popup({ title, fields, submit: ok, cancel, danger, focus, width: 480, onSubmit: (values) => onConfirm(values.reason ?? '', values) });
 }
 
 /* ── toast ─────────────────────────────────────────────────────────── */
@@ -1726,7 +1734,7 @@ export const IDESH_HEADLINE = {
   HANDED: ['Хүлээлгэн өгсөн', 'Сайхан өвөлжөөрэй'],
   CLOSED: ['Дууслаа', 'Баярлалаа'],
   CANCELLED: ['Цуцлагдлаа', 'Мөнгө буцаагдана'],
-  REFUNDED: ['Буцаагдлаа', 'Мөнгө таны түрийвчинд орлоо'],
+  REFUNDED: ['Буцаагдлаа', 'Мөнгө таны банкны данс руу шилжлээ'],
 };
 
 /** What each kind of animal is called, and the word for one of it. */
