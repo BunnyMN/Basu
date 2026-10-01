@@ -7,11 +7,45 @@
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0F1110">
 <title>Өвлийн идэш · Үйлчилгээний нөхцөл</title>
 <link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/site.css">
+<script>
+/* In a browser this is a page of the website: its header and its foot, and
+   light, like every page of the website. In the phone app (the shell's web
+   view) it keeps the app's own bar and follows the phone's theme. Set before
+   the body is drawn, so nothing shows and then changes. */
+if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.basu)) {
+  document.documentElement.setAttribute('data-site', '');
+  document.documentElement.setAttribute('data-theme', 'light');
+  for (const meta of document.querySelectorAll('meta[name="theme-color"]')) meta.setAttribute('content', '#FFFFFF');
+}
+</script>
 <style>
 /* Layout only. Faces, colours, radii and weights come from app.css (.doc, .topbar). */
 .toc .n{flex:none;width:28px}
 .doc-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;margin-top:24px}
 .doc-foot .back{margin-top:0}
+/* In a browser (data-site, set in the head): the website's header and foot
+   instead of the app's bar, a wider column, and on a wide screen the
+   contents beside the text, the section being read marked. */
+html[data-site] .topbar{display:none}
+html[data-site] .doc{flex:1 0 auto;padding-top:32px;padding-bottom:56px}
+html[data-site] .doc h2{scroll-margin-top:calc(var(--s-bar) + var(--safe-t) + 20px)}
+.doc .toc a:not(.btn):not(.link):not(.go){text-decoration:none}
+.doc-aside{display:none}
+@media (max-width:480px){html[data-site] .doc{padding-top:0}html[data-site] .doc-card{border-top:0}}
+@media (min-width:760px){
+  html[data-site] main.doc{max-width:760px}
+  html[data-site] .doc-card{padding:36px 40px;border-radius:18px}
+}
+@media (min-width:1100px){
+  html[data-site] main.doc{max-width:1080px;display:grid;grid-template-columns:232px minmax(0,1fr);gap:48px;align-items:start}
+  html[data-site] .doc-aside{display:block;position:sticky;top:calc(var(--s-bar) + var(--safe-t) + 32px)}
+  html[data-site] .doc-aside .eyebrow{margin:8px 0 12px}
+  html[data-site] .doc-aside .toc a{min-height:36px;margin:0 -10px;padding:0 10px;border-radius:8px;font-size:.875rem;color:var(--ink-2)}
+  html[data-site] .doc-aside .toc a[aria-current]{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+  html[data-site] .doc-aside .toc a[aria-current] .n{color:var(--accent-ink)}
+  html[data-site] .doc-card > .toc{display:none}
+}
 </style>
 </head>
 <body>
@@ -85,6 +119,40 @@ document.getElementById('back').addEventListener('click', (event) => {
     history.back();
   }
 });
+
+// In a browser: the website's header and foot around the page, and on a wide
+// screen the contents beside the text with the section in view marked. The
+// shell's web view never loads the website's parts.
+if (document.documentElement.hasAttribute('data-site')) {
+  const { mountFrame } = await import('/site.js');
+  void mountFrame(null);
+  const toc = document.querySelector('.doc-card .toc');
+  if (toc) {
+    const aside = document.createElement('aside');
+    aside.className = 'doc-aside';
+    aside.setAttribute('aria-label', 'Агуулга');
+    aside.innerHTML = '<div class="eyebrow">Агуулга</div>';
+    aside.append(toc.cloneNode(true));
+    document.querySelector('main.doc').prepend(aside);
+    const links = new Map([...aside.querySelectorAll('a[href^="#"]')].map((a) => [a.getAttribute('href').slice(1), a]));
+    if ('IntersectionObserver' in window) {
+      const reading = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            for (const a of links.values()) a.removeAttribute('aria-current');
+            links.get(entry.target.id)?.setAttribute('aria-current', 'true');
+          }
+        },
+        { rootMargin: '-12% 0px -70% 0px' },
+      );
+      for (const id of links.keys()) {
+        const heading = document.getElementById(id);
+        if (heading) reading.observe(heading);
+      }
+    }
+  }
+}
 </script>
 </body>
 </html>
