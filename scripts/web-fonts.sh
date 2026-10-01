@@ -33,9 +33,9 @@ FACES="GolosText-Regular GolosText-Medium GolosText-SemiBold JetBrainsMono-Regul
 # Basic Latin, Latin-1 (« » × · ° and the like), Cyrillic with Mongolian's
 # Ө Ү, the Kazakh and Buryat letters a supplier from the west may sign
 # with (Ғ Қ Ң Ұ Һ Ә), general punctuation (– — … “ ” „ thin and narrow
-# spaces), € ₮ № ™, the four arrows, the minus sign, ≤ ≥, and the ● ✓ ✗
+# spaces), € ₮ № ™, the four arrows, the minus sign, ≈ ≤ ≥, and the ● ✓ ✗
 # the pages and letters print.
-UNICODES="U+0020-007E,U+00A0-00FF,U+0400-045F,U+0490-0493,U+049A-049B,U+04A2-04A3,U+04AE-04B1,U+04BA-04BB,U+04D8-04D9,U+04E8-04E9,U+2000-206F,U+20AC,U+20AE,U+2116,U+2122,U+2190-2193,U+2212,U+2264-2265,U+25CF,U+2713,U+2717"
+UNICODES="U+0020-007E,U+00A0-00FF,U+0400-045F,U+0490-0493,U+049A-049B,U+04A2-04A3,U+04AE-04B1,U+04BA-04BB,U+04D8-04D9,U+04E8-04E9,U+2000-206F,U+20AC,U+20AE,U+2116,U+2122,U+2190-2193,U+2212,U+2248,U+2264-2265,U+25CF,U+2713,U+2717"
 
 PYTHON=${PYTHON:-python3}
 cd "$(dirname "$0")/.."

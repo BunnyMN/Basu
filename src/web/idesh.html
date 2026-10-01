@@ -481,6 +481,8 @@ const state = {
  */
 const canPay = (amount) => state.paymentsOpen || (state.wallet !== null && state.wallet >= amount);
 const CLOSED = 'Онлайн төлбөр одоогоор хаалттай байна.';
+// Beside the button the callout above has already said it in full: the short form, as /shop's bar says it.
+const CLOSED_SHORT = 'Онлайн төлбөр хаалттай';
 
 /** While payments are closed, the signed-in guest's wallet — never a sign-in for it. */
 async function lookAtWallet() {
@@ -1158,7 +1160,7 @@ function renderFoot() {
   sayClosed(!able, $('screen-body').querySelector('.facts'));
   // What stops the order, over its button: payments first — nothing typed fixes that.
   const needs = able ? missing() : null;
-  if (!able) foot.append(el(`<p class="why" data-calm>${MARK.info}${CLOSED}</p>`));
+  if (!able) foot.append(el(`<p class="why" data-calm>${MARK.info}${CLOSED_SHORT}</p>`));
   else if (needs) foot.append(el(`<p class="why">${MARK.warn}${needs}</p>`));
   const row = el(`
     <div class="foot-row">
@@ -1227,7 +1229,7 @@ function renderReview({ replace = false } = {}) {
 
   const foot = $('screen-foot');
   foot.replaceChildren();
-  if (!able) foot.append(el(`<p class="why" data-calm>${MARK.info}${CLOSED}</p>`));
+  if (!able) foot.append(el(`<p class="why" data-calm>${MARK.info}${CLOSED_SHORT}</p>`));
   const row = el(`
     <div class="foot-row">
       <div class="sum"><span>${state.paymentsOpen ? 'Түрийвчнээс · дутвал QPay' : 'Түрийвчнээс'}</span><b>${money(total())}</b></div>

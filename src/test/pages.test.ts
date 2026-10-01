@@ -2143,7 +2143,7 @@ describe('өвлийн идэш', () => {
       expect(d.querySelector('#closed b')?.textContent).toBe(PAYMENTS_CLOSED);
       expect(d.querySelector('#closed a[href="mailto:basuappmn@gmail.com"]')).toBeTruthy();
       expect((d.querySelector('#next') as HTMLButtonElement).disabled).toBe(true);
-      expect(d.querySelector('#screen-foot .why')?.textContent).toBe(PAYMENTS_CLOSED);
+      expect(d.querySelector('#screen-foot .why')?.textContent).toBe('Онлайн төлбөр хаалттай');
       // Nobody was asked to sign in on the way to being told.
       expect(storage.getItem('basu.guest')).toBeNull();
       expect(d.querySelector('#pay')).toBeNull();
@@ -2222,7 +2222,7 @@ describe('өвлийн идэш', () => {
       const next = d.querySelector('#next') as HTMLButtonElement;
       expect(next.disabled).toBe(true);
       const why = d.querySelector('#screen-foot .why');
-      expect(why?.textContent).toBe(PAYMENTS_CLOSED);
+      expect(why?.textContent).toBe('Онлайн төлбөр хаалттай');
       expect(why!.compareDocumentPosition(next) & dom.window.Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
       // More of it is no nearer: the reason stays, the button stays grey.
       (d.querySelector('#step-qty [data-d="1"]') as HTMLButtonElement).click();

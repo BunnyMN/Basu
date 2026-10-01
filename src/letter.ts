@@ -64,7 +64,7 @@ export function renderLetter(letter: Letter): string {
   const code = letter.code
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 20px"><tr>
         <td align="center" bgcolor="${C.pineSoft}" style="background:${C.pineSoft};border-radius:14px;padding:22px 12px">
-          <div style="font-family:${MONO};font-size:36px;line-height:1;font-weight:700;letter-spacing:12px;color:${C.pineInk};padding-left:12px">${esc(letter.code)}</div>
+          <div style="font-family:${MONO};font-size:36px;line-height:1;font-weight:700;letter-spacing:8px;color:${C.pineInk};padding-left:8px">${esc(letter.code)}</div>
         </td></tr></table>`
     : '';
 
