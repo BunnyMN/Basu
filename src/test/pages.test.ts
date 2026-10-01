@@ -2349,11 +2349,22 @@ describe('өвлийн идэш', () => {
   }
   const rowNamed = (dom: JSDOM, title: string) =>
     [...dom.window.document.querySelectorAll('.stall .row[data-listing]')].find((r) => r.querySelector('.name')?.textContent?.includes(title));
-  /** Type into the open popup's fields, the way answerPopup does, without pressing its button. */
+  /**
+   * Type into the open popup's fields as a person does — each field hears it
+   * changed, so one that was refused takes its word back — without pressing
+   * the popup's button.
+   */
   const fill = (sheet: Element, values: Record<string, string>) => {
-    for (const [name, value] of Object.entries(values)) (sheet.querySelector(`[name="${name}"]`) as HTMLInputElement).value = value;
+    for (const [name, value] of Object.entries(values)) {
+      const input = sheet.querySelector(`[name="${name}"]`) as HTMLInputElement;
+      input.value = value;
+      input.dispatchEvent(new input.ownerDocument.defaultView!.Event('input', { bubbles: true }));
+    }
   };
-  const refusal = (sheet: Element) => (sheet.querySelector('.popup-error') as HTMLElement | null)?.hidden === false;
+  /** What the popup says is wrong with one field: the line under that field, where every popup says it. */
+  const refusalOf = (sheet: Element, name: string) =>
+    sheet.querySelector(`[name="${name}"]`)?.closest('.field')?.querySelector('.help[data-error]')?.textContent ?? null;
+  const overTheFields = (sheet: Element) => (sheet.querySelector('.popup-error') as HTMLElement | null)?.hidden === false;
 
   it('takes a listing’s numbers as typed: a half kilo stays a half, and a count kept in wholes refuses a fraction', async () => {
     const screen = await stallOf(seeded.suppliers[0]!.phone);
@@ -2368,7 +2379,8 @@ describe('өвлийн идэш', () => {
     expect(rowNamed(screen, 'Хонь, хагас кг')!.querySelector('.num')?.textContent).toBe('410,000₮толгой бүр');
 
     // Kilos are sold in whole kilos: «2.5» and «120.5» are refused in words,
-    // the field said wrong is the one the cursor goes to, and nothing is sent.
+    // under the field that is wrong, which is where the cursor goes, and
+    // nothing is sent.
     const before = d.querySelectorAll('.stall .row[data-listing]').length;
     (d.querySelector('#add') as HTMLElement).click();
     await until(screen, 'the popup', (doc) => Boolean(doc.querySelector('#listing-new [name="unit"]')));
@@ -2378,13 +2390,17 @@ describe('өвлийн идэш', () => {
     unit.dispatchEvent(new screen.window.Event('change', { bubbles: true }));
     fill(sheet, { title: 'Үхрийн мах, кг', price_mnt: '24000', min_qty: '2.5', quantity: '120.5', origin: 'Төв' });
     (sheet.querySelector('[data-submit]') as HTMLElement).click();
-    await until(screen, 'the minimum refused', () => refusal(sheet));
-    expect(sheet.querySelector('.popup-error')?.textContent).toContain('Доод захиалгыг бүхэл кг-аар бичнэ үү.');
+    await until(screen, 'the minimum refused', () => refusalOf(sheet, 'min_qty') !== null);
+    expect(refusalOf(sheet, 'min_qty')).toContain('Доод захиалгыг бүхэл кг-аар бичнэ үү.');
+    expect(overTheFields(sheet)).toBe(false);
     expect(d.activeElement?.getAttribute('name')).toBe('min_qty');
+    // Typing the minimum again takes its word back.
     fill(sheet, { min_qty: '2' });
+    expect(refusalOf(sheet, 'min_qty')).toBeNull();
+    expect(sheet.querySelector('[name="min_qty"]')?.hasAttribute('aria-invalid')).toBe(false);
     (sheet.querySelector('[data-submit]') as HTMLElement).click();
-    await until(screen, 'the amount refused', () => sheet.querySelector('.popup-error')?.textContent?.includes('бүхэл тоогоор') ?? false);
-    expect(sheet.querySelector('.popup-error')?.textContent).toContain('Хэдэн кг байгааг бүхэл тоогоор бичнэ үү.');
+    await until(screen, 'the amount refused', () => refusalOf(sheet, 'quantity')?.includes('бүхэл тоогоор') ?? false);
+    expect(refusalOf(sheet, 'quantity')).toContain('Хэдэн кг байгааг бүхэл тоогоор бичнэ үү.');
     expect(d.activeElement?.getAttribute('name')).toBe('quantity');
     expect(sheet.querySelector('[name="quantity"]')?.getAttribute('aria-invalid')).toBe('true');
     (sheet.querySelector('[data-cancel]') as HTMLElement).click();
@@ -2419,10 +2435,12 @@ describe('өвлийн идэш', () => {
     delivers.dispatchEvent(new screen.window.Event('change', { bubbles: true }));
     expect(fee.disabled).toBe(false);
     (editing.querySelector('[data-submit]') as HTMLElement).click();
-    await until(screen, 'the fee asked for', () => refusal(editing));
-    expect(editing.querySelector('.popup-error')?.textContent).toContain('Хүргэлтийн төлбөрөө бичнэ үү');
+    await until(screen, 'the fee asked for', () => refusalOf(editing, 'delivery_fee_mnt') !== null);
+    expect(refusalOf(editing, 'delivery_fee_mnt')).toContain('Хүргэлтийн төлбөрөө бичнэ үү');
+    expect(overTheFields(editing)).toBe(false);
     expect(d.activeElement).toBe(fee);
-    fee.value = '15000';
+    fill(editing, { delivery_fee_mnt: '15000' });
+    expect(refusalOf(editing, 'delivery_fee_mnt')).toBeNull();
     (editing.querySelector('[data-submit]') as HTMLElement).click();
     await until(screen, 'the delivery kept', (doc) =>
       !doc.querySelector('.sheet.popup[data-open]') && (rowNamed(screen, 'Хонь, өөрөө авна')?.querySelector('.sub')?.textContent?.includes('хүргэлт 15,000₮') ?? false),
