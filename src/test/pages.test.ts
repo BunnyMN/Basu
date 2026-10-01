@@ -1085,6 +1085,9 @@ describe('the Basu home screen', () => {
 
     const card = home.window.document.querySelector('.card') as HTMLAnchorElement;
     expect(card.textContent).toContain(pairedVenue);
+    // Waiting on the kitchen, the corner gives the time the guest comes, in
+    // the words the iPhone's launcher and lock screen use.
+    expect(card.querySelector('.when')?.textContent).toBe('13:00ирэх');
     const href = card.getAttribute('href') ?? '';
     expect(href).toMatch(/^\/dine\?order=[0-9a-f-]{36}$/);
 

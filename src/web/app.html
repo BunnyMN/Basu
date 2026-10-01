@@ -212,7 +212,9 @@ async function loadSupplierTile() {
 
 /**
  * The states that carry a time worth putting in the corner of the card, and
- * what that time is called. Anything else gets the slot it was booked for.
+ * what that time is called. Anything else gets the slot it was booked for:
+ * the time the guest comes, «ирэх» — as the iOS launcher, lock screen and
+ * widgets call it, and as a delivery's day is called here.
  */
 function moment(order) {
   if (['FIRED', 'COOKING'].includes(order.state) && order.ready_at) {
@@ -221,7 +223,7 @@ function moment(order) {
   if (order.fire_at && !['READY', 'SERVED'].includes(order.state)) {
     return [hhmm(order.fire_at), 'гал'];
   }
-  return [hhmm(order.slot_starts_at), 'суух'];
+  return [hhmm(order.slot_starts_at), 'ирэх'];
 }
 
 const SUB = {

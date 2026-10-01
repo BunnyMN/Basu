@@ -232,7 +232,7 @@ Dark `@media (prefers-color-scheme: dark)` доор `:root:not([data-theme="ligh
       <span class="sub what">Энэ цагт гал дээр гарна</span>
       <span class="meta code">Хоол · №0970 <span class="chip" data-inline data-s="PAID">Төлсөн</span></span>
     </span>
-    <span class="end"><span class="val when" data-size="lg">12:30<small>суух</small></span></span>
+    <span class="end"><span class="val when" data-size="lg">12:30<small>ирэх</small></span></span>
   </a>
 </div>
 <ul data-rows><li><button class="row listing" …>…</button></li></ul>
@@ -525,7 +525,7 @@ Chrome: badge + «‹ Basu» → нэг `.topbar[data-fixed]` (back тэргүү
 ### home (`index.html`)
 - Тест: `.app` яг 2 (basu.guest байхгүй үед) — `app` классыг өөр зүйлд хэрэглэхгүй; `.app[data-app="dine"]` `<a href="/dine">`, текст «Хоол», дотор `.tile svg`; `[data-app="idesh"]` `/idesh`, «Идэш», `.tile svg`; `.card` 0 (гарсан үед) — `.card` зөвхөн live мөрөнд, контейнер/grid-д биш; dine захиалгатай бол эхний `.card` `<a>` текст = ресторан, href `/^\/dine\?order=[0-9a-f-]{36}$/`; `.card[data-source="Идэш"]` href `/^\/idesh\?order=[0-9a-f-]{36}$/`, `card.querySelector('.chip').textContent === 'Төлсөн'` (PAID; зөвхөн үг), `.when` textContent `/^\d{1,2}\/\d{1,2}авах$/` (`${row.time}<small>${row.label}</small>` зэрэгцээ, зайгүй).
 - JS: `#apps` (ul, append + `[data-app="supplier"]`), `#live` (`dataset.any` / `removeAttribute`), `#live-list` (`replaceChildren`), `#hello` (хэрэглэгддэггүй, үлдээж болно); tile `<li> > a.app[data-app][href] > .tile(svg) + .name + .tag` (`closest('li').remove()`); мөр `a.card[href][data-source] > span.who > .venue .what .code(«${source} · №${code}» + span.chip[data-s]) ; span.when`; `.live:not([data-any]){display:none}`; `data-app` dine|idesh|supplier, `data-source` Хоол|Идэш, `data-s` төлөв, `data-any` тоо.
-- Копи: «Улаанбаатар», «Өнөөдөр юу хийх вэ?», «Идэвхтэй», «Аппууд», «Гал тогооны дэлгэц →»; «Хоол» «Идэш» «Нийлүүлэгч»; «урьдчилсан» «өвлийн» «миний зар»; SUB; «бэлэн» «гал» «суух» «буцаалт» «ирэх» «авах»; `${title} ×${qty} · ${cap}`. Холбоос `/dine /idesh /supplier /kds`. Boot: `mountClock(() => loadLive())`, `loadLive()`, 4000ms poll (hidden алгасна, pagehide clear), 401 → `store.guestToken=null`. `<link rel="stylesheet" href="/app.css">` + Google Fonts (өөр гадаад CSS хориотой). `<html lang="mn">`, `<title>Basu</title>`.
+- Копи: «Улаанбаатар», «Өнөөдөр юу хийх вэ?», «Идэвхтэй», «Аппууд», «Гал тогооны дэлгэц →»; «Хоол» «Идэш» «Нийлүүлэгч»; «урьдчилсан» «өвлийн» «миний зар»; SUB; «бэлэн» «гал» «ирэх» (хоолны ширээний цаг — iOS-ийн «ИРЭХ»-тэй адил; «суух» биш) «буцаалт» «ирэх» (хүргэлт) «авах»; `${title} ×${qty} · ${cap}`. Холбоос `/dine /idesh /supplier /kds`. Boot: `mountClock(() => loadLive())`, `loadLive()`, 4000ms poll (hidden алгасна, pagehide clear), 401 → `store.guestToken=null`. `<link rel="stylesheet" href="/app.css">` + Google Fonts (өөр гадаад CSS хориотой). `<html lang="mn">`, `<title>Basu</title>`.
 
 ### dine (`dine.html`)
 - ID: map, badge (`$('badge').querySelector('span')` — `<span>` хүү), home, blank, scrim, sheet, sheet-name, sheet-sub, sheet-walk, sheet-close, sheet-body, sheet-foot, orderbar, ob-code, ob-what, ob-when; `#toast`, `#clock-now`.
