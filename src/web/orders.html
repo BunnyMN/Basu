@@ -120,7 +120,7 @@
 </main>
 
 <script type="module">
-import { store, mnt, dayLabel, IDESH_STATE, IDESH_LIVE, BANK_NAMES, popup, passwordPopup, whatWentWrong } from '/api.js';
+import { store, mnt, dayLabel, dayShort, ubParts, IDESH_STATE, IDESH_LIVE, BANK_NAMES, popup, passwordPopup, whatWentWrong } from '/api.js';
 import { mountFrame, requireSignIn, authed, esc, el, say, me, siteEmpty, howToBuy, statePill, tugrik, phoneShown, meatPhoto, stillGoing, refundPill } from '/site.js';
 
 const token = requireSignIn();
@@ -237,9 +237,10 @@ const FACE = {
   CANCELLED: ['Цуцлагдсан', (o) => (o.refund_mnt ? `Захиалга цуцлагдлаа.${o.forfeit_mnt ? ` Мал нядалсны дараа тул ${mnt(o.forfeit_mnt)} суутгав.` : ''} ${mnt(o.refund_mnt)} таны банкны данс руу буцна.` : 'Захиалга цуцлагдлаа.')],
   REFUNDED: ['Мөнгө буцаасан', (o) => `${mnt(o.refund?.amount_mnt ?? o.refund_mnt ?? 0)} данс руу тань шилжүүлсэн.`],
 };
+/** «10/2 06:30»: a moment's day and clock as Ulaanbaatar reads them, whatever zone the computer is set to. */
 const clockOf = (iso) => {
-  const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const { day, clock } = ubParts(iso);
+  return `${dayShort(day)} ${clock}`;
 };
 /** «Бусад банк»: a bank not on the list, its name typed in the field under it. */
 const OTHER_BANK = '__other';

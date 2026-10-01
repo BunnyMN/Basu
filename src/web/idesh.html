@@ -377,7 +377,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 <!-- MapLibre from cdnjs, held to cdnjs's own hash of the file: bytes that ever differ do not run. A new version takes its new hash, here and on the stylesheet. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js" integrity="sha512-hoXlvOdSmh58mppUyZHZsscHkR/yXl6zLpTMTNwA6IZ61DpeaCNjosRu1WJ2DeIpkfW5MsJJ9H89zjV4IBGqRw==" crossorigin="anonymous"></script>
 <script type="module">
-import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, KIND, dayLabel, dayShort, signInSheet, passwordPopup, dropSession, whatWentWrong } from '/api.js';
+import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, KIND, dayLabel, dayShort, ubParts, signInSheet, passwordPopup, dropSession, whatWentWrong } from '/api.js';
 import { mapStyle, mapTheme, onMapTheme, repaintMap, ULAANBAATAR } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -1534,11 +1534,8 @@ const REASON_WORDS = {
 const FORFEIT_PCT = 10;
 const BANKS = ['Хаан банк', 'Голомт банк', 'Худалдаа хөгжлийн банк', 'Хас банк', 'Төрийн банк', 'Капитрон банк', 'Ариг банк', 'Богд банк', 'М банк'];
 
-/** «14:05», the local clock, for a step that is done. */
-function clockOf(iso) {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
+/** «14:05», Ulaanbaatar's clock, for a step that is done — whatever zone the phone is set to. */
+const clockOf = (iso) => ubParts(iso).clock;
 
 /**
  * A refund does not go to a wallet: the guest names their own bank account
@@ -1671,7 +1668,7 @@ function refundPanel(order) {
     el(`<div class="line">${r.state === 'paid' ? MARK.check : MARK.wallet}<div>
           <span class="lab">${r.state === 'paid' ? 'Буцаалт шилжүүлсэн' : 'Буцаалт'}</span>
           <div class="v"><span class="mono">${money(r.amount_mnt)}</span><small>${escapeHtml(r.bank_name ?? '')} · ${escapeHtml(r.bank_account ?? '')} · ${escapeHtml(r.bank_holder ?? '')}${
-            r.state === 'paid' ? `<br>Шилжүүлсэн ${r.paid_at ? `${dayShort(r.paid_at.slice(0, 10))} ${clockOf(r.paid_at)}` : ''}` : '<br>Basu ажлын өдөрт шилжүүлж, мэдэгдэл илгээнэ.'
+            r.state === 'paid' ? `<br>Шилжүүлсэн ${r.paid_at ? `${dayShort(ubParts(r.paid_at).day)} ${clockOf(r.paid_at)}` : ''}` : '<br>Basu ажлын өдөрт шилжүүлж, мэдэгдэл илгээнэ.'
           }</small></div>
         </div></div>`),
   );

@@ -467,7 +467,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 </div>
 
 <script type="module">
-import { api, ApiError, store, toast, mnt, money, KIND, HEADLINE, LUNCH_WORD, IDESH_STATE, IDESH_LIVE, headlineWord, dayLabel, dayShort, signInDoors, authMethods, accountWays, authReturn, takeSession, dropSession, popup, confirmPopup, phoneText, skeleton, emptyState, whatWentWrong } from '/api.js';
+import { api, ApiError, store, toast, mnt, money, KIND, HEADLINE, LUNCH_WORD, IDESH_STATE, IDESH_LIVE, headlineWord, dayLabel, dayShort, ubParts, signInDoors, authMethods, accountWays, authReturn, takeSession, dropSession, popup, confirmPopup, phoneText, skeleton, emptyState, whatWentWrong } from '/api.js';
 import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -487,16 +487,7 @@ const el = (html) => {
  * attribute of its own.
  */
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-/**
- * A moment as Ulaanbaatar reads it: its day and its clock, whatever zone the computer at the desk is set to.
- * A stamp's first ten characters are UTC's day, and before 08:00 here that is yesterday — so the day beside a
- * time is always read here, from the same moment as the time.
- */
-const UB_PARTS = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ulaanbaatar', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
-const ubParts = (iso) => {
-  const p = Object.fromEntries(UB_PARTS.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
-  return { day: `${p.year}-${p.month}-${p.day}`, clock: `${p.hour === '24' ? '00' : p.hour}:${p.minute}` };
-};
+/* A moment's day and clock are Ulaanbaatar's (api.js ubParts), whatever zone the computer at the desk is set to. */
 const when = (iso) => (iso ? dayLabel(ubParts(iso).day) : '—');
 const clockOf = (iso) => ubParts(iso).clock;
 /** A date and its time in a table cell, as datatable.js draws them («10-р сарын 2 · 07:15»), read in Ulaanbaatar. */

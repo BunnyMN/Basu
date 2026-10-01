@@ -2089,6 +2089,19 @@ export function money(value, tone) {
   return `<span class="money"${attr}>${sign}${digits}<span class="cur">₮</span></span>`;
 }
 
+/**
+ * A moment as Ulaanbaatar reads it — its day («2026-10-02») and its clock
+ * («06:30») — whatever zone the computer is set to; now, when no moment is
+ * given. A stamp's first ten characters are UTC's day, and before 08:00 here
+ * that is yesterday: every day and time a page says is read here, the day
+ * from the same moment as the time beside it.
+ */
+const UB_PARTS = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ulaanbaatar', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+export function ubParts(at = Date.now()) {
+  const p = Object.fromEntries(UB_PARTS.formatToParts(new Date(at)).map((x) => [x.type, x.value]));
+  return { day: `${p.year}-${p.month}-${p.day}`, clock: `${p.hour === '24' ? '00' : p.hour}:${p.minute}` };
+}
+
 /** `2026-11-03` → `11-р сарын 3`. The day, said the way a message says it. */
 export function dayLabel(day) {
   if (!day) return '—';

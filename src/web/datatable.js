@@ -23,6 +23,9 @@ const DT_NEXT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6
 const DT_EMPTY = '<svg viewBox="0 0 24 24"><path d="M3.5 13h4.5l1.5 2.5h5l1.5-2.5h4.5"/><path d="M6 5h12l2.5 8v5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-5z"/></svg>';
 const DT_FOUND_NONE = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>';
 
+/** A moment's month, day and clock in Ulaanbaatar, for `dtCell.when`. */
+const DT_UB = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ulaanbaatar', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+
 function dtEsc(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -82,13 +85,15 @@ export const dtCell = {
     const m = /^(?:\+?976)?(\d{4})(\d{4})$/.exec(String(value).replace(/[\s-]/g, ''));
     return `<span class="mono dt-phone">${dtEsc(m ? `+976 ${m[1]} ${m[2]}` : value)}</span>`;
   },
-  /** A date and its time, as one short run: «9-р сарын 28 · 14:05». */
+  /**
+   * A date and its time, as one short run: «9-р сарын 28 · 14:05» — both
+   * Ulaanbaatar's, whatever zone the computer is set to (api.js ubParts).
+   */
   when: (iso) => {
     if (!iso) return '<span class="dt-none">—</span>';
-    const d = new Date(iso);
-    const day = `${d.getMonth() + 1}-р сарын ${d.getDate()}`;
-    const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    return `<span class="dt-when">${day}<small>${time}</small></span>`;
+    const p = Object.fromEntries(DT_UB.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+    const time = `${p.hour === '24' ? '00' : p.hour}:${p.minute}`;
+    return `<span class="dt-when">${Number(p.month)}-р сарын ${Number(p.day)}<small>${time}</small></span>`;
   },
   /** Nothing to say. */
   none: () => '<span class="dt-none">—</span>',

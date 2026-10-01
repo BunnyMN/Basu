@@ -28,7 +28,7 @@ beforeEach(async () => {
   const nav = strip(await readFile(join(WEB, 'sidenav.js'), 'utf8'));
   const tables = strip(await readFile(join(WEB, 'datatable.js'), 'utf8'));
   window.eval(
-    `${api}\n${nav}\n${tables}\nObject.assign(window, { popup, confirmPopup, toast, emptyState, skeleton, fieldError, setBusy, phoneText, phoneInput, moneyInput, moneyValue, deskFrame, dataTable, HEADLINE, headlineWord, IDESH_HEADLINE, IDESH_STATE, IDESH_LIVE });`,
+    `${api}\n${nav}\n${tables}\nObject.assign(window, { popup, confirmPopup, toast, emptyState, skeleton, fieldError, setBusy, phoneText, phoneInput, moneyInput, moneyValue, deskFrame, dataTable, dtCell, ubParts, HEADLINE, headlineWord, IDESH_HEADLINE, IDESH_STATE, IDESH_LIVE });`,
   );
 });
 
@@ -413,6 +413,24 @@ describe('an идэш’s state', () => {
     for (const state of Object.keys(window.IDESH_HEADLINE)) expect(window.IDESH_STATE[state]).toBeTruthy();
     // «Идэвхтэй» is paid and not yet handed over, everywhere.
     expect(window.IDESH_LIVE).toEqual(['PAID', 'PREPARING', 'READY', 'DISPATCHED']);
+  });
+});
+
+describe('Ulaanbaatar’s day and clock', () => {
+  it('reads a moment as Ulaanbaatar does, whatever zone the computer is set to — in a sentence and in a table’s cell', () => {
+    const was = process.env['TZ'];
+    // A computer set to UTC, where 22:30 on 1 October is 06:30 on the 2nd here.
+    process.env['TZ'] = 'UTC';
+    try {
+      expect({ ...window.ubParts('2026-10-01T22:30:00Z') }).toEqual({ day: '2026-10-02', clock: '06:30' });
+      // Midnight here is 00:00, never «24:00».
+      expect({ ...window.ubParts('2026-10-01T16:00:00Z') }).toEqual({ day: '2026-10-02', clock: '00:00' });
+      expect(window.dtCell.when('2026-10-01T22:30:00Z')).toBe('<span class="dt-when">10-р сарын 2<small>06:30</small></span>');
+      expect(window.dtCell.when(null)).toBe('<span class="dt-none">—</span>');
+    } finally {
+      if (was === undefined) delete process.env['TZ'];
+      else process.env['TZ'] = was;
+    }
   });
 });
 

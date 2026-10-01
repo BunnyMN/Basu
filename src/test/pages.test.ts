@@ -119,6 +119,8 @@ const trafficOf = new WeakMap<JSDOM, { made: number; pending: number }>();
  * be given one that says something. `respond` answers a request in place of
  * the server, for a state the seed cannot be put in — an empty market — or
  * loses the server's answer on its way back, the way a patchy connection does.
+ * `now` sets the page's own clock — what `new Date()` and `Date.now()` say
+ * in it, still ticking — for a test about the day a computer thinks it is.
  */
 async function openPage(
   file: string,
@@ -126,6 +128,7 @@ async function openPage(
   respond?: (path: string, init?: RequestInit) => Response | Promise<Response> | undefined,
   browser: ReturnType<typeof memoryStorage> = storage,
   userAgent?: string,
+  now?: string,
 ): Promise<JSDOM> {
   const html = await readFile(join(WEB, file), 'utf8');
   const dom = new JSDOM(html, {
@@ -184,6 +187,16 @@ async function openPage(
   const page = inline.replace(/^\s*import[\s\S]*?from\s*'\/[\w.]+';?$/gm, '');
 
   stubMapLibre(window);
+  if (now) {
+    window.eval(`(() => {
+      const Real = Date;
+      const shift = ${Date.parse(now)} - Real.now();
+      globalThis.Date = class extends Real {
+        constructor(...at) { super(...(at.length ? at : [Real.now() + shift])); }
+        static now() { return Real.now() + shift; }
+      };
+    })();`);
+  }
   window.eval(
     `(async () => { ${shared}\n${site}\n${mapLib}\n${sideNav}\n${tables}\n${page} })().catch(e => { window.__err = e; });`,
   );
@@ -3590,6 +3603,179 @@ describe('who sees what', () => {
       for (const key of [plain, quoted]) await fetch(`${base}/v1/ops/menus/org/links/${key}`, { method: 'DELETE', headers: { authorization: `Bearer ${desk}` } });
     }
   });
+
+  describe('Ulaanbaatar’s day, whatever zone the computer is in', () => {
+    /*
+     * 06:30 on 2 October in Ulaanbaatar is 22:30 on 1 October in UTC: a
+     * stamp's first ten characters, and the day of a computer set to UTC (a
+     * phone abroad, a CI runner), are the day before. Every page says the
+     * day and the time Ulaanbaatar reads, run here on a machine set to UTC.
+     */
+    const DAWN = '2026-10-01T22:30:00Z';
+    const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+    /** The server's own answer to a page's GET for `path`, changed on its way back. */
+    const changed =
+      (match: (path: string) => boolean, change: (body: Record<string, any>) => void) =>
+      (path: string, init?: RequestInit): Promise<Response> | undefined =>
+        match(path) && (init?.method ?? 'GET') === 'GET'
+          ? (async () => {
+              const real = await fetch(new URL(path, base), { headers: new Headers(init?.headers) });
+              const body = (await real.json()) as Record<string, any>;
+              change(body);
+              return json(body, real.status);
+            })()
+          : undefined;
+    /** One whole animal, collected, bought and paid for by `buyer`: the order's id. */
+    async function paidOrder(buyer: string): Promise<string> {
+      const { listings, today } = (await (await fetch(`${base}/v1/idesh/listings`)).json()) as {
+        today: string;
+        listings: Array<{ id: string; unit: string; remaining: number; ready_from: string }>;
+      };
+      const stall = listings.find((l) => l.unit === 'whole' && l.remaining > 0)!;
+      const made = await fetch(`${base}/v1/idesh`, {
+        method: 'POST',
+        headers: as(buyer),
+        body: JSON.stringify({ listing_id: stall.id, qty: 1, receive: 'pickup', receive_on: stall.ready_from > today ? stall.ready_from : today }),
+      });
+      const order = (await made.json()) as { id: string };
+      expect(made.status, JSON.stringify(order)).toBe(201);
+      expect((await fetch(`${base}/v1/idesh/${order.id}/pay`, { method: 'POST', headers: as(buyer), body: '{}' })).status).toBe(200);
+      return order.id;
+    }
+
+    it('puts a new listing’s ready day a week from Ulaanbaatar’s today when the server has not said which day it is', async () => {
+      const owner = await account('+97688031001', 'Үүрийн');
+      const orgId = await business(owner, 'Үүрийн мах · тест', { supplier: true });
+      // Neither the day's numbers nor the board answer: the page has only its own clock to go by.
+      const down = (path: string) =>
+        path.startsWith('/v1/supplier/home') || path.startsWith('/v1/supplier/board') ? json({ error: { code: 'DOWN', message_mn: 'Түр саатал.' } }, 503) : undefined;
+      await inZone('UTC', async () => {
+        const stall = await openPage('supplier.html', `?org=${orgId}#stall/new`, down, device(owner), undefined, DAWN);
+        await until(stall, 'the new listing', (d) => Boolean(d.querySelector('#listing-new [name="ready_from"]')));
+        expect((stall.window.document.querySelector('#listing-new [name="ready_from"]') as HTMLInputElement).value).toBe('2026-10-09');
+      });
+    });
+
+    it('says on the supplier’s board the day a guest may be called absent from, and the time it last reached the server', async () => {
+      const owner = await account('+97688031002', 'Үүрээ');
+      const orgId = await business(owner, 'Үүрийн гэр · тест', { supplier: true });
+      const ticket = {
+        id: '00000000-0000-4000-8000-000000000001',
+        code: 'K7Q2',
+        title: 'Хонь, бүтэн',
+        qty: 1,
+        unit: 'whole',
+        state: 'READY',
+        receive: 'pickup',
+        receive_on: '2026-10-02',
+        total_mnt: 460000,
+        payout_mnt: 414000,
+        guest: 'Нараа',
+        // 06:30 on the 4th in Ulaanbaatar.
+        no_show_from: '2026-10-03T22:30:00Z',
+      };
+      // The board answers once, then the line drops.
+      let boards = 0;
+      const board = (path: string) => {
+        if (!path.startsWith('/v1/supplier/board')) return undefined;
+        boards += 1;
+        return boards === 1
+          ? json({ today: '2026-10-02', supplier: { name: 'Үүрийн гэр · тест' }, lanes: { paid: [], preparing: [], ready: [ticket], dispatched: [] }, listings: [] })
+          : json({ error: { code: 'DOWN', message_mn: 'Түр саатал.' } }, 503);
+      };
+      await inZone('UTC', async () => {
+        const screen = await openPage('supplier.html', `?org=${orgId}`, board, device(owner), undefined, DAWN);
+        await until(screen, 'the ticket', (d) => Boolean(d.querySelector('.ticket .grace')));
+        expect(screen.window.document.querySelector('.ticket .grace')?.textContent).toContain('Ирэхгүй бол 10-р сарын 4-нөөс');
+        // Lost, the strip says when the board was last right: 06:30 here, not 22:30.
+        await until(screen, 'the lost line', (d) => Boolean(d.querySelector('#conn:not([hidden])')));
+        expect(screen.window.document.querySelector('#conn .mono')?.textContent).toBe('06:30');
+      });
+    });
+
+    it('dates a listing’s paid place and the supplier’s payouts by Ulaanbaatar’s day', async () => {
+      const owner = await account('+97688031003', 'Тэлмэн');
+      const orgId = await business(owner, 'Тэлмэн мах · тест', { supplier: true });
+      const listing = {
+        id: '00000000-0000-4000-8000-000000000002',
+        kind: 'sheep',
+        unit: 'whole',
+        title: 'Хонь, залуу ирэг',
+        price_mnt: 460000,
+        approx_kg: 38,
+        min_qty: null,
+        quantity: 5,
+        sold: 0,
+        remaining: 5,
+        ready_from: '2026-10-05',
+        origin: 'Архангай',
+        delivers: false,
+        delivery_fee_mnt: 0,
+        active: true,
+        note: null,
+        tier: 'featured',
+        // Its place ends at 06:30 on the 9th in Ulaanbaatar.
+        tier_until: '2026-10-08T22:30:00Z',
+      };
+      const settlement = { id: '00000000-0000-4000-8000-000000000003', order_code: 'K7Q2', memo: 'Хонь ×1', state: 'paid', amount_mnt: 414000, created_at: '2026-10-01T21:00:00Z', paid_at: DAWN, reference: 'ХААН-1' };
+      const answers = (path: string, init?: RequestInit) =>
+        changed((p) => p.startsWith('/v1/supplier/listings'), (body) => (body['listings'] = [listing]))(path, init) ??
+        changed((p) => p.startsWith('/v1/supplier/money'), (body) => (body['settlements'] = [settlement]))(path, init);
+      await inZone('UTC', async () => {
+        const stall = await openPage('supplier.html', `?org=${orgId}#stall`, answers, device(owner));
+        await until(stall, 'the listing', (d) => Boolean(d.querySelector('.chip.tier')));
+        expect(stall.window.document.querySelector('.chip.tier')?.textContent).toBe('Онцгой · 10-р сарын 9 хүртэл');
+        const money = await openPage('supplier.html', `?org=${orgId}#money`, answers, device(owner));
+        await until(money, 'the payout', (d) => Boolean(d.querySelector(`[data-settlement="${settlement.id}"] .sub`)));
+        expect(money.window.document.querySelector(`[data-settlement="${settlement.id}"] .sub`)?.textContent).toBe('Шилжүүлсэн 10/2 06:30 · ХААН-1');
+      });
+    });
+
+    it('times an order’s steps and its refund on the app’s page and the website’s by Ulaanbaatar’s clock', async () => {
+      const buyer = await account('+97688031004', 'Сарнай');
+      const id = await paidOrder(buyer);
+      const isOrder = (path: string) => path === `/v1/idesh/${id}` || path.startsWith(`/v1/idesh/${id}?`);
+      const paidAtDawn = changed(isOrder, (o) => (o['paid_at'] = DAWN));
+      const refunded = changed(isOrder, (o) => {
+        o['state'] = 'CANCELLED';
+        o['refund'] = { state: 'paid', amount_mnt: 460000, bank_name: 'Хаан банк', bank_account: '5000123456', bank_holder: 'Сарнай', paid_at: DAWN };
+      });
+      await inZone('UTC', async () => {
+        const app = await openPage('idesh.html', `?order=${id}`, paidAtDawn, device(buyer));
+        await until(app, 'the steps', (d) => Boolean(d.querySelector('.timeline li[data-done] .t')));
+        expect(app.window.document.querySelector('.timeline li[data-done] .t')?.textContent).toBe('06:30');
+        const back = await openPage('idesh.html', `?order=${id}`, refunded, device(buyer));
+        await until(back, 'the refund', (d) => Boolean(d.querySelector('#refund small')));
+        expect(back.window.document.querySelector('#refund small')?.textContent).toContain('Шилжүүлсэн 10/2 06:30');
+        const site = await openPage('orders.html', `/${id}`, paidAtDawn, device(buyer));
+        await until(site, 'the steps', (d) => Boolean(d.querySelector('li[data-done] time')));
+        expect(site.window.document.querySelector('li[data-done] time')?.textContent).toBe('10/2 06:30');
+      });
+    });
+
+    it('says on the account page today, yesterday and the day joined as Ulaanbaatar counts them', async () => {
+      const person = await account('+97688031005', 'Номин');
+      const answers = (path: string, init?: RequestInit) =>
+        changed((p) => p === '/v1/me', (me) => (me['member_since'] = DAWN))(path, init) ??
+        changed(
+          (p) => p === '/v1/me/sessions',
+          (body) => {
+            // Seen at 06:30 today and at 23:00 last night, Ulaanbaatar's; the computer's clock reads 07:00.
+            body['sessions'] = [
+              { ...body['sessions'][0], last_seen_at: DAWN },
+              { ...body['sessions'][0], id: '00000000-0000-4000-8000-000000000004', current: false, label: 'iPhone', last_seen_at: '2026-10-01T15:00:00Z' },
+            ];
+          },
+        )(path, init);
+      await inZone('UTC', async () => {
+        const page = await openPage('account.html', '', answers, device(person), undefined, '2026-10-01T23:00:00Z');
+        await until(page, 'the devices', (d) => d.querySelectorAll('#sa li small').length === 2);
+        const seen = [...page.window.document.querySelectorAll('#sa li small')].map((s) => s.textContent);
+        expect(seen).toEqual(['Сүүлд: Өнөөдөр 06:30', 'Сүүлд: Өчигдөр 23:00']);
+        expect(page.window.document.querySelector('#sa')?.textContent).toContain('2026 оны 10-р сарын 2');
+      });
+    });
+  });
 });
 
 describe('one browser, one person', () => {
@@ -5151,6 +5337,22 @@ async function buyPickup(dom: JSDOM): Promise<string> {
   (dom.window.document.querySelector('#pay') as HTMLElement).click();
   await until(dom, 'the status', (d) => Boolean(d.querySelector('.handcode b')));
   return dom.window.document.querySelector('.handcode b')!.textContent!;
+}
+
+/**
+ * Run with the machine set to another zone, the way a computer abroad (or a
+ * CI runner in UTC) reads dates: a page that took the computer's zone for
+ * Ulaanbaatar's says another day there. The zone comes back afterwards.
+ */
+async function inZone<T>(zone: string, run: () => Promise<T>): Promise<T> {
+  const was = process.env['TZ'];
+  process.env['TZ'] = zone;
+  try {
+    return await run();
+  } finally {
+    if (was === undefined) delete process.env['TZ'];
+    else process.env['TZ'] = was;
+  }
 }
 
 /** The desk opens on the numbers; a test goes to the section it is about. */

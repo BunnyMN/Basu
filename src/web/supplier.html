@@ -248,7 +248,7 @@
 <div id="root"></div>
 
 <script type="module">
-import { api, store, shell, toast, mnt, money, KIND, IDESH_STATE, dayLabel, dayShort, signInDoors, accountWays, authReturn, popup, passwordPopup, BANK_NAMES, dropSession, whatWentWrong } from '/api.js';
+import { api, store, shell, toast, mnt, money, KIND, IDESH_STATE, dayLabel, dayShort, ubParts, signInDoors, accountWays, authReturn, popup, passwordPopup, BANK_NAMES, dropSession, whatWentWrong } from '/api.js';
 import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -683,9 +683,12 @@ const APPLICATION = {
 const WAIT_WORDS =
   'Шалгалт ихэвчлэн ажлын нэг, хоёр өдөр болдог. Асуух зүйл байвал <a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a> хаягаар бичээрэй.';
 
-/** The day of a timestamp in Ulaanbaatar: «10-р сарын 1» in a sentence, «10/1» where it is set as a figure. */
-const dayOfStamp = (iso) => (iso ? dayLabel(new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ulaanbaatar' })) : '');
-const dayFigure = (iso) => (iso ? dayShort(new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ulaanbaatar' })) : '');
+/**
+ * The day of a timestamp in Ulaanbaatar: «10-р сарын 1» in a sentence, «10/1» where it is set as a figure.
+ * Never a stamp's first ten characters: those are UTC's day, and before 08:00 here that is yesterday.
+ */
+const dayOfStamp = (iso) => (iso ? dayLabel(ubParts(iso).day) : '');
+const dayFigure = (iso) => (iso ? dayShort(ubParts(iso).day) : '');
 
 function statusCard(a, needsPhone = false) {
   const [word, cap] = APPLICATION[a.state] ?? [a.state, ''];
@@ -900,7 +903,7 @@ function renderTicket(ticket, lane, { page = false } = {}) {
           lane === 'ready' && !delivery && ticket.no_show_from
             ? new Date(ticket.no_show_from) <= new Date()
               ? '<div class="grace callout" data-k="warn"><span>Зочин ирсэнгүй. Залгаад, ирэхгүй бол «Цуцлах» дээр «зочин ирээгүй» гэж сонгоно.</span></div>'
-              : `<div class="grace callout"><span>Ирэхгүй бол ${dayLabel(ticket.no_show_from.slice(0, 10))}-нөөс «зочин ирээгүй» гэж цуцалж болно.</span></div>`
+              : `<div class="grace callout"><span>Ирэхгүй бол ${dayOfStamp(ticket.no_show_from)}-нөөс «зочин ирээгүй» гэж цуцалж болно.</span></div>`
             : ''
         }
         <div class="btns"></div>
@@ -1107,7 +1110,7 @@ function connection(ok) {
     return;
   }
   if (!strip) return;
-  const at = lastGood ? `${String(lastGood.getHours()).padStart(2, '0')}:${String(lastGood.getMinutes()).padStart(2, '0')}` : '—';
+  const at = lastGood ? ubParts(lastGood).clock : '—';
   strip.querySelector('.mono').textContent = at;
   strip.dataset.stale = '1';
   strip.hidden = false;
@@ -1147,7 +1150,7 @@ const listingWhat = (l) =>
 function listingMarks(l) {
   const [state, word] = listingState(l);
   return `${state === 'active' ? '' : ` <span class="chip" data-size="sm" data-s="${state}">${word}</span>`}${
-    l.tier ? ` <span class="chip tier" data-size="sm" data-tone="${l.tier === 'vip' ? 'hi' : 'accent'}" data-strong>${l.tier === 'vip' ? 'VIP' : 'Онцгой'} · ${dayLabel(l.tier_until.slice(0, 10))} хүртэл</span>` : ''
+    l.tier ? ` <span class="chip tier" data-size="sm" data-tone="${l.tier === 'vip' ? 'hi' : 'accent'}" data-strong>${l.tier === 'vip' ? 'VIP' : 'Онцгой'} · ${dayOfStamp(l.tier_until)} хүртэл</span>` : ''
   }`;
 }
 
@@ -1302,9 +1305,9 @@ const asNumber = (value) => {
   if (s === '') return NaN;
   return /^\d{1,3}([.,]\d{3})+$/.test(s) ? Number(s.replace(/[.,]/g, '')) : Number(s.replace(',', '.'));
 };
-/** The day a week from today, for a new listing's ready day. */
+/** The day a week from today — the server's, else Ulaanbaatar's by this computer's clock — for a new listing's ready day. */
 function weekFrom(day) {
-  const d = new Date(`${day ?? new Date().toISOString().slice(0, 10)}T12:00:00+08:00`);
+  const d = new Date(`${day ?? ubParts().day}T12:00:00+08:00`);
   d.setUTCDate(d.getUTCDate() + 7);
   return d.toISOString().slice(0, 10);
 }
@@ -1874,11 +1877,11 @@ async function renderMoney(bank = false) {
   if (bank && may('org.idesh.profile:bank')) void changeBank(data);
 }
 
-/** «9/8 14:05» for a timestamp the supplier reads across a list. */
+/** «9/8 14:05» for a timestamp the supplier reads across a list, as Ulaanbaatar reads it. */
 function when(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const { day, clock } = ubParts(iso);
+  return `${dayShort(day)} ${clock}`;
 }
 
 /* ── the module ──────────────────────────────────────────────────── */
