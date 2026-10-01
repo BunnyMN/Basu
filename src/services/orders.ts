@@ -8,7 +8,7 @@ import type { SignalType } from '../domain/eta.js';
 import { cancelFire } from '../scheduler/fireJobs.js';
 import { planAndSchedule } from './planning.js';
 import { enqueue } from '../platform/notify/index.js';
-import { collect, queueReceipt, refund as refundToWallet } from '../platform/ledger/index.js';
+import { collect, LedgerError, queueReceipt, refund as refundToWallet } from '../platform/ledger/index.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -309,6 +309,9 @@ export async function payOrder(ctx: Ctx, orderId: string): Promise<void> {
       idempotencyKey: `order:${orderId}:purchase`,
     });
   } catch (error) {
+    // As for meat: a server with no payment provider says it is closed,
+    // rather than «try again» at a button that cannot work today.
+    if (error instanceof LedgerError && error.code === 'PAYMENTS_CLOSED') throw error;
     throw new OrderError('PAYMENT_FAILED', (error as Error).message);
   }
 

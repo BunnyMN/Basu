@@ -5,7 +5,7 @@ import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
 import { createListing, housekeeping, registerSupplier, type Listing } from '../idesh/index.js';
-import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
+import { ClosedPaymentProvider, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
 import { setSetting } from '../ops/index.js';
 
@@ -320,6 +320,30 @@ describe('ordering', () => {
 
     const listing = await app.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}`, headers: auth(token) });
     expect(listing.json().listing.sold).toBe(1);
+  });
+
+  it('says payments are closed in their own words, not «try again», on a server with no provider', async () => {
+    const closed = await buildServer({ ...ctx, payments: new ClosedPaymentProvider() }, { dev: true });
+    try {
+      const token = await signIn();
+      const created = await closed.inject({
+        method: 'POST',
+        url: '/v1/idesh',
+        headers: auth(token),
+        payload: { listing_id: sheep.id, qty: 1, receive: 'pickup', receive_on: '2026-09-12' },
+      });
+      expect(created.statusCode, created.body).toBe(201);
+      const paid = await closed.inject({ method: 'POST', url: `/v1/idesh/${created.json().id}/pay`, headers: auth(token) });
+      expect(paid.statusCode).toBe(503);
+      expect(paid.json().error).toMatchObject({ code: 'PAYMENTS_CLOSED', message_mn: 'Онлайн төлбөр одоогоор хаалттай байна.' });
+      // Nothing was taken and nothing was ordered.
+      const live = await closed.inject({ method: 'GET', url: '/v1/idesh', headers: auth(token) });
+      expect(live.json().orders).toEqual([]);
+      const wallet = await closed.inject({ method: 'GET', url: '/v1/wallet', headers: auth(token) });
+      expect(wallet.json().balance_mnt).toBe(0);
+    } finally {
+      await closed.close();
+    }
   });
 
   it('explains a refusal in Mongolian', async () => {

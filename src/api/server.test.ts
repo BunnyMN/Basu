@@ -8,6 +8,7 @@ import { addMember, removeMember } from '../platform/org/index.js';
 import { accountByContact } from '../platform/identity/index.js';
 import { tick } from '../scheduler/runner.js';
 import {
+  ClosedPaymentProvider,
   FakeNotifier,
   FakePaymentProvider,
   FakeTaxProvider,
@@ -310,6 +311,31 @@ describe('ordering over HTTP', () => {
 
     expect(response.statusCode).toBe(503);
     expect(response.json().error.code).toBe('RESTAURANT_OFFLINE');
+  });
+
+  it('says payments are closed in their own words, not «try again», on a server with no provider', async () => {
+    const closed = await buildServer({ ...ctx, payments: new ClosedPaymentProvider() });
+    try {
+      const guest = await signIn();
+      await atKitchen(venue.restaurantId);
+      const created = await closed.inject({
+        method: 'POST',
+        url: '/v1/orders',
+        headers: auth(guest),
+        payload: {
+          restaurant_id: venue.restaurantId,
+          slot_starts_at: at('12:30').toISOString(),
+          party_size: 2,
+          items: [{ menu_item_id: venue.menuIds['tsuivan'], qty: 1 }],
+        },
+      });
+      expect(created.statusCode, created.body).toBe(201);
+      const paid = await closed.inject({ method: 'POST', url: `/v1/orders/${created.json().id}/pay`, headers: auth(guest) });
+      expect(paid.statusCode).toBe(503);
+      expect(paid.json().error).toMatchObject({ code: 'PAYMENTS_CLOSED', message_mn: 'Онлайн төлбөр одоогоор хаалттай байна.' });
+    } finally {
+      await closed.close();
+    }
   });
 
   it('explains a full slot in Mongolian rather than failing opaquely', async () => {

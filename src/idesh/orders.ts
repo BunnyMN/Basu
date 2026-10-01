@@ -1,6 +1,6 @@
 import { getPool, tx, type Db } from '../db/pool.js';
 import { contactsFor, displayNamesFor } from '../platform/identity/index.js';
-import { collect, queueReceipt, receiptsFor } from '../platform/ledger/index.js';
+import { collect, LedgerError, queueReceipt, receiptsFor } from '../platform/ledger/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
 import { IdeshError } from './errors.js';
@@ -247,6 +247,9 @@ export async function payIdesh(ctx: Ctx, orderId: string): Promise<void> {
       idempotencyKey: `idesh:${orderId}:purchase`,
     });
   } catch (error) {
+    // A server with no payment provider says so in its own words. «Try
+    // again» would send the guest back to a button that cannot work today.
+    if (error instanceof LedgerError && error.code === 'PAYMENTS_CLOSED') throw error;
     throw new IdeshError('PAYMENT_FAILED', (error as Error).message);
   }
 
