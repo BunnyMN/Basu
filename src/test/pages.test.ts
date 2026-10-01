@@ -2034,14 +2034,18 @@ describe('өвлийн идэш', () => {
     await until(screen, 'our order', () => Boolean(ticket()));
     expect(ticket()!.textContent).toContain('Танд очих');
     (ticket()!.querySelector('[data-a="cancel"]') as HTMLElement).click();
-    const reasons = ticket()!.querySelector('.reasons')!;
-    expect(reasons.querySelector('[data-a="confirm"]')).toHaveProperty('disabled', true);
-    const pick = reasons.querySelector('input[value="guest_asked"]') as HTMLInputElement;
+    // Why, asked in a popup over the board: the reason decides the money.
+    await until(screen, 'the reasons', (d) => Boolean(d.querySelector('#cancel-order .reasons')));
+    const asked = screen.window.document.querySelector('#cancel-order')!;
+    const confirm = asked.querySelector('[data-submit]') as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    const pick = asked.querySelector('.reasons input[value="guest_asked"]') as HTMLInputElement;
     pick.checked = true;
     pick.dispatchEvent(new screen.window.Event('change', { bubbles: true }));
-    // Before slaughter: everything back, and the screen says so before the press.
-    expect(reasons.querySelector('.money')?.textContent).toContain('бүтнээр');
-    (reasons.querySelector('[data-a="confirm"]') as HTMLElement).click();
+    // Before slaughter: everything back, and the popup says so before the press.
+    expect(asked.querySelector('.reasons .refund')?.textContent).toContain('бүтнээр');
+    expect(confirm.disabled).toBe(false);
+    confirm.click();
     await until(screen, 'the ticket to go', () => !ticket());
 
     /* the guest: told, and asked where the money goes */
@@ -2134,6 +2138,19 @@ describe('өвлийн идэш', () => {
     expect(guest.window.document.querySelector('.status .big')?.textContent).toBe('Мах бэлтгэгдэж байна');
     expect(guest.window.document.querySelectorAll('.timeline li[data-done]')).toHaveLength(2);
     expect(guest.window.document.querySelector('#screen-foot a[href^="tel:"]')).toBeTruthy();
+
+    // Ready, then handed over. Handing over cannot be taken back, so it asks
+    // first — with the code the guest's phone shows, to check against.
+    const press = (label: string) =>
+      ([...ticket().querySelectorAll('button')].find((b) => b.textContent?.includes(label)) as HTMLElement).click();
+    press('Бэлэн боллоо');
+    await until(screen, 'the meat to be ready', () => ticket()?.getAttribute('data-lane') === 'ready');
+    press('Хүлээлгэн өгсөн');
+    await until(screen, 'the code to check', (d) => d.querySelector('#hand-order .hand-code b')?.textContent === code);
+    expect(ticket()?.getAttribute('data-lane')).toBe('ready');
+    (screen.window.document.querySelector('#hand-order [data-submit]') as HTMLElement).click();
+    await until(screen, 'the ticket to be done', () => !ticket());
+    await until(guest, 'the guest to have it', (d) => d.querySelector('.status')?.getAttribute('data-s') === 'HANDED');
   });
 
   it('lets a supplier run their own stall from their screen', async () => {
@@ -2144,19 +2161,11 @@ describe('өвлийн идэш', () => {
     await until(screen, 'the stall', (d) => d.querySelectorAll('.stall .row[data-listing]').length > 0);
     const before = screen.window.document.querySelectorAll('.stall .row[data-listing]').length;
     expect(before).toBeGreaterThan(0);
-    expect(screen.window.document.querySelector('.new h3')?.textContent).toBe('Шинэ зар нэмэх');
 
-    const form = screen.window.document.querySelector('.new')!;
-    const set = (name: string, value: string) => {
-      const input = form.querySelector(`[name="${name}"]`) as HTMLInputElement;
-      input.value = value;
-    };
-    set('title', 'Хонь, шинэ зар');
-    set('price_mnt', '400000');
-    set('approx_kg', '35');
-    set('quantity', '5');
-    set('origin', 'Архангай');
-    (form.querySelector('#add') as HTMLElement).click();
+    // The page only shows the stall; a new listing is a popup from its head.
+    (screen.window.document.querySelector('#add') as HTMLElement).click();
+    await until(screen, 'the new listing', (d) => d.querySelector('#listing-new h2')?.textContent === 'Шинэ зар нэмэх');
+    await answerPopup(screen, { title: 'Хонь, шинэ зар', price_mnt: '400000', approx_kg: '35', quantity: '5', origin: 'Архангай' });
 
     await until(screen, 'the new row', (d) =>
       d.querySelectorAll('.stall .row[data-listing]').length === before + 1,
