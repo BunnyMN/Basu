@@ -1159,11 +1159,12 @@ async function renderOrgsDesk(view) {
         key: 'applicant',
         label: 'Бүртгүүлсэн',
         value: (o) => `${o.applicant ?? ''} ${o.phone ?? ''}`,
-        // An applicant with no name is shown by the number they signed in with: in the mono a number wears.
+        // An applicant with no name is shown by the number they signed in with, read as a number
+        // is read — «+976 9800 0010» — as is the business's own number under it.
         render: (o) =>
           dtCell.twoHtml(
-            realName(o.applicant) ? esc(o.applicant) : `<span class="mono">${esc(o.applicant ?? '—')}</span>`,
-            o.phone && o.phone !== o.applicant ? `<span class="mono">${esc(o.phone)}</span>` : '',
+            realName(o.applicant) ? esc(o.applicant) : dtCell.phone(o.applicant),
+            o.phone && o.phone !== o.applicant ? dtCell.phone(o.phone) : '',
           ),
       },
       { key: 'tin', label: 'ТТД', render: (o) => dtCell.mono(o.tin), phone: false },
@@ -2003,7 +2004,7 @@ async function openOrgAccess(orgId, from = { label: 'Байгууллагууд'
   const peopleLine = [owners ? `эзэн ${owners}` : '', data.members.length - owners ? `ажилтан ${data.members.length - owners}` : ''].filter(Boolean).join(' · ') || 'хүн алга';
   view.append(el(`
     <div class="card facts-card"><div class="facts">
-      <div><span class="lab">Бүртгүүлсэн</span><b>${listed.applicant ? (realName(listed.applicant) ? esc(listed.applicant) : `<span class="mono">${esc(listed.applicant)}</span>`) : unset}</b><span class="fact-sub">${when(org.created_at)}</span></div>
+      <div><span class="lab">Бүртгүүлсэн</span><b>${listed.applicant ? (realName(listed.applicant) ? esc(listed.applicant) : dtCell.phone(listed.applicant)) : unset}</b><span class="fact-sub">${when(org.created_at)}</span></div>
       <div><span class="lab">Холбогдох утас</span><b>${org.phone ? tel(org.phone) : unset}</b></div>
       <div><span class="lab">ТТД</span><b class="mono">${org.tin ? esc(org.tin) : unset}</b></div>
       <div><span class="lab">${org.state === 'declined' ? 'Татгалзсан' : 'Батлагдсан'}</span><b>${org.decided_at ? when(org.decided_at) : unset}</b>${org.state === 'declined' && org.decline_reason ? `<span class="fact-sub">${esc(org.decline_reason)}</span>` : ''}</div>

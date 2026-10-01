@@ -3522,6 +3522,9 @@ describe('Basu decides who may do what', () => {
     await opsTab(desk, 'orgs');
     await until(desk, 'the business', (d) => [...d.querySelectorAll('#orgs tr[data-org]')].some((r) => r.textContent?.includes('Эрхийн мах · тест')));
     const row = [...desk.window.document.querySelectorAll('#orgs tr[data-org]')].find((r) => r.textContent?.includes('Эрхийн мах · тест'))!;
+    // Who registered it, by the number they signed in with, read as a number is read.
+    expect(row.textContent).toContain('+976 8804 0001');
+    expect(row.textContent).not.toContain('+97688040001');
     (row.querySelector('[data-a="access"]') as HTMLElement).click();
     await until(desk, 'its people', (d) => d.querySelectorAll('[data-people] tr[data-member]').length === 2);
     (desk.window.document.querySelector(`[data-people] tr[data-member="${found.guest_id}"] [data-a="role"]`) as HTMLElement).click();
