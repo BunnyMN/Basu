@@ -1,5 +1,5 @@
-import { allOrders } from '../idesh/index.js';
-import { closeAccount, findGuests, guestCard, sessionsOf } from '../platform/identity/index.js';
+import { allOrders, guestsByDeliveryPhone } from '../idesh/index.js';
+import { closeAccount, findGuests, guestCard, guestCards, sessionsOf } from '../platform/identity/index.js';
 import { balance, wallet } from '../platform/ledger/index.js';
 import { devicesOf, inbox } from '../platform/notify/index.js';
 import { dineOrdersOf } from '../services/guestOrders.js';
@@ -22,8 +22,25 @@ const shapeCard = (g: NonNullable<Awaited<ReturnType<typeof guestCard>>>) => ({
   closed_at: g.closedAt?.toISOString() ?? null,
 });
 
+/**
+ * Guests by what the desk has in front of it: a name, an address, a number.
+ * Somebody who signed up by email has no phone of their own — but the one
+ * they gave for a delivery is the one they call from, so a number finds them
+ * by their orders too, after the accounts whose own number it is, each
+ * saying which delivery number found it.
+ */
 export async function guestSearch(q: string) {
-  return { guests: (await findGuests(q, 200)).map(shapeCard) };
+  const found = await findGuests(q, 200);
+  const digits = q.replace(/\D/g, '');
+  if (digits.length < 4) return { guests: found.map(shapeCard) };
+  const seen = new Set(found.map((g) => g.id));
+  const byDelivery = (await guestsByDeliveryPhone(digits)).filter((hit) => !seen.has(hit.guestId));
+  const cards = await guestCards(byDelivery.map((hit) => hit.guestId));
+  const more = byDelivery.flatMap((hit) => {
+    const card = cards.get(hit.guestId);
+    return card ? [{ ...shapeCard(card), delivery_phone: hit.phone }] : [];
+  });
+  return { guests: [...found.map(shapeCard), ...more] };
 }
 
 export async function guestFile(guestId: string) {

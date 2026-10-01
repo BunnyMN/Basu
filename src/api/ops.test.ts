@@ -459,6 +459,47 @@ describe('the desk’s window onto orders', () => {
     expect(nobody.statusCode).toBe(404);
   });
 
+  it('finds the guest who calls from the number they gave for a delivery, and names the account on the desk’s orders', async () => {
+    const { guestId: ownerId } = await startSession(ctx, '+97688010001');
+    const supplierId = await registerSupplier({ ownerId, name: 'Архангай · Дорж', phone: '+97688010001', merchantTin: '6501234567', pickupAddress: 'Нарантуул' });
+    const sheep = await createListing(
+      supplierId,
+      { kind: 'sheep', unit: 'whole', title: 'Хонь', priceMnt: 460_000, approxKg: 38, quantity: 3, origin: 'Архангай', readyFrom: '2026-09-10', delivers: true, deliveryFeeMnt: 20_000 },
+      clock.now(),
+    );
+    const guest = await signIn('+97699004009');
+    await topUp(guest, 500_000);
+    // The number on the delivery is not the account's own — somebody signed up by email has none at all.
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/idesh',
+      headers: auth(guest),
+      payload: { listing_id: sheep.id, qty: 1, receive: 'delivery', receive_on: '2026-09-12', address: 'Баянзүрх, 26-р хороо', address_phone: '+976 9911 8877' },
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    expect((await app.inject({ method: 'POST', url: `/v1/idesh/${created.json().id}/pay`, headers: auth(guest) })).statusCode).toBe(200);
+
+    // Rung from the delivery's number: found by it, and the answer says which number found them.
+    const byDelivery = (await app.inject({ method: 'GET', url: '/v1/ops/guests?q=9911 8877', headers: desk() })).json().guests;
+    expect(byDelivery).toEqual([expect.objectContaining({ phone: '+97699004009', delivery_phone: '+976 9911 8877' })]);
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/guests?q=8877', headers: desk() })).json().guests).toHaveLength(1);
+    // Fewer than four digits finds nobody by a delivery; the account's own number finds it once, as itself.
+    expect((await app.inject({ method: 'GET', url: '/v1/ops/guests?q=877', headers: desk() })).json().guests).toEqual([]);
+    const own = (await app.inject({ method: 'GET', url: '/v1/ops/guests?q=99004009', headers: desk() })).json().guests;
+    expect(own).toHaveLength(1);
+    expect(own[0]).not.toHaveProperty('delivery_phone');
+
+    // The desk's orders carry the account — its id for the guest's file, its address (none here) for a guest with no name.
+    const orders = (await app.inject({ method: 'GET', url: '/v1/ops/orders?q=99118877', headers: desk() })).json().orders;
+    expect(orders).toEqual([expect.objectContaining({ id: created.json().id, guest_id: own[0].id, guest_email: null, address_phone: '+976 9911 8877' })]);
+    const one = (await app.inject({ method: 'GET', url: `/v1/ops/orders/${created.json().id}`, headers: desk() })).json();
+    expect(one.order).toMatchObject({ guest_id: own[0].id, guest_email: null });
+    // The supplier's own list never carries the account.
+    const theirs = (await app.inject({ method: 'GET', url: '/v1/supplier/orders?scope=all', headers: auth(await signIn('+97688010001')) })).json().orders;
+    expect(theirs[0]).not.toHaveProperty('guest_id');
+    expect(JSON.stringify(theirs)).not.toContain(own[0].id);
+  });
+
   it('signs a lost phone out, and closes an account with a reason — or refuses while money is held', async () => {
     const { guest } = await aPaidOrder();
     const [me] = (await app.inject({ method: 'GET', url: '/v1/ops/guests?q=99004009', headers: desk() })).json().guests;
