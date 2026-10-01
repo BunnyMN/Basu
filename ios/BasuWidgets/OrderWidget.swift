@@ -21,7 +21,7 @@ struct OrderWidget: Widget {
         }
     }
     .configurationDisplayName("Захиалга")
-    .description("Гал тавих цаг ба суух цаг.")
+    .description("Гал тавих цаг ба ирэх цаг.")
     .supportedFamilies([.systemSmall, .systemMedium])
     .contentMarginsDisabled()
   }
@@ -105,7 +105,7 @@ struct OrderWidgetView: View {
   }
 }
 
-/// 28pt icon at the top, then the seating time over `СУУХ · №0971`. Nothing else.
+/// 28pt icon at the top, then the seating time over `ИРЭХ · №0971`. Nothing else.
 struct SmallOrder: View {
   let snap: OrderSnapshot
 
@@ -118,7 +118,7 @@ struct SmallOrder: View {
         .tracking(-0.02 * 34)
         .monospacedDigit()
         .foregroundStyle(BasuColor.ink)
-      Text("СУУХ · \(snap.orderNumber)")
+      Text("ИРЭХ · \(snap.orderNumber)")
         .font(BasuFont.mono(9))
         .tracking(9 * 0.14)
         .foregroundStyle(BasuColor.ink3)
@@ -153,7 +153,7 @@ struct MediumOrder: View {
             .font(BasuFont.mono(30, .semibold))
             .monospacedDigit()
             .foregroundStyle(BasuColor.ink)
-          Text("СУУХ")
+          Text("ИРЭХ")
             .font(BasuFont.mono(9, .medium))
             .tracking(9 * 0.14)
             .foregroundStyle(BasuColor.ink3)

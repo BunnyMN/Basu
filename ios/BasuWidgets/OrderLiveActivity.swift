@@ -43,7 +43,7 @@ struct OrderLiveActivity: Widget {
 }
 
 /// The expanded island: 34pt icon, venue over the stage, the seating time
-/// over СУУХ, and the bar. Nothing the lock screen card does not show.
+/// over ИРЭХ, and the bar. Nothing the lock screen card does not show.
 struct ExpandedIsland: View {
   let attributes: BasuActivityAttributes
   let state: BasuActivityAttributes.ContentState
@@ -71,7 +71,7 @@ struct ExpandedIsland: View {
             .font(BasuFont.mono(28, .semibold))
             .monospacedDigit()
             .foregroundStyle(BasuColor.onLock)
-          UnitLabel("СУУХ", colour: dim)
+          UnitLabel("ИРЭХ", colour: dim)
         }
         .fixedSize()
       }
@@ -110,7 +110,7 @@ struct LockScreenCard: View {
             .font(BasuFont.mono(26, .semibold))
             .monospacedDigit()
             .foregroundStyle(BasuColor.onLock)
-          UnitLabel("СУУХ", colour: BasuColor.onLock2)
+          UnitLabel("ИРЭХ", colour: BasuColor.onLock2)
         }
       }
 
@@ -136,7 +136,7 @@ struct LockScreenCard: View {
   }
 }
 
-/// `СУУХ` — mono 9/500, tracked 0.14em.
+/// `ИРЭХ` — mono 9/500, tracked 0.14em.
 struct UnitLabel: View {
   let text: String
   let colour: Color

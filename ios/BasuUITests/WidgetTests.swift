@@ -42,7 +42,7 @@ final class WidgetTests: XCTestCase {
     // Anything an earlier run left behind goes first, so the screen has one.
     for _ in 0..<4 {
       let stale = springboard.staticTexts.matching(
-        NSPredicate(format: "label BEGINSWITH 'СУУХ' OR label BEGINSWITH 'Захиалга алга'"),
+        NSPredicate(format: "label BEGINSWITH 'ИРЭХ' OR label BEGINSWITH 'Захиалга алга'"),
       ).firstMatch
       guard stale.waitForExistence(timeout: 2) else { break }
       removeWidget(at: stale, on: springboard)
@@ -84,9 +84,9 @@ final class WidgetTests: XCTestCase {
 
     // The medium widget carries the venue and the stage; the sentence is the
     // empty state, and must not be what is showing now.
-    // `СУУХ` on the medium, `СУУХ · №0971` on the small — whichever page
+    // `ИРЭХ` on the medium, `ИРЭХ · №0971` on the small — whichever page
     // the gallery landed on, the seating time is labelled.
-    let label = springboard.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'СУУХ'")).firstMatch
+    let label = springboard.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'ИРЭХ'")).firstMatch
     XCTAssertTrue(label.waitForExistence(timeout: 10), "the widget should show the seating time's label")
     XCTAssertFalse(springboard.staticTexts["Захиалга алга. Товшиж хоол сонгоно."].exists)
 
