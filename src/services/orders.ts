@@ -8,7 +8,7 @@ import type { SignalType } from '../domain/eta.js';
 import { cancelFire } from '../scheduler/fireJobs.js';
 import { planAndSchedule } from './planning.js';
 import { enqueue } from '../platform/notify/index.js';
-import { collect, LedgerError, queueReceipt, refund as refundToWallet } from '../platform/ledger/index.js';
+import { assertCollectable, collect, LedgerError, queueReceipt, refund as refundToWallet } from '../platform/ledger/index.js';
 import type { Ctx } from '../ports.js';
 
 /**
@@ -96,6 +96,12 @@ export interface CreatedOrder {
   tableId: string;
 }
 
+/**
+ * A draft lunch: a slot, a table and the dishes, held for the ten minutes the
+ * guest has to pay. One nobody could pay for is never made: with payments
+ * closed, the wallet must cover the whole total, or PAYMENTS_CLOSED — before
+ * the slot or the table is touched.
+ */
 export async function createOrder(ctx: Ctx, input: CreateOrderInput): Promise<CreatedOrder> {
   const now = ctx.clock.now();
 
@@ -114,20 +120,29 @@ export async function createOrder(ctx: Ctx, input: CreateOrderInput): Promise<Cr
       throw new OrderError('TRUST_BLOCKED', 'pre-ordering is paused for this guest');
     }
 
+    // Priced first: what the lunch costs decides whether it can be made at all.
+    const lines = await priceLines(client, input);
+    const totalMnt = lines.reduce((sum, line) => sum + line.unitPriceMnt * line.qty, 0);
+
+    // A lunch nobody can pay for holds nothing. On a server with no payment
+    // provider a draft the guest's wallet does not cover could never be paid,
+    // and it took a place in its slot and a table all the same until it
+    // expired — as an идэш draft held its animal (see `createIdesh`).
+    await assertCollectable(ctx, { guestId: input.guestId, amountMnt: totalMnt }, client);
+
     const slotId = await reserveSlot(client, input, now);
     const code = await nextOrderCode(client);
 
     const { rows } = await client.query<{ id: string }>(
       `INSERT INTO dine.dining_order
-         (code, restaurant_id, guest_id, slot_id, state, party_size, slot_starts_at, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, 'DRAFT', $5, $6, $7, $7)
+         (code, restaurant_id, guest_id, slot_id, state, party_size, slot_starts_at, total_mnt, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, 'DRAFT', $5, $6, $7, $8, $8)
        RETURNING id`,
-      [code, input.restaurantId, input.guestId, slotId, input.partySize, input.slotStartsAt, now],
+      [code, input.restaurantId, input.guestId, slotId, input.partySize, input.slotStartsAt, totalMnt, now],
     );
     const orderId = rows[0]!.id;
 
-    const totalMnt = await addLines(client, orderId, input);
-    await client.query('UPDATE dine.dining_order SET total_mnt = $2 WHERE id = $1', [orderId, totalMnt]);
+    await addLines(client, orderId, lines);
 
     const tableId = await holdTable(client, {
       orderId,
@@ -183,8 +198,21 @@ async function reserveSlot(db: Db, input: CreateOrderInput, now: Date): Promise<
   return slot.id;
 }
 
-async function addLines(db: Db, orderId: string, input: CreateOrderInput): Promise<number> {
-  let total = 0;
+/** A dish as ordered, with what the menu said of it at the time. */
+interface PricedLine {
+  menuItemId: string;
+  qty: number;
+  name: string;
+  unitPriceMnt: number;
+  prepMinutes: number;
+  holdToleranceMinutes: number;
+  stationCode: string;
+  notes: string | null;
+}
+
+/** Every dish, read off the menu: on offer, not 86'd, and what it costs. */
+async function priceLines(db: Db, input: CreateOrderInput): Promise<PricedLine[]> {
+  const lines: PricedLine[] = [];
   for (const item of input.items) {
     const { rows } = await db.query<{
       id: string;
@@ -209,7 +237,25 @@ async function addLines(db: Db, orderId: string, input: CreateOrderInput): Promi
     if (menu.sold_out_until) {
       throw new OrderError('ITEM_SOLD_OUT', `${menu.name} is 86'd`);
     }
+    lines.push({
+      menuItemId: menu.id,
+      qty: item.qty,
+      name: menu.name,
+      unitPriceMnt: menu.price_mnt,
+      prepMinutes: menu.prep_minutes,
+      holdToleranceMinutes: menu.hold_tolerance_minutes,
+      stationCode: menu.code,
+      notes: item.notes ?? null,
+    });
+  }
+  if (lines.reduce((sum, line) => sum + line.unitPriceMnt * line.qty, 0) === 0) {
+    throw new OrderError('ITEM_SOLD_OUT', 'an order needs at least one line');
+  }
+  return lines;
+}
 
+async function addLines(db: Db, orderId: string, lines: readonly PricedLine[]): Promise<void> {
+  for (const line of lines) {
     // Copied, not joined: tomorrow's price change must not rewrite this ticket.
     await db.query(
       `INSERT INTO dine.order_line
@@ -218,20 +264,17 @@ async function addLines(db: Db, orderId: string, input: CreateOrderInput): Promi
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         orderId,
-        menu.id,
-        item.qty,
-        menu.name,
-        menu.price_mnt,
-        menu.prep_minutes,
-        menu.hold_tolerance_minutes,
-        menu.code,
-        item.notes ?? null,
+        line.menuItemId,
+        line.qty,
+        line.name,
+        line.unitPriceMnt,
+        line.prepMinutes,
+        line.holdToleranceMinutes,
+        line.stationCode,
+        line.notes,
       ],
     );
-    total += menu.price_mnt * item.qty;
   }
-  if (total === 0) throw new OrderError('ITEM_SOLD_OUT', 'an order needs at least one line');
-  return total;
 }
 
 /**

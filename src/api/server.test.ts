@@ -313,26 +313,78 @@ describe('ordering over HTTP', () => {
     expect(response.json().error.code).toBe('RESTAURANT_OFFLINE');
   });
 
-  it('says payments are closed in their own words, not «try again», on a server with no provider', async () => {
+  it('says payments are closed in their own words, not «try again», on a server with no provider — and holds nothing', async () => {
     const closed = await buildServer({ ...ctx, payments: new ClosedPaymentProvider() });
     try {
       const guest = await signIn();
       await atKitchen(venue.restaurantId);
-      const created = await closed.inject({
-        method: 'POST',
-        url: '/v1/orders',
-        headers: auth(guest),
-        payload: {
-          restaurant_id: venue.restaurantId,
-          slot_starts_at: at('12:30').toISOString(),
-          party_size: 2,
-          items: [{ menu_item_id: venue.menuIds['tsuivan'], qty: 1 }],
-        },
-      });
-      expect(created.statusCode, created.body).toBe(201);
-      const paid = await closed.inject({ method: 'POST', url: `/v1/orders/${created.json().id}/pay`, headers: auth(guest) });
-      expect(paid.statusCode).toBe(503);
-      expect(paid.json().error).toMatchObject({ code: 'PAYMENTS_CLOSED', message_mn: 'Онлайн төлбөр одоогоор хаалттай байна.' });
+      // Pressed once more than the slot takes lunches: each refused before a
+      // place in the slot, a table or a draft is taken. A draft made anyway
+      // held both for ten minutes, and three of them filled the 12:30 slot
+      // for everybody with a lunch nobody could pay for.
+      for (let press = 0; press <= 3; press++) {
+        const created = await closed.inject({
+          method: 'POST',
+          url: '/v1/orders',
+          headers: auth(guest),
+          payload: {
+            restaurant_id: venue.restaurantId,
+            slot_starts_at: at('12:30').toISOString(),
+            party_size: 2,
+            items: [{ menu_item_id: venue.menuIds['tsuivan'], qty: 1 }],
+          },
+        });
+        expect(created.statusCode, created.body).toBe(503);
+        expect(created.json().error).toMatchObject({ code: 'PAYMENTS_CLOSED', message_mn: 'Онлайн төлбөр одоогоор хаалттай байна.' });
+      }
+      const held = await pool().query(
+        `SELECT (SELECT count(*)::int FROM dine.dining_order) AS orders,
+                (SELECT count(*)::int FROM dine.table_hold) AS tables,
+                (SELECT COALESCE(sum(taken_orders), 0)::int FROM dine.slot) AS places`,
+      );
+      expect(held.rows[0]).toEqual({ orders: 0, tables: 0, places: 0 });
+    } finally {
+      await closed.close();
+    }
+  });
+
+  it('still books a lunch the wallet covers when there is no provider, and only then', async () => {
+    const guest = await signIn();
+    await atKitchen(venue.restaurantId);
+    // Money the guest already holds in Basu, put there while payments were open: one цуйван's worth.
+    const started = await app.inject({ method: 'POST', url: '/v1/wallet/topup', headers: auth(guest), payload: { amount_mnt: 14_000 } });
+    expect(started.statusCode, started.body).toBe(200);
+    const settled = await app.inject({ method: 'POST', url: `/v1/wallet/topup/${started.json().topup_id}/settle`, headers: auth(guest) });
+    expect(settled.statusCode, settled.body).toBe(200);
+
+    const closed = await buildServer({ ...ctx, payments: new ClosedPaymentProvider() });
+    try {
+      const order = (qty: number) =>
+        closed.inject({
+          method: 'POST',
+          url: '/v1/orders',
+          headers: auth(guest),
+          payload: {
+            restaurant_id: venue.restaurantId,
+            slot_starts_at: at('12:30').toISOString(),
+            party_size: 2,
+            items: [{ menu_item_id: venue.menuIds['tsuivan'], qty }],
+          },
+        });
+      // Two are 28 000 ₮, more than the wallet holds: refused, and no place in the slot taken for it.
+      const two = await order(2);
+      expect(two.statusCode, two.body).toBe(503);
+      expect(two.json().error.code).toBe('PAYMENTS_CLOSED');
+      expect((await pool().query('SELECT COALESCE(sum(taken_orders), 0)::int AS n FROM dine.slot')).rows[0].n).toBe(0);
+
+      // One is 14 000 ₮, which the wallet covers: booked, and paid from the wallet alone.
+      const one = await order(1);
+      expect(one.statusCode, one.body).toBe(201);
+      const paid = await closed.inject({ method: 'POST', url: `/v1/orders/${one.json().id}/pay`, headers: auth(guest) });
+      expect(paid.statusCode, paid.body).toBe(200);
+      const wallet = await closed.inject({ method: 'GET', url: '/v1/wallet', headers: auth(guest) });
+      expect(wallet.json().balance_mnt).toBe(0);
+      expect((await pool().query('SELECT taken_orders FROM dine.slot WHERE starts_at = $1', [at('12:30')])).rows).toEqual([{ taken_orders: 1 }]);
     } finally {
       await closed.close();
     }
