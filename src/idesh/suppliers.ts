@@ -512,6 +512,14 @@ export interface ProfileEdit extends BankDetails {
 }
 
 /**
+ * A bank account as people write it: the plain number, or the IBAN with its
+ * MN and two check digits — what the application takes, so an account taken
+ * there can be saved again here. Spaces are only how it was read aloud.
+ */
+const BANK_ACCOUNT = /^(MN\d{2})?\d{6,20}$/;
+const accountOf = (typed: string | null | undefined) => typed?.replace(/\s+/g, '').toUpperCase() || null;
+
+/**
  * What a supplier may change about themselves: how they are named and
  * found, and where the money goes. A changed account comes back flagged —
  * the caller tells the owner and finance checks it before anything is paid
@@ -526,8 +534,10 @@ export async function updateSupplierProfile(
   if (edit.pickupAddress !== undefined && edit.pickupAddress.trim().length < 4) {
     throw new IdeshError('WRONG_STATE', 'a supplier needs a pickup address');
   }
-  const account = edit.bankAccount?.replace(/\s+/g, '') || null;
-  if (account && !/^\d{6,20}$/.test(account)) throw new IdeshError('WRONG_STATE', 'an account number is 6 to 20 digits');
+  const account = accountOf(edit.bankAccount);
+  if (account && !BANK_ACCOUNT.test(account)) {
+    throw new IdeshError('WRONG_STATE', 'an account is 6 to 20 digits, or MN, two check digits and the number');
+  }
   const bankChanged = await bankWouldChange(supplierId, edit, db);
   const { rowCount } = await db.query(
     `UPDATE idesh.supplier
@@ -573,7 +583,7 @@ export async function bankWouldChange(supplierId: string, edit: BankDetails, db:
   const held = { name: now.bank_name, account: unseal(now.bank_account), holder: unseal(now.bank_holder) };
   const next = {
     name: edit.bankName?.trim() || held.name,
-    account: edit.bankAccount?.replace(/\s+/g, '') || held.account,
+    account: accountOf(edit.bankAccount) || held.account,
     holder: edit.bankHolder?.trim() || held.holder,
   };
   return next.name !== held.name || next.account !== held.account || next.holder !== held.holder;

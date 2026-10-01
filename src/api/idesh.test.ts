@@ -685,4 +685,30 @@ describe('the supplier’s own module', () => {
     const short = await app.inject({ method: 'PATCH', url: '/v1/supplier/profile', headers: auth(owner), payload: { name: 'X' } });
     expect(short.statusCode).toBe(409);
   });
+
+  it('takes an account in every form the application takes: the number, or the IBAN with MN', async () => {
+    const owner = await signIn('+97688010001');
+    const change = (bank_account: string) =>
+      app.inject({
+        method: 'PATCH',
+        url: '/v1/supplier/profile',
+        headers: auth(owner),
+        payload: { bank_name: 'Хаан банк', bank_account, bank_holder: 'Дорж', password: PASSWORD },
+      });
+    // Read aloud in groups, in either case: the spaces go, the MN stays.
+    const iban = await change('mn12 0005 0050 1234 5678');
+    expect(iban.statusCode, iban.body).toBe(200);
+    expect(iban.json()).toMatchObject({ bank_account: 'MN120005005012345678', bank_verified: false });
+    const plain = await change('5012 3456 78');
+    expect(plain.statusCode, plain.body).toBe(200);
+    expect(plain.json().bank_account).toBe('5012345678');
+    // Anything else is still refused, and nothing is changed by it.
+    for (const wrong of ['MN12 345', 'MNXX12345678', 'GB12345678', '12345', 'дансны дугаар']) {
+      const refused = await change(wrong);
+      expect(refused.statusCode, wrong).toBe(409);
+      expect(refused.json().error.code, wrong).toBe('WRONG_STATE');
+    }
+    const kept = await app.inject({ method: 'GET', url: '/v1/supplier/money', headers: auth(owner) });
+    expect(kept.json().bank_account).toBe('5012345678');
+  });
 });

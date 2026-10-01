@@ -1602,17 +1602,17 @@ async function changeBank(b) {
     submit: 'Хадгалах',
     onSubmit: async (v) => {
       const account = v.bank_account.replace(/\s+/g, '').toUpperCase();
-      if (!ACCOUNT.test(account)) throw refuse('bank_account', 'Дансны дугаар 6–20 оронтой тоо, эсвэл MN-ээр эхэлсэн IBAN байна.');
+      const badForm = 'Дансны дугаар 6–20 оронтой тоо, эсвэл MN-ээр эхэлсэн IBAN байна.';
+      if (!ACCOUNT.test(account)) throw refuse('bank_account', badForm);
       try {
         await sup('/v1/supplier/profile', {
           method: 'PATCH',
           body: { bank_name: v.bank_name, bank_account: account, bank_holder: v.bank_holder, password: v.password },
         });
       } catch (error) {
-        // The only thing this change can say «the state changed» about is the number's form: the server keeps digits alone.
-        if (error.code === 'WRONG_STATE') {
-          throw refuse('bank_account', 'Энэ дансны дугаарыг хадгалж чадсангүй. MN-гүйгээр, зөвхөн тоогоор бичээд дахин оролдоно уу.');
-        }
+        // The server takes the same forms the application does; the one thing this change can say
+        // «the state changed» about is the number's form, said under it in the page's own words.
+        if (error.code === 'WRONG_STATE') throw refuse('bank_account', badForm);
         throw error;
       }
       return true;
