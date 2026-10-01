@@ -28,6 +28,7 @@ import {
   type CancelReason,
   type IdeshState,
   type OrderScope,
+  type SupplierOrder,
   type SupplierRow,
   type Tally,
   supplierForOrg,
@@ -423,7 +424,16 @@ export async function registerOpsRoutes(
         });
       }
       await audit(request, { action: 'org.approve', targetKind: 'org', targetId: org.id, note: org.name });
-      await tellOwner(org.appliedBy, org.id, 'Байгууллага батлагдлаа', `«${org.name}» Basu дээр батлагдлаа. basu.burzai.cloud/dashboard-д ажилтнуудаа нэмж болно.`);
+      // What to do first, said in the order it matters: a supplier sells nothing until a listing is up and is
+      // paid nothing until an account is on file; a business without the идэш side opens its pages.
+      await tellOwner(
+        org.appliedBy,
+        org.id,
+        'Байгууллага батлагдлаа',
+        org.supplier
+          ? `«${org.name}» Basu дээр батлагдлаа. basu.burzai.cloud/dashboard-д нэвтэрч эхний зараа нэмээд олголт очих дансаа оруулна уу.`
+          : `«${org.name}» Basu дээр батлагдлаа. basu.burzai.cloud/dashboard-д нэвтэрч байгууллагынхаа хэсгүүдийг нээнэ үү.`,
+      );
       return reply.send(shapeOrg(org));
     } catch (error) {
       return orgRefusal(reply, error);
@@ -708,6 +718,17 @@ export async function registerOpsRoutes(
 
   /* ── every order, through one window ── */
 
+  /**
+   * An order as the desk reads it: the supplier's shape, and the account
+   * that bought it — its id for the guest's file, and its address, which is
+   * how somebody who gave no name is told apart on a call.
+   */
+  const deskOrder = (o: SupplierOrder, guests: Map<string, { email: string | null }>) => ({
+    ...shapeOrder(o),
+    guest_id: o.guestId,
+    guest_email: guests.get(o.guestId)?.email ?? null,
+  });
+
   app.get<{ Querystring: { scope?: string; state?: string; supplier?: string; day?: string; q?: string } }>(
     '/v1/ops/orders',
     desk('desk.orders'),
@@ -722,7 +743,8 @@ export async function registerOpsRoutes(
         q: request.query.q ?? '',
         limit: 200,
       });
-      return { orders: orders.map(shapeOrder) };
+      const guests = await guestCards(orders.map((o) => o.guestId));
+      return { orders: orders.map((o) => deskOrder(o, guests)) };
     },
   );
 
@@ -730,7 +752,7 @@ export async function registerOpsRoutes(
     const found = await orderForOps(request.params.id);
     if (!found) return sendError(reply, new IdeshError('NOT_FOUND', 'no such order'));
     return reply.send({
-      order: shapeOrder(found.order),
+      order: deskOrder(found.order, await guestCards([found.order.guestId])),
       events: found.events.map((e) => ({ seq: e.seq, type: e.type, actor: e.actor, payload: e.payload, at: e.at.toISOString() })),
       settlements: found.settlements.map(shapeSettlement),
     });

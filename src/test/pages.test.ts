@@ -2637,6 +2637,14 @@ describe('өвлийн идэш', () => {
       b.textContent?.includes('Бэлтгэж эхлэх'),
     ) as HTMLElement;
     start.click();
+    // Starting is the slaughter: the press asks first, and says in money what a cancel leaves from then on.
+    await until(screen, 'the question', (d) => Boolean(d.querySelector('#prepare-order[data-open]')));
+    const asked = screen.window.document.querySelector('#prepare-order')!;
+    expect(asked.textContent).toContain(`№${code}`);
+    expect(asked.textContent).toContain('10%');
+    expect(asked.textContent).toContain('танд үлдэнэ');
+    expect(ticket().getAttribute('data-lane')).toBe('paid');
+    (asked.querySelector('[data-submit]') as HTMLElement).click();
     await until(screen, 'the ticket to move', () => ticket()?.getAttribute('data-lane') === 'preparing');
 
     // The guest's page catches up on its own: the headline moves on, the
@@ -2658,6 +2666,28 @@ describe('өвлийн идэш', () => {
     (screen.window.document.querySelector('#hand-order [data-submit]') as HTMLElement).click();
     await until(screen, 'the ticket to be done', () => !ticket());
     await until(guest, 'the guest to have it', (d) => d.querySelector('.status')?.getAttribute('data-s') === 'HANDED');
+
+    // The day's numbers moved with the work, on the same page: what the server says now, not what it said on opening.
+    const asOwner = { authorization: `Bearer ${screen.window.localStorage.getItem('basu.guest')}` };
+    const home = (await (await fetch(`${base}/v1/supplier/home`, { headers: asOwner })).json()) as {
+      lanes: Record<'paid' | 'preparing' | 'ready' | 'dispatched', number>;
+      season: { handed: number };
+    };
+    const todo = home.lanes.paid + home.lanes.preparing + home.lanes.ready + home.lanes.dispatched;
+    await until(screen, 'the numbers to follow', (d) => {
+      const figures = [...d.querySelectorAll('#home .kpi b')].map((b) => b.textContent);
+      return figures[0] === String(todo) && figures[1] === String(home.season.handed);
+    });
+
+    // «When does Basu pay me?» right after it: the order, under what comes next, with the day its payout opens.
+    (screen.window.document.querySelector('.tabs button[data-tab="money"]') as HTMLElement).click();
+    await until(screen, 'the money on its way', (d) =>
+      [...d.querySelectorAll('#coming [data-coming]')].some((r) => r.textContent?.includes(`№${code}`)),
+    );
+    const coming = [...screen.window.document.querySelectorAll('#coming [data-coming]')].find((r) => r.textContent?.includes(`№${code}`))!;
+    expect(coming.textContent).toMatch(/олголт \d+-р сарын \d+-нөөс/);
+    expect(coming.querySelector('.chip')?.textContent).toBe('Удахгүй');
+    expect(screen.window.document.querySelector('#coming-sum .lab')?.textContent).toBe('Удахгүй олгох');
   });
 
   it('lets a supplier run their own stall from their screen', async () => {
@@ -3239,6 +3269,163 @@ describe('who sees what', () => {
     // Out of the dashboard, to Basu's front page, in one press.
     expect(doc.querySelector('#go-home')?.getAttribute('href')).toBe('/');
     expect(doc.querySelector('.brand-home')?.getAttribute('href')).toBe('/');
+  });
+
+  /** The answers a page gets from production: the demo's shortcuts are not there. */
+  const asInProduction = (path: string) => (path.startsWith('/dev/') ? new Response('{"error":{"code":"NOT_FOUND"}}', { status: 404, headers: { 'content-type': 'application/json' } }) : undefined);
+
+  it('takes somebody who came to register a business from its own door to the popup, «Идэшний нийлүүлэгч» ticked, and says a missing kind under the boxes', async () => {
+    // Signed out: the door says this is the way to register, and what comes after signing in.
+    const door = await openPage('ops.html', '?join=business', asInProduction, device());
+    await until(door, 'the door', (d) => Boolean(d.querySelector('.door .door-card h2')));
+    expect(door.window.document.querySelector('.door .door-card h2')?.textContent).toBe('Бизнесээ бүртгүүлэх');
+    expect(door.window.document.querySelector('.door .door-for')?.textContent).toContain('бүртгэлийн цонх нээгдэнэ');
+    // Without the wish it is the plain door.
+    const plain = await openPage('ops.html', '', asInProduction, device());
+    await until(plain, 'the door', (d) => Boolean(d.querySelector('.door .door-card h2')));
+    expect(plain.window.document.querySelector('.door .door-card h2')?.textContent).toBe('Нэвтрэх');
+
+    // Signed in: their own corner, the registration open on it, the supplier ticked — and the wish taken, once.
+    const person = await account('+97688030091', 'Баатар');
+    const dash = await openPage('ops.html', '?join=business', undefined, device(person));
+    await until(dash, 'the registration', (d) => Boolean(d.querySelector('#org-form[data-open]')));
+    const form = dash.window.document.querySelector('#org-form')!;
+    expect((form.querySelector('[name="supplier"]') as HTMLInputElement).checked).toBe(true);
+    expect((form.querySelector('[name="restaurant"]') as HTMLInputElement).checked).toBe(false);
+    expect(dash.window.location.search).toBe('');
+
+    // No kind ticked: said under the boxes, where the person is, the first box marked — and nothing is sent.
+    (form.querySelector('[name="name"]') as HTMLInputElement).value = 'Баатарын мах · тест';
+    (form.querySelector('[name="supplier"]') as HTMLInputElement).checked = false;
+    (form.querySelector('[data-submit]') as HTMLElement).click();
+    const kinds = form.querySelector('.popup-checks')!.closest('.field')!;
+    await until(dash, 'the refusal', () => Boolean(kinds.querySelector('.help[data-error]')));
+    expect(kinds.querySelector('.help[data-error]')?.textContent).toContain('Юу хийдгээ сонгоно уу');
+    expect(form.querySelector('[name="supplier"]')?.getAttribute('aria-invalid')).toBe('true');
+    expect((form.querySelector('.popup-error') as HTMLElement).hidden).toBe(true);
+    const made = await getPool().query("SELECT 1 FROM org.organization WHERE name = 'Баатарын мах · тест'");
+    expect(made.rowCount).toBe(0);
+  });
+
+  it('names on a new supplier’s home what it still lacks, each button opening its popup on the supplier’s screen at once', async () => {
+    const owner = await account('+97688030071', 'Ганбат');
+    const orgId = await business(owner, 'Шинэ мах · тест', { supplier: true });
+    const dash = await openPage('ops.html', `#${orgId}/home`, undefined, device(owner));
+    await until(dash, 'what it lacks', (d) => d.querySelectorAll('#nudges .nudge').length === 2);
+    // Nothing sold yet: no band of zeros over the steps.
+    await until(dash, 'no band of zeros', (d) => !d.querySelector('#org-kpis'));
+    const doc = dash.window.document;
+    const listing = doc.querySelector('#nudge-listing a.btn')!;
+    const bank = doc.querySelector('#nudge-bank a.btn')!;
+    expect(listing.getAttribute('href')).toBe(`/supplier?org=${orgId}#stall/new`);
+    expect(bank.getAttribute('href')).toBe(`/supplier?org=${orgId}#profile/bank`);
+    // One pine button: the first thing to do.
+    expect(listing.getAttribute('data-v')).toBe('primary');
+    expect(bank.hasAttribute('data-v')).toBe(false);
+
+    // Followed: the stall opens on the new listing's popup — no second press — and a reload would not open it again.
+    const stall = await openPage('supplier.html', `?org=${orgId}#stall/new`, undefined, device(owner));
+    await until(stall, 'the new listing', (d) => d.querySelector('#listing-new h2')?.textContent === 'Шинэ зар нэмэх');
+    expect(stall.window.location.hash).toBe('#stall');
+    // The account's: its popup over the profile.
+    const profile = await openPage('supplier.html', `?org=${orgId}#profile/bank`, undefined, device(owner));
+    await until(profile, 'the account’s popup', (d) => Boolean(d.querySelector('.profile-page')) && Boolean(d.querySelector('.sheet.popup[data-open]')));
+    expect(profile.window.location.hash).toBe('#profile');
+  });
+
+  it('says on the day why no order comes while payments are closed, and that the payouts have nowhere to go yet', async () => {
+    const owner = await account('+97688030081', 'Чулуун');
+    const orgId = await business(owner, 'Хаалттай мах · тест', { supplier: true });
+    const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+    // The listings say it when they carry it; else the wallet's top-ups, which the same provider closes.
+    const closedByListings = (path: string) => (path.startsWith('/v1/idesh/listings') ? json({ today: '2026-09-02', listings: [], payments_open: false }) : undefined);
+    const closedByWallet = (path: string) =>
+      path.startsWith('/v1/idesh/listings')
+        ? json({ today: '2026-09-02', listings: [] })
+        : path.startsWith('/v1/wallet')
+          ? json({ balance_mnt: 0, currency: 'MNT', topups_open: false, next: null, lines: [] })
+          : undefined;
+    for (const closed of [closedByListings, closedByWallet]) {
+      const screen = await openPage('supplier.html', `?org=${orgId}`, closed, device(owner));
+      await until(screen, 'the day’s notes', (d) => Boolean(d.querySelector('#notes:not([hidden]) #payments-closed')) && Boolean(d.querySelector('#bank-missing')));
+      const d = screen.window.document;
+      expect(d.querySelector('#payments-closed')?.textContent).toContain('төлбөр түр хаалттай');
+      expect(d.querySelector('#bank-missing b')?.textContent).toBe('Олголт очих данс алга');
+      expect(d.querySelector('#bank-missing #bank-add')?.textContent).toBe('Данс нэмэх');
+    }
+    // Open, the day says nothing of it.
+    const open = await openPage('supplier.html', `?org=${orgId}`, undefined, device(owner));
+    await until(open, 'the day', (d) => Boolean(d.querySelector('#board[data-ready]')) && Boolean(d.querySelector('#bank-missing')));
+    expect(open.window.document.querySelector('#payments-closed')).toBeNull();
+  });
+
+  it('finds a caller who signed up by email by the number they gave for a delivery, on the guests and on the orders', async () => {
+    const mailer = new FakeMailer();
+    ctx.mailer = mailer;
+    let caller: string;
+    try {
+      await fetch(`${base}/v1/auth/email/start`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: 'saraa.dalgar@example.mn' }) });
+      const code = /(\d{6})/.exec(mailer.to('saraa.dalgar@example.mn')!.text)![1];
+      caller = ((await (await fetch(`${base}/v1/auth/email/verify`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: 'saraa.dalgar@example.mn', code, device: 'Вэб' }),
+      })).json()) as { token: string }).token;
+    } finally {
+      delete ctx.mailer;
+    }
+    // A delivery, paid, then cancelled by the supplier: an order that has ended, which «Идэвхтэй» would hide.
+    const { listings, today } = (await (await fetch(`${base}/v1/idesh/listings`)).json()) as {
+      today: string;
+      listings: Array<{ id: string; delivers: boolean; unit: string; remaining: number; ready_from: string; supplier: { id: string } }>;
+    };
+    const stall = listings.find((l) => l.delivers && l.unit === 'whole' && l.remaining > 0)!;
+    const receiveOn = stall.ready_from > today ? stall.ready_from : today;
+    const made = await fetch(`${base}/v1/idesh`, {
+      method: 'POST',
+      headers: as(caller),
+      body: JSON.stringify({ listing_id: stall.id, qty: 1, receive: 'delivery', receive_on: receiveOn, address: 'Баянзүрх, 26-р хороо', address_phone: '+976 9907 4411' }),
+    });
+    const order = (await made.json()) as { id: string; code: string };
+    expect(made.status, JSON.stringify(order)).toBe(201);
+    const paid = await fetch(`${base}/v1/idesh/${order.id}/pay`, { method: 'POST', headers: as(caller), body: '{}' });
+    expect(paid.status, await paid.text()).toBe(200);
+    const { rows } = await getPool().query<{ phone: string }>('SELECT g.phone_e164 AS phone FROM idesh.supplier s JOIN identity.guest g ON g.id = s.owner_guest_id WHERE s.id = $1', [stall.supplier.id]);
+    const seller = await devLogin(rows[0]!.phone, 'Нийлүүлэгч');
+    expect((await fetch(`${base}/v1/supplier/orders/${order.id}/cancel`, { method: 'POST', headers: as(seller), body: JSON.stringify({ reason: 'cannot_fulfil' }) })).status).toBe(200);
+
+    const desk = await openPage('ops.html', '', undefined, device(await deskToken()));
+    const doc = desk.window.document;
+    const search = async (box: string, q: string) => {
+      const input = doc.querySelector(`${box} .dt-search input`) as HTMLInputElement;
+      input.value = q;
+      input.dispatchEvent(new desk.window.Event('input', { bubbles: true }));
+    };
+    // The guests: found by the delivery's number, said to be that.
+    await opsTab(desk, 'guests');
+    await until(desk, 'the guests', (d) => Boolean(d.querySelector('#guests .dt-search input')));
+    await search('#guests', '9907 4411');
+    // The answer to the search, not the list of everybody it replaces: one row, the caller's.
+    await until(desk, 'the caller', (d) => {
+      const rows = [...d.querySelectorAll('#guests tr[data-guest]')];
+      return rows.length === 1 && Boolean(rows[0]!.textContent?.includes('saraa.dalgar@example.mn'));
+    });
+    const guest = doc.querySelector('#guests tr[data-guest]')!;
+    expect(guest.textContent).toContain('+976 9907 4411');
+    expect(guest.textContent).toContain('хүргэлтийн утас');
+
+    // The orders: a search looks through every order, ended ones too, and the guest with no name is their address.
+    await opsTab(desk, 'orders');
+    await until(desk, 'the orders', (d) => Boolean(d.querySelector('#orders .dt-seg button[data-v="live"][data-on]')));
+    await search('#orders', '99074411');
+    await until(desk, 'every order searched', (d) => Boolean(d.querySelector('#orders .dt-seg button[data-v="all"][data-on]')));
+    await until(desk, 'the ended order', (d) => Boolean(d.querySelector(`#orders tr[data-order="${order.id}"]`)));
+    const row = doc.querySelector(`#orders tr[data-order="${order.id}"]`)!;
+    expect(row.textContent).toContain('saraa.dalgar@example.mn');
+    expect(row.textContent).not.toContain('Нэр оруулаагүй');
+    // Cleared, the list goes back to where it was.
+    await search('#orders', '');
+    await until(desk, 'the scope back', (d) => Boolean(d.querySelector('#orders .dt-seg button[data-v="live"][data-on]')));
   });
 
   it('seats somebody an admin chose from Basu’s users, and the desk opens for them', async () => {

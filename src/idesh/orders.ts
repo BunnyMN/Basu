@@ -643,7 +643,8 @@ async function arrangeRefund(
     body:
       `Идэш №${facts.code} цуцлагдлаа (${REASON_LABEL[reason].toLowerCase()}). ` +
       (split.forfeitMnt > 0 ? `Мал нядалсны дараа тул ${FORFEIT_PCT}% суутгав. ` : '') +
-      `Буцаалт ${amount} — Basu аппаар дансаа оруулна уу.`,
+      // The website takes the account too: somebody who ordered on it may never have had the app.
+      `Буцаалт ${amount} — basu.burzai.cloud/orders хуудсанд эсвэл Basu аппад дансаа оруулна уу.`,
   });
 }
 
@@ -1098,6 +1099,12 @@ export async function homeOf(supplierId: string, now: Date, db: Db = getPool()):
 }
 
 export interface SupplierOrder extends BoardTicket {
+  /**
+   * The account that bought it — for the desk, which names the guest by
+   * their address when they gave no name. The supplier's routes shape an
+   * order field by field and never send it.
+   */
+  guestId: string;
   handedAt: Date | null;
   cancelledAt: Date | null;
   cancelReason: CancelReason | null;
@@ -1164,6 +1171,7 @@ async function listOrders(opts: OrderFilter, db: Db): Promise<SupplierOrder[]> {
   const digits = q.replace(/\D/g, '');
   const all = rows.map((r) => ({
     ...ticketOf(r, names, contacts),
+    guestId: r.guest_id,
     handedAt: r.handed_at,
     cancelledAt: r.cancelled_at,
     cancelReason: r.cancel_reason,
@@ -1184,6 +1192,30 @@ async function listOrders(opts: OrderFilter, db: Db): Promise<SupplierOrder[]> {
       )
     : all;
   return hits.slice(0, opts.limit ?? 100);
+}
+
+/**
+ * The accounts that gave this number for a delivery — somebody who signed
+ * up by email has no phone of their own, and the desk looking for a caller
+ * has only the number they ring from. `digits` is at least four of them;
+ * each account once, with the number its latest such order carried.
+ */
+export async function guestsByDeliveryPhone(
+  digits: string,
+  db: Db = getPool(),
+): Promise<Array<{ guestId: string; phone: string }>> {
+  const wanted = digits.replace(/\D/g, '');
+  if (wanted.length < 4) return [];
+  const { rows } = await db.query<{ guest_id: string; address_phone: string }>(
+    `SELECT DISTINCT ON (guest_id) guest_id, address_phone
+       FROM idesh.idesh_order
+      WHERE address_phone IS NOT NULL
+        AND regexp_replace(address_phone, '[^0-9]', '', 'g') LIKE '%' || $1 || '%'
+      ORDER BY guest_id, created_at DESC
+      LIMIT 50`,
+    [wanted],
+  );
+  return rows.map((r) => ({ guestId: r.guest_id, phone: r.address_phone }));
 }
 
 export interface OrderEvent {
@@ -1260,7 +1292,7 @@ export async function resendForOps(ctx: Ctx, orderId: string, who: string): Prom
       break;
     case 'CANCELLED':
       await say('idesh.cancelled', 'sms', 'Идэш цуцлагдлаа',
-        `Идэш №${facts.code} цуцлагдсан. Буцаалтаа авахын тулд Basu аппаар дансаа оруулна уу.`);
+        `Идэш №${facts.code} цуцлагдсан. Буцаалтаа авахын тулд basu.burzai.cloud/orders хуудсанд эсвэл Basu аппад дансаа оруулна уу.`);
       break;
     default:
       throw new IdeshError('WRONG_STATE', `nothing to say in ${facts.state}`);

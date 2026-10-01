@@ -127,6 +127,7 @@ export {
   homeOf,
   ordersOf,
   allOrders,
+  guestsByDeliveryPhone,
   orderForSupplier,
   orderForOps,
   resendForOps,
