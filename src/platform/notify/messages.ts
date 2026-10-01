@@ -25,7 +25,11 @@ export interface OutgoingRequest {
   title?: string;
   body: string;
   channel: 'push' | 'sms';
-  /** What this is about, in the caller's own vocabulary — e.g. `order`. */
+  /**
+   * What this is about, in the caller's own vocabulary — e.g. `order` — and
+   * the id of that one thing: the app opens it from the inbox, the letter
+   * links to it. An `idesh` message's id is always the order's.
+   */
   subject?: string;
   subjectId?: string;
   /** Defaults to one message per template per subject. */
@@ -51,12 +55,17 @@ export async function enqueue(ctx: Ctx, req: OutgoingRequest): Promise<void> {
   await getPool().query(
     `INSERT INTO notify.message
        (guest_id, order_id, subject, subject_id, channel, template, dedupe_key, title, body, state)
-     VALUES ($1, $2, $3, $2, $4, $5, $6, $7, $8, 'queued')
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'queued')
      ON CONFLICT (dedupe_key) DO NOTHING`,
     [
       req.guestId,
+      // The deprecated column only ever held a lunch's id; it keeps doing that
+      // and no more. The subject's id goes in subject_id whatever the subject
+      // is — it once took this lunch-only value too, which left every идэш
+      // message with no order the app could open.
       req.subject === 'order' ? (req.subjectId ?? null) : null,
       req.subject ?? null,
+      req.subjectId ?? null,
       req.channel,
       req.template,
       key,

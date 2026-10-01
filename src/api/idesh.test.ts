@@ -273,6 +273,35 @@ describe('ordering', () => {
     expect(wallet.json().lines[0].memo).toContain('Идэш');
   });
 
+  it('files what the guest and the supplier are told under the order, so the app opens it from the inbox', async () => {
+    type Message = { template: string; subject: string | null; subject_id: string | null };
+    const inbox = async (token: string) =>
+      (await app.inject({ method: 'GET', url: '/v1/notifications', headers: auth(token) })).json().messages as Message[];
+    const token = await signIn();
+    await topUp(token, 500_000);
+    const { id } = await placeAndPay(token);
+
+    expect((await inbox(token)).find((m) => m.template === 'idesh.paid')).toMatchObject({ subject: 'idesh', subject_id: id });
+    // The supplier hears of the same order, by the same id.
+    const owner = await signIn('+97688010001');
+    expect((await inbox(owner)).find((m) => m.template === 'supplier.order')).toMatchObject({ subject: 'idesh', subject_id: id });
+
+    // What is about the supplier itself is filed under the supplier, so
+    // nothing under «idesh» carries an id that is not an order's.
+    const moved = await app.inject({
+      method: 'PATCH',
+      url: '/v1/supplier/profile',
+      headers: auth(owner),
+      payload: { bank_name: 'Хаан банк', bank_account: '5012345678', bank_holder: 'Дорж', password: PASSWORD },
+    });
+    expect(moved.statusCode, moved.body).toBe(200);
+    const told = await inbox(owner);
+    expect(told.find((m) => m.template === 'supplier.bank')).toMatchObject({ subject: 'supplier', subject_id: supplierId });
+    const filed = told.filter((m) => m.subject === 'idesh');
+    expect(filed.length).toBeGreaterThan(0);
+    expect(new Set(filed.map((m) => m.subject_id))).toEqual(new Set([id]));
+  });
+
   it('keeps every paid order in the history, finished ones too, and never a draft', async () => {
     const token = await signIn('+97699001133');
     await topUp(token, 1_000_000);

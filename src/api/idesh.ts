@@ -664,9 +664,11 @@ export async function registerIdeshRoutes(
         if (registered) owners.add(registered);
         const stamp = ctx.clock.now().getTime();
         for (const owner of owners) {
+          // About the supplier, as approving and declining one are — an
+          // `idesh` message is about an order, and the app opens it.
           await enqueue(ctx, {
             guestId: owner,
-            subject: 'idesh',
+            subject: 'supplier',
             subjectId: supplierId,
             template: 'supplier.bank',
             channel: 'sms',

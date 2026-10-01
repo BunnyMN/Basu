@@ -161,9 +161,11 @@ export async function settlePromotion(ctx: Ctx, supplierId: string, promotionId:
   });
   await activate(ctx, found.id, collected.transferId);
   const done = (await promotion(found.id))!;
+  // Filed under the promotion, as its money is: an `idesh` message is about
+  // an order, and the app opens that order from it.
   await enqueue(ctx, {
     guestId: done.boughtBy,
-    subject: 'idesh',
+    subject: 'idesh_promo',
     subjectId: done.id,
     template: 'supplier.promoted',
     channel: 'push',
