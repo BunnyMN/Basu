@@ -236,7 +236,7 @@ The seating time is the largest element on the card because it is the only numbe
 **Dynamic Island.**
 
 - *Compact*: 37pt pill, radius 19, black. 22pt icon at radius 6 leading, seating time at 15/600 mono trailing.
-- *Expanded*: radius 40, black, padding 18 × 20 × 20, gap 15. Same facts as the lock screen card — 34pt icon, venue at 15/600, stage label in mono 11.5 `#8E9AA0`, seating time at 28/600 mono over `ИРЭХ`, then the three-segment bar with `#2B3236` as the empty track. It shows nothing the card doesn't.
+- *Expanded*: radius 40, black, padding 18 × 20 × 20, gap 15. Same facts as the lock screen card — 34pt icon, venue at 15/600, stage label in sans 11.5 `#8E9AA0` (words are sans; only numbers are mono), seating time at 28/600 mono over `ИРЭХ`, then the three-segment bar with `#2B3236` as the empty track. It shows nothing the card doesn't.
 - *Two activities*: the food activity keeps the wide compact slot and the other collapses to a 37pt circular glyph. Whichever is nearer in time takes the wide slot.
 
 `staleDate` is seating time + 30 minutes. Updates arrive by push; see `DATA-MODEL.md` for the payload.
