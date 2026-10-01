@@ -32,8 +32,32 @@ final class Session {
 
   var isSignedIn: Bool { token != nil }
 
-  /// Which ways in the server has open, for the sheet to draw.
-  func methods() async -> AuthMethods { await api.authMethods() }
+  /// Which ways in the server has open, for the sheet to draw. Remembered, so
+  /// the next sheet draws them at once rather than a door at a time on a slow
+  /// network; a server that does not answer gets what it said last time.
+  func methods() async -> AuthMethods {
+    if let open = await api.authMethodsIfAnswered() {
+      Self.remember(open)
+      return open
+    }
+    return Self.rememberedMethods() ?? .unknown
+  }
+
+  /// Per server: a developer's own one may have doors the pilot has not.
+  nonisolated private static var methodsKey: String {
+    "auth.methods.\(Endpoint.base.host ?? ""):\(Endpoint.base.port ?? 443)"
+  }
+
+  /// What the server said last time, if it has ever said.
+  nonisolated static func rememberedMethods() -> AuthMethods? {
+    guard let data = UserDefaults.standard.data(forKey: methodsKey) else { return nil }
+    return try? JSONDecoder().decode(AuthMethods.self, from: data)
+  }
+
+  nonisolated private static func remember(_ methods: AuthMethods) {
+    guard let data = try? JSONEncoder().encode(methods) else { return }
+    UserDefaults.standard.set(data, forKey: methodsKey)
+  }
 
   /// Where the system's sign-in sheet goes for Google.
   var googleStart: URL { api.googleStart }

@@ -117,6 +117,8 @@ struct RootView: View {
         lock.admitted()
         // In now: signing out later lands on the way in, not on browsing.
         model.browsing = false
+        // The token APNs gave at launch had nobody to belong to; now it has.
+        Task { await PushRegistrar.shared.registerIfAllowed() }
       } else {
         tab = .home
         path = []
@@ -154,18 +156,32 @@ struct RootView: View {
       OrderActivity.shared.register = { orderId, token in
         await platform.registerActivityToken(token, order: orderId)
       }
+      // A phone that already said yes tells the server where it is now; one
+      // that has not been asked is asked after its first order, not here.
+      await PushRegistrar.shared.registerIfAllowed()
       Self.jumpForDebug(tab: &tab, path: &path)
       await Self.signInForDebug(model)
+      // The splash lasts as long as the launch does, within limits: the floor
+      // is so a fast launch does not flash, and the cap is so a stalled
+      // network is not a minute of wordmark. Past the cap the launcher draws
+      // what it has, and the live card and the offline banner arrive on
+      // their own when the network does.
+      let cap = Task {
+        try? await Task.sleep(for: .milliseconds(1200))
+        if !Task.isCancelled { lift() }
+      }
       async let boot: Void = model.bootstrap()
       async let me: Void = platform.refresh()
-      // The splash lasts as long as the launch does and not a moment longer;
-      // the floor is so a fast launch does not flash.
       async let floor: Void = { try? await Task.sleep(for: .milliseconds(650)) }()
       _ = await (boot, me, floor)
-      if !Self.debugHoldsSplash {
-        withAnimation(.easeOut(duration: 0.35)) { splash = false }
-      }
+      cap.cancel()
+      lift()
     }
+  }
+
+  private func lift() {
+    guard splash, !Self.debugHoldsSplash else { return }
+    withAnimation(.easeOut(duration: 0.35)) { splash = false }
   }
 
   /// The launcher and the three it shares a bar with.
@@ -198,6 +214,22 @@ struct RootView: View {
         // It stays up over the inbox — that is still the shell, and the bell is
         // a detour rather than a departure. An app takes the whole screen.
         if !inApp {
+          // Content fades out as it nears the bar rather than peeking round
+          // both ends of the capsule. It takes no touches: what is under it
+          // is still the page's.
+          LinearGradient(
+            stops: [
+              .init(color: Color.groundBottom.opacity(0), location: 0),
+              .init(color: Color.groundBottom.opacity(0.92), location: 0.62),
+              .init(color: Color.groundBottom, location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom,
+          )
+          .frame(height: outer.safeAreaInsets.bottom + 72)
+          .allowsHitTesting(false)
+          .accessibilityHidden(true)
+
           TabBar(tab: tab, bottom: outer.safeAreaInsets.bottom) { chosen in
             // A tab always lands on its own root: from the inbox, Түрийвч
             // shows the wallet rather than the inbox over it.
@@ -350,9 +382,11 @@ struct SplashView: View {
  were the same tap twice — so the balance is one tap away rather than visible on
  arrival. That is a real trade against the brief, made once, on purpose.
 
- The pill slides between tabs and the phone ticks as it lands. Only the chosen
- tab shows its name, so the accessibility labels below are what VoiceOver has
- for the other two.
+ The pill slides between tabs and the phone ticks as it lands — or, with
+ Reduce Motion on, fades from one tab to the next without travelling. Only
+ the chosen tab shows its name, so the accessibility labels below are what
+ VoiceOver has for the other two, and the bar is one tab bar to it, «1 of 3»
+ and so on, rather than three loose buttons.
  */
 struct TabBar: View {
   let tab: ShellTab
@@ -360,13 +394,16 @@ struct TabBar: View {
   let bottom: CGFloat
   let select: (ShellTab) -> Void
   @Namespace private var lit
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     HStack(spacing: 4) {
       ForEach(ShellTab.allCases, id: \.self) { item in
         let active = item == tab
         Button {
-          withAnimation(.spring(response: 0.34, dampingFraction: 0.82)) { select(item) }
+          withAnimation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.34, dampingFraction: 0.82)) {
+            select(item)
+          }
         } label: {
           HStack(spacing: 8) {
             ShellGlyph(mark: item.mark, size: 22, lineWidth: active ? 2 : 1.7)
@@ -374,7 +411,7 @@ struct TabBar: View {
               Text(item.title)
                 .font(.sans(14, .semibold))
                 .fixedSize()
-                .transition(.opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
             }
           }
           .foregroundStyle(active ? Color.onDeepPill : Color.onDeep)
@@ -383,8 +420,13 @@ struct TabBar: View {
           .frame(height: 50)
           .background {
             if active {
-              Capsule().fill(Color.deepPill)
-                .matchedGeometryEffect(id: "lit", in: lit)
+              if reduceMotion {
+                Capsule().fill(Color.deepPill)
+                  .transition(.opacity)
+              } else {
+                Capsule().fill(Color.deepPill)
+                  .matchedGeometryEffect(id: "lit", in: lit)
+              }
             }
           }
           .contentShape(Capsule())
@@ -401,6 +443,8 @@ struct TabBar: View {
     .shadow(color: .barShadow, radius: 18, y: 8)
     // The pill is 50 tall; past this the name would not fit inside it.
     .dynamicTypeSize(...DynamicTypeSize.xxLarge)
+    .accessibilityElement(children: .contain)
+    .accessibilityAddTraits(.isTabBar)
     .padding(.horizontal, 36)
     .padding(.bottom, max(bottom - 10, 14))
     .sensoryFeedback(.selection, trigger: tab)

@@ -18,6 +18,8 @@ extension Color {
   /// The ground's first stop. A fixed title sits on this so the seam with the
   /// gradient underneath is invisible where they meet.
   static let groundTop = dynamic(light: 0xF8F7F3, dark: 0x141815)
+  /// The ground's last stop: what content fades into above the tab bar.
+  static let groundBottom = dynamic(light: 0xECEBE4, dark: 0x0A0C0B)
 
   static let ink = BasuColor.ink
   static let ink2 = BasuColor.ink2

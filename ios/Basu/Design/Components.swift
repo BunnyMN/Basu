@@ -1,19 +1,22 @@
+import BasuKit
 import SwiftUI
 
-/// The uppercase mono label the web pages use above every section.
+/// The uppercase mono label the web pages use above every section — at 11,
+/// the web's floor for anything that has to be read.
 struct SectionLabel: View {
   let text: String
   init(_ text: String) { self.text = text }
 
   var body: some View {
     Text(text.uppercased())
-      .font(.mono(10, .medium))
-      .tracking(1.6)
+      .font(.mono(11, .medium))
+      .tracking(11 * 0.14)
       .foregroundStyle(Color.ink3)
   }
 }
 
-/// The big button at the bottom of a sheet — pay, cancel, send.
+/// The big button at the bottom of a sheet — pay, cancel, send — at the
+/// button corner the web's buttons have.
 struct WideButton: View {
   enum Kind { case primary, quiet, danger }
 
@@ -22,6 +25,8 @@ struct WideButton: View {
   var enabled: Bool = true
   let action: () -> Void
 
+  private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: BasuMetric.button, style: .continuous) }
+
   var body: some View {
     Button(action: action) {
       Text(title)
@@ -29,9 +34,11 @@ struct WideButton: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 15)
         .foregroundStyle(foreground)
-        .background(background, in: RoundedRectangle(cornerRadius: 4))
-        .overlay(RoundedRectangle(cornerRadius: 4).stroke(border, lineWidth: 1))
+        .background(background, in: shape)
+        .overlay(shape.strokeBorder(border, lineWidth: 1))
+        .contentShape(shape)
     }
+    .buttonStyle(Pressable())
     .disabled(!enabled)
     .opacity(enabled ? 1 : 0.45)
   }
@@ -58,7 +65,9 @@ struct WideButton: View {
 
  Said out loud rather than left as an empty screen: "no restaurants today" and
  "this phone cannot reach anything" are the same picture and completely
- different problems, and only one of them is the guest's to wait out.
+ different problems, and only one of them is the guest's to wait out. Said in
+ the guest's words — a lost connection, the internet to check — not the
+ developer's: nobody holding a phone knows what a server is.
 
  The words are for whoever holds the phone, in every build. A debug build
  once added the API's address and `npm run dev` here, and a debug copy on a
@@ -67,43 +76,36 @@ struct WideButton: View {
 struct OfflineBanner: View {
   let retry: () async -> Void
   @State private var trying = false
+  @Environment(\.dynamicTypeSize) private var typeSize
+
+  private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: BasuMetric.button, style: .continuous) }
 
   var body: some View {
-    HStack(alignment: .top, spacing: 10) {
-      Image(systemName: "wifi.slash")
-        .font(.sans(15))
-        .foregroundStyle(Color.hold)
-      VStack(alignment: .leading, spacing: 2) {
-        Text("Серверт холбогдож чадсангүй")
-          .font(.sans(13.5, .semibold))
-          .foregroundStyle(Color.ink)
-        Text(hint)
-          .font(.sans(12))
-          .foregroundStyle(Color.ink2)
-          .fixedSize(horizontal: false, vertical: true)
-      }
-      Spacer(minLength: 6)
-      Button {
-        Task {
-          trying = true
-          await retry()
-          trying = false
+    // At the largest text sizes the words take the whole width and «Дахин»
+    // goes under them: beside them, both broke mid-word («Холбол/т», «Дах/ин»).
+    Group {
+      if typeSize.isAccessibilitySize {
+        VStack(alignment: .leading, spacing: 10) {
+          HStack(alignment: .firstTextBaseline, spacing: 10) {
+            mark
+            words
+          }
+          again
         }
-      } label: {
-        if trying {
-          ProgressView().controlSize(.small)
-        } else {
-          Text("Дахин")
-            .font(.mono(11, .semibold))
-            .foregroundStyle(Color.accentInk)
+      } else {
+        HStack(alignment: .center, spacing: 10) {
+          mark
+          words
+          Spacer(minLength: 6)
+          again
+            .padding(.vertical, -5)
         }
       }
-      .accessibilityIdentifier("offline.retry")
     }
     .padding(12)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(Color.holdSoft, in: RoundedRectangle(cornerRadius: 4))
-    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.holdLine, lineWidth: 1))
+    .background(Color.holdSoft, in: shape)
+    .overlay(shape.strokeBorder(Color.holdLine, lineWidth: 1))
     // Without this the row is a handful of loose labels rather than one thing
     // anybody — VoiceOver or a test — can point at.
     .accessibilityElement(children: .contain)
@@ -115,21 +117,75 @@ struct OfflineBanner: View {
     }
   }
 
-  private var hint: String { "Сүлжээгээ шалгаад дахин оролдоно уу." }
+  private var mark: some View {
+    Image(systemName: "wifi.slash")
+      .font(.sans(15))
+      .foregroundStyle(Color.hold)
+      .accessibilityHidden(true)
+  }
+
+  private var words: some View {
+    VStack(alignment: .leading, spacing: 2) {
+      Text("Холболт тасарлаа")
+        .font(.sans(13.5, .semibold))
+        .foregroundStyle(Color.ink)
+        .fixedSize(horizontal: false, vertical: true)
+      Text("Интернэтээ шалгаад дахин оролдоно уу.")
+        .font(.sans(12))
+        .foregroundStyle(Color.ink2)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  /// The only thing to do here, so a thumb's worth of it: a capsule in a
+  /// 44-point target, not eleven points of mono — and never narrower than
+  /// the word on it.
+  private var again: some View {
+    Button {
+      Task {
+        trying = true
+        await retry()
+        trying = false
+      }
+    } label: {
+      ZStack {
+        if trying {
+          ProgressView().controlSize(.small)
+        } else {
+          Text("Дахин")
+            .font(.sans(14, .semibold))
+            .foregroundStyle(Color.accentInk)
+            .fixedSize()
+        }
+      }
+      .padding(.horizontal, 14)
+      .frame(minWidth: 64, minHeight: 34)
+      .background(Color.surface, in: Capsule())
+      .overlay(Capsule().strokeBorder(Color.holdLine, lineWidth: BasuMetric.hairline))
+      .frame(minHeight: BasuMetric.minTarget)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .disabled(trying)
+    .accessibilityIdentifier("offline.retry")
+  }
 }
 
 /// A line of trouble, said in Mongolian, in the place it happened.
 struct Banner: View {
   let message: String
 
+  private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: BasuMetric.button, style: .continuous) }
+
   var body: some View {
     Text(message)
       .font(.sans(13))
       .foregroundStyle(Color.stop)
       .frame(maxWidth: .infinity, alignment: .leading)
+      .fixedSize(horizontal: false, vertical: true)
       .padding(12)
-      .background(Color.stopSoft, in: RoundedRectangle(cornerRadius: 4))
-      .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.stopLine, lineWidth: 1))
+      .background(Color.stopSoft, in: shape)
+      .overlay(shape.strokeBorder(Color.stopLine, lineWidth: 1))
   }
 }
 
@@ -219,12 +275,12 @@ struct UnreadBadge: View {
 /// The tracked mono label that names which app a row came from.
 struct SourceLabel: View {
   let text: String
-  var size: CGFloat = 9.5
+  var size: CGFloat = 11
 
   var body: some View {
     Text(text)
       .font(.mono(size, .medium))
-      .tracking(size * 0.14)
+      .tracking(size * 0.12)
       .foregroundStyle(Color.ink3)
   }
 }

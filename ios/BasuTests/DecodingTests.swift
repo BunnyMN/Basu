@@ -76,6 +76,73 @@ struct DecodingTests {
     #expect(Format.day(order.receiveOn) == "11/3")
     #expect(order.asLiveItem().timeLabel == "АВАХ")
     #expect(order.asLiveItem().when == "11/3")
+    // A whole animal is counted in heads, the web's word for it.
+    #expect(order.asLiveItem().detail == "Хонь, залуу ирэг · 1 толгой · Төлсөн")
+  }
+
+  @Test func meatByTheKiloIsSaidInKilosNotTimes() throws {
+    let order = try decode(LiveIdesh.self, """
+      {
+        "id": "8c1f2a2e-1d1e-4b4a-9f0e-2b1a3c4d5e70",
+        "code": "7001",
+        "state": "PREPARING",
+        "supplier": { "id": "s3", "name": "Улаанбаатар махны төв" },
+        "kind": "sheep",
+        "unit": "kg",
+        "title": "Хонины мах, кг-аар",
+        "qty": 10,
+        "total_mnt": 128000,
+        "receive": "delivery",
+        "receive_on": "2026-10-03",
+        "paid_at": "2026-10-01T04:12:00.000Z"
+      }
+      """)
+    let row = order.asLiveItem()
+    // «Хонины мах, кг-аар ×10» read as a multiplication.
+    #expect(row.detail == "Хонины мах · 10 кг · Бэлтгэж байна")
+    #expect(row.timeLabel == "ИРЭХ")
+    // Being prepared is on the fire, so honey — not the blue of on the way.
+    #expect(row.status == .cooking)
+    #expect(row.spoken.contains("10-р сарын 3-нд ирэх"))
+  }
+
+  @Test func whatIsCookingIsHoneyAndWhatIsOnTheWayIsBlue() throws {
+    func lunch(_ state: String) throws -> LiveItem {
+      try decode(LiveOrder.self, """
+        {
+          "id": "o", "code": "0970", "state": "\(state)",
+          "restaurant": { "id": "r", "name": "Бөмбөгөр Ресторан" }, "table": null,
+          "total_mnt": 1, "slot_starts_at": "2026-09-01T04:00:00.000Z",
+          "fire_at": null, "ready_at": null
+        }
+        """).asLiveItem(expanded: false)
+    }
+    #expect(try lunch("COOKING").status == .cooking)
+    #expect(try lunch("FIRED").status == .cooking)
+    #expect(try lunch("PLACED").status == .waiting)
+    #expect(try lunch("READY").status == .ready)
+    #expect(try lunch("PLACED").timeLabel == "ИРЭХ")
+    #expect(try lunch("PLACED").spoken.hasPrefix("Хоол, Бөмбөгөр Ресторан, 12:00 цагт ирэх, захиалга 0970"))
+  }
+
+  @Test func theLiveRowSaysWhatTheWebLauncherSays() throws {
+    func word(_ state: String) throws -> String {
+      try decode(LiveOrder.self, """
+        {
+          "id": "o", "code": "0970", "state": "\(state)",
+          "restaurant": { "id": "r", "name": "Ц" }, "table": null,
+          "total_mnt": 1, "slot_starts_at": "2026-09-01T04:00:00.000Z",
+          "fire_at": null, "ready_at": null
+        }
+        """).asLiveItem(expanded: false).detail
+    }
+    #expect(try word("PLACED") == "Хүлээгдэж байна")
+    // The states the shared headline names by a time: the status sheet's
+    // words, never «SCHEDULED» in English on the first screen.
+    #expect(try word("SCHEDULED") == "Хүлээн авсан")
+    #expect(try word("ARMED") == "Хөдлөх цаг")
+    #expect(try word("COOKING") == "Гал дээр")
+    #expect(try word("FIRED") == "Гал дээр")
   }
 
   @Test func anUnknownStateDoesNotBrickThePhone() throws {

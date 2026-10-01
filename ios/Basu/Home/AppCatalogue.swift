@@ -17,7 +17,9 @@ import Foundation
 struct LauncherApp: Identifiable, Hashable, Sendable {
   let id: String
   let name: String
-  /// One lower-case word. It carries the specificity the glyph must not.
+  /// A few lower-case words — «урьдчилж захиал», «өвлийн мах». They carry
+  /// the specificity the glyph must not, so they are a phrase rather than a
+  /// fragment («урьдчилсан» on its own said nothing).
   let tag: String
   let icon: ServiceIcon
   /// Where the page lives on the server — `/dine`. `nil` is an icon that is
@@ -59,7 +61,7 @@ struct AppBand: Identifiable, Hashable, Sendable {
 
 enum AppCatalogue {
   static let food = LauncherApp(
-    id: "food", name: "Хоол", tag: "урьдчилсан", icon: .raster("food-tile"), path: "/dine",
+    id: "food", name: "Хоол", tag: "урьдчилж захиал", icon: .raster("food-tile"), path: "/dine",
   )
 
   /// The second app: the page at `/idesh`, opened like the first. One entry
@@ -67,14 +69,14 @@ enum AppCatalogue {
   /// is a supplied render, like the food one; the drawn rib mark stays in the
   /// icon system for the sheet.
   static let idesh = LauncherApp(
-    id: "idesh", name: "Идэш", tag: "өвлийн", icon: .raster("idesh-tile"), path: "/idesh",
+    id: "idesh", name: "Идэш", tag: "өвлийн мах", icon: .raster("idesh-tile"), path: "/idesh",
   )
 
   /// The supplier's own side of the second app, for the few guests who are
   /// one: the same page the counter's tablet shows, opened with the phone's
   /// own sign-in — every screen there is a person signed in as themselves. Not in `shipped` — it is on the launcher only for them.
   static let supplier = LauncherApp(
-    id: "supplier", name: "Нийлүүлэгч", tag: "миний зар", icon: .glyph(.supplier), path: "/supplier",
+    id: "supplier", name: "Нийлүүлэгч", tag: "миний зарууд", icon: .glyph(.supplier), path: "/supplier",
   )
 
   /// What is actually built. Everything in `planned` is drawn and named only.

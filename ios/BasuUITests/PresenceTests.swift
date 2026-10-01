@@ -50,14 +50,14 @@ final class PresenceTests: XCTestCase {
     XCTAssertTrue(compact.firstMatch.waitForExistence(timeout: 10), "the compact island should show the seating time")
 
     // A tap opens the order in the app — the deep link. A press expands the
-    // island: the venue, the stage, the same time over СУУХ, the bar.
+    // island: the venue, the stage, the same time over ИРЭХ, the bar.
     // Left of centre: with two activities live the food one keeps the wide
     // slot on the left and the other collapses to a circle on the right.
     springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.42, dy: 0.04)).press(forDuration: 1)
     try await Task.sleep(for: .seconds(1.5))
     shot("3-island-expanded", of: springboard)
     XCTAssertTrue(
-      springboard.staticTexts["СУУХ"].waitForExistence(timeout: 5),
+      springboard.staticTexts["ИРЭХ"].waitForExistence(timeout: 5),
       "the expanded island should label the seating time",
     )
     springboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7)).tap()
@@ -80,7 +80,7 @@ final class PresenceTests: XCTestCase {
     try await Task.sleep(for: .seconds(2))
     shot("4-lock-screen", of: springboard)
     XCTAssertTrue(
-      springboard.staticTexts["СУУХ"].waitForExistence(timeout: 5),
+      springboard.staticTexts["ИРЭХ"].waitForExistence(timeout: 5),
       "the lock screen card should be up",
     )
     if springboard.buttons["Allow"].waitForExistence(timeout: 2) { springboard.buttons["Allow"].tap() }

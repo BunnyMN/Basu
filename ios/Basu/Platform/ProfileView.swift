@@ -13,7 +13,13 @@ import WebKit
 
  Every switch here does what it says, today. The language row came off for
  that reason: the app speaks Mongolian only, and a choice of English that
- changed nothing was a setting in name only.
+ changed nothing was a setting in name only. The SMS row goes the same way on
+ a server with no SMS gateway — the pilot has none yet — and comes back by
+ itself when it has one.
+
+ What cannot be undone is asked in an alert, which always draws «Болих»: a
+ confirmation dialog on iOS 26 is a popover whose only button was the
+ irreversible one.
  */
 struct ProfileView: View {
   @Environment(Platform.self) private var platform
@@ -25,15 +31,22 @@ struct ProfileView: View {
 
   @State private var editing: Field?
   @State private var closing = false
+  /// The server's no to closing, in its own words: money still in the
+  /// wallet, an order still running.
+  @State private var closeRefusal: String?
   @State private var signingOutOthers = false
   /// What iOS itself says about notifications, apart from Basu's own switches.
   @State private var permission: UNAuthorizationStatus?
   @State private var cacheCleared = false
   /// What the last password change did, said under the card it was made from.
   @State private var passwordNote: String?
+  /// The ways the server can reach somebody: no gateway, no SMS switch.
+  @State private var methods: AuthMethods?
 
   enum Field: String, Identifiable {
-    case name, email, password
+    /// The address sheet opened from the password row: an account with no
+    /// address adds one first, and the sheet says that is why.
+    case name, email, emailFirst, password
     var id: String { rawValue }
   }
 
@@ -41,7 +54,15 @@ struct ProfileView: View {
     ScrollView {
       VStack(alignment: .leading, spacing: 26) {
         if session.isSignedIn {
-          identity
+          VStack(alignment: .leading, spacing: 14) {
+            identity
+            // Said where it is seen on arrival, not at the foot of the page
+            // under the tab bar.
+            if let trouble = platform.trouble {
+              Banner(message: trouble)
+                .accessibilityIdentifier("profile.trouble")
+            }
+          }
           fields
           settings
           notifications
@@ -73,16 +94,13 @@ struct ProfileView: View {
     .toolbarVisibility(.hidden, for: .navigationBar)
     .sheet(item: $editing) { field in
       switch field {
-      case .name: ProfileEditSheet(field: field)
+      case .name: ProfileEditSheet()
       case .email: EmailAttachSheet()
+      case .emailFirst: EmailAttachSheet(forPassword: true)
       case .password: PasswordChangeSheet { revoked, first in noteChanged(revoked: revoked, first: first) }
       }
     }
-    .confirmationDialog(
-      "Бусад бүх төхөөрөмжөөс гарах уу?",
-      isPresented: $signingOutOthers,
-      titleVisibility: .visible,
-    ) {
+    .alert("Бусад бүх төхөөрөмжөөс гарах уу?", isPresented: $signingOutOthers) {
       Button("Гаргах", role: .destructive) {
         Task { await platform.signOutOtherDevices() }
       }
@@ -90,22 +108,21 @@ struct ProfileView: View {
     } message: {
       Text("Энэ утас нэвтэрсэн хэвээр үлдэнэ.")
     }
-    .confirmationDialog(
-      "Бүртгэлээ бүрмөсөн хаах уу?",
-      isPresented: $closing,
-      titleVisibility: .visible,
+    .alert(
+      "Бүртгэлийг хааж чадсангүй",
+      isPresented: Binding(get: { closeRefusal != nil }, set: { if !$0 { closeRefusal = nil } }),
     ) {
-      Button("Хаах", role: .destructive) {
-        Task { await platform.closeAccount() }
-      }
-      Button("Болих", role: .cancel) {}
+      Button("Ойлголоо", role: .cancel) {}
     } message: {
-      Text("Нэр, утас, мэдэгдэл устана. Хийсэн гүйлгээ, татварын баримт хуулийн дагуу үлдэнэ. Буцаах боломжгүй.")
+      Text(closeRefusal ?? "")
     }
     .task {
       await platform.refresh()
       await platform.loadPreferences()
       await platform.loadSessions()
+    }
+    .task(id: session.token) {
+      methods = await session.methods()
     }
     // Back from the phone's Settings, where the answer may have changed.
     .task(id: phase) {
@@ -120,11 +137,7 @@ struct ProfileView: View {
     HStack(spacing: 16) {
       SeedAvatar(seed: platform.me?.avatarSeed ?? "00000000", size: 54)
       VStack(alignment: .leading, spacing: 5) {
-        Text(platform.me?.displayName ?? "Нэргүй")
-          .font(.sans(24, .semibold))
-          .tracking(-0.02 * 24)
-          .foregroundStyle(Color.ink)
-          .fixedSize(horizontal: false, vertical: true)
+        headline
         // The number in the mono, the way every number is; an address is words.
         if let phone = platform.me?.phone ?? (platform.me == nil ? session.phone : nil) {
           Text(spaced(phone))
@@ -139,15 +152,46 @@ struct ProfileView: View {
             .truncationMode(.middle)
         }
         if let me = platform.me {
-          // The seed is on the screen because the avatar is derived from it:
-          // somebody who wonders where their mark came from can see the answer.
-          Text("Basu-д \(Format.since(me.memberSince)) хойш · \(me.avatarSeed)")
-            .font(.sans(11.5))
-            .lineSpacing(11.5 * 0.35 - 3)
+          Text("Basu-д \(Format.since(me.memberSince)) хойш")
+            .font(.sans(12))
             .foregroundStyle(Color.ink3)
             .fixedSize(horizontal: false, vertical: true)
         }
       }
+    }
+  }
+
+  /**
+   The name — or, for an account that has none yet, the way to give one,
+   where the name goes. Every new account used to be headed «Нэргүй» in 24
+   points, which reads as a fault rather than a field nobody has filled.
+   */
+  @ViewBuilder private var headline: some View {
+    if let name = platform.me?.displayName?.trimmingCharacters(in: .whitespaces), !name.isEmpty {
+      Text(name)
+        .font(.sans(24, .semibold))
+        .tracking(-0.02 * 24)
+        .foregroundStyle(Color.ink)
+        .fixedSize(horizontal: false, vertical: true)
+    } else if platform.me != nil {
+      Button { editing = .name } label: {
+        HStack(spacing: 6) {
+          Text("Нэрээ оруулах")
+            .font(.sans(22, .semibold))
+            .tracking(-0.02 * 22)
+          Chevron(size: 14, lineWidth: 2.2)
+        }
+        .foregroundStyle(Color.accentInk)
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityIdentifier("profile.addName")
+    } else {
+      // Still on its way: the shape of a name, not a word that is wrong.
+      Text("Батаа Болд")
+        .font(.sans(24, .semibold))
+        .redacted(reason: .placeholder)
+        .accessibilityHidden(true)
     }
   }
 
@@ -170,8 +214,11 @@ struct ProfileView: View {
             Spacer(minLength: 8)
             Text(platform.me?.displayName ?? "—")
               .font(.sans(15, .medium))
-              .foregroundStyle(Color.ink)
+              .foregroundStyle(platform.me?.displayName == nil ? Color.ink3 : Color.ink)
               .lineLimit(1)
+              // The row's own word keeps its width; the name gives way.
+              .minimumScaleFactor(0.6)
+              .layoutPriority(-1)
             Chevron(size: 13).foregroundStyle(Color.ink3)
           }
           .padding(.horizontal, 16)
@@ -252,11 +299,12 @@ struct ProfileView: View {
   /**
    The password: changed, or set for the first time. A first password is set
    with a code sent to the address on the account, so an account with no
-   address adds one first — the row says so, and opens that sheet instead.
+   address adds one first — the row says so, and opens that sheet instead,
+   which says it again at its top.
    */
   private func passwordRow(hasPassword: Bool, hasEmail: Bool) -> some View {
     let needsAddress = !hasPassword && !hasEmail
-    return Button { editing = needsAddress ? .email : .password } label: {
+    return Button { editing = needsAddress ? .emailFirst : .password } label: {
       HStack(spacing: 12) {
         RowLabel(
           title: hasPassword ? "Нууц үг солих" : "Нууц үг тохируулах",
@@ -356,14 +404,18 @@ struct ProfileView: View {
           isOn: platform.preferences.push,
           id: "profile.pref.push",
         ) { await platform.setPreference(push: $0) }
-        Hairline()
-        switchRow(
-          "SMS-ээр",
-          symbol: "message",
-          detail: "Апп-аар хүрэхгүй үед мессежээр",
-          isOn: platform.preferences.sms,
-          id: "profile.pref.sms",
-        ) { await platform.setPreference(sms: $0) }
+        // Only where SMS can actually be sent. A switch that is on and does
+        // nothing is the one kind this screen does not have.
+        if methods?.sms == true {
+          Hairline()
+          switchRow(
+            "SMS-ээр",
+            symbol: "message",
+            detail: "Апп-аар хүрэхгүй үед мессежээр",
+            isOn: platform.preferences.sms,
+            id: "profile.pref.sms",
+          ) { await platform.setPreference(sms: $0) }
+        }
         Hairline()
         switchRow(
           "Урамшуулал",
@@ -377,7 +429,7 @@ struct ProfileView: View {
 
       // Being honest about what cannot be switched off is the difference
       // between a setting and a lie.
-      Text("Захиалгын явцын мэдэгдлийг унтраах боломжгүй — гал тавих мөчийг мэдэхгүй бол урьдчилсан захиалга утгагүй болно.")
+      Text("Захиалгын явцын мэдэгдлийг унтраах боломжгүй — хоол бэлэн болох, мах гарах цагийг мэдэх хэрэгтэй.")
         .font(.sans(12))
         .lineSpacing(12 * 0.55 - 3)
         .foregroundStyle(Color.ink3)
@@ -413,6 +465,7 @@ struct ProfileView: View {
       }
       .font(.sans(14, .semibold))
       .foregroundStyle(Color.accent)
+      .frame(minHeight: BasuMetric.minTarget)
       .accessibilityIdentifier("profile.permission")
     }
     .padding(.horizontal, 16)
@@ -567,19 +620,33 @@ struct ProfileView: View {
    Required by App Store review guideline 5.1.1(v): an app that makes accounts
    has to let somebody close theirs from inside it — not by email, not by
    ringing anybody. Set apart from «Гарах» and worded so the two cannot be
-   confused, because one of them is reversible and the other is not.
+   confused, because one of them is reversible and the other is not; and the
+   button that does it says «устгах», never «Хаах», which everywhere else in
+   the app is the word that closes a sheet.
+
+   A refusal — money still in the wallet, an order still running — comes back
+   as an alert of its own: a banner here sat under the tab bar, out of sight.
    */
   private var closeAccount: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      Button("Бүртгэл хаах") { closing = true }
+    Button { closing = true } label: {
+      Text("Бүртгэл хаах")
         .font(.sans(13))
         .foregroundStyle(Color.ink3)
-        .accessibilityIdentifier("profile.close")
-      if let trouble = platform.trouble {
-        Banner(message: trouble)
-      }
+        .padding(.horizontal, 12)
+        .frame(minHeight: BasuMetric.minTarget)
+        .contentShape(Rectangle())
     }
+    .buttonStyle(.plain)
+    .accessibilityIdentifier("profile.close")
     .frame(maxWidth: .infinity, alignment: .center)
+    .alert("Бүртгэлээ бүрмөсөн хаах уу?", isPresented: $closing) {
+      Button("Бүртгэлээ устгах", role: .destructive) {
+        Task { closeRefusal = await platform.closeAccount() }
+      }
+      Button("Болих", role: .cancel) {}
+    } message: {
+      Text("Нэр, утас, мэдэгдэл устана. Хийсэн гүйлгээ, татварын баримт хуулийн дагуу үлдэнэ. Буцаах боломжгүй.")
+    }
   }
 }
 
@@ -596,7 +663,8 @@ struct RowLabel: View {
       Image(systemName: symbol)
         .font(.sans(16))
         .foregroundStyle(tint)
-        .frame(width: 24)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        .frame(minWidth: 24)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 2) {
         Text(title)
@@ -644,53 +712,97 @@ struct Switch: View {
 }
 
 /**
- The one field being changed, on its own.
-
- A row that turns into a text field in place is a row that moves under the
- thumb and loses what was typed on the next refresh. A sheet has a Done button,
- which is what «I have finished» looks like.
+ A sheet of the profile's: the ground, the title in the bar with «Болих»
+ beside it, and the form on one card made of the way in's own parts — so
+ adding an address looks like the app that signed you in, not a settings
+ screen from another one.
  */
-struct ProfileEditSheet: View {
-  let field: ProfileView.Field
+struct ProfileSheet<Content: View>: View {
+  let title: String
+  @ViewBuilder let content: Content
 
-  @Environment(Platform.self) private var platform
   @Environment(\.dismiss) private var dismiss
-  @State private var name = ""
 
   var body: some View {
     NavigationStack {
-      Form {
-        Section {
-          TextField("Таныг юу гэж дуудах вэ?", text: $name)
-            .font(.sans(15))
-            .submitLabel(.done)
-            .onSubmit { save() }
-            .accessibilityIdentifier("profile.name.field")
-        } footer: {
-          Text("Ресторанд таны ширээн дээр энэ нэр очно.")
-        }
+      ScrollView {
+        content
+          .padding(.horizontal, BasuMetric.screenPadding)
+          .padding(.top, 8)
+          .padding(.bottom, 28)
+          .frame(maxWidth: 460)
+          .frame(maxWidth: .infinity)
       }
-      .navigationTitle("Нэр")
+      .scrollIndicators(.hidden)
+      .scrollDismissesKeyboard(.interactively)
+      .containerBackground(for: .navigation) { LinearGradient.ground.ignoresSafeArea() }
+      .navigationTitle(title)
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .topBarLeading) {
           Button("Болих") { dismiss() }
         }
-        ToolbarItem(placement: .topBarTrailing) {
-          Button("Болсон") { save() }.fontWeight(.semibold)
-        }
       }
     }
-    .presentationDetents([.medium])
+  }
+}
+
+/**
+ The one field being changed, on its own.
+
+ A row that turns into a text field in place is a row that moves under the
+ thumb and loses what was typed on the next refresh. A sheet has a button
+ that says what it does, which is what «I have finished» looks like.
+ */
+struct ProfileEditSheet: View {
+  @Environment(Platform.self) private var platform
+  @Environment(\.dismiss) private var dismiss
+  @State private var name = ""
+  @State private var busy = false
+  @State private var trouble: String?
+  @FocusState private var typing: Bool
+
+  private var ready: Bool { !busy && !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+  var body: some View {
+    ProfileSheet(title: "Нэр") {
+      VStack(spacing: 12) {
+        AuthField(symbol: "person", active: typing) { typing = true } content: {
+          TextField("Таныг юу гэж дуудах вэ?", text: $name)
+            .textContentType(.name)
+            .focused($typing)
+            .submitLabel(.done)
+            .onSubmit { save() }
+            .accessibilityIdentifier("profile.name.field")
+        }
+        if let trouble {
+          TroubleNote(text: trouble, id: "profile.name.trouble")
+        }
+        Note(text: "Захиалга дээр энэ нэр харагдана — ресторан, нийлүүлэгч таныг ингэж танина.")
+        PrimaryButton(title: "Хадгалах", enabled: ready, busy: busy) { save() }
+          .accessibilityIdentifier("profile.name.save")
+      }
+      .padding(18)
+      .authCard()
+    }
+    .presentationDetents([.medium, .large])
+    .sensoryFeedback(.error, trigger: trouble) { _, said in said != nil }
     .task {
       name = platform.me?.displayName ?? ""
     }
   }
 
   private func save() {
+    guard ready else { return }
     Task {
-      await platform.save(displayName: name, locale: nil)
-      dismiss()
+      busy = true
+      trouble = nil
+      defer { busy = false }
+      if await platform.save(displayName: name.trimmingCharacters(in: .whitespacesAndNewlines), locale: nil) {
+        dismiss()
+      } else {
+        trouble = platform.trouble ?? "Хадгалж чадсангүй. Дахин оролдоно уу."
+      }
     }
   }
 }
@@ -706,6 +818,11 @@ struct ProfileEditSheet: View {
  ago, and says so in its refusal when it has not.
  */
 struct EmailAttachSheet: View {
+  /// Opened from «Нууц үг тохируулах»: the address comes before the password,
+  /// and the sheet says so rather than leaving somebody wondering why they
+  /// asked for one thing and got another.
+  var forPassword = false
+
   fileprivate enum Field: Hashable { case email, password, passwordShown, code }
 
   @Environment(Platform.self) private var platform
@@ -723,52 +840,73 @@ struct EmailAttachSheet: View {
   private var needsPassword: Bool { platform.me?.hasPassword == true }
 
   var body: some View {
-    NavigationStack {
-      Form {
-        Section {
-          TextField("Имэйл хаяг", text: $email)
-            .keyboardType(.emailAddress)
-            .textContentType(.emailAddress)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .focused($focus, equals: .email)
-            .submitLabel(needsPassword ? .next : .send)
-            .onSubmit {
-              if needsPassword { focus = reveal ? .passwordShown : .password } else { Task { await send() } }
-            }
-            .onChange(of: email) { _, typed in
-              // Another address after a code went out is a new start, not a
-              // code for the old one.
-              if let sent = sentTo, Session.address(typed) != sent {
-                sentTo = nil
-                code = ""
+    ProfileSheet(title: "Имэйл холбох") {
+      VStack(spacing: 16) {
+        if forPassword {
+          HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "key")
+              .font(.sans(15, .medium))
+              .foregroundStyle(Color.accent)
+              .accessibilityHidden(true)
+            Text("Нууц үг тохируулахын өмнө имэйлээ холбоно уу — тохируулах код тэр хаяг руу очно.")
+              .font(.sans(14))
+              .foregroundStyle(Color.ink)
+              .fixedSize(horizontal: false, vertical: true)
+          }
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(14)
+          .background(Color.accentSoft, in: RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous))
+          .accessibilityElement(children: .combine)
+          .accessibilityIdentifier("profile.email.why")
+        }
+
+        VStack(spacing: 12) {
+          AuthField(symbol: "envelope", active: focus == .email) { focus = .email } content: {
+            TextField("Имэйл хаяг", text: $email)
+              .keyboardType(.emailAddress)
+              .textContentType(.emailAddress)
+              .textInputAutocapitalization(.never)
+              .autocorrectionDisabled()
+              .focused($focus, equals: .email)
+              .submitLabel(needsPassword ? .next : .send)
+              .onSubmit {
+                if needsPassword { focus = reveal ? .passwordShown : .password } else { Task { await send() } }
+              }
+              .onChange(of: email) { _, typed in
+                // Another address after a code went out is a new start, not a
+                // code for the old one.
+                if let sent = sentTo, Session.address(typed) != sent {
+                  sentTo = nil
+                  code = ""
+                }
+              }
+              .accessibilityIdentifier("profile.email.field")
+          }
+
+          if needsPassword {
+            AuthField(symbol: "lock", active: focus == .password || focus == .passwordShown) {
+              focus = reveal ? .passwordShown : .password
+            } content: {
+              HStack(spacing: 8) {
+                PasswordField(
+                  title: "Одоогийн нууц үг",
+                  text: $password,
+                  reveal: reveal,
+                  content: .password,
+                  focus: $focus,
+                  hidden: .password,
+                  shown: .passwordShown,
+                )
+                .submitLabel(.send)
+                .onSubmit { Task { await send() } }
+                .accessibilityIdentifier("profile.email.password")
+                RevealButton(reveal: $reveal, focus: $focus, twins: [(.password, .passwordShown)])
               }
             }
-            .accessibilityIdentifier("profile.email.field")
-          if needsPassword {
-            HStack(spacing: 10) {
-              PasswordField(
-                title: "Одоогийн нууц үг",
-                text: $password,
-                reveal: reveal,
-                content: .password,
-                focus: $focus,
-                hidden: .password,
-                shown: .passwordShown,
-              )
-              .submitLabel(.send)
-              .onSubmit { Task { await send() } }
-              .accessibilityIdentifier("profile.email.password")
-              RevealButton(reveal: $reveal, focus: $focus, twins: [(.password, .passwordShown)])
-            }
           }
+
           if sentTo != nil {
-            TextField("······", text: $code)
-              .keyboardType(.numberPad)
-              .textContentType(.oneTimeCode)
-              .font(.mono(20, .semibold))
-              .tracking(6)
-              .focused($focus, equals: .code)
+            CodeInput(code: $code, focus: $focus, field: .code, id: "profile.email.code")
               .onChange(of: code) { _, typed in
                 let digits = String(typed.filter(\.isNumber).prefix(6))
                 if digits != typed {
@@ -778,48 +916,33 @@ struct EmailAttachSheet: View {
                 // Six digits is the whole code: it goes without another tap.
                 if digits.count == 6 { Task { await confirm() } }
               }
-              .accessibilityLabel("Имэйлд ирсэн код")
-              .accessibilityIdentifier("profile.email.code")
+              .transition(.move(edge: .top).combined(with: .opacity))
           }
-        } footer: {
-          Text(footer)
-        }
 
-        if let trouble {
-          Section {
-            Banner(message: trouble)
-              .accessibilityIdentifier("profile.email.trouble")
+          if let trouble {
+            TroubleNote(text: trouble, id: "profile.email.trouble")
           }
-          .listRowBackground(Color.clear)
-          .listRowInsets(EdgeInsets())
-        }
 
-        Section {
-          WideButton(title: sentTo == nil ? "Код авах" : "Холбох", enabled: ready) {
+          Note(text: footer)
+
+          PrimaryButton(title: sentTo == nil ? "Код авах" : "Холбох", enabled: ready, busy: busy) {
             Task { if sentTo == nil { await send() } else { await confirm() } }
           }
           .accessibilityIdentifier("profile.email.go")
-          .listRowInsets(EdgeInsets())
-          .listRowBackground(Color.clear)
-          .listRowSeparator(.hidden)
+
           if sentTo != nil {
-            Button("Код дахин авах") { Task { await send() } }
-              .font(.sans(14))
-              .buttonStyle(.borderless)
-              .listRowBackground(Color.clear)
-              .listRowSeparator(.hidden)
+            QuietLink("Код дахин авах") { Task { await send() } }
+              .padding(.vertical, -8)
           }
         }
+        .padding(18)
+        .authCard()
       }
-      .navigationTitle("Имэйл холбох")
-      .navigationBarTitleDisplayMode(.inline)
-      .toolbar {
-        ToolbarItem(placement: .topBarLeading) {
-          Button("Болих") { dismiss() }
-        }
-      }
+      .animation(.snappy(duration: 0.28), value: sentTo)
+      .animation(.easeOut(duration: 0.2), value: trouble)
     }
     .presentationDetents([.large])
+    .sensoryFeedback(.error, trigger: trouble) { _, said in said != nil }
   }
 
   private var footer: String {
@@ -912,12 +1035,14 @@ struct PasswordChangeSheet: View {
   private var title: String { hasPassword ? "Нууц үг солих" : "Нууц үг тохируулах" }
 
   var body: some View {
-    NavigationStack {
-      Form {
-        Section {
-          // The eye sits on the first password row, whichever that is, and shows all three.
-          if hasPassword {
-            HStack(spacing: 10) {
+    ProfileSheet(title: title) {
+      VStack(spacing: 12) {
+        if hasPassword {
+          // The eye sits on the first password, whichever that is, and shows all three.
+          AuthField(symbol: "lock", active: focus == .current || focus == .currentShown) {
+            focus = reveal ? .currentShown : .current
+          } content: {
+            HStack(spacing: 8) {
               PasswordField(
                 title: "Одоогийн нууц үг",
                 text: $current,
@@ -932,68 +1057,46 @@ struct PasswordChangeSheet: View {
               .accessibilityIdentifier("profile.password.current")
               eye
             }
-            nextField
-            againField
-          } else if sentTo != nil {
-            codeField
-            HStack(spacing: 10) {
-              nextField
-              eye
-            }
-            againField
-          } else {
-            // Nothing to type yet: the code goes to the address on the account.
-            LabeledContent("Код очих хаяг", value: platform.me?.email ?? "—")
-              .accessibilityIdentifier("profile.password.to")
           }
-        } footer: {
-          Text(footer)
+          nextField(withEye: false)
+          againField
+        } else if sentTo != nil {
+          codeField
+          nextField(withEye: true)
+          againField
+        } else {
+          // Nothing to type yet: the code goes to the address on the account.
+          AuthValue(symbol: "envelope", label: "Код очих хаяг", value: platform.me?.email ?? "—")
+            .accessibilityIdentifier("profile.password.to")
         }
 
         if let trouble {
-          Section {
-            Banner(message: trouble)
-              .accessibilityIdentifier("profile.password.trouble")
-          }
-          .listRowBackground(Color.clear)
-          .listRowInsets(EdgeInsets())
+          TroubleNote(text: trouble, id: "profile.password.trouble")
         }
 
-        Section {
-          WideButton(title: waiting ? "Код авах" : title, enabled: ready) {
-            Task { if waiting { await send() } else { await save() } }
-          }
-          .accessibilityIdentifier("profile.password.go")
-          .listRowInsets(EdgeInsets())
-          .listRowBackground(Color.clear)
-          .listRowSeparator(.hidden)
-          if !hasPassword, sentTo != nil {
-            Button("Код дахин авах") { Task { await send() } }
-              .font(.sans(14))
-              .buttonStyle(.borderless)
-              .listRowBackground(Color.clear)
-              .listRowSeparator(.hidden)
-          }
+        Note(text: footer)
+
+        PrimaryButton(title: waiting ? "Код авах" : title, enabled: ready, busy: busy) {
+          Task { if waiting { await send() } else { await save() } }
+        }
+        .accessibilityIdentifier("profile.password.go")
+
+        if !hasPassword, sentTo != nil {
+          QuietLink("Код дахин авах") { Task { await send() } }
+            .padding(.vertical, -8)
         }
       }
-      .navigationTitle(title)
-      .navigationBarTitleDisplayMode(.inline)
-      .toolbar {
-        ToolbarItem(placement: .topBarLeading) {
-          Button("Болих") { dismiss() }
-        }
-      }
+      .padding(18)
+      .authCard()
+      .animation(.snappy(duration: 0.28), value: sentTo)
+      .animation(.easeOut(duration: 0.2), value: trouble)
     }
     .presentationDetents([.large])
+    .sensoryFeedback(.error, trigger: trouble) { _, said in said != nil }
   }
 
   private var codeField: some View {
-    TextField("······", text: $code)
-      .keyboardType(.numberPad)
-      .textContentType(.oneTimeCode)
-      .font(.mono(20, .semibold))
-      .tracking(6)
-      .focused($focus, equals: .code)
+    CodeInput(code: $code, focus: $focus, field: .code, id: "profile.password.code")
       .onChange(of: code) { _, typed in
         let digits = String(typed.filter(\.isNumber).prefix(6))
         if digits != typed {
@@ -1003,38 +1106,47 @@ struct PasswordChangeSheet: View {
         // Six digits is the whole code: the keyboard moves on to the password.
         if digits.count == 6, next.isEmpty { focus = reveal ? .nextShown : .next }
       }
-      .accessibilityLabel("Имэйлд ирсэн код")
-      .accessibilityIdentifier("profile.password.code")
   }
 
-  private var nextField: some View {
-    PasswordField(
-      title: "Шинэ нууц үг · дор хаяж 8 тэмдэгт",
-      text: $next,
-      reveal: reveal,
-      content: .newPassword,
-      focus: $focus,
-      hidden: .next,
-      shown: .nextShown,
-    )
-    .submitLabel(.next)
-    .onSubmit { focus = reveal ? .againShown : .again }
-    .accessibilityIdentifier("profile.password.next")
+  private func nextField(withEye: Bool) -> some View {
+    AuthField(symbol: "lock", active: focus == .next || focus == .nextShown) {
+      focus = reveal ? .nextShown : .next
+    } content: {
+      HStack(spacing: 8) {
+        PasswordField(
+          title: "Шинэ нууц үг · 8+ тэмдэгт",
+          text: $next,
+          reveal: reveal,
+          content: .newPassword,
+          focus: $focus,
+          hidden: .next,
+          shown: .nextShown,
+        )
+        .submitLabel(.next)
+        .onSubmit { focus = reveal ? .againShown : .again }
+        .accessibilityIdentifier("profile.password.next")
+        if withEye { eye }
+      }
+    }
   }
 
   private var againField: some View {
-    PasswordField(
-      title: "Нууц үгээ давтах",
-      text: $again,
-      reveal: reveal,
-      content: .newPassword,
-      focus: $focus,
-      hidden: .again,
-      shown: .againShown,
-    )
-    .submitLabel(.go)
-    .onSubmit { Task { await save() } }
-    .accessibilityIdentifier("profile.password.again")
+    AuthField(symbol: "lock.rotation", active: focus == .again || focus == .againShown) {
+      focus = reveal ? .againShown : .again
+    } content: {
+      PasswordField(
+        title: "Нууц үгээ давтах",
+        text: $again,
+        reveal: reveal,
+        content: .newPassword,
+        focus: $focus,
+        hidden: .again,
+        shown: .againShown,
+      )
+      .submitLabel(.go)
+      .onSubmit { Task { await save() } }
+      .accessibilityIdentifier("profile.password.again")
+    }
   }
 
   private var eye: some View {

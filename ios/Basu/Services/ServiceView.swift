@@ -23,13 +23,23 @@ import WebKit
    shell shows its own sheet, and the token arrives the same way.
  - **The way out.** The page's `‹ Basu` link goes to `/`, which in a browser
    is the web launcher. Here it is this screen's parent, so the navigation is
-   cancelled and the stack pops instead. There is no second back button.
+   cancelled and the stack pops instead.
  - **What changed.** The page tells the shell when an order moved, so the
    ИДЭВХТЭЙ card, the lock screen and the widget catch up at once rather than
    on the next poll. The poll is still there for what the page cannot know.
+   The first time something is running, it is also the moment to ask whether
+   its progress may come to the lock screen (`PushAsk`) — or, for a supplier,
+   the moment their counter opens.
 
  Nothing else. The page does not know it is inside an app beyond the one
  message handler, and a page that works in Safari works here.
+
+ The page's own «‹ Basu» is the way back once it has drawn; until then, and
+ whenever it cannot draw, the shell's own «‹ Basu» stands in that corner and a
+ swipe from the edge leaves too — an app that never loaded used to leave no
+ way out but force-quitting. The page runs edge to edge and pads itself with
+ the safe areas (`env(safe-area-inset-*)`), so its bars meet the clock and the
+ home indicator rather than a band of the shell's ground.
  */
 struct ServiceView: View {
   let app: String
@@ -40,37 +50,94 @@ struct ServiceView: View {
   @Environment(Session.self) private var session
   @State private var page = ServicePage()
   @State private var signingIn = false
+  @State private var askingPush = false
+  /// A beat after opening. A page that draws within it never shows the
+  /// shell's chip or spinner at all, rather than flashing them.
+  @State private var slow = false
 
   var body: some View {
-    ZStack(alignment: .top) {
+    ZStack(alignment: .topLeading) {
       LinearGradient.ground.ignoresSafeArea()
 
       ServiceWeb(page: page)
+        .ignoresSafeArea()
+        // A page that could not be reached has nothing to show or touch: a
+        // proxy's «502 Bad Gateway» showed through under the banner, and a
+        // blank web view under the thumb kept the edge swipe from leaving.
+        .opacity(page.unreachable ? 0 : 1)
+        .allowsHitTesting(!page.unreachable)
+        .accessibilityHidden(page.unreachable)
         .accessibilityIdentifier("service.\(app)")
 
-      if page.unreachable {
-        OfflineBanner {
-          await model.retry()
-          page.reload()
+      if !page.loaded && !page.unreachable && slow {
+        ProgressView()
+          .controlSize(.large)
+          .tint(Color.ink3)
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
+          // What the page has drawn so far stays touchable under it.
+          .allowsHitTesting(false)
+          .accessibilityLabel("Уншиж байна")
+          .transition(.opacity)
+      }
+
+      if (!page.loaded && slow) || page.unreachable {
+        VStack(alignment: .leading, spacing: 8) {
+          HomeChip(action: back)
+          if page.unreachable {
+            OfflineBanner {
+              await model.retry()
+              page.reload()
+            }
+            .padding(.horizontal, BasuMetric.screenPadding)
+          }
         }
-        .padding(.horizontal, BasuMetric.screenPadding)
-        .padding(.top, 8)
+        .padding(.top, 4)
         .transition(.opacity)
       }
     }
+    .animation(.easeOut(duration: 0.2), value: page.loaded)
+    .animation(.easeOut(duration: 0.2), value: page.unreachable)
+    .animation(.easeOut(duration: 0.2), value: slow)
     .toolbarVisibility(.hidden, for: .navigationBar)
+    // The stack's edge swipe, back: the page's own swipe walks its screens
+    // first, and from the first one the swipe leaves the app.
+    .background(InteractivePop(enabled: !page.walksItsOwnHistory))
     // Whatever happened in the sheet, the page is waiting for an answer.
     .sheet(isPresented: $signingIn, onDismiss: { page.deliver(token: session.token) }) {
-      SignInSheet()
+      // A guest asked mid-order hears why and that nothing was lost; the
+      // supplier's counter asking again has no order to speak of.
+      SignInSheet(reason: isSupplier ? nil : "Захиалгаа дуусгахын тулд нэвтэрнэ үү — сонгосон зүйлс тань хэвээр үлдэнэ.")
+    }
+    .sheet(isPresented: $askingPush) {
+      PushAsk(audience: isSupplier ? .supplier : .guest) {
+        askingPush = false
+        Task { await PushRegistrar.shared.askIfNeeded() }
+      }
+    }
+    // The supplier's counter is where new orders arrive, and push is how they
+    // reach a supplier who is not looking: asked as it opens, not after an
+    // order of their own they will never place.
+    .onChange(of: page.loaded) { _, loaded in
+      guard loaded, isSupplier else { return }
+      Task { await offerPush() }
     }
     .onAppear {
       page.home = back
       page.signIn = { signingIn = true }
-      page.changed = { Task { await model.refreshLive() } }
+      page.changed = {
+        Task {
+          await model.refreshLive()
+          await offerPush()
+        }
+      }
       page.load(Endpoint.base, path: path, token: session.token)
     }
     .onChange(of: session.token) { _, token in
       page.deliver(token: token)
+    }
+    .task {
+      try? await Task.sleep(for: .milliseconds(450))
+      slow = true
     }
     .task {
       // The card outside the page keeps up with the page. Five seconds is the
@@ -80,6 +147,52 @@ struct ServiceView: View {
         await model.refreshLive()
       }
     }
+  }
+
+  private var isSupplier: Bool { app == AppCatalogue.supplier.id }
+
+  /// The moment the question is about something, if iOS has never put it: a
+  /// guest's order running — just paid for, as a rule — or a supplier's
+  /// counter open.
+  private func offerPush() async {
+    guard session.isSignedIn, !signingIn, !askingPush else { return }
+    guard isSupplier || !(model.live.isEmpty && model.liveIdesh.isEmpty) else { return }
+    guard await PushRegistrar.shared.shouldOffer() else { return }
+    PushRegistrar.shared.markOffered()
+    askingPush = true
+  }
+}
+
+/**
+ «‹ Basu»: the shell's way out of an app, drawn by the shell, in the page's
+ own words for it. Shown until the page has drawn its own «‹ Basu» in the
+ same corner, and whenever the page cannot be reached — it is the one control
+ that does not depend on the page.
+ */
+private struct HomeChip: View {
+  let action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      HStack(spacing: 4) {
+        Chevron(direction: .back, size: 17)
+        Text("Basu")
+          .font(.sans(15, .medium))
+      }
+      .foregroundStyle(Color.accentInk)
+      .padding(.leading, 8)
+      .padding(.trailing, 14)
+      .frame(minHeight: 36)
+      .background(.ultraThinMaterial, in: Capsule())
+      .overlay(Capsule().strokeBorder(Color.line, lineWidth: BasuMetric.hairline))
+      .frame(minHeight: BasuMetric.minTarget)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(Pressable())
+    .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+    .padding(.leading, BasuMetric.screenPadding - 6)
+    .accessibilityLabel("Basu нүүр")
+    .accessibilityIdentifier("service.home")
   }
 }
 
@@ -103,6 +216,26 @@ private struct ServiceWeb: UIViewRepresentable {
 final class ServicePage: NSObject {
   /// The server could not be reached. Said out loud, not left as a white page.
   private(set) var unreachable = false
+  /// The page this app opened on has drawn — its own «‹ Basu» is there.
+  private(set) var loaded = false
+  /// The web view has history to go back through (`pushState` included).
+  private(set) var canGoBack = false
+  private var watching: NSKeyValueObservation?
+  private weak var edge: UIScreenEdgePanGestureRecognizer?
+
+  /// The page is up and has screens of its own to go back through, so the
+  /// edge swipe is the page's until it is on its first one. A page that never
+  /// drew has nothing to go back through, whatever its history says: a failed
+  /// load leaves an entry behind, and the swipe must still leave the app.
+  var walksItsOwnHistory: Bool { canGoBack && loaded && !unreachable }
+
+  /// What the page's state decides in UIKit: who has the edge swipe, and
+  /// whether VoiceOver may read the page at all — an unreachable one is a
+  /// proxy's «502 Bad Gateway» or a blank, never something to read out.
+  private func follow() {
+    edge?.isEnabled = walksItsOwnHistory
+    webView.isHidden = unreachable
+  }
 
   var home: (() -> Void)?
   var signIn: (() -> Void)?
@@ -110,6 +243,11 @@ final class ServicePage: NSObject {
 
   private var base = Endpoint.base
   private var pending: URLRequest?
+  /// The app's own pages: the path it was opened on, and what is under it.
+  private var prefix = "/"
+  /// The last answer for the whole page was the server failing — a proxy's
+  /// error page is not the app having loaded.
+  private var failedAnswer = false
 
   /// The page's side of the bridge: `window.webkit.messageHandlers.basu`.
   static let handler = "basu"
@@ -123,6 +261,9 @@ final class ServicePage: NSObject {
     webView.isOpaque = false
     webView.backgroundColor = .clear
     webView.scrollView.contentInsetAdjustmentBehavior = .never
+    // WebKit's own swipe skips history a page added after waiting on the
+    // network — idesh opens a stall that way — so on idesh it never went
+    // anywhere. The edge is this file's instead (`edgeSwiped`).
     webView.allowsBackForwardNavigationGestures = false
     #if DEBUG
       // Safari → Develop → the simulator, for the page as it is here.
@@ -132,6 +273,32 @@ final class ServicePage: NSObject {
     webView.navigationDelegate = self
     webView.uiDelegate = self
     configuration.userContentController.add(Relay(self), name: Self.handler)
+
+    let edge = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(edgeSwiped(_:)))
+    edge.edges = .left
+    edge.delegate = self
+    edge.isEnabled = false
+    webView.addGestureRecognizer(edge)
+    self.edge = edge
+    // `pushState` tells no navigation delegate anything; the history does.
+    // With history the edge walks it; without, the stack's own swipe leaves.
+    watching = webView.observe(\.canGoBack, options: [.initial, .new]) { [weak self] web, _ in
+      MainActor.assumeIsolated {
+        self?.canGoBack = web.canGoBack
+        self?.follow()
+      }
+    }
+  }
+
+  /// A swipe from the left edge, while the page has screens of its own to go
+  /// back through: the page's own `history.back()`, as a browser's back
+  /// button would — the page draws its previous screen on `popstate`.
+  @objc private func edgeSwiped(_ edge: UIScreenEdgePanGestureRecognizer) {
+    guard edge.state == .ended else { return }
+    let moved = edge.translation(in: webView).x
+    let speed = edge.velocity(in: webView).x
+    guard moved > 72 || speed > 600 else { return }
+    webView.evaluateJavaScript("history.back()")
   }
 
   /// Put the session where the page looks, then open it.
@@ -147,6 +314,7 @@ final class ServicePage: NSObject {
       forMainFrameOnly: true,
     ))
     guard let url = URL(string: path, relativeTo: base)?.absoluteURL else { return }
+    prefix = url.path.isEmpty ? "/" : url.path
     var request = URLRequest(url: url)
     request.timeoutInterval = 15
     pending = request
@@ -155,6 +323,8 @@ final class ServicePage: NSObject {
 
   func reload() {
     unreachable = false
+    loaded = false
+    follow()
     if let pending { webView.load(pending) } else { webView.reload() }
   }
 
@@ -195,6 +365,28 @@ final class ServicePage: NSObject {
 
   private func isOurs(_ url: URL) -> Bool {
     url.host == base.host && url.port == base.port
+  }
+
+  /**
+   The pages this app may show inside the shell: its own (`/idesh` and what is
+   under it), the other app a guest has (the lunch page with no restaurant
+   points to the winter-meat one, and back), and the two every page links
+   to. Anything else of ours — the dashboard, the website's sign-in — is the
+   website, and opens in Safari: inside the app it was a page with no way
+   back to it.
+   */
+  nonisolated static func belongs(_ path: String, to prefix: String) -> Bool {
+    if ["/terms", "/privacy"].contains(path) { return true }
+    let own = prefix.hasSuffix("/") && prefix.count > 1 ? String(prefix.dropLast()) : prefix
+    let guests = ["/dine", "/idesh"]
+    let mates = guests.contains(own) ? guests : [own]
+    return mates.contains { path == $0 || path.hasPrefix($0 + "/") }
+  }
+
+  /// The kitchen's screen is for a kitchen's own tablet. A guest's app goes
+  /// nowhere near it — not even to Safari.
+  nonisolated static func staffOnly(_ path: String) -> Bool {
+    path == "/kds" || path.hasPrefix("/kds/")
   }
 
   // MARK: the page's messages
@@ -244,11 +436,29 @@ extension ServicePage: WKNavigationDelegate {
     }
 
     // A link out of the page — the tile attribution, a restaurant's site —
-    // is Safari's, not this screen's. So is anything asking for a new window.
-    let external = ["http", "https"].contains(url.scheme ?? "") && !isOurs(url)
-    if external || action.targetFrame == nil {
+    // is Safari's, not this screen's. So is anything asking for a new window,
+    // and so is any page of ours that is not this app's.
+    let web = ["http", "https"].contains(url.scheme ?? "")
+    if web, isOurs(url), Self.staffOnly(url.path) { return .cancel }
+    let external = web && !isOurs(url)
+    let elsewhere = web && isOurs(url) && action.targetFrame?.isMainFrame == true
+      && !Self.belongs(url.path, to: prefix)
+    if external || elsewhere || action.targetFrame == nil {
       await UIApplication.shared.open(url)
       return .cancel
+    }
+    return .allow
+  }
+
+  func webView(
+    _ webView: WKWebView,
+    decidePolicyFor response: WKNavigationResponse,
+  ) async -> WKNavigationResponsePolicy {
+    if response.isForMainFrame {
+      failedAnswer = ((response.response as? HTTPURLResponse)?.statusCode ?? 200) >= 500
+      // A proxy's «502 Bad Gateway» is never drawn, nor read out: the load
+      // fails here, and the shell says the server is not answering.
+      if failedAnswer { return .cancel }
     }
     return .allow
   }
@@ -258,22 +468,38 @@ extension ServicePage: WKNavigationDelegate {
     // web view answers it by finishing `about:blank` instead, with no error
     // callback at all — so "the page that finished is not the one asked for"
     // is the outage, and is the only signal there reliably is.
-    if let url = webView.url, isOurs(url) {
+    if let url = webView.url, isOurs(url), !failedAnswer {
       unreachable = false
+      loaded = true
     } else {
       unreachable = true
     }
+    follow()
   }
 
   func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-    // A cancelled load is this file's own doing (see above), not an outage.
-    if (error as NSError).code == NSURLErrorCancelled { return }
+    // A cancelled load is this file's own doing (see above), not an outage —
+    // unless what was cancelled was the server's error page.
+    if (error as NSError).code == NSURLErrorCancelled, !failedAnswer { return }
     unreachable = true
+    follow()
   }
 
   func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
     if (error as NSError).code == NSURLErrorCancelled { return }
     unreachable = true
+    follow()
+  }
+}
+
+extension ServicePage: UIGestureRecognizerDelegate {
+  /// The edge swipe and the page's own scrolling both see the touch; a swipe
+  /// that starts at the edge is rarely a scroll, and never only one.
+  func gestureRecognizer(
+    _ recognizer: UIGestureRecognizer,
+    shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer,
+  ) -> Bool {
+    true
   }
 }
 

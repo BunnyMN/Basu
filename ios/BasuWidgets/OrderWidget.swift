@@ -21,7 +21,7 @@ struct OrderWidget: Widget {
         }
     }
     .configurationDisplayName("Захиалга")
-    .description("Гал тавих цаг ба суух цаг.")
+    .description("Гал тавих цаг ба ирэх цаг.")
     .supportedFamilies([.systemSmall, .systemMedium])
     .contentMarginsDisabled()
   }
@@ -105,7 +105,10 @@ struct OrderWidgetView: View {
   }
 }
 
-/// 28pt icon at the top, then the seating time over `СУУХ · №0971`. Nothing else.
+/// 28pt icon at the top, then the seating time over `ИРЭХ · №0971` at 11 —
+/// the word in the time label's sans, the number in the mono. Nothing else.
+/// The ` · ` goes with the number, as in the `№0971 · 2 хүн` lines: the sans
+/// space is so narrow that the dot sat against the №.
 struct SmallOrder: View {
   let snap: OrderSnapshot
 
@@ -118,10 +121,10 @@ struct SmallOrder: View {
         .tracking(-0.02 * 34)
         .monospacedDigit()
         .foregroundStyle(BasuColor.ink)
-      Text("СУУХ · \(snap.orderNumber)")
-        .font(BasuFont.mono(9))
-        .tracking(9 * 0.14)
+      (Text("ИРЭХ").font(BasuFont.sans(11, .medium)).tracking(11 * 0.06)
+        + Text(" · \(snap.orderNumber)").font(BasuFont.mono(11)).monospacedDigit())
         .foregroundStyle(BasuColor.ink3)
+        .lineLimit(1)
         .padding(.top, 4)
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -153,10 +156,7 @@ struct MediumOrder: View {
             .font(BasuFont.mono(30, .semibold))
             .monospacedDigit()
             .foregroundStyle(BasuColor.ink)
-          Text("СУУХ")
-            .font(BasuFont.mono(9, .medium))
-            .tracking(9 * 0.14)
-            .foregroundStyle(BasuColor.ink3)
+          UnitLabel("ИРЭХ", colour: BasuColor.ink3)
         }
       }
       Spacer(minLength: 8)

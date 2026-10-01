@@ -63,13 +63,21 @@ enum Format {
     value < 0 ? "−\(mnt(-value))" : "+\(mnt(value))"
   }
 
+  /// Month, then day: the web's own `dayShort`, so a corner reads the same in
+  /// the app and on its pages. A dot instead («10.03») reads as 10 March.
   private static let day: DateFormatter = {
     let f = DateFormatter()
-    f.locale = Locale(identifier: "mn_MN")
+    f.locale = Locale(identifier: "en_US_POSIX")
     f.timeZone = TimeZone(identifier: "Asia/Ulaanbaatar")
     f.dateFormat = "M/d"
     return f
   }()
+
+  private static var calendar: Calendar {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(identifier: "Asia/Ulaanbaatar") ?? .current
+    return calendar
+  }
 
   private static let month: DateFormatter = {
     let f = DateFormatter()
@@ -84,16 +92,26 @@ enum Format {
   /// ending, because «9-р сар-аас» is not Mongolian.
   static func since(_ date: Date) -> String { month.string(from: date) }
 
-  /// `11/03` — a day, at the size a card corner allows.
+  /// `11/3` — a day, at the size a card corner allows.
   static func day(_ date: Date) -> String { day.string(from: date) }
 
-  /// The time if it happened today, the date if it did not. What a list of
-  /// things that happened needs, and nothing more.
+  /// `2026 оны 10-р сарын 1` — the whole date, for a receipt and anything
+  /// kept: the website's own way of writing one.
+  static func date(_ date: Date) -> String {
+    let parts = calendar.dateComponents([.year, .month, .day], from: date)
+    return "\(parts.year ?? 0) оны \(parts.month ?? 0)-р сарын \(parts.day ?? 0)"
+  }
+
+  /// `10-р сарын 3` — a day in a sentence, the way a message says it (the
+  /// web's `dayLabel`).
+  static func dayWords(_ date: Date) -> String {
+    let parts = calendar.dateComponents([.month, .day], from: date)
+    return "\(parts.month ?? 0)-р сарын \(parts.day ?? 0)"
+  }
+
   /// When a device was last seen, the way somebody would say it: «саяхан»,
   /// «өнөөдөр 11:40», «өчигдөр 18:05», or the day.
   static func seen(_ date: Date, now: Date = .now) -> String {
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(identifier: "Asia/Ulaanbaatar") ?? .current
     if now.timeIntervalSince(date) < 5 * 60 { return "саяхан" }
     if calendar.isDate(date, inSameDayAs: now) { return "өнөөдөр \(hhmm(date))" }
     if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
@@ -101,9 +119,31 @@ enum Format {
     return day.string(from: date)
   }
 
-  static func when(_ date: Date) -> String {
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(identifier: "Asia/Ulaanbaatar") ?? .current
-    return calendar.isDateInToday(date) ? hhmm(date) : day.string(from: date)
+  /// The time if it happened today, the date if it did not. What a list of
+  /// things that happened needs, and nothing more.
+  static func when(_ date: Date, now: Date = .now) -> String {
+    calendar.isDate(date, inSameDayAs: now) ? hhmm(date) : day.string(from: date)
+  }
+
+  /// The same, for VoiceOver: «10/1» is read out as a fraction, so a day is
+  /// said in words.
+  static func whenSpoken(_ date: Date, now: Date = .now) -> String {
+    calendar.isDate(date, inSameDayAs: now) ? hhmm(date) : dayWords(date)
+  }
+
+  /// A line as VoiceOver should say it. The marks that separate words on the
+  /// screen — «·», «×» — are pauses, not words, and «№7001» is «дугаар 7001».
+  static func spoken(_ text: String) -> String {
+    text
+      .replacingOccurrences(of: "№", with: "дугаар ")
+      .replacingOccurrences(of: " · ", with: ", ")
+      .replacingOccurrences(of: "·", with: ",")
+      .replacingOccurrences(of: " ×", with: " ")
+      .replacingOccurrences(of: "×", with: " ")
+  }
+
+  /// Money as VoiceOver should say it: the digits and the word, not the sign.
+  static func moneySpoken(_ value: Int) -> String {
+    "\(grouped(abs(value))) төгрөг"
   }
 }

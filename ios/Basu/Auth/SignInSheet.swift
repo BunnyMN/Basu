@@ -32,6 +32,14 @@ import SwiftUI
  swaps them for the launcher the moment a session exists (`gate`). Signed in,
  a page inside the app that needs a guest can still ask for them as a sheet.
 
+ Typing happens with the keyboard over half the screen, so the screen moves
+ with the keyboard rather than hiding things under it: the field being typed
+ in is brought to the middle, a refusal is said under the field it is about
+ (and felt — the phone buzzes), and while a code is awaited the photograph
+ and the other doors fold away, so the code, what went wrong with it and the
+ button are all above the keys. The fields, the code boxes and the button are
+ in `AuthParts.swift`, shared with the profile's own sheets.
+
  A debug build pointed at a developer's own server has one more button, which
  goes straight to a session the way that server allows. It is compiled out of
  anything shipped, and hidden against the pilot, which has no such door.
@@ -40,14 +48,24 @@ struct SignInSheet: View {
   /// The whole screen of a signed-out app rather than a sheet over something:
   /// the wordmark on top, nothing to close, nothing to dismiss once in.
   var gate = false
+  /// Why a page inside the app asked, said under the title: a sheet that
+  /// arrives mid-order should say what it is for and that nothing was lost.
+  var reason: String?
 
   /// Which face the sheet shows: the doors most people take, or the password.
   enum Way: Hashable { case doors, password }
   enum Door: Hashable { case signIn, signUp, forgot }
+  /// The door waiting on an answer. The wait is shown in that one — a tap on
+  /// Google used to spin the email button, the only one with a spinner.
+  enum Busy: Hashable { case apple, google, email, password }
+  /// Where a refusal is said: beside the door that was refused.
+  enum Spot: Hashable { case social, email, password }
   /// Each password has two fields, one hidden and one shown — see `PasswordField`.
   fileprivate enum Field: Hashable {
     case email, emailCode, name, login, letterCode, phone, password, passwordShown, again, againShown
   }
+  /// The refusal, as a place the screen can be scrolled to.
+  private enum Mark: Hashable { case trouble }
 
   @Environment(Session.self) private var session
   @Environment(AppModel.self) private var model
@@ -61,10 +79,17 @@ struct SignInSheet: View {
   /// here does not turn the sheet into the account view: it closes with the
   /// doors still on it.
   @State private var arrivedSignedIn: Bool?
-  /// Asked of the server when the sheet opens; nil until it answers.
-  @State private var methods: AuthMethods?
-  @State private var busy = false
+  /// Asked of the server when the sheet opens. Until it answers, what it said
+  /// last time, so a slow network does not draw the way in a door at a time;
+  /// nil only the first time, when the doors' places are kept instead.
+  @State private var methods: AuthMethods? = Session.rememberedMethods()
+  @State private var methodsAsked = false
+  /// Google's button grows with the text and Apple's must not be smaller:
+  /// the height Google's took, for Apple's to take too.
+  @State private var doorHeight: CGFloat = BasuMetric.controlHeight
+  @State private var busy: Busy?
   @State private var trouble: String?
+  @State private var troubleAt: Spot = .email
 
   // a code by email
   @State private var email = ""
@@ -103,47 +128,67 @@ struct SignInSheet: View {
 
   var body: some View {
     NavigationStack {
-      ScrollView {
-        VStack(spacing: 0) {
-          if gate {
-            browse
-            hero
-          } else if !showsAccount {
-            sheetHead
-          }
-          if gate && model.offline {
-            OfflineBanner {
-              await model.retry()
-              if !model.offline { methods = await session.methods() }
+      ScrollViewReader { scroller in
+        ScrollView {
+          VStack(spacing: 0) {
+            if gate {
+              browse
+              // Waiting for a code, the picture is only in the way of it.
+              if !codeStep { hero }
+            } else if !showsAccount {
+              sheetHead
+            }
+            if gate && model.offline {
+              OfflineBanner {
+                await model.retry()
+                if !model.offline { methods = await session.methods() }
+              }
+              .padding(.top, 18)
+            }
+            Group {
+              if showsAccount {
+                account
+              } else if way == .password {
+                passwordDoors
+              } else {
+                doors
+              }
             }
             .padding(.top, 18)
+            if !showsAccount { legal }
+            developerDoor
           }
-          Group {
-            if showsAccount {
-              account
-            } else if way == .password {
-              passwordDoors
-            } else {
-              doors
-            }
-          }
-          .padding(.top, 18)
-          if !showsAccount { legal }
-          developerDoor
+          .padding(.horizontal, BasuMetric.screenPadding)
+          .padding(.bottom, 28)
+          .frame(maxWidth: 460)
+          .frame(maxWidth: .infinity)
+          .animation(.snappy(duration: 0.28), value: way)
+          .animation(.snappy(duration: 0.28), value: door)
+          .animation(.snappy(duration: 0.28), value: codeSentTo)
+          .animation(.snappy(duration: 0.28), value: letterFor)
+          .animation(.easeOut(duration: 0.2), value: trouble)
+          .animation(.snappy(duration: 0.3), value: focus)
         }
-        .padding(.horizontal, BasuMetric.screenPadding)
-        .padding(.bottom, 28)
-        .frame(maxWidth: 460)
-        .frame(maxWidth: .infinity)
-        .animation(.snappy(duration: 0.28), value: way)
-        .animation(.snappy(duration: 0.28), value: door)
-        .animation(.snappy(duration: 0.28), value: codeSentTo)
-        .animation(.snappy(duration: 0.28), value: letterFor)
-        .animation(.easeOut(duration: 0.2), value: trouble)
-        .animation(.snappy(duration: 0.3), value: focus)
+        .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.interactively)
+        // Signed out there is no bar over the gate, and the photograph and
+        // the fields scrolled up under the clock. The strip keeps the time
+        // on the ground.
+        .overlay(alignment: .top) {
+          if gate { StatusBarBackdrop() }
+        }
+        .onChange(of: focus) { _, field in
+          guard let field else { return }
+          bring(anchor(of: field), to: .center, with: scroller)
+        }
+        .onChange(of: trouble) { _, said in
+          guard said != nil else { return }
+          bring(Mark.trouble, to: .center, with: scroller)
+        }
       }
-      .scrollIndicators(.hidden)
-      .scrollDismissesKeyboard(.interactively)
+      // A refusal is felt as well as read: a wrong code empties the boxes,
+      // and with the phone in one hand that is easy to miss.
+      .sensoryFeedback(.error, trigger: trouble) { _, said in said != nil }
       // The navigation container's own ground, not the scroll view's: under
       // a keyboard on its way down there is otherwise a band of plain white.
       .containerBackground(for: .navigation) { Backdrop().ignoresSafeArea() }
@@ -163,7 +208,10 @@ struct SignInSheet: View {
       if arrivedSignedIn == nil { arrivedSignedIn = session.isSignedIn }
     }
     .task {
-      guard methods == nil else { return }
+      // Asked once a sheet, whatever was remembered: the doors drawn from
+      // last time are replaced by today's as soon as the server says.
+      guard !methodsAsked else { return }
+      methodsAsked = true
       let open = await session.methods()
       methods = open
       // A server with no door but the password: the password is the sheet.
@@ -171,7 +219,35 @@ struct SignInSheet: View {
     }
   }
 
+  /// A code is on its way and the screen is waiting for it.
+  private var codeStep: Bool { codeSentTo != nil || lettered }
+
+  /// The field's place on the screen; a password's twins share one.
+  private func anchor(of field: Field) -> Field {
+    switch field {
+    case .passwordShown: .password
+    case .againShown: .again
+    default: field
+    }
+  }
+
+  /**
+   Scroll something into the middle of what the keyboard leaves. A beat
+   later than asked: focus moves first and the keyboard follows, and until it
+   has risen the middle is the middle of the whole screen.
+   */
+  private func bring(_ id: some Hashable, to anchor: UnitPoint, with scroller: ScrollViewProxy) {
+    Task { @MainActor in
+      try? await Task.sleep(for: .milliseconds(320))
+      withAnimation(.snappy(duration: 0.3)) { scroller.scrollTo(id, anchor: anchor) }
+    }
+  }
+
   // MARK: - the head
+
+  /// What the first face says under the wordmark. Winter meat first, because
+  /// it is what can be bought today; lunch after it.
+  private static let tagline = "Өвлийн идшээ гэрээт нийлүүлэгчээс ав, хоолоо урьдчилан захиал."
 
   /**
    The gate's head: a photograph of what Basu is for, the wordmark on it in
@@ -180,6 +256,10 @@ struct SignInSheet: View {
    band so the fields and the keyboard both fit, and the line becomes the
    door that is open.
 
+   The words decide the height and the picture fills behind them, not the
+   other way round: at the largest text sizes the line needs more than the
+   photograph's 210 points, and it grows the head rather than spilling off it.
+
    The buuz are Tuguldur Baatar's, from Unsplash (free for commercial use;
    credited with the web's photographs in src/web/brand/meat/CREDITS.txt).
    */
@@ -187,39 +267,48 @@ struct SignInSheet: View {
     let first = way == .doors
     let small = !first || focus != nil
     let shape = RoundedRectangle(cornerRadius: BasuMetric.authCard, style: .continuous)
-    return ZStack(alignment: .bottomLeading) {
-      Image("SignInPhoto")
-        .resizable()
-        .scaledToFill()
-        .frame(height: small ? BasuMetric.authPhoto * 0.55 : BasuMetric.authPhoto)
-        .frame(maxWidth: .infinity)
-        .clipped()
-        .accessibilityHidden(true)
-      // A shade for the words, from nothing at the middle to most of black
-      // at the foot: white type on a photograph needs somewhere to stand.
-      LinearGradient(
-        colors: [Color.black.opacity(0), Color.black.opacity(0.72)],
-        startPoint: UnitPoint(x: 0.5, y: 0.3),
-        endPoint: .bottom,
-      )
-      VStack(alignment: .leading, spacing: 4) {
-        Text("Basu")
-          .font(.sans(small ? 28 : 36, .semibold))
-          .tracking(-0.03 * (small ? 28 : 36))
-        Text(first ? "Хоолоо урьдчилан захиалж, өвлийн идшээ гэрээт малчнаас ав." : title)
-          .font(.sans(first ? 14 : 16, first ? .regular : .medium))
-          .opacity(0.86)
-          .fixedSize(horizontal: false, vertical: true)
-          .contentTransition(.opacity)
+    return VStack(alignment: .leading, spacing: 4) {
+      Text("Basu")
+        .font(.sans(small ? 28 : 36, .semibold))
+        .tracking(-0.03 * (small ? 28 : 36))
+      Text(first ? Self.tagline : title)
+        .font(.sans(first ? 14 : 16, first ? .regular : .medium))
+        .opacity(0.86)
+        .fixedSize(horizontal: false, vertical: true)
+        .contentTransition(.opacity)
+    }
+    .foregroundStyle(.white)
+    .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+    .padding(18)
+    .frame(
+      maxWidth: .infinity,
+      minHeight: small ? BasuMetric.authPhoto * 0.55 : BasuMetric.authPhoto,
+      alignment: .bottomLeading,
+    )
+    .background {
+      ZStack {
+        Image("SignInPhoto")
+          .resizable()
+          .scaledToFill()
+        // A shade for the words, from nothing at the middle to most of black
+        // at the foot: white type on a photograph needs somewhere to stand.
+        LinearGradient(
+          colors: [Color.black.opacity(0), Color.black.opacity(0.72)],
+          startPoint: UnitPoint(x: 0.5, y: 0.3),
+          endPoint: .bottom,
+        )
       }
-      .foregroundStyle(.white)
-      .padding(18)
+      // The picture fills past the band when the band is small; clipped to
+      // the eye but not to the thumb, it lay over «Бүртгэлгүйгээр үзэх».
+      .allowsHitTesting(false)
+      .accessibilityHidden(true)
     }
     .clipShape(shape)
+    .contentShape(shape)
     .overlay(shape.strokeBorder(Color.line, lineWidth: BasuMetric.hairline))
     .padding(.top, 8)
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel("Basu · \(title)")
+    .accessibilityLabel("Basu. \(first ? Self.tagline : title)")
     .accessibilityAddTraits(.isHeader)
     .accessibilityIdentifier("signin.gate")
   }
@@ -235,43 +324,59 @@ struct SignInSheet: View {
       Button { model.browsing = true } label: {
         HStack(spacing: 6) {
           Text("Бүртгэлгүйгээр үзэх")
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
           Image(systemName: "arrow.right")
         }
+        // One line at every size: grown past this it broke mid-word.
+        .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .font(.sans(14, .semibold))
         .foregroundStyle(Color.ink)
         .padding(.horizontal, 14)
         .frame(minHeight: 36)
         .background(Color.surface, in: Capsule())
         .overlay(Capsule().strokeBorder(Color.line2, lineWidth: BasuMetric.hairline))
-        .contentShape(Capsule())
+        .frame(minHeight: BasuMetric.minTarget)
+        .contentShape(Rectangle())
       }
       .buttonStyle(Pressable())
       .accessibilityIdentifier("signin.browse")
     }
-    .padding(.top, 4)
   }
 
-  /// A sheet over a page: no photograph, the title large and on the ground.
+  /// A sheet over a page: no photograph, the title large and on the ground —
+  /// and, when a page asked, why.
   private var sheetHead: some View {
-    Text(title)
-      .font(.sans(28, .semibold))
-      .tracking(-0.02 * 28)
-      .foregroundStyle(Color.ink)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 4)
-      .accessibilityAddTraits(.isHeader)
+    VStack(alignment: .leading, spacing: 6) {
+      Text(title)
+        .font(.sans(28, .semibold))
+        .tracking(-0.02 * 28)
+        .foregroundStyle(Color.ink)
+        .accessibilityAddTraits(.isHeader)
+      if let reason, !codeStep {
+        Text(reason)
+          .font(.sans(14))
+          .foregroundStyle(Color.ink2)
+          .fixedSize(horizontal: false, vertical: true)
+          .accessibilityIdentifier("signin.reason")
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.top, 4)
   }
 
   /// The two pages every way in is under, one tap from the door.
   private var legal: some View {
     HStack(spacing: 6) {
       Link("Үйлчилгээний нөхцөл", destination: Endpoint.base.appending(path: "terms"))
+        .frame(minHeight: BasuMetric.minTarget)
       Text("·").foregroundStyle(Color.ink3)
       Link("Нууцлалын бодлого", destination: Endpoint.base.appending(path: "privacy"))
+        .frame(minHeight: BasuMetric.minTarget)
     }
     .font(.sans(12.5))
     .tint(Color.ink2)
-    .padding(.top, 26)
+    .padding(.top, 16)
   }
 
   // MARK: - signed in
@@ -294,7 +399,7 @@ struct SignInSheet: View {
         Task { await model.refreshLive() }
         dismiss()
       }
-      Text("Гарсан ч захиалга чинь хэвээр. Дахин нэвтэрвэл гарч ирнэ.")
+      Text("Гарсан ч захиалга тань хэвээр. Дахин нэвтэрвэл гарч ирнэ.")
         .font(.sans(12.5))
         .foregroundStyle(Color.ink3)
     }
@@ -307,44 +412,99 @@ struct SignInSheet: View {
   private var doors: some View {
     VStack(spacing: 16) {
       VStack(spacing: 12) {
-        SignInWithAppleButton(.signIn) { request in
-          let nonce = Nonce.make()
-          appleNonce = nonce
-          request.requestedScopes = [.fullName, .email]
-          request.nonce = Nonce.sha256(nonce)
-        } onCompletion: { result in
-          Task { await signInWithApple(result) }
-        }
-        .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-        .frame(height: BasuMetric.controlHeight)
-        .clipShape(RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous))
-        .accessibilityIdentifier("signin.apple")
+        // Waiting for a code, the other doors fold into one row under the
+        // card: two big buttons above a code nobody asked them about is what
+        // pushed the code under the keyboard.
+        if codeSentTo == nil {
+          appleButton
 
-        if methods?.google == true {
-          GoogleButton { Task { await signInWithGoogle() } }
-            .accessibilityIdentifier("signin.google")
+          if methods?.google == true {
+            GoogleButton(busy: busy == .google) { Task { await signInWithGoogle() } }
+              .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                doorHeight = max(BasuMetric.controlHeight, $0)
+              }
+              .accessibilityIdentifier("signin.google")
+          }
+
+          refusal(at: .social)
         }
 
         if methods?.email == true {
-          OrLine(words: "эсвэл имэйлээр")
-            .padding(.vertical, 4)
+          if codeSentTo == nil {
+            OrLine(words: "эсвэл имэйлээр")
+              .padding(.vertical, 4)
+          }
           emailDoor
+        } else if methods == nil {
+          // The first time, before the server has said which doors it has:
+          // their places, so the card does not grow under the thumb.
+          DoorsPlaceholder()
         }
-
-        troubleView
       }
-      .disabled(busy && codeSentTo == nil)
+      .disabled(busy != nil && codeSentTo == nil)
       .padding(18)
       .authCard()
 
-      WayButton(
-        title: "Нууц үгээр нэвтрэх, бүртгүүлэх",
-        detail: "Имэйл эсвэл утасны дугаар, нууц үгээр. Нууц үгээ мартсан бол мөн эндээс.",
-        symbol: "key",
-      ) { switchTo(.password) }
-        .accessibilityIdentifier("signin.passwordWay")
-
+      if codeSentTo != nil {
+        WayButton(
+          title: "Өөр аргаар нэвтрэх",
+          detail: "Apple, Google эсвэл нууц үгээр",
+          symbol: "arrow.uturn.backward",
+        ) {
+          focus = nil
+          startOver()
+        }
+        .accessibilityIdentifier("signin.otherWays")
+      } else {
+        WayButton(
+          title: "Нууц үгээр нэвтрэх, бүртгүүлэх",
+          detail: "Имэйл эсвэл утас, нууц үгээр",
+          symbol: "key",
+        ) { switchTo(.password) }
+          .accessibilityIdentifier("signin.passwordWay")
+      }
     }
+  }
+
+  /**
+   Apple's own button, white. On the dark ground that is the guidelines' own
+   choice; on the light one it wears a hairline, the outline the guidelines
+   ask for there — drawn at the card's corner rather than Apple's, whose
+   outline the corner clipped. Either way it is the twin of Google's button
+   under it, so the pine button is the one strong colour on the card rather
+   than a black slab above it.
+   */
+  private var appleButton: some View {
+    let shape = RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous)
+    return SignInWithAppleButton(.signIn) { request in
+      let nonce = Nonce.make()
+      appleNonce = nonce
+      request.requestedScopes = [.fullName, .email]
+      request.nonce = Nonce.sha256(nonce)
+    } onCompletion: { result in
+      Task { await signInWithApple(result) }
+    }
+    .signInWithAppleButtonStyle(.white)
+    // Never smaller than the other doors (Apple's rule), however large the text.
+    .frame(height: doorHeight)
+    .clipShape(shape)
+    .overlay {
+      if colorScheme == .light {
+        shape.strokeBorder(Color.line2, lineWidth: BasuMetric.hairline)
+          .allowsHitTesting(false)
+      }
+    }
+    .overlay {
+      if busy == .apple {
+        ZStack {
+          RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous)
+            .fill(Color.surface)
+          ProgressView()
+        }
+        .transition(.opacity)
+      }
+    }
+    .accessibilityIdentifier("signin.apple")
   }
 
   @ViewBuilder private var emailDoor: some View {
@@ -364,6 +524,7 @@ struct SignInSheet: View {
         }
         .accessibilityIdentifier("signin.email")
     }
+    .id(Field.email)
 
     if codeSentTo != nil {
       CodeInput(code: $emailCode, focus: $focus, field: .emailCode, id: "signin.emailCode")
@@ -374,28 +535,31 @@ struct SignInSheet: View {
           // without another tap.
           if digits.count == 6 { Task { await checkEmailCode() } }
         }
+        .id(Field.emailCode)
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 
+    // Right under the field it is about, above the small print.
+    refusal(at: .email)
+
     Note(text: emailFooter)
 
-    PrimaryButton(title: codeSentTo == nil ? "Код авах" : "Нэвтрэх", enabled: emailReady, busy: busy) {
+    PrimaryButton(title: codeSentTo == nil ? "Код авах" : "Нэвтрэх", enabled: emailReady, busy: busy == .email) {
       Task { if codeSentTo == nil { await askForCode() } else { await checkEmailCode() } }
     }
     .accessibilityIdentifier("signin.emailGo")
 
     if codeSentTo != nil {
       HStack {
-        Button("Код дахин авах") { Task { await askForCode() } }
+        QuietLink("Код дахин авах") { Task { await askForCode() } }
           .accessibilityIdentifier("signin.resend")
         Spacer()
-        Button("Хаяг солих") {
+        QuietLink("Хаяг солих") {
           startOver()
           focus = .email
         }
       }
-      .font(.sans(14, .medium))
-      .tint(Color.accent)
+      .padding(.vertical, -8)
     }
   }
 
@@ -407,7 +571,7 @@ struct SignInSheet: View {
   }
 
   private var emailReady: Bool {
-    guard !busy else { return false }
+    guard busy == nil else { return false }
     if codeSentTo == nil { return Session.address(email).contains("@") }
     return emailCode.count == 6
   }
@@ -415,6 +579,7 @@ struct SignInSheet: View {
   private func startOver() {
     codeSentTo = nil
     emailCode = ""
+    if troubleAt == .email { trouble = nil }
   }
 
   // MARK: - a password
@@ -445,23 +610,21 @@ struct SignInSheet: View {
         // before that there is nothing to set it with.
         if door != .forgot || lettered { passwordFields }
 
+        refusal(at: .password)
         Note(text: footer)
-        troubleView
 
-        PrimaryButton(title: action, enabled: ready, busy: busy) {
+        PrimaryButton(title: action, enabled: ready, busy: busy == .password) {
           Task { await go() }
         }
         .accessibilityIdentifier("signin.go")
 
         if door == .signIn && byEmail {
-          Button("Нууц үгээ мартсан?") { open(.forgot) }
-            .font(.sans(14, .medium))
-            .tint(Color.accent)
+          QuietLink("Нууц үгээ мартсан?") { open(.forgot) }
+            .padding(.vertical, -8)
             .accessibilityIdentifier("signin.forgot")
         } else if lettered {
-          Button("Код дахин авах") { Task { await askForLetter() } }
-            .font(.sans(14, .medium))
-            .tint(Color.accent)
+          QuietLink("Код дахин авах") { Task { await askForLetter() } }
+            .padding(.vertical, -8)
             .accessibilityIdentifier("signin.resendLetter")
         }
       }
@@ -474,7 +637,8 @@ struct SignInSheet: View {
             .accessibilityIdentifier("signin.back")
         }
         if methods.map({ $0.apple || $0.google || $0.email }) ?? false {
-          WayButton(title: "Apple, Google эсвэл имэйлээр нэвтрэх", symbol: "apple.logo") { switchTo(.doors) }
+          // A neutral mark: Apple's logo belongs on Apple's own button.
+          WayButton(title: "Apple, Google эсвэл имэйлээр нэвтрэх", symbol: "person.badge.key") { switchTo(.doors) }
             .accessibilityIdentifier("signin.doorsWay")
         }
       }
@@ -490,6 +654,7 @@ struct SignInSheet: View {
         .onSubmit { focus = .login }
         .accessibilityIdentifier("signin.name")
     }
+    .id(Field.name)
   }
 
   /**
@@ -524,6 +689,7 @@ struct SignInSheet: View {
         }
         .accessibilityIdentifier("signin.login")
     }
+    .id(Field.login)
   }
 
   private var phoneField: some View {
@@ -535,6 +701,7 @@ struct SignInSheet: View {
         .focused($focus, equals: .phone)
         .accessibilityIdentifier("signin.phone")
     }
+    .id(Field.phone)
   }
 
   private var letterCodeField: some View {
@@ -561,6 +728,7 @@ struct SignInSheet: View {
         Task { await go() }
       }
     }
+    .id(Field.letterCode)
     .transition(.move(edge: .top).combined(with: .opacity))
   }
 
@@ -586,6 +754,7 @@ struct SignInSheet: View {
           .accessibilityIdentifier("signin.reveal")
       }
     }
+    .id(Field.password)
     if door != .signIn {
       AuthField(symbol: "lock.rotation", active: focus == .again || focus == .againShown) {
         focus = reveal ? .againShown : .again
@@ -603,6 +772,7 @@ struct SignInSheet: View {
         .onSubmit { Task { await go() } }
         .accessibilityIdentifier("signin.again")
       }
+      .id(Field.again)
     }
   }
 
@@ -635,31 +805,26 @@ struct SignInSheet: View {
     focus = nil
   }
 
-  @ViewBuilder private var troubleView: some View {
-    if let trouble {
-      VStack(alignment: .leading, spacing: 8) {
-        HStack(alignment: .top, spacing: 8) {
-          Image(systemName: "exclamationmark.circle.fill")
-            .font(.sans(14))
-            .foregroundStyle(Color.stop)
-          Text(trouble)
-            .font(.sans(13.5))
-            .foregroundStyle(Color.stop)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityIdentifier("signin.trouble")
-        }
-        if offerSignUp {
+  /// A refusal, where it belongs — and nowhere else.
+  @ViewBuilder private func refusal(at spot: Spot) -> some View {
+    if let trouble, troubleAt == spot {
+      TroubleNote(text: trouble) {
+        if offerSignUp && spot == .password {
           Button("Шинэ хэрэглэгч бол бүртгүүлэх") { open(.signUp) }
             .font(.sans(14, .semibold))
             .tint(Color.accent)
+            .frame(minHeight: 32)
             .accessibilityIdentifier("signin.offerSignUp")
         }
       }
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(12)
-      .background(Color.stopSoft, in: RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous))
-      .transition(.opacity.combined(with: .scale(scale: 0.98)))
+      .id(Mark.trouble)
     }
+  }
+
+  /// Say no, beside the door that was refused.
+  private func say(_ words: String, at spot: Spot) {
+    troubleAt = spot
+    trouble = words
   }
 
   @ViewBuilder private var developerDoor: some View {
@@ -668,15 +833,15 @@ struct SignInSheet: View {
         VStack(spacing: 6) {
           Button("Хөгжүүлэгчийн сервер: шууд нэвтрэх") {
             Task {
-              busy = true
-              defer { busy = false }
+              busy = .password
+              defer { busy = nil }
               do {
                 // Whichever number is typed, or the demo guest's.
                 let typed = [login, phone].first(where: PhoneNumber.looksComplete).map(PhoneNumber.e164)
                 try await session.demoSignIn(phone: typed ?? "+97699001122")
                 signedIn()
               } catch {
-                trouble = (error as? APIError)?.message ?? "Нэвтэрч чадсангүй."
+                say((error as? APIError)?.message ?? "Нэвтэрч чадсангүй.", at: way == .password ? .password : .email)
               }
             }
           }
@@ -730,7 +895,7 @@ struct SignInSheet: View {
   }
 
   private var ready: Bool {
-    guard !busy else { return false }
+    guard busy == nil else { return false }
     let passwords = !password.isEmpty && !again.isEmpty
     switch door {
     case .signIn:
@@ -766,44 +931,44 @@ struct SignInSheet: View {
   }
 
   private func askForCode() async {
-    guard !busy, Session.address(email).contains("@") else { return }
-    busy = true
+    guard busy == nil, Session.address(email).contains("@") else { return }
+    busy = .email
     trouble = nil
-    defer { busy = false }
+    defer { busy = nil }
     do {
       try await session.requestCode(email: email)
       codeSentTo = Session.address(email)
       emailCode = ""
       focus = .emailCode
     } catch let error as APIError {
-      trouble = error.message
+      say(error.message, at: .email)
     } catch {
-      trouble = "Код илгээж чадсангүй. Дахин оролдоно уу."
+      say("Код илгээж чадсангүй. Дахин оролдоно уу.", at: .email)
     }
   }
 
   private func checkEmailCode() async {
-    guard !busy, let sent = codeSentTo, emailCode.count == 6 else { return }
-    busy = true
+    guard busy == nil, let sent = codeSentTo, emailCode.count == 6 else { return }
+    busy = .email
     trouble = nil
-    defer { busy = false }
+    defer { busy = nil }
     do {
       try await session.signIn(email: sent, code: emailCode)
       signedIn()
     } catch let error as APIError {
-      trouble = error.message
+      say(error.message, at: .email)
       emailCode = ""
       focus = .emailCode
     } catch {
-      trouble = "Нэвтэрч чадсангүй. Дахин оролдоно уу."
+      say("Нэвтэрч чадсангүй. Дахин оролдоно уу.", at: .email)
     }
   }
 
   private func signInWithGoogle() async {
-    guard !busy else { return }
-    busy = true
+    guard busy == nil else { return }
+    busy = .google
     trouble = nil
-    defer { busy = false }
+    defer { busy = nil }
     do {
       let back = try await webAuthenticationSession.authenticate(
         using: session.googleStart,
@@ -820,12 +985,12 @@ struct SignInSheet: View {
       case .cancelled:
         break
       case .refused(let why):
-        trouble = GoogleReturn.words(for: why)
+        say(GoogleReturn.words(for: why), at: .social)
       }
     } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
       // Closed the sheet: nothing happened, nothing to say.
     } catch {
-      trouble = GoogleReturn.words(for: "SOCIAL_REFUSED")
+      say(GoogleReturn.words(for: "SOCIAL_REFUSED"), at: .social)
     }
   }
 
@@ -833,27 +998,27 @@ struct SignInSheet: View {
     switch result {
     case .failure(let error):
       if (error as? ASAuthorizationError)?.code == .canceled { return }
-      trouble = "Apple-ээр нэвтэрч чадсангүй. Дахин оролдоно уу."
+      say("Apple-ээр нэвтэрч чадсангүй. Дахин оролдоно уу.", at: .social)
     case .success(let authorization):
       guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
             let data = credential.identityToken,
             let identityToken = String(data: data, encoding: .utf8)
       else {
-        trouble = "Apple-ээр нэвтэрч чадсангүй. Дахин оролдоно уу."
+        say("Apple-ээр нэвтэрч чадсангүй. Дахин оролдоно уу.", at: .social)
         return
       }
       // Apple says the name once, the first time, and only to the app.
       let name = credential.fullName.map { PersonNameComponentsFormatter().string(from: $0) }
-      busy = true
+      busy = .apple
       trouble = nil
-      defer { busy = false }
+      defer { busy = nil }
       do {
         try await session.signIn(appleToken: identityToken, nonce: appleNonce, name: name?.isEmpty == false ? name : nil)
         signedIn()
       } catch let error as APIError {
-        trouble = error.message
+        say(error.message, at: .social)
       } catch {
-        trouble = "Apple-ээр нэвтэрч чадсангүй. Дахин оролдоно уу."
+        say("Apple-ээр нэвтэрч чадсангүй. Дахин оролдоно уу.", at: .social)
       }
     }
   }
@@ -865,12 +1030,12 @@ struct SignInSheet: View {
     // typed after its code has gone, so until then there are none to check.
     if door != .signIn, door != .forgot || lettered {
       if password.count < 8 {
-        trouble = "Нууц үг дор хаяж 8 тэмдэгт байх ёстой."
+        say("Нууц үг дор хаяж 8 тэмдэгт байх ёстой.", at: .password)
         focus = reveal ? .passwordShown : .password
         return
       }
       if password != again {
-        trouble = "Хоёр нууц үг таарахгүй байна."
+        say("Хоёр нууц үг таарахгүй байна.", at: .password)
         focus = reveal ? .againShown : .again
         return
       }
@@ -880,10 +1045,10 @@ struct SignInSheet: View {
       if lettered { await setPassword() } else { await askForLetter() }
       return
     }
-    busy = true
+    busy = .password
     trouble = nil
     offerSignUp = false
-    defer { busy = false }
+    defer { busy = nil }
     do {
       switch door {
       case .signIn: try await session.signIn(login: login, password: password)
@@ -897,10 +1062,10 @@ struct SignInSheet: View {
         login = phone
         open(.signIn)
       }
-      trouble = error.message
       offerSignUp = door == .signIn && error.code == "BAD_CREDENTIALS"
+      say(error.message, at: .password)
     } catch {
-      trouble = "Нэвтэрч чадсангүй. Дахин оролдоно уу."
+      say("Нэвтэрч чадсангүй. Дахин оролдоно уу.", at: .password)
     }
   }
 
@@ -908,11 +1073,11 @@ struct SignInSheet: View {
   /// the one on the account for a forgotten password. A number with no
   /// address behind it is refused, and the server says what to do instead.
   private func askForLetter() async {
-    guard !busy, door == .signUp || door == .forgot else { return }
-    busy = true
+    guard busy == nil, door == .signUp || door == .forgot else { return }
+    busy = .password
     trouble = nil
     offerSignUp = false
-    defer { busy = false }
+    defer { busy = nil }
     do {
       letterSentTo = try await session.requestPasswordCode(
         login: login,
@@ -922,9 +1087,9 @@ struct SignInSheet: View {
       letterCode = ""
       focus = .letterCode
     } catch let error as APIError {
-      trouble = error.message
+      say(error.message, at: .password)
     } catch {
-      trouble = "Код илгээж чадсангүй. Дахин оролдоно уу."
+      say("Код илгээж чадсангүй. Дахин оролдоно уу.", at: .password)
     }
   }
 
@@ -937,12 +1102,12 @@ struct SignInSheet: View {
    did more than they saw: a reset signs every other device out.
    */
   private func setPassword() async {
-    guard !busy, let sentFor = letterFor, letterCode.count == 6 else { return }
+    guard busy == nil, let sentFor = letterFor, letterCode.count == 6 else { return }
     let forgot = door == .forgot
     let typedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-    busy = true
+    busy = .password
     trouble = nil
-    defer { busy = false }
+    defer { busy = nil }
     do {
       let created = try await session.setPassword(
         login: sentFor,
@@ -957,7 +1122,7 @@ struct SignInSheet: View {
       }
       signedIn()
     } catch let error as APIError {
-      trouble = error.message
+      say(error.message, at: .password)
       if error.code == "TOO_SHORT" {
         focus = reveal ? .passwordShown : .password
       } else {
@@ -966,29 +1131,43 @@ struct SignInSheet: View {
         focus = .letterCode
       }
     } catch {
-      trouble = "Нэвтэрч чадсангүй. Дахин оролдоно уу."
+      say("Нэвтэрч чадсангүй. Дахин оролдоно уу.", at: .password)
     }
   }
 }
 
 /// Google's button as its guidelines draw it: the four-colour mark on white
 /// (on the dark ground, on the dark surface), a hairline, the words — the
-/// same height and corner as Apple's above it.
+/// same height and corner as Apple's above it, and its own wait.
 private struct GoogleButton: View {
+  var busy = false
   let action: () -> Void
 
   var body: some View {
     Button(action: action) {
-      HStack(spacing: 10) {
-        Image("GoogleG")
-          .resizable()
-          .frame(width: 18, height: 18)
-        Text("Google-ээр нэвтрэх")
-          .font(.sans(17, .medium))
-          .foregroundStyle(Color.ink)
+      ZStack {
+        if busy {
+          ProgressView()
+        } else {
+          HStack(spacing: 10) {
+            Image("GoogleG")
+              .resizable()
+              .frame(width: 18, height: 18)
+              .accessibilityHidden(true)
+            Text("Google-ээр нэвтрэх")
+              .font(.sans(17, .medium))
+              .foregroundStyle(Color.ink)
+              .multilineTextAlignment(.center)
+          }
+          // Apple's button beside it stops growing early; past this the
+          // words broke at the hyphen into three lines.
+          .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+        }
       }
+      .padding(.horizontal, 14)
+      .padding(.vertical, 8)
       .frame(maxWidth: .infinity)
-      .frame(height: BasuMetric.controlHeight)
+      .frame(minHeight: BasuMetric.controlHeight)
       .background(Color.surface, in: RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous))
       .overlay(
         RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous)
@@ -1008,127 +1187,39 @@ private struct Backdrop: View {
   }
 }
 
-extension View {
-  /// The one card the way in sits on: glass, a hairline, a wide corner.
-  fileprivate func authCard() -> some View {
-    glassCard(radius: BasuMetric.authCard)
-  }
-}
-
 /**
- A field: its mark, what is typed, and a ring that lights when it is the one
- being typed in. The whole of it takes the tap, not only the text — the mark
- is part of the target.
+ The strip under the clock, in the ground's top colour. With no navigation
+ bar over the gate, whatever scrolls up — the photograph, the fields — ran
+ into the time; with it the time stays on the ground, the way it does under
+ a bar. Nothing under it is ever reachable, so it takes no touches.
  */
-private struct AuthField<Content: View>: View {
-  let symbol: String
-  let active: Bool
-  let tap: () -> Void
-  @ViewBuilder let content: Content
-
-  private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous) }
-
+private struct StatusBarBackdrop: View {
   var body: some View {
-    HStack(spacing: 12) {
-      Image(systemName: symbol)
-        .font(.sans(16))
-        .foregroundStyle(active ? Color.accent : Color.ink3)
-        .frame(width: 22)
-        .accessibilityHidden(true)
-      content
-        .font(.sans(16))
-        .foregroundStyle(Color.ink)
-    }
-    .padding(.horizontal, 14)
-    .frame(height: BasuMetric.controlHeight)
-    .background(Color.surface, in: shape)
-    .overlay(shape.strokeBorder(active ? Color.accent : Color.line2, lineWidth: active ? 1.5 : BasuMetric.hairline))
-    .contentShape(shape)
-    .onTapGesture(perform: tap)
-    .animation(.easeOut(duration: 0.15), value: active)
-  }
-}
-
-/**
- Six digits in six boxes. The boxes are drawn; the typing goes to one plain
- field laid over them with its ink cleared, so pasting, the keyboard's
- «From Mail» suggestion and VoiceOver all see an ordinary text field.
- */
-private struct CodeInput<Field: Hashable>: View {
-  @Binding var code: String
-  var focus: FocusState<Field?>.Binding
-  let field: Field
-  let id: String
-
-  var body: some View {
-    let digits = Array(code)
-    let typing = focus.wrappedValue == field
-    ZStack {
-      HStack(spacing: 8) {
-        ForEach(0..<6, id: \.self) { index in
-          let shape = RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous)
-          let next = typing && index == min(digits.count, 5)
-          Text(index < digits.count ? String(digits[index]) : "")
-            .font(.mono(22, .semibold))
-            .foregroundStyle(Color.ink)
-            .frame(maxWidth: .infinity)
-            .frame(height: BasuMetric.controlHeight + 4)
-            .background(Color.surface, in: shape)
-            .overlay(shape.strokeBorder(next ? Color.accent : Color.line2, lineWidth: next ? 1.5 : BasuMetric.hairline))
-        }
-      }
+    Color.clear
+      .frame(height: 0)
+      .background(Color.groundTop.ignoresSafeArea(edges: .top))
       .allowsHitTesting(false)
       .accessibilityHidden(true)
-
-      TextField("", text: $code)
-        .keyboardType(.numberPad)
-        .textContentType(.oneTimeCode)
-        .focused(focus, equals: field)
-        .foregroundStyle(.clear)
-        .tint(.clear)
-        .frame(height: BasuMetric.controlHeight + 4)
-        .accessibilityLabel("Имэйлд ирсэн код")
-        .accessibilityIdentifier(id)
-    }
-    .animation(.easeOut(duration: 0.12), value: code)
   }
 }
 
-/// The one thing the card is for, in the accent, with the wait shown in place.
-private struct PrimaryButton: View {
-  let title: String
-  let enabled: Bool
-  let busy: Bool
-  let action: () -> Void
-
+/**
+ Where Google's door and the email door go, before the server has said it has
+ them — only ever the first time; after that the doors it had last time are
+ drawn. Shapes, not words: nothing here can be pressed.
+ */
+private struct DoorsPlaceholder: View {
   var body: some View {
-    Button(action: action) {
-      ZStack {
-        if busy {
-          ProgressView().tint(Color.onAccent)
-        } else {
-          Text(title).font(.sans(16, .semibold))
-        }
-      }
-      .foregroundStyle(Color.onAccent)
-      .frame(maxWidth: .infinity)
-      .frame(height: BasuMetric.controlHeight)
-      .background(Color.accent, in: RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous))
+    let shape = RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous)
+    VStack(spacing: 12) {
+      shape.fill(Color.sunk.opacity(0.8)).frame(height: BasuMetric.controlHeight)
+      Rectangle().fill(Color.line).frame(height: BasuMetric.hairline).padding(.vertical, 12)
+      shape.fill(Color.sunk.opacity(0.8)).frame(height: BasuMetric.controlHeight)
+      shape.fill(Color.sunk.opacity(0.5)).frame(height: BasuMetric.controlHeight)
     }
-    .buttonStyle(Pressable())
-    .disabled(!enabled)
-    .opacity(enabled || busy ? 1 : 0.45)
-    .animation(.easeOut(duration: 0.15), value: enabled)
-  }
-}
-
-/// Shrinks a touch under the thumb: the only answer a tap gets before the server's.
-private struct Pressable: ButtonStyle {
-  func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .scaleEffect(configuration.isPressed ? 0.98 : 1)
-      .opacity(configuration.isPressed ? 0.9 : 1)
-      .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("Уншиж байна")
+    .accessibilityIdentifier("signin.doorsLoading")
   }
 }
 
@@ -1148,20 +1239,6 @@ private struct OrLine: View {
   }
 }
 
-/// The small print under a field: what happens next, and where the code goes.
-private struct Note: View {
-  let text: String
-
-  var body: some View {
-    Text(text)
-      .font(.sans(12.5))
-      .lineSpacing(2)
-      .foregroundStyle(Color.ink3)
-      .fixedSize(horizontal: false, vertical: true)
-      .frame(maxWidth: .infinity, alignment: .leading)
-  }
-}
-
 /// Another way in, off the card: a mark, the words, and where it leads.
 private struct WayButton: View {
   let title: String
@@ -1175,11 +1252,14 @@ private struct WayButton: View {
         Image(systemName: symbol)
           .font(.sans(15, .medium))
           .foregroundStyle(Color.accent)
-          .frame(width: 22)
+          .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+          .frame(minWidth: 22)
+          .accessibilityHidden(true)
         VStack(alignment: .leading, spacing: 2) {
           Text(title)
             .font(.sans(15, .medium))
             .foregroundStyle(Color.ink)
+            .fixedSize(horizontal: false, vertical: true)
           if let detail {
             Text(detail)
               .font(.sans(12.5))
@@ -1226,7 +1306,7 @@ private struct DoorSwitch: View {
         .font(.sans(15, chosen ? .semibold : .medium))
         .foregroundStyle(chosen ? Color.ink : Color.ink2)
         .frame(maxWidth: .infinity)
-        .frame(height: 40)
+        .frame(minHeight: 40)
         .background {
           if chosen {
             Capsule()
@@ -1258,77 +1338,5 @@ enum Nonce {
 
   static func sha256(_ value: String) -> String {
     SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
-  }
-}
-
-/**
- A password, hidden or shown. Shown, it must not be "helped": no capital
- letter at the start, no autocorrected word.
-
- Both fields stay on screen, one of them invisible, rather than one taking
- the other's place: a filled password field leaving the screen is how iOS
- recognises a sign-in, and swapping them made it offer «Save Password?» for
- whatever had been typed so far.
-
- Generic over the screen's own focus: the way in has one set of fields, the
- profile's password and address sheets another.
- */
-struct PasswordField<Field: Hashable>: View {
-  let title: String
-  @Binding var text: String
-  let reveal: Bool
-  let content: UITextContentType
-  var focus: FocusState<Field?>.Binding
-  let hidden: Field
-  let shown: Field
-
-  var body: some View {
-    ZStack {
-      SecureField(title, text: $text)
-        .focused(focus, equals: hidden)
-        .opacity(reveal ? 0 : 1)
-        .allowsHitTesting(!reveal)
-        .accessibilityHidden(reveal)
-      TextField(title, text: $text)
-        .textInputAutocapitalization(.never)
-        .autocorrectionDisabled()
-        .focused(focus, equals: shown)
-        .opacity(reveal ? 1 : 0)
-        .allowsHitTesting(reveal)
-        .accessibilityHidden(!reveal)
-    }
-    .textContentType(content)
-  }
-}
-
-/**
- The eye beside a password. A secure field on iOS offers only keyboards that
- type Latin, and a password chosen on the web may be in Cyrillic — shown, the
- field takes the Mongolian keyboard like any other.
-
- Turned, the keyboard moves to the twin that is now on show, where the same
- characters already are.
- */
-struct RevealButton<Field: Hashable>: View {
-  @Binding var reveal: Bool
-  var focus: FocusState<Field?>.Binding
-  /// Every password on the screen, as its hidden field and its shown one.
-  let twins: [(hidden: Field, shown: Field)]
-
-  var body: some View {
-    Button {
-      reveal.toggle()
-      if let now = focus.wrappedValue,
-         let twin = twins.first(where: { $0.hidden == now || $0.shown == now }) {
-        focus.wrappedValue = reveal ? twin.shown : twin.hidden
-      }
-    } label: {
-      Image(systemName: reveal ? "eye.slash" : "eye")
-        .font(.sans(15))
-        .foregroundStyle(Color.ink3)
-        .frame(width: 28, height: 28)
-    }
-    .buttonStyle(.plain)
-    .accessibilityLabel(reveal ? "Нууц үгийг нуух" : "Нууц үгийг харуулах")
   }
 }

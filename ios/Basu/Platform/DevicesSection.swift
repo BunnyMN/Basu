@@ -118,11 +118,8 @@ private struct AllDevicesSheet: View {
           Button("Болсон") { dismiss() }.fontWeight(.semibold)
         }
       }
-      .confirmationDialog(
-        "Бусад бүх төхөөрөмжөөс гарах уу?",
-        isPresented: $confirming,
-        titleVisibility: .visible,
-      ) {
+      // An alert, as on the profile: it always draws «Болих».
+      .alert("Бусад бүх төхөөрөмжөөс гарах уу?", isPresented: $confirming) {
         Button("Гаргах", role: .destructive) {
           Task { await platform.signOutOtherDevices() }
         }
@@ -188,7 +185,9 @@ private struct DeviceRow: View {
           .padding(.horizontal, 12)
           .frame(minWidth: 72, minHeight: 32)
           .overlay(Capsule().strokeBorder(Color.stopLine, lineWidth: BasuMetric.hairline))
-          .contentShape(Capsule())
+          // Drawn at 32, taken at a thumb's 44.
+          .frame(minHeight: BasuMetric.minTarget)
+          .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(revoking)

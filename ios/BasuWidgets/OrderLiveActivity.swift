@@ -43,7 +43,7 @@ struct OrderLiveActivity: Widget {
 }
 
 /// The expanded island: 34pt icon, venue over the stage, the seating time
-/// over СУУХ, and the bar. Nothing the lock screen card does not show.
+/// over ИРЭХ, and the bar. Nothing the lock screen card does not show.
 struct ExpandedIsland: View {
   let attributes: BasuActivityAttributes
   let state: BasuActivityAttributes.ContentState
@@ -59,8 +59,9 @@ struct ExpandedIsland: View {
             .font(BasuFont.sans(15, .semibold))
             .foregroundStyle(BasuColor.onLock)
             .lineLimit(1)
+          // Words, so the sans, as on the lock screen card.
           Text(state.stageLabel)
-            .font(BasuFont.mono(11.5))
+            .font(BasuFont.sans(11.5))
             .foregroundStyle(dim)
             .lineLimit(1)
         }
@@ -71,7 +72,7 @@ struct ExpandedIsland: View {
             .font(BasuFont.mono(28, .semibold))
             .monospacedDigit()
             .foregroundStyle(BasuColor.onLock)
-          UnitLabel("СУУХ", colour: dim)
+          UnitLabel("ИРЭХ", colour: dim)
         }
         .fixedSize()
       }
@@ -110,7 +111,7 @@ struct LockScreenCard: View {
             .font(BasuFont.mono(26, .semibold))
             .monospacedDigit()
             .foregroundStyle(BasuColor.onLock)
-          UnitLabel("СУУХ", colour: BasuColor.onLock2)
+          UnitLabel("ИРЭХ", colour: BasuColor.onLock2)
         }
       }
 
@@ -136,7 +137,10 @@ struct LockScreenCard: View {
   }
 }
 
-/// `СУУХ` — mono 9/500, tracked 0.14em.
+/// The time label — what the time over it is the time of (`ИРЭХ`): sans
+/// 11/500, uppercase, tracked 0.06em, as on the launcher's live row. A word,
+/// so the sans; and nothing anybody has to read is set under 11 — at mono 9
+/// it was a smudge under the time.
 struct UnitLabel: View {
   let text: String
   let colour: Color
@@ -147,9 +151,9 @@ struct UnitLabel: View {
   }
 
   var body: some View {
-    Text(text)
-      .font(BasuFont.mono(9, .medium))
-      .tracking(9 * 0.14)
+    Text(text.uppercased())
+      .font(BasuFont.sans(11, .medium))
+      .tracking(11 * 0.06)
       .foregroundStyle(colour)
   }
 }
