@@ -385,7 +385,6 @@ function drawMarket() {
           </div>
         </div>`),
     el('<div class="sh-grid" id="grid" aria-live="polite" aria-busy="true"></div>'),
-    howToBuy(),
   );
   document.getElementById('sort').value = view.sort;
   document.getElementById('sort').addEventListener('change', (e) => {
@@ -982,7 +981,8 @@ if (stallId) {
     el(`<div class="sd-wait" role="status" aria-busy="true" aria-label="Зар ачаалж байна"><span class="s-skel t"></span><span class="s-skel w"></span><div class="g"><span class="s-skel p"></span><span class="s-skel b"></span></div></div>`),
   );
   try {
-    const [{ listing, today, payments_open: open }] = await Promise.all([api(`/v1/idesh/listings/${stallId}`), load()]);
+    // The stall's own answer says the day and whether money can be taken: the whole market is not asked for that.
+    const { listing, today, payments_open: open } = await api(`/v1/idesh/listings/${stallId}`);
     market.today = today;
     pay.open = open !== false;
     await lookAtWallet();
@@ -1008,6 +1008,8 @@ if (stallId) {
     loaded = true;
     paintKinds();
     paintGrid();
+    // How it goes, under the cards, its paying step said from the market's own answer — not asked for a second time.
+    document.getElementById('grid').after(howToBuy({ paymentsOpen: pay.open }));
     comeBack();
   } catch (error) {
     // Nothing to filter: the bar that held its place goes with the skeleton.

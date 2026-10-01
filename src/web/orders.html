@@ -336,10 +336,14 @@ async function refundBox(o) {
   }
   const person = await me();
   const needsPassword = Boolean(person && !person.has_password);
+  // The way there, said before the press: a password's code comes by email, so an account with no address links one first.
+  const way = person?.email
+    ? 'Дансаа нууц үгээр баталгаажуулдаг. Таны бүртгэлд нууц үг алга — имэйлээр ирэх кодоор энд тохируулаад дансаа шууд оруулна.'
+    : 'Дансаа нууц үгээр баталгаажуулдаг. Таны бүртгэлд нууц үг ч, түүний код очих имэйл ч алга — энд имэйлээ холбож, нууц үгээ тохируулаад дансаа шууд оруулна.';
   const box = el(`<div class="s-card od-refund">
       <h2>Буцаалт авах данс</h2>
       <p><span class="s-money">${tugrik(r.amount_mnt)}</span> аль банкны ямар данс руу шилжүүлэхийг оруулна уу. Basu шилжүүлмэгц мэдэгдэл ирнэ.</p>
-      ${needsPassword ? `<div class="s-note">${MARK.key}<span><b>Эхлээд нууц үг тохируулна</b>Дансаа нууц үгээр баталгаажуулдаг. Таны бүртгэлд нууц үг алга — имэйлээр ирэх кодоор энд тохируулаад дансаа шууд оруулна.</span></div>` : ''}
+      ${needsPassword ? `<div class="s-note">${MARK.key}<span><b>Эхлээд нууц үг тохируулна</b>${way}</span></div>` : ''}
       <button class="s-btn s-btn-dark" type="button" data-account>Данс оруулах</button>
     </div>`);
   box.querySelector('[data-account]').addEventListener('click', () => {
@@ -348,6 +352,8 @@ async function refundBox(o) {
       token: store.guestToken,
       email: person.email,
       why: 'Мөнгө тань руу очих дансыг нууц үгээр баталгаажуулдаг. Нууц үгээ тохируулмагц дансаа оруулна.',
+      // One word at the end, from the account's popup, for the password and the account both.
+      quiet: true,
       // Set just now, or already set in another tab (null): either way the account is next.
       then: ({ password }) => askAccount(o, password),
     });
@@ -358,7 +364,9 @@ async function refundBox(o) {
 /**
  * The refund's bank account, in a popup. `password` is one the person has
  * just chosen (passwordPopup): it confirms the account without being asked
- * for again. Without it, the popup asks.
+ * for again, and the word at the end says both were kept. Without it, the
+ * popup asks, and a wrong one is said under its field. Resolves to true once
+ * the account is in, null when the popup was closed.
  */
 function askAccount(o, password = null) {
   const r = o.refund;
@@ -390,9 +398,10 @@ function askAccount(o, password = null) {
           body: { bank_name: bank, bank_account: account, bank_holder: v.holder, password: password ?? v.password },
         });
       } catch (e) {
-        throw new Error(e.code === 'BAD_PASSWORD' ? 'Нууц үг буруу байна.' : whatWentWrong(e));
+        if (e.code === 'BAD_PASSWORD') throw Object.assign(new Error('Нууц үг буруу байна.'), { field: 'password' });
+        throw new Error(whatWentWrong(e));
       }
-      say('Данс бүртгэгдлээ. Шилжүүлмэгц мэдэгдэл ирнэ.', 'good');
+      say(password ? 'Нууц үг, данс хоёулаа хадгалагдлаа. Шилжүүлмэгц мэдэгдэл ирнэ.' : 'Данс бүртгэгдлээ. Шилжүүлмэгц мэдэгдэл ирнэ.', 'good');
       drawn = null;
       await drawOrder(o.id);
     },

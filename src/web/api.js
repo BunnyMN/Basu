@@ -834,15 +834,19 @@ const atLetterCode = (error) => (error instanceof ApiError && /CODE|EXPIRED/.tes
  * An address for the account: typed — with the password, where there is
  * one, since a session left open is no proof of who may add a way back in —
  * a code sent to it, and the code typed back. Two steps of one popup.
+ * `why` is a line over the field when the address is asked for on the way
+ * to something else — a password's code, for a bank account — so the person
+ * who pressed «Данс нэмэх» knows why «Имэйл холбох» came up.
  * `then(address)` is the next step once it is linked. Resolves with what it
  * returned (or the address), or null when the popup was closed first.
  */
-async function emailPopup({ token, hasPassword = false, then }) {
+async function emailPopup({ token, hasPassword = false, why = '', then }) {
   let sent = null;
   const linked = await popup({
     title: 'Имэйл холбох',
     sub: 'Нууц үгээ мартвал энэ хаягаар сэргээнэ. Хаяг руу 6 оронтой код илгээнэ.',
     fields: [
+      ...(why ? [{ type: 'note', text: why }] : []),
       { name: 'email', label: 'Имэйл хаяг', type: 'email', autocomplete: 'email', placeholder: 'нэр@gmail.com', required: true, wide: true },
       ...(hasPassword ? [{ name: 'current', label: 'Одоогийн нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true }] : []),
     ],
@@ -876,17 +880,30 @@ async function emailPopup({ token, hasPassword = false, then }) {
  * code and the new password. Every other device is signed out; this stays.
  *
  * `email` is the address on the account, said as where the code goes; an
- * account with none adds one first (emailPopup) and goes on from there.
- * `why` is the first step's line when the password is for something. `then({
- * password, revoked })` is the next step, once the popup has closed with the
- * password kept: the bank account's popup, handed the password just chosen
- * so it is not asked for twice, or the page drawn again. An account that
- * turns out to have a password by now (set in another tab) skips straight to
- * it, with `password: null`. Resolves with what `then` returned (or what it
- * would have been handed), or null when the popup was closed first.
+ * account with none adds one first (emailPopup) and goes on from there,
+ * saying why: what the password is for (`why`), and that its code comes by
+ * email. `why` is the first step's line when the password is for something.
+ * `then({ password, revoked })` is the next step, once the popup has closed
+ * with the password kept: the bank account's popup, handed the password just
+ * chosen so it is not asked for twice, or the page drawn again. An account
+ * that turns out to have a password by now (set in another tab) skips
+ * straight to it, with `password: null`. Resolves with what `then` returned
+ * (or what it would have been handed), or null when the popup was closed
+ * first.
+ *
+ * `quiet` leaves the confirmation to the step after: the bank account's
+ * popup says one word at its end for both, rather than two toasts standing
+ * over each other. Should that step be left without an answer (`then`
+ * resolves to null), the password kept is said after all.
  */
-export async function passwordPopup({ token, email = null, why = '', then } = {}) {
-  if (!email) return emailPopup({ token, then: (address) => passwordPopup({ token, email: address, why, then }) });
+export async function passwordPopup({ token, email = null, why = '', quiet = false, then } = {}) {
+  if (!email) {
+    return emailPopup({
+      token,
+      why: `${why ? `${why} ` : ''}Нууц үгийн код имэйлээр ирдэг тул хамгийн түрүүнд имэйлээ холбоно.`,
+      then: (address) => passwordPopup({ token, email: address, why, quiet, then }),
+    });
+  }
   let sent = null;
   const kept = await popup({
     title: 'Нууц үг тохируулах',
@@ -934,9 +951,15 @@ export async function passwordPopup({ token, email = null, why = '', then } = {}
     },
   });
   if (!kept) return null;
-  if (!kept.already) toast(passwordSaved(kept.revoked), 'good');
+  const said = () => {
+    if (!kept.already) toast(passwordSaved(kept.revoked), 'good');
+  };
+  if (!quiet) said();
   const handed = { password: kept.password, revoked: kept.revoked };
-  return then ? then(handed) : handed;
+  if (!then) return handed;
+  const next = await then(handed);
+  if (quiet && next == null) said();
+  return next;
 }
 
 /* ── popups ────────────────────────────────────────────────────────── */
