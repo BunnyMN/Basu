@@ -90,7 +90,17 @@ async function bySms(phone: string): Promise<string> {
   return verified.json().token as string;
 }
 
-type Listed = { id: string; name: string; phone: string | null; email: string | null; role: string; active: boolean; joined: boolean };
+type Listed = {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  role: string;
+  active: boolean;
+  joined: boolean;
+  account_phone: string | null;
+  account_phone_verified: boolean;
+};
 
 const seat = (payload: Record<string, string>, token?: string) =>
   app.inject({ method: 'POST', url: '/v1/ops/members', headers: token ? bearer(token) : desk(), payload });
@@ -181,6 +191,8 @@ describe('changing a member’s role', () => {
     expect((await me(token)).json().member.role).toBe('finance');
     const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() })).json();
     expect(JSON.stringify(audit)).toContain('member.role');
+    // The record names the role as the desk does, not by its key.
+    expect(audit.audit.find((a: { action: string }) => a.action === 'member.role')).toMatchObject({ note: 'Бат · Санхүү' });
     expect((await setRole(seat.id, 'owner')).statusCode).toBe(400);
   });
 
@@ -236,6 +248,22 @@ describe('choosing a person from Basu’s users', () => {
     expect(provedRow.phone_verified).toBe(true);
   });
 
+  it('lists a seat its account proved nothing for by the number that account typed, said to be unproved — and keeps it off the seat', async () => {
+    const typed = await byPhone('+97699112244', 'Сарнай');
+    expect((await seat({ guest_id: typed.id, role: 'viewer' })).statusCode).toBe(201);
+    const proved = await bySms('+97699112255');
+    expect((await seat({ guest_id: await websiteId(proved), role: 'ops' })).statusCode).toBe(201);
+    await seatedByEmail('bold@gmail.com', 'finance');
+
+    const listed = await members();
+    // Shown, for the desk to know them by — and said to be what it is: a number nobody proved. The seat's own
+    // phone and email stay empty: nothing can find or link it by the number.
+    expect(listed.find((m) => m.name === 'Сарнай')).toMatchObject({ phone: null, email: null, account_phone: '+97699112244', account_phone_verified: false });
+    // A seat named by what its account proved says that and nothing more.
+    expect(listed.find((m) => m.phone === '+97699112255')).toMatchObject({ account_phone: null });
+    expect(listed.find((m) => m.email === 'bold@gmail.com')).toMatchObject({ phone: null, account_phone: null });
+  });
+
   it('tells the person their seat is there, by email where they have no app, and records who gave it', async () => {
     const token = await byEmail('bold@gmail.com');
     const given = await seat({ guest_id: await accountId(token), role: 'viewer' });
@@ -248,7 +276,7 @@ describe('choosing a person from Basu’s users', () => {
     expect(mail?.subject).toContain('Basu ops эрх олголоо');
     expect(mail?.text ?? JSON.stringify(mail)).toContain('Зөвхөн харах');
     const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() })).json();
-    expect(JSON.stringify(audit)).toContain('member.grant');
+    expect(audit.audit.find((a: { action: string }) => a.action === 'member.grant')).toMatchObject({ note: 'bold@gmail.com · Зөвхөн харах' });
   });
 
   it('keeps the choosing to whoever may seat people', async () => {

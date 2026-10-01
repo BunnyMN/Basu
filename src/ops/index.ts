@@ -4,6 +4,7 @@
  * schema.
  */
 export {
+  accountsOfSeats,
   deskRoleExists,
   listMembers,
   memberForAccount,

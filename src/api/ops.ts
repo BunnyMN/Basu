@@ -49,6 +49,7 @@ import { revokeSession } from '../platform/identity/index.js';
 import { mode } from '../mode.js';
 import { badRequest, forbidden, noSuchSession, notFound, sendError, signInAgain, unauthorized } from './errors.js';
 import {
+  accountsOfSeats,
   deskRoleExists,
   linkByProof,
   listMembers,
@@ -465,7 +466,23 @@ export async function registerOpsRoutes(
     created_at: m.createdAt.toISOString(),
   });
 
-  app.get('/v1/ops/members', desk('desk.members'), async () => ({ members: (await listMembers()).map(shapeMember) }));
+  /**
+   * The seats, each named by what its account proved. A seat named by nothing — an account made with a phone
+   * and a password, whose number no SMS code reached — is shown by the number that account typed, said to be
+   * unproved (`account_phone`, `account_phone_verified`): for the eye alone. The seat keeps no such number, and
+   * nothing finds, names or links a seat by it (`seatAccount`).
+   */
+  app.get('/v1/ops/members', desk('desk.members'), async () => {
+    const members = await listMembers();
+    const sitting = await accountsOfSeats(members.filter((m) => !m.phone && !m.email).map((m) => m.id));
+    const contacts = await contactsFor([...sitting.values()].flat());
+    return {
+      members: members.map((m) => {
+        const typed = (sitting.get(m.id) ?? []).map((id) => contacts.get(id)).find((c) => c?.phone);
+        return { ...shapeMember(m), account_phone: typed?.phone ?? null, account_phone_verified: Boolean(typed?.phoneVerified) };
+      }),
+    };
+  });
 
   /**
    * Basu's users, for choosing whom to seat: found by name, phone or email,
@@ -545,8 +562,10 @@ export async function registerOpsRoutes(
         },
         actor(request),
       );
-      await audit(request, { action: 'member.grant', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
-      await tellSeated(card.id, member, (await roleOf('desk', member.role))?.name ?? member.role);
+      // The record says the role as the desk names it, «Зөвхөн харах», not its key.
+      const roleName = (await roleOf('desk', member.role))?.name ?? member.role;
+      await audit(request, { action: 'member.grant', targetKind: 'member', targetId: member.id, note: `${member.name} · ${roleName}` });
+      await tellSeated(card.id, member, roleName);
       return reply.status(201).send(shapeMember(member));
     } catch (error) {
       return sendError(reply, error);
@@ -564,7 +583,7 @@ export async function registerOpsRoutes(
     if (!role || !(await deskRoleExists(role))) return badRequest(reply, 'Эрх буруу байна.', `no such role: ${request.body?.role}`);
     try {
       const member = await setMemberRole(request.params.id, role, actor(request));
-      await audit(request, { action: 'member.role', targetKind: 'member', targetId: member.id, note: `${member.name} · ${member.role}` });
+      await audit(request, { action: 'member.role', targetKind: 'member', targetId: member.id, note: `${member.name} · ${(await roleOf('desk', member.role))?.name ?? member.role}` });
       return reply.send(shapeMember(member));
     } catch (error) {
       return sendError(reply, error);

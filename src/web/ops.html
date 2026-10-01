@@ -14,9 +14,12 @@
 <script defer src="/vendor/table-core.js"></script>
 <script>
 /* Which first shape the page paints while its own script (most of this file) is still on its way: the door,
-   or — for somebody signed in on this browser, or back from Google — the frame; and the door for registering a business. */
+   or — for somebody signed in on this browser, or back from Google — the frame; and the door for registering a business.
+   In Facebook's, Instagram's and LINE's own browsers the door has no Google (api.js inAppBrowser, login.html's
+   same test): its first shape has no Google either. */
 try {
   const shape = document.documentElement;
+  if (/FBAN|FBAV|FB_IAB|Instagram|Line\//.test(navigator.userAgent)) shape.setAttribute('data-in-app', '');
   if (localStorage.getItem('basu.guest') || /[#&]auth_code=/.test(location.hash)) shape.setAttribute('data-signed', '');
   if (/[?&]join=business(&|$)/.test(location.search)) shape.setAttribute('data-join', '');
 } catch {
@@ -49,6 +52,14 @@ p{margin:0}
 .shell-ways .sw-fold{height:14px;width:46%;align-self:center;margin:35px 0 12px}
 /* a phone's card is narrow enough that the line over the ways in takes two lines */
 @media (max-width:480px){.shell-ways .sw-lead{margin-bottom:39px}}
+/* Facebook's, Instagram's and LINE's own browsers (data-in-app): no Google and no «эсвэл», the line over the ways
+   in short enough for one line on a phone too, and under «Код авах» the line saying where Google works — two
+   lines on a phone */
+.shell-ways .sw-inapp{display:none;height:14px;width:80%;align-self:center;margin:16px 0 2px}
+:root[data-in-app] .shell-ways :is(.sw-google,.sw-or){display:none}
+:root[data-in-app] .shell-ways .sw-lead{margin-bottom:18px}
+:root[data-in-app] .shell-ways .sw-inapp{display:block}
+@media (max-width:480px){:root[data-in-app] .shell-ways .sw-inapp{margin-bottom:20px}}
 .door-card{width:100%;max-width:440px;padding:32px 32px 28px}
 .door-brand{display:inline-flex;align-items:baseline;gap:10px;margin:0 0 28px;color:var(--ink);text-decoration:none}
 .door-brand .wordmark{font-size:24px}
@@ -170,6 +181,8 @@ p{margin:0}
 .nudge-copy{flex:1 1 320px;min-width:0}
 .nudge-copy b{display:block;font-size:var(--t-row);font-weight:600;color:var(--ink)}
 .nudge-copy span{display:block;margin-top:2px;font-size:var(--t-body);line-height:1.5;color:var(--ink-2)}
+/* what stands between a supplier and its orders, said under the head before anything else: payments closed */
+.org-notes{display:grid;gap:10px;margin:0 0 20px}
 .org-you{margin-top:20px;font-size:var(--t-cap);color:var(--ink-2)}
 .org-you .link{min-height:0;font-size:var(--t-cap)}
 
@@ -442,7 +455,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
       <a class="door-brand" href="/" aria-label="Basu-гийн нүүр хуудас"><span class="wordmark">Basu</span><span class="door-place">Бизнес</span></a>
       <h2><span data-plain>Нэвтрэх</span><span data-joining>Бизнесээ бүртгүүлэх</span></h2>
       <p class="door-for"><span data-plain>Байгууллагаа Basu дээр удирдах газар. Basu-д нэвтэрдэг бүртгэлээрээ орно.</span><span data-joining>Нэвтэрмэгц бүртгэлийн цонх нээгдэнэ: бизнесийнхээ нэр, утас, хаягийг бөглөөд илгээнэ. Basu шалгаж баталмагц зар, захиалгаа эндээс удирдана.</span></p>
-      <div class="shell-ways" aria-hidden="true"><span class="skel sw-lead"></span><span class="skel sw-btn"></span><span class="skel sw-or"></span><span class="skel sw-label"></span><span class="skel sw-input"></span><span class="skel sw-hint"></span><span class="skel sw-btn"></span><span class="skel sw-fold"></span></div>
+      <div class="shell-ways" aria-hidden="true"><span class="skel sw-lead"></span><span class="skel sw-btn sw-google"></span><span class="skel sw-or"></span><span class="skel sw-label"></span><span class="skel sw-input"></span><span class="skel sw-hint"></span><span class="skel sw-btn"></span><span class="skel sw-inapp"></span><span class="skel sw-fold"></span></div>
     </div>
     <a class="door-home" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Basu-гийн нүүр хуудас</a>
   </div>
@@ -454,7 +467,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 </div>
 
 <script type="module">
-import { api, ApiError, store, toast, mnt, money, KIND, HEADLINE, LUNCH_WORD, IDESH_STATE, IDESH_LIVE, headlineWord, dayLabel, signInDoors, authMethods, accountWays, authReturn, takeSession, dropSession, popup, confirmPopup, phoneText, skeleton, emptyState, whatWentWrong } from '/api.js';
+import { api, ApiError, store, toast, mnt, money, KIND, HEADLINE, LUNCH_WORD, IDESH_STATE, IDESH_LIVE, headlineWord, dayLabel, dayShort, signInDoors, authMethods, accountWays, authReturn, takeSession, dropSession, popup, confirmPopup, phoneText, skeleton, emptyState, whatWentWrong } from '/api.js';
 import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -474,10 +487,23 @@ const el = (html) => {
  * attribute of its own.
  */
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const when = (iso) => (iso ? dayLabel(iso.slice(0, 10)) : '—');
-const clockOf = (iso) => {
-  const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+/**
+ * A moment as Ulaanbaatar reads it: its day and its clock, whatever zone the computer at the desk is set to.
+ * A stamp's first ten characters are UTC's day, and before 08:00 here that is yesterday — so the day beside a
+ * time is always read here, from the same moment as the time.
+ */
+const UB_PARTS = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ulaanbaatar', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const ubParts = (iso) => {
+  const p = Object.fromEntries(UB_PARTS.formatToParts(new Date(iso)).map((x) => [x.type, x.value]));
+  return { day: `${p.year}-${p.month}-${p.day}`, clock: `${p.hour === '24' ? '00' : p.hour}:${p.minute}` };
+};
+const when = (iso) => (iso ? dayLabel(ubParts(iso).day) : '—');
+const clockOf = (iso) => ubParts(iso).clock;
+/** A date and its time in a table cell, as datatable.js draws them («10-р сарын 2 · 07:15»), read in Ulaanbaatar. */
+const whenCell = (iso) => {
+  if (!iso) return dtCell.none();
+  const { day, clock } = ubParts(iso);
+  return `<span class="dt-when">${dayLabel(day)}<small>${clock}</small></span>`;
 };
 const CHEV = '<svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg>';
 const PHONE = '<svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg>';
@@ -912,13 +938,12 @@ async function renderMeProfile(view) {
 /** When a device was last used, the way the website's /account says it: «Өнөөдөр 11:16», «Өчигдөр 11:16», «10-р сарын 1, 11:16». */
 function seenAt(iso) {
   if (!iso) return '—';
-  const d = new Date(iso);
-  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const ago = Math.round((day(new Date()) - day(d)) / 86400000);
-  const hm = clockOf(iso);
-  if (ago === 0) return `Өнөөдөр ${hm}`;
-  if (ago === 1) return `Өчигдөр ${hm}`;
-  return `${d.getMonth() + 1}-р сарын ${d.getDate()}, ${hm}`;
+  // Today and yesterday are Ulaanbaatar's, as the time beside them is.
+  const { day, clock } = ubParts(iso);
+  const ago = Math.round((Date.parse(ubParts(Date.now()).day) - Date.parse(day)) / 86400000);
+  if (ago === 0) return `Өнөөдөр ${clock}`;
+  if (ago === 1) return `Өчигдөр ${clock}`;
+  return `${dayLabel(day)}, ${clock}`;
 }
 
 /**
@@ -968,6 +993,27 @@ function orgPopup({ supplier = false } = {}) {
 const orgFile = () => ops(`/v1/orgs/${ws.id}`);
 /** The supplier's own routes, for the business open now. */
 const atOrg = (path) => api(path, { token: token(), headers: { 'x-basu-org': ws.id } });
+
+/**
+ * Whether guests can pay on Basu at all just now: the stalls' answer says so when it carries it
+ * (`payments_open`); else the wallet's top-ups, which the same payment provider opens and closes. Null when
+ * neither said — and then nothing is said either. /supplier asks the same, the same way.
+ */
+async function paymentsOpen() {
+  try {
+    const listed = await api('/v1/idesh/listings', { token: token() });
+    if (typeof listed?.payments_open === 'boolean') return listed.payments_open;
+  } catch {
+    // The wallet is asked instead.
+  }
+  try {
+    const wallet = await api('/v1/wallet', { token: token() });
+    if (typeof wallet?.topups_open === 'boolean') return wallet.topups_open;
+  } catch {
+    // Nobody said.
+  }
+  return null;
+}
 const orgLink = (key) => pagesOf(ws).find((i) => i.key === key);
 
 /**
@@ -1036,6 +1082,19 @@ async function renderOrgHome(view) {
     }
     view.append(card);
     return;
+  }
+
+  // Payments closed on Basu — which is why no order comes, however good the listings — said first, in the words
+  // /supplier's «Өнөөдөр» says it. Nothing is said while it is open, nor when nobody answered.
+  if (w.kinds?.supplier) {
+    const notes = el('<div class="org-notes" id="org-notes" hidden></div>');
+    view.append(notes);
+    void paymentsOpen().then((open) => {
+      if (!notes.isConnected) return;
+      if (open !== false) return notes.remove();
+      notes.append(el('<div class="callout" data-k="info" id="payments-closed"><span>Basu дээр төлбөр түр хаалттай тул зочид одоогоор захиалга өгч чадахгүй байна. Төлбөр нээгдмэгц шинэ захиалга ирж эхэлнэ.</span></div>'));
+      notes.hidden = false;
+    });
   }
 
   if (w.kinds?.supplier && (can('org.idesh.today') || can('org.idesh.orders'))) {
@@ -1382,7 +1441,7 @@ async function renderOrgLog(view) {
   }
   const table = dataTable({
     columns: [
-      { key: 'at', label: 'Хэзээ', render: (e) => dtCell.when(e.at) },
+      { key: 'at', label: 'Хэзээ', render: (e) => whenCell(e.at) },
       { key: 'by', label: 'Хэн', value: (e) => e.by ?? 'систем' },
       { key: 'what', label: 'Юу болсон', value: (e) => (LOG_WORD[e.action] ?? (() => e.action))(e), render: (e) => `<b>${(LOG_WORD[e.action] ?? (() => esc(e.action)))(e)}</b>`, width: '50%' },
     ],
@@ -1468,7 +1527,7 @@ async function renderOrgsDesk(view) {
           ),
       },
       { key: 'tin', label: 'ТТД', render: (o) => dtCell.mono(o.tin), phone: false },
-      { key: 'created_at', label: 'Бүртгэгдсэн', render: (o) => dtCell.when(o.created_at), phone: false },
+      { key: 'created_at', label: 'Бүртгэгдсэн', render: (o) => whenCell(o.created_at), phone: false },
       {
         key: 'state',
         label: 'Төлөв',
@@ -2918,11 +2977,17 @@ function renderGuests(view) {
         key: 'phone',
         label: 'Утас',
         value: (g) => `${g.phone ?? ''} ${phoneText(g.phone ?? '')} ${g.delivery_phone ?? ''}`,
-        // Somebody with no number of their own, found by the one they gave for a delivery: that number, said as such.
-        render: (g) => (g.phone || !g.delivery_phone ? dtCell.phone(g.phone) : dtCell.twoHtml(dtCell.phone(g.delivery_phone), 'хүргэлтийн утас')),
+        // Found by the number they gave for a delivery, not by their own: the row says so, with the number the desk
+        // typed under their own — or, for somebody with no number of their own, that number, said as such.
+        render: (g) =>
+          !g.delivery_phone
+            ? dtCell.phone(g.phone)
+            : g.phone
+              ? dtCell.twoHtml(dtCell.phone(g.phone), `хүргэлтийн утсаар олдсон: <span class="mono nowrap">${esc(phoneText(g.delivery_phone))}</span>`)
+              : dtCell.twoHtml(dtCell.phone(g.delivery_phone), 'хүргэлтийн утсаар олдсон'),
       },
       { key: 'email', label: 'Имэйл', render: (g) => (g.email ? emailHtml(g.email) : dtCell.none()) },
-      { key: 'joined_at', label: 'Бүртгүүлсэн', render: (g) => dtCell.when(g.joined_at) },
+      { key: 'joined_at', label: 'Бүртгүүлсэн', render: (g) => whenCell(g.joined_at) },
       {
         key: 'state',
         label: 'Төлөв',
@@ -3069,7 +3134,7 @@ async function openGuest(id, from = { label: 'Зочид', go: () => show('guest
   const put = (key, table) => page.querySelector(`[data-t="${key}"]`).replaceWith(table.el);
   put('wallet', dataTable({
     columns: [
-      { key: 'at', label: 'Огноо', render: (l) => dtCell.when(l.at) },
+      { key: 'at', label: 'Огноо', render: (l) => whenCell(l.at) },
       { key: 'kind', label: 'Юу', value: (l) => LINE_WORD[l.kind] ?? l.kind, render: (l) => dtCell.two(LINE_WORD[l.kind] ?? l.kind, l.memo ?? '') },
       { key: 'amount_mnt', label: 'Дүн', align: 'end', numeric: true, render: (l) => money(l.amount_mnt, l.amount_mnt > 0 ? 'credit' : undefined) },
     ],
@@ -3083,7 +3148,7 @@ async function openGuest(id, from = { label: 'Зочид', go: () => show('guest
     columns: [
       { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(`<span class="mono">№${esc(o.code)}</span>`, `${o.party_size} хүн`) },
       { key: 'restaurant', label: 'Ресторан', value: (o) => o.restaurant.name },
-      { key: 'slot_starts_at', label: 'Цаг', render: (o) => dtCell.when(o.slot_starts_at) },
+      { key: 'slot_starts_at', label: 'Цаг', render: (o) => whenCell(o.slot_starts_at) },
       { key: 'state', label: 'Төлөв', value: (o) => DINE_WORD[o.state] ?? o.state, render: (o) => dtCell.pill(o.state, DINE_WORD[o.state] ?? o.state) },
       { key: 'total_mnt', label: 'Дүн', align: 'end', numeric: true, render: (o) => dtCell.money(o.total_mnt) },
     ],
@@ -3115,7 +3180,7 @@ async function openGuest(id, from = { label: 'Зочид', go: () => show('guest
   put('idesh', idesh);
   put('messages', dataTable({
     columns: [
-      { key: 'created_at', label: 'Хэзээ', render: (m) => dtCell.when(m.created_at) },
+      { key: 'created_at', label: 'Хэзээ', render: (m) => whenCell(m.created_at) },
       { key: 'channel', label: 'Суваг', value: (m) => (m.channel === 'sms' ? 'SMS' : m.channel === 'email' ? 'Имэйл' : 'Push') },
       { key: 'title', label: 'Мэдэгдэл', value: (m) => `${m.title ?? ''} ${m.body}`, render: (m) => `<span class="dt-two"><b>${esc(m.title ?? '')}</b><small class="dt-text">${esc(m.body)}</small></span>`, width: '50%' },
       { key: 'state', label: 'Төлөв', value: (m) => MSG_WORD[m.state] ?? m.state, render: (m) => dtCell.pill(MSG_PILL[m.state] ?? 'off', MSG_WORD[m.state] ?? m.state) },
@@ -3432,7 +3497,7 @@ async function renderLunches(view) {
         value: (o) => `${o.guest ?? ''} ${o.guest_phone ?? ''}`,
         render: (o) => dtCell.twoHtml(guestName(o.guest), o.guest_phone ? dtCell.phone(o.guest_phone) : ''),
       },
-      { key: 'slot_starts_at', label: 'Цаг', render: (o) => dtCell.when(o.slot_starts_at) },
+      { key: 'slot_starts_at', label: 'Цаг', render: (o) => whenCell(o.slot_starts_at) },
       {
         key: 'fire_at',
         label: 'Гал',
@@ -3641,7 +3706,7 @@ async function renderReviews(view) {
   if (tab !== 'reviews') return;
   const table = dataTable({
     columns: [
-      { key: 'at', label: 'Огноо', render: (v) => dtCell.when(v.at) },
+      { key: 'at', label: 'Огноо', render: (v) => whenCell(v.at) },
       { key: 'restaurant', label: 'Ресторан', value: (v) => v.restaurant.name },
       { key: 'order_code', label: 'Захиалга', render: (v) => `<span class="mono">№${esc(v.order_code)}</span>`, phone: false },
       { key: 'guest', label: 'Зочин', value: (v) => v.guest ?? 'зочин' },
@@ -3781,7 +3846,7 @@ async function moneyChecks() {
       { key: 'kind', label: 'Төрөл', value: (a) => KIND_ACCOUNT[a.kind] ?? a.kind },
       { key: 'balance_mnt', label: 'Үлдэгдэл', align: 'end', numeric: true, render: (a) => dtCell.money(a.balance_mnt) },
       { key: 'entries', label: 'Бичилт', align: 'end', numeric: true, render: (a) => (a.entries === null ? dtCell.none() : dtCell.num(a.entries)) },
-      { key: 'last_at', label: 'Сүүлд', render: (a) => dtCell.when(a.last_at) },
+      { key: 'last_at', label: 'Сүүлд', render: (a) => whenCell(a.last_at) },
     ],
     search: false,
     noun: 'данс',
@@ -3837,7 +3902,7 @@ async function moneyTransfers() {
   const { transfers } = await ops(`/v1/ops/money/transfers?${qs}`);
   const table = dataTable({
     columns: [
-      { key: 'at', label: 'Огноо', render: (t) => dtCell.when(t.at) },
+      { key: 'at', label: 'Огноо', render: (t) => whenCell(t.at) },
       {
         key: 'kind',
         label: 'Төрөл',
@@ -3871,7 +3936,7 @@ async function moneyTopups() {
   const { topups } = await ops(`/v1/ops/money/topups?${qs}`);
   const table = dataTable({
     columns: [
-      { key: 'created_at', label: 'Эхэлсэн', render: (t) => dtCell.when(t.created_at) },
+      { key: 'created_at', label: 'Эхэлсэн', render: (t) => whenCell(t.created_at) },
       {
         key: 'guest',
         label: 'Зочин',
@@ -3880,7 +3945,7 @@ async function moneyTopups() {
       },
       { key: 'provider', label: 'Суваг', value: (t) => `${t.provider} ${t.provider_ref ?? ''}`, render: (t) => dtCell.twoHtml(esc(t.provider), t.provider_ref ? `<span class="mono">${esc(t.provider_ref)}</span>` : ''), phone: false },
       { key: 'state', label: 'Төлөв', value: (t) => TOPUP_WORD[t.state] ?? t.state, render: (t) => dtCell.pill(TOPUP_PILL[t.state] ?? 'off', TOPUP_WORD[t.state] ?? t.state) },
-      { key: 'settled_at', label: 'Орсон', render: (t) => dtCell.when(t.settled_at) },
+      { key: 'settled_at', label: 'Орсон', render: (t) => whenCell(t.settled_at) },
       { key: 'amount_mnt', label: 'Дүн', align: 'end', numeric: true, render: (t) => dtCell.money(t.amount_mnt) },
     ],
     search: { placeholder: 'Зочин, утас, лавлах дугаар…' },
@@ -3906,7 +3971,7 @@ async function moneyReceipts() {
   const { receipts } = await ops(`/v1/ops/money/receipts?${qs}`);
   const table = dataTable({
     columns: [
-      { key: 'created_at', label: 'Огноо', render: (r) => dtCell.when(r.created_at) },
+      { key: 'created_at', label: 'Огноо', render: (r) => whenCell(r.created_at) },
       { key: 'order_code', label: 'Захиалга', render: (r) => dtCell.twoHtml(`<span class="mono">№${esc(r.order_code ?? '')}</span>`, r.kind === 'RETURN' ? 'буцаалт' : 'борлуулалт') },
       { key: 'merchant_tin', label: 'ТТД', render: (r) => dtCell.mono(r.merchant_tin), phone: false },
       {
@@ -3993,7 +4058,7 @@ async function drawNotify() {
 async function notifyLog() {
   const table = dataTable({
     columns: [
-      { key: 'created_at', label: 'Хэзээ', render: (m) => dtCell.when(m.created_at) },
+      { key: 'created_at', label: 'Хэзээ', render: (m) => whenCell(m.created_at) },
       {
         key: 'guest',
         label: 'Хэнд',
@@ -4596,7 +4661,7 @@ function renderSuppliers(view) {
         { key: 'phone', label: 'Утас', render: (s) => dtCell.phone(s.phone) },
         { key: 'merchant_tin', label: 'ТТД', render: (s) => dtCell.mono(s.merchant_tin), phone: false },
         { key: 'pickup_address', label: 'Авах цэг', phone: false },
-        { key: 'applied_at', label: 'Ирсэн', render: (s) => dtCell.when(s.applied_at) },
+        { key: 'applied_at', label: 'Ирсэн', render: (s) => whenCell(s.applied_at) },
       ],
       search: false,
       actions: runs
@@ -4636,7 +4701,7 @@ function renderSuppliers(view) {
         phone: false,
       },
       { key: 'listings', label: 'Зар', align: 'end', numeric: true, render: (s) => (s.state === 'contracted' ? dtCell.num(s.listings) : dtCell.none()) },
-      { key: 'contracted_at', label: 'Гэрээ', render: (s) => (s.state === 'declined' ? `<small class="muted">татгалзсан</small>` : dtCell.when(s.contracted_at)), phone: false },
+      { key: 'contracted_at', label: 'Гэрээ', render: (s) => (s.state === 'declined' ? `<small class="muted">татгалзсан</small>` : whenCell(s.contracted_at)), phone: false },
       { key: 'state', label: 'Төлөв', value: (s) => supplierState(s)[1], render: (s) => dtCell.pill(...supplierState(s)) },
     ],
     search: { placeholder: 'Нэр, утас, ТТД, хаяг…' },
@@ -4922,7 +4987,7 @@ function settlementTable(rows, withFilters = true, opensOn = 'open', { hide = []
                 : '',
           ),
       },
-      { key: 'created_at', label: 'Үүссэн', render: (t) => dtCell.when(t.created_at), phone: false },
+      { key: 'created_at', label: 'Үүссэн', render: (t) => whenCell(t.created_at), phone: false },
       { key: 'amount_mnt', label: 'Дүн', align: 'end', numeric: true, render: (t) => dtCell.money(t.amount_mnt) },
     ].filter((c) => !hide.includes(c.key)),
     search: withFilters ? { placeholder: 'Нэр, захиалга, данс…' } : false,
@@ -5016,7 +5081,7 @@ async function renderPromotions(view) {
   view.append(band);
   const table = dataTable({
     columns: [
-      { key: 'created_at', label: 'Хэзээ', render: (p) => dtCell.when(p.created_at) },
+      { key: 'created_at', label: 'Хэзээ', render: (p) => whenCell(p.created_at) },
       { key: 'listing', label: 'Зар', value: (p) => `${p.listing_title} ${p.supplier_name}`, render: (p) => dtCell.two(p.listing_title, p.supplier_name) },
       {
         key: 'tier',
@@ -5026,7 +5091,7 @@ async function renderPromotions(view) {
       },
       { key: 'price_mnt', label: 'Үнэ', render: (p) => dtCell.money(p.price_mnt) },
       { key: 'buyer', label: 'Төлсөн', value: (p) => `${p.buyer ?? ''} ${p.buyer_contact ?? ''}`, render: (p) => dtCell.two(p.buyer ?? 'Нэргүй', p.buyer_contact ?? '') },
-      { key: 'ends_at', label: 'Хүртэл', render: (p) => (p.ends_at ? dtCell.when(p.ends_at) : dtCell.none()) },
+      { key: 'ends_at', label: 'Хүртэл', render: (p) => (p.ends_at ? whenCell(p.ends_at) : dtCell.none()) },
       {
         key: 'standing',
         label: 'Төлөв',
@@ -5169,14 +5234,14 @@ function auditWho(a) {
   const contact = a.account ? line(a.account.email ?? phoneText(a.account.phone)) : '';
   const label = a.session ? line(a.session.label) : '';
   const iso = a.session?.signed_in_at;
-  const day = iso && new Date(iso);
+  const at = iso && ubParts(iso);
   const account = a.account && (contact || (a.account.closed ? 'хаагдсан бүртгэл' : 'бүртгэл'));
   const device = a.session && (label || 'нэргүй төхөөрөмж');
-  const signedIn = iso && `${day.getMonth() + 1}/${day.getDate()} ${clockOf(iso)}-д нэвтэрсэн`;
+  const signedIn = at && `${dayShort(at.day)} ${at.clock}-д нэвтэрсэн`;
   const cell = el(dtCell.two(a.who.replace(/^ops:/, ''), [account, device, signedIn].filter(Boolean).join(' · ')));
   const hover = [
     a.account && `Бүртгэл: ${[name, contact].filter(Boolean).join(', ') || (a.account.closed ? 'хаагдсан' : '—')}`,
-    a.session && `Нэвтрэлт: ${[label, iso && `${day.getMonth() + 1}-р сарын ${day.getDate()} ${clockOf(iso)}-д нэвтэрсэн`].filter(Boolean).join(', ') || '—'}`,
+    a.session && `Нэвтрэлт: ${[label, at && `${dayLabel(at.day)} ${at.clock}-д нэвтэрсэн`].filter(Boolean).join(', ') || '—'}`,
   ].filter(Boolean).join('\n');
   if (hover) cell.title = hover;
   return cell;
@@ -5187,7 +5252,7 @@ async function renderAudit(view) {
   const areas = [...new Set(Object.values(TARGET_WORD))];
   const table = dataTable({
     columns: [
-      { key: 'at', label: 'Хэзээ', render: (a) => dtCell.when(a.at) },
+      { key: 'at', label: 'Хэзээ', render: (a) => whenCell(a.at) },
       {
         key: 'who',
         label: 'Хэн',
@@ -5286,13 +5351,16 @@ async function renderMembers(view) {
       {
         key: 'contact',
         label: 'Утас, имэйл',
-        value: (m) => `${m.phone ?? ''} ${m.email ?? ''}`,
-        // A seat keeps only a number or an address its account proved: with neither, the cell says so rather than «—».
+        value: (m) => `${m.phone ?? ''} ${m.email ?? ''} ${m.account_phone ?? ''} ${m.account_phone ? phoneText(m.account_phone) : ''}`,
+        // A seat keeps only a number or an address its account proved. With neither — somebody who signed up with a
+        // phone and a password — the number their account typed, marked as unproved: to know them by, never to trust.
         render: (m) =>
-          dtCell.twoHtml(
-            m.phone ? dtCell.phone(m.phone) : m.email ? emailHtml(m.email) : '<span class="dt-unnamed">Баталгаажсан утас, имэйл алга</span>',
-            m.phone && m.email ? emailHtml(m.email) : '',
-          ),
+          m.phone || m.email || !m.account_phone
+            ? dtCell.twoHtml(
+                m.phone ? dtCell.phone(m.phone) : m.email ? emailHtml(m.email) : '<span class="dt-unnamed">Баталгаажсан утас, имэйл алга</span>',
+                m.phone && m.email ? emailHtml(m.email) : '',
+              )
+            : dtCell.twoHtml(dtCell.phone(m.account_phone), m.account_phone_verified ? '' : dtCell.pill('hold', 'баталгаагүй')),
       },
       { key: 'role', label: 'Үүрэг', value: (m) => roleNames.get(m.role) ?? m.role },
       { key: 'state', label: 'Төлөв', value: (m) => memberState(m)[1], render: (m) => dtCell.pill(...memberState(m)) },
@@ -5307,7 +5375,11 @@ async function renderMembers(view) {
           () => {
             void popup({
               title: 'Үүрэг солих',
-              sub: `${esc(m.name)} · ${esc(m.email ?? phoneText(m.phone ?? ''))}`,
+              // The seat's name and what it is known by — never a «·» left hanging after a name with nothing proved.
+              sub: [
+                m.name,
+                m.email ?? (m.phone ? phoneText(m.phone) : m.account_phone ? `${phoneText(m.account_phone)}${m.account_phone_verified ? '' : ' (баталгаагүй)'}` : null),
+              ].filter(Boolean).map(esc).join(' · '),
               width: 520,
               id: 'member-role',
               fields: [{ name: 'role', label: 'Үүрэг', type: 'select', options: roleOptions, value: m.role, wide: true, hint: roleList.find((r) => r.key === m.role)?.description || ' ' }],
