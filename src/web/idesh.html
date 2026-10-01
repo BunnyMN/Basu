@@ -372,7 +372,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 <!-- MapLibre from cdnjs, held to cdnjs's own hash of the file: bytes that ever differ do not run. A new version takes its new hash, here and on the stylesheet. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js" integrity="sha512-hoXlvOdSmh58mppUyZHZsscHkR/yXl6zLpTMTNwA6IZ61DpeaCNjosRu1WJ2DeIpkfW5MsJJ9H89zjV4IBGqRw==" crossorigin="anonymous"></script>
 <script type="module">
-import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, KIND, dayLabel, dayShort, signInSheet, dropSession, whatWentWrong } from '/api.js';
+import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, KIND, dayLabel, dayShort, signInSheet, passwordPopup, dropSession, whatWentWrong } from '/api.js';
 import { mapStyle, mapTheme, onMapTheme, repaintMap, ULAANBAATAR } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -514,13 +514,18 @@ async function signIn() {
   return signInSheet();
 }
 
-/** Every call that needs a guest. A dead token means sign in again — once. */
+/**
+ * Every call that needs a guest. A dead token means sign in again — once. A
+ * password the person typed that was wrong (BAD_PASSWORD, the refund's
+ * account) is a 401 too, and says nothing about the session: it is said
+ * where it was typed, not answered by signing somebody in afresh.
+ */
 async function guestApi(path, options = {}) {
   const token = store.guestToken ?? (await signIn());
   try {
     return await api(path, { ...options, token });
   } catch (error) {
-    if (error.status !== 401) throw error;
+    if (error.status !== 401 || error.code === 'BAD_PASSWORD') throw error;
     store.guestToken = null;
     return api(path, { ...options, token: await signIn() });
   }
@@ -1465,6 +1470,12 @@ function clockOf(iso) {
  * A refund does not go to a wallet: the guest names their own bank account
  * here, once, and ops sends the money there. Until then the order waits on
  * this one form; after, the panel says what was sent and when.
+ *
+ * Money is about to go to the account typed, so it is confirmed with the
+ * account's password. An account made by Google, Apple or an email code has
+ * none: «Данс илгээх» sets one first — a code to the account's address, then
+ * the password (api.js passwordPopup) — and the account goes with it, rather
+ * than asking for a password the person never had.
  */
 function refundPanel(order) {
   const r = order.refund;
@@ -1473,12 +1484,12 @@ function refundPanel(order) {
     panel.append(
       el(`<div class="line">${MARK.wallet}<div>
             <span class="lab">Буцаалт авах данс</span>
-            <div class="v"><span class="mono">${money(r.amount_mnt)}</span><small>Аль банкны ямар данс руу шилжүүлэхийг бичнэ үү. Basu шилжүүлмэгц SMS ирнэ.</small></div>
+            <div class="v"><span class="mono">${money(r.amount_mnt)}</span><small>Аль банкны ямар данс руу шилжүүлэхийг бичнэ үү. Basu шилжүүлмэгц мэдэгдэл ирнэ.</small></div>
             <div class="field"><label for="bank">Банк</label>
               <input id="bank" list="banks" placeholder="Хаан банк" autocomplete="off">
               <datalist id="banks">${BANKS.map((b) => `<option value="${b}">`).join('')}</datalist></div>
             <div class="field"><label for="account">Дансны дугаар</label>
-              <input id="account" inputmode="numeric" placeholder="5012345678"></div>
+              <input id="account" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="5012345678"></div>
             <div class="field"><label for="holder">Данс эзэмшигчийн нэр</label>
               <input id="holder" placeholder="Банкинд бүртгэлтэй нэр"></div>
             <div class="field" id="otp-step" hidden><label for="otp">Нууц үгээ оруулж баталгаажуулна уу</label>
@@ -1492,6 +1503,8 @@ function refundPanel(order) {
     const holder = panel.querySelector('#holder');
     const send = panel.querySelector('#send-account');
     const why = panel.querySelector('#refund-why');
+    const otpStep = panel.querySelector('#otp-step');
+    const otp = panel.querySelector('#otp');
     const check = () => {
       // The rule the server holds every account to: the number, or the IBAN — MN and eighteen digits.
       const number = account.value.replace(/\s+/g, '').toUpperCase();
@@ -1501,7 +1514,9 @@ function refundPanel(order) {
           ? 'Дансны дугаар 6–20 оронтой тоо, эсвэл MN-ээр эхэлсэн IBAN байна.'
           : holder.value.trim().length < 2
             ? 'Данс эзэмшигчийн нэрээ бичнэ үү.'
-            : null;
+            : !otpStep.hidden && !otp.value
+              ? 'Нууц үгээ бичнэ үү.'
+              : null;
       // A hint while the form is being filled in, calm; the server's refusal
       // (below) is the only thing said in the stop colour.
       delete why.dataset.tone;
@@ -1510,23 +1525,24 @@ function refundPanel(order) {
       if (problem) why.innerHTML = `${MARK.warn}${problem}`;
       send.disabled = Boolean(problem);
     };
-    for (const input of [bank, account, holder]) input.addEventListener('input', check);
-    send.addEventListener('click', async () => {
+    // The password typed after a refusal is the next try: the refusal goes, and the button wakes, as it is typed.
+    for (const input of [bank, account, holder, otp]) input.addEventListener('input', check);
+    /** The account, confirmed with `password`; a refusal of the password opens its field. */
+    const submit = async (password) => {
       send.disabled = true;
       try {
-        const password = panel.querySelector('#otp').value;
         await guestApi(`/v1/idesh/${state.orderId}/refund-account`, {
           method: 'POST',
           body: { bank_name: bank.value, bank_account: account.value, bank_holder: holder.value, password: password || undefined },
         });
-        toast('Данс бүртгэгдлээ. Шилжүүлмэгц SMS ирнэ.');
+        toast('Данс бүртгэгдлээ. Шилжүүлмэгц мэдэгдэл ирнэ.');
         shell.ordersChanged();
         if (!gone) await Promise.all([showStatus(true), loadMine()]);
       } catch (error) {
         if (error.code === 'PASSWORD_REQUIRED' || error.code === 'BAD_PASSWORD') {
           // Money is about to be sent to this account: prove it is still you.
-          panel.querySelector('#otp-step').hidden = false;
-          panel.querySelector('#otp').focus();
+          otpStep.hidden = false;
+          otp.focus();
           why.hidden = false;
           why.innerHTML = `${MARK.warn}${error.code === 'BAD_PASSWORD' ? 'Нууц үг буруу байна.' : 'Нууц үгээ оруулаад дахин дарна уу.'}`;
           send.disabled = false;
@@ -1541,6 +1557,25 @@ function refundPanel(order) {
         toast(whatWentWrong(error), 'bad');
         send.disabled = false;
       }
+    };
+    send.addEventListener('click', async () => {
+      send.disabled = true;
+      // No password typed: an account that has none sets it now, and the account goes with it.
+      if (!otp.value) {
+        const me = await guestApi('/v1/me').catch(() => null);
+        if (me && !me.has_password) {
+          const done = await passwordPopup({
+            token: store.guestToken,
+            email: me.email,
+            why: 'Мөнгө тань руу очих дансыг нууц үгээр баталгаажуулдаг. Таны бүртгэлд нууц үг алга — нэг удаа тохируулмагц данс шууд илгээгдэнэ.',
+            // Set just now — or already set elsewhere (null), and then asked for in its field.
+            then: ({ password }) => submit(password ?? ''),
+          });
+          if (done === null) check();
+          return;
+        }
+      }
+      await submit(otp.value);
     });
     return panel;
   }
@@ -1548,7 +1583,7 @@ function refundPanel(order) {
     el(`<div class="line">${r.state === 'paid' ? MARK.check : MARK.wallet}<div>
           <span class="lab">${r.state === 'paid' ? 'Буцаалт шилжүүлсэн' : 'Буцаалт'}</span>
           <div class="v"><span class="mono">${money(r.amount_mnt)}</span><small>${escapeHtml(r.bank_name ?? '')} · ${escapeHtml(r.bank_account ?? '')} · ${escapeHtml(r.bank_holder ?? '')}${
-            r.state === 'paid' ? `<br>Шилжүүлсэн ${r.paid_at ? `${dayShort(r.paid_at.slice(0, 10))} ${clockOf(r.paid_at)}` : ''}` : '<br>Basu ажлын өдөрт шилжүүлж, SMS илгээнэ.'
+            r.state === 'paid' ? `<br>Шилжүүлсэн ${r.paid_at ? `${dayShort(r.paid_at.slice(0, 10))} ${clockOf(r.paid_at)}` : ''}` : '<br>Basu ажлын өдөрт шилжүүлж, мэдэгдэл илгээнэ.'
           }</small></div>
         </div></div>`),
   );

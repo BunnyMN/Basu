@@ -260,6 +260,17 @@ export const authReturn = (async () => {
   }
 })();
 
+/**
+ * Facebook's, Instagram's and LINE's own browsers — where a link shared there
+ * opens. Google refuses to sign anybody in inside them, with a page of its
+ * own in English, so the doors leave Google out there, lead with the code by
+ * email, and say where Google does work.
+ */
+export const inAppBrowser = () => typeof navigator !== 'undefined' && /FBAN|FBAV|FB_IAB|Instagram|Line\//.test(navigator.userAgent ?? '');
+
+/** Why Google is not offered in an in-app browser, and where it is. */
+export const IN_APP_GOOGLE = 'Google-ээр нэвтрэх бол Safari эсвэл Chrome-д нээнэ үү.';
+
 /** Google's mark, in Google's colours — its button guidelines ask for exactly this. */
 const GOOGLE_MARK = `<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>`;
 
@@ -309,6 +320,7 @@ export function signInDoors({
         <button class="link" type="button" data-change>Хаяг солих</button>
       </div>
     </div>
+    <p class="cap" data-in-app style="margin:14px 0 0;text-align:center" hidden></p>
     <details class="fold" data-password>
       <summary>Нууц үгээр нэвтрэх, бүртгүүлэх</summary>
       <div class="body">
@@ -631,11 +643,18 @@ export function signInDoors({
   /* only the doors that are open */
   if (!withPassword) $('[data-password]').remove();
   box.ready = authMethods().then((open) => {
-    // Google will not sign anybody in inside an app's web view; the app has its own sheet.
-    const googleOpen = Boolean(open.google) && !shell.present;
+    // Google will not sign anybody in inside an app's web view: Basu's own app
+    // has its own sheet, and Facebook's or Instagram's browser gets Google's
+    // refusal in English — there the code by email leads, and a line says
+    // where Google does work.
+    const refused = Boolean(open.google) && !shell.present && inAppBrowser();
+    const googleOpen = Boolean(open.google) && !shell.present && !refused;
     google.hidden = !googleOpen;
     $('[data-email]').hidden = !open.email;
     $('[data-or]').hidden = !(googleOpen && open.email);
+    const why = $('[data-in-app]');
+    why.textContent = refused ? IN_APP_GOOGLE : '';
+    why.hidden = !refused;
     const passwordAlone = !googleOpen && !open.email;
     byEmail = Boolean(open.email);
     draw();
@@ -759,110 +778,36 @@ export function accountWays({ token }) {
     $('[data-open="email"]').hidden = Boolean(me.email);
     // A first password's code goes to the address, so with none there is nothing to press yet.
     $('[data-open="password"]').hidden = !me.has_password && !me.email;
-    // A wrong or spent code is said under the code field, as on the sign-in doors; any other refusal over the fields.
-    const atCode = (error) => (error instanceof ApiError && /CODE|EXPIRED/.test(error.code ?? '') ? Object.assign(error, { field: 'code' }) : error);
-
     // An address: typed, a code sent to it, the code typed back — two steps of one popup.
-    $('[data-open="email"]').addEventListener('click', () => {
-      let sentTo = null;
-      const first = [
-        { name: 'email', label: 'Имэйл хаяг', type: 'email', autocomplete: 'email', placeholder: 'нэр@gmail.com', required: true, wide: true },
-        ...(me.has_password ? [{ name: 'current', label: 'Одоогийн нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true }] : []),
-      ];
-      void popup({
-        title: 'Имэйл холбох',
-        sub: 'Нууц үгээ мартвал энэ хаягаар сэргээнэ. Хаяг руу 6 оронтой код илгээнэ.',
-        fields: first,
-        submit: 'Код авах',
-        width: 480,
-        steps: 2,
-        onSubmit: async (v, { step }) => {
-          if (!sentTo) {
-            await api('/v1/me/email/code', { method: 'POST', token, body: { email: v.email, password: v.current || undefined } });
-            sentTo = v.email;
-            step({
-              sub: `<b>${popupEsc(sentTo)}</b> хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Спам хавтсаа шалгаарай.`,
-              fields: [{ name: 'code', label: 'Имэйлд ирсэн код', inputmode: 'numeric', autocomplete: 'one-time-code', placeholder: '······', required: true, wide: true, attrs: { maxlength: 6 } }],
-              submit: 'Баталгаажуулах',
-            });
-            return false;
-          }
-          const code = v.code.replace(/\D/g, '');
-          if (code.length !== 6) throw Object.assign(new Error('Имэйлд ирсэн 6 оронтой кодоо бичнэ үү.'), { field: 'code' });
-          await api('/v1/me/email', { method: 'POST', token, body: { email: sentTo, code } }).catch((error) => Promise.reject(atCode(error)));
+    $('[data-open="email"]').addEventListener('click', () =>
+      void emailPopup({
+        token,
+        hasPassword: me.has_password,
+        then: async () => {
           toast('Имэйл холбогдлоо.', 'good');
           await draw();
         },
-      });
-    });
+      }),
+    );
 
     // A password: changed knowing the old one. The first has no old one to
-    // know, so it is two steps of one popup, like the address above: a code
-    // to the address on the account, then the code and the new password.
+    // know: a code to the address on the account, then the code and the new
+    // password (passwordPopup, below — the refund's and the payout's too).
     $('[data-open="password"]').addEventListener('click', () => {
-      const nextField = { name: 'next', label: 'Шинэ нууц үг', type: 'password', autocomplete: 'new-password', placeholder: 'Дор хаяж 8 тэмдэгт', required: true, wide: true };
-      const saved = async (revoked) => {
-        toast(revoked ? `Нууц үг хадгалагдлаа. Өөр ${revoked} төхөөрөмжөөс гаргалаа.` : 'Нууц үг хадгалагдлаа.', 'good');
-        await draw();
-      };
-      if (me.has_password) {
-        void popup({
-          title: 'Нууц үг солих',
-          sub: 'Бусад төхөөрөмж дээрх нэвтрэлт хаагдана, энэ хэвээр үлдэнэ.',
-          width: 480,
-          fields: [{ name: 'current', label: 'Одоогийн нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true }, nextField],
-          onSubmit: async (v) => {
-            if (v.next.length < 8) throw Object.assign(new Error('Нууц үг дор хаяж 8 тэмдэгт байх ёстой.'), { field: 'next' });
-            const { revoked } = await api('/v1/me/password', { method: 'POST', token, body: { current: v.current, next: v.next } });
-            await saved(revoked);
-          },
-        });
+      if (!me.has_password) {
+        void passwordPopup({ token, email: me.email, then: () => draw() });
         return;
       }
-      let sentTo = null;
-      const sentSub = () => `<b>${popupEsc(sentTo)}</b> хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Спам хавтсаа шалгаарай.`;
       void popup({
-        title: 'Нууц үг тохируулах',
-        sub: `Таныг мөн гэдгийг батлах 6 оронтой код <b>${popupEsc(me.email)}</b> хаяг руу илгээнэ. Бусад төхөөрөмж дээрх нэвтрэлт хаагдана, энэ хэвээр үлдэнэ.`,
-        submit: 'Код авах',
+        title: 'Нууц үг солих',
+        sub: 'Бусад төхөөрөмж дээрх нэвтрэлт хаагдана, энэ хэвээр үлдэнэ.',
         width: 480,
-        steps: 2,
-        onSubmit: async (v, { step, el, say }) => {
-          if (!sentTo) {
-            const sent = await api('/v1/me/password/code', { method: 'POST', token });
-            sentTo = sent.to;
-            step({
-              sub: sentSub(),
-              fields: [
-                { name: 'code', label: 'Имэйлд ирсэн код', inputmode: 'numeric', autocomplete: 'one-time-code', placeholder: '······', required: true, wide: true, attrs: { maxlength: 6 } },
-                nextField,
-                { type: 'note', html: '<button class="btn" data-v="link" type="button" data-resend>Код дахин авах</button>' },
-              ],
-              submit: 'Тохируулах',
-            });
-            // A letter that never came, or a code spent on three wrong tries:
-            // another one, here, rather than closing the popup to start over.
-            const again = el.querySelector('[data-resend]');
-            again.addEventListener('click', async () => {
-              if (again.hasAttribute('data-busy')) return;
-              again.setAttribute('data-busy', '');
-              try {
-                sentTo = (await api('/v1/me/password/code', { method: 'POST', token })).to;
-                el.querySelector('[name="code"]').value = '';
-                step({ sub: sentSub() });
-              } catch (error) {
-                say(error?.message ?? 'Код илгээж чадсангүй.');
-              } finally {
-                again.removeAttribute('data-busy');
-              }
-            });
-            return false;
-          }
-          const code = v.code.replace(/\D/g, '');
-          if (code.length !== 6) throw Object.assign(new Error('Имэйлд ирсэн 6 оронтой кодоо бичнэ үү.'), { field: 'code' });
-          if (v.next.length < 8) throw Object.assign(new Error('Нууц үг дор хаяж 8 тэмдэгт байх ёстой.'), { field: 'next' });
-          const { revoked } = await api('/v1/me/password', { method: 'POST', token, body: { next: v.next, code } }).catch((error) => Promise.reject(atCode(error)));
-          await saved(revoked);
+        fields: [{ name: 'current', label: 'Одоогийн нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true }, NEW_PASSWORD],
+        onSubmit: async (v) => {
+          if (v.next.length < 8) throw Object.assign(new Error(PASSWORD_TOO_SHORT), { field: 'next' });
+          const { revoked } = await api('/v1/me/password', { method: 'POST', token, body: { current: v.current, next: v.next } });
+          toast(passwordSaved(revoked), 'good');
+          await draw();
         },
       });
     });
@@ -870,6 +815,128 @@ export function accountWays({ token }) {
 
   box.ready = draw();
   return box;
+}
+
+/** The field a new password is chosen in, wherever one is. */
+const NEW_PASSWORD = { name: 'next', label: 'Шинэ нууц үг', type: 'password', autocomplete: 'new-password', placeholder: 'Дор хаяж 8 тэмдэгт', required: true, wide: true };
+const PASSWORD_TOO_SHORT = 'Нууц үг дор хаяж 8 тэмдэгт байх ёстой.';
+/** The field a code from a letter is typed in. */
+const LETTER_CODE = { name: 'code', label: 'Имэйлд ирсэн код', inputmode: 'numeric', autocomplete: 'one-time-code', placeholder: '······', required: true, wide: true, attrs: { maxlength: 6 } };
+const LETTER_CODE_SHORT = 'Имэйлд ирсэн 6 оронтой кодоо бичнэ үү.';
+/** Where a code went, said on the step that asks for it. */
+const letterSent = (address) => `<b>${popupEsc(address)}</b> хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Спам хавтсаа шалгаарай.`;
+/** A password kept: said, with how many other devices it signed out. */
+const passwordSaved = (revoked) => (revoked ? `Нууц үг хадгалагдлаа. Өөр ${revoked} төхөөрөмжөөс гаргалаа.` : 'Нууц үг хадгалагдлаа.');
+/** A wrong or spent code is said under the code field, as on the sign-in doors; any other refusal over the fields. */
+const atLetterCode = (error) => (error instanceof ApiError && /CODE|EXPIRED/.test(error.code ?? '') ? Object.assign(error, { field: 'code' }) : error);
+
+/**
+ * An address for the account: typed — with the password, where there is
+ * one, since a session left open is no proof of who may add a way back in —
+ * a code sent to it, and the code typed back. Two steps of one popup.
+ * `then(address)` is the next step once it is linked. Resolves with what it
+ * returned (or the address), or null when the popup was closed first.
+ */
+async function emailPopup({ token, hasPassword = false, then }) {
+  let sent = null;
+  const linked = await popup({
+    title: 'Имэйл холбох',
+    sub: 'Нууц үгээ мартвал энэ хаягаар сэргээнэ. Хаяг руу 6 оронтой код илгээнэ.',
+    fields: [
+      { name: 'email', label: 'Имэйл хаяг', type: 'email', autocomplete: 'email', placeholder: 'нэр@gmail.com', required: true, wide: true },
+      ...(hasPassword ? [{ name: 'current', label: 'Одоогийн нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true }] : []),
+    ],
+    submit: 'Код авах',
+    width: 480,
+    steps: 2,
+    onSubmit: async (v, { step }) => {
+      if (!sent) {
+        await api('/v1/me/email/code', { method: 'POST', token, body: { email: v.email, password: v.current || undefined } });
+        sent = v.email;
+        step({ sub: letterSent(sent), fields: [LETTER_CODE], submit: 'Баталгаажуулах' });
+        return false;
+      }
+      const code = v.code.replace(/\D/g, '');
+      if (code.length !== 6) throw Object.assign(new Error(LETTER_CODE_SHORT), { field: 'code' });
+      await api('/v1/me/email', { method: 'POST', token, body: { email: sent, code } }).catch((error) => Promise.reject(atLetterCode(error)));
+      return sent;
+    },
+  });
+  if (!linked) return null;
+  return then ? then(linked) : linked;
+}
+
+/**
+ * A first password, for an account made by an address, Google or Apple, set
+ * where it is wanted: on the account's page, and in front of a bank account
+ * that money is about to go to, which is confirmed with it — the refund's on
+ * /orders and in the app, the payouts' on the supplier's screen. The session
+ * looking at the page is no proof of who holds the account; the inbox is.
+ * So: two steps of one popup, a code to the address on the account, then the
+ * code and the new password. Every other device is signed out; this stays.
+ *
+ * `email` is the address on the account, said as where the code goes; an
+ * account with none adds one first (emailPopup) and goes on from there.
+ * `why` is the first step's line when the password is for something. `then({
+ * password, revoked })` is the next step, once the popup has closed with the
+ * password kept: the bank account's popup, handed the password just chosen
+ * so it is not asked for twice, or the page drawn again. An account that
+ * turns out to have a password by now (set in another tab) skips straight to
+ * it, with `password: null`. Resolves with what `then` returned (or what it
+ * would have been handed), or null when the popup was closed first.
+ */
+export async function passwordPopup({ token, email = null, why = '', then } = {}) {
+  if (!email) return emailPopup({ token, then: (address) => passwordPopup({ token, email: address, why, then }) });
+  let sent = null;
+  const kept = await popup({
+    title: 'Нууц үг тохируулах',
+    sub: `Таныг мөн гэдгийг батлах 6 оронтой код <b>${popupEsc(email)}</b> хаяг руу илгээнэ. Бусад төхөөрөмж дээрх нэвтрэлт хаагдана, энэ хэвээр үлдэнэ.`,
+    fields: [{ type: 'note', text: why || 'Дараагийн алхамд кодоо оруулж, шинэ нууц үгээ сонгоно.' }],
+    submit: 'Код авах',
+    width: 480,
+    steps: 2,
+    onSubmit: async (v, { step, el, say }) => {
+      if (!sent) {
+        const asked = await api('/v1/me/password/code', { method: 'POST', token }).catch((error) => {
+          if (error instanceof ApiError && error.code === 'PASSWORD_SET') return null;
+          throw error;
+        });
+        if (!asked) return { password: null, revoked: 0, already: true };
+        sent = asked.to;
+        step({
+          sub: letterSent(sent),
+          fields: [LETTER_CODE, NEW_PASSWORD, { type: 'note', html: '<button class="link" type="button" data-resend>Код дахин авах</button>' }],
+          submit: 'Тохируулах',
+        });
+        // A letter that never came, or a code spent on three wrong tries:
+        // another one, here, rather than closing the popup to start over.
+        const again = el.querySelector('[data-resend]');
+        again.addEventListener('click', async () => {
+          if (again.hasAttribute('data-busy')) return;
+          again.setAttribute('data-busy', '');
+          try {
+            sent = (await api('/v1/me/password/code', { method: 'POST', token })).to;
+            el.querySelector('[name="code"]').value = '';
+            step({ sub: letterSent(sent) });
+          } catch (error) {
+            say(error?.message ?? 'Код илгээж чадсангүй.');
+          } finally {
+            again.removeAttribute('data-busy');
+          }
+        });
+        return false;
+      }
+      const code = v.code.replace(/\D/g, '');
+      if (code.length !== 6) throw Object.assign(new Error(LETTER_CODE_SHORT), { field: 'code' });
+      if (v.next.length < 8) throw Object.assign(new Error(PASSWORD_TOO_SHORT), { field: 'next' });
+      const { revoked } = await api('/v1/me/password', { method: 'POST', token, body: { next: v.next, code } }).catch((error) => Promise.reject(atLetterCode(error)));
+      return { password: v.next, revoked };
+    },
+  });
+  if (!kept) return null;
+  if (!kept.already) toast(passwordSaved(kept.revoked), 'good');
+  const handed = { password: kept.password, revoked: kept.revoked };
+  return then ? then(handed) : handed;
 }
 
 /* ── popups ────────────────────────────────────────────────────────── */
@@ -1146,6 +1213,11 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
     const say = (message) => {
       errorBox.hidden = !message;
       errorBox.querySelector('span').textContent = message ?? '';
+      // Said over the fields, which a long form has scrolled away from the
+      // button that was pressed: brought into view, or it is said to nobody.
+      if (!message || typeof errorBox.scrollIntoView !== 'function') return;
+      const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      errorBox.scrollIntoView({ block: 'nearest', behavior: still ? 'auto' : 'smooth' });
     };
     /** The control a field's error belongs to: the named input, or the first of a group. */
     const control = (name) => [...sheet.querySelectorAll('.fields [name]')].find((node) => node.name === name) ?? null;
@@ -1936,8 +2008,11 @@ export const IDESH_STATE = {
 
 /**
  * The states an идэш is still going on in: paid for and not yet in the
- * guest's hands. What every «Идэвхтэй» holds — /home's and /orders' alike;
- * handed over, cancelled and refunded are done.
+ * guest's hands — the order's page looks again now and then, and shows the
+ * handover code. Handed over, cancelled and refunded are over. A guest's
+ * «Идэвхтэй» on /home and /orders also keeps a cancelled order whose money
+ * is still on its way back, as the server's own live list does (site.js
+ * stillGoing).
  */
 export const IDESH_LIVE = ['PAID', 'PREPARING', 'READY', 'DISPATCHED'];
 
@@ -1948,6 +2023,27 @@ export const KIND = {
   beef: 'Үхэр',
   horse: 'Адуу',
 };
+
+/**
+ * Mongolia's banks, the biggest first: what a guest picks the refund's bank
+ * from on /orders, and what the supplier's payout account offers as they
+ * type. One list, so a bank is not on one page and missing from the next; a
+ * bank that is not here is typed in («Бусад банк»).
+ */
+export const BANK_NAMES = [
+  'Хаан банк',
+  'Голомт банк',
+  'Худалдаа хөгжлийн банк',
+  'Хас банк',
+  'Төрийн банк',
+  'Капитрон банк',
+  'Ариг банк',
+  'Богд банк',
+  'М банк',
+  'Тээвэр хөгжлийн банк',
+  'Үндэсний хөрөнгө оруулалтын банк',
+  'Чингис хаан банк',
+];
 
 export const mnt = (value) => `${Number(value).toLocaleString('mn-MN')}₮`;
 

@@ -57,6 +57,7 @@ a.h-row:active{background:var(--surface-2)}
 </style>
 </head>
 <body>
+<header class="s-bar" data-static><div class="s-wrap"><a class="s-word" href="/">Basu</a><nav class="s-nav" aria-label="Цэс"><a href="/home" aria-current="page">Нүүр</a><a href="/shop">Зах</a><a href="/orders">Миний захиалга</a><a href="/dashboard">Бизнест</a></nav><div class="s-right"></div></div></header>
 <main class="s-main">
   <div class="s-wrap">
     <section class="s-head"><h1 id="hi">Миний Basu</h1><p class="h-hello">Өнөөдөр юу хийх вэ?</p></section>
@@ -70,8 +71,8 @@ a.h-row:active{background:var(--surface-2)}
 </main>
 
 <script type="module">
-import { api, store, dayShort, IDESH_STATE, IDESH_LIVE } from '/api.js';
-import { mountFrame, esc, el, loginUrl, siteEmpty, howToBuy, statePill } from '/site.js';
+import { api, store, dayShort, IDESH_STATE } from '/api.js';
+import { mountFrame, esc, el, loginUrl, siteEmpty, howToBuy, statePill, refundPill, meatPhoto, stillGoing } from '/site.js';
 
 // The header and the foot are drawn at once; who is signed in comes after — the tiles do not wait for it.
 const framed = mountFrame('home');
@@ -126,7 +127,7 @@ if (token) {
   );
 }
 // Asked beside who it is, not after: the orders do not wait for the name either.
-const asked = token ? api('/v1/idesh', { token }).catch(() => null) : null;
+const asked = token ? stillGoing() : null;
 const person = await framed;
 if (person?.display_name) $('hi').textContent = `Сайн байна уу, ${person.display_name}`;
 
@@ -140,20 +141,19 @@ if (!token || !person) {
     })
     .catch(() => {});
 
-  // What of theirs is going on: the meat paid for and not yet in their hands — what «Миний захиалга» calls «Идэвхтэй».
-  // Handed over and cancelled are done; they are on «Миний захиалга» under «Дууссан».
-  const answer = await asked;
-  const going = (answer?.orders ?? []).filter((o) => IDESH_LIVE.includes(o.state));
+  // What of theirs is going on — what «Миний захиалга» calls «Идэвхтэй»: the meat paid for and not yet in
+  // their hands, and a cancelled order whose money is still on its way back, saying what it waits for.
+  // Handed over, and refunded, are done; they are on «Миний захиалга» under «Дууссан».
+  const going = await asked;
   if (going.length) {
-    const PHOTO = (kind) => `/brand/meat/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}.webp`;
     // The day in the corner says what it is the day of.
     const dayWord = (o) => (o.receive === 'delivery' ? 'хүргэх' : 'авах');
     $('live-list').replaceChildren(
       ...going.map((o) =>
         el(`<a class="h-row" href="/orders/${o.id}" data-order="${o.id}">
-              <img src="${PHOTO(o.kind)}" alt="" loading="lazy" width="64" height="48">
+              <img src="${meatPhoto(o.kind)}" alt="" loading="lazy" width="64" height="48">
               <span><b>${esc(o.title)} × ${o.qty}</b><small><span class="mono">№${esc(o.code)}</span> · ${esc(o.supplier.name)}</small></span>
-              <span class="end"><span class="h-when">${dayShort(o.receive_on)}<small>${dayWord(o)}</small></span>${statePill(o.state, IDESH_STATE[o.state] ?? o.state)}</span>
+              <span class="end"><span class="h-when">${dayShort(o.receive_on)}<small>${dayWord(o)}</small></span>${o.refund ? refundPill(o.refund) : statePill(o.state, IDESH_STATE[o.state] ?? o.state)}</span>
             </a>`),
       ),
     );
