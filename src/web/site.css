@@ -84,12 +84,13 @@ input.s-input[type="date"]{display:flex;align-items:center}
 .s-bar{position:sticky;top:0;z-index:var(--z-bar);padding-top:var(--safe-t);background:rgba(255,255,255,.92);background:color-mix(in srgb,var(--surface) 92%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line)}
 .s-bar > .s-wrap{display:flex;align-items:center;gap:36px;min-height:var(--s-bar)}
 .s-word{display:inline-flex;align-items:center;min-height:44px;font-size:1.375rem;font-weight:600;letter-spacing:-.035em;color:var(--accent-ink);text-decoration:none}
-.s-nav{display:flex;align-self:stretch;gap:28px}
-.s-nav a{position:relative;display:flex;align-items:center;font-size:.9375rem;font-weight:500;color:var(--ink-2);text-decoration:none}
+/* the links keep to one line each, whatever name is in the corner: the corner gives way («…») instead */
+.s-nav{display:flex;align-self:stretch;flex:none;gap:28px}
+.s-nav a{position:relative;display:flex;align-items:center;font-size:.9375rem;font-weight:500;color:var(--ink-2);text-decoration:none;white-space:nowrap}
 .s-nav a[aria-current="page"]{color:var(--accent-ink);font-weight:600}
 .s-nav a[aria-current="page"]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:2px;background:var(--accent)}
 @media (hover:hover){.s-nav a:hover{color:var(--ink)}}
-.s-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.s-right{margin-left:auto;display:flex;align-items:center;gap:8px;min-width:0}
 .s-burger{display:none;width:44px;height:44px;margin-right:-8px;border:0;border-radius:12px;background:none;color:var(--ink);cursor:pointer}
 .s-burger svg{width:24px;height:24px}
 .s-burger .x{display:none}
@@ -111,8 +112,8 @@ input.s-input[type="date"]{display:flex;align-items:center}
 @keyframes s-drop{from{opacity:0;transform:translateY(-6px)}}
 
 /* the account: a name in the corner, and a menu under it */
-.s-acct{position:relative}
-.s-acct > button{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:4px 12px 4px 4px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font:inherit;font-size:.9375rem;font-weight:500;color:var(--ink);cursor:pointer;max-width:260px}
+.s-acct{position:relative;min-width:0}
+.s-acct > button{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:4px 12px 4px 4px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font:inherit;font-size:.9375rem;font-weight:500;color:var(--ink);cursor:pointer;max-width:min(260px,100%)}
 .s-acct > button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .s-acct > button svg{width:16px;height:16px;flex:none;color:var(--ink-3)}
 .s-ini{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--on-accent);font-size:.8125rem;font-style:normal;font-weight:600;text-transform:uppercase}
