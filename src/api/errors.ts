@@ -153,7 +153,9 @@ const LEDGER_ERRORS: Record<LedgerError['code'], Spec> = {
     // Says what to do about it, because there is something to do about it.
     mn: 'Түрийвчинд хүрэлцэхгүй байна. Цэнэглээд дахин оролдоно уу.',
   },
-  PAYMENTS_CLOSED: { status: 503, mn: 'Төлбөр одоогоор хаалттай байна. Удахгүй нээгдэнэ.' },
+  // What is true today, and nothing about when: a promise of «soon» is one
+  // nobody here can keep on the day it is read.
+  PAYMENTS_CLOSED: { status: 503, mn: 'Онлайн төлбөр одоогоор хаалттай байна.' },
   NOT_PAID_YET: { status: 409, mn: 'Төлбөр хараахан хийгдээгүй байна. Төлсний дараа дахин шалгана уу.' },
   TOPUP_FAILED: {
     status: 402,

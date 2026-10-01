@@ -5,7 +5,7 @@ import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
 import { reconcileLedger } from '../platform/ledger/index.js';
-import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
+import { ClosedPaymentProvider, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { seedRestaurant, truncateAll, type SeededRestaurant } from '../test/seed.js';
 
 /**
@@ -166,6 +166,23 @@ describe('the wallet', () => {
         payload: { amount_mnt: amount },
       });
       expect(response.statusCode, `${amount}`).toBe(400);
+    }
+  });
+
+  it('says plainly that paying online is closed where no provider is set, and promises no day', async () => {
+    const closed = await buildServer({ ...ctx, payments: new ClosedPaymentProvider() });
+    try {
+      const token = await signIn();
+      const refused = await closed.inject({
+        method: 'POST',
+        url: '/v1/wallet/topup',
+        headers: auth(token),
+        payload: { amount_mnt: 20_000 },
+      });
+      expect(refused.statusCode).toBe(503);
+      expect(refused.json().error).toMatchObject({ code: 'PAYMENTS_CLOSED', message_mn: 'Онлайн төлбөр одоогоор хаалттай байна.' });
+    } finally {
+      await closed.close();
     }
   });
 
