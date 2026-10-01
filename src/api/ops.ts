@@ -260,6 +260,8 @@ const shape = (s: SupplierRow) => ({
   bank_verified: s.bankVerified,
   bank_changed_at: s.bankChangedAt?.toISOString() ?? null,
   listings: s.listings,
+  // The business this supplier belongs to: the desk steps from one to the other by it.
+  org_id: s.orgId,
 });
 
 
