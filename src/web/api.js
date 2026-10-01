@@ -301,7 +301,8 @@ export function signInDoors({
     <div data-email hidden>
       <label class="field"><span>Имэйл хаяг</span><input name="email" type="email" inputmode="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com"></label>
       <p class="cap" data-email-hint></p>
-      <div data-code hidden><input name="code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" aria-label="Имэйлд ирсэн код"></div>
+      <div class="field" data-code hidden><input name="code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" aria-label="Имэйлд ирсэн код"></div>
+      <p class="ways-say" data-email-say role="alert" hidden></p>
       <button class="btn" data-v="primary" data-size="lg" type="button" data-email-go>Код авах</button>
       <div class="again" data-again-row hidden>
         <button class="link" type="button" data-resend>Код дахин авах</button>
@@ -313,9 +314,10 @@ export function signInDoors({
       <div class="body">
         <label class="field" data-f="name" hidden><span>Нэр</span><input name="name" autocomplete="name" placeholder="Таны нэр"></label>
         <label class="field" data-f="login"><span data-login-label>Имэйл эсвэл утас</span><input name="login" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com · 8811 2233"></label>
-        <div data-f="code" hidden><input name="pwcode" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" aria-label="Имэйлд ирсэн код"></div>
+        <div class="field" data-f="code" hidden><input name="pwcode" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="······" aria-label="Имэйлд ирсэн код"></div>
         <label class="field" data-f="password"><span data-password-label>Нууц үг</span><input name="password" type="password" autocomplete="current-password" placeholder="Дор хаяж 8 тэмдэгт"></label>
         <p class="cap" data-pw-hint hidden></p>
+        <p class="ways-say" data-pw-say role="alert" hidden></p>
         <button class="btn" data-size="lg" type="button" data-go>Нэвтрэх</button>
         <div class="again">
           <button class="link" type="button" data-to-a></button>
@@ -328,29 +330,56 @@ export function signInDoors({
     if (keep) takeSession(token);
     onToken(token);
   };
+  /*
+   * Trouble is said where it happened: a field that is empty or wrong says so
+   * under itself; a refusal that is about nothing typed — a dropped
+   * connection, too many tries — over the button that will try again. Never
+   * in a toast at the far edge of the screen, and never in the browser's
+   * English. Typing again takes the word back.
+   */
+  const sayer = (line) => (message) => {
+    line.textContent = message ?? '';
+    line.hidden = !message;
+  };
+  const mends = (...inputs) => {
+    for (const input of inputs) input.addEventListener('input', () => input.getAttribute('aria-invalid') === 'true' && fieldError(input, null));
+  };
 
-  /* Google: a plain link, so the browser does the leaving. */
+  /* Google: a plain link, so the browser does the leaving. The press shows at
+     once (the trip to Google takes a moment), and a page brought back by the
+     browser's back button is not left turning. */
   const google = $('[data-google]');
   google.href = `/v1/auth/google/start?return=${encodeURIComponent(returnTo)}`;
+  google.addEventListener('click', (e) => {
+    if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey) setBusy(google);
+  });
+  addEventListener('pageshow', () => setBusy(google, false));
 
   /* a code by email */
   const email = $('[name="email"]');
   const code = $('[name="code"]');
   const emailGo = $('[data-email-go]');
   const hint = $('[data-email-hint]');
+  const emailSay = sayer($('[data-email-say]'));
   hint.textContent = emailHint;
   let sentTo = null;
+  mends(email, code);
 
   const askForCode = async () => {
     const address = email.value.trim();
+    emailSay(null);
     if (!address) {
+      fieldError(email, 'Имэйл хаягаа бичнэ үү.');
       email.focus();
       return;
     }
-    emailGo.setAttribute('data-busy', '');
+    if (emailGo.hasAttribute('data-busy')) return;
+    setBusy(emailGo);
     try {
       await api('/v1/auth/email/start', { method: 'POST', body: { email: address } });
       sentTo = address;
+      fieldError(email, null);
+      fieldError(code, null);
       $('[data-code]').hidden = false;
       $('[data-again-row]').hidden = false;
       hint.textContent = `${address} хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Spam хавтсаа шалгаарай.`;
@@ -358,27 +387,33 @@ export function signInDoors({
       code.value = '';
       code.focus();
     } catch (error) {
-      toast(error.message, 'bad');
+      // The server's word is about the address; a dropped line is about nothing typed.
+      if (error instanceof ApiError) fieldError(email, error.message);
+      else emailSay(whatWentWrong(error));
     } finally {
-      emailGo.removeAttribute('data-busy');
+      setBusy(emailGo, false);
     }
   };
 
   const checkCode = async () => {
     const typed = code.value.replace(/\D/g, '');
+    emailSay(null);
     if (typed.length !== 6) {
+      fieldError(code, 'Имэйлд ирсэн 6 оронтой кодоо бичнэ үү.');
       code.focus();
       return;
     }
-    emailGo.setAttribute('data-busy', '');
+    if (emailGo.hasAttribute('data-busy')) return;
+    setBusy(emailGo);
     try {
       const { token } = await api('/v1/auth/email/verify', { method: 'POST', body: { email: sentTo, code: typed, device } });
       done(token);
     } catch (error) {
-      toast(error.message, 'bad');
+      if (error instanceof ApiError) fieldError(code, error.message);
+      else emailSay(whatWentWrong(error));
       code.select();
     } finally {
-      emailGo.removeAttribute('data-busy');
+      setBusy(emailGo, false);
     }
   };
 
@@ -386,6 +421,8 @@ export function signInDoors({
     sentTo = null;
     $('[data-code]').hidden = true;
     $('[data-again-row]').hidden = true;
+    fieldError(code, null);
+    emailSay(null);
     hint.textContent = emailHint;
     emailGo.textContent = 'Код авах';
   };
@@ -472,26 +509,42 @@ export function signInDoors({
     }
   };
 
+  const pwSay = sayer($('[data-pw-say]'));
+  mends(pw.name, pw.login, pw.code, pw.password);
+  /** A field that must be filled and is not, said under it; true when it was. */
+  const missing = (input, message = 'Бөглөнө үү.') => {
+    fieldError(input, message);
+    input.focus();
+    return true;
+  };
+  const SHORT = 'Нууц үг дор хаяж 8 тэмдэгт байх ёстой.';
+
   const turnTo = (next) => {
     face = next;
     step = 'ask';
     codeFor = null;
     pw.code.value = '';
     pw.password.value = '';
+    for (const input of [pw.name, pw.login, pw.code, pw.password]) fieldError(input, null);
+    pwSay(null);
     draw();
     (face === 'up' ? pw.name : pw.login).focus();
   };
 
   const busy = async (work) => {
     if (pw.go.hasAttribute('data-busy')) return;
-    pw.go.setAttribute('data-busy', '');
+    setBusy(pw.go);
+    pwSay(null);
     try {
       await work();
     } catch (error) {
-      toast(error.message, 'bad');
-      if (step === 'code' && error.code && /CODE|EXPIRED/.test(error.code)) pw.code.select();
+      // A wrong or spent code is the code field's; any other refusal is said over the button.
+      if (step === 'code' && error.code && /CODE|EXPIRED/.test(error.code)) {
+        fieldError(pw.code, error.message);
+        pw.code.select();
+      } else pwSay(whatWentWrong(error));
     } finally {
-      pw.go.removeAttribute('data-busy');
+      setBusy(pw.go, false);
     }
   };
 
@@ -499,11 +552,8 @@ export function signInDoors({
   const askForPasswordCode = () =>
     busy(async () => {
       const login = pw.login.value.trim();
-      if (!login) return pw.login.focus();
-      if (face === 'up' && pw.password.value.length < 8) {
-        toast('Нууц үг дор хаяж 8 тэмдэгт байх ёстой.', 'bad');
-        return pw.password.focus();
-      }
+      if (!login) return missing(pw.login);
+      if (face === 'up' && pw.password.value.length < 8) return missing(pw.password, SHORT);
       const { to } = await api('/v1/auth/password/code', {
         method: 'POST',
         body: { login, purpose: face === 'up' ? 'sign_up' : 'reset' },
@@ -520,11 +570,8 @@ export function signInDoors({
   const setPassword = () =>
     busy(async () => {
       const typed = pw.code.value.replace(/\D/g, '');
-      if (typed.length !== 6) return pw.code.focus();
-      if (pw.password.value.length < 8) {
-        toast('Нууц үг дор хаяж 8 тэмдэгт байх ёстой.', 'bad');
-        return pw.password.focus();
-      }
+      if (typed.length !== 6) return missing(pw.code, 'Имэйлд ирсэн 6 оронтой кодоо бичнэ үү.');
+      if (pw.password.value.length < 8) return missing(pw.password, SHORT);
       const { token, created } = await api('/v1/auth/password', {
         method: 'POST',
         body: { login: codeFor, code: typed, password: pw.password.value, name: pw.name.value.trim() || undefined, device },
@@ -537,8 +584,8 @@ export function signInDoors({
   const signIn = () =>
     busy(async () => {
       const login = pw.login.value.trim();
-      if (!login) return pw.login.focus();
-      if (!pw.password.value) return pw.password.focus();
+      if (!login) return missing(pw.login);
+      if (!pw.password.value) return missing(pw.password);
       const { token } = await api('/v1/auth/login', { method: 'POST', body: { login, password: pw.password.value, device } });
       done(token);
     });
@@ -627,15 +674,24 @@ export function signInSheet(reason = 'Үргэлжлүүлэхийн тулд н
     sheet.querySelector('header .sub').textContent = reason;
 
     let settled = false;
+    const opener = document.activeElement;
+    // Esc closes it, as it closes a popup; the focus goes back to what opened it.
+    const onKey = (e) => {
+      if (e.key !== 'Escape' || !sheet.hasAttribute('data-open')) return;
+      e.preventDefault();
+      close(null);
+    };
     const close = (token) => {
       if (settled) return;
       settled = true;
+      document.removeEventListener('keydown', onKey, true);
       sheet.removeAttribute('data-open');
       scrim.removeAttribute('data-open');
       setTimeout(() => {
         sheet.remove();
         scrim.remove();
       }, 260);
+      if (!token && opener?.isConnected) opener.focus?.();
       if (token) resolve(token);
       else reject(new ApiError(401, { error: { code: 'SIGN_IN', message_mn: 'Нэвтрээгүй байна.' } }));
     };
@@ -645,6 +701,7 @@ export function signInSheet(reason = 'Үргэлжлүүлэхийн тулд н
     requestAnimationFrame(() => sheet.setAttribute('data-open', ''));
     sheet.querySelector('.x').addEventListener('click', () => close(null));
     scrim.addEventListener('click', () => close(null));
+    document.addEventListener('keydown', onKey, true);
   });
 }
 
@@ -713,19 +770,20 @@ export function accountWays({ token }) {
         fields: first,
         submit: 'Код авах',
         width: 480,
+        steps: 2,
         onSubmit: async (v, { step }) => {
           if (!sentTo) {
             await api('/v1/me/email/code', { method: 'POST', token, body: { email: v.email, password: v.current || undefined } });
             sentTo = v.email;
             step({
               sub: `<b>${popupEsc(sentTo)}</b> хаяг руу код илгээлээ. 10 минут хүчинтэй — ирэхгүй бол Spam хавтсаа шалгаарай.`,
-              fields: [{ name: 'code', label: 'Имэйлд ирсэн код', inputmode: 'numeric', autocomplete: 'one-time-code', placeholder: '······', required: true, wide: true }],
+              fields: [{ name: 'code', label: 'Имэйлд ирсэн код', inputmode: 'numeric', autocomplete: 'one-time-code', placeholder: '······', required: true, wide: true, attrs: { maxlength: 6 } }],
               submit: 'Баталгаажуулах',
             });
             return false;
           }
           const code = v.code.replace(/\D/g, '');
-          if (code.length !== 6) throw new Error('Код 6 оронтой.');
+          if (code.length !== 6) throw Object.assign(new Error('Имэйлд ирсэн 6 оронтой кодоо бичнэ үү.'), { field: 'code' });
           await api('/v1/me/email', { method: 'POST', token, body: { email: sentTo, code } });
           toast('Имэйл холбогдлоо.', 'good');
           await draw();
@@ -749,7 +807,7 @@ export function accountWays({ token }) {
           width: 480,
           fields: [{ name: 'current', label: 'Одоогийн нууц үг', type: 'password', autocomplete: 'current-password', required: true, wide: true }, nextField],
           onSubmit: async (v) => {
-            if (v.next.length < 8) throw new Error('Нууц үг дор хаяж 8 тэмдэгт байх ёстой.');
+            if (v.next.length < 8) throw Object.assign(new Error('Нууц үг дор хаяж 8 тэмдэгт байх ёстой.'), { field: 'next' });
             const { revoked } = await api('/v1/me/password', { method: 'POST', token, body: { current: v.current, next: v.next } });
             await saved(revoked);
           },
@@ -763,6 +821,7 @@ export function accountWays({ token }) {
         sub: `Таныг мөн гэдгийг батлах 6 оронтой код <b>${popupEsc(me.email)}</b> хаяг руу илгээнэ. Бусад төхөөрөмж дээрх нэвтрэлт хаагдана, энэ хэвээр үлдэнэ.`,
         submit: 'Код авах',
         width: 480,
+        steps: 2,
         onSubmit: async (v, { step, el, say }) => {
           if (!sentTo) {
             const sent = await api('/v1/me/password/code', { method: 'POST', token });
@@ -770,7 +829,7 @@ export function accountWays({ token }) {
             step({
               sub: sentSub(),
               fields: [
-                { name: 'code', label: 'Имэйлд ирсэн код', inputmode: 'numeric', autocomplete: 'one-time-code', placeholder: '······', required: true, wide: true },
+                { name: 'code', label: 'Имэйлд ирсэн код', inputmode: 'numeric', autocomplete: 'one-time-code', placeholder: '······', required: true, wide: true, attrs: { maxlength: 6 } },
                 nextField,
                 { type: 'note', html: '<button class="btn" data-v="link" type="button" data-resend>Код дахин авах</button>' },
               ],
@@ -795,8 +854,8 @@ export function accountWays({ token }) {
             return false;
           }
           const code = v.code.replace(/\D/g, '');
-          if (code.length !== 6) throw new Error('Код 6 оронтой.');
-          if (v.next.length < 8) throw new Error('Нууц үг дор хаяж 8 тэмдэгт байх ёстой.');
+          if (code.length !== 6) throw Object.assign(new Error('Имэйлд ирсэн 6 оронтой кодоо бичнэ үү.'), { field: 'code' });
+          if (v.next.length < 8) throw Object.assign(new Error('Нууц үг дор хаяж 8 тэмдэгт байх ёстой.'), { field: 'next' });
           const { revoked } = await api('/v1/me/password', { method: 'POST', token, body: { next: v.next, code } });
           await saved(revoked);
         },
@@ -815,11 +874,19 @@ const popupEsc = (value) =>
   String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const POPUP_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 
+/** Attributes a field asks for beyond the usual — maxlength, min, step, pattern — each escaped. */
+const popupAttrs = (attrs = {}) =>
+  Object.entries(attrs)
+    .filter(([, v]) => v !== null && v !== undefined && v !== false)
+    .map(([k, v]) => (v === true ? ` ${popupEsc(k)}` : ` ${popupEsc(k)}="${popupEsc(v)}"`))
+    .join('');
+
 /** One field of a popup's form, as the design system draws a field. */
 function popupField(f, n) {
   const id = `popup-${n}-${f.name ?? Math.random().toString(36).slice(2)}`;
   const wide = f.wide || ['textarea', 'checks', 'icons', 'static', 'note', 'pick'].includes(f.type) ? ' data-wide' : '';
-  const hint = f.hint ? `<small>${popupEsc(f.hint)}</small>` : '';
+  const hint = f.hint ? `<small class="help" id="${id}-hint">${popupEsc(f.hint)}</small>` : '';
+  const described = f.hint ? ` aria-describedby="${id}-hint"` : '';
   const req = f.required ? ' required' : '';
   if (f.type === 'note') return `<p class="popup-text"${wide}>${f.html ?? popupEsc(f.text)}</p>`;
   if (f.type === 'static') return `<div class="field popup-static"${wide}><span>${popupEsc(f.label)}</span><div>${f.html ?? popupEsc(f.value)}</div></div>`;
@@ -845,25 +912,75 @@ function popupField(f, n) {
   }
   if (f.type === 'pick') {
     // One row chosen from a list that answers a search — a person among Basu's users. `mountPick` wires it.
-    return `<div class="field popup-pick"${wide} data-pick="${popupEsc(f.name)}"><span>${popupEsc(f.label)}</span><input type="search" class="input search" id="${id}" placeholder="${popupEsc(
+    return `<div class="field popup-pick"${wide} data-pick="${popupEsc(f.name)}"${f.required ? ' data-required' : ''}><span>${popupEsc(f.label)}</span><input type="search" class="input search" id="${id}" placeholder="${popupEsc(
       f.placeholder ?? 'Хайх…',
     )}" autocomplete="off" spellcheck="false" aria-label="${popupEsc(f.label)}"><div class="popup-pick-list" role="radiogroup" aria-label="${popupEsc(f.label)}" aria-busy="true"></div>${hint}</div>`;
   }
   if (f.type === 'select') {
-    return `<label class="field"${wide} for="${id}"><span>${popupEsc(f.label)}</span><select id="${id}" name="${popupEsc(f.name)}"${req}>${f.options
+    return `<label class="field"${wide} for="${id}"><span>${popupEsc(f.label)}</span><select id="${id}" name="${popupEsc(f.name)}"${req}${described}>${f.options
       .map(([v, w]) => `<option value="${popupEsc(v)}"${String(v) === String(f.value ?? '') ? ' selected' : ''}>${popupEsc(w)}</option>`)
       .join('')}</select>${hint}</label>`;
   }
   if (f.type === 'textarea') {
-    return `<label class="field"${wide} for="${id}"><span>${popupEsc(f.label)}</span><textarea id="${id}" name="${popupEsc(f.name)}" placeholder="${popupEsc(f.placeholder ?? '')}"${req}>${popupEsc(f.value ?? '')}</textarea>${hint}</label>`;
+    return `<label class="field"${wide} for="${id}"><span>${popupEsc(f.label)}</span><textarea id="${id}" name="${popupEsc(f.name)}" placeholder="${popupEsc(f.placeholder ?? '')}"${req}${described}${popupAttrs(f.attrs)}>${popupEsc(f.value ?? '')}</textarea>${hint}</label>`;
   }
+  const type = f.type ?? 'text';
+  // A phone types digits on a phone's own keypad unless the page said otherwise.
+  const inputmode = f.inputmode ?? (type === 'tel' ? 'tel' : '');
   const attrs = [
-    `type="${f.type ?? 'text'}"`,
-    f.inputmode ? `inputmode="${f.inputmode}"` : '',
-    f.autocomplete ? `autocomplete="${f.autocomplete}"` : '',
-    f.type === 'email' || f.inputmode === 'email' ? 'autocapitalize="none" spellcheck="false"' : '',
+    `type="${popupEsc(type)}"`,
+    inputmode ? `inputmode="${popupEsc(inputmode)}"` : '',
+    f.autocomplete ? `autocomplete="${popupEsc(f.autocomplete)}"` : '',
+    type === 'email' || inputmode === 'email' ? 'autocapitalize="none" spellcheck="false"' : '',
   ].filter(Boolean).join(' ');
-  return `<label class="field"${wide} for="${id}"><span>${popupEsc(f.label)}</span><input id="${id}" name="${popupEsc(f.name)}" ${attrs} value="${popupEsc(f.value ?? '')}" placeholder="${popupEsc(f.placeholder ?? '')}"${req}>${hint}</label>`;
+  const input = `<input id="${id}" name="${popupEsc(f.name)}" ${attrs} value="${popupEsc(f.value ?? '')}" placeholder="${popupEsc(f.placeholder ?? '')}"${req}${described}${popupAttrs(f.attrs)}>`;
+  // A unit after the digits (₮, кг) or a start before them (+976): one value, read as one.
+  const control = f.unit
+    ? `<span class="affix">${input}<i aria-hidden="true">${popupEsc(f.unit)}</i></span>`
+    : f.prefix
+      ? `<span class="affix"><i data-start aria-hidden="true">${popupEsc(f.prefix)}</i>${input}</span>`
+      : input;
+  return `<label class="field"${wide} for="${id}"><span>${popupEsc(f.label)}</span>${control}${hint}</label>`;
+}
+
+let fieldErrorSeq = 0;
+
+/**
+ * Say what is wrong with one field, under it — or, with no message, take the
+ * word back. The control turns stop-red (`aria-invalid`), the line under it
+ * is tied to it for a screen reader (`aria-describedby`), and a hint under
+ * the field steps aside while the error stands. Works in any `.field`: a
+ * popup's, a door's, a page's own form.
+ *
+ *   fieldError(input, 'Утасны дугаар 8 оронтой.');
+ *   fieldError(input, null);
+ */
+export function fieldError(input, message) {
+  if (!input) return;
+  const field = input.closest('.field') ?? input.parentElement;
+  if (!field) return;
+  let line = field.querySelector(':scope > .help[data-error]');
+  const hint = field.querySelector(':scope > .help:not([data-error]), :scope > small:not(.help)');
+  if (!message) {
+    input.removeAttribute('aria-invalid');
+    for (const bad of field.querySelectorAll('[aria-invalid]')) bad.removeAttribute('aria-invalid');
+    line?.remove();
+    if (hint) hint.hidden = false;
+    if (hint?.id) input.setAttribute('aria-describedby', hint.id);
+    else input.removeAttribute('aria-describedby');
+    return;
+  }
+  if (!line) {
+    line = document.createElement('small');
+    line.className = 'help';
+    line.setAttribute('data-error', '');
+    line.id = `field-error-${++fieldErrorSeq}`;
+    field.append(line);
+  }
+  line.textContent = message;
+  input.setAttribute('aria-invalid', 'true');
+  input.setAttribute('aria-describedby', line.id);
+  if (hint) hint.hidden = true;
 }
 
 /**
@@ -873,7 +990,8 @@ function popupField(f, n) {
  * `flag` is one word after the line under the title, in the tone that asks
  * for a second look — «баталгаагүй» beside a number nobody proved. The one
  * chosen stays in the list whatever is typed next, so the form still carries
- * it. Enter searches at once; it does not answer the popup.
+ * it. Enter searches at once; it does not answer the popup. Until the first
+ * answer the list holds three rows of its shape.
  */
 function mountPick(box, f) {
   if (!box) return;
@@ -894,6 +1012,7 @@ function mountPick(box, f) {
     const shown = chosen && !rows.some((r) => String(r.value) === String(chosen.value)) ? [chosen, ...rows] : rows;
     list.innerHTML = shown.length ? shown.map(row).join('') : `<p class="popup-pick-empty">${popupEsc(f.empty ?? 'Олдсонгүй.')}</p>`;
   };
+  list.innerHTML = '<div class="popup-pick-skel"><span class="skel"></span><span class="skel-lines"><span class="skel"></span><span class="skel"></span></span></div>'.repeat(3);
   const load = async () => {
     const mine = ++seq;
     list.setAttribute('aria-busy', 'true');
@@ -923,29 +1042,47 @@ function mountPick(box, f) {
   void load();
 }
 
+/** What a field that must be filled says when it is not, by the kind of control it is. */
+function popupMissing(control) {
+  if (control.type === 'checkbox') return 'Тэмдэглэнэ үү.';
+  if (control.tagName === 'SELECT' || control.type === 'radio') return 'Сонгоно уу.';
+  return 'Бөглөнө үү.';
+}
+
 /**
  * A popup over the page: the one place a thing is added, changed, or said no
  * to. On top its title and what it is about; in the middle the fields; at the
  * foot «Болих» and the one button that does it. It closes on its cross, on
  * Esc and on the dim around it, keeps the keyboard inside while it is open,
  * and gives the focus back to whatever opened it. On a phone it is a sheet
- * from the bottom.
+ * from the bottom, its foot pinned within the thumb's reach.
  *
  * `fields` draw the form — { name, label, type: text | email | tel | number |
  * date | textarea | select | checks | icons | pick | static | note, value,
- * placeholder, options, required, hint, wide, inputmode, autocomplete }; a
- * pick also takes `search(q)` and `empty` (see `mountPick`). All of it is
- * text, escaped here, except three things that are markup because they carry
- * a name in bold or a code in mono: `sub`, and a note's or a static's
- * `html`. Whoever fills those escapes what a person wrote. `onSubmit(values,
- * popup)` does the work: what it returns closes the popup and is what the
- * promise resolves to; `false` keeps it open (a first step done, the second
- * drawn with `popup.step(...)`); a thrown error is said inside the popup, over
- * the fields, and the popup stays for another try. A button a step draws for
- * itself — «Код дахин авах» — says its own trouble in the same place, with
- * `popup.say(...)`. Closed without an answer, the promise resolves to null.
+ * placeholder, options, required, hint, wide, inputmode, autocomplete, unit
+ * (₮, кг after the value), prefix (+976 before it), format ('phone': the
+ * digits grouped «9911 2233» as they are typed — phoneInput), attrs ({
+ * maxlength, min, step, pattern }) }; a pick also takes `search(q)` and `empty` (see
+ * `mountPick`). All of it is text, escaped here, except three things that are
+ * markup because they carry a name in bold or a code in mono: `sub`, and a
+ * note's or a static's `html`. Whoever fills those escapes what a person
+ * wrote.
+ *
+ * `onSubmit(values, popup)` does the work: what it returns closes the popup
+ * and is what the promise resolves to; `false` keeps it open (a first step
+ * done, the second drawn with `popup.step(...)`). A field that must be filled
+ * and is not says so under itself before anything is sent. A thrown error is
+ * said inside the popup, over the fields — or under one field, when the error
+ * names it (`error.field = 'phone'`, or `popup.fieldError('phone', '…')`) —
+ * and the popup stays for another try. A button a step draws for itself —
+ * «Код дахин авах» — says its own trouble in the same place, with
+ * `popup.say(...)`. While the answer is on the way the button turns and the
+ * form holds still. `steps: 2` puts «Алхам 1/2» over the title, and each
+ * `step()` that draws new fields moves it on. `danger` makes the button the
+ * filled red of a step that cannot be undone. Closed without an answer, the
+ * promise resolves to null.
  */
-export function popup({ title, sub = '', fields = [], submit = 'Хадгалах', cancel = 'Болих', danger = false, width = 560, onSubmit = async () => true, id = null }) {
+export function popup({ title, sub = '', fields = [], submit = 'Хадгалах', cancel = 'Болих', danger = false, width = 560, steps = 0, onSubmit = async () => true, id = null }) {
   return new Promise((resolve) => {
     const n = ++popupSeq;
     const opener = document.activeElement;
@@ -961,38 +1098,71 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
     sheet.style.setProperty('--sheet-w', `${width}px`);
     if (id) sheet.id = id;
     sheet.innerHTML = `
-      <header><div><h2 id="popup-title-${n}"></h2><div class="sub"></div></div><button class="x" type="button" aria-label="Хаах">${POPUP_X}</button></header>
+      <header><div><div class="popup-steps"></div><h2 id="popup-title-${n}"></h2><div class="sub" id="popup-sub-${n}"></div></div><button class="x" type="button" aria-label="Хаах">${POPUP_X}</button></header>
       <form class="body" novalidate>
-        <div class="callout popup-error" data-k="warn" role="alert" hidden><span></span></div>
+        <div class="callout popup-error" data-k="stop" role="alert" hidden><span></span></div>
         <div class="fields"></div>
       </form>
       <footer><button class="btn" data-v="quiet" type="button" data-cancel></button><button class="btn" type="button" data-submit></button></footer>`;
     const $ = (selector) => sheet.querySelector(selector);
+    const form = $('form');
     const errorBox = $('.popup-error');
     const go = $('[data-submit]');
     const say = (message) => {
       errorBox.hidden = !message;
       errorBox.querySelector('span').textContent = message ?? '';
     };
+    /** The control a field's error belongs to: the named input, or the first of a group. */
+    const control = (name) => [...sheet.querySelectorAll('.fields [name]')].find((node) => node.name === name) ?? null;
+    const sayAt = (name, message) => {
+      const node = control(name);
+      if (!node) return say(message);
+      fieldError(node, message);
+      node.focus?.();
+    };
+
+    let at = 1;
+    const drawSteps = () => {
+      const box = $('.popup-steps');
+      if (!(steps > 1)) {
+        box.replaceChildren();
+        return;
+      }
+      box.innerHTML = `<span>Алхам ${at}/${steps}</span><i aria-hidden="true">${Array.from({ length: steps }, (_, i) => `<b${i < at ? ' data-on' : ''}></b>`).join('')}</i>`;
+    };
 
     /** Draw a step: the words on top, the fields, the buttons. */
     const step = (next) => {
+      if (next.at !== undefined) at = next.at;
+      else if (next.fields && drawn) at = Math.min(at + 1, Math.max(steps, 1));
+      drawSteps();
       if (next.title !== undefined) $('header h2').textContent = next.title;
       if (next.sub !== undefined) {
         $('header .sub').innerHTML = next.sub;
         $('header .sub').hidden = !next.sub;
+        if (next.sub) sheet.setAttribute('aria-describedby', `popup-sub-${n}`);
+        else sheet.removeAttribute('aria-describedby');
       }
       if (next.fields) {
         $('.fields').innerHTML = next.fields.map((f) => popupField(f, n)).join('');
-        for (const f of next.fields) if (f.type === 'pick') mountPick([...sheet.querySelectorAll('[data-pick]')].find((box) => box.dataset.pick === f.name), f);
+        for (const f of next.fields) {
+          if (f.type === 'pick') mountPick([...sheet.querySelectorAll('[data-pick]')].find((box) => box.dataset.pick === f.name), f);
+          if (f.format === 'phone') phoneInput(control(f.name));
+        }
       }
       if (next.submit !== undefined) go.textContent = next.submit;
-      if (next.danger !== undefined) go.setAttribute('data-v', next.danger ? 'danger' : 'primary');
+      if (next.danger !== undefined) {
+        go.setAttribute('data-v', next.danger ? 'danger' : 'primary');
+        // The button of a step that cannot be undone is the filled red; a popup's button is always that step.
+        go.toggleAttribute('data-fill', Boolean(next.danger));
+      }
       say(null);
       const first = sheet.querySelector('.fields input:not([type="checkbox"]):not([type="radio"]), .fields select, .fields textarea');
       (first ?? go).focus?.();
     };
+    let drawn = false;
     step({ title, sub, fields, submit, danger });
+    drawn = true;
     $('[data-cancel]').textContent = cancel;
 
     const values = () => {
@@ -1007,6 +1177,15 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
       }
       return out;
     };
+
+    // A field that was wrong is right again as soon as it is touched.
+    const mend = (e) => {
+      const field = e.target.closest?.('.field');
+      const bad = field?.querySelector('[aria-invalid="true"]');
+      if (bad) fieldError(bad, null);
+    };
+    form.addEventListener('input', mend);
+    form.addEventListener('change', mend);
 
     let closed = false;
     const close = (answer) => {
@@ -1025,29 +1204,48 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
       resolve(answer);
     };
 
+    const busy = (on) => {
+      go.toggleAttribute('data-busy', on);
+      if (on) go.setAttribute('aria-busy', 'true');
+      else go.removeAttribute('aria-busy');
+      sheet.toggleAttribute('data-busy', on);
+      form.setAttribute('aria-busy', String(on));
+    };
+
     const run = async () => {
       if (go.hasAttribute('data-busy')) return;
-      // What must be there, is — said here, before anything is sent.
-      for (const input of sheet.querySelectorAll('.fields [required]')) {
+      // What must be there, is — said under each field that is not, before anything is sent.
+      const missing = [];
+      for (const input of sheet.querySelectorAll('.fields [required]:not(:disabled)')) {
         const empty = input.type === 'checkbox' ? !input.checked : !input.value.trim();
-        input.toggleAttribute('aria-invalid', empty);
         if (empty) {
-          const label = input.closest('.field')?.querySelector('span')?.textContent ?? '';
-          say(`${label} хоосон байна.`);
-          input.focus();
-          return;
-        }
+          missing.push(input);
+          fieldError(input, popupMissing(input));
+        } else if (input.getAttribute('aria-invalid') === 'true') fieldError(input, null);
       }
-      go.setAttribute('data-busy', '');
+      for (const box of sheet.querySelectorAll('.fields [data-pick][data-required]')) {
+        const radios = [...box.querySelectorAll('input[type="radio"]')];
+        if (radios.some((r) => r.checked)) continue;
+        const target = box.querySelector('input[type="search"]');
+        missing.push(target);
+        fieldError(target, 'Нэгийг сонгоно уу.');
+      }
+      if (missing.length) {
+        say(null);
+        missing[0].focus();
+        return;
+      }
+      busy(true);
       say(null);
       try {
-        const answer = await onSubmit(values(), { step, el: sheet, say });
+        const answer = await onSubmit(values(), { step, el: sheet, say, fieldError: sayAt });
         if (answer === false) return;
         close(answer ?? true);
       } catch (error) {
-        say(error?.message ?? 'Алдаа гарлаа.');
+        if (error?.field && control(error.field)) sayAt(error.field, error.message);
+        else say(error?.message ?? 'Алдаа гарлаа.');
       } finally {
-        go.removeAttribute('data-busy');
+        busy(false);
       }
     };
 
@@ -1062,9 +1260,9 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
         return;
       }
       if (e.key !== 'Tab') return;
-      const stops = [...sheet.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled])')].filter(
-        (node) => node.getClientRects().length > 0,
-      );
+      const stops = [
+        ...sheet.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+      ].filter((node) => node.getClientRects().length > 0);
       if (!stops.length) return;
       const [first, last] = [stops[0], stops[stops.length - 1]];
       const inside = sheet.contains(document.activeElement);
@@ -1078,12 +1276,12 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
     };
 
     go.addEventListener('click', run);
-    $('form').addEventListener('submit', (e) => {
+    form.addEventListener('submit', (e) => {
       e.preventDefault();
       void run();
     });
     // Enter in a one-line field answers, as a form does; in a textarea it is a new line.
-    $('form').addEventListener('keydown', (e) => {
+    form.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'checkbox' && e.target.type !== 'radio') {
         e.preventDefault();
         void run();
@@ -1105,9 +1303,9 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
 
 /**
  * «Are you sure?» as a popup: what is about to happen, a reason to keep when
- * the record wants one, and the button that does it — in the stop colour
- * when it cannot be undone. Resolves to what `onConfirm(reason)` returned,
- * or null when the person said no.
+ * the record wants one, and the button that does it — the filled red of a
+ * step that cannot be undone when `danger`. Resolves to what
+ * `onConfirm(reason)` returned, or null when the person said no.
  */
 export function confirmPopup({ title, text = '', ok = 'Тийм', cancel = 'Болих', danger = false, reason = null, onConfirm = async () => true }) {
   const fields = [];
@@ -1121,6 +1319,7 @@ export function confirmPopup({ title, text = '', ok = 'Тийм', cancel = 'Бо
       required: Boolean(reason.required),
       value: reason.value ?? '',
       options: reason.options,
+      hint: reason.hint,
       wide: true,
     });
   }
@@ -1130,12 +1329,63 @@ export function confirmPopup({ title, text = '', ok = 'Тийм', cancel = 'Бо
 /* ── toast ─────────────────────────────────────────────────────────── */
 
 let toastTimer;
+/** The toasts still showing behind the newest, newest first: copies, aria-hidden. */
+let toastOld = [];
+/** Long enough to read: an error stays longer than good news. */
+const TOAST_MS = { bad: 5200 };
+
 /**
- * One line at the bottom of the screen, gone after 3.2s. `kind` is 'good'
- * (a ready dot before the text) or 'bad' (stop on its own text); it lands on
- * `#toast` as `data-kind` and is cleared again when the next toast has
- * none. The element is created on first use with `role=status`, and
- * `data-show` is what the tests read on a timeout — both stay as they are.
+ * How far up from the bottom edge a toast stands: above whatever is pinned
+ * along that edge — a tab bar, a pay bar, an order bar — so its buttons stay
+ * in reach and in sight. A bar is the first thing under the bottom centre
+ * that sits on the edge, spans at least half the width, is less than 40% of
+ * the screen tall and is pinned (fixed or sticky, itself or inside something
+ * that is). A popup's dim and a full-screen panel are not bars; a phone's
+ * bottom sheet sends the toast to the top instead (app.css).
+ */
+function toastOver() {
+  if (typeof document.elementsFromPoint !== 'function') return 0;
+  const height = innerHeight;
+  const hit = document.elementsFromPoint(innerWidth / 2, height - 2).find((node) => !node.closest('#toast, .toast-old'));
+  for (let node = hit; node && node !== document.body && node !== document.documentElement; node = node.parentElement) {
+    const box = node.getBoundingClientRect();
+    if (box.bottom < height - 2 || box.height >= height * 0.4 || box.width < innerWidth * 0.5) continue;
+    for (let up = node; up && up !== document.documentElement; up = up.parentElement) {
+      const { position } = getComputedStyle(up);
+      if (position === 'fixed' || position === 'sticky') return Math.max(0, Math.round(height - box.top));
+    }
+    return 0;
+  }
+  return 0;
+}
+
+/** Each toast showing steps up above the ones newer than it. */
+function toastRestack() {
+  const newest = document.getElementById('toast');
+  let y = newest?.dataset.show ? newest.offsetHeight + 8 : 0;
+  for (const old of toastOld) {
+    old.style.setProperty('--toast-y', `${-y}px`);
+    y += old.offsetHeight + 8;
+  }
+}
+
+function toastDrop(old) {
+  clearTimeout(old.toastTimer);
+  toastOld = toastOld.filter((x) => x !== old);
+  delete old.dataset.show;
+  setTimeout(() => old.remove(), 260);
+  toastRestack();
+}
+
+/**
+ * One line at the bottom of the screen, gone after 3.2s (an error after
+ * 5.2s). `kind` is 'good' (a check), 'bad' (an alert) or 'info' (an «i»); it
+ * lands on `#toast` as `data-kind` and is cleared again when the next toast
+ * has none. A toast that comes while another is showing puts the other one
+ * up a step instead of wiping it, so two quick words are both read; three at
+ * most. A tap puts one away. The element is created on first use with
+ * `role=status`, it always holds the newest words, and `data-show` is what
+ * the tests read on a timeout — all as they were.
  */
 export function toast(message, kind) {
   let el = document.getElementById('toast');
@@ -1143,14 +1393,189 @@ export function toast(message, kind) {
     el = document.createElement('div');
     el.id = 'toast';
     el.setAttribute('role', 'status');
+    el.addEventListener('click', () => {
+      clearTimeout(toastTimer);
+      delete el.dataset.show;
+      toastRestack();
+    });
     document.body.appendChild(el);
+  }
+  if (el.dataset.show && el.textContent && el.textContent !== message) {
+    const old = el.cloneNode(true);
+    old.removeAttribute('id');
+    old.removeAttribute('role');
+    old.className = 'toast-old';
+    old.setAttribute('aria-hidden', 'true');
+    old.addEventListener('click', () => toastDrop(old));
+    document.body.append(old);
+    toastOld.unshift(old);
+    while (toastOld.length > 2) toastDrop(toastOld[toastOld.length - 1]);
+    old.toastTimer = setTimeout(() => toastDrop(old), 2600);
   }
   el.textContent = message;
   if (kind) el.dataset.kind = kind;
   else delete el.dataset.kind;
+  const over = toastOver();
+  if (over) el.style.setProperty('--toast-over', `${over}px`);
+  else el.style.removeProperty('--toast-over');
   el.dataset.show = '1';
+  toastRestack();
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => delete el.dataset.show, 3200);
+  toastTimer = setTimeout(() => {
+    delete el.dataset.show;
+    toastRestack();
+  }, TOAST_MS[kind] ?? 3200);
+}
+
+/* ── empty states, skeletons, busy buttons ─────────────────────────── */
+
+/**
+ * The marks an empty state wears: line icons on the 24 grid, stroked like
+ * the menu's. A page may pass its own svg instead — sidenav's NAV_ICON.orders.
+ */
+const EMPTY_ICON = {
+  inbox: '<svg viewBox="0 0 24 24"><path d="M3.5 13h4.5l1.5 2.5h5l1.5-2.5h4.5"/><path d="M6 5h12l2.5 8v5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-5z"/></svg>',
+  search: '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>',
+  orders: '<svg viewBox="0 0 24 24"><path d="M6 4h12v16l-3-2-3 2-3-2-3 2z"/><path d="M9 9h6M9 13h4"/></svg>',
+  people: '<svg viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2"/><path d="M3 20c.8-3.2 3-4.8 6-4.8s5.2 1.6 6 4.8"/><circle cx="17" cy="9.5" r="2.4"/><path d="M15.5 15.2c2.6.2 4.4 1.6 5 4.8"/></svg>',
+  store: '<svg viewBox="0 0 24 24"><path d="M4 9l1.5-4h13L20 9"/><path d="M4 9c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3"/><path d="M6 12v8h12v-8M10 20v-5h4v5"/></svg>',
+  bowl: '<svg viewBox="0 0 24 24"><path d="M3 11h18a9 9 0 0 1-18 0z"/><path d="M8 7c0-1.5 1-2 1-3.5M12 7c0-1.5 1-2 1-3.5M16 7c0-1.5 1-2 1-3.5"/></svg>',
+  wallet: '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18M15.5 15h2"/></svg>',
+  bell: '<svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>',
+  calendar: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8 3v4M16 3v4M8 14h3"/></svg>',
+  star: '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>',
+  org: '<svg viewBox="0 0 24 24"><path d="M4 20V6l8-3 8 3v14"/><path d="M9 20v-4h6v4M8 9h.01M12 9h.01M16 9h.01M8 13h.01M12 13h.01M16 13h.01"/></svg>',
+  clock: '<svg viewBox="0 0 24 24"><path d="M12 8v4l3 2"/><circle cx="12" cy="12" r="8.5"/></svg>',
+  truck: '<svg viewBox="0 0 24 24"><path d="M3 6h11v10H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/></svg>',
+  alert: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg>',
+  offline: '<svg viewBox="0 0 24 24"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0"/><path d="M12 19h.01M3 3l18 18"/></svg>',
+};
+
+/**
+ * What a place is for while it holds nothing yet: a mark, a title, one line,
+ * and the one next step. Returns the element (`.empty-state`) to put where
+ * the list or the page would be.
+ *
+ *   emptyState({ icon: 'orders', title: 'Захиалга алга', text: 'Зочин захиалга өгмөгц энд гарна.',
+ *                action: { label: 'Зар нэмэх', onClick: () => …, primary: true } })
+ *
+ * `icon` is a name from EMPTY_ICON (inbox, search, orders, people, store,
+ * bowl, wallet, bell, calendar, star, org, clock, truck, alert, offline) or
+ * an svg string. `action` is { label, onClick | href, primary, icon (svg) }
+ * or a node of the page's own. `html` stands in for `text` when the line
+ * needs a name in bold — the caller escapes what a person wrote. `size: 'sm'`
+ * for a panel or a short list, `frame: true` for a card of its own where it
+ * stands alone on a page, `tone: 'accent' | 'stop'` to tint the mark (a first
+ * step / could not load), `align: 'start'` to sit at the left.
+ */
+export function emptyState({ icon = 'inbox', title, text = '', html = '', action = null, size, tone, frame = false, align } = {}) {
+  const box = document.createElement('div');
+  box.className = 'empty-state';
+  if (size) box.dataset.size = size;
+  if (tone) box.dataset.tone = tone;
+  if (align) box.dataset.align = align;
+  if (frame) box.setAttribute('data-frame', '');
+  const svg = typeof icon === 'string' && icon.trim().startsWith('<svg') ? icon : EMPTY_ICON[icon] ?? EMPTY_ICON.inbox;
+  box.innerHTML = `<span class="es-mark" aria-hidden="true">${svg}</span><h3 class="es-title"></h3><p class="es-text"></p>`;
+  box.querySelector('.es-title').textContent = title ?? '';
+  if (html) box.querySelector('.es-text').innerHTML = html;
+  else box.querySelector('.es-text').textContent = text ?? '';
+  if (action) {
+    const act = document.createElement('div');
+    act.className = 'es-act';
+    if (action instanceof Node) act.append(action);
+    else {
+      const b = document.createElement(action.href ? 'a' : 'button');
+      b.className = 'btn';
+      if (action.href) b.href = action.href;
+      else b.type = 'button';
+      if (action.primary) b.dataset.v = 'primary';
+      if (size === 'sm') b.dataset.size = 'sm';
+      b.innerHTML = action.icon ?? '';
+      b.append(document.createTextNode(action.label ?? ''));
+      if (action.onClick) b.addEventListener('click', action.onClick);
+      act.append(b);
+    }
+    box.append(act);
+  }
+  return box;
+}
+
+/**
+ * The shape of what is coming, at its size, while it loads — so nothing
+ * jumps when it lands. `kind`: 'rows' (a card of list rows), 'cards' (a grid
+ * of cards with a picture), 'kpis' (a KPI band), 'lines' (a paragraph). The
+ * container says it is busy to a screen reader; put the real thing in its
+ * place when it arrives.
+ */
+export function skeleton(kind = 'rows', n = 3) {
+  const box = document.createElement('div');
+  box.setAttribute('role', 'status');
+  box.setAttribute('aria-busy', 'true');
+  box.setAttribute('aria-label', 'Ачаалж байна');
+  const bar = '<span class="skel"></span>';
+  if (kind === 'cards') {
+    box.className = 'skel-cards';
+    box.innerHTML = `<div class="skel-card">${bar.repeat(3)}</div>`.repeat(n);
+  } else if (kind === 'kpis') {
+    box.className = 'kpi-band skel-kpis';
+    box.innerHTML = `<div class="skel-kpi-cell"><span class="skel" data-w="60"></span><span class="skel skel-kpi"></span><span class="skel" data-w="40"></span></div>`.repeat(n);
+  } else if (kind === 'lines') {
+    box.className = 'skel-lines-block';
+    box.innerHTML = bar.repeat(n);
+  } else {
+    box.className = 'card skel-rows';
+    box.innerHTML = `<div class="skel-row">${bar}<span class="skel-lines">${bar}${bar}</span>${bar}</div>`.repeat(n);
+  }
+  return box;
+}
+
+/**
+ * A button at work: the words go transparent (they stay for a reader and for
+ * `textContent`), a spinner turns in the button's own ink, and it takes no
+ * second press. `setBusy(button, false)` gives it back.
+ */
+export function setBusy(button, on = true) {
+  if (!button) return button;
+  button.toggleAttribute('data-busy', on);
+  if (on) button.setAttribute('aria-busy', 'true');
+  else button.removeAttribute('aria-busy');
+  return button;
+}
+
+/**
+ * A phone field that groups the digits the way people read them — «9911
+ * 2233» — while they are typed or pasted, the caret kept where it was. Put it
+ * after a `+976` start mark (`.affix > i[data-start]`). What the field holds
+ * is still what is sent: Basu's sign-in reads «9911 2233» as +97699112233
+ * (phoneE164); a page whose endpoint wants bare digits strips the space.
+ */
+export function phoneInput(input) {
+  if (!input) return input;
+  const group = () => {
+    const was = input.value;
+    const caret = input.selectionStart ?? was.length;
+    const digitsBefore = was.slice(0, caret).replace(/\D/g, '').length;
+    let digits = was.replace(/\D/g, '');
+    if (digits.length > 8 && digits.startsWith('976')) digits = digits.slice(3);
+    digits = digits.slice(0, 8);
+    const next = digits.length > 4 ? `${digits.slice(0, 4)} ${digits.slice(4)}` : digits;
+    if (next === was) return;
+    input.value = next;
+    let at = 0;
+    for (let seen = 0; at < next.length && seen < digitsBefore; at++) if (/\d/.test(next[at])) seen++;
+    if (document.activeElement === input) input.setSelectionRange(at, at);
+  };
+  input.addEventListener('input', group);
+  group();
+  return input;
+}
+
+/** A Mongolian number as people read it: `+97699112233` → `+976 9911 2233`. Anything else comes back as it was. */
+export function phoneText(value) {
+  const raw = String(value ?? '');
+  const m = /^(?:\+?976)?(\d{4})(\d{4})$/.exec(raw.replace(/[\s-]/g, ''));
+  return m ? `+976 ${m[1]} ${m[2]}` : raw;
 }
 
 /* ── avatar ────────────────────────────────────────────────────────── */

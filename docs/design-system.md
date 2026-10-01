@@ -11,7 +11,7 @@
 1. **Юу ч өөрийн агуулгаасаа чанга биш.** Үг нь нэг sans фонт (Golos Text) 400/500/600 жингээр; 600-аас хүнд юу ч байхгүй. Гарчиг том, жин биш хэмжээгээрээ ялгарна. Uppercase зөвхөн mono eyebrow шошгонд.
 2. **Тоо бол тоо шиг харагдана.** Мөнгө, цаг, тоо ширхэг, код, утас — бүгд нэг mono фонт (JetBrains Mono, shell-тэй адил), `tabular-nums`, `--ink` өнгөтэй. ₮ тэмдэг sans фонтоор, 0.1em зайтай. Мөнгө хэзээ ч өнгөтэй биш.
 3. **Basu-гийн өнгө — нарс ногоон, зөгийн балны шартай.** Primary товч, сонгосон цэс, холбоос, газрын зургийн тэмдэг нарс ногоон (`--accent` #1F5A43). Урд нүүрний болон нэвтрэх хуудасны бараан зурвас нь шөнийн нарс (`--deep` #123A2C). Зөгийн балны шар (`--hi` #D9A441) жижиг онцлох тэмдэгт л: шинэ, «гал дээр», «удахгүй». Хэзээ ч товч, мөнгө биш. Утгын өнгө (замд, хүлээж, болсон, анхаар) хэвээр. Дэлгэц бүрт ногоон дүүргэлттэй нэг л primary товч. Улбар шар, хар-цагаан ганцаараа — хоёулаа хэрэглэгч татгалзсан.
-4. **Карт бол бүлэг, мөр бол хайрцаг биш.** Хэсэг бүр нэг карт (`--surface`, 1px `--line`, радиус 12, y1/b2 сүүдэр), дотор нь мөрүүд 1px hairline-аар тусгаарлагдана. Карт дотор карт байхгүй; зүүн талын өнгөт зураас байхгүй; хоосон төлөв — hairline ба нэг мөр бичвэр, хоосон карт биш.
+4. **Карт бол бүлэг, мөр бол хайрцаг биш.** Хэсэг бүр нэг карт (`--surface`, 1px `--line`, радиус 12, y1/b2 сүүдэр), дотор нь мөрүүд 1px hairline-аар тусгаарлагдана. Карт дотор карт байхгүй; зүүн талын өнгөт зураас байхгүй; хоосон төлөв — энэ газар юунд зориулагдсан, дараагийн алхам юу болохыг хэлдэг санаатай блок (тэмдэг, гарчиг, нэг мөр, нэг үйлдэл — 5.14), хөндий карт биш.
 5. **Нэг хэмжүүр.** Зай 4pt масштаб, радиус зургаан утга, гүн гурван түвшин, бичвэрийн доод хэмжээ 11px (уншигдах ёстой бүх зүйл ≥12.5px), хүрэлтийн бай ≥44px, оролтын талбар 16px (iOS zoom хийхгүй).
 
 ---
@@ -116,6 +116,11 @@
 | `--shadow` | 0 1px 2px rgba(22,21,20,.05) | 0 1px 2px rgba(0,0,0,.4) | карт (shell-ийн y1 b2) |
 | `--shadow-float` | + 0 12px 32px −12px .20 | + 0 14px 36px −12px .7 | toast, popover, dock panel |
 | `--shadow-sheet` | 0 −1px 0 line, 0 −16px 40px −20px .28 | … .70 | доороос дээш |
+| `--ring` / `--ring-stop` | 3px `color-mix(accent 22%)` / `color-mix(stop 22%)` | ижил томьёо | focus-ийн угаалт; алдаатай талбар focus-тэй үед stop. accent-soft dark surface дээр бараг харагддаггүй байсан тул томьёо |
+| `--hover` / `--press` | `color-mix(ink 5%)` / `color-mix(ink 9%)` | ижил томьёо | hover, дарах угаалт — цагаан карт, дулаан ground, dark гурвууланд харагдана (surface-2 ground дээр үл үзэгдэнэ) |
+| `--toast-good` / `--toast-bad` / `--toast-info` | #57C295 / #F08A8D / #78B0E0 | #136A4B / #9B2226 / #1B5B8F | toast-ийн тэмдэг: pill нь эсрэг сэдвийн өнгөтэй тул тэмдэг нь эсрэг сэдвийн тон |
+| `--mask-alert` / `--mask-info` / `--mask-check` | — | — | currentColor-оор зурагдах 14–18px тэмдэг: алдааны мөр, шалтгааны мөр, toast |
+| `--sticky-top` | 0 (ширээ ≥900) · `bar-h + safe-t` (≤900, deskbar-ийн доор) | — | `.desk-frame` дээр; sticky хүснэгтийн толгой хаана зогсох |
 
 Dark `@media (prefers-color-scheme: dark)` доор `:root:not([data-theme="light"])`-аар (одоогийнх шиг) **ба** `:root[data-theme="dark"]`-аар давхар тодорхойлогдоно — хоёр блок byte-ийн хэмжээнд ижил байх ёстой. `color-scheme` тус бүрт заагдсан тул select, date picker, scrollbar, checkbox хуудасны сэдвийг дагана.
 
@@ -199,10 +204,13 @@ Dark `@media (prefers-color-scheme: dark)` доор `:root:not([data-theme="ligh
 <button class="btn" data-icon aria-label="Хаах"><svg>…</svg></button>
 ```
 
-- Суурь: inline-flex, sans 15/500, 44px, padding 0 16, radius 10, 1px `--line-2`, `--surface`, `--ink`; svg 18px stroke 1.6.
+- Суурь: inline-flex, sans 15/500, 44px, padding 0 16, radius 10, 1px `--line-2`, `--surface`, `--ink`; svg 18px (sm-д 16) stroke 1.6.
 - Хэмжээ: `sm` 36/13px (ширээний хүснэгтэд л); `lg` 52/16px 600, width 100%.
-- primary — `--accent` дүүргэлт, `--on-accent`, 600; hover brightness 1.06. quiet — хүрээгүй `--ink-2`, hover `--surface-2`. danger — тунгалаг, `--stop-line` хүрээ, `--stop` текст, hover `--stop-soft`; `[data-fill]` — `--stop` дүүргэлт, `--on-stop`, 600. link — хүрээгүй 13/500 `--accent-ink`, hover underline.
-- `:active{transform:scale(.985)}`; `[disabled]` — `--surface-2`, `--line`, `--ink-3`, opacity 1 (45% opacity-тай улаан «идэвхтэй» шиг харагддаг); `[data-busy]` — текст тунгалаг (textContent хэвээр — тест «Түр хүлээнэ үү…» уншина), 16px spinner, pointer-events none.
+- primary — `--accent` дүүргэлт, `--on-accent`, 600; hover `--accent-hover`. quiet — хүрээгүй `--ink-2`, hover `--hover` (ink-ийн хальс — ground дээр ч харагдана). danger — тунгалаг, `--stop-line` хүрээ, `--stop` текст, hover `--stop-soft`; `[data-fill]` — `--stop` дүүргэлт, `--on-stop`, 600. link — хүрээгүй 13/500 `--accent-ink`, hover underline.
+- Хувилбарууд `:where()`-ээр нэг классын жинтэй бичигдсэн: доорх төлвүүд (disabled, busy) **бүх** хувилбарыг, улаан дүүргэлттэйг ч давна; хуудасны өөрийн `.btn` дүрэм хувилбарыг давна.
+- Төлвүүд: hover — зөвхөн `(hover:hover)`; дарах `:active` — `scale(.985)` + secondary `--surface-2`, quiet `--press`, primary `--accent-hover`, danger `--stop-soft`; focus — 2px нарс outline, offset 2 (нийтийн `:focus-visible`). `[disabled]`/`[aria-disabled=true]` — бүх хувилбарт нэг хавтгай харагдац: `--surface-2`, `--line`, `--ink-3`, opacity 1 (45% opacity-тай улаан «идэвхтэй» шиг харагддаг; улаан дүүргэлттэй disabled товч өмнө нь улаанаараа үлддэг байсан — supplier «Цуцлах» баталгаажуулалт); quiet/link хавтгүй. `[data-busy]` — үг тунгалаг, хүүхэд элемент нуугдана (товч өргөнөө хадгална; textContent хэвээр — тест «Түр хүлээнэ үү…» уншина), 16px (lg 18) spinner товчны өөрийн бэхээр (`--spin`: нарсан дээр on-accent, улаан дээр on-stop, хүрээтэй danger дээр stop, бусад ink-2), pointer-events none. `setBusy(button, on = true)` (api.js) `data-busy` + `aria-busy` хоёуланг тавина/авна.
+- **Яагаад идэвхгүй вэ** — хүн юу хийвэл товч нээгдэхийг товчны дор хэлнэ, tooltip-д нуухгүй (утас hover-гүй): `<button … disabled aria-describedby="why-pay">` + `<p class="btn-why" id="why-pay">Цагаа сонгосны дараа төлнө.</p>` — 13px `--ink-2`, 14px «i» тэмдэг; хоосон бол нуугдана.
+- Зөвхөн дүрстэй товч (`data-icon`) үргэлж `aria-label`-тай. Ширээнд нэрээ харуулах бол `data-tip` нэмнэ — hover/keyboard focus дээр aria-label-ийг ink бөмбөлгөөр (350ms хүлээгээд) харуулна; overflow хайчилдаг саванд (`[data-rows]`) таслагдах тул сонголтоор.
 - Дүрэм: дэлгэцэд нэг primary; устгах үйлдэл primary-ийн хажууд quiet эсвэл danger, хоёр дахь дүүргэлттэй товч биш; Болих (quiet) + Захиалгыг цуцлах (danger fill).
 
 ### 5.2 Карт — `.card`, `.card-head`, `.card-body`, `.inset`
@@ -237,17 +245,20 @@ Dark `@media (prefers-color-scheme: dark)` доор `:root:not([data-theme="ligh
 ### 5.4 Талбар — `.field`, `.input`, checkbox/radio, `input.code`, `.affix`
 
 ```html
-<label class="field"><span>Утас</span><input type="tel" inputmode="tel"><small class="help">Код энэ дугаарт ирнэ</small></label>
+<label class="field"><span>Утас</span><span class="affix"><i data-start>+976</i><input type="tel" inputmode="tel" placeholder="8801 0011"></span><small class="help">Код энэ дугаарт ирнэ</small></label>
 <label class="field"><span>Үнэ</span><span class="affix"><input inputmode="numeric" name="price_mnt"><i>₮</i></span></label>
+<label class="field"><span>Тэмдэглэл <span class="opt">(заавал биш)</span></span><textarea name="note"></textarea></label>
 <label class="check"><input type="checkbox" name="delivers"> Хүргэлт хийнэ</label>
 <input class="code" inputmode="numeric" maxlength="6" aria-label="Имэйлд ирсэн код">
 ```
 
-- Шошго `.field > span|label` 13/500 `--ink-2`, доор 6. Хяналт: width 100%, min-height `--ctl-h` (44/40), padding 0 14, sans `--ctl-fs` (16/15), `--surface`, 1px `--line-2`, radius 10, `appearance:none`; placeholder `--ink-3`.
-- `:focus` — `--accent` хүрээ + `--ring` (3px accent-soft); `[aria-invalid=true]` — `--stop` + stop-soft ring, `.help[data-error]` 13/500 `--stop` `role=alert`; `[disabled]`/`[readonly]` — `--surface-2`, `--ink-3`.
-- select — `--chev` data-URI chevron (сэдэв тус бүрт `--ink-3` өнгө), padding-right 40. textarea — min 96, 12×14, resize vertical. date — native picker, `color-scheme` дагана. search — `.input.search` 38px зүүн padding + `--icon-search`.
-- Тоон: `input[type=tel]`, `[inputmode=numeric|decimal]`, `input.code` mono tabular. `.affix > i` — sans 14 `--ink-3` баруун 14. `input.code` — 64px, mono 32/600, .32em tracking, төв, `--surface-2`, radius 12 (найман нүд биш).
-- checkbox/radio — `appearance:none`, 20px, `--line-2` хүрээ; checked `--accent` + `--check` data-URI (`--on-accent` өнгө сэдэв тус бүрт) / radio inset 4px `--surface` цагираг. `.check` мөр 44px gap 12.
+- Шошго үргэлж харагдана: `.field > span|label` 13/500 `--ink-2`, доор 6; `.opt` — «(заавал биш)» 400 `--ink-3`. Хяналт: width 100%, min-height `--ctl-h` (44/40), padding 0 14, sans `--ctl-fs` (16/15 — утсанд 16, iOS zoom хийхгүй), `--surface`, 1px `--line-2`, radius 10, `appearance:none`; placeholder `--ink-3`.
+- Суурь сонгогч `.field :where(input…, select, textarea)` — нэг классын жинтэй. Тиймээс төлвүүд form, popup бүрт ялна (өмнө нь (0,3,1) жинтэй суурь focus, invalid, disabled, readonly, mono тоог бүгдийг дардаг байсан — focus бараг үл үзэгдэх, disabled талбар засагдах мэт харагддаг байв), хуудасны өөрийн дүрэм ч суурийг давна.
+- Төлвүүд: hover (`hover:hover`) хүрээ `--ink-3`; `:focus` — `--accent` хүрээ + `--ring`; `[aria-invalid="true"]` — `--stop` хүрээ, focus-тэй бол `--ring-stop`; `[readonly]` — `--surface-2`, `--ink-2` (focus харагдсаар); `[disabled]` — `--surface-2`, `--ink-3`, `not-allowed`.
+- **Алдаа талбарын дор**: `.help[data-error]` 13/500 `--stop` + 14px анхааруулах тэмдэг (өнгө ганц дохио биш); байх хугацаандаа hint-ийг орлоно. `fieldError(input, message)` (api.js) — `aria-invalid="true"`, `aria-describedby` холбож мөрийг үүсгэнэ, `fieldError(input, null)` буцаана (hint сэргэнэ). Popup, нэвтрэх хаалга үүнийг хэрэглэнэ; хуудасны өөрийн form ч мөн. Хоосон заавал талбарын үг: «Бөглөнө үү.» (бичих), «Сонгоно уу.» (select, radio, pick), «Тэмдэглэнэ үү.» (checkbox) — form-ын дээр биш, тухайн талбарын дор. Талбарыг засаж эхлэхэд алдаа арилна.
+- select — `--chev` data-URI chevron (сэдэв тус бүрт `--ink-3` өнгө), padding-right 40. textarea — min 96, 12×14, resize vertical. date — native picker, `color-scheme` дагана. search — `.input.search` 38px зүүн padding + `--icon-search` (`.field` дотор ч), focus-д `--surface`.
+- Тоон: `input[type=tel]`, `[inputmode=numeric|decimal]`, `input.code` mono tabular — `.field` дотор ч (өмнө нь sans болдог байсан); placeholder нь sans (үг, утга биш), `+976` start тэмдэгтэй талбарынх mono. `.affix > i` — sans 14 `--ink-3` баруун 14; `.affix > i[data-start]` — эхэнд, хяналтын mono, хэмжээгээр («+976» ба бичсэн «9911 2233» нэг дугаар шиг уншигдана), input-ийн padding `--start` (тоонд 4ch). `input.code` — 64px, mono 32/600, .32em tracking, төв, `--surface-2`, radius 12 (найман нүд биш).
+- checkbox/radio — `appearance:none`, 20px, `--line-2` хүрээ (hover `--ink-3`); checked `--accent` + `--check` data-URI (`--on-accent` өнгө сэдэв тус бүрт) / radio inset 4px `--surface` цагираг. `.check` мөр 44px gap 12; disabled оролттой мөр бүхэлдээ `--ink-3`, `not-allowed`.
 - Бүлэглэл: `.fields` grid (утас 1 багана, ≥640 minmax 200), `.wide`, `.form-group` (hairline + eyebrow), `.form-foot`. Хүрээгүй-хүрээтэй давхар хайрцаг байхгүй: форм картын дотор шууд.
 - Хөндөгдөөгүй бүрэн бус форм — тусламж `--ink-3`, анхааруулга зөвхөн талбар хүрсний дараа.
 
@@ -265,7 +276,7 @@ Dark `@media (prefers-color-scheme: dark)` доор `:root:not([data-theme="ligh
 - Тон `data-s`-ээр (3.3-ын хүснэгт) эсвэл `data-tone=route|hold|accent|ready|stop`. Soft дүүргэлт өөрөө: HELD FIRED COOKING PREPARING warn failed bad late error; `[data-strong]` дурын тоныг дүүргэнэ. Бусад нь neutral pill + цэг: 50 PLACED мөртэй хүснэгт 50 цэнхэр pill биш.
 - `[data-inline]` — өндөр/padding/хүрээ/дэвсгэргүй, launcher ба idesh «Миний идэш» мөрийн meta-д.
 - Чип зөвхөн төлөвийн үг; нийлүүлэгчийн нэр, огноо чип биш (meta текст); бүх мөрөнд ижил байгаа баримт (Гэрээт) бүлгийн толгойд нэг удаа (DOM-д `.verified` үлдэнэ — тест).
-- `.pill` (ops) ижил дүрэмтэй alias. `.filter > button` — 36px sans 14/500, `[aria-pressed=true]` accent-soft + accent-ink + accent-line (ink slab биш). `.badge` — шошго pill (Гэрээт), ready tint, 20px, sentence-case, `data-tone`.
+- `.pill` (ops) ижил дүрэмтэй alias. `.filter > button` — 36px sans 14/500, `[aria-pressed=true]` accent-soft + accent-ink + accent-line (ink slab биш); hover хүрээ `--ink-3`. `.badge` — шошго pill (Гэрээт), ready tint, 20px, sentence-case, `data-tone`.
 
 ### 5.6 Хүснэгт — `.table` (ширээ)
 
@@ -273,7 +284,14 @@ Dark `@media (prefers-color-scheme: dark)` доор `:root:not([data-theme="ligh
 
 **Өгөгдлийн хүснэгт — `dataTable()` (`src/web/datatable.js`).** Dashboard дээрх *жагсаалт* бүр (зочид, захиалга, мөнгө, мэдэгдэл, нийлүүлэгч, байгууллага, гишүүд, түүх…) нэг л хэлбэртэй: хэрэгслийн мөр (хайлт; тухайн жагсаалтад хэрэгтэй шүүлтүүр — `.seg` эсвэл select; хуудасны товч, огноо, CSV; баруун талд мөрийн тоо «128 захиалга» эсвэл «12 / 128»), дараа нь нэг карт хүснэгт. Толгой бүр дарахад эрэмбэлнэ (тоо, дүн том нь эхэндээ; нэр А-аас), мөр дээр дарахад дэлгэрэнгүй нээгдэнэ, сүүлийн нүдэнд тухайн мөрийн үйлдэл (`.dt-act`, sm товч), 25-аар хуудаслана (25/50/100).
 
-Эрэмбэ, хуудас, шүүлт, хайлтын логик нь TanStack Table (`/vendor/table-core.js`, v8.21.3, MIT — global `TableCore`); харагдах байдал нь бидний: `.dt`, `.dt-bar`, `.dt-table`, `.dt-foot`. Нүдийг `dtCell`-ээр: `two(нэр, дэд мөр)`, `pill(төлөв, үг)`, `money`, `num`, `mono`, `when`, `none` («—»). Тоо, дүн баруун тийш (`align:'end'`), mono. Утсан дээр (≤720px) мөр бүр карт болж, баганын нэр утгынхаа хажууд гарна; `phone:false` багана утсан дээр нуугдана. Хэдхэн мөртэй, хайх юмгүй жагсаалтын хэрэгслийн мөр нуугдана.
+Эрэмбэ, хуудас, шүүлт, хайлтын логик нь TanStack Table (`/vendor/table-core.js`, v8.21.3, MIT — global `TableCore`); харагдах байдал нь бидний: `.dt`, `.dt-bar`, `.dt-table`, `.dt-foot`. Нүдийг `dtCell`-ээр: `two(нэр, дэд мөр)`, `pill(төлөв, үг)`, `money`, `num`, `mono`, `phone` («+976 9911 2233» болгож mono), `when`, `none` («—»). Тоо, дүн баруун тийш (`align:'end'`), mono. Утсан дээр (≤720px) мөр бүр карт болж, баганын нэр утгынхаа хажууд гарна; `phone:false` багана утсан дээр нуугдана. Хэдхэн мөртэй, хайх юмгүй жагсаалтын хэрэгслийн мөр нуугдана.
+
+- **Толгой**: ширээнд хуудсыг гүйлгэхэд толгой дээд ирмэгт наалдана (`top: var(--sticky-top)` — ≤900 deskbar-ийн доор). Карт зөвхөн хүснэгт өөрөөсөө өргөн үед л хайчилж, хажуу тийш гүйлгэнэ (`.dt-wrap[data-scroll]`, datatable.js хэмжиж тавина) — хайчлах хайрцаг бол sticky толгойн наалдах газар нь болдог тул. Эрэмбийн сум зөвхөн эрэмбэлсэн баганад (600 + чиглэл), бусад нь hover/focus-д л бүдэг; тоон баганын нэр тоон дээрээ тэгш байхаар сум нь өмнө нь.
+- **Мөр**: hover/дарах `--surface-2`, focus 2px нарс дотогшоо; `dense: true` — 8px мөр, урт жагсаалтад.
+- **Ачааллах**: 4 мөр яг ирэх мөрийн өндрөөр (64, dense 56) — эхний нүд нэр + дэд мөр, тоон нүд баруун, үйлдлийн нүд товчны хэлбэр; өгөгдөл ирэхэд үсрэхгүй.
+- **Хоосон**: хоосон төлвийн блок (5.14) картын дотор — `empty: { title, text, icon, action }` (`icon` — svg, жишээ нь sidenav-ийн `NAV_ICON.orders`; `action` — дараагийн алхмын товч node). Огт мөргүй, юу ч хайгаагүй, шүүгээгүй бол багануудын толгой нуугдана. Хайлт юу ч олоогүй бол «Олдсонгүй» + «Хайлтыг цэвэрлэх» товч.
+- **Хэрэгслийн мөр**: хайлт, шүүлтүүр, товч бүгд 40px (ширээ); count баруун талд. Одоогийн хуудасны дугаар accent-soft (хоёр дахь primary биш).
+- **Утсан дээрх карт**: нэр (дэд мөрөөр) дээр, нэг үйлдэл түүний баруун талд, дараа нь hairline, баганын нэр `--ink-3` (утгаасаа чимээгүй) — утга баруун; хоёр ба түүнээс олон үйлдэл картын доод мөрөнд. Хуудаслагч, seg 40–44px.
 
 Шинэ жагсаалт энэ бүрэлдэхүүнээр л хийгдэнэ — карт мөрийн жижиг саарал бичвэрт («· · ·»-ээр холбосон) мэдээллийг шахаж жагсаалт хийхгүй. `.table` нь цөөн баримт (түлхүүр–утга) харуулах жижиг хүснэгтэд л үлдэнэ.
 
@@ -287,7 +305,7 @@ Dark `@media (prefers-color-scheme: dark)` доор `:root:not([data-theme="ligh
 </div>
 ```
 
-Нэг карт, нүднүүд 1px hairline grid-ээр (gap 1px, `--line` дэвсгэр), 12 сүүдэр биш. Нүд 16×20, min 104, `.kpi` класс хэвээр (`#now .kpi === 6`, `#money .kpi === 6` тест). Шошго sans 13/500 `--ink-2`; утга mono 28/600 `--ink` (`.cur` .65em), утас 22, `data-span` бүтэн мөр; тайлбар 13 `--ink-3`; `data-tone=bad|warn|good` зөвхөн утгыг өнгөлнө, accent хэзээ ч биш. **Үг бол тоо биш**: `[data-word]` — 8px тон цэг + sans 17/600 үг («тэнцсэн», «Scheduler» textContent хэвээр).
+Нэг карт, нүднүүд 1px hairline grid-ээр (gap 1px, `--line` дэвсгэр), 12 сүүдэр биш. Нүд 16×20, min 104, `.kpi` класс хэвээр (`#now .kpi === 6`, `#money .kpi === 6` тест). Шошго sans 13/500 `--ink-2`; утга mono 28/600 `--ink` (`.cur` .65em), утас 22, `data-span` бүтэн мөр; тайлбар 13 `--ink-3`; `data-tone=bad|warn|good` зөвхөн утгыг өнгөлнө, accent хэзээ ч биш. **Үг бол тоо биш**: `[data-word]` — 8px тон цэг + sans 17/600 үг («тэнцсэн», «Scheduler» textContent хэвээр); үгийн мөр тооны мөрийн өндөртэй (min-height), нэг band-ийн тайлбарууд нэг шугамд. Ачаалж байх үед `skeleton('kpis', n)` (5.15).
 
 ### 5.8 Хэсгийн гарчиг — `.section-label`, `.section-title`, `.eyebrow`/`.lab`/`.sec`
 
@@ -295,7 +313,7 @@ Dark `@media (prefers-color-scheme: dark)` доор `:root:not([data-theme="ligh
 
 ### 5.9 Хуудасны толгой — `.page-head`
 
-Ширээ: flex flex-end space-between, margin-bottom 20; h1 22/600 −.015em; p 13/400 `--ink-2` нэг мөр (≤600px нуугдана); баруун slot — нэг seg эсвэл нэг primary. `.crumb` — 13/500 breadcrumb (эх tab accent-ink › одоогийнх `--ink-2`), буцах товч бүртгэсэн эх рүү. h1 доторх чип `margin-left:10;vertical-align:middle` (inline style биш). Утас: `[data-large]` — padding-top 8+safe, h1 28/600 −.02em, p 14 ≤36ch. Нэг хуудсанд нэг h1; supplier-ийн нэр bar-т span, хуудасны гарчиг h1.
+Ширээ: flex flex-end space-between, margin-bottom 20; h1 22/600 −.015em; p 13/400 `--ink-2` ≤48ch (≤600px — хоёр мөрөөр хязгаарлагдана, нуугдахгүй: утсан дээр ч хуудас юунд зориулагдсаныг хэлнэ); баруун slot — нэг seg эсвэл `.head-acts` (flex gap 8) дотор нэг primary. `.crumb` — 13/500 breadcrumb (эх tab accent-ink › одоогийнх `--ink-2`), буцах товч бүртгэсэн эх рүү. h1 доторх чип `margin-left:10;vertical-align:middle` (inline style биш). Утас: `[data-large]` — padding-top 8+safe, h1 28/600 −.02em, p 14 ≤36ch. Нэг хуудсанд нэг h1; supplier-ийн нэр bar-т span, хуудасны гарчиг h1.
 
 ### 5.10 Sheet — `.sheet`, `.scrim`
 
@@ -304,9 +322,12 @@ Fixed bottom, max 88dvh, `--glass` + blur, border-top, radius 16 16 0 0, `--shad
 **Нэмэх, засах, устгах — үргэлж popup (`api.js` `popup()` / `confirmPopup()`).** Dashboard болон данс, нийлүүлэгчийн хуудсууд дээр хуудас өөрөө **зөвхөн харуулна**: жагсаалт, баримт (`.facts`), мөр. Шинэ юм нэмэх, мэдээлэл засах, батлах, татгалзах, хаах, устгах бүгд popup дотор хийгдэнэ; хуудсан дээр задгай form, мөрөн доор нээгддэг inline form, хүснэгтийн нүдэн доторх select, `window.prompt()`/`confirm()` **байхгүй**.
 
 - *Товчны байр.* Хуудасны гол «нэмэх» үйлдэл (`+ Нийлүүлэгч бүртгэх`, `+ Хүн нэмэх`, `+ Модуль`) — `.page-head`-ийн баруун талд (`headActs()`), primary нэг л байна. Хэсгийн «Засах» — `.section-label`-ийн баруун талд, sm. Мөрийн үйлдэл («Батлах», «Эрх солих», «Хасах») — мөрийн сүүлийн нүдэнд, sm; primary нь зөвхөн хариу хүлээж буй мөрөнд.
-- *Popup-ийн бүтэц.* Толгой: гарчиг (үйлдлийн нэр — «Эрх солих», «Нийлүүлэгч бүртгэх») + юуны тухай гэдэг нэг мөр. Бие: талбарууд `.fields` — ≥640px хоёр багана, урт нь (`wide`, textarea, checks, icons) бүтэн мөр. Хөл: «Болих» quiet + нэг гол товч баруун талд; буцаах боломжгүй бол гол товч `danger`. Алдааг popup дотор талбаруудын дээр хэлнэ (toast биш — dim-ийн ард харагдахгүй), popup хаагдахгүй; заавал талбар хоосон бол илгээхээс өмнө хэлнэ.
-- *Асуулт.* `confirmPopup` — юу болох гэж буйг нэг, хоёр өгүүлбэрээр (нэрийг **тод**), бүртгэлд үлдэх шалтгаан/тэмдэглэл хэрэгтэй бол нэг textarea. «Итгэлтэй байна уу?» гэж асуухгүй — юу болохыг хэлнэ.
-- *Олон алхам.* Хайгаад дараа нь сонгох зүйл (хүн нэмэх: утас/имэйлээр хайх → эрх сонгох; имэйл холбох: хаяг → код) нэг popup-ийн хоёр алхам (`step()`), шинэ popup биш.
+- *Popup-ийн бүтэц.* Толгой: гарчиг (үйлдлийн нэр — «Эрх солих», «Нийлүүлэгч бүртгэх») + юуны тухай гэдэг нэг мөр (`aria-describedby`). Бие: талбарууд `.fields` — ≥640px хоёр багана, урт нь (`wide`, textarea, checks, icons) бүтэн мөр. Хөл: «Болих» quiet + нэг гол товч баруун талд (утсан дээр хоёулаа хагас өргөнөөр, доод ирмэгт эрхий хуруунд ойр, body дотроо гүйлгэгдэнэ); буцаах боломжгүй бол гол товч `danger` — popup-ийн гол товч бол баталгаажуулах алхам тул **улаан дүүргэлттэй** (`data-fill`). Ширээнд × 36px чимээгүй (hover `--hover`), утсан дээр 44px тойрог.
+- *Алдаа хаана.* Заавал талбар хоосон бол илгээхээс өмнө тухайн талбар бүрийн дор («Бөглөнө үү.», «Сонгоно уу.», `fieldError`), эхнийх нь focus авна. Серверийн хариу талбаруудын дээр stop callout-оор (`.popup-error`, `role=alert`) — toast биш, dim-ийн ард харагдахгүй; popup хаагдахгүй. Алдаа нэг талбарын тухай бол тэр талбарын дор: `throw Object.assign(new Error('…'), { field: 'phone' })` эсвэл `popup.fieldError('phone', '…')`. Талбарт бичиж эхлэхэд алдаа нь арилна.
+- *Хүлээх.* Илгээж байх хооронд гол товч эргэнэ (`data-busy`, `aria-busy`), талбарууд 60% бүдгэрч хөдөлгөөнгүй (`.popup[data-busy]`) — layout үсрэхгүй; «Болих» идэвхтэй хэвээр.
+- *Талбарын нэмэлт.* `unit: '₮' | 'кг'` (утгын дараа), `prefix: '+976'` (өмнө), `format: 'phone'` (бичих тусам «9911 2233» болгож бүлэглэнэ — `phoneInput`), `attrs: { maxlength, min, step, pattern }`; `type: 'tel'` бол `inputmode=tel` өөрөө.
+- *Асуулт.* `confirmPopup` — юу болох гэж буйг нэг, хоёр өгүүлбэрээр (нэрийг **тод**), бүртгэлд үлдэх шалтгаан/тэмдэглэл хэрэгтэй бол нэг textarea (`reason.hint` дор нь). «Итгэлтэй байна уу?» гэж асуухгүй — юу болохыг хэлнэ.
+- *Олон алхам.* Хайгаад дараа нь сонгох зүйл (хүн нэмэх: утас/имэйлээр хайх → эрх сонгох; имэйл холбох: хаяг → код) нэг popup-ийн хоёр алхам (`step()`), шинэ popup биш. `steps: 2` өгвөл гарчгийн дээр «АЛХАМ 1/2» eyebrow + хоёр зураас; шинэ талбар зурсан `step()` бүр дараагийн алхам руу шилжүүлнэ (`step({ at })` шууд). Pick жагсаалт эхний хариу иртэл гурван мөрийн хэлбэртэй skeleton харуулна.
 - *Жагсаалтаас сонгох* — `type: 'pick'` талбар (`search(q)` мөрүүд буцаана: `{ value, title, sub, note, disabled }`, `empty` хоосон үеийн өгүүлбэр): дээр нь хайлтын нүд (`input.search`, бичих тусам 200ms-ийн дараа хайна, Enter шууд хайна — popup-ийг илгээхгүй), доор нь radio мөрүүд (`.popup-pick-row`, 52px, нэр 14/600 + mono утас/имэйл, баруун талд `.note`; сонгосон мөр accent-soft; сонгох боломжгүй нь `[data-off]` саарал). Сонгосон мөр дараагийн хайлтад ч жагсаалтад үлдэнэ. Ops «Гишүүн нэмэх»: Basu-гийн хэрэглэгчдээс хүнээ сонгоод эрх олгоно — ops-д аль хэдийн байгаа хүн сонгогдохгүй.
 - *Хоосон хэсэг зай эзлэхгүй.* Хариу хүлээж буй өргөдөл (нийлүүлэгч, байгууллага) байхгүй бол тэр хэсэг огт зурагдахгүй; хоосон хүснэгт тавихгүй.
 - Хадгалахад popup хаагдаж, хуудас серверээс шинээр зурагдана. Олон зүйлийг нэг дор «Хадгалах» товч (цэсийн хуудас гэх мэт) хийхгүй — өөрчлөлт бүр өөрийн popup-аар шууд хадгалагдана.
@@ -322,25 +343,51 @@ Sticky, grid `minmax(44px,auto) 1fr minmax(44px,auto)`, min-height 52+safe, glas
 - `.brand` — Basu 18/600 `--ink` + «Dashboard»/«Нийлүүлэгч» 13/500 `--ink-3`; `.brand-home` (wordmark) болон баруун талын `.go-home#go-home` «⌂ Нүүр» (30px pill, line, 13/500 `--ink-2`) хоёулаа Basu-гийн нүүр хуудас `/` руу — dashboard-оос гарах нэг товшилт. `deskFrame({ home })`: апп дотор (`shell.present`) `null` — тэнд нүүр нь аппын өөрийнх.
 - `.ws` ажлын орчин сэлгэгч — `.ws-btn` 54px, `--surface-2`, 1px line, `--r-ctl`: `.ws-mark` 32 (эхний хоёр үсэг; `[data-kind="desk"]` `--ink` дүүргэлт «B», `[data-kind="me"]` дугуй) + нэр 14/600 + мөр 11.5 `--ink-3` («Нийлүүлэгч · Эзэн») + дээш-доош chevron. Нэг л газартай бол `disabled`, chevron-гүй. `.ws-menu` (role=menu) — `width:max(100%,296px)`, `--shadow-float`: «Ажлын орчин» eyebrow, `.ws-opt` 44 (role=menuitemradio, тогтмол дараалал: ширээ → идэвхтэй байгууллага → хүлээгдэж буй → хувийн булан; одоогийнх accent check), `.ws-sep`, `.ws-act` («Байгууллага бүртгүүлэх»; ops-д орох эрхийг хэн ч хүсдэггүй — админ хэрэглэгчдээс сонгож олгоно). Esc, гадна дарах хаана.
 - `nav.tabs` flex column `overflow-y:auto` `flex:1` — Гарах хэзээ ч тасрахгүй. **Модуль → Цэс мод**: дээд хэсэг `.nav-top` (модульгүй хуудсууд, дүрстэй), дараа модуль бүр `.nav-mod[data-group]`: `.mod` товч 38px — модулийн дүрс 18 `--ink-3`, нэр 14/600 `--ink`, эвхэгдсэн үед нийт тоо `.n[data-mod-badge]`, баруун талд 14px chevron (`aria-expanded`); доор нь `.mod-items` (зүүнээс 19px, 1px `--line` шугам, `role=group`) дотор `.nav-item.sub` 32px, 14/500 `--ink-2`, дүрсгүй. `[data-shut]` → хуудсууд нуугдана, chevron −90°; эвхэлт `localStorage['basu.nav.shut']`-д (`<kind>:<module>`). Нээлттэй хуудас: `[data-on]` accent-soft + accent-ink 600, шугам дээр 2px accent тэмдэг (`::before`), модуль нь `[data-here]` — дүрс нь accent, хэзээ ч эвхэгдэхгүй. Өөр хуудас руу `a[href]` (нийлүүлэгчийн хуудас), гадагш холбоос `target=_blank` + `.away` дүрс. `.n[data-badge]` count (neutral; `[data-hot]` accent). Модуль, хуудас, нэр, дүрс, дараалал бүгд `/v1/access`-ээс — Basu-гийн «Цэс» хуудсаар засагдана.
-- `.acct` hairline дээр: `.av` 32 дугуй эхний үсэг, нэр 13/600, хаяг mono 11.5 ellipsis, `#out` 36 icon → hover stop-soft; supplier дээр хоёр товшилтоор (`[data-confirm]` «Гарах уу?»).
+- `.acct` hairline дээр — **хэний сесс вэ** гэдэг тод: grid, эхний мөрөнд `.av` 32 дугуй эхний үсэг (нэр нь утасны дугаар бол хүний дүрс), нэр 13/600, `#out` 30 icon (утасны drawer-т 40) → hover stop-soft; хоёр дахь мөрөнд нэвтэрсэн хаяг нэрийн доор **бүтэн өргөнөөр** sans 12.5 `--ink-2` (gmail хаяг товчны хажууд таслагддаг байсан), утасны дугаар бол mono «+976 8801 0011»; нэргүй бол хаяг/дугаар өөрөө нэр. Бүтэн мөр `title`-д. supplier дээр хоёр товшилтоор (`[data-confirm]` «Гарах уу?»). Нээлттэй хуудас урт цэсний доор нуугдвал цэс өөрөө гүйлгэж харуулна.
 
-≤900px: `.deskbar` sticky (52+safe): `.nav-open` 44 hamburger + хуудасны нэр 15.5/600 + газрын нэр 11.5; sidebar `position:fixed` drawer `min(86vw,304px)`, `translateX(-104%)` → `[data-open]`, `.nav-scrim` (`--scrim`), `.nav-close`, `html[data-nav-open]{overflow:hidden}`, Esc хаана. Supplier утсан дээр (<900) `.tabbar` хэвээр — таб нь суудлын эрхээр шүүгдэнэ (ажилтан 4, нягтлан 3). Цэсийн мөр, бүлэг бүр серверийн `/v1/access`-ээс ирнэ — хуудас өөрөө жагсаалт зохиохгүй (ADR 0003). Ширээний өргөнтэй supplier `data-theme="light"`-д зүүгдэнэ — dashboard-тай нэг харагдана.
+≤900px: `.deskbar` sticky (52+safe): `.nav-open` 44 hamburger + хуудасны нэр 15.5/600 + газрын нэр 11.5 + баруун төгсгөлд `.deskbar-me` (44 бай, 32 дугуй эхний үсэг — хэн нэвтэрснийг утсан дээр ч хэлнэ, `aria-label` «Нэвтэрсэн: нэр · хаяг», дарахад drawer); sidebar `position:fixed` drawer `min(86vw,304px)`, `translateX(-104%)` → `[data-open]`, `.nav-scrim` (`--scrim`), `.nav-close`, `html[data-nav-open]{overflow:hidden}`, Esc хаана. Нээгдэхэд keyboard drawer дотор орно (× focus), Tab дотроо эргэнэ, хаагдахад цэсний товч руу буцна. Supplier утсан дээр (<900) `.tabbar` хэвээр — таб нь суудлын эрхээр шүүгдэнэ (ажилтан 4, нягтлан 3). Цэсийн мөр, бүлэг бүр серверийн `/v1/access`-ээс ирнэ — хуудас өөрөө жагсаалт зохиохгүй (ADR 0003). Ширээний өргөнтэй supplier `data-theme="light"`-д зүүгдэнэ — dashboard-тай нэг харагдана.
 
 ### 5.13 Toast — `#toast`
 
-Fixed, `bottom:calc(24px + var(--toast-lift) + safe)`, ink дэвсгэр `--ink-inverse` текст, 12×16, radius 12, sans 14/500, `--shadow-float`; `[data-kind=bad]` `--stop`/`--on-stop`; `[data-kind=good]` `--ready` цэг (ops 8 удаа дууддаг, өнөөдөр загваргүй). Tab bar-тай хуудас `.has-tabbar` (`--toast-lift:var(--tabbar-h)`). 3200ms; хүн хадгалах код/дүн toast-д хэзээ ч ганцаараа байхгүй.
+`toast(message, kind)`. Нэг ink pill бүх төрөлд (light-д бараан, dark-д цайвар), төрөл нь үгийн өмнөх тэмдэг: `good` — check (`--toast-good`), `bad` — анхааруулга (`--toast-bad`) + pill нь stop руу хазайна (light-д дарсны өнгө, dark-д ягаан туяа — улаан хавтан чанга, dark-д хашгирсан байсан), `info` — «i» (`--toast-info`), төргүй — тэмдэггүй. Fixed, `bottom:calc(20px + var(--toast-lift) + safe)`, 12×16, radius 12, sans 14/500, `--shadow-float`, гарахдаа 16px дээш + fade. 3200ms, `bad` 5200ms. Дараагийн toast өмнөхийг арчихгүй — өмнөх нь дээш нэг шат гарна (хуулбар `.toast-old`, `aria-hidden`), гурваас илүүгүй; дарахад алга болно. `#toast` (`role=status`) үргэлж хамгийн сүүлийн үгийг агуулна — тест үүнийг уншина. Доод ирмэгт наалдсан bar (tab bar, idesh-ийн төлөх bar, dine-ийн захиалгын bar) байвал toast түүний дээр гарна — api.js харуулах мөчид хэмжинэ (`--toast-over`; хуудасны нэмэлт тохиргоо хэрэггүй, `--toast-lift` нөөц хэвээр); утсан дээр доод sheet нээлттэй бол toast дээрээс гарна — sheet-ийн өөрийн товчийг хаахгүй. Хүн хадгалах код/дүн toast-д хэзээ ч ганцаараа байхгүй; form-ын алдаа toast биш, талбарын дор (5.4).
 
-### 5.14 Хоосон төлөв — `.empty`
+### 5.14 Хоосон төлөв — `.empty-state` (`emptyState()`) ба `.empty`
 
-Hairline + нэг мөр: padding 20×16, border-top, 14/400 `--ink-2`, зүүн зэрэгцүүлэлт, `b` 600 `--ink`, сонголтоор нэг secondary sm `.btn` (Зар нэмэх). `.card.empty` картын харагдацаа алдана (дэвсгэр/хүрээ/сүүдэргүй) — скриптүүд `<div class="card empty">` үүсгэсээр байж болно. `[data-center]` ≤32ch төв (KDS lane). Дүрсгүй. `…` ачааллын текст skeleton-оор солигдоно.
+Production ихэвчлэн хоосон: хүн анх харах зүйл бол хоосон төлөв. Тиймээс хоосон газар **санаатай** харагдана: энэ газар юунд зориулагдсан, дараагийн алхам юу вэ.
 
-### 5.15 Skeleton — `.skel`, `.skel-row`
+**Блок — `emptyState({...})` (api.js), `.empty-state`.** Жагсаалт, хуудас, хэсэг бүр юу ч агуулаагүй үедээ:
 
-`--surface-2` блок, radius 8, shimmer (`prefers-reduced-motion` үед хөдөлгөөнгүй). `.skel-row` — 56px, 40px plate + `.skel-lines` (60%/40%) + 48px баруун. Ирэх мөрийн геометрийг хуулна, гурван мөр; контейнерт `role=status aria-busy=true`; амжилтгүй бол `.empty` өгүүлбэр + «Дахин ачаалах» secondary sm. Home `#live` token байгаа үед skeleton-оор зайгаа хадгална (grid үсрэхгүй); `[data-any]` hook хэвээр.
+```js
+view.append(emptyState({
+  icon: 'orders',                       // EMPTY_ICON-ийн нэр эсвэл svg (sidenav-ийн NAV_ICON.orders)
+  title: 'Захиалга алга',
+  text: 'Зочин захиалга өгмөгц энд гарна.',
+  action: { label: 'Зар нэмэх', onClick: () => …, primary: true },   // эсвэл node
+  size: 'sm', frame: true, tone: 'accent', align: 'start',           // бүгд сонголт
+}));
+```
+
+- Тэмдэг: 48px дугуй plate, `--surface-2` + 1px `--line`, 22px шугаман дүрс `--ink-2` (`sm` 40/20); `tone: 'accent'` (анхны алхам — accent-soft + accent-ink) эсвэл `'stop'` (ачаалж чадсангүй). Гарчиг 15.5/600 `--ink`; нэг мөр 14/400 `--ink-2` ≤46ch; нэг үйлдэл (sm-д sm товч) 18px доор. Төвд, padding 40×24 (ширээ 48), `sm` 24×16. Ганцаараа хуудсан дээр бол `frame: true` — өөрийн карттай. `html` — нэрийг **тод** бичих шаардлагатай мөр (дуудагч escape хийнэ).
+- Дүрсүүд (`EMPTY_ICON`): inbox, search, orders, people, store, bowl, wallet, bell, calendar, star, org, clock, truck, alert, offline — цэсний дүрстэй нэг загвар (24 grid, stroke 1.6).
+- Үг: юу байхгүйг + хэзээ/яаж гарахыг эсвэл юу хийхийг хэлнэ: «Захиалга алга — Зочин захиалга өгмөгц энд гарна.», «Зар алга — Эхний зараа нэмбэл зочид харж эхэлнэ.» Ганц «Алга» биш. Үйлдэл: дэлгэцийн цорын ганц дараагийн алхам бол primary, хуудасны толгойд primary аль хэдийн байвал secondary (нэг дэлгэц — нэг primary).
+- `dataTable`-ийн хоосон мөр, «Олдсонгүй» мөр ижил блок (5.6).
+
+**Нэг мөр — `.empty`** (хуучин хэлбэр): алдааны өгүүлбэр, жижиг panel доторх тэмдэглэл, KDS lane. Hairline + нэг мөр: padding 20×16, border-top, 14/400 `--ink-2`, зүүн зэрэгцүүлэлт, `b` 600 `--ink`, сонголтоор нэг secondary sm `.btn`. `.card.empty` картын харагдацаа алдана — скриптүүд `<div class="card empty">` үүсгэсээр байж болно. `[data-center]` ≤32ch төв (KDS lane). Шинэ «юу ч алга» газар блокоор хийгдэнэ; хуудаснууд аажмаар шилжинэ.
+
+### 5.15 Skeleton — `skeleton()`, `.skel`, `.skel-row`
+
+`--surface-2` блок, radius 8, shimmer (`prefers-reduced-motion` үед хөдөлгөөнгүй; dark-д цайвар туяа). Ирэх зүйлийн хэлбэр, хэмжээг хуулна — өгөгдөл ирэхэд үсрэхгүй. `skeleton(kind, n)` (api.js) — `role=status aria-busy=true aria-label="Ачаалж байна"` контейнер буцаана:
+
+- `'rows'` — карт доторх `.skel-row` мөрүүд (56px, 40px plate + `.skel-lines` 60%/40% + 48px баруун, hairline-аар);
+- `'cards'` — `.skel-cards` grid (≥240px) — 16:10 зураг + хоёр мөр (зарын карт);
+- `'kpis'` — `.kpi-band` дотор `.skel-kpi-cell` (шошго, утга, тайлбар; `.kpi` класс **биш** — тест `.kpi`-г тоолдог);
+- `'lines'` — догол мөрийн хэдэн зураас.
+
+Ирсэн зүйлээр контейнерийг солино; амжилтгүй бол `emptyState({ tone: 'stop', icon: 'offline', … , action: «Дахин ачаалах» })`. Home `#live` token байгаа үед skeleton-оор зайгаа хадгална (grid үсрэхгүй); `[data-any]` hook хэвээр. Ширээний хүснэгтийн ачааллын мөрийг `dataTable` өөрөө зурна (5.6).
 
 ### 5.16 Avatar — `.avatar`
 
-30 (`sm`) / 40 / 54 (`lg`), radius 28%, `--surface-2` plate + line; `[data-mark]` — 4×4 толин тусгал grid (`api.js` `avatar(seed,size)`: %3 хоосон, сондгой тойрог, тэгш дөрвөлжин, ≥8 `--ink`, эхний ≥13 accent); үсэг fallback 600 `--ink-2`. Зураг биш, хүн тус бүрт өнгө биш.
+30 (`sm`) / 40 / 54 (`lg`), radius 28%, `--surface-2` plate + line; `[data-mark]` — 4×4 толин тусгал grid (padding, gap нь тэмдгийн өөрийн хэмжээгээр — хувиар бол эцгийн өргөнөөр тооцогдож өргөн мөрөнд 235px болдог байсан) (`api.js` `avatar(seed,size)`: %3 хоосон, сондгой тойрог, тэгш дөрвөлжин, ≥8 `--ink`, эхний ≥13 accent); үсэг fallback 600 `--ink-2`. Зураг биш, хүн тус бүрт өнгө биш.
 
 ### 5.17 Count — `.count`
 
@@ -348,11 +395,11 @@ Hairline + нэг мөр: padding 20×16, border-top, 14/400 `--ink-2`, зүүн
 
 ### 5.18 Segmented — `.seg`
 
-`--surface-2` track, 1px `--line`, radius 10, padding 3; товч 32px (утас `[data-fill]` 40) 13/500 `--ink-2`; `[data-on]`/`[aria-pressed=true]` `--surface` + `--line-2` + `--shadow` 600. Тон: `[data-on=yes]`/`[data-tone=ready]` ready-soft, `no`/stop stop-soft (dine Тийм/Үгүй). Хугацаа, scope, KDS lane (тоо `.count`-оор). Товчны текст яг монгол үг (тест текстээр дардаг).
+`--surface-2` track, 1px `--line`, radius 10, padding 3; товч 32px (утас `[data-fill]` 40) 13/500 `--ink-2`; `[data-on]`/`[aria-pressed=true]` `--surface` + `--line-2` + `--shadow` 600; бусад нь hover `--hover`, дарах `--press`, `disabled` `--ink-3`. `max-width:100%` — нарийн дэлгэцэд хуудсыг хажуу тийш түлхэхгүй, дотроо гүйлгэнэ (scrollbar-гүй, focus дотогшоо). Тон: `[data-on=yes]`/`[data-tone=ready]` ready-soft, `no`/stop stop-soft (dine Тийм/Үгүй). Хугацаа, scope, KDS lane (тоо `.count`-оор). Товчны текст яг монгол үг (тест текстээр дардаг).
 
 ### 5.19 Tab bar — `.tabbar` (утас)
 
-Fixed bottom 64+safe, glass, border-top, grid; товч 44, дүрс 24 stroke 1.6, шошго 11/500 (**харагдана**, icon-only strip биш), `[data-on]` accent-ink + svg accent, `:active` `--surface-2`, `.count` дүрсний дээр. ≤5; тавдахь «Бусад». Агуулга `.has-tabbar`.
+Fixed bottom 64+safe, glass, border-top, grid; товч 44, дүрс 24 stroke 1.6, шошго 11/500 (**харагдана**, icon-only strip биш), `[data-on]` accent-ink + svg accent, `:active` `--press`, `.count` дүрсний дээр. ≤5; тавдахь «Бусад». Агуулга `.has-tabbar`.
 
 ### 5.20 Callout — `.callout`, `.note[data-k]`
 
@@ -373,6 +420,12 @@ Flex, 18px дүрс, 12×14, radius 10, `--surface-2` + line (default info); `da
 ### 5.24 Баримт — `.doc` (terms, privacy)
 
 `.doc` 560 багана, `.doc-card` нэг карт (≤480 ирмэгээс ирмэг), h1 28/600, h2 17/600 hairline дээр + `.n` mono дугаар (текст дэх «1.» хэвээр, span-аар харагдац тусгаарлана), p/li 15/400/1.6 `--ink-2` ≤62ch, `ol` mono counter, `.doc-meta` (dt eyebrow / dd) — ХҮЧИНТЭЙ / ХУВИЛБАР / ОПЕРАТОР / ХОЛБОО БАРИХ, `.doc-summary` (мөнгөний дүрмүүд mono утгаар), `.toc`, `.en` hairline + EN eyebrow, `.back` 44 chevron. Topbar (5.11) — `history.length>1 ? history.back() : '/idesh'` нэг inline модуль (CSP hash — restart).
+
+### 5.25 Нэвтрэх хаалга — `signInDoors()`, `accountWays()`
+
+Google, имэйл код, нууц үг — нэг блок (`.ways`); ширээ, нийлүүлэгч, гал тогоо, вэбийн sheet бүгд үүнийг хэрэглэнэ. Бэрхшээл болсон газартаа хэлэгдэнэ, дэлгэцийн ёроолын toast-д биш: хоосон эсвэл буруу талбар өөрийнхөө дор (`fieldError` — «Имэйл хаягаа бичнэ үү.», «Имэйлд ирсэн 6 оронтой кодоо бичнэ үү.», серверийн «Имэйл хаягаа шалгана уу.»); юу ч бичсэнтэй хамаагүй татгалзал (холболт тасарсан, хэт олон оролдлого, «нууц үг буруу») дахин оролдох товчны яг дээр `.ways-say` (13/500 `--stop` + тэмдэг, `role=alert`). Сүлжээ тасарвал хөтчийн англи үг («Failed to fetch») биш — `whatWentWrong()`-ийн монгол үг. Код оруулах нүд `.field` дотор (focus нарс хүрээтэй). Дахин бичиж эхлэхэд алдаа арилна. Амжилтын мэдээ («Нууц үг шинэчлэгдлээ») toast хэвээр. `accountWays` — имэйл холбох, анхны нууц үг хоёр алхамтай popup (`steps: 2`), кодын талбар 6 тэмдэгтээр хязгаартай, буруу код, богино нууц үг тухайн талбарын дор.
+
+Утасны дугаарыг харуулахдаа `phoneText(value)` (api.js) → «+976 9911 2233» (dataTable-д `dtCell.phone`). Утас бичих талбарт `+976` start тэмдэг + `phoneInput(input)` — бичих, буулгах тусам цифрийг «9911 2233» болгож бүлэглэнэ, курсор байрандаа; илгээх утга хоосон зайтай хэвээр (нэвтрэлт `phoneE164` үүнийг уншдаг — өөр endpoint бол хуудас зайг арилгана).
 
 ---
 
@@ -463,7 +516,7 @@ Chrome: badge + «‹ Basu» → нэг `.topbar[data-fixed]` (back тэргүү
 
 ## Хавсралт А. Эвдэж болохгүй зүйлс
 
-Бүх хуудсанд: (1) хуудас бүр яг нэг `<script type="module">…</script>` (атрибутгүй — тест `/<script type="module">([\s\S]*?)<\/script>/` эхнийхийг авна); import `import { … } from '/api.js';` / `'/mapStyle.js';` / `'/sidenav.js';` хэлбэрээр (тест гурвууланг нь inline хийнэ; `sidenav.js` import-гүй, дээд түвшний нэр бүр `nav`/`NAV`-аар эхэлнэ) мөрийн төгсгөлд (regex `/^\s*import[\s\S]*?from\s*'\/[\w.]+';?$/m`); хоёр дахь inline script hash-лагдана, тест ажиллуулахгүй. (2) `src/api/hardening.ts` inline script бүрийг сервер эхлэхэд SHA-256 хийнэ — JS өөрчлөгдвөл restart; `hardening.test` хуудас бүрт нэг hash. (3) `localStorage` түлхүүр `basu.guest`, `basu.kitchen` (гал тогооны сесс), `basu.ops`, `basu.ops.tab/.period/.money/.notify` (`basu.ops.tab` = ширээний сүүлийн хуудас), `basu.dash.ws` (сүүлийн ажлын орчин), `basu.dash.page.<orgId>`, `basu.nav.shut`. (4) `#toast` (api.js үүсгэнэ, `role=status`, `data-show`, `data-kind=bad`) — тест timeout дээр уншина. (5) `html.in-shell` (api.js shell дотор). (6) `.clockbar` markup: `.lab` «Демо цаг», `#clock-now.now.mn`, `button[data-to|data-advance|data-tick][data-hot]`. (7) Бүх монгол копи үг үсгээрээ хэвээр; `№`, `·`, `₮` (`mnt()`), `—`.
+Бүх хуудсанд: (1) хуудас бүр яг нэг `<script type="module">…</script>` (атрибутгүй — тест `/<script type="module">([\s\S]*?)<\/script>/` эхнийхийг авна); import `import { … } from '/api.js';` / `'/mapStyle.js';` / `'/sidenav.js';` хэлбэрээр (тест гурвууланг нь inline хийнэ; `sidenav.js` import-гүй, дээд түвшний нэр бүр `nav`/`NAV`-аар эхэлнэ) мөрийн төгсгөлд (regex `/^\s*import[\s\S]*?from\s*'\/[\w.]+';?$/m`); хоёр дахь inline script hash-лагдана, тест ажиллуулахгүй. (2) `src/api/hardening.ts` inline script бүрийг сервер эхлэхэд SHA-256 хийнэ — JS өөрчлөгдвөл restart; `hardening.test` хуудас бүрт нэг hash. (3) `localStorage` түлхүүр `basu.guest`, `basu.kitchen` (гал тогооны сесс), `basu.ops`, `basu.ops.tab/.period/.money/.notify` (`basu.ops.tab` = ширээний сүүлийн хуудас), `basu.dash.ws` (сүүлийн ажлын орчин), `basu.dash.page.<orgId>`, `basu.nav.shut`. (4) `#toast` (api.js үүсгэнэ, `role=status`, `data-show`, `data-kind=bad`) — тест timeout дээр уншина. (5) `html.in-shell` (api.js shell дотор). (6) `.clockbar` markup: `.lab` «Демо цаг», `#clock-now.now.mn`, `button[data-to|data-advance|data-tick][data-hot]`. (7) Бүх монгол копи үг үсгээрээ хэвээр; `№`, `·`, `₮` (`mnt()`), `—`. (8) `#toast` үргэлж хамгийн сүүлийн үгийг агуулна (textContent = зөвхөн үг; тэмдэг нь `::before`); өмнөх toast-ууд `.toast-old` хуулбар (`aria-hidden`, id-гүй) — тест `#toast`-ийг уншсаар. (9) Popup: `.sheet.popup[data-open]`, `[data-submit]`, `[data-cancel]`, `header h2` (гарчиг — алхмын eyebrow `.popup-steps` h2-оос гадна), `header .sub`, `.popup-error` (`hidden` + серверийн үг, одоо stop тон), заавал талбарын алдаа `.help[data-error]` талбарын дор + `aria-invalid="true"`; `answerPopup` туслах хэвээр ажиллана. (10) `dataTable`: `tbody tr.dt-skel` ачааллын үед, `.dt-empty` текстэд «Олдсонгүй», `thead th .dt-sort` textContent = баганын нэр яг (сум svg), `.dt-count`, `.dt-range`, `.dt-pages [aria-current="page"]`, `[aria-label="Өмнөх"|"Дараах"]` хэвээр; огт хоосон жагсаалтад `.dt[data-empty]` (толгой нуугдана). (11) `api.js`-ийн дээд түвшний шинэ нэрс (`fieldError`, `emptyState`, `skeleton`, `setBusy`, `phoneText`, `phoneInput`, `EMPTY_ICON`, `toastOver`, `toastRestack`, `toastDrop`, `toastOld`, `TOAST_MS`, `popupAttrs`, `popupMissing`, `fieldErrorSeq`) хуудасны inline модульд дахин зарлагдахгүй — тест бүгдийг нэг scope-д нийлүүлдэг.
 
 ### home (`index.html`)
 - Тест: `.app` яг 2 (basu.guest байхгүй үед) — `app` классыг өөр зүйлд хэрэглэхгүй; `.app[data-app="dine"]` `<a href="/dine">`, текст «Хоол», дотор `.tile svg`; `[data-app="idesh"]` `/idesh`, «Идэш», `.tile svg`; `.card` 0 (гарсан үед) — `.card` зөвхөн live мөрөнд, контейнер/grid-д биш; dine захиалгатай бол эхний `.card` `<a>` текст = ресторан, href `/^\/dine\?order=[0-9a-f-]{36}$/`; `.card[data-source="Идэш"]` href `/^\/idesh\?order=[0-9a-f-]{36}$/`, `card.querySelector('.chip').textContent === 'Төлсөн'` (PAID; зөвхөн үг), `.when` textContent `/^\d{1,2}\/\d{1,2}авах$/` (`${row.time}<small>${row.label}</small>` зэрэгцээ, зайгүй).

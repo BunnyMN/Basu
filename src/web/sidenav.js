@@ -156,8 +156,23 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', h
   // A steady order, whichever is open: Basu's desk, the businesses running, the ones waiting, the person's own corner.
   const rank = (w) => (w.kind === 'desk' ? 0 : w.kind === 'org' ? (w.state === 'active' || !w.state ? 1 : 2) : 3);
   const listed = workspaces.map((w, i) => [w, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([w]) => w);
-  const who = account ? account.name || account.email || account.phone || 'Нэргүй' : 'Демо';
-  const contact = account ? account.email || account.phone || '' : 'Хуваалцсан нууц үг';
+  /*
+   * Whose session this is, said plainly at the foot (and at the end of the
+   * phone's bar): the name, and under it the address or the number it signs
+   * in with. A number reads in the mono, «+976 9911 2233»; an address in the
+   * sans, which fits the foot. Without a name the contact is the name.
+   */
+  const byPhone = Boolean(account && !account.email && account.phone);
+  const contactText = account
+    ? byPhone
+      ? String(account.phone).replace(/^\+?976(\d{4})(\d{4})$/, '+976 $1 $2')
+      : account.email || account.phone || ''
+    : '';
+  const who = account ? account.name || contactText || 'Нэргүй' : 'Демо';
+  const contactLine = account ? (account.name ? contactText : '') : 'Хуваалцсан нууц үг';
+  const whoMono = byPhone && !account.name;
+  /** The round mark: the name's first letters, or a person when the name is a number. */
+  const avatarMark = /\p{L}/u.test(who) ? esc(initials(who)) : NAV_ICON.person;
 
   const t = document.createElement('template');
   t.innerHTML = `
@@ -165,6 +180,7 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', h
       <header class="deskbar">
         <button class="nav-open" type="button" aria-label="Цэс" aria-controls="sidebar" aria-expanded="false">${NAV_ICON.burger}</button>
         <div class="deskbar-t"><b data-title></b><span>${esc(current.name)}</span></div>
+        <button class="deskbar-me" type="button" aria-label="${esc(`Нэвтэрсэн: ${who}${contactLine ? ` · ${contactLine}` : ''}`)}" title="${esc(contactLine ? `${who} · ${contactLine}` : who)}" aria-controls="sidebar"><span aria-hidden="true">${avatarMark}</span></button>
       </header>
       <aside class="side sidebar" id="sidebar" aria-label="Хажуугийн цэс">
         <div class="brand">${
@@ -191,9 +207,9 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', h
           </div>
         </div>
         <nav class="tabs" aria-label="Хэсгүүд">${groups}</nav>
-        <div class="acct">
-          <span class="av" aria-hidden="true">${esc(initials(who))}</span>
-          <span class="who"><b>${esc(who)}</b><small>${esc(contact)}</small></span>
+        <div class="acct" title="${esc(contactLine ? `${who} · ${contactLine}` : who)}">
+          <span class="av" aria-hidden="true">${avatarMark}</span>
+          <span class="who"><b${whoMono ? ' data-mono' : ''}>${esc(who)}</b>${contactLine ? `<small${byPhone ? ' data-mono' : ''}>${esc(contactLine)}</small>` : ''}</span>
           <button class="out" type="button" id="out" aria-label="Гарах" title="Гарах">${NAV_ICON.out}</button>
         </div>
       </aside>
@@ -208,13 +224,21 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', h
   const wsMenu = root.querySelector('.ws-menu');
 
   /* ── the drawer, on a phone ── */
+  /** Whether the sidebar is a drawer here (a phone, a narrow window) rather than a column. */
+  const narrow = () => typeof matchMedia === 'function' && matchMedia('(max-width: 900px)').matches;
   const drawer = (open) => {
+    const was = side.hasAttribute('data-open');
     side.toggleAttribute('data-open', open);
     scrim.hidden = !open;
     opener.setAttribute('aria-expanded', String(open));
     document.documentElement.toggleAttribute('data-nav-open', open);
+    // The keyboard goes into the drawer as it opens, and back to the menu button as it closes.
+    if (!narrow()) return;
+    if (open && !was) root.querySelector('.nav-close')?.focus();
+    else if (!open && was && side.contains(document.activeElement)) opener.focus();
   };
   opener.addEventListener('click', () => drawer(true));
+  root.querySelector('.deskbar-me').addEventListener('click', () => drawer(true));
   root.querySelector('.nav-close').addEventListener('click', () => drawer(false));
   scrim.addEventListener('click', () => drawer(false));
 
@@ -241,6 +265,18 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', h
   };
   document.addEventListener('click', away);
   root.addEventListener('keydown', (e) => {
+    // An open drawer keeps the keyboard inside it, as a popup does.
+    if (e.key === 'Tab' && side.hasAttribute('data-open') && narrow()) {
+      const stops = [...side.querySelectorAll('a[href], button:not([disabled])')].filter((node) => node.getClientRects().length > 0);
+      const [first, last] = [stops[0], stops[stops.length - 1]];
+      if (first && e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (last && !e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
     if (!wsMenu.hidden && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
       // Up and down move through the places and the actions, round and round.
       const lines = [...wsMenu.querySelectorAll('.ws-opt, .ws-act')];
@@ -303,6 +339,12 @@ export function deskFrame({ workspaces, current, account, brand = 'Dashboard', h
         box.setAttribute('data-here', '');
         box.removeAttribute('data-shut');
         box.querySelector('.mod')?.setAttribute('aria-expanded', 'true');
+      }
+      // A long menu scrolls: the open page is never left below its fold.
+      const list = root.querySelector('.tabs');
+      if (list && list.scrollHeight > list.clientHeight) {
+        const top = node.offsetTop - list.offsetTop;
+        if (top < list.scrollTop || top + node.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = top - list.clientHeight / 2;
       }
     }
     const it = items.find((x) => x.key === key);

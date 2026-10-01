@@ -61,7 +61,19 @@
   --shadow:0 1px 2px rgba(18,26,21,.05);
   --shadow-float:0 1px 2px rgba(18,26,21,.06),0 12px 32px -12px rgba(18,26,21,.20);
   --shadow-sheet:0 -1px 0 var(--line),0 -16px 40px -20px rgba(18,26,21,.28);
-  --ring:0 0 0 3px var(--accent-soft);
+  /* The focus wash around a control: the pine at a fifth, so it reads on
+     white, on the ground and on the dark surface alike (accent-soft is all
+     but invisible on the dark surface). The invalid wash is the same, in stop. */
+  --ring:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent);
+  --ring-stop:0 0 0 3px color-mix(in srgb,var(--stop) 22%,transparent);
+  /* Hover and press are a film of ink, not a colour: the same wash reads on
+     a card, on the warm ground and in dark, so a quiet button or a row never
+     hovers invisibly. */
+  --hover:color-mix(in srgb,var(--ink) 5%,transparent);
+  --press:color-mix(in srgb,var(--ink) 9%,transparent);
+  /* The toast is an ink pill (light on dark, dark on light), so its marks take
+     the other theme's tones to stay legible on it. */
+  --toast-good:#57C295; --toast-bad:#F08A8D; --toast-info:#78B0E0;
 
   /* shape. Nothing else is legal: 4 code/checkbox, 8 badges/thumbs, 10
      controls, 12 cards, 16 sheet top, 18 app tiles, 2 the channel chip. */
@@ -102,6 +114,10 @@
   --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
   --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23696C64' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
   --mask-chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
+  /* small marks drawn in currentColor: an error line's alert, a reason line's info */
+  --mask-alert:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7.5v5.5M12 16.5h.01'/%3E%3C/svg%3E");
+  --mask-info:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5.5M12 7.5h.01'/%3E%3C/svg%3E");
+  --mask-check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='m8 12.5 2.7 2.7L16 9.8'/%3E%3C/svg%3E");
   --chev-r:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23696C64' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E");
 
   /* motion + layers */
@@ -131,6 +147,7 @@
     --shadow:0 1px 2px rgba(0,0,0,.40);
     --shadow-float:0 1px 2px rgba(0,0,0,.40),0 14px 36px -12px rgba(0,0,0,.70);
     --shadow-sheet:0 -1px 0 var(--line),0 -16px 40px -20px rgba(0,0,0,.70);
+    --toast-good:#136A4B; --toast-bad:#9B2226; --toast-info:#1B5B8F;
     --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238D958C' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230D1F16' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
     --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238D958C' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
@@ -157,6 +174,7 @@
   --shadow:0 1px 2px rgba(0,0,0,.40);
   --shadow-float:0 1px 2px rgba(0,0,0,.40),0 14px 36px -12px rgba(0,0,0,.70);
   --shadow-sheet:0 -1px 0 var(--line),0 -16px 40px -20px rgba(0,0,0,.70);
+  --toast-good:#136A4B; --toast-bad:#9B2226; --toast-info:#1B5B8F;
   --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238D958C' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230D1F16' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E");
   --icon-search:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238D958C' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
@@ -294,8 +312,12 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
 
 /* ── buttons ──────────────────────────────────────────────────────── */
 /* Sans, 44px, one radius. One primary per view; a destructive action beside
-   it is quiet or danger, and fills red only on the confirming step. */
+   it is quiet or danger, and fills red only on the confirming step.
+   The variants are written at one class's weight (:where), so the states
+   after them — disabled, busy — win over every variant, the filled red one
+   included, and a page's own rule for a button wins over all of them. */
 .btn{
+  --spin:var(--ink-2);   /* the busy spinner, in the variant's own ink */
   display:inline-flex;align-items:center;justify-content:center;gap:8px;
   font-family:var(--sans);font-size:var(--t-body-lg);font-weight:500;line-height:1;letter-spacing:0;text-transform:none;
   min-height:var(--h-md);padding:0 16px;border-radius:var(--r-ctl);
@@ -304,37 +326,69 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
   transition:background var(--dur),border-color var(--dur),color var(--dur),transform 120ms var(--ease);
 }
 .btn svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.btn:active{transform:scale(.985)}
+.btn:active{transform:scale(.985);background:var(--surface-2)}
 .btn[data-size="sm"]{min-height:var(--h-sm);padding:0 12px;font-size:var(--t-cap)}
+.btn[data-size="sm"] svg{width:16px;height:16px}
 .btn[data-size="lg"]{min-height:var(--h-lg);padding:0 20px;font-size:1rem;font-weight:600;width:100%}
 .btn[data-icon]{width:var(--h-md);padding:0}
 .btn[data-size="sm"][data-icon]{width:var(--h-sm)}
-.btn[data-v="primary"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
-.btn[data-v="quiet"],.btn.quiet{background:transparent;border-color:transparent;color:var(--ink-2)}
-.btn[data-v="danger"]{background:transparent;border-color:var(--stop-line);color:var(--stop)}
-.btn[data-v="danger"][data-fill]{background:var(--stop);border-color:var(--stop);color:var(--on-stop);font-weight:600}
-.btn[data-v="link"]{min-height:0;padding:0;border:0;background:none;color:var(--accent-ink);font-size:var(--t-cap);border-radius:var(--r-xs)}
+/* An icon-only button says its name on hover and on keyboard focus, from its
+   aria-label, where there is a pointer to hover with: <button class="btn"
+   data-icon data-tip aria-label="Бусад үйлдэл">. Opt-in, because a box that
+   clips (a list card) would cut the bubble off. */
+@media (hover:hover){
+  .btn[data-tip]{position:relative}
+  .btn[data-tip]::before{
+    content:attr(aria-label);position:absolute;left:50%;bottom:calc(100% + 6px);z-index:var(--z-toast);
+    padding:5px 8px;border-radius:var(--r-sm);background:var(--ink);color:var(--ink-inverse);
+    font-family:var(--sans);font-size:var(--t-meta);font-weight:500;line-height:1.2;white-space:nowrap;pointer-events:none;
+    opacity:0;transform:translate(-50%,2px);transition:opacity 120ms var(--ease),transform 120ms var(--ease);
+  }
+  .btn[data-tip]:is(:hover,:focus-visible)::before{opacity:1;transform:translate(-50%,0);transition-delay:350ms}
+  .btn[data-tip][data-busy]::before{display:none}
+}
+.btn:where([data-v="primary"]){--spin:var(--on-accent);background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.btn:where([data-v="primary"]):active{background:var(--accent-hover)}
+.btn:where([data-v="quiet"],.quiet){background:transparent;border-color:transparent;color:var(--ink-2)}
+.btn:where([data-v="quiet"],.quiet):active{background:var(--press)}
+.btn:where([data-v="danger"]){--spin:var(--stop);background:transparent;border-color:var(--stop-line);color:var(--stop)}
+.btn:where([data-v="danger"]):active{background:var(--stop-soft)}
+.btn:where([data-v="danger"][data-fill]){--spin:var(--on-stop);background:var(--stop);border-color:var(--stop);color:var(--on-stop);font-weight:600}
+.btn:where([data-v="danger"][data-fill]):active{background:var(--stop);filter:brightness(.94)}
+.btn:where([data-v="link"]){min-height:0;padding:0;border:0;background:none;color:var(--accent-ink);font-size:var(--t-cap);border-radius:var(--r-xs)}
+.btn:where([data-v="link"]):active{background:none;transform:none;text-decoration:underline;text-underline-offset:.15em}
 @media (hover:hover){
   .btn:hover{background:var(--surface-2);border-color:var(--ink-3)}
-  .btn[data-v="primary"]:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
-  .btn[data-v="quiet"]:hover,.btn.quiet:hover{background:var(--surface-2);border-color:transparent;color:var(--ink)}
-  .btn[data-v="danger"]:hover{background:var(--stop-soft);border-color:var(--stop-line)}
-  .btn[data-v="danger"][data-fill]:hover{background:var(--stop);border-color:var(--stop);filter:brightness(1.06)}
-  .btn[data-v="link"]:hover{background:none;border-color:transparent;text-decoration:underline;text-underline-offset:.15em}
+  .btn:where([data-v="primary"]):hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+  .btn:where([data-v="quiet"],.quiet):hover{background:var(--hover);border-color:transparent;color:var(--ink)}
+  .btn:where([data-v="danger"]):hover{background:var(--stop-soft);border-color:var(--stop-line)}
+  .btn:where([data-v="danger"][data-fill]):hover{background:var(--stop);border-color:var(--stop);filter:brightness(1.06)}
+  .btn:where([data-v="link"]):hover{background:none;border-color:transparent;text-decoration:underline;text-underline-offset:.15em}
 }
-/* Disabled is a real state, not 45% opacity: a filled red at half alpha reads as enabled. */
-.btn[disabled],.btn[disabled]:hover{
+/* Disabled is a real state, not 45% opacity: a filled red at half alpha reads
+   as enabled. Every variant, hovered or pressed, takes the same flat look. */
+.btn:is([disabled],[aria-disabled="true"]),.btn:is([disabled],[aria-disabled="true"]):is(:hover,:active){
   background:var(--surface-2);border-color:var(--line);color:var(--ink-3);
   opacity:1;cursor:not-allowed;filter:none;transform:none;
 }
-.btn[data-v="link"][disabled]{background:none;border-color:transparent}
+.btn:where([data-v="link"],[data-v="quiet"],.quiet):is([disabled],[aria-disabled="true"]),
+.btn:where([data-v="link"],[data-v="quiet"],.quiet):is([disabled],[aria-disabled="true"]):is(:hover,:active){background:none;border-color:transparent}
+/* Busy: the words go transparent (the button keeps its width, textContent
+   stays for tests and readers), a spinner turns in the variant's ink. */
 .btn[data-busy]{position:relative;pointer-events:none;color:transparent!important}
+.btn[data-busy] > *{visibility:hidden}
 .btn[data-busy]::after{
-  content:"";position:absolute;width:16px;height:16px;border-radius:50%;
-  border:2px solid var(--line-2);border-top-color:var(--ink-2);animation:spin 700ms linear infinite;
+  content:"";position:absolute;top:50%;left:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;box-sizing:border-box;
+  border:2px solid color-mix(in srgb,var(--spin) 28%,transparent);border-top-color:var(--spin);animation:spin 700ms linear infinite;
 }
-.btn[data-v="primary"][data-busy]::after{border-color:color-mix(in srgb,var(--on-accent) 35%,transparent);border-top-color:var(--on-accent)}
+.btn[data-size="lg"][data-busy]::after{width:18px;height:18px;margin:-9px 0 0 -9px}
 @keyframes spin{to{transform:rotate(360deg)}}
+/* Why a button is off, said next to it rather than in a tooltip a phone
+   cannot show: <button … disabled aria-describedby="why-pay">…</button>
+   <p class="btn-why" id="why-pay">Цагаа сонгоно уу.</p> */
+.btn-why{display:flex;align-items:flex-start;gap:6px;margin:8px 0 0;font-size:var(--t-cap);font-weight:400;line-height:1.4;color:var(--ink-2);text-align:left}
+.btn-why::before{content:"";flex:none;width:14px;height:14px;margin-top:1px;background:currentColor;opacity:.8;-webkit-mask:var(--mask-info) center/contain no-repeat;mask:var(--mask-info) center/contain no-repeat}
+.btn-why:empty{display:none}
 
 /* ── overflow menu ────────────────────────────────────────────────── */
 /* One visible secondary and a ⋯ for the rest, on desk rows:
@@ -426,30 +480,61 @@ input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"],input.co
 .row[data-dense]{min-height:44px;padding:8px 16px}
 
 /* ── fields ───────────────────────────────────────────────────────── */
+/* The label always shows above the control; a hint, or the error that
+   replaces it, sits under it. The control's look is written at one class's
+   weight (`.field :where(…)`), so its states — focus, invalid, disabled,
+   read-only — and the mono face for numbers win in every form and popup,
+   and a page's own rule for a field still wins over the base. */
 .field{display:block;margin:0 0 16px}
 .field > span,.field > label,.field-label{display:block;font-size:var(--t-cap);font-weight:500;line-height:1.3;color:var(--ink-2);margin-bottom:6px}
+.field-label .opt,.field > span .opt{font-weight:400;color:var(--ink-3)}   /* «(заавал биш)» beside a label */
 .input,
-.field input:not([type="checkbox"]):not([type="radio"]),.field select,.field textarea{
+.field :where(input:not([type="checkbox"],[type="radio"],[type="range"],[type="color"],[type="file"]),select,textarea){
   width:100%;min-height:var(--ctl-h);padding:0 14px;margin:0;
   font-family:var(--sans);font-size:var(--ctl-fs);line-height:1.3;color:var(--ink);
   background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r-ctl);
-  -webkit-appearance:none;appearance:none;transition:border-color var(--dur),box-shadow var(--dur);
+  -webkit-appearance:none;appearance:none;transition:border-color var(--dur),box-shadow var(--dur),background-color var(--dur);
 }
 ::placeholder{color:var(--ink-3);opacity:1}
-.input:focus,.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent);box-shadow:var(--ring)}
-.input[aria-invalid="true"],.field [aria-invalid="true"]{border-color:var(--stop);box-shadow:0 0 0 3px var(--stop-soft)}
-.input[disabled],.input[readonly],.field input[disabled],.field select[disabled],.field textarea[disabled],.field input[readonly]{background:var(--surface-2);color:var(--ink-3);border-color:var(--line)}
+/* A number typed is a number shown: phone, amount, quantity in the mono. The
+   hint inside stays in the sans — it is words, not a value. */
+.field :where(input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"]),
+.input:is([type="tel"],[inputmode="numeric"],[inputmode="decimal"]){font-family:var(--mono);font-variant-numeric:tabular-nums}
+:is(input[type="tel"],input[inputmode="numeric"],input[inputmode="decimal"]):not(.code)::placeholder{font-family:var(--sans)}
+@media (hover:hover){
+  .input:not(:focus,:disabled,[readonly],[aria-invalid="true"]):hover,
+  .field :where(input:not([type="checkbox"],[type="radio"]),select,textarea):not(:focus,:disabled,[readonly],[aria-invalid="true"]):hover{border-color:var(--ink-3)}
+}
+/* read-only and disabled first, so a read-only field that takes the focus still shows it */
+.input:is([disabled],[readonly]),.field :where(input:not([type="checkbox"],[type="radio"]),select,textarea):is([disabled],[readonly]){background:var(--surface-2);color:var(--ink-2);border-color:var(--line)}
+.input[disabled],.field :where(input,select,textarea)[disabled]{color:var(--ink-3);cursor:not-allowed;box-shadow:none}
+.input:focus,.field :where(input:not([type="checkbox"],[type="radio"]),select,textarea):focus{outline:none;border-color:var(--accent);box-shadow:var(--ring)}
+.input[aria-invalid="true"],.field :where(input,select,textarea)[aria-invalid="true"]{border-color:var(--stop)}
+.input[aria-invalid="true"]:focus,.field :where(input,select,textarea)[aria-invalid="true"]:focus{border-color:var(--stop);box-shadow:var(--ring-stop)}
 .field select,select.input{padding-right:40px;background-image:var(--chev);background-repeat:no-repeat;background-position:right 12px center;background-size:16px}
 .field textarea,textarea.input{min-height:96px;padding:12px 14px;line-height:1.5;resize:vertical}
 .field input[type="date"]{min-height:var(--ctl-h)}
 .field .help,.field small{display:block;font-size:var(--t-cap);line-height:1.4;color:var(--ink-3);margin-top:6px}
-.field .help[data-error],.field .error{color:var(--stop);font-weight:500}
-.input.search{padding-left:38px;background-color:var(--surface-2);background-image:var(--icon-search);background-repeat:no-repeat;background-position:12px center;background-size:16px}
-/* value plus a unit, ₮ or кг, drawn after the digits */
+/* The error says what to do, under the field it is about; the mark beside
+   it means colour is not the only signal. api.js fieldError() writes it. */
+.field .help[data-error],.field .error{display:flex;align-items:flex-start;gap:6px;color:var(--stop);font-weight:500}
+.field .help[data-error]::before,.field .error::before{content:"";flex:none;width:14px;height:14px;margin-top:1px;background:currentColor;-webkit-mask:var(--mask-alert) center/contain no-repeat;mask:var(--mask-alert) center/contain no-repeat}
+.field .help:empty{display:none}
+.input.search,.field input.search{padding-left:38px;background-color:var(--surface-2);background-image:var(--icon-search);background-repeat:no-repeat;background-position:12px center;background-size:16px}
+.input.search:focus,.field input.search:focus{background-color:var(--surface)}
+input.search::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
+/* A value with its unit: ₮ or кг after the digits, +976 before them.
+     <span class="affix"><input inputmode="numeric"><i>₮</i></span>
+     <span class="affix"><i data-start>+976</i><input type="tel"></span>
+   A start mark is drawn in the control's own face and size, so «+976» and
+   the typed «9911 2233» read as one number. */
 .affix{position:relative;display:block}
 .field > .affix{font-size:inherit;font-weight:400;line-height:inherit;color:inherit;margin-bottom:0}   /* it is a wrapper, not the label */
 .affix > input{padding-right:52px}
 .affix > i{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-style:normal;font-size:var(--t-body);color:var(--ink-3);pointer-events:none}
+.affix > i[data-start]{right:auto;left:14px;font-family:var(--mono);font-size:var(--ctl-fs);font-variant-numeric:tabular-nums;color:var(--ink-3)}
+.affix:has(> i[data-start]) > input{padding-left:calc(14px + var(--start,4ch) + 8px);padding-right:14px}
+.affix:has(> i[data-start]) > input:not([type="tel"],[inputmode="numeric"],[inputmode="decimal"]){--start:1.2em}
 /* codes: sign-in, hand-over — one big tracked input, not eight boxes */
 input.code{width:100%;
   min-height:64px;font-size:2rem;font-weight:600;letter-spacing:.32em;text-indent:.32em;text-align:center;
@@ -473,6 +558,8 @@ input[type="radio"]{border-radius:50%}
 input[type="checkbox"]:checked{background:var(--accent) var(--check) center/13px no-repeat;border-color:var(--accent)}
 input[type="radio"]:checked{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 0 0 4px var(--surface)}
 input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor:not-allowed}
+@media (hover:hover){input:is([type="checkbox"],[type="radio"]):not(:checked,:disabled):hover{border-color:var(--ink-3)}}
+input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var(--stop)}
 /* the same radio drawn as a span inside a button[role=radio] (idesh .choice, dine slots) */
 .radio-mark{
   display:inline-grid;place-items:center;width:20px;height:20px;flex:none;border-radius:50%;
@@ -481,6 +568,8 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .radio-mark[data-on],[role="radio"][aria-checked="true"] .radio-mark{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 0 0 4px var(--surface)}
 [role="radio"][disabled] .radio-mark,[role="radio"][aria-disabled="true"] .radio-mark{opacity:.5}
 .check,.choice-row{display:flex;align-items:center;gap:12px;min-height:var(--target);font-size:var(--t-body-lg);cursor:pointer}
+/* a choice that cannot be made reads as such, words and all */
+.check:has(input:disabled),.choice-row:has(input:disabled){color:var(--ink-3);cursor:not-allowed}
 
 /* ── chips (state pills) ──────────────────────────────────────────── */
 /* Neutral pill + tone dot by default, so a list of ten orders is not ten
@@ -543,6 +632,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 }
 .filter > button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink);font-weight:600}
 .filter > button:active{background:var(--surface-2)}
+@media (hover:hover){.filter > button:not([aria-pressed="true"]):hover{border-color:var(--ink-3);color:var(--ink)}}
 
 /* ── badges + counts ──────────────────────────────────────────────── */
 /* .badge is a label (Гэрээт, Баталгаажсан): tint only, sentence case.
@@ -614,7 +704,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .kpi-band .kpi[data-tone="warn"] b{color:var(--hold)}
 .kpi-band .kpi[data-tone="good"] b{color:var(--ready)}
 /* A word is not a number: a status KPI is a dot and a sentence-case word. */
-.kpi-band .kpi[data-word] b{display:flex;align-items:center;gap:8px;font-family:var(--sans);font-size:var(--t-title-3);letter-spacing:0;line-height:1.3}
+.kpi-band .kpi[data-word] b{display:flex;align-items:center;gap:8px;font-family:var(--sans);font-size:var(--t-title-3);letter-spacing:0;line-height:1.3;min-height:calc(var(--t-title) * 1.1)}   /* as tall as a number's line, so captions in one band line up */
 .kpi-band .kpi[data-word] b::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ink-3);flex:none}
 .kpi-band .kpi[data-word][data-tone="good"] b::before{background:var(--ready)}
 .kpi-band .kpi[data-word][data-tone="warn"] b::before{background:var(--hold)}
@@ -623,6 +713,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 @media (max-width:640px){
   .kpi-band{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
   .kpi-band .kpi b{font-size:var(--t-title-2)}
+  .kpi-band .kpi[data-word] b{font-size:var(--t-title-3);min-height:calc(var(--t-title-2) * 1.1)}
   .kpi-band > .kpi[data-span]{grid-column:1 / -1}
 }
 
@@ -637,7 +728,10 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .page-head[data-large]{display:block;padding-top:calc(8px + var(--safe-t));margin-bottom:16px}
 .page-head[data-large] h1{font-size:var(--t-title);letter-spacing:-.02em}
 .page-head[data-large] p{font-size:var(--t-body);max-width:36ch;margin-top:6px}
-@media (max-width:600px){.page-head:not([data-large]) p{display:none}}
+/* the head's buttons: one primary, at most a quiet one beside it */
+.page-head .head-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+/* On a phone the line under the title still says what the page is for — two lines at most. */
+@media (max-width:600px){.page-head:not([data-large]) p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}}
 
 /* ── top bar + tab bar (phone chrome) ─────────────────────────────── */
 /* The only glass in the system is chrome that content slides beneath. */
@@ -654,6 +748,8 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
   font-family:var(--sans);font-size:var(--t-body-lg);font-weight:500;letter-spacing:0;text-decoration:none;white-space:nowrap;box-shadow:none;
 }
 .topbar .back svg,.topbar .home svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.topbar :is(.back,.home):active{background:var(--press)}
+@media (hover:hover){.topbar :is(.back,.home):hover{background:var(--hover)}}
 .topbar .title{text-align:center;min-width:0}
 .topbar .title b,.topbar h1{display:block;font-size:var(--t-title-3);font-weight:600;line-height:1.25;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .topbar .title span{display:block;font-size:var(--t-cap);color:var(--ink-2);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -677,7 +773,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .tabbar button svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .tabbar button[data-on]{color:var(--accent-ink)}
 .tabbar button[data-on] svg{stroke:var(--accent)}
-.tabbar button:active{background:var(--surface-2)}
+.tabbar button:active{background:var(--press)}
 .tabbar button .count{position:absolute;top:4px;left:calc(50% + 6px)}
 
 /* ── sidebar (desk) ───────────────────────────────────────────────── */
@@ -686,7 +782,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
    place's menu, one folding group per module; the person pinned at the foot
    so the way out never scrolls away. ≤900px the sidebar is a drawer behind
    the deskbar's menu button. Only the open item carries the accent. */
-.desk-frame{display:grid;grid-template-columns:var(--side) minmax(0,1fr);min-height:100dvh}
+.desk-frame{--sticky-top:0px;display:grid;grid-template-columns:var(--side) minmax(0,1fr);min-height:100dvh}   /* --sticky-top: where a sticky table header stops — under the deskbar on a phone */
 .desk-frame > .main{min-width:0}
 .deskbar,.nav-scrim{display:none}
 .sidebar{
@@ -765,6 +861,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .sidebar [data-tab][data-on] svg{color:var(--accent)}
 .sidebar [data-tab].sub[data-on]::before{content:"";position:absolute;left:-11px;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--accent)}
 @media (hover:hover){.sidebar [data-tab]:hover{background:var(--surface-2);color:var(--ink)}.sidebar [data-tab][data-on]:hover{background:var(--accent-soft);color:var(--accent-ink)}}
+.sidebar [data-tab]:not([data-on]):active,.sidebar .mod:active,.ws-btn:not(:disabled):active{background:var(--press)}
 .sidebar [data-tab] .n,.sidebar .mod .n,.sidebar .count{
   margin-left:auto;display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:var(--r-sm);
   background:var(--surface-2);color:var(--ink-2);font-family:var(--mono);font-size:.6875rem;font-weight:600;font-variant-numeric:tabular-nums;
@@ -773,20 +870,34 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .sidebar [data-tab] .n[data-hot],.sidebar .mod .n[data-hot]{background:var(--accent);color:var(--on-accent)}
 
 /* the person, and the way out */
-.acct{display:flex;align-items:center;gap:10px;margin-top:8px;padding:12px 2px 0 6px;border-top:1px solid var(--line)}
-.acct .av{flex:none;display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);font-size:var(--t-cap);font-weight:600;line-height:1;color:var(--ink-2)}
-.acct .who{display:flex;flex-direction:column;flex:1;min-width:0}
-.acct .who b{font-size:var(--t-cap);font-weight:600;line-height:1.35;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.acct .who small{font-family:var(--mono);font-size:var(--t-meta);line-height:1.4;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.acct .out{flex:none;display:inline-grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:var(--r-sm);background:none;color:var(--ink-3)}
+/* Whose session this is: the mark, the name and the way out on one line, the
+   address under the name with the whole width to itself (Golos is wide; a
+   gmail address does not fit beside a button). The full line is the title. */
+.acct{display:grid;grid-template-columns:32px minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:10px;align-items:center;margin-top:6px;padding:10px 2px 0 6px;border-top:1px solid var(--line)}
+.acct .av{grid-column:1;grid-row:1 / span 2;align-self:center;display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);font-size:var(--t-cap);font-weight:600;line-height:1;color:var(--ink-2)}
+.acct .who{display:contents}
+.acct .who b{grid-column:2;grid-row:1;align-self:center;min-width:0;font-size:var(--t-cap);font-weight:600;line-height:1.35;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acct .who b:only-child{align-self:center}
+/* the address in the sans; a phone number keeps the mono (data-mono) */
+.acct .who small{grid-column:2 / 4;grid-row:2;align-self:start;min-width:0;margin-top:1px;font-size:var(--t-pill);line-height:1.4;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acct .who small[data-mono]{font-family:var(--mono);font-size:var(--t-meta);font-variant-numeric:tabular-nums}
+.acct .who b[data-mono]{font-family:var(--mono);font-weight:500;font-variant-numeric:tabular-nums}
+.acct .av svg,.deskbar-me span svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.acct .out{grid-column:3;grid-row:1;justify-self:end;display:inline-grid;place-items:center;width:30px;height:30px;margin:-2px -2px -2px 0;padding:0;border:0;border-radius:var(--r-sm);background:none;color:var(--ink-3)}
 .acct .out svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 @media (hover:hover){.acct .out:hover{background:var(--stop-soft);color:var(--stop)}}
 .acct .out[data-confirm]{display:inline-flex;width:auto;padding:0 10px;background:var(--stop-soft);color:var(--stop);font-size:var(--t-cap);font-weight:500}
 .acct .out[data-confirm] svg{display:none}
 
 /* ≤900px: the sidebar is a drawer behind the deskbar's menu button */
+.deskbar-me{display:none}
 @media (max-width:900px){
-  .desk-frame{grid-template-columns:minmax(0,1fr);align-content:start}
+  .desk-frame{--sticky-top:calc(var(--bar-h) + var(--safe-t));grid-template-columns:minmax(0,1fr);align-content:start}
+  /* the person, at the end of the bar: whose session this is, one tap from the menu that holds the way out */
+  .deskbar-me{display:inline-grid;place-items:center;flex:none;width:var(--target);height:var(--target);margin-left:auto;padding:0;border:0;border-radius:50%;background:none}
+  .deskbar-me span{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);font-size:var(--t-cap);font-weight:600;line-height:1;color:var(--ink-2)}
+  .deskbar-me:active span{background:var(--press)}
+  .acct .out{width:40px;height:40px;margin:-7px -6px -7px 0}   /* a thumb's target in the drawer, the line's height unchanged */
   .deskbar{position:sticky;top:0;z-index:var(--z-bar);display:flex;align-items:center;gap:6px;min-height:calc(var(--bar-h) + var(--safe-t));padding:var(--safe-t) 12px 0 4px;background:var(--surface);border-bottom:1px solid var(--line)}
   .nav-open{display:inline-grid;place-items:center;flex:none;width:var(--target);height:var(--target);padding:0;border:0;border-radius:var(--r-ctl);background:none;color:var(--ink)}
   .nav-open svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
@@ -805,12 +916,17 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 @media (prefers-reduced-motion:reduce){.sidebar,.sidebar .mod svg{transition:none}}
 
 /* ── segmented control ────────────────────────────────────────────── */
-.seg{display:inline-flex;gap:2px;padding:3px;border-radius:var(--r-ctl);background:var(--surface-2);border:1px solid var(--line)}
+.seg{display:inline-flex;gap:2px;padding:3px;max-width:100%;overflow-x:auto;scrollbar-width:none;border-radius:var(--r-ctl);background:var(--surface-2);border:1px solid var(--line)}   /* on a narrow screen it scrolls within itself rather than push the page sideways */
+.seg::-webkit-scrollbar{display:none}
+.seg button:focus-visible{outline-offset:-2px}
 .seg button{
   flex:1 1 auto;min-height:32px;padding:0 14px;border:1px solid transparent;border-radius:var(--r-sm);background:transparent;
   font-family:var(--sans);font-size:var(--t-cap);font-weight:500;letter-spacing:0;color:var(--ink-2);white-space:nowrap;
 }
 .seg button[data-on],.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);font-weight:600;border-color:var(--line-2);box-shadow:var(--shadow)}
+.seg button:not([data-on],[aria-pressed="true"]):active{background:var(--press)}
+@media (hover:hover){.seg button:not([data-on],[aria-pressed="true"],:disabled):hover{background:var(--hover);color:var(--ink)}}
+.seg button:disabled{color:var(--ink-3);cursor:not-allowed}
 .seg button .count{margin-left:6px}
 .seg[data-fill]{display:flex;width:100%}
 .seg[data-fill] button{min-height:40px}
@@ -847,7 +963,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .sheet .summary .money{font-size:var(--t-body-lg)}
 .sheet .summary[data-total]{font-size:var(--t-body-lg);color:var(--ink);padding-top:8px;border-top:1px solid var(--line)}
 .sheet .summary[data-total] .money{font-size:var(--t-title-3)}
-.sheet[data-busy] > .body{pointer-events:none;opacity:.6}
+.sheet:not(.popup)[data-busy] > .body{pointer-events:none;opacity:.6}   /* a popup dims only its fields (below) */
 /* On a desk the same element docks as a side panel; the map stays live. */
 @media (min-width:900px){
   .sheet[data-dock]{top:0;bottom:0;right:0;left:auto;width:440px;max-height:none;border-radius:0;border-top:0;border-left:1px solid var(--line);box-shadow:var(--shadow-float);transform:translateX(102%)}
@@ -874,8 +990,25 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
    over the fields rather than in a toast behind the dim. */
 .sheet.popup{background:var(--surface)}
 .popup > header h2{font-size:var(--t-title-3)}
+.popup > header .sub{line-height:1.45;max-width:60ch}
 .popup > header .sub:empty{display:none}
+/* «АЛХАМ 1/2» over the title of a popup that takes two steps */
+.popup-steps{display:flex;align-items:center;gap:8px;margin:0 0 6px;font-family:var(--mono);font-size:var(--t-eyebrow);font-weight:500;line-height:1;letter-spacing:var(--track-eyebrow);text-transform:uppercase;color:var(--ink-3)}
+.popup-steps i{display:flex;gap:4px}
+.popup-steps i b{display:block;width:16px;height:3px;border-radius:2px;background:var(--line-2)}
+.popup-steps i b[data-on]{background:var(--accent)}
+.popup-steps:empty{display:none}
 .popup > .body{padding:18px 20px 4px}
+/* While its answer is on the way the form holds still: nothing moves, nothing can be changed under it. */
+.popup[data-busy] > .body{pointer-events:none}
+.popup[data-busy] .fields{opacity:.6;transition:opacity var(--dur)}
+@media (min-width:720px){
+  .popup > header{padding:16px 16px 14px 20px}
+  .popup > header .x{width:36px;height:36px;margin:-2px -2px 0 0;background:none;color:var(--ink-3);border-radius:var(--r-sm)}
+  .popup > header{grid-template-columns:minmax(0,1fr) 36px}
+}
+@media (min-width:720px) and (hover:hover){.popup > header .x:hover{background:var(--hover);color:var(--ink)}}
+.sheet > header .x:active{background:var(--press)}
 .popup .fields{display:grid;grid-template-columns:1fr;gap:0 12px}
 @media (min-width:640px){
   .popup .fields{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -912,6 +1045,14 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .popup .popup-pick-row[data-off] b{color:var(--ink-3)}
 @media (hover:hover){.popup .popup-pick-row:not([data-off]):not(:has(input:checked)):hover{background:var(--surface-2)}}
 .popup .popup-pick-empty{margin:0;padding:14px;font-size:var(--t-cap);line-height:1.5;color:var(--ink-3)}
+/* the list's shape until its first answer comes */
+.popup .popup-pick-skel{display:flex;align-items:center;gap:12px;min-height:52px;padding:8px 14px;border-top:1px solid var(--line)}
+.popup .popup-pick-skel:first-child{border-top:0}
+.popup .popup-pick-skel > .skel{width:20px;height:20px;min-height:0;flex:none;border-radius:50%}
+.popup .popup-pick-skel > .skel-lines{flex:1;display:flex;flex-direction:column;gap:6px}
+.popup .popup-pick-skel .skel-lines .skel{height:11px;min-height:0;width:42%}
+.popup .popup-pick-skel .skel-lines .skel + .skel{height:9px;width:28%}
+.popup .popup-pick-list[aria-busy="true"]:has(.popup-pick-skel){opacity:1}
 .popup .popup-icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:6px}
 .popup .popup-icons label{position:relative;display:grid;place-items:center;height:40px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--surface);cursor:pointer;color:var(--ink-2)}
 .popup .popup-icons input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
@@ -921,7 +1062,6 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 @media (hover:hover){.popup .popup-icons label:hover{border-color:var(--line-2);color:var(--ink)}}
 .popup > footer{flex-direction:row;justify-content:flex-end;align-items:center;gap:8px;background:var(--surface)}
 @media (max-width:719px){.popup > footer .btn{flex:1 1 0}}
-.field [aria-invalid]{border-color:var(--stop)}
 
 /* ── the ways in ──────────────────────────────────────────────────── */
 /* Google, a code by email, and the phone folded under them: one block
@@ -934,6 +1074,9 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .or{display:flex;align-items:center;gap:12px;margin:18px 0;font-size:var(--t-cap);color:var(--ink-3)}
 .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line)}
 .ways [data-code]{margin:0 0 12px}
+/* what went wrong, said right over the button that will try again */
+.ways-say{display:flex;align-items:flex-start;gap:6px;margin:0 0 12px;font-size:var(--t-cap);font-weight:500;line-height:1.45;color:var(--stop)}
+.ways-say::before{content:"";flex:none;width:14px;height:14px;margin-top:2px;background:currentColor;-webkit-mask:var(--mask-alert) center/contain no-repeat;mask:var(--mask-alert) center/contain no-repeat}
 .ways .cap{margin:-4px 0 14px}
 .ways .again{display:flex;justify-content:space-between;gap:12px;margin-top:4px}
 .ways .again .link{font-size:var(--t-cap)}
@@ -948,18 +1091,42 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .ways .fold[data-alone] > .body{padding-top:0}
 
 /* ── toast ────────────────────────────────────────────────────────── */
-/* Ink on the ground; bad is stop on its own text. Pages with a bottom bar
-   raise it with --toast-lift. It never carries a code a person must keep. */
-#toast{
-  position:fixed;left:50%;bottom:calc(24px + var(--toast-lift) + var(--safe-b));transform:translateX(-50%) translateY(140%);
-  display:flex;align-items:center;gap:10px;max-width:min(440px,calc(100vw - 32px));padding:12px 16px;
+/* One ink pill for every kind — light on dark in light mode, dark on light in
+   dark mode — and the kind is the mark before the words: a check (good), an
+   alert (bad), an «i» (info). A slab of red was loud in light and garish in
+   dark; the mark says it without shouting. Up to three stack, the newest at
+   the bottom (older ones are copies, .toast-old, aria-hidden); a tap puts one
+   away. A bar pinned along the bottom edge (a tab bar, a pay bar) is measured
+   by api.js and the toast stands above it (--toast-over; --toast-lift is the
+   fallback, .has-tabbar sets it); on a phone with a bottom sheet open they
+   come from the top, so the sheet's own button stays in reach. It never
+   carries a code a person must keep. */
+#toast,.toast-old{
+  /* --toast-over: the height of a bar pinned along the bottom edge, measured by api.js when the toast shows */
+  position:fixed;left:50%;bottom:calc(20px + var(--toast-over,calc(var(--toast-lift) + var(--safe-b))));z-index:var(--z-toast);
+  display:flex;align-items:flex-start;gap:10px;width:max-content;max-width:min(440px,calc(100vw - 32px));padding:12px 16px;
   border-radius:var(--r-md);background:var(--ink);color:var(--ink-inverse);
-  font-family:var(--sans);font-size:var(--t-body);font-weight:500;line-height:1.35;
-  box-shadow:var(--shadow-float);z-index:var(--z-toast);transition:transform 220ms var(--ease);
+  font-family:var(--sans);font-size:var(--t-body);font-weight:500;line-height:1.4;text-align:left;
+  box-shadow:var(--shadow-float);cursor:default;-webkit-user-select:none;user-select:none;
+  transform:translate(-50%,16px);opacity:0;visibility:hidden;pointer-events:none;
+  transition:transform 220ms var(--ease),opacity 180ms var(--ease),visibility 0s linear 220ms;
 }
-#toast[data-show]{transform:translateX(-50%) translateY(0)}
-#toast[data-kind="bad"]{background:var(--stop);color:var(--on-stop)}
-#toast[data-kind="good"]::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ready);flex:none}
+#toast[data-show],.toast-old[data-show]{
+  transform:translate(-50%,var(--toast-y,0px));opacity:1;visibility:visible;pointer-events:auto;
+  transition:transform 220ms var(--ease),opacity 180ms var(--ease),visibility 0s;
+}
+.toast-old[data-show]{opacity:.92}
+#toast[data-kind]::before,.toast-old[data-kind]::before{
+  content:"";flex:none;width:18px;height:18px;margin:0 -2px 0 -2px;background:var(--toast-mark,currentColor);
+  -webkit-mask:var(--toast-glyph) center/contain no-repeat;mask:var(--toast-glyph) center/contain no-repeat;
+}
+:is(#toast,.toast-old)[data-kind="good"]{--toast-mark:var(--toast-good);--toast-glyph:var(--mask-check)}
+:is(#toast,.toast-old)[data-kind="bad"]{--toast-mark:var(--toast-bad);--toast-glyph:var(--mask-alert);background:color-mix(in srgb,var(--stop) 26%,var(--ink))}   /* the pill leans to wine (light) or blush (dark): trouble, without a red slab */
+:is(#toast,.toast-old)[data-kind="info"]{--toast-mark:var(--toast-info);--toast-glyph:var(--mask-info)}
+@media (max-width:719px){
+  :root:has(.sheet[data-open]:not([data-dock])) :is(#toast,.toast-old){top:calc(12px + var(--safe-t));bottom:auto;transform:translate(-50%,-16px)}
+  :root:has(.sheet[data-open]:not([data-dock])) :is(#toast,.toast-old)[data-show]{transform:translate(-50%,calc(-1 * var(--toast-y,0px)))}
+}
 
 /* ── empty + loading ──────────────────────────────────────────────── */
 /* A hairline and one line of type; never a hollow card, never an icon. */
@@ -976,13 +1143,50 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
    the frame goes, the hairline and the sentence stay. */
 [data-rows]:has(> .empty:only-child),.card:has(> .empty:only-child){background:none;border:0;border-radius:0;box-shadow:none}
 [data-rows] > .empty:only-child,.card > .empty:only-child{border-top:1px solid var(--line);padding-left:0;padding-right:0}
+/* The empty-state block: what a place is for while it holds nothing yet. A
+   mark from the line-icon set on a round plate, a title, one line, one next
+   step — centred, calm, part of the content rather than a hollow box. Built
+   by api.js emptyState(); dataTable's empty and «no match» rows are the same
+   block. [data-frame] gives it a card of its own where it stands alone on a
+   page; [data-size=sm] for a panel or a short list; [data-tone] tints the
+   plate (accent for a first step, stop for «could not load»).
+     <div class="empty-state">
+       <span class="es-mark"><svg>…</svg></span>
+       <h3 class="es-title">Захиалга алга</h3>
+       <p class="es-text">Зочин захиалга өгмөгц энд гарна.</p>
+       <div class="es-act"><button class="btn">…</button></div>
+     </div> */
+.empty-state{display:flex;flex-direction:column;align-items:center;text-align:center;padding:40px 24px;margin:0;color:var(--ink-2)}
+.empty-state[data-frame]{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow)}
+.empty-state .es-mark{display:grid;place-items:center;width:48px;height:48px;flex:none;margin:0 0 14px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2)}
+.empty-state .es-mark svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.empty-state .es-title{display:block;margin:0;font-size:var(--t-row);font-weight:600;line-height:var(--lh-snug);letter-spacing:0;color:var(--ink);text-wrap:balance}
+.empty-state .es-text{display:block;margin:6px 0 0;max-width:46ch;font-size:var(--t-body);line-height:1.5;color:var(--ink-2);text-wrap:pretty}
+.empty-state .es-text:empty{display:none}
+.empty-state .es-act{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:18px}
+.empty-state[data-size="sm"]{padding:24px 16px}
+.empty-state[data-size="sm"] .es-mark{width:40px;height:40px;margin-bottom:10px}
+.empty-state[data-size="sm"] .es-mark svg{width:20px;height:20px}
+.empty-state[data-size="sm"] .es-title{font-size:var(--t-body-lg)}
+.empty-state[data-size="sm"] .es-act{margin-top:14px}
+.empty-state[data-tone="accent"] .es-mark{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink)}
+.empty-state[data-tone="stop"] .es-mark{background:var(--stop-soft);border-color:var(--stop-line);color:var(--stop)}
+.empty-state[data-align="start"]{align-items:flex-start;text-align:left}
+.empty-state[data-align="start"] .es-act{justify-content:flex-start}
+:root[data-desk] .empty-state:not([data-size="sm"]){padding:48px 24px}
+
+/* Skeletons: the shape of what is coming, at its size, so nothing jumps when
+   it lands. api.js skeleton(kind, n) builds them (rows, cards, kpis, lines). */
 .skel{display:block;position:relative;overflow:hidden;background:var(--surface-2);border-radius:var(--r-sm);color:transparent;min-height:14px}
 .skel::after{
   content:"";position:absolute;inset:0;transform:translateX(-100%);
-  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--surface) 60%,transparent),transparent);
+  background:linear-gradient(90deg,transparent,var(--skel-sheen,color-mix(in srgb,var(--surface) 60%,transparent)),transparent);
   animation:skel 1.4s infinite;
 }
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .skel{--skel-sheen:rgba(255,255,255,.035)}}
+:root[data-theme="dark"] .skel{--skel-sheen:rgba(255,255,255,.035)}
 @keyframes skel{to{transform:translateX(100%)}}
+@media (prefers-reduced-motion:reduce){.skel::after{animation:none;display:none}}
 .skel[data-w="25"]{width:25%}.skel[data-w="40"]{width:40%}.skel[data-w="60"]{width:60%}.skel[data-w="80"]{width:80%}
 .skel-row{display:flex;align-items:center;gap:12px;min-height:56px;padding:12px 16px}
 .skel-row > .skel:first-child{width:40px;height:40px;flex:none}
@@ -990,7 +1194,21 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .skel-row .skel-lines .skel{height:12px;width:60%}
 .skel-row .skel-lines .skel:nth-child(2){width:40%;height:10px}
 .skel-row > .skel:last-child{width:48px;height:14px;flex:none}
+.skel-rows > .skel-row + .skel-row{border-top:1px solid var(--line)}
 .skel-kpi{height:28px;width:80px}
+.skel-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.skel-card{display:flex;flex-direction:column;gap:10px;padding:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow)}
+.skel-card > .skel:first-child{aspect-ratio:16 / 10;height:auto;border-radius:var(--r-sm)}
+.skel-card > .skel:nth-child(2){height:14px;width:70%}
+.skel-card > .skel:nth-child(3){height:12px;width:45%}
+.skel-lines-block{display:flex;flex-direction:column;gap:10px}
+.skel-lines-block > .skel{height:12px}
+.skel-lines-block > .skel:nth-child(3n+2){width:86%}
+.skel-lines-block > .skel:nth-child(3n){width:62%}
+.kpi-band .kpi .skel{margin:2px 0}
+.kpi-band > .skel-kpi-cell{display:flex;flex-direction:column;gap:12px;min-height:104px;padding:16px 20px;background:var(--surface)}
+.kpi-band > .skel-kpi-cell > .skel{height:12px;min-height:0}
+.kpi-band > .skel-kpi-cell > .skel-kpi{height:26px;width:55%}
 [aria-busy="true"] > .btn{pointer-events:none}
 
 /* ── avatar ───────────────────────────────────────────────────────── */
@@ -1003,7 +1221,7 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .avatar[data-size="sm"]{--n:30px}
 .avatar[data-size="lg"]{--n:54px}
 .avatar svg{width:100%;height:100%;display:block}
-.avatar[data-mark]{padding:12%;grid-template-columns:repeat(4,1fr);gap:9%;place-items:stretch}
+.avatar[data-mark]{padding:calc(var(--n) * .12);grid-template-columns:repeat(4,1fr);gap:calc(var(--n) * .06);place-items:stretch}   /* in the mark's own size: a percentage would be the parent's width */
 .avatar[data-mark] i{display:block;background:var(--ink-2);border-radius:1px}
 .avatar[data-mark] i[data-k="o"]{border-radius:50%}
 .avatar[data-mark] i[data-k="x"]{background:transparent}
@@ -1119,17 +1337,22 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 /* datatable.js: one way to show a list on the desk. The toolbar (search,
    the filters that matter, the count, the page's own buttons), a card of a
    table whose headers sort, and pages of 25. On a phone each row is a card
-   of its own with the column names beside the values. */
+   of its own with the column names beside the values.
+   The header sticks to the top of the page while the rows scroll under it —
+   the card clips only when the table is wider than it ([data-scroll], set by
+   datatable.js), because a clipping box is what a sticky header sticks to. */
 .dt{display:flex;flex-direction:column;gap:12px;min-width:0}
 .dt-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
 .dt-search{flex:1 1 280px;max-width:440px;display:block;margin:0}
 .dt-search input{
   width:100%;height:40px;margin:0;padding:0 12px 0 38px;border:1px solid var(--line-2);border-radius:var(--r-ctl);
   background:var(--surface) var(--icon-search) 12px 50%/18px no-repeat;color:var(--ink);font:inherit;font-size:var(--t-body);
-  -webkit-appearance:none;appearance:none;
+  -webkit-appearance:none;appearance:none;transition:border-color var(--dur),box-shadow var(--dur);
 }
 .dt-search input::placeholder{color:var(--ink-3)}
-.dt-search input:focus{outline:none;border-color:var(--ink);box-shadow:var(--ring)}
+.dt-search input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none}
+@media (hover:hover){.dt-search input:not(:focus):hover{border-color:var(--ink-3)}}
+.dt-search input:focus{outline:none;border-color:var(--accent);box-shadow:var(--ring)}
 .dt-filters{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .dt-filters:empty{display:none}
 .dt-select{width:auto;min-width:170px;height:40px;min-height:40px;font-size:var(--t-body)}
@@ -1138,24 +1361,39 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .dt-tools{display:flex;flex-wrap:wrap;gap:8px}
 .dt-tools:empty{display:none}
 .dt-tools .input{width:auto;height:40px;min-height:40px;font-size:var(--t-body)}
-.dt-wrap{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow);overflow-x:auto;-webkit-overflow-scrolling:touch}
+.dt-tools .btn{min-height:40px;font-size:var(--t-body)}   /* one height across the toolbar: search, filters, buttons */
+.dt-tools .btn[data-icon]{width:40px}
+.dt-wrap{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow);overflow:visible}
+.dt-wrap[data-scroll]{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .dt-table{width:100%;border-collapse:separate;border-spacing:0;font-size:var(--t-body);line-height:1.4}
 .dt-table th{
+  position:sticky;top:var(--sticky-top,0px);z-index:2;
   height:40px;padding:0 16px;text-align:left;vertical-align:middle;white-space:nowrap;
   font-size:var(--t-cap);font-weight:500;color:var(--ink-2);background:var(--surface-2);border-bottom:1px solid var(--line);
 }
+.dt-wrap[data-scroll] .dt-table th{position:static}
+/* the card's corners, drawn by the cells now that the card does not clip */
+.dt-table thead th:first-child{border-top-left-radius:calc(var(--r-md) - 1px)}
+.dt-table thead th:last-child{border-top-right-radius:calc(var(--r-md) - 1px)}
+.dt-table tbody tr:last-child > td:first-child{border-bottom-left-radius:calc(var(--r-md) - 1px)}
+.dt-table tbody tr:last-child > td:last-child{border-bottom-right-radius:calc(var(--r-md) - 1px)}
 .dt-table th[data-align="end"]{text-align:right}
-.dt-sort{display:inline-flex;align-items:center;gap:4px;min-height:40px;margin:0;padding:0;border:0;background:none;font:inherit;color:inherit;cursor:pointer;white-space:nowrap}
-.dt-sort svg{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:.4}
-.dt-sort[data-sorted]{color:var(--ink)}
+.dt-sort{display:inline-flex;align-items:center;gap:4px;min-height:40px;margin:0;padding:0;border:0;background:none;font:inherit;color:inherit;cursor:pointer;white-space:nowrap;border-radius:var(--r-xs)}
+/* a number's heading sits flush over its numbers: the arrow goes before the word */
+.dt-table th[data-align="end"] .dt-sort{flex-direction:row-reverse}
+.dt-sort svg{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur)}
+.dt-sort[data-sorted]{color:var(--ink);font-weight:600}
 .dt-sort[data-sorted] svg{opacity:1}
-@media (hover:hover){.dt-sort:hover{color:var(--ink)}.dt-sort:hover svg{opacity:.8}}
-.dt-sort:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:4px}
-.dt-table td{padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:middle;color:var(--ink)}
+@media (hover:hover){.dt-sort:hover{color:var(--ink)}.dt-sort:not([data-sorted]):hover svg{opacity:.55}}
+.dt-sort:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dt-sort:focus-visible svg{opacity:.55}
+.dt-table td{padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:middle;color:var(--ink);transition:background-color 120ms}
 .dt-table tbody tr:last-child td{border-bottom:0}
 .dt-table td[data-align="end"]{text-align:right}
+.dt[data-dense] .dt-table td{padding-top:8px;padding-bottom:8px}
 .dt-row[data-link]{cursor:pointer}
-.dt-row:focus-visible{outline:2px solid var(--ink);outline-offset:-2px}
+.dt-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.dt-row[data-link]:active > td{background:var(--surface-2)}
 @media (hover:hover){.dt-row:hover > td{background:var(--surface-2)}}
 .dt-two{display:flex;flex-direction:column;gap:2px;min-width:0}
 .dt-two b{font-weight:500;color:var(--ink);overflow-wrap:anywhere}
@@ -1167,41 +1405,68 @@ input[type="checkbox"][disabled],input[type="radio"][disabled]{opacity:.5;cursor
 .dt-none{color:var(--ink-3)}
 .dt-text{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--ink-2)}
 .dt-table .mono{font-size:var(--t-cap)}
+.dt-phone{white-space:nowrap}
 .dt-act{width:1%;white-space:nowrap;text-align:right}
 .dt-act > * + *{margin-left:6px}
 .dt-act .btn{min-height:32px;font-size:var(--t-cap)}
+.dt-act .btn[data-icon]{width:32px}
 .dt-table .dt-select{min-width:0;width:auto;max-width:220px;height:32px;min-height:32px;font-size:var(--t-cap)}
-.dt-empty td{padding:40px 16px;text-align:center}
-.dt-empty b{display:block;font-weight:600;color:var(--ink)}
-.dt-empty span{display:block;margin-top:4px;font-size:var(--t-cap);color:var(--ink-2)}
+/* empty, nothing found: the empty-state block, in the card */
+.dt-empty td{padding:0;text-align:center}
+.dt-empty .empty-state{padding:40px 24px}
+.dt[data-empty] thead{display:none}   /* a wholly empty list: no header row of sortable columns over nothing */
+/* loading: rows of the size that is coming, so nothing jumps when it lands */
+.dt-skel td{height:64px;padding-top:10px;padding-bottom:10px}
 .dt-skel td .skel{display:block;height:12px;max-width:160px;border-radius:6px}
+.dt-skel td .skel + .skel{margin-top:8px;height:10px;max-width:96px}
+.dt-skel td[data-align="end"] .skel{margin-left:auto}
+.dt-skel td.dt-act .skel{width:56px;height:28px;border-radius:var(--r-sm);margin-left:auto}
+.dt[data-dense] .dt-skel td{height:56px}
 .dt-foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;font-size:var(--t-cap);color:var(--ink-2);font-variant-numeric:tabular-nums}
 .dt-size{display:inline-flex;align-items:center;gap:8px;margin:0}
 .dt-size select{height:32px;padding:0 28px 0 10px;border:1px solid var(--line-2);border-radius:var(--r-sm);background:var(--surface) var(--chev) right 8px center/14px no-repeat;color:var(--ink);font:inherit;-webkit-appearance:none;appearance:none}
+.dt-size select:focus{outline:none;border-color:var(--accent);box-shadow:var(--ring)}
 .dt-pages{display:flex;align-items:center;gap:4px;margin-left:auto}
 .dt-page{
   display:inline-grid;place-items:center;min-width:32px;height:32px;padding:0 8px;border:1px solid transparent;border-radius:var(--r-sm);
   background:none;color:var(--ink-2);font-family:var(--mono);font-size:var(--t-cap);cursor:pointer;
 }
 .dt-page svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.dt-page[aria-current]{background:var(--accent);color:var(--on-accent);font-weight:600}
+/* the page you are on is chosen, like a filter — soft pine, not a second primary */
+.dt-page[aria-current]{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink);font-weight:600}
 .dt-page:disabled{opacity:.35;cursor:default}
-@media (hover:hover){.dt-page:not(:disabled):not([aria-current]):hover{background:var(--surface-2);color:var(--ink)}}
+.dt-page:not(:disabled):not([aria-current]):active{background:var(--press)}
+@media (hover:hover){.dt-page:not(:disabled):not([aria-current]):hover{background:var(--hover);color:var(--ink)}}
 .dt-gap{padding:0 4px;color:var(--ink-3)}
 @media (max-width:720px){
   .dt-search{max-width:none}
   .dt-count{margin-left:0}
-  .dt-wrap{overflow:visible;background:none;border:0;border-radius:0;box-shadow:none}
+  .dt-filters{flex:1 1 100%}
+  .dt-seg{width:100%}
+  .dt-seg button{flex:1 1 auto;min-height:38px;padding:0 10px}
+  .dt-wrap,.dt-wrap[data-scroll]{overflow:visible;background:none;border:0;border-radius:0;box-shadow:none}
   .dt-table,.dt-table tbody{display:block}
   .dt-table thead{display:none}
-  .dt-table tr.dt-row{display:block;margin:0 0 8px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow)}
-  .dt-table tr.dt-row > td{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:4px 0;border:0;text-align:right}
-  .dt-table tr.dt-row > td::before{content:attr(data-label);flex:none;font-size:var(--t-cap);color:var(--ink-2);text-align:left}
-  .dt-table tr.dt-row > td:first-child{display:block;padding:0 0 8px;text-align:left}
+  /* a row is a card: its name (and one action) on top, the other columns as
+     label — value lines under it, the labels quieter than the values */
+  .dt-table tr.dt-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;column-gap:12px;margin:0 0 8px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow)}
+  .dt-table tr.dt-row > td{grid-column:1 / -1;display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:5px 0;border:0;border-radius:0;text-align:right;min-width:0}
+  .dt-table tr.dt-row > td::before{content:attr(data-label);flex:none;font-size:var(--t-cap);color:var(--ink-3);text-align:left}
+  .dt-table tr.dt-row > td:first-child{grid-column:1;grid-row:1;display:block;padding:0 0 8px;text-align:left}
   .dt-table tr.dt-row > td:first-child::before,.dt-table tr.dt-row > td.dt-act::before{content:none}
-  .dt-table tr.dt-row > td.dt-act{justify-content:flex-end;padding-top:10px;width:auto}
+  .dt-table tr.dt-row > td:first-child + td{border-top:1px solid var(--line);padding-top:10px}
+  .dt-table tr.dt-row > td.dt-act{grid-column:2;grid-row:1;justify-content:flex-end;flex-wrap:wrap;gap:6px;width:auto;padding:0}
+  .dt-table tr.dt-row > td.dt-act > * + *{margin-left:0}
+  /* two or more actions are a row of their own at the foot of the card */
+  .dt-table tr.dt-row > td.dt-act:has(> :nth-child(2)){grid-column:1 / -1;grid-row:auto;padding-top:10px}
+  .dt-table tr.dt-row > td.dt-act .btn{min-height:36px}
   .dt-table tr.dt-row > td[data-phone="off"]{display:none}
-  .dt-table tr.dt-empty,.dt-table tr.dt-skel{display:block;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md)}
-  .dt-table tr.dt-empty td,.dt-table tr.dt-skel td{display:block;border:0}
-  .dt-pages{margin-left:0}
+  .dt-table tr.dt-empty,.dt-table tr.dt-skel{display:block;margin:0 0 8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow)}
+  .dt-table tr.dt-empty td,.dt-table tr.dt-skel td{display:block;height:auto;border:0}
+  .dt-table tr.dt-skel td:not(:first-child){display:none}
+  .dt-table tr.dt-skel td:first-child{padding:14px}
+  .dt-foot{justify-content:space-between}
+  .dt-pages{margin-left:0;width:100%;justify-content:center}
+  .dt-page{min-width:40px;height:40px}
+  .dt-size select{height:40px}
 }

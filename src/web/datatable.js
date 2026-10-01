@@ -19,6 +19,9 @@ const DT_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 14 5-5 5 
 const DT_DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg>';
 const DT_PREV = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>';
 const DT_NEXT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+/** The empty list's mark (an inbox) and the «nothing found» one (a lens) — line icons like the menu's. */
+const DT_EMPTY = '<svg viewBox="0 0 24 24"><path d="M3.5 13h4.5l1.5 2.5h5l1.5-2.5h4.5"/><path d="M6 5h12l2.5 8v5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-5z"/></svg>';
+const DT_FOUND_NONE = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg>';
 
 function dtEsc(value) {
   return String(value ?? '')
@@ -73,6 +76,12 @@ export const dtCell = {
   num: (n) => (n === null || n === undefined ? '<span class="dt-none">—</span>' : `<span class="dt-num">${Number(n).toLocaleString('en-US')}</span>`),
   /** Anything in the mono face: a phone, a code, a TIN. */
   mono: (text) => (text ? `<span class="mono">${dtEsc(text)}</span>` : '<span class="dt-none">—</span>'),
+  /** A Mongolian number as people read it, «+976 9911 2233»; anything else as it came. */
+  phone: (value) => {
+    if (!value) return '<span class="dt-none">—</span>';
+    const m = /^(?:\+?976)?(\d{4})(\d{4})$/.exec(String(value).replace(/[\s-]/g, ''));
+    return `<span class="mono dt-phone">${dtEsc(m ? `+976 ${m[1]} ${m[2]}` : value)}</span>`;
+  },
   /** A date and its time, as one short run: «9-р сарын 28 · 14:05». */
   when: (iso) => {
     if (!iso) return '<span class="dt-none">—</span>';
@@ -104,13 +113,21 @@ export const dtCell = {
  *   actions(row) → node(s)      the last cell: buttons that are not the row's click
  *   rowAttrs(row) → {attr: v}   extra attributes on the <tr> (hooks for tests and pages)
  *   tools: [node]               buttons at the end of the toolbar: CSV, «Нэмэх»
- *   empty: { title, text }      what an empty list says
+ *   empty: { title, text, icon?, action? }
+ *                               what an empty list says, as the design system's
+ *                               empty-state block: `icon` an svg (sidenav's
+ *                               NAV_ICON.orders) — an inbox when not given —
+ *                               and `action` one node (the next step's button)
  *   noun: 'захиалга'            what one row is, for the count
  *   stateKey                    where the sort and page size are remembered
  *   pageSize                    25 unless said
+ *   dense: true                 tighter rows, for long lists read at a glance
  *
  * Returns `{ el, setRows(rows), rows() }`. Rows can arrive later: until the
- * first `setRows` the table shows the shape of what is coming.
+ * first `setRows` the table shows the shape of what is coming, at the size of
+ * the rows that will replace it. A list with nothing in it at all (and
+ * nothing searched or filtered) shows its empty block without a header row;
+ * a search that finds nothing says so and offers to clear the search.
  */
 export function dataTable(options) {
   const {
@@ -126,6 +143,7 @@ export function dataTable(options) {
     stateKey = null,
     onSearch = null,
     onFilter = null,
+    dense = false,
   } = options;
   const remembered = dtRemembered(stateKey);
   let all = options.rows ?? null;
@@ -147,6 +165,7 @@ export function dataTable(options) {
       </div>
     </section>`);
   const $ = (selector) => root.querySelector(selector);
+  if (dense) root.setAttribute('data-dense', '');
   for (const tool of tools) if (tool) $('.dt-tools').append(tool);
   // A short list with nothing to search, filter or press says how many rows in its table's own heading, not in a bar of its own.
   if (!search && !filters.length && !tools.filter(Boolean).length) $('.dt-bar').hidden = true;
@@ -287,22 +306,51 @@ export function dataTable(options) {
     const tbody = $('tbody');
     tbody.replaceChildren();
     if (all === null) {
-      // The shape of what is coming, while it loads.
-      for (let i = 0; i < 4; i++) {
-        tbody.append(dtEl(`<tr class="dt-skel">${columns.map(() => '<td><span class="skel"></span></td>').join('')}${actions ? '<td></td>' : ''}</tr>`));
-      }
+      // The shape of what is coming, while it loads, at the size of the rows
+      // that will replace it: a name and a line under it first, numbers at
+      // the right, the action's button at the end.
+      const cells = columns
+        .map((c, i) => `<td${c.align === 'end' ? ' data-align="end"' : ''}${c.phone === false ? ' data-phone="off"' : ''}><span class="skel"></span>${i === 0 ? '<span class="skel"></span>' : ''}</td>`)
+        .join('');
+      for (let i = 0; i < 4; i++) tbody.append(dtEl(`<tr class="dt-skel">${cells}${actions ? '<td class="dt-act"><span class="skel"></span></td>' : ''}</tr>`));
+      root.removeAttribute('data-empty');
       return;
     }
     const rows = table.getRowModel().rows;
     if (!rows.length) {
       const nothing = all.length === 0;
-      tbody.append(
-        dtEl(`<tr class="dt-empty"><td colspan="${columns.length + (actions ? 1 : 0)}"><b>${dtEsc(nothing ? empty.title : 'Олдсонгүй')}</b><span>${dtEsc(
+      const query = input?.value.trim() ?? '';
+      // Nothing at all and nothing narrowing it: the block alone, without a header of columns over nothing.
+      const narrowed = Boolean(query) || filters.some((f) => chosen[f.key] !== (f.initial ?? f.options[0]?.[0]));
+      root.toggleAttribute('data-empty', nothing && !narrowed);
+      const tr = dtEl(
+        `<tr class="dt-empty"><td colspan="${columns.length + (actions ? 1 : 0)}"><div class="empty-state" data-size="sm"><span class="es-mark" aria-hidden="true">${
+          nothing ? empty.icon ?? DT_EMPTY : DT_FOUND_NONE
+        }</span><b class="es-title">${dtEsc(nothing ? empty.title : 'Олдсонгүй')}</b><span class="es-text">${dtEsc(
           nothing ? empty.text ?? '' : 'Хайлт, шүүлтүүрээ өөрчилж үзнэ үү.',
-        )}</span></td></tr>`),
+        )}</span></div></td></tr>`,
       );
+      const box = tr.querySelector('.empty-state');
+      // The next step: the page's own (an «add» button), or — for a search that found nothing — clearing it.
+      let next = null;
+      if (nothing && empty.action instanceof Node) next = empty.action;
+      else if (!nothing && query && input) {
+        next = dtEl('<button type="button" class="btn" data-size="sm">Хайлтыг цэвэрлэх</button>');
+        next.addEventListener('click', () => {
+          input.value = '';
+          input.dispatchEvent(new Event('input'));
+          input.focus();
+        });
+      }
+      if (next) {
+        const act = dtEl('<div class="es-act"></div>');
+        act.append(next);
+        box.append(act);
+      }
+      tbody.append(tr);
       return;
     }
+    root.removeAttribute('data-empty');
     for (const row of rows) {
       const r = row.original;
       const tr = document.createElement('tr');
@@ -373,10 +421,23 @@ export function dataTable(options) {
     pages.append(button(DT_NEXT, pageIndex + 1, `${table.getCanNextPage() ? '' : ' disabled'} aria-label="Дараах"`));
   }
 
+  /*
+   * The header sticks to the top of the page while the rows scroll under it.
+   * A box that clips is what a sticky header sticks to, so the card clips
+   * (and scrolls sideways) only when the table is wider than the card.
+   */
+  const wrap = $('.dt-wrap');
+  const fit = () => {
+    if (!root.isConnected) return;
+    wrap.toggleAttribute('data-scroll', $('.dt-table').offsetWidth > wrap.clientWidth + 1);
+  };
+  if (typeof ResizeObserver === 'function') new ResizeObserver(fit).observe(wrap);
+
   function draw() {
     drawHead();
     drawBody();
     drawFoot();
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(fit);
   }
 
   sync();
