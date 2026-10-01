@@ -77,12 +77,15 @@ Sizes are pt. Numbers are always mono with tabular figures; the ₮ sign is set 
 | Body copy | Sans | 13–14 / 400 / 1.5–1.6 | — |
 | Inline action (Дэлгэрэнгүй) | Sans | 13 / 500 / 1.2 | — |
 | Meta, timestamps | Mono | 11–11.5 / 400 / 1.3–1.4 | — |
-| Section label (ТҮРИЙВЧ) | Mono | 10 / 500 / 1 | 0.16em, uppercase |
+| App tag (урьдчилж захиал) | Sans | 12 / 400 / 1.3 | — |
+| Section label (ТҮРИЙВЧ) | Mono | 11 / 500 / 1 | 0.14em, uppercase |
+| Source label (ХООЛ) | Mono | 11 / 500 / 1 | 0.12em |
+| Time label (ИРЭХ, АВАХ) | Sans | 11 / 500 / 1 | 0.06em, uppercase |
+| Channel chip (SMS) | Mono | 11 / 500 / 1 | 0.12em |
 | Tab label | Sans | 10 / 500–600 / 1.2 | — |
-| Source label (ХООЛ) | Mono | 9.5 / 500 / 1 | 0.14em |
-| App tag | Mono | 9.5 / 400 / 1.3 | — |
 | Badge count | Mono | 9.5 / 600 / 1 | — |
-| Channel chip (SMS) | Mono | 9 / 500 / 1 | 0.12em |
+
+**Nothing anybody has to read is set under 11.** That is the web's floor too (`docs/design-system.md` §2.2). Words are in the sans; the mono is for digits and for the short uppercase eyebrows. The tab label is unused (the bar is icons only) and the badge count is a digit in a pill, not a label.
 
 Body copy uses `text-wrap: pretty`. App names wrap rather than truncate at larger Dynamic Type.
 
@@ -119,22 +122,22 @@ The default screen. Three artboards show it at 1, 4 and 9 icons — same structu
 **Avatar.** 30 × 30 on the launcher, 54 × 54 on profile. See *Avatar marks* below.
 
 **LIVE row.** A card, padding 9 × 14, gap 9.
-- Header line, `space-between`: left is a wrapping flex run (gap 4 × 8) of — a 6pt status dot, the source label (`ХООЛ`, `ТАКСИ`), the title at 15.5/600, and the meta in mono 11.5 `ink3`. Right is a baseline-aligned pair: the label (`СУУХ`, `ИРЭХ`) in mono 9/500 tracked 0.14em, then the time at 23/600 mono.
+- Header line, `space-between`: left is a wrapping flex run (gap 4 × 8) of — a 6pt status dot, the source label (`ХООЛ`, `ИДЭШ`), the title at 15.5/600, and the meta in mono 11.5 `ink3`. Right is the time at 23/600 mono over what it is the time of — the time label (`ИРЭХ`: when the guest comes to lunch, or when meat is delivered; `АВАХ`: when meat is picked up) in sans 11/500 uppercase, tracked 0.06em, `ink3`. Never `СУУХ`: «sit» read as a riddle.
 - Optional second line, only when a single row is on screen: separated by a top hairline with 9pt padding, `space-between`, description at 12.5/400 `ink2` on the left, time at 12.5/600 mono `accent` on the right.
 - Dot colour: `hold` for waiting, `route` for in transit.
 
 Rows are ordered by the moment that matters, not by which app produced them.
 
-**App grid.** Bands, each with a label row (min-height 22) and a grid.
+**App grid.** Bands, each a grid; a label row (min-height 22) over a band only when there is more than one.
 - Grid: `repeat(auto-fill, minmax(92px, 1fr))`, gap 10 vertical / 14 horizontal — three columns at 402pt.
 - Tile: square, max 92, `surface` + blur, 1pt `line`, radius 18, shadow y1 b2. Glyph 34, stroke 1.6, `accent`.
-- Under the tile, gap 6: name (13/600 `ink`) over tag (mono 9.5 `ink3`).
+- Under the tile, gap 6: name (13/600 `ink`) over tag (sans 12 `ink3`).
 
 **Band rules that must be preserved:**
-- Bands are **editorial, fixed by the product** — `АППУУД` when few; `ӨДӨР ТУТАМ` / `БУСАД` from nine on.
+- Bands are **editorial, fixed by the product** — one band while the apps are few, and **no label over a single band**: `АППУУД` over the only band there is names nothing. From nine on, `ӨДӨР ТУТАМ` / `БУСАД`, each labelled.
 - **No folders and no most-recently-used reordering.** A grid that rearranges itself cannot be learned by thumb. Recency belongs to the LIVE section, which sits above the grid already.
 - A **search field appears at seven or more icons**, inline on the first band's label row: `surface2` + blur, 1pt `line`, radius 12, padding 5 × 9, 13pt magnifier + `Хайх` in mono 12 `ink3`.
-- With one icon only, the coming-soon line is **a hairline and one line of type** (`Такси, хүргэлт, тасалбар — 2026 оны төгсгөлд`, mono 11.5 `ink3`), never an empty placeholder card.
+- With few icons the grid is only what is built: **no line about apps to come** and never an empty placeholder card. Basu does not tease what it has not made.
 
 ### 2. Wallet (Түрийвч)
 
@@ -153,7 +156,7 @@ Two artboards: populated and empty.
 - **Unread** is a muted blue wash across the row — `unread` = `#E4EDF5` light / `#16232E` dark — plus the heavier title. No dot, and the accent is reserved for the bell badge.
 - **Swipe left** on a row reveals `Устгах`: an 88pt-wide `stop`-filled button pinned to the row's right edge, label 14/500 in `onStop` (`#FFFFFF` light / `#2A0B0C` dark). The row's own right padding goes to 100 while open so text truncates rather than sliding out of the clip box. Shown open on the third row of the populated artboard.
 - Row content, gap 7: header line with source label + channel chip on the left and time on the right; title (600 when unread, 400 `ink2` when read); body at 13/400 `ink2`.
-- **Channel chip** is a separate fact from the source: `SMS` or `АПП`, mono 9/500 tracked 0.12em, 1pt `line2` border, radius 2, padding 3 × 5. Source says where it came from; channel says where to look for it.
+- **Channel chip** is a separate fact from the source: `SMS` or `АПП`, mono 11/500 tracked 0.12em, 1pt `line2` border, radius 2, padding 3 × 5. Source says where it came from; channel says where to look for it.
 - **Empty state** is a paragraph on the ground colour under the same hairline, max 32ch, 14/400 `ink2`. No illustration, no card, no button.
 
 ### 4. Profile (Профайл)
@@ -194,7 +197,7 @@ Six glyphs shipped, three more drawn to prove the rule (see the icon sheet at th
 
 - Tile 92 × 92 minimum, radius 18 continuous, `surface`, 1pt line, shadow y1 b2.
 - Columns `minmax(92, 1fr)`; gap 10 × 14; glyph 34.
-- Name 13/600, wraps at Dynamic Type and never truncates. Tag mono 9.5 `ink3`, one word, lower case.
+- Name 13/600, wraps at Dynamic Type and never truncates. Tag sans 12 `ink3`, a word or two, lower case.
 
 **Drawing the seventh**
 
@@ -224,7 +227,7 @@ One activity per order, started when the order is confirmed and ended when the p
 
 **Lock screen card.** Full-width less 14pt side margin, `lockCard` (white at 12%) over an 18pt blur, 1pt `lockLine` border, radius 22, padding 16 × 18, gap 14.
 
-- Header row: 30pt app icon at radius 8; venue at 15/600; `№0971 · 2 хүн` in mono 11.5 `onLock2`. Right side is the seating time at 26/600 mono over `СУУХ` in mono 9 tracked 0.14em.
+- Header row: 30pt app icon at radius 8; venue at 15/600; `№0971 · 2 хүн` in mono 11.5 `onLock2`. Right side is the seating time at 26/600 mono over `ИРЭХ`, the time label (sans 11/500, uppercase, tracked 0.06em).
 - Below, gap 7: a **three-segment bar** — three equal 3pt bars, gap 4, radius 2, filled in `accent` up to the current stage and `lockTrack` beyond it. The three segments are the order's only states (Хүлээгдэж байна / Гал дээр / Ширээ бэлэн), so no percentage is ever computed or shown.
 - Under the bar: the stage label at 12.5/500 on the left, the fire time at 12.5/600 mono `accent` on the right.
 
@@ -233,7 +236,7 @@ The seating time is the largest element on the card because it is the only numbe
 **Dynamic Island.**
 
 - *Compact*: 37pt pill, radius 19, black. 22pt icon at radius 6 leading, seating time at 15/600 mono trailing.
-- *Expanded*: radius 40, black, padding 18 × 20 × 20, gap 15. Same facts as the lock screen card — 34pt icon, venue at 15/600, stage label in mono 11.5 `#8E9AA0`, seating time at 28/600 mono over `СУУХ`, then the three-segment bar with `#2B3236` as the empty track. It shows nothing the card doesn't.
+- *Expanded*: radius 40, black, padding 18 × 20 × 20, gap 15. Same facts as the lock screen card — 34pt icon, venue at 15/600, stage label in mono 11.5 `#8E9AA0`, seating time at 28/600 mono over `ИРЭХ`, then the three-segment bar with `#2B3236` as the empty track. It shows nothing the card doesn't.
 - *Two activities*: the food activity keeps the wide compact slot and the other collapses to a 37pt circular glyph. Whichever is nearer in time takes the wide slot.
 
 `staleDate` is seating time + 30 minutes. Updates arrive by push; see `DATA-MODEL.md` for the payload.
@@ -242,8 +245,8 @@ The seating time is the largest element on the card because it is the only numbe
 
 Same timeline as the activity. Both sizes are `surface` + blur, 1pt `line`, radius 24, padding 16.
 
-- **Medium (2 × 4)**, height 158: header row identical in structure to the activity card (28pt icon, venue 14.5/600, `№0971 · 2 хүн` mono 11) with the seating time at 30/600 mono over `СУУХ` on the right; the three-segment bar and the stage / fire-time line at the bottom. Empty track is `line2`.
-- **Small (2 × 2)**, 158 × 158: 28pt icon at the top, then the seating time at 34/600 mono tracked −0.02em over `СУУХ · №0971` in mono 9. Nothing else.
+- **Medium (2 × 4)**, height 158: header row identical in structure to the activity card (28pt icon, venue 14.5/600, `№0971 · 2 хүн` mono 11) with the seating time at 30/600 mono over `ИРЭХ` on the right; the three-segment bar and the stage / fire-time line at the bottom. Empty track is `line2`.
+- **Small (2 × 2)**, 158 × 158: 28pt icon at the top, then the seating time at 34/600 mono tracked −0.02em over `ИРЭХ · №0971` at 11 — the word in the time label's sans, the number in the mono. Nothing else.
 - **Empty state** (no live order): the icon and one sentence — `Захиалга алга. Товшиж хоол сонгоно.` at 12.5/400 `ink2`. Never a zeroed layout.
 
 Timeline entries at now, fire time, seating time, and seating + 15 minutes. Tap opens `basu://order/{id}`.
