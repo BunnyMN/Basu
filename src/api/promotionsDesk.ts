@@ -1,8 +1,9 @@
 import type { FastifyInstance, FastifyRequest, RouteShorthandOptions } from 'fastify';
-import { endPromotion, promotionsForDesk, TIER_WORD, type AuditLine, type DeskPromotion } from '../idesh/index.js';
+import { endPromotion, IdeshError, promotionsForDesk, TIER_WORD, type AuditLine, type DeskPromotion } from '../idesh/index.js';
 import { contactsFor, displayNamesFor } from '../platform/identity/index.js';
 import type { Ctx } from '../ports.js';
 import { badRequest, sendError } from './errors.js';
+import { UUID } from './guards.js';
 
 /**
  * Listings suppliers paid to put first, for the desk: every purchase, what
@@ -70,6 +71,8 @@ export function registerPromotionsDesk(app: FastifyInstance, ctx: Ctx, { desk, w
     '/v1/ops/promotions/:id/end',
     desk('desk.promotions:manage'),
     async (request, reply) => {
+      // An id that is not one is no promotion: 404, never a query Postgres fails.
+      if (!UUID.test(request.params.id)) return sendError(reply, new IdeshError('NOT_FOUND', 'that is not an id'));
       const note = request.body?.note?.trim();
       if (!note) return badRequest(reply, 'Яагаад зогсоож байгаагаа бичнэ үү.', 'a reason is required');
       try {

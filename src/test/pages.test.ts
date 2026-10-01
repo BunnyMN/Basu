@@ -12,6 +12,7 @@ import { cancelIdesh } from '../idesh/index.js';
 import { handOff } from '../platform/identity/index.js';
 import { seedDemo } from '../seed/demo.js';
 import {
+  ClosedPaymentProvider,
   FakeMailer,
   FakeNotifier,
   FakePaymentProvider,
@@ -1390,6 +1391,60 @@ describe('the website', () => {
     expect(s.getElementById('pay')?.textContent).toBe('Нэвтэрч төлөх →');
   });
 
+  it('opens on the animal the address names, and on all of them for a name that is none of the four', async () => {
+    storage.removeItem('basu.guest');
+    const beef = await openPage('shop.html', '?kind=beef');
+    await until(beef, 'the beef', (d) => d.querySelectorAll('.sh-card').length > 0);
+    expect([...beef.window.document.querySelectorAll('.sh-card')].every((c) => c.getAttribute('data-kind') === 'beef')).toBe(true);
+    // Something every object answers to is not an animal: no «function Object()» over an empty grid.
+    const odd = await openPage('shop.html', '?kind=constructor');
+    const d = odd.window.document;
+    await until(odd, 'the market', () => d.querySelectorAll('.sh-card').length > 0 || Boolean(d.querySelector('#grid .s-empty')));
+    expect(d.getElementById('grid')?.textContent).not.toContain('function');
+    expect(d.querySelectorAll('.sh-card').length).toBeGreaterThanOrEqual(seeded.listings);
+    expect(d.querySelector('#kinds [data-kind="all"]')?.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('puts back a form kept before signing in as words, never as markup', async () => {
+    await ownGuest('+97699005031');
+    const id = await fullestStall();
+    const stall = await openPage('shop.html', `/${id}`);
+    // Kept in this browser before the sign-in: a day that is not one.
+    stall.window.sessionStorage.setItem(`basu.shop.${id}`, JSON.stringify({ receiveOn: '2026-09-12" data-planted="1' }));
+    const s = stall.window.document;
+    await until(stall, 'the order form', () => Boolean(s.getElementById('when')));
+    expect(s.querySelector('[data-planted]')).toBeNull();
+    expect(s.getElementById('when')?.getAttribute('value')).toBe('2026-09-12" data-planted="1');
+  });
+
+  it('says payments are closed over «Төлөх», and sets nothing aside for an order nobody can pay for', async () => {
+    await ownGuest('+97699005032');
+    const id = await fullestStall();
+    const left = async () => ((await (await fetch(`${base}/v1/idesh/listings/${id}`)).json()) as { listing: { remaining: number } }).listing.remaining;
+    const before = await left();
+    // Production with no payment provider, and a new account's empty wallet.
+    const open = ctx.payments;
+    ctx.payments = new ClosedPaymentProvider();
+    try {
+      const stall = await reviewAtStall(undefined, id);
+      const s = stall.window.document;
+      const pay = () => s.getElementById('pay') as HTMLButtonElement;
+      pay().click();
+      await until(stall, 'the reason, said', () => (s.getElementById('pay-error')?.textContent ?? '') !== '' && !pay().hasAttribute('data-busy'));
+      expect(s.getElementById('pay-error')?.textContent).toBe('Онлайн төлбөр одоогоор хаалттай байна.');
+      // Over the button it is about, where the eye is — not under «Засах».
+      const error = s.getElementById('pay-error')!;
+      expect(error.compareDocumentPosition(pay()) & stall.window.Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      // Pressed again, the same answer — and still nothing held: the stall keeps every animal it had.
+      pay().click();
+      await until(stall, 'the second answer', () => !pay().hasAttribute('data-busy'));
+      expect(await left()).toBe(before);
+      expect(await ideshOf('+97699005032')).toEqual({ orders: 0, payments: 0 });
+    } finally {
+      ctx.payments = open;
+    }
+  });
+
   it('shows the market as cards, filters it, and orders from a stall', async () => {
     await ownGuest('+97699005002');
     const token = storage.getItem('basu.guest')!;
@@ -1897,6 +1952,31 @@ describe('өвлийн идэш', () => {
     expect(await ideshOf('+97699004016')).toEqual({ orders: 1, payments: 1 });
   });
 
+  it('says payments are closed above Pay, and sets nothing aside for an order nobody can pay for', async () => {
+    await ownGuest('+97699004031');
+    const id = await fullestStall();
+    const left = async () => ((await (await fetch(`${base}/v1/idesh/listings/${id}`)).json()) as { listing: { remaining: number } }).listing.remaining;
+    const before = await left();
+    // Production with no payment provider, and a new account's empty wallet.
+    const open = ctx.payments;
+    ctx.payments = new ClosedPaymentProvider();
+    try {
+      const dom = await openPage('idesh.html');
+      await chooseOne(dom, id);
+      const d = dom.window.document;
+      const pay = () => d.querySelector('#pay') as HTMLButtonElement;
+      const why = () => d.querySelector('#screen-foot .why[data-tone="stop"]');
+      pay().click();
+      await until(dom, 'the reason, said', () => Boolean(why()) && !pay().disabled);
+      expect(why()?.textContent).toBe('Онлайн төлбөр одоогоор хаалттай байна.');
+      expect(why()!.compareDocumentPosition(pay()) & dom.window.Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(await left()).toBe(before);
+      expect(await ideshOf('+97699004031')).toEqual({ orders: 0, payments: 0 });
+    } finally {
+      ctx.payments = open;
+    }
+  });
+
   it('takes a Pay whose answer was lost for the payment it made, and shows the order', async () => {
     await ownGuest('+97699004017');
     const network = losingOne(payingIdesh);
@@ -2222,6 +2302,15 @@ describe('өвлийн идэш', () => {
     type('account', '5012 3456 78');
     expect(send.disabled).toBe(true);
     type('holder', 'Бат Дорж');
+    expect(send.disabled).toBe(false);
+    // The IBAN a bank's app hands out is taken too, in either case — by the
+    // rule the server holds every account to; one too short for an IBAN is not.
+    type('account', 'mn12 0005 0050 1234 5678');
+    expect(send.disabled).toBe(false);
+    type('account', 'MN12 0005 0050 1234');
+    expect(send.disabled).toBe(true);
+    expect(form.querySelector('#refund-why')?.textContent).toContain('MN-ээр эхэлсэн IBAN');
+    type('account', '5012 3456 78');
     expect(send.disabled).toBe(false);
     send.click();
     // Money is about to go to this account, so the person proves it is still

@@ -41,6 +41,7 @@ import { closeGuest, guestFile, guestSearch } from './guests.js';
 import { registerDineDesk } from './dineDesk.js';
 import { registerMoneyDesk } from './moneyDesk.js';
 import { registerPromotionsDesk } from './promotionsDesk.js';
+import { anIdeshId } from './idesh.js';
 import { registerSystemDesk } from './systemDesk.js';
 import { registerAccessDesk } from './accessDesk.js';
 import { revokeSession } from '../platform/identity/index.js';
@@ -303,6 +304,12 @@ export async function registerOpsRoutes(
    * drawn from.
    */
   const desk = (permission: string) => ({ preHandler: [requireOps, need(permission)], config: limit });
+  /**
+   * A desk route about one идэш thing by the id in its address — a
+   * supplier, an order, a listing, a payout: an id that is not one is no
+   * such thing, 404, never a query Postgres fails (`anIdeshId`).
+   */
+  const deskOnOne = (permission: string) => ({ preHandler: [requireOps, need(permission), anIdeshId], config: limit });
   /** A desk route two pages read from: a seat that holds either page. */
   const deskAny = (...permissions: string[]) => ({ preHandler: [requireOps, needAny(...permissions)], config: limit });
 
@@ -645,7 +652,7 @@ export async function registerOpsRoutes(
   });
 
   /** Yes to an application — and the account the applicant gave, if any, is one money may go to from now. */
-  app.post<{ Params: { id: string } }>('/v1/ops/suppliers/:id/approve', desk('desk.suppliers:manage'), async (request, reply) => {
+  app.post<{ Params: { id: string } }>('/v1/ops/suppliers/:id/approve', deskOnOne('desk.suppliers:manage'), async (request, reply) => {
     try {
       const approved = await approveSupplier(ctx, request.params.id);
       await audit(request, {
@@ -662,7 +669,7 @@ export async function registerOpsRoutes(
 
   app.post<{ Params: { id: string }; Body: { reason?: string } }>(
     '/v1/ops/suppliers/:id/decline',
-    desk('desk.suppliers:manage'),
+    deskOnOne('desk.suppliers:manage'),
     async (request, reply) => {
       try {
         const declined = await declineSupplier(ctx, request.params.id, request.body?.reason ?? '');
@@ -678,7 +685,7 @@ export async function registerOpsRoutes(
   app.patch<{
     Params: { id: string };
     Body: { commission_pct?: number; tin?: string; bank_name?: string; bank_account?: string; bank_holder?: string };
-  }>('/v1/ops/suppliers/:id', desk('desk.suppliers:terms'), async (request, reply) => {
+  }>('/v1/ops/suppliers/:id', deskOnOne('desk.suppliers:terms'), async (request, reply) => {
     const body = request.body ?? {};
     if (body.commission_pct !== undefined && typeof body.commission_pct !== 'number') {
       return badRequest(reply, 'Шимтгэл тоо байх ёстой.', 'commission_pct must be a number');
@@ -719,7 +726,7 @@ export async function registerOpsRoutes(
     },
   );
 
-  app.get<{ Params: { id: string } }>('/v1/ops/orders/:id', desk('desk.orders'), async (request, reply) => {
+  app.get<{ Params: { id: string } }>('/v1/ops/orders/:id', deskOnOne('desk.orders'), async (request, reply) => {
     const found = await orderForOps(request.params.id);
     if (!found) return sendError(reply, new IdeshError('NOT_FOUND', 'no such order'));
     return reply.send({
@@ -736,7 +743,7 @@ export async function registerOpsRoutes(
    */
   app.post<{ Params: { id: string; action: string }; Body: { reason?: string; note?: string } }>(
     '/v1/ops/orders/:id/:action',
-    desk('desk.orders:manage'),
+    deskOnOne('desk.orders:manage'),
     async (request, reply) => {
       const { id, action } = request.params;
       const body = request.body ?? {};
@@ -885,7 +892,7 @@ export async function registerOpsRoutes(
   });
 
   /** One supplier's listings, for the desk to look at and, if need be, hide. */
-  app.get<{ Params: { id: string } }>('/v1/ops/suppliers/:id/listings', desk('desk.suppliers'), async (request) => ({
+  app.get<{ Params: { id: string } }>('/v1/ops/suppliers/:id/listings', deskOnOne('desk.suppliers'), async (request) => ({
     listings: (await listingsOf(request.params.id)).map((l) => ({
       id: l.id,
       kind: l.kind,
@@ -903,7 +910,7 @@ export async function registerOpsRoutes(
 
   app.post<{ Params: { id: string }; Body: { active?: boolean; note?: string } }>(
     '/v1/ops/suppliers/:id/active',
-    desk('desk.suppliers:manage'),
+    deskOnOne('desk.suppliers:manage'),
     async (request, reply) => {
       const active = request.body?.active;
       if (typeof active !== 'boolean') return badRequest(reply, 'active: true эсвэл false.', 'active must be a boolean');
@@ -919,7 +926,7 @@ export async function registerOpsRoutes(
   );
 
   /** Finance has held the account up against the contract: money may go there now. */
-  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/suppliers/:id/bank-verify', desk('desk.suppliers:terms'), async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/suppliers/:id/bank-verify', deskOnOne('desk.suppliers:terms'), async (request, reply) => {
     try {
       await verifySupplierBank(request.params.id);
       await audit(request, { action: 'supplier.bank_verify', targetKind: 'supplier', targetId: request.params.id, note: request.body?.note ?? null });
@@ -930,7 +937,7 @@ export async function registerOpsRoutes(
     }
   });
 
-  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/listings/:id/hide', desk('desk.suppliers:manage'), async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { note?: string } }>('/v1/ops/listings/:id/hide', deskOnOne('desk.suppliers:manage'), async (request, reply) => {
     try {
       await hideListing(request.params.id, ctx.clock.now());
       await audit(request, { action: 'listing.hide', targetKind: 'listing', targetId: request.params.id, note: request.body?.note ?? null });
@@ -994,7 +1001,7 @@ export async function registerOpsRoutes(
   /** «Батлах»: this one should be paid. The person who presses it may not be the one who pays. */
   app.post<{ Params: { id: string }; Body: { note?: string } }>(
     '/v1/ops/settlements/:id/approve',
-    desk('desk.pay:approve'),
+    deskOnOne('desk.pay:approve'),
     async (request, reply) => {
       try {
         const released = await approveSettlement(request.params.id, who(request), ctx.clock.now());
@@ -1014,7 +1021,7 @@ export async function registerOpsRoutes(
   /** «Шилжүүлсэн»: the bank transfer was made by hand; the ledger and the person owed hear of it. */
   app.post<{ Params: { id: string }; Body: { reference?: string } }>(
     '/v1/ops/settlements/:id/paid',
-    desk('desk.pay:approve'),
+    deskOnOne('desk.pay:approve'),
     async (request, reply) => {
       try {
         const paid = await markSettled(ctx, request.params.id, who(request), request.body?.reference ?? '');

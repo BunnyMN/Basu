@@ -9,6 +9,7 @@
 export {
   LedgerError,
   accrue,
+  assertCollectable,
   balance,
   collect,
   movement,

@@ -1,6 +1,6 @@
 import { getPool, tx } from '../../db/pool.js';
 import { receiptsFor, type IssuedReceipt } from './ebarimt.js';
-import type { Ctx } from '../../ports.js';
+import { topupsOpen, type Ctx } from '../../ports.js';
 import type { Db } from '../../db/pool.js';
 
 /**
@@ -57,8 +57,8 @@ async function namedAccount(db: Db, label: string): Promise<string> {
   return id;
 }
 
-export async function balance(guestId: string): Promise<number> {
-  const { rows } = await getPool().query<{ balance: number }>(
+export async function balance(guestId: string, db: Db = getPool()): Promise<number> {
+  const { rows } = await db.query<{ balance: number }>(
     `SELECT COALESCE(SUM(e.amount_mnt), 0)::bigint AS balance
        FROM ledger.entry e
        JOIN ledger.account a ON a.id = e.account_id
@@ -278,6 +278,22 @@ export interface Collected {
   fromWalletMnt: number;
   /** How much had to be pulled from the payment provider on the spot. */
   toppedUpMnt: number;
+}
+
+/**
+ * Whether `collect` could take this much from this guest now — asked before
+ * a vertical sets anything aside for the purchase. Refused as
+ * PAYMENTS_CLOSED exactly where `collect` would refuse it: a server with no
+ * payment provider, and a wallet that does not cover the whole amount. A
+ * wallet that does is paid from, provider or none.
+ *
+ * `db` is the caller's transaction, when it asks while holding a row: the
+ * balance is read there rather than on a second connection.
+ */
+export async function assertCollectable(ctx: Ctx, input: { guestId: string; amountMnt: number }, db: Db = getPool()): Promise<void> {
+  if (topupsOpen(ctx.payments)) return;
+  if ((await balance(input.guestId, db)) >= input.amountMnt) return;
+  throw new LedgerError('PAYMENTS_CLOSED', 'payments are not configured on this server, and the wallet does not cover this');
 }
 
 /**

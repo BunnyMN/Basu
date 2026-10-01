@@ -156,6 +156,8 @@ describe('what somebody is told when a request breaks', () => {
   it('leaves one line in the server’s log for each: the route and the kind of error, never what was sent or said', async () => {
     const server = Fastify();
     server.setErrorHandler(errorHandler);
+    // A route that hands the id in its address to Postgres as it came.
+    server.get('/listings/:id', async (request) => getPool().query('SELECT $1::uuid', [(request.params as { id: string }).id]));
     server.post('/code', async (request) => (request.body as { login: string }).login.trim());
     server.get('/provider', async () => {
       throw new WireError(401, 'invalid_api_key', 'req_7Hq', 'Invalid API key provided: sk_live_****abcd');
@@ -169,7 +171,9 @@ describe('what somebody is told when a request breaks', () => {
     try {
       const { token } = (await app.inject({ method: 'POST', url: '/dev/login', payload: { phone: '+97699007789' } })).json();
       expect((await app.inject({ method: 'GET', url: '/v1/wallet?before=Бат-ийн-нууц', headers: { authorization: `Bearer ${token}` } })).statusCode).toBe(500);
-      expect((await app.inject({ method: 'GET', url: '/v1/idesh/listings/Бат-ийн-нууц' })).statusCode).toBe(500);
+      expect((await server.inject({ method: 'GET', url: '/listings/Бат-ийн-нууц' })).statusCode).toBe(500);
+      // The real server's идэш addresses hand no such id on: a 404 of their own, nothing to look into.
+      expect((await app.inject({ method: 'GET', url: '/v1/idesh/listings/Бат-ийн-нууц' })).statusCode).toBe(404);
       expect((await server.inject({ method: 'POST', url: '/code', payload: { login: 42 } })).statusCode).toBe(500);
       expect((await server.inject({ method: 'GET', url: '/provider' })).statusCode).toBe(500);
       // A refusal of ours by its name is the caller's answer, not a failure to look into.
@@ -180,7 +184,7 @@ describe('what somebody is told when a request breaks', () => {
     }
     expect(lines).toEqual([
       '[api] 500 GET /v1/wallet error 22P02',
-      '[api] 500 GET /v1/idesh/listings/:id error 22P02',
+      '[api] 500 GET /listings/:id error 22P02',
       '[api] 500 POST /code TypeError',
       '[api] 500 GET /provider WireError invalid_api_key',
     ]);
