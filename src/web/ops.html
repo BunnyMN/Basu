@@ -40,8 +40,9 @@ p{margin:0}
 .page-note a{color:var(--accent-ink)}
 .section-note{margin:-2px 0 12px;font-size:var(--t-cap);line-height:1.5;color:var(--ink-2);max-width:90ch}
 .nowrap{white-space:nowrap}
+.dt-unnamed{font-weight:400;color:var(--ink-3)}
 .skel-line{display:block;width:40%;height:14px}
-.band-gap{margin-bottom:24px}
+.page-head + .kpi-band.band-gap,.kpi-band.band-gap{margin-bottom:24px}
 
 /* a person's own corner: the first visit, and their businesses as rows */
 /* the first visit: what this place is for and the button on the left, the three steps on the right */
@@ -1743,7 +1744,7 @@ function roleEditor(data, mods, role, { manage, from, close, copy }) {
  */
 async function renderMenus(view) {
   const manage = can('desk.menus:manage');
-  const h = head('Цэс', 'Зүүн цэсний модуль, хуудсыг нэрлэж, эрэмбэлж, нууна. Хэн юу харахыг «Үүрэг, эрх» шийднэ.');
+  const h = head('Цэс', 'Зүүн цэсний модуль, хуудсыг нэрлэж, эрэмбэлж, нууна.');
   // The desk-or-business switch and the buttons that add: together, at the head's right.
   const headBox = el('<div class="head-acts"></div>');
   headBox.append(scopeSeg(() => show('menus')));
@@ -2475,12 +2476,14 @@ function renderGuests(view) {
         key: 'name',
         label: 'Зочин',
         value: (g) => g.name ?? '',
-        // How they sign in, when it says more than the phone and email columns beside it do.
-        render: (g) =>
-          dtCell.two(
-            g.name ?? (g.closed_at ? 'Хаагдсан бүртгэл' : 'Нэргүй зочин'),
-            (g.ways ?? []).some((w) => w === 'google' || w === 'apple') || (g.ways ?? []).length > 1 ? `нэвтэрдэг: ${(g.ways ?? []).map((w) => WAY_WORD[w] ?? w).join(', ')}` : '',
-          ),
+        // How they sign in, when it says more than the phone and email columns beside it do. Somebody with no
+        // name is said quietly, so the names there are stand out down the list.
+        render: (g) => {
+          const ways = (g.ways ?? []).some((w) => w === 'google' || w === 'apple') || (g.ways ?? []).length > 1 ? `нэвтэрдэг: ${(g.ways ?? []).map((w) => WAY_WORD[w] ?? w).join(', ')}` : '';
+          return g.name
+            ? dtCell.two(g.name, ways)
+            : dtCell.twoHtml(`<span class="dt-unnamed">${g.closed_at ? 'Хаагдсан бүртгэл' : 'Нэр оруулаагүй'}</span>`, esc(ways));
+        },
       },
       { key: 'phone', label: 'Утас', render: (g) => dtCell.mono(g.phone) },
       { key: 'email', label: 'Имэйл', render: (g) => (g.email ? esc(g.email) : dtCell.none()) },
@@ -2754,7 +2757,7 @@ async function renderVenues(view) {
         numeric: true,
         render: (r) =>
           dtCell.twoHtml(
-            r.online ? dtCell.pill('contracted', 'нээлттэй') : dtCell.pill('declined', 'хаалттай'),
+            r.online ? dtCell.pill('contracted', 'нээлттэй') : dtCell.pill('off', 'хаалттай'),
             !r.org_id ? 'байгууллагагүй' : r.kitchen_seen_at ? `сүүлд ${when(r.kitchen_seen_at)} ${clockOf(r.kitchen_seen_at)}` : 'хэзээ ч нээгээгүй',
           ),
       },
@@ -2866,7 +2869,7 @@ async function openVenue(r, from = { label: 'Ресторан', go: () => show('
         key: 'state',
         label: 'Төлөв',
         value: (m) => (m.active ? (m.sold_out_until ? 'дууссан' : 'цэсэнд') : 'нуусан'),
-        render: (m) => (m.active ? (m.sold_out_until ? dtCell.pill('off', 'дууссан') : dtCell.pill('contracted', 'цэсэнд')) : dtCell.pill('declined', 'нуусан')),
+        render: (m) => (m.active ? (m.sold_out_until ? dtCell.pill('off', 'дууссан') : dtCell.pill('contracted', 'цэсэнд')) : dtCell.pill('off', 'нуусан')),
       },
     ],
     search: { placeholder: 'Хоолны нэр, цех…' },
@@ -3299,7 +3302,7 @@ async function moneyTransfers() {
         key: 'kind',
         label: 'Төрөл',
         value: (t) => KIND_WORD[t.kind] ?? t.kind,
-        render: (t) => dtCell.pill(t.kind === 'refund' ? 'declined' : t.kind === 'topup' ? 'contracted' : 'PAID', KIND_WORD[t.kind] ?? t.kind),
+        render: (t) => dtCell.pill(t.kind === 'refund' ? 'REFUNDED' : t.kind === 'topup' ? 'contracted' : 'PAID', KIND_WORD[t.kind] ?? t.kind),
       },
       { key: 'route', label: 'Хаанаас → хаашаа', value: (t) => `${t.from.name} ${t.to.name}`, render: (t) => `${esc(t.from.name)} <span class="muted">→</span> ${esc(t.to.name)}` },
       { key: 'memo', label: 'Тайлбар', value: (t) => `${t.memo ?? ''} ${t.id}`, render: (t) => dtCell.twoHtml(esc(t.memo ?? '—'), `<span class="mono">${esc(t.id.slice(0, 8))}</span>`), phone: false },
@@ -4396,7 +4399,7 @@ const PROMO_STANDING = {
   live: ['active', 'Идэвхтэй'],
   pending: ['pending', 'Төлбөр хүлээж буй'],
   over: ['CLOSED', 'Дууссан'],
-  ended: ['declined', 'Зогсоосон'],
+  ended: ['off', 'Зогсоосон'],
   cancelled: ['CANCELLED', 'Төлөгдөөгүй'],
 };
 
@@ -4523,10 +4526,10 @@ const ACTION = {
   'ledger.checks': 'Мөнгөний шалгалт ажиллуулсан', 'ledger.export': 'Мөнгөний CSV татсан', 'receipt.retry': 'Е-баримт дахин илгээсэн', 'message.retry': 'Мэдэгдэл дахин илгээсэн',
   'guest.close': 'Зочны бүртгэл хаасан', 'guest.session_revoke': 'Зочны нэвтрэлт хаасан',
   'restaurant.activate': 'Ресторан идэвхжүүлсэн', 'restaurant.suspend': 'Ресторан зогсоосон', 'menu.show': 'Хоол цэсэнд буцаасан', 'menu.hide': 'Хоол цэснээс нуусан',
-  'member.upsert': 'Гишүүн нэмсэн', 'member.grant': 'Ops эрх олгосон', 'member.role': 'Гишүүний эрх өөрчилсөн', 'member.approve': 'Ops эрх олгосон', 'member.decline': 'Эрхийн хүсэлт татгалзсан',
+  'member.upsert': 'Гишүүн нэмсэн', 'member.grant': 'Ширээнд гишүүн нэмсэн', 'member.role': 'Гишүүний үүрэг өөрчилсөн', 'member.approve': 'Ширээнд гишүүн нэмсэн', 'member.decline': 'Ширээний хүсэлт татгалзсан',
   'member.activate': 'Гишүүн нээсэн', 'member.deactivate': 'Гишүүн хаасан',
-  'org.approve': 'Байгууллага баталсан', 'org.decline': 'Байгууллага татгалзсан', 'org.member_role': 'Байгууллагын хүний эрх өөрчилсөн', 'org.roles': 'Байгууллагын эрхүүд өөрчилсөн',
-  'role.create': 'Эрх үүсгэсэн', 'role.update': 'Эрх өөрчилсөн', 'role.delete': 'Эрх устгасан',
+  'org.approve': 'Байгууллага баталсан', 'org.decline': 'Байгууллага татгалзсан', 'org.member_role': 'Байгууллагын хүний үүрэг өөрчилсөн', 'org.roles': 'Байгууллагад нээх үүрэг өөрчилсөн',
+  'role.create': 'Үүрэг үүсгэсэн', 'role.update': 'Үүрэг өөрчилсөн', 'role.delete': 'Үүрэг устгасан',
   'menu.save': 'Цэс өөрчилсөн', 'menu.module': 'Модуль нэмсэн', 'menu.module_remove': 'Модуль устгасан', 'menu.link': 'Холбоос нэмсэн', 'menu.link_remove': 'Холбоос устгасан',
   'setting.change': 'Тохиргоо өөрчилсөн',
   'promotion.end': 'Онцлолт зогсоосон',
@@ -4535,7 +4538,7 @@ const ACTION = {
 /** What an action was done to, in the words of the desk's own sections. */
 const TARGET_WORD = {
   order: 'Идэш', listing: 'Идэш', supplier: 'Нийлүүлэгч', settlement: 'Мөнгө', ledger: 'Мөнгө', receipt: 'Мөнгө', guest: 'Зочин',
-  member: 'Гишүүд', org: 'Байгууллага', role: 'Эрх, цэс', menu: 'Эрх, цэс', restaurant: 'Хоол', device: 'Хоол', menu_item: 'Хоол',
+  member: 'Гишүүд', org: 'Байгууллага', role: 'Үүрэг, цэс', menu: 'Үүрэг, цэс', restaurant: 'Хоол', device: 'Хоол', menu_item: 'Хоол',
   message: 'Мэдэгдэл', setting: 'Систем', promotion: 'Онцлох зар',
 };
 
