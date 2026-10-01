@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#F4F3EE">
-<title>Dashboard — Basu</title>
+<title>Бизнес — Basu</title>
 <link rel="stylesheet" href="/app.css">
 <script src="/vendor/table-core.js"></script>
 <style>
@@ -14,14 +14,90 @@
    what is left here is where things sit. */
 p{margin:0}
 
-/* the door */
-.door{min-height:100dvh;display:grid;place-items:center;padding:var(--s-6) var(--gutter)}
-.pair{width:100%;max-width:420px;padding:28px}
-.pair .brand{margin-bottom:20px}
-.pair h2{margin-bottom:6px}
-.pair p{color:var(--ink-2);margin-bottom:20px}
-.pair .callout{margin:12px 0 16px}
-.pair .input{margin-bottom:10px}
+/* the door: one card in the middle of the ground, the way back home under it */
+.door{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:var(--s-7) var(--gutter)}
+.door-card{width:100%;max-width:440px;padding:32px 32px 28px}
+.door-brand{display:inline-flex;align-items:baseline;gap:10px;margin:0 0 28px;color:var(--ink);text-decoration:none}
+.door-brand .wordmark{font-size:24px}
+.door-place{font-size:var(--t-body);font-weight:500;color:var(--ink-3)}
+.door-card h2{font-size:var(--t-title-2);line-height:var(--lh-tight);letter-spacing:-.015em;margin:0 0 8px}
+.door-card > p{color:var(--ink-2);margin:0 0 20px;line-height:1.5}
+.door-card > .door-for{font-size:var(--t-body);margin-bottom:16px}
+.door-card > #door-lead{font-size:var(--t-cap);color:var(--ink-3);margin-bottom:16px}
+.door-card > .chip{margin:0 0 12px}
+.door-card > .callout{margin:0 0 16px}
+.door-card > .input{margin-bottom:10px}
+.door-home{display:inline-flex;align-items:center;gap:4px;min-height:var(--target);padding:0 8px;font-size:var(--t-body);font-weight:500;color:var(--ink-2);text-decoration:none;border-radius:var(--r-ctl)}
+.door-home svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+@media (hover:hover){.door-home:hover{color:var(--ink);background:var(--surface-2)}}
+@media (max-width:480px){.door-card{padding:24px 20px}}
+
+/* page heads: the line under a title is one sentence; on a desk it may run to the head's buttons */
+.page-head p{max-width:70ch}
+.head-acts .seg{flex:none}
+/* a quiet line of help under a list or a section, and the line that says what a section is for */
+.page-note{margin:12px 0 0;font-size:var(--t-cap);line-height:1.5;color:var(--ink-3);max-width:90ch}
+.page-note a{color:var(--accent-ink)}
+.section-note{margin:-2px 0 12px;font-size:var(--t-cap);line-height:1.5;color:var(--ink-2);max-width:90ch}
+.nowrap{white-space:nowrap}
+.dt-unnamed{font-weight:400;color:var(--ink-3)}
+.skel-line{display:block;width:40%;height:14px}
+/* a file while its answer is on the way: a title, a line, the facts card, rows */
+.file-skel{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.file-skel .skel-h1{display:block;width:min(320px,70%);height:28px}
+.file-skel > .skel{background:var(--sunk)}   /* on the ground, not in a card: the plate a shade darker so it shows */
+.skel-card{margin-top:22px;padding:4px 16px}
+.skel-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"facts facts" "main rail";gap:22px 24px;margin-top:10px;align-items:start}
+.skel-grid > .skel-facts{grid-area:facts}
+.skel-grid > .skel-main{grid-area:main;margin-top:0}
+.skel-grid > .skel-rail{grid-area:rail;display:flex;flex-direction:column;gap:12px;padding:20px}
+.skel-rail .skel{display:block;height:36px}
+@media (max-width:1100px){.skel-grid{grid-template-columns:minmax(0,1fr);grid-template-areas:"facts" "rail" "main"}}
+.skel-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:24px;padding:20px}
+.skel-facts .skel{display:block;height:40px}
+@media (max-width:600px){.skel-facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.page-head + .kpi-band.band-gap,.kpi-band.band-gap{margin-bottom:24px}
+
+/* a person's own corner: the first visit, and their businesses as rows */
+/* the first visit: what this place is for and the button on the left, the three steps on the right */
+#org-list > .first-run{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,380px);gap:32px;align-items:center;padding:32px}
+.fr-copy h2{font-size:var(--t-title-2);line-height:var(--lh-tight);letter-spacing:-.015em;margin:0 0 10px}
+.fr-copy > p{font-size:var(--t-body-lg);line-height:1.55;color:var(--ink-2);max-width:56ch;margin:0 0 24px}
+.fr-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;counter-reset:fr}
+.fr-steps li{display:grid;grid-template-columns:28px minmax(0,1fr);column-gap:12px;counter-increment:fr;padding:14px 16px;border-radius:var(--r-ctl);background:var(--surface-2)}
+.fr-steps li::before{content:counter(fr);grid-row:span 2;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--deep);color:var(--on-accent);font-family:var(--mono);font-size:var(--t-meta);font-weight:600}
+.fr-steps b{font-size:var(--t-body-lg);font-weight:600;line-height:1.35;color:var(--ink)}
+.fr-steps span{margin-top:2px;font-size:var(--t-cap);line-height:1.45;color:var(--ink-2)}
+.fr-acts{display:flex;gap:10px;flex-wrap:wrap}
+.fr-copy > .fr-other{margin:16px 0 0;font-size:var(--t-cap);line-height:1.5;color:var(--ink-3);max-width:56ch}
+@media (max-width:1100px){#org-list > .first-run{grid-template-columns:1fr;gap:24px;padding:24px 20px}}
+.org-mark{display:grid;place-items:center;width:40px;height:40px;flex:none;border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2);font-weight:600}
+.org-mark svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.org-mark[data-desk]{background:var(--deep);border-color:var(--deep);color:var(--on-accent)}
+.org-row .org-why{color:var(--stop)}
+#front .row .end{display:flex;align-items:center}
+
+/* a record read as label and value, one per line: a profile, a business's details */
+.kv{margin:0}
+.kv > div{display:grid;grid-template-columns:minmax(140px,200px) minmax(0,1fr);gap:16px;padding:14px 20px;border-top:1px solid var(--line)}
+.kv > div:first-child{border-top:0}
+.kv dt{font-size:var(--t-cap);font-weight:500;line-height:20px;color:var(--ink-2)}
+.kv dd{margin:0;font-size:var(--t-body);line-height:20px;color:var(--ink)}
+.kv dd small{display:block;margin-top:2px;font-size:var(--t-cap);line-height:1.4;color:var(--ink-3)}
+.kv-none{color:var(--ink-3)}
+@media (max-width:600px){.kv > div{grid-template-columns:1fr;gap:2px;padding:12px 16px}}
+
+/* a business waiting for Basu: where it stands and what comes */
+.org-wait .card-body{padding:24px}
+.org-wait-head{margin-bottom:12px}
+.org-wait-lead{font-size:var(--t-body-lg);line-height:1.55;color:var(--ink-2);max-width:62ch;margin:0 0 16px}
+.org-steps{max-width:520px;margin:0}
+.nudge{display:flex;align-items:center;gap:16px 24px;flex-wrap:wrap;margin-top:24px;padding:18px 20px}
+.nudge-copy{flex:1 1 320px;min-width:0}
+.nudge-copy b{display:block;font-size:var(--t-row);font-weight:600;color:var(--ink)}
+.nudge-copy span{display:block;margin-top:2px;font-size:var(--t-body);line-height:1.5;color:var(--ink-2)}
+.org-you{margin-top:20px;font-size:var(--t-cap);color:var(--ink-2)}
+.org-you .link{min-height:0;font-size:var(--t-cap)}
 
 /* the frame: the grid, the sidebar and the drawer are /app.css's .desk-frame */
 .main{min-width:0}
@@ -29,15 +105,24 @@ p{margin:0}
 .page > .back{margin-bottom:4px}
 .page-head + .section{margin-top:0}
 .page-head + .kpi-band{margin-bottom:8px}
-.org-row{cursor:pointer}
 .pair-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:0 16px;align-items:start}
-/* a business's front page: a door to each of its parts */
-.org-doors{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
-.org-door h3{font-size:var(--t-row);margin:0 0 10px}
-.org-door .links{display:flex;flex-direction:column;gap:2px;margin:0 -8px}
-.door-link{display:flex;align-items:center;gap:10px;min-height:36px;padding:0 8px;border-radius:var(--r-sm);font-size:var(--t-body);font-weight:500;color:var(--ink-2)}
-.door-link svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3)}
-@media (hover:hover){.door-link:hover{background:var(--surface-2);color:var(--ink)}}
+/* a business's front page: a door to each of its parts, each saying what it is for */
+.org-doors{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px;align-items:start}
+.org-door{overflow:hidden}
+.org-door-head{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:1px solid var(--line)}
+.org-door-head svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3)}
+.org-door-head h3{font-size:var(--t-title-3);margin:0}
+.org-door .links{display:flex;flex-direction:column}
+.door-link{display:grid;grid-template-columns:20px minmax(0,1fr) 16px;grid-template-areas:"icon label go" "icon say go";column-gap:12px;row-gap:2px;align-items:center;min-height:56px;padding:10px 20px;border-top:1px solid var(--line);color:var(--ink);text-decoration:none}
+.door-link:first-child{border-top:0}
+.door-link > svg{grid-area:icon;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3)}
+.door-link > span{grid-area:label;font-size:var(--t-body-lg);font-weight:500;line-height:1.3}
+.door-link > small{grid-area:say;font-size:var(--t-cap);line-height:1.4;color:var(--ink-3)}
+.door-link::after{content:"";grid-area:go;width:16px;height:16px;background:var(--ink-3);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center/16px no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center/16px no-repeat}
+@media (hover:hover){.door-link:hover{background:var(--surface-2)}.door-link:hover > svg{color:var(--accent-ink)}}
+.door-link:active{background:var(--surface-2)}
+/* the card clips its rows to its corners: the focus ring is drawn inside, so it is never cut */
+.door-link:focus-visible{outline-offset:-3px}
 /* who may do what: permissions down, roles across, the reader's own column marked */
 .table.roles th.role-col,.table.roles td.role-col{width:96px;text-align:center}
 .table.roles th.yours{color:var(--ink)}
@@ -47,9 +132,8 @@ p{margin:0}
 .table.roles .no{color:var(--ink-3)}
 .table.roles tr.role-sec td{padding-top:18px;font-family:var(--mono);font-size:var(--t-eyebrow);font-weight:500;letter-spacing:var(--track-eyebrow);text-transform:uppercase;color:var(--ink-3);background:none}
 /* the roles page: every role in one table; a role is made and changed in a popup, module by module */
-.roles-tools{display:flex;align-items:center;gap:12px;margin:0 0 12px}
-.roles-tools .section-title{flex:1;min-width:0;margin:0}
-.roles-tools .section-title .n{margin:0 0 0 8px}
+.roles-tools{display:flex;align-items:center;gap:12px;margin:0 0 8px}
+.roles-tools .section-label{flex:1;min-width:0;margin:0}
 .roles-table .who{display:flex;align-items:flex-start;gap:12px;min-width:260px}
 .roles-table .who b{font-size:var(--t-row);font-weight:600}
 .roles-table .who .tags{display:inline-flex;gap:6px;margin-left:8px;vertical-align:1px}
@@ -57,7 +141,7 @@ p{margin:0}
 .roles-table tr[data-on] td{background:var(--accent-soft)}
 .role-mark{display:grid;place-items:center;width:36px;height:36px;flex:none;border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--line);font-size:var(--t-cap);font-weight:600;color:var(--ink-2)}
 .role-mark svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.role-mark[data-locked]{background:var(--ink);border-color:var(--ink);color:var(--ink-inverse)}
+.role-mark[data-locked]{background:var(--deep);border-color:var(--deep);color:var(--on-accent)}
 /* a role's fingerprint: every module in menu order, lit where the role opens it */
 .role-strip{display:flex;align-items:center;gap:8px;color:var(--ink-2)}
 .role-strip span{display:grid}
@@ -82,7 +166,7 @@ p{margin:0}
 .role-sec-head{display:flex;align-items:center;gap:12px;margin:0 0 14px}
 .role-sec-head h3{flex:1;min-width:0;display:flex;align-items:center;font-size:var(--t-title-3);font-weight:600}
 .role-sec-head .meta{font-family:var(--mono);font-size:var(--t-meta);color:var(--ink-3)}
-.role-step{display:inline-grid;place-items:center;width:22px;height:22px;flex:none;margin-right:10px;border-radius:50%;background:var(--ink);color:var(--ink-inverse);font-family:var(--mono);font-size:var(--t-meta);font-weight:600}
+.role-step{display:inline-grid;place-items:center;width:22px;height:22px;flex:none;margin-right:10px;border-radius:50%;background:var(--deep);color:var(--on-accent);font-family:var(--mono);font-size:var(--t-meta);font-weight:600}
 @media (min-width:640px){.role-sheet .fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .role-flags{display:flex;flex-direction:column;margin-top:4px;border-top:1px solid var(--line)}
 .role-flag{display:flex;align-items:flex-start;gap:12px;padding:12px 0 0;cursor:pointer}
@@ -106,8 +190,9 @@ p{margin:0}
 .role-fold[aria-expanded="false"] .fold svg{transform:rotate(-90deg)}
 .role-mod[data-level="none"] .role-fold .ic{color:var(--ink-3)}
 .role-mod[data-level="none"] .role-fold .t b{color:var(--ink-2)}
-.role-mod[data-level="full"] .role-fold .ic{background:var(--ink);border-color:var(--ink);color:var(--ink-inverse)}
-.role-mod[data-level="view"] .role-fold .ic,.role-mod[data-level="some"] .role-fold .ic{background:var(--accent-soft);border-color:var(--line-2)}
+/* how far a module is open, in the tile: whole in the pine wash, part in the plate, shut in grey */
+.role-mod[data-level="full"] .role-fold .ic{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink)}
+.role-mod[data-level="view"] .role-fold .ic,.role-mod[data-level="some"] .role-fold .ic{background:var(--surface);border-color:var(--line-2);color:var(--ink)}
 .role-level{flex:none}
 .role-level button{min-height:30px;padding:0 12px}
 .role-level button[disabled]{cursor:default}
@@ -185,57 +270,67 @@ p{margin:0}
 .table:has(tr[data-link]) th:last-child{padding-right:32px}
 .table td.end{text-align:right}
 .run-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}
+/* Six numbers in one row on a wide desk, two rows of three below that, two by two on a phone —
+   never five and an orphan over a grey gap; four numbers four across, then two by two. */
+.kpi-band:has(> .kpi:nth-child(6):last-child){grid-template-columns:repeat(6,minmax(0,1fr))}
+.kpi-band:has(> .kpi:nth-child(4):last-child){grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:1400px){.kpi-band:has(> .kpi:nth-child(6):last-child){grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:900px){.kpi-band:has(> .kpi:nth-child(4):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.kpi-band:has(> .kpi:nth-child(6):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* six across with a long figure in it (fitBands marks it): the whole row a size down together, so it
+   stays in its cells and the row stays even */
+@media (min-width:1401px){
+  .kpi-band:has(> .kpi:nth-child(6):last-child):has(> .kpi[data-long]) > .kpi:not([data-word]) > b{font-size:var(--t-title-2)}
+  .kpi-band:has(> .kpi:nth-child(6):last-child):has(> .kpi[data-long="2"]) > .kpi:not([data-word]) > b{font-size:var(--t-title-3)}
+}
+@media (max-width:640px){.kpi-band > .kpi[data-long="2"] > b{font-size:var(--t-title-3)}}
 /* Until app.css scopes `.kpi-band .kpi span` to `> span`: money() inside a
    KPI value keeps the value's size, weight and tone instead of the caption's. */
 .kpi-band .kpi b span{display:inline;font-size:inherit;color:inherit;line-height:inherit}
 .kpi-band .kpi b .cur{font-size:.65em;font-weight:500}
 
-/* rows: suppliers, kitchens, settlements — hairline rows in one container */
-.rows[data-rows]{overflow:visible}
-/* a list with nothing in it is a hairline and one line, not a boxed card */
-.rows[data-rows]:has(> .empty:only-child){background:none;border:0;border-radius:0;box-shadow:none}
-.rows[data-rows] > .empty:only-child{border-top:1px solid var(--line);padding-left:0;padding-right:0}
-.rows[data-rows] > .row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 16px;align-items:center;padding:14px 20px}
-.row .name{font-size:var(--t-row);font-weight:600;line-height:var(--lh-snug);min-width:0}
-.row .name .pill{margin-left:6px}
-.row .name small{display:block;font-size:var(--t-cap);font-weight:400;line-height:1.5;color:var(--ink-2);margin-top:3px}
-.row .right{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
-.row .btns{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-.row .amount{font-size:var(--t-title-3)}
-.row[data-paid] .name{color:var(--ink-2)}
-.row[data-paid] .amount .money{color:var(--ink-3)}
-.row .about{grid-column:1 / -1;font-size:var(--t-cap);line-height:1.5;color:var(--ink-2)}
-.row .about b{font-weight:500;color:var(--ink)}
-.row .drawer{grid-column:1 / -1;padding-top:12px;border-top:1px solid var(--line)}
-.row .drawer .table th:first-child,.row .drawer .table td:first-child{padding-left:0}
-.row .drawer .table th:last-child,.row .drawer .table td:last-child{padding-right:0}
-.row .code{grid-column:1 / -1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;border-radius:var(--r-ctl);background:var(--ready-soft);border:1px solid var(--ready-line);color:var(--ready);font-size:var(--t-cap)}
-.row .code b{font-size:var(--t-title-3);font-weight:600;letter-spacing:.12em;color:inherit}
+/* a signed-in device on a guest's file: its name and when it was last seen, the button that signs it out */
 .sess{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:var(--t-body)}
 .sess small{display:block;font-size:var(--t-cap);color:var(--ink-3)}
 @media (max-width:720px){
-  .rows[data-rows] > .row{grid-template-columns:1fr}
-  .row .right,.row .btns{justify-content:flex-start}
   /* a wide table scrolls inside its wrap instead of squeezing every cell */
   .table:has(th:nth-child(4)){min-width:640px}
   .table:has(th:nth-child(4)) td:first-child,.table:has(th:nth-child(4)) .sub{white-space:nowrap}
 }
 
-/* the overflow menu: every action stays in the DOM, one is in view */
-.more{position:relative;display:inline-flex}
-.more > summary{list-style:none}
-.more > summary::-webkit-details-marker{display:none}
-.more > summary svg{fill:currentColor;stroke:none}
-.more > .menu{position:absolute;right:0;top:calc(100% + 4px);z-index:var(--z-bar);min-width:220px;display:flex;flex-direction:column;gap:2px;padding:4px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-ctl);box-shadow:var(--shadow-float)}
-.more > .menu .btn{width:100%;justify-content:flex-start}
-.more > .menu .btn.ink-stop{color:var(--stop)}
+/* a file — one order, one guest, one supplier, one business: the facts across the top, the
+   sections down the left, and on the right a rail with what can be done and the files around
+   it, which stays in view while the left scrolls. On a narrow screen: facts, rail, sections. */
+.detail{display:grid;grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"facts facts" "main rail";gap:0 24px;align-items:start}
+.detail > .detail-facts{grid-area:facts}
+.detail > .detail-main{grid-area:main;min-width:0}
+.detail > .detail-rail{grid-area:rail;position:sticky;top:24px;margin-top:32px;min-width:0}
+@media (max-width:1100px){
+  .detail{grid-template-columns:minmax(0,1fr);grid-template-areas:"facts" "rail" "main"}
+  .detail > .detail-rail{position:static}
+}
+.detail-rail > .section-label:not(:first-child),.detail-rail > .rail-sec{margin-top:24px}
+.detail-rail > .rail-sec > .section-label{margin-top:0}
+.rail-note{margin:0;font-size:var(--t-cap);line-height:1.5;color:var(--ink-3)}
+.related .row{width:100%;text-align:left;font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.facts-card{margin-bottom:0}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px 24px;padding:18px 20px;font-size:var(--t-body);line-height:1.45;color:var(--ink-2)}
+/* a fact's name in the page's own sentence case, like the numbers' labels above a band */
+.facts .lab{display:block;margin-bottom:4px;font-family:var(--sans);font-size:var(--t-cap);font-weight:500;letter-spacing:0;text-transform:none;color:var(--ink-2)}
+.facts b{display:block;font-size:var(--t-row);font-weight:600;line-height:1.3;color:var(--ink)}
+.fact-sub{display:block;margin-top:3px;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}
+/* a tablet or a narrow window: facts two by two, like the numbers' bands, never three and an orphan */
+@media (max-width:1100px){.facts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.facts{gap:14px 16px;padding:16px}}
+.fact-sub .pill{margin-left:4px;vertical-align:1px}
+.review-body p{margin-top:8px;color:var(--ink-2)}
+.table td > .sub{display:block;margin-top:2px;font-size:var(--t-cap);font-weight:400;color:var(--ink-3)}
 
-/* one order, one guest */
-.detail{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
-@media (max-width:1000px){.detail{grid-template-columns:1fr}}
-.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px 20px;padding:20px;font-size:var(--t-body);line-height:1.45;color:var(--ink-2)}
-.facts .lab{display:block;margin-bottom:4px}
-.facts b{font-size:var(--t-row);font-weight:600;color:var(--ink)}
+/* the overview: the word left for everyone, then the things to do, one row each, its button at the end */
+.overview-banner{margin:0 0 8px}
+#alerts > .alert{min-height:52px;padding:8px 16px 8px 20px}
+#alerts .alert-text{flex:1;min-width:0}
+#queue{padding:12px 20px}
 .section-label .btn{margin-left:auto}
 .section-label:has(.btn){align-items:center}
 .section-label .label-acts{display:flex;gap:6px;margin-left:auto}
@@ -250,14 +345,6 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 .stars{display:inline-flex;gap:1px;vertical-align:middle}
 .stars svg{width:14px;height:14px;fill:var(--star)}
 .stars svg[data-off]{fill:var(--line-2)}
-
-/* the log: who, what, when */
-.log li{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 20px;font-size:var(--t-body)}
-.log li.empty{display:block}
-.log .who{font-weight:500;color:var(--ink-2);white-space:nowrap}
-.log .when{white-space:nowrap;text-align:right}
-.log small{display:block;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}
-.log .when .pill{margin-top:4px}
 
 /* one toned word inside a sentence */
 .ink-stop{color:var(--stop)}
@@ -301,13 +388,6 @@ const STAR = '<svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 
 const tel = (phone) => `<a class="tel mono" href="tel:${esc(phone)}">${PHONE}${esc(phone)}</a>`;
 /** Three rows of the shape that is coming, while it loads. */
 const busy = () => el(`<div role="status" aria-busy="true">${'<div class="skel-row"><span class="skel"></span><span class="skel-lines"><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></div>'.repeat(3)}</div>`);
-/** The rest of a row's actions, folded behind one button; every button stays in the DOM. */
-const more = () => el('<details class="more"><summary class="btn" data-size="sm" data-icon aria-label="Бусад үйлдэл"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg></summary><div class="menu"></div></details>');
-document.addEventListener('click', (e) => {
-  for (const d of document.querySelectorAll('details.more[open]')) {
-    if (!d.contains(e.target) || e.target.closest('.menu button')) d.open = false;
-  }
-});
 /** The dot's tone on the story: red for a cancellation, blue for on the road, green for handed over. */
 const STORY_K = {
   CANCELLED: 'stop', REFUNDED: 'stop', REFUND_DUE: 'stop', HELD: 'stop', HELD_BY_KITCHEN: 'stop', REJECTED: 'stop', NO_SHOW: 'stop',
@@ -358,15 +438,21 @@ async function showToken() {
   const demo = await api('/dev/ops-token').catch(() => null);
   if (drawing !== doorDrawn) return;
   const door = el('<div class="door"></div>');
-  const why = doorWhy ? `<div class="callout" data-k="info" role="status" id="door-why"><span>${esc(doorWhy)}</span></div>` : '';
+  // Why the door is up again: the bold line is ours, the sentence under it is the server's, word for word.
+  const why = doorWhy
+    ? `<div class="callout door-why" data-k="warn" role="status"><b>Нэвтрэлтийн хугацаа дууссан</b><span id="door-why">${esc(doorWhy)}</span></div>`
+    : '';
+  const mark = '<a class="door-brand" href="/" aria-label="Basu-гийн нүүр хуудас"><span class="wordmark">Basu</span><span class="door-place">Бизнес</span></a>';
+  const home = `<a class="door-home" href="/">${CHEV}Basu-гийн нүүр хуудас</a>`;
   if (demo?.token) {
     const card = el(`
-      <div class="card pair">
-        <div class="brand wordmark">Basu<small>Ops</small></div>
-        <h2>Демо горим</h2>
+      <div class="card pair door-card">
+        ${mark}
+        <span class="chip" data-tone="route">Туршилтын орчин</span>
+        <h2>Basu-гийн ширээнд нэвтрэх</h2>
         ${why}
-        <p>Нууц үг автоматаар орлоо. Нэвтрэхэд л болно.</p>
-        <input class="input" type="password" placeholder="OPS_TOKEN" aria-label="Ops нууц" autocomplete="off">
+        <p>Туршилтын орчинд ширээний нууц үг өөрөө бөглөгдсөн. Нэвтрэх товчийг дарахад админаар орно.</p>
+        <input class="input" type="password" placeholder="Ширээний нууц үг" aria-label="Ширээний нууц үг" autocomplete="off">
         <button class="btn" data-v="primary" data-size="lg" type="button">Нэвтрэх</button>
       </div>`);
     const input = card.querySelector('input');
@@ -383,14 +469,16 @@ async function showToken() {
     };
     card.querySelector('button').addEventListener('click', submit);
     input.addEventListener('keydown', (e) => e.key === 'Enter' && submit());
-    door.append(card);
+    door.append(card, el(home));
     root.append(door);
     return;
   }
+  // The real door. Whoever comes here runs a business on Basu or works at Basu's desk; the same sign-in as the website.
   const card = el(`
-    <div class="card pair">
-      <div class="brand wordmark">Basu<small>Ops</small></div>
+    <div class="card door-card">
+      ${mark}
       <h2>Нэвтрэх</h2>
+      <p class="door-for">Байгууллагаа Basu дээр удирдах газар. Basu-д нэвтэрдэг бүртгэлээрээ орно.</p>
       ${why}
       <p id="door-lead">Нэвтэрнэ үү.</p>
       <div data-doors></div>
@@ -399,7 +487,7 @@ async function showToken() {
   // the shared block, and the session it makes is the browser's one person,
   // the same as on the website. What the account may do is its roles',
   // which it asks for once inside.
-  const doors = signInDoors({ device: 'Ops', returnTo: '/dashboard', onToken: () => boot() });
+  const doors = signInDoors({ device: 'Бизнес', returnTo: '/dashboard', onToken: () => boot() });
   card.querySelector('[data-doors]').append(doors);
   // Say only the ways that are really on the card.
   doors.ready.then((open) => {
@@ -407,7 +495,7 @@ async function showToken() {
     const ways = others.length ? `${others.join(', ')} эсвэл нууц үгээрээ` : 'нууц үгээрээ';
     card.querySelector('#door-lead').textContent = `${ways[0].toUpperCase()}${ways.slice(1)} нэвтэрнэ үү.`;
   });
-  door.append(card);
+  door.append(card, el(home));
   root.append(door);
 }
 
@@ -425,42 +513,74 @@ const kinds = (o) => [o.restaurant && 'Ресторан', o.supplier && 'Ний�
  * there. Nobody asks for the desk from here: an admin gives a seat, to an
  * account chosen from Basu's users.
  */
+/**
+ * A name worth greeting by: the one the person chose, not the number the
+ * account fell back on, which the server shows in its place.
+ */
+const realName = (name) => (name && !/^[+\d\s·.-]+$/.test(name) ? name : null);
+
 function renderMeHome(view) {
   const account = access.account ?? {};
-  view.append(
-    headActs(
-      head(account.name ? `Сайн байна уу, ${esc(account.name)}` : 'Тавтай морил', 'Таны ажилладаг байгууллагууд нэг дор.'),
-      button(`${NAV_ICON.plus}Байгууллага бүртгүүлэх`, () => orgPopup(), 'data-v="primary" id="org-new"'),
-    ),
-  );
-
   const orgs = access.workspaces.filter((w) => w.kind === 'org');
+  const named = realName(account.name);
+  // Somebody who sits at Basu's desk came for the desk: it comes first, and registering a business is one quiet row.
+  const seat = deskSeat();
+  const h = head(
+    named ? `Сайн байна уу, ${esc(named)}` : 'Тавтай морил',
+    orgs.length ? 'Таны ажилладаг байгууллагууд. Аль нэгийг нь сонгоод ажлаа үргэлжлүүлнэ.' : seat ? 'Basu-гийн ширээ болон таны байгууллагууд.' : 'Байгууллагаа Basu дээр ажиллуулах эхний алхам энд.',
+  );
+  view.append(h);
+  // Somebody with a business already: one more is the head's button. Somebody with none: the welcome below carries it.
+  if (orgs.length) headActs(h, button(`${NAV_ICON.plus}Байгууллага бүртгүүлэх`, () => orgPopup(), 'data-v="primary" id="org-new"'));
+  if (seat) view.append(deskSection());
+
   const section = el(`
-    <section class="section"><h2 class="section-label">Миний байгууллагууд</h2>
+    <section class="section">${orgs.length ? `<h2 class="section-label">Миний байгууллагууд<span class="n">${orgs.length}</span></h2>` : ''}
       <div class="card" data-rows id="org-list"></div>
     </section>`);
   const list = section.querySelector('#org-list');
-  if (!orgs.length) {
-    list.append(el('<div class="empty">Та одоогоор ямар ч байгууллагад байхгүй. Ресторан эсвэл нийлүүлэгчээ бүртгүүлбэл та эзэн нь болно; эсвэл менежер тань таныг утас, имэйлээр чинь нэмнэ.</div>'));
+  if (!orgs.length && seat) {
+    section.prepend(el('<h2 class="section-label">Миний байгууллагууд</h2>'));
+    const row = el('<div class="row"><span class="main"><span class="title" data-weight="normal">Та одоогоор байгууллагад байхгүй.</span><span class="sub">Ресторан, нийлүүлэгчээ бүртгүүлбэл та эзэн нь болно.</span></span><span class="end"></span></div>');
+    row.querySelector('.end').append(button(`${NAV_ICON.plus}Байгууллага бүртгүүлэх`, () => orgPopup(), 'data-size="sm" id="org-new"'));
+    list.append(row);
+  } else if (!orgs.length) {
+    // The first visit, which is most people's: what this place is for, and the way in.
+    const welcome = el(`
+      <div class="first-run">
+        <div class="fr-copy">
+          <h2>Бизнесээ Basu дээр ажиллуулаарай</h2>
+          <p>Махны нийлүүлэгч эсвэл ресторан бол бүртгүүлээд Basu-гийн зочдод зар, хоолоо санал болгоно. Захиалга, мөнгө, ажилтнаа эндээс удирдана.</p>
+          <div class="fr-acts"></div>
+          <p class="fr-other">Өөр байгууллагад ажилладаг бол эзэн, менежер тань таныг Basu-д нэвтэрдэг утас, имэйлээр тань нэмнэ. Нэмэгдмэгц тэр байгууллага энд гарна.</p>
+        </div>
+        <ol class="fr-steps">
+          <li><b>Бүртгүүлэх</b><span>Нэр, утас, хаягаа өгнө. Бүртгүүлсэн хүн эзэн нь болно.</span></li>
+          <li><b>Basu шалгана</b><span>Basu-гийн баг шалгаж батална. Батлагдмагц танд мэдэгдэнэ.</span></li>
+          <li><b>Ажилтнаа нэмнэ</b><span>Менежер, ажилтан, нягтландаа үүрэг өгч ажиллуулна.</span></li>
+        </ol>
+      </div>`);
+    welcome.querySelector('.fr-acts').append(button(`${NAV_ICON.plus}Байгууллага бүртгүүлэх`, () => orgPopup(), 'data-v="primary" id="org-new"'));
+    list.append(welcome);
   }
   for (const w of orgs) {
     const [tone, word] = ORG_STATE[w.state] ?? ['off', w.state];
+    const why = w.state === 'declined' ? `<span class="sub org-why">${w.decline_reason ? `Татгалзсан шалтгаан: ${esc(w.decline_reason)}` : 'Татгалзсан.'} Засаад дахин бүртгүүлж болно.</span>` : '';
+    // A running business says what it is and what the person is in it; one not running yet says what it will be — its state is the chip.
+    const sub = w.state === 'active' ? w.sub : [kinds(w.kinds ?? {}).join(', '), w.state === 'applied' ? 'бүртгэл илгээсэн, Basu шалгаж байна' : ''].filter(Boolean).join(' · ');
     const row = el(`
-      <div class="row org-row" data-chev tabindex="0" data-org="${esc(w.id)}">
-        <div class="main">
-          <div class="title">${esc(w.name)}</div>
-          <p class="cap" style="margin:2px 0 0">${esc(w.sub)}</p>
-          ${w.state === 'declined' && w.decline_reason ? `<p class="cap" style="margin:4px 0 0">Шалтгаан: ${esc(w.decline_reason)}</p>` : ''}
-        </div>
-        <div class="end"><span class="pill" data-s="${esc(tone)}">${esc(word)}</span></div>
-      </div>`);
-    const go = () => open(w);
-    row.addEventListener('click', go);
-    row.addEventListener('keydown', (e) => e.key === 'Enter' && go());
+      <a class="row org-row" href="#${esc(w.id)}/home" data-chev data-org="${esc(w.id)}">
+        <span class="lead"><span class="org-mark" aria-hidden="true">${NAV_ICON[w.kinds?.restaurant && !w.kinds?.supplier ? 'venues' : 'org'] ?? ''}</span></span>
+        <span class="main"><span class="title">${esc(w.name)}</span>${sub ? `<span class="sub">${esc(sub)}</span>` : ''}${why}</span>
+        <span class="end"><span class="pill" data-s="${esc(tone)}">${esc(word)}</span></span>
+      </a>`);
+    row.addEventListener('click', (e) => {
+      e.preventDefault();
+      open(w);
+    });
     list.append(row);
   }
   view.append(section);
-  if (deskSeat()) view.append(deskSection());
 
   if (wanted === 'new-org') void orgPopup();
   wanted = null;
@@ -470,35 +590,39 @@ function renderMeHome(view) {
 function deskSection() {
   const seat = deskSeat();
   const box = el(`
-    <section class="section"><h2 class="section-label">Basu ops</h2>
-      <div class="card"><div class="card-body" id="front">
-        <p class="cap" style="margin:0 0 14px"></p>
-        <div class="form-foot" style="justify-content:flex-start;margin:0" data-act></div>
-      </div></div>
+    <section class="section"><h2 class="section-label">Basu-гийн ширээ</h2>
+      <div class="card" data-rows id="front">
+        <div class="row">
+          <span class="lead"><span class="org-mark" data-desk aria-hidden="true">B</span></span>
+          <span class="main"><span class="title">Basu ops</span><span class="sub"></span></span>
+          <span class="end" data-act></span>
+        </div>
+      </div>
     </section>`);
-  box.querySelector('.cap').textContent = `Та Basu ops-ийн гишүүн — ${seat.role_label}.`;
-  box.querySelector('[data-act]').append(button('Ops ширээ нээх', () => open(seat)));
+  box.querySelector('.sub').textContent = `Та ширээнд ${seat.role_label} үүрэгтэй.`;
+  box.querySelector('[data-act]').append(button('Ширээ нээх', () => open(seat), 'data-size="sm"'));
   return box;
 }
 
 /** The person: their name, how they sign in, and every device that is signed in as them. */
 async function renderMeProfile(view) {
   const account = access.account ?? {};
-  view.append(head('Профайл', 'Таны нэр, нэвтэрдэг хаяг, нэвтэрсэн төхөөрөмжүүд.'));
+  view.append(head('Профайл', 'Таны нэр, нэвтрэх арга, нэвтэрсэн төхөөрөмжүүд.'));
+  const unset = '<span class="kv-none">Оруулаагүй</span>';
   const card = el(`
-    <section class="section"><h2 class="section-label">Та</h2>
-      <div class="card"><div class="facts" id="me-facts">
-        <div><span class="lab">Нэр</span><b>${account.name ? esc(account.name) : '—'}</b></div>
-        <div><span class="lab">Имэйл</span><b>${account.email ? esc(account.email) : '—'}</b></div>
-        <div><span class="lab">Утас</span><b class="mono">${account.phone ? esc(account.phone) : '—'}</b></div>
-      </div></div>
+    <section class="section"><h2 class="section-label">Хувийн мэдээлэл</h2>
+      <div class="card"><dl class="kv" id="me-facts">
+        <div><dt>Нэр</dt><dd>${account.name ? esc(account.name) : `${unset}<small>Байгууллага, Basu-гийн ажилтнууд таныг нэрээр тань таньдаг.</small>`}</dd></div>
+        <div><dt>Имэйл</dt><dd>${account.email ? esc(account.email) : unset}</dd></div>
+        <div><dt>Утас</dt><dd>${account.phone ? `<span class="mono">${esc(account.phone)}</span>` : unset}</dd></div>
+      </dl></div>
     </section>`);
   card.querySelector('.section-label').append(
     button(
-      'Нэр засах',
+      account.name ? 'Нэр засах' : 'Нэр оруулах',
       () =>
         popup({
-          title: 'Нэр засах',
+          title: account.name ? 'Нэр засах' : 'Нэр оруулах',
           sub: 'Байгууллага, Basu-гийн ажилтнууд таныг энэ нэрээр харна.',
           width: 440,
           fields: [{ name: 'display_name', label: 'Нэр', autocomplete: 'name', value: account.name ?? '', required: true, wide: true }],
@@ -517,7 +641,7 @@ async function renderMeProfile(view) {
 
   const sessions = el(`
     <section class="section"><h2 class="section-label">Нэвтэрсэн төхөөрөмжүүд</h2>
-      <div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Төхөөрөмж</th><th>Нэвтэрсэн</th><th>Сүүлд</th></tr></thead><tbody id="sessions"><tr><td colspan="3" class="empty">…</td></tr></tbody></table></div></div>
+      <div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Төхөөрөмж</th><th>Нэвтэрсэн</th><th>Сүүлд ашигласан</th></tr></thead><tbody id="sessions"><tr><td colspan="3" class="empty"><span class="skel skel-line"></span></td></tr></tbody></table></div></div>
     </section>`);
   sessions.querySelector('.section-label').append(
     button(
@@ -541,7 +665,7 @@ async function renderMeProfile(view) {
   try {
     const { sessions: list } = await ops('/v1/me/sessions');
     const body = sessions.querySelector('#sessions');
-    body.replaceChildren(...list.map((s) => el(`<tr><td><b>${esc(s.label ?? 'Төхөөрөмж')}</b>${s.current ? ' <span class="pill" data-size="sm" data-s="contracted">энэ</span>' : ''}</td><td>${stamp(s.created_at)}</td><td>${s.last_seen_at ? stamp(s.last_seen_at) : '—'}</td></tr>`)));
+    body.replaceChildren(...list.map((s) => el(`<tr><td><b>${esc(s.label ?? 'Төхөөрөмж')}</b>${s.current ? ' <span class="pill" data-size="sm" data-s="contracted">одоо энд</span>' : ''}</td><td>${stamp(s.created_at)}</td><td>${s.last_seen_at ? stamp(s.last_seen_at) : '—'}</td></tr>`)));
     // Nothing else signed in: nothing to sign out of.
     if (list.length < 2) sessions.querySelector('#revoke-others').remove();
   } catch (error) {
@@ -553,16 +677,24 @@ async function renderMeProfile(view) {
 function orgPopup() {
   return popup({
     title: 'Байгууллага бүртгүүлэх',
-    sub: 'Бүртгүүлсэн хүн байгууллагын эзэн болно. Basu шалгаж баталсны дараа ажилтнуудаа нэмнэ.',
+    sub: 'Та энэ байгууллагын эзэн болно. Basu шалгаж баталсны дараа ажилтнуудаа нэмж, ажлаа эхэлнэ.',
     width: 600,
     id: 'org-form',
     fields: [
-      { name: 'name', label: 'Байгууллагын нэр', placeholder: 'Хэрлэн мах, Алтан тогоо ресторан…', required: true, wide: true },
-      { type: 'checks', label: 'Юу хийдэг вэ', options: [['restaurant', 'Ресторан'], ['supplier', 'Идэшний нийлүүлэгч']] },
-      { name: 'phone', label: 'Холбогдох утас', type: 'tel', placeholder: '+976 XXXX XXXX' },
-      { name: 'tin', label: 'ТТД (байвал)', inputmode: 'numeric', placeholder: '7–10 орон' },
+      { name: 'name', label: 'Байгууллагын нэр', placeholder: 'Хэрлэн мах, Алтан тогоо ресторан…', required: true, wide: true, hint: 'Зочид, Basu-гийн баг таныг энэ нэрээр харна.' },
+      {
+        type: 'checks',
+        label: 'Юу хийдэг вэ',
+        options: [
+          ['supplier', 'Идэшний нийлүүлэгч', false, { hint: 'Мал, мах зарж, зочинд хүлээлгэн өгнө' }],
+          ['restaurant', 'Ресторан', false, { hint: 'Зочид урьдчилж хоол захиална' }],
+        ],
+        hint: 'Хоёуланг нь сонгож болно.',
+      },
+      { name: 'phone', label: 'Холбогдох утас', type: 'tel', inputmode: 'tel', autocomplete: 'tel', placeholder: '+976 9911 2233', hint: 'Basu-гийн баг энэ дугаар руу залгана.' },
+      { name: 'tin', label: 'ТТД', inputmode: 'numeric', placeholder: '7–10 орон', hint: 'Байвал бичнэ. Е-баримт гаргахад хэрэгтэй.' },
       { name: 'address', label: 'Хаяг', placeholder: 'Дүүрэг, хороо, байр / зах, хаалга', wide: true },
-      { name: 'about', label: 'Товч тайлбар', type: 'textarea', placeholder: 'Юу хийдэг, хэдэн хүнтэй…' },
+      { name: 'about', label: 'Товч тайлбар', type: 'textarea', placeholder: 'Юу хийдэг, хэдэн хүнтэй, хаанаас мах авдаг…' },
     ],
     submit: 'Бүртгүүлэх',
     onSubmit: async (v) => {
@@ -590,21 +722,57 @@ const orgLink = (key) => pagesOf(ws).find((i) => i.key === key);
  * day's numbers where it sells идэш, and a door to every page the role opens.
  * One still waiting for the desk, or turned down, says so and nothing else.
  */
+/** What each of a business's pages is for, in a line its owner reads without help. A link Basu added says nothing more. */
+const DOOR_WORD = {
+  'idesh.today': 'Өнөөдөр бэлтгэх, хүлээлгэн өгөх захиалга',
+  'idesh.orders': 'Бүх захиалга, төлөв бүрээр',
+  'idesh.stall': 'Зочдод харагдах махны зарууд',
+  'idesh.money': 'Танд очих олголт, суутгал',
+  'idesh.profile': 'Нэр, мах авах цэг, олголтын данс',
+  'dine.orders': 'Ресторанд ирсэн хоолны захиалга',
+  'dine.menu': 'Хоол, үнэ, зураг',
+  'dine.kitchen': 'Гал тогооны дэлгэц',
+  'dine.money': 'Хоолны борлуулалт, олголт',
+  team: 'Хамт ажилладаг хүмүүс, тэдний үүрэг',
+  profile: 'Байгууллагын нэр, утас, хаяг, ТТД',
+  roles: 'Үүрэг бүр юу хийж болох',
+  log: 'Хэн хэнийг нэмж, үүрэг өөрчилсөн',
+};
+
+/** A row of steps — what is done, what is happening, what comes — drawn as the stepper. */
+const steps = (list) =>
+  `<ol class="story stepper org-steps">${list
+    .map(([state, word, sub]) => `<li${state === 'done' ? ' data-done' : state === 'next' ? ' data-next' : ''}><span class="w">${word}<span class="s">${sub}</span></span><span class="t"></span></li>`)
+    .join('')}</ol>`;
+
 async function renderOrgHome(view) {
   const w = ws;
   view.append(head(esc(w.name), esc(w.sub)));
   if (w.state !== 'active') {
-    const word = {
-      applied: ['ok', 'Basu шалгаж байна', 'Бүртгэлийг тань Basu-гийн баг шалгаж байна. Батлагдмагц энд ажилтнуудаа нэмж, хэсгүүдээ нээнэ — мэдэгдэл ирнэ.'],
-      declined: ['warn', 'Бүртгэлийг татгалзсан', w.decline_reason ? `Шалтгаан: ${esc(w.decline_reason)}. Засаад дахин бүртгүүлж болно.` : 'Засаад дахин бүртгүүлж болно.'],
-      suspended: ['warn', 'Түр хаасан', 'Энэ байгууллагыг Basu түр хаасан байна. Дэлгэрэнгүйг Basu-гаас асууна уу.'],
-    }[w.state] ?? ['warn', w.state, ''];
-    view.append(el(`<div class="callout" data-k="${word[0]}"><b>${esc(word[1])}</b><span>${word[2]}</span></div>`));
-    if (w.state === 'declined') {
-      const again = el('<div class="form-foot" style="justify-content:flex-start;margin-top:16px"></div>');
-      again.append(button('Дахин бүртгүүлэх', () => orgPopup()));
-      view.append(again);
+    // A business Basu has not opened: where it stands, and what comes next — nothing else to press.
+    const card = el('<section class="section org-wait"><div class="card"><div class="card-body"></div></div></section>');
+    const body = card.querySelector('.card-body');
+    if (w.state === 'applied') {
+      body.innerHTML = `
+        <div class="org-wait-head"><span class="pill" data-s="applied">Basu шалгаж байна</span></div>
+        <p class="org-wait-lead">Бүртгэлийг тань Basu-гийн баг шалгаж байна. Батлагдмагц энд таны хэсгүүд нээгдэж, танд мэдэгдэл очно.</p>
+        ${steps([
+          ['done', 'Бүртгэл илгээсэн', 'Та эзэн нь болно'],
+          ['next', 'Basu шалгаж байна', 'Нэр, утас, хаягийг тулгана'],
+          ['', 'Ажилтнаа нэмэх', 'Менежер, ажилтан, нягтландаа үүрэг өгнө'],
+        ])}`;
+    } else if (w.state === 'declined') {
+      body.innerHTML = `
+        <div class="org-wait-head"><span class="pill" data-s="off">Татгалзсан</span></div>
+        <p class="org-wait-lead">Basu энэ бүртгэлийг батлаагүй.${w.decline_reason ? ` Шалтгаан: <b>${esc(w.decline_reason)}</b>.` : ''} Засаад дахин бүртгүүлж болно.</p>
+        <div class="org-wait-acts"></div>`;
+      body.querySelector('.org-wait-acts').append(button('Дахин бүртгүүлэх', () => orgPopup(), 'data-v="primary"'));
+    } else {
+      body.innerHTML = `
+        <div class="org-wait-head"><span class="pill" data-s="off">Түр хаасан</span></div>
+        <p class="org-wait-lead">Энэ байгууллагыг Basu түр хаасан байна. Дэлгэрэнгүйг Basu-гаас асууна уу: <a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a>.</p>`;
     }
+    view.append(card);
     return;
   }
 
@@ -615,12 +783,13 @@ async function renderOrgHome(view) {
       .then((h) => {
         if (!band.isConnected) return;
         const todo = h.lanes.paid + h.lanes.preparing + h.lanes.ready + h.lanes.dispatched;
+        const due = [h.due_today ? `${h.due_today} нь өнөөдөр авна` : '', h.overdue ? `${h.overdue} нь хоцорсон` : ''].filter(Boolean).join(' · ');
         const cells = [
-          `<div class="card kpi"><div class="lab">Хийх ажил</div><b>${todo}</b><span>${[h.due_today ? `${h.due_today} өнөөдөр авна` : '', h.overdue ? `${h.overdue} ирээгүй` : ''].filter(Boolean).join(' · ') || 'идэвхтэй захиалга'}</span></div>`,
-          `<div class="card kpi"><div class="lab">Шинэ</div><b>${h.lanes.paid}</b><span>төлсөн, бэлтгэж эхлээгүй</span></div>`,
-          `<div class="card kpi"><div class="lab">Улирал</div><b>${h.season.handed}</b><span>хүлээлгэн өгсөн</span></div>`,
+          `<div class="card kpi"${h.overdue ? ' data-tone="warn"' : ''}><div class="lab">Хийх ажил</div><b>${todo}</b><span>${todo ? due || 'хүлээлгэн өгөөгүй захиалга' : 'одоогоор хийх захиалга алга'}</span></div>`,
+          `<div class="card kpi"><div class="lab">Шинэ захиалга</div><b>${h.lanes.paid}</b><span>${h.lanes.paid ? 'төлсөн, бэлтгэж эхлээгүй' : 'шинэ захиалга алга'}</span></div>`,
+          `<div class="card kpi"><div class="lab">Энэ улиралд</div><b>${h.season.handed}</b><span>зочинд хүлээлгэн өгсөн</span></div>`,
         ];
-        if (h.season.payout_mnt !== null) cells.push(`<div class="card kpi"><div class="lab">Танд очих</div><b>${money(h.season.payout_mnt)}</b><span>энэ улирлын орлого</span></div>`);
+        if (h.season.payout_mnt !== null) cells.push(`<div class="card kpi"><div class="lab">Танд очих</div><b>${money(h.season.payout_mnt)}</b><span>энэ улирлын орлого, шимтгэл хассан</span></div>`);
         band.innerHTML = cells.join('');
         band.hidden = false;
       })
@@ -630,12 +799,14 @@ async function renderOrgHome(view) {
   const doors = w.menu.filter((g) => g.label);
   const grid = el('<section class="section"><h2 class="section-label">Таны хэсгүүд</h2><div class="org-doors"></div></section>');
   for (const g of doors) {
-    const card = el(`<div class="card org-door"><div class="card-body"><h3>${esc(g.label)}</h3><div class="links"></div></div></div>`);
+    const card = el(`<div class="card org-door"><div class="org-door-head">${NAV_ICON[g.icon] ?? ''}<h3>${esc(g.label)}</h3></div><div class="links"></div></div>`);
     for (const it of g.items) {
       // A link somebody added to the menu is followed only to a page of Basu's or an http(s) address — the sidebar's rule.
       const away = it.href ? navHref(it.href) : null;
       if (it.href && !away) continue;
-      const link = el(`<a class="door-link" href="${esc(away ?? `#${w.id}/${it.key}`)}">${NAV_ICON[it.icon] ?? ''}<span>${esc(it.label)}</span></a>`);
+      // The label is the first span: the page tests find a door by it.
+      const say = DOOR_WORD[it.key];
+      const link = el(`<a class="door-link" href="${esc(away ?? `#${w.id}/${it.key}`)}">${NAV_ICON[it.icon] ?? ''}<span>${esc(it.label)}</span>${say ? `<small>${esc(say)}</small>` : ''}</a>`);
       if (!it.href) {
         link.addEventListener('click', (e) => {
           e.preventDefault();
@@ -647,11 +818,26 @@ async function renderOrgHome(view) {
     grid.querySelector('.org-doors').append(card);
   }
   view.append(grid);
-  view.append(el(`<p class="cap" style="margin-top:20px">Та энэ байгууллагад <b>${esc(w.role_label)}</b>. ${orgLink('roles') ? '<a class="link" href="#" data-roles>Хэн юу хийж болохыг харах →</a>' : ''}</p>`));
-  view.querySelector('[data-roles]')?.addEventListener('click', (e) => {
+  // A supplier nobody can find yet: the one step that changes it, before the doors.
+  const stall = w.kinds?.supplier && can('org.idesh.stall:edit') ? navHref(orgLink('idesh.stall')?.href) : null;
+  if (stall) {
+    atOrg('/v1/supplier/listings')
+      .then(({ listings }) => {
+        if (!grid.isConnected || listings.some((l) => l.active)) return;
+        grid.before(el(`
+          <div class="card nudge">
+            <div class="nudge-copy"><b>Зочдод харагдах зар алга</b><span>Эхний зараа нэмбэл зочид таныг Basu дээр олж захиална: мал, үнэ, хэдийд бэлэн болохыг бичнэ.</span></div>
+            <a class="btn" data-v="primary" href="${esc(stall)}">Зар нэмэх</a>
+          </div>`));
+      })
+      .catch(() => {});
+  }
+  const you = el(`<p class="org-you">Та энэ байгууллагад <b>${esc(w.role_label)}</b> үүрэгтэй.${orgLink('roles') ? ' <a class="link" href="#" data-roles>Хэн юу хийж болохыг харах</a>' : ''}</p>`);
+  you.querySelector('[data-roles]')?.addEventListener('click', (e) => {
     e.preventDefault();
     show('roles');
   });
+  view.append(you);
 }
 
 /**
@@ -660,7 +846,7 @@ async function renderOrgHome(view) {
  * taking somebody out. Anybody may leave. Each of those is a popup.
  */
 async function renderOrgTeam(view) {
-  const h = head('Ажилтнууд', 'Хэн энэ байгууллагад ажилладаг, ямар эрхтэй.');
+  const h = head('Ажилтнууд', 'Энд ажилладаг хүмүүс, тэдний үүрэг.');
   view.append(h);
   let data;
   try {
@@ -672,19 +858,27 @@ async function renderOrgTeam(view) {
   const { org, members } = data;
   // The roles this business may hand out that this person may give — never more than they hold themselves.
   const giving = data.roles.filter((r) => r.assignable);
-  const roleField = (chosen) => ({ name: 'role', label: 'Эрх', type: 'select', options: giving.map((r) => [r.key, r.name]), value: chosen, wide: true });
+  const roleField = (chosen) => ({
+    name: 'role',
+    label: 'Үүрэг',
+    type: 'select',
+    options: giving.map((r) => [r.key, r.name]),
+    value: chosen,
+    wide: true,
+    hint: giving.find((r) => r.key === chosen)?.description || ' ',
+  });
 
   /** Two steps: find the person by what they sign in with, then the role. */
   const addPopup = () => {
     let who = null;
     return popup({
       title: 'Хүн нэмэх',
-      sub: 'Тэр хүний Basu-д нэвтэрдэг утас эсвэл имэйлээр хайна. Урьд нь нэг удаа нэвтэрсэн байх ёстой.',
+      sub: 'Тэр хүний Basu-д нэвтэрдэг утас эсвэл имэйлээр хайна. Тэр урьд нь Basu-д нэг удаа ч гэсэн нэвтэрсэн байх ёстой.',
       width: 480,
       id: 'member-add',
-      fields: [{ name: 'contact', label: 'Утас эсвэл имэйл', inputmode: 'email', placeholder: '9911 2233 эсвэл нэр@gmail.com', required: true, wide: true }],
+      fields: [{ name: 'contact', label: 'Утас эсвэл имэйл', inputmode: 'email', placeholder: '9911 2233 эсвэл нэр@gmail.com', required: true, wide: true, hint: 'Утсыг +976-гүйгээр бичиж болно.' }],
       submit: 'Хайх',
-      onSubmit: async (v, { step }) => {
+      onSubmit: async (v, { step, el: sheet }) => {
         if (!who) {
           who = await ops(`/v1/orgs/${org.id}/lookup?contact=${encodeURIComponent(v.contact)}`);
           // Who it is, by what the account proved: its address first. A number a password sign-up typed proves nothing —
@@ -697,13 +891,14 @@ async function renderOrgTeam(view) {
           step({
             sub: unproved
               ? 'Олдлоо, гэхдээ энэ дугаарыг SMS кодоор баталгаажуулаагүй — өөр хүн бүртгүүлсэн байж болзошгүй. Эргэлзвэл имэйлээр нь хайгаарай.'
-              : 'Олдлоо. Ямар эрхтэй ажиллахыг сонгоно уу.',
+              : 'Олдлоо. Ямар үүрэгтэй ажиллахыг сонгоно уу.',
             fields: [
               { type: 'static', label: 'Хүн', html: `<b>${esc(who.name ?? 'Нэргүй')}</b>${known ? ` · ${known}` : ''}` },
               roleField(giving.find((r) => !r.head)?.key),
             ],
             submit: 'Нэмэх',
           });
+          roleHint(sheet, giving);
           return false;
         }
         await ops(`/v1/orgs/${org.id}/members`, { method: 'POST', body: { guest_id: who.guest_id, role: v.role } });
@@ -718,7 +913,7 @@ async function renderOrgTeam(view) {
     columns: [
       { key: 'name', label: 'Нэр', value: (m) => m.name ?? '', render: (m) => `<b>${esc(m.name ?? '—')}</b>${m.you ? ' <small class="muted">(та)</small>' : ''}` },
       { key: 'contact', label: 'Утас, имэйл', render: (m) => dtCell.mono(m.contact) },
-      { key: 'role', label: 'Эрх', value: (m) => m.role_name },
+      { key: 'role', label: 'Үүрэг', value: (m) => m.role_name },
     ],
     search: members.length > 8 ? { placeholder: 'Нэр, утас, имэйл…' } : false,
     actions: (m) => {
@@ -726,12 +921,13 @@ async function renderOrgTeam(view) {
       if (m.manageable) {
         out.push(
           button(
-            'Эрх солих',
-            () =>
-              popup({
-                title: 'Эрх солих',
+            'Үүрэг солих',
+            () => {
+              void popup({
+                title: 'Үүрэг солих',
                 sub: `${esc(m.name ?? '')} · <span class="mono">${esc(m.contact ?? '')}</span>`,
                 width: 440,
+                id: 'team-role',
                 fields: [roleField(m.role)],
                 onSubmit: async (v) => {
                   if (v.role === m.role) return true;
@@ -739,7 +935,9 @@ async function renderOrgTeam(view) {
                   toast(`${m.name ?? ''}: ${giving.find((r) => r.key === v.role)?.name ?? v.role}`, 'good');
                   show('team');
                 },
-              }),
+              });
+              roleHint(document.getElementById('team-role'), giving);
+            },
             'data-v="quiet" data-size="sm" data-a="role"',
           ),
         );
@@ -776,7 +974,9 @@ async function renderOrgTeam(view) {
   });
   team.el.setAttribute('data-members', '');
   view.append(team.el);
-  if (!giving.length) view.append(el('<p class="cap" style="margin-top:12px">Хүн нэмэх, эрх өөрчлөх нь эзэн, менежерийн ажил.</p>'));
+  view.append(el(`<p class="page-note">${giving.length
+    ? 'Нэмэх хүн Basu-д нэг удаа ч гэсэн нэвтэрсэн байх ёстой. Үүрэг бүр юу хийж болохыг «Эрхүүд» хуудаснаас харна.'
+    : 'Хүн нэмэх, үүрэг өөрчлөх нь эзэн, менежерийн ажил.'}</p>`));
 }
 
 /** The business's own details — what Basu knows it by — read here, changed in a popup by its owner or a manager. */
@@ -792,34 +992,35 @@ async function renderOrgProfile(view) {
   }
   const { org } = data;
   const editable = can('org.profile:edit');
-  const fact = (label, value, mono = false) => `<div><span class="lab">${label}</span><b${mono ? ' class="mono"' : ''}>${value ? esc(value) : '—'}</b></div>`;
+  const unset = '<span class="kv-none">Оруулаагүй</span>';
+  const fact = (label, value, mono = false) => `<div><dt>${label}</dt><dd>${value ? (mono ? `<span class="mono">${esc(value)}</span>` : esc(value)) : unset}</dd></div>`;
   view.append(el(`
-    <section class="section"><div class="card">
-      <div class="facts" id="org-facts">
+    <section class="section"><h2 class="section-label">Байгууллага</h2><div class="card">
+      <dl class="kv" id="org-facts">
         ${fact('Нэр', org.name)}
-        <div><span class="lab">Төрөл</span><b>${kinds(org).join(' · ') || '—'}</b></div>
+        <div><dt>Төрөл</dt><dd>${kinds(org).join(', ') || unset}</dd></div>
         ${fact('Холбогдох утас', org.phone, true)}
         ${fact('ТТД', org.tin, true)}
         ${fact('Хаяг', org.address)}
-        <div><span class="lab">Бүртгүүлсэн</span><b>${when(org.created_at)}</b>${org.decided_at ? `<br><small class="muted">батлагдсан ${when(org.decided_at)}</small>` : ''}</div>
-      </div>
-      ${org.about ? `<div class="card-foot"><span class="cap">${esc(org.about)}</span></div>` : ''}
+        ${org.about ? fact('Товч тайлбар', org.about) : ''}
+        <div><dt>Бүртгүүлсэн</dt><dd>${when(org.created_at)}${org.decided_at ? `<small>Basu баталсан: ${when(org.decided_at)}</small>` : ''}</dd></div>
+      </dl>
     </div>
-    ${editable ? '' : '<p class="cap" style="margin-top:12px">Мэдээллийг эзэн эсвэл менежер засна.</p>'}
+    ${editable ? '' : '<p class="page-note">Мэдээллийг эзэн эсвэл менежер засна.</p>'}
     </section>`));
   if (editable) {
     headActs(
       h,
       button(
-        'Засах',
+        'Мэдээлэл засах',
         () =>
           popup({
             title: 'Байгууллагын мэдээлэл',
             sub: esc(org.name),
             width: 600,
             fields: [
-              { name: 'name', label: 'Байгууллагын нэр', value: org.name ?? '', required: true, wide: true },
-              { name: 'phone', label: 'Холбогдох утас', type: 'tel', value: org.phone ?? '' },
+              { name: 'name', label: 'Байгууллагын нэр', value: org.name ?? '', required: true, wide: true, hint: 'Зочид, Basu-гийн баг таныг энэ нэрээр харна.' },
+              { name: 'phone', label: 'Холбогдох утас', type: 'tel', inputmode: 'tel', placeholder: '+976 9911 2233', value: org.phone ?? '' },
               { name: 'tin', label: 'ТТД', inputmode: 'numeric', placeholder: '7–10 орон', value: org.tin ?? '' },
               { name: 'address', label: 'Хаяг', value: org.address ?? '', wide: true },
               { name: 'about', label: 'Товч тайлбар', type: 'textarea', value: org.about ?? '' },
@@ -836,7 +1037,14 @@ async function renderOrgProfile(view) {
   }
   const supplierProfile = org.supplier ? navHref(orgLink('idesh.profile')?.href) : null;
   if (supplierProfile) {
-    view.append(el(`<div class="callout" style="margin-top:16px"><b>Зочдод харагдах профайл, олголтын данс</b><span>Нийлүүлэгчийн нэр, мах авах цэг, данс нь <a class="link" href="${esc(supplierProfile)}">нийлүүлэгчийн профайл</a> дээр.</span></div>`));
+    view.append(el(`
+      <section class="section"><h2 class="section-label">Зочдод харагдах профайл</h2>
+        <div class="card" data-rows>
+          <a class="row" href="${esc(supplierProfile)}" data-chev>
+            <span class="main"><span class="title">Нийлүүлэгчийн профайл</span><span class="sub">Зочдод харагдах нэр, мах авах цэг, олголт очих данс тусдаа хуудсанд засагдана.</span></span>
+          </a>
+        </div>
+      </section>`));
   }
 }
 
@@ -846,7 +1054,7 @@ async function renderOrgProfile(view) {
  * the person's own column is marked.
  */
 async function renderOrgRoles(view) {
-  view.append(head('Эрхүүд', 'Үүрэг бүр энэ байгууллагад юу хийж болох вэ. Таны үүргийг тодруулсан.'));
+  view.append(head('Эрхүүд', 'Үүрэг бүр энэ байгууллагад юу хийж болох вэ. Таны багана тодорсон.'));
   let table;
   try {
     table = await ops(`/v1/access/roles?org=${encodeURIComponent(ws.id)}`);
@@ -871,7 +1079,7 @@ const LOG_WORD = {
 
 /** Who gave whom which role, newest first: the owner's and the managers' record. */
 async function renderOrgLog(view) {
-  view.append(head('Түүх', 'Хэн хэнийг ямар эрхээр нэмж, өөрчилж, хассан.'));
+  view.append(head('Түүх', 'Хэн хэнийг нэмж, үүргийг нь өөрчилж, хассан бүртгэл.'));
   let log;
   try {
     ({ log } = await ops(`/v1/orgs/${ws.id}/log`));
@@ -889,7 +1097,7 @@ async function renderOrgLog(view) {
     sort: { key: 'at', desc: true },
     rowAttrs: () => ({ 'data-entry': '' }),
     noun: 'бичлэг',
-    empty: { title: 'Бүртгэл алга', text: 'Хүн нэмж, эрх өөрчлөхөд энд үлдэнэ.' },
+    empty: { title: 'Бүртгэл алга', text: 'Хүн нэмж, үүрэг өөрчлөхөд энд үлдэнэ.' },
     rows: log,
   });
   table.el.id = 'org-log';
@@ -903,25 +1111,60 @@ function renderDineSoon(view) {
   view.append(el(`
     <div class="card"><div class="card-body soon">
       <span class="soon-mark" aria-hidden="true">${NAV_ICON[item?.icon] ?? NAV_ICON.venues}</span>
-      <h3>Тун удахгүй</h3>
-      <p class="cap">Таны рестораныг Basu-гийн хоолны апп-тай холбох ажил явагдаж байна. Холбогдмогц цэс, захиалга, гал тогооны дэлгэц энд нээгдэнэ — эрх нь яг одоо харагдаж буйгаар: цэсийг эзэн, менежер засна, ажилтан хардаг.</p>
+      <h3>Ресторан тань хоолны апп-тай холбогдоогүй байна</h3>
+      <p class="cap">Basu-гийн баг рестораныг тань хоолны апп-тай холбосны дараа цэс, захиалга, гал тогооны дэлгэц энд нээгдэнэ. Хэн юу хийх нь «Эрхүүд» хуудсанд харагдаж буйгаар байна: цэсийг эзэн, менежер засна, ажилтан хардаг.</p>
     </div></div>`));
 }
 
 /* ── the desk: businesses waiting for a yes ────────────────────────── */
 
+/** Yes to a business: who it is, and what the yes does — the person who registered it becomes its owner. */
+function approveOrg(o, done) {
+  return confirmPopup({
+    title: 'Байгууллагыг батлах',
+    text: `<b>${esc(o.name)}</b> (${esc(kinds(o).join(', '))}) Basu дээр ажиллаж эхэлнэ. Бүртгүүлсэн <b>${esc(o.applicant ?? 'хүн')}</b> эзэн нь болж, ажилтнуудаа өөрөө нэмнэ.`,
+    ok: 'Батлах',
+    onConfirm: async () => {
+      await ops(`/v1/ops/orgs/${o.id}/approve`, { method: 'POST' });
+      toast(`«${o.name}» батлагдлаа.`, 'good');
+      await done();
+    },
+  });
+}
+
+/** No to a business, with the reason the person who registered it will read. */
+function declineOrg(o, done) {
+  return confirmPopup({
+    title: 'Бүртгэлийг татгалзах',
+    text: `<b>${esc(o.name)}</b>-ийн бүртгэлийг татгалзана. Бүртгүүлсэн хүн шалтгааныг нь харж, засаад дахин бүртгүүлж болно.`,
+    ok: 'Татгалзах',
+    danger: true,
+    reason: { label: 'Шалтгаан', placeholder: 'ТТД буруу, хаяг тодорхойгүй…', required: true },
+    onConfirm: async (reason) => {
+      await ops(`/v1/ops/orgs/${o.id}/decline`, { method: 'POST', body: { reason } });
+      toast('Татгалзлаа.', 'good');
+      await done();
+    },
+  });
+}
+
 async function renderOrgsDesk(view) {
-  view.append(head('Байгууллагууд', 'Ресторан, нийлүүлэгчийн бүртгэл. Батлахад бүртгүүлсэн хүн нь эзэн болж, ажилтнуудаа өөрөө нэмнэ.'));
+  view.append(head('Байгууллагууд', 'Ресторан, нийлүүлэгчийн бүртгэл. Батлахад бүртгүүлсэн хүн эзэн нь болно.'));
   const decides = can('desk.orgs:decide');
   const table = dataTable({
     columns: [
-      { key: 'name', label: 'Байгууллага', render: (o) => dtCell.two(o.name, o.about ?? '') },
+      { key: 'name', label: 'Байгууллага', width: '26%', render: (o) => dtCell.two(o.name, o.about ?? '') },
       { key: 'kind', label: 'Төрөл', value: (o) => kinds(o).join(', ') },
       {
         key: 'applicant',
         label: 'Бүртгүүлсэн',
         value: (o) => `${o.applicant ?? ''} ${o.phone ?? ''}`,
-        render: (o) => dtCell.twoHtml(esc(o.applicant ?? '—'), o.phone && o.phone !== o.applicant ? `<span class="mono">${esc(o.phone)}</span>` : ''),
+        // An applicant with no name is shown by the number they signed in with: in the mono a number wears.
+        render: (o) =>
+          dtCell.twoHtml(
+            realName(o.applicant) ? esc(o.applicant) : `<span class="mono">${esc(o.applicant ?? '—')}</span>`,
+            o.phone && o.phone !== o.applicant ? `<span class="mono">${esc(o.phone)}</span>` : '',
+          ),
       },
       { key: 'tin', label: 'ТТД', render: (o) => dtCell.mono(o.tin), phone: false },
       { key: 'members', label: 'Хүн', align: 'end', numeric: true, render: (o) => dtCell.num(o.members) },
@@ -951,48 +1194,20 @@ async function renderOrgsDesk(view) {
     ],
     actions: (o) => {
       if (o.state === 'applied' && decides) {
-        const ok = button(
-          'Батлах',
-          () =>
-            confirmPopup({
-              title: 'Байгууллагыг батлах',
-              text: `<b>${esc(o.name)}</b> (${kinds(o).join(', ')}) Basu-д ажиллаж эхэлнэ. Бүртгүүлсэн <b>${esc(o.applicant ?? 'хүн')}</b> эзэн нь болж, ажилтнуудаа өөрөө нэмнэ.`,
-              ok: 'Батлах',
-              onConfirm: async () => {
-                await ops(`/v1/ops/orgs/${o.id}/approve`, { method: 'POST' });
-                toast(`«${o.name}» батлагдлаа.`, 'good');
-                show('orgs');
-              },
-            }),
-          'data-v="primary" data-size="sm" data-a="approve"',
-        );
-        const no = button(
-          'Татгалзах',
-          () =>
-            confirmPopup({
-              title: 'Бүртгэлийг татгалзах',
-              text: `<b>${esc(o.name)}</b>-ийн бүртгэлийг татгалзана. Шалтгааныг нь бүртгүүлсэн хүн харж, засаад дахин бүртгүүлж болно.`,
-              ok: 'Татгалзах',
-              danger: true,
-              reason: { label: 'Шалтгаан', placeholder: 'ТТД буруу, хаяг тодорхойгүй…', required: true },
-              onConfirm: async (reason) => {
-                await ops(`/v1/ops/orgs/${o.id}/decline`, { method: 'POST', body: { reason } });
-                toast('Татгалзлаа.', 'good');
-                show('orgs');
-              },
-            }),
-          'data-v="quiet" data-size="sm" data-a="decline"',
-        );
-        return [ok, no];
+        return [
+          button('Батлах', () => approveOrg(o, () => show('orgs')), 'data-v="primary" data-size="sm" data-a="approve"'),
+          button('Татгалзах', () => declineOrg(o, () => show('orgs')), 'data-v="quiet" data-size="sm" data-a="decline"'),
+        ];
       }
       if (o.state === 'active') {
-        const access = el('<button class="btn" data-size="sm" type="button" data-a="access">Үүрэг, эрх</button>');
+        const access = el('<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="access">Үүрэг, эрх</button>');
         access.addEventListener('click', () => openOrgAccess(o.id));
         return access;
       }
       return null;
     },
     sort: { key: 'created_at', desc: true },
+    onRow: (o) => openOrgAccess(o.id),
     rowAttrs: (o) => ({ 'data-org': o.id, 'data-state': o.state }),
     noun: 'байгууллага',
     empty: { title: 'Бүртгэл алга', text: 'Ресторан, нийлүүлэгч бүртгүүлэхэд энд гарна.' },
@@ -1142,11 +1357,15 @@ async function renderRoles(view) {
   const lit = rolePick;
   rolePick = null;
   const manage = can('desk.roles:manage');
-  view.append(head('Үүрэг, эрх', 'Үүрэг бүр ямар модуль, хуудас, үйлдэл нээхийг энд тохируулна. Хүн бүрийн цэс, эрх үүнээс шууд гарна.', '<div data-seg></div>'));
-  view.querySelector('[data-seg]').replaceWith(scopeSeg(() => show('roles')));
+  // The switch between the desk's roles and businesses' roles, and the one way to add a role: together, at the head's right.
+  const h = head('Үүрэг, эрх', 'Үүрэг бүр ямар хуудас, үйлдэл нээхийг тохируулна. Хүний цэс үүнээс гарна.');
+  const acts = el('<div class="head-acts"></div>');
+  acts.append(scopeSeg(() => show('roles')));
+  h.append(acts);
+  view.append(h);
   const box = el(`
     <section class="roles-page">
-      <div class="roles-tools"><h2 class="section-title">Үүргүүд<span class="n" data-count></span></h2></div>
+      <div class="roles-tools"><h2 class="section-label">${accessScope === 'org' ? 'Байгууллагын үүргүүд' : 'Basu-гийн ширээний үүргүүд'}<span class="n" data-count></span></h2></div>
       <div class="card"><div class="table-wrap"><table class="table roles-table" id="roles-table">
         <thead><tr><th>Үүрэг</th><th>Модуль</th><th class="num">Хуудас</th><th class="num">Үйлдэл</th><th class="num">Хүн</th></tr></thead>
         <tbody></tbody>
@@ -1168,7 +1387,7 @@ async function renderRoles(view) {
   if (manage) {
     const add = el(`<button class="btn" data-v="primary" type="button" id="role-new">${NAV_ICON.plus}Шинэ үүрэг</button>`);
     add.addEventListener('click', () => open(draftRole(data, null)));
-    box.querySelector('.roles-tools').append(add);
+    acts.append(add);
   }
   const body = box.querySelector('tbody');
   for (const r of data.roles) {
@@ -1557,9 +1776,12 @@ function roleEditor(data, mods, role, { manage, from, close, copy }) {
  */
 async function renderMenus(view) {
   const manage = can('desk.menus:manage');
-  const h = head('Цэс', 'Зүүн цэсний модуль, хуудсыг нэрлэж, эрэмбэлж, зөөж, нууна. Хэн юу харах нь «Үүрэг, эрх»-ээр.', '<div data-seg></div>');
+  const h = head('Цэс', 'Зүүн цэсний модуль, хуудсыг нэрлэж, эрэмбэлж, нууна.');
+  // The desk-or-business switch and the buttons that add: together, at the head's right.
+  const headBox = el('<div class="head-acts"></div>');
+  headBox.append(scopeSeg(() => show('menus')));
+  h.append(headBox);
   view.append(h);
-  h.querySelector('[data-seg]').replaceWith(scopeSeg(() => show('menus')));
   let data;
   try {
     data = await ops(`/v1/ops/access/${accessScope}`);
@@ -1676,8 +1898,7 @@ async function renderMenus(view) {
     });
 
   if (manage) {
-    headActs(
-      h,
+    headBox.append(
       button(`${NAV_ICON.plus}Холбоос`, addLink, 'id="add-link"'),
       button(`${NAV_ICON.plus}Модуль`, addModule, 'data-v="primary" id="add-module"'),
     );
@@ -1685,8 +1906,8 @@ async function renderMenus(view) {
 
   const arrows = (list, i, kind) => {
     const box = el('<span class="menu-moves"></span>');
-    const up = button('↑', () => move(list, i, -1, kind), `data-size="sm" data-v="quiet" data-icon data-up aria-label="Дээш"${i === 0 ? ' disabled' : ''}`);
-    const down = button('↓', () => move(list, i, 1, kind), `data-size="sm" data-v="quiet" data-icon data-down aria-label="Доош"${i === list.length - 1 ? ' disabled' : ''}`);
+    const up = button('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>', () => move(list, i, -1, kind), `data-size="sm" data-v="quiet" data-icon data-up aria-label="Дээш зөөх" title="Дээш зөөх"${i === 0 ? ' disabled' : ''}`);
+    const down = button('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14m-6-6 6 6 6-6"/></svg>', () => move(list, i, 1, kind), `data-size="sm" data-v="quiet" data-icon data-down aria-label="Доош зөөх" title="Доош зөөх"${i === list.length - 1 ? ' disabled' : ''}`);
     box.append(up, down);
     return box;
   };
@@ -1707,7 +1928,7 @@ async function renderMenus(view) {
     const acts = card.querySelector('.menu-acts');
     if (manage && !top) {
       acts.append(arrows(custom, custom.indexOf(m), 'modules'));
-      acts.append(button('Засах', () => editModule(m), 'data-size="sm" data-edit-mod'));
+      acts.append(button('Засах', () => editModule(m), 'data-size="sm" data-v="quiet" data-edit-mod'));
       if (m.key.startsWith('m-')) acts.append(button('Устгах', () => dropModule(m), 'data-size="sm" data-v="quiet" data-drop-mod'));
     }
     const list = card.querySelector('.menu-pages');
@@ -1723,7 +1944,7 @@ async function renderMenus(view) {
       const acts = row.querySelector('.menu-acts');
       if (manage) {
         acts.append(arrows(pages, i, 'pages'));
-        acts.append(button('Засах', () => editPage(p), 'data-size="sm" data-edit-page'));
+        acts.append(button('Засах', () => editPage(p), 'data-size="sm" data-v="quiet" data-edit-page'));
         if (p.link) acts.append(button('Устгах', () => dropLink(p), 'data-size="sm" data-v="quiet" data-drop-link'));
       }
       list.append(row);
@@ -1738,21 +1959,74 @@ async function renderMenus(view) {
  * them the desk may change, its head too — and which roles, beyond those
  * open to every business, it may hand out. Both read here, changed in a popup.
  */
-async function openOrgAccess(orgId) {
+async function openOrgAccess(orgId, from = { label: 'Байгууллагууд', go: () => show('orgs') }) {
   const view = nav.view;
-  view.replaceChildren();
-  window.scrollTo(0, 0);
+  const wanted = opening(view, from);
   let data;
   try {
     data = await ops(`/v1/ops/orgs/${orgId}/access`);
   } catch (error) {
     toast(error.message, 'bad');
-    return show('orgs');
+    return wanted() ? from.go() : undefined;
   }
+  if (!wanted()) return;
+  view.replaceChildren();
   const deciding = can('desk.orgs:access');
-  const back = el(`<button class="back link" type="button" id="back">${CHEV}Байгууллагууд</button>`);
-  back.addEventListener('click', () => show('orgs'));
-  view.append(back, head(esc(data.org.name), esc(`${kinds(data.org).join(' · ')} · ${ORG_STATE[data.org.state]?.[1] ?? data.org.state}`)));
+  const org = data.org;
+  // The list's row knows who registered it and how many work there; the business's own answer is the rest.
+  const listed = cache.orgs.find((o) => o.id === orgId) ?? {};
+  const [tone, word] = ORG_STATE[org.state] ?? ['off', org.state];
+  const h = head(`${esc(org.name)} ${dtCell.pill(tone, word)}`, esc([kinds(org).join(', '), org.address].filter(Boolean).join(' · ')));
+  if (org.state === 'applied' && can('desk.orgs:decide')) {
+    // Decided here, the desk's own list moves too: the overview's «Хийх ажил» and the sidebar's count read it.
+    const again = async () => {
+      try {
+        cache.orgs = (await ops('/v1/ops/orgs')).orgs;
+        badges();
+      } catch {
+        /* the page below says what it can; the list catches up on the next refresh */
+      }
+      await openOrgAccess(orgId, from);
+    };
+    headActs(
+      h,
+      button('Татгалзах', () => declineOrg({ ...listed, ...org }, again), 'data-a="decline"'),
+      button('Батлах', () => approveOrg({ ...listed, ...org }, again), 'data-v="primary" data-a="approve"'),
+    );
+  }
+  backTo(view, from);
+  view.append(h);
+  const unset = '<span class="kv-none">—</span>';
+  // Who works there, the head counted apart: an owner is not staff.
+  const heads = new Set(data.roles.filter((r) => r.head).map((r) => r.key));
+  const owners = data.members.filter((m) => heads.has(m.role)).length;
+  const peopleLine = [owners ? `эзэн ${owners}` : '', data.members.length - owners ? `ажилтан ${data.members.length - owners}` : ''].filter(Boolean).join(' · ') || 'хүн алга';
+  view.append(el(`
+    <div class="card facts-card"><div class="facts">
+      <div><span class="lab">Бүртгүүлсэн</span><b>${listed.applicant ? (realName(listed.applicant) ? esc(listed.applicant) : `<span class="mono">${esc(listed.applicant)}</span>`) : unset}</b><span class="fact-sub">${when(org.created_at)}</span></div>
+      <div><span class="lab">Холбогдох утас</span><b>${org.phone ? tel(org.phone) : unset}</b></div>
+      <div><span class="lab">ТТД</span><b class="mono">${org.tin ? esc(org.tin) : unset}</b></div>
+      <div><span class="lab">${org.state === 'declined' ? 'Татгалзсан' : 'Батлагдсан'}</span><b>${org.decided_at ? when(org.decided_at) : unset}</b>${org.state === 'declined' && org.decline_reason ? `<span class="fact-sub">${esc(org.decline_reason)}</span>` : ''}</div>
+      <div><span class="lab">Хүмүүс</span><b>${data.members.length}</b><span class="fact-sub">${peopleLine}</span></div>
+    </div>${org.about ? `<div class="card-foot"><span class="cap">${esc(org.about)}</span></div>` : ''}</div>`));
+  // A supplier's business and its supplier file are one and the same to the desk: a step from one to the other.
+  const supplier = org.supplier ? cache.suppliers.find((s) => s.org_id === orgId) : null;
+  if (supplier && hasPage('suppliers')) {
+    const link = el(`
+      <section class="section"><h2 class="section-label">Холбоотой</h2>
+        <div class="card" data-rows>
+          <a class="row" href="#desk/suppliers" data-chev data-go-supplier>
+            <span class="main"><span class="title">Нийлүүлэгчийн хуудас</span><span class="sub">Гэрээ, данс, зарууд, захиалга</span></span>
+            <span class="end">${dtCell.pill(...supplierState(supplier))}</span>
+          </a>
+        </div>
+      </section>`);
+    link.querySelector('a').addEventListener('click', (e) => {
+      e.preventDefault();
+      void openSupplier(supplier.id, { label: org.name, go: () => openOrgAccess(orgId, from) });
+    });
+    view.append(link);
+  }
   const open = data.roles.filter((r) => r.open);
   const nameOf = (key) => data.roles.find((r) => r.key === key)?.name ?? key;
 
@@ -1767,25 +2041,28 @@ async function openOrgAccess(orgId) {
       ? (m) =>
           button(
             'Үүрэг солих',
-            () =>
-              popup({
+            () => {
+              void popup({
                 title: 'Үүрэг солих',
                 sub: `${esc(m.name ?? '')} · ${esc(data.org.name)}`,
                 width: 480,
-                fields: [{ name: 'role', label: 'Үүрэг', type: 'select', options: open.map((r) => [r.key, r.name]), value: m.role, wide: true }],
+                id: 'org-member-role',
+                fields: [{ name: 'role', label: 'Үүрэг', type: 'select', options: open.map((r) => [r.key, r.name]), value: m.role, wide: true, hint: open.find((r) => r.key === m.role)?.description || ' ' }],
                 onSubmit: async (v) => {
                   if (v.role === m.role) return true;
                   await ops(`/v1/ops/orgs/${orgId}/members/${m.guest_id}`, { method: 'PATCH', body: { role: v.role } });
                   toast(`${m.name ?? 'Хүн'}: ${nameOf(v.role)}`, 'good');
-                  await openOrgAccess(orgId);
+                  await openOrgAccess(orgId, from);
                 },
-              }),
+              });
+              roleHint(document.getElementById('org-member-role'), open);
+            },
             'data-v="quiet" data-size="sm" data-a="role"',
           )
       : null,
     rowAttrs: (m) => ({ 'data-member': m.guest_id }),
     noun: 'хүн',
-    empty: { title: 'Хүн алга', text: '' },
+    empty: { title: 'Хүн алга', text: 'Батлагдсаны дараа эзэн нь ажилтнуудаа нэмнэ.' },
     rows: data.members,
   });
   people.el.setAttribute('data-people', '');
@@ -1804,7 +2081,7 @@ async function openOrgAccess(orgId) {
         </div>`,
         )
         .join('')}</div>
-      <p class="cap" style="margin-top:10px">«Бүх байгууллагад» үүргийг хүн бүр ашиглана; бусдыг зөвхөн сонгосон байгууллага ажилтандаа өгнө. Үүрэг бүр юу нээхийг «Үүрэг, эрх»-ээр засна.</p>
+      <p class="page-note">«Бүх байгууллагад» үүргийг ямар ч байгууллага өгнө; бусдыг Basu сонгосон байгууллагад л нээнэ. Үүрэг бүр юу нээхийг «Үүрэг, эрх» хуудсанд засна.</p>
     </section>`);
   const choosable = data.roles.filter((r) => !r.everyone);
   if (deciding && choosable.length) {
@@ -1828,7 +2105,7 @@ async function openOrgAccess(orgId) {
               const keys = choosable.filter((r) => v[r.key]).map((r) => r.key);
               await ops(`/v1/ops/orgs/${orgId}/roles`, { method: 'PUT', body: { keys } });
               toast('Хадгалагдлаа.', 'good');
-              await openOrgAccess(orgId);
+              await openOrgAccess(orgId, from);
             },
           }),
         'data-size="sm" id="edit-org-roles"',
@@ -1939,6 +2216,8 @@ function frame() {
   const actions = [];
   if (access.account) actions.push({ key: 'new-org', label: 'Байгууллага бүртгүүлэх', icon: 'plus' });
   nav = deskFrame({
+    // The place, named in the language of everything in it.
+    brand: 'Бизнес',
     workspaces: access.workspaces,
     current: ws,
     account: access.account,
@@ -1952,6 +2231,23 @@ function frame() {
     },
   });
   root.replaceChildren(nav.root);
+  // Whatever a page draws, its numbers are fitted to their cells as they land.
+  new MutationObserver(() => fitBands(nav.view)).observe(nav.view, { childList: true, subtree: true });
+}
+
+/**
+ * A figure too long for its cell — ten million tugriks or more in one of six cells
+ * across — is set a size down rather than run out of the cell or under the
+ * next one. The band's own size stays for every figure that fits.
+ */
+function fitBands(scope) {
+  for (const b of scope.querySelectorAll('.kpi-band > .kpi:not([data-word]) > b')) {
+    const n = b.textContent.trim().length;
+    const level = n >= 13 ? '2' : n >= 11 ? '1' : null;
+    if ((b.parentElement.getAttribute('data-long') ?? null) === level) continue;
+    if (level) b.parentElement.setAttribute('data-long', level);
+    else b.parentElement.removeAttribute('data-long');
+  }
 }
 
 /** Ask again who the person is and where they work — after they changed it — and open `id` (or stay). */
@@ -2042,7 +2338,12 @@ function show(key) {
   const pages = ws.kind === 'desk' ? DESK_PAGES : ws.kind === 'org' ? ORG_PAGES : ME_PAGES;
   const draw = hasPage(key) ? pages[key] ?? (key.startsWith('dine.') ? renderDineSoon : null) : null;
   if (draw) draw(view);
-  else view.append(head('Олдсонгүй', 'Энэ хуудас танд нээлттэй биш байна.'));
+  else {
+    // A page this person's role does not open — an old link, a role changed since: say so, and the way back.
+    view.append(head('Энэ хуудас нээлттэй биш', 'Таны үүрэг энэ хуудсыг нээдэггүй, эсвэл хуудас цэснээс хасагдсан.'));
+    const home = firstPage(ws);
+    if (home && home !== key && hasPage(home)) view.append(button('Эхний хуудас руу', () => show(home), 'data-size="sm"'));
+  }
 }
 
 /** A page's h1 and its line. Both are markup — a pill beside a name, a phone link — so a caller escapes whatever a person wrote. */
@@ -2067,6 +2368,22 @@ const headActs = (h, ...buttons) => {
   return h;
 };
 
+/**
+ * Under a role picker in an open popup, the chosen role's one line, kept to
+ * whichever role is chosen — so nobody hands out a role without reading what
+ * it opens. `sheet` is the popup; `roles` [{ key, description }].
+ */
+function roleHint(sheet, roles) {
+  const select = sheet?.querySelector('select[name="role"]');
+  const hint = select?.closest('.field')?.querySelector('small');
+  if (!select || !hint) return;
+  const say = () => {
+    hint.textContent = roles.find((r) => r.key === select.value)?.description ?? '';
+  };
+  select.addEventListener('change', say);
+  say();
+}
+
 /* ── the whole house ── */
 
 const PERIODS = [['today', 'Өнөөдөр'], ['week', '7 хоног'], ['season', 'Улирал']];
@@ -2088,8 +2405,22 @@ function periodSeg(draw) {
 
 const periodWord = () => PERIODS.find(([k]) => k === period)?.[1] ?? '';
 
+/** The button on a thing to do: where it is answered, said as what the press does. */
+const GO_WORD = {
+  suppliers: 'Хүсэлт харах', orgs: 'Бүртгэл харах', pay: 'Олголт харах', money: 'Мөнгө харах',
+  venues: 'Ресторан харах', lunches: 'Захиалга харах', notify: 'Мэдэгдэл харах', system: 'Систем харах',
+};
+/** The server's sentences that name no page yet: the page that answers each, by what the sentence says. */
+const ALERT_TAB = [
+  [/гал тогоо хаалттай/, 'venues'],
+  [/захиалга түр зогсоосон/, 'lunches'],
+  [/мэдэгдэл/i, 'notify'],
+  [/хоцорч байна/, 'system'],
+];
+const LEVEL_RANK = { bad: 0, warn: 1, info: 2 };
+
 async function renderOverview(view) {
-  view.append(head('Самбар', 'Бүх систем нэг дэлгэцэнд: зочид, түрийвч, хоол, идэш, мэдэгдэл.'));
+  view.append(head('Самбар', 'Хийх ажил эхэндээ, дараа нь Basu-гийн өнөөдрийн байдал.'));
   view.append(busy());
   let v;
   try {
@@ -2101,59 +2432,82 @@ async function renderOverview(view) {
   if (tab !== 'overview') return;
   view.lastElementChild.remove();
 
-  const alerts = el('<section class="section"><h2 class="section-label">Анхаарах</h2><div class="alerts" id="alerts" data-rows></div></section>');
-  const list = alerts.querySelector('#alerts');
-  if (v.banner) list.append(el(`<div class="card alert" data-level="info" id="banner"><span><b>Зарлал.</b> ${esc(v.banner)}</span></div>`));
-  if (v.alerts.length) {
-    for (const a of v.alerts) {
-      list.append(el(`<div class="card alert" data-level="${esc(a.level)}"><span>${esc(a.text)}</span>${a.tab && hasPage(a.tab) ? `<button type="button" class="btn" data-v="quiet" data-size="sm" data-go="${esc(a.tab)}">Очих</button>` : ''}</div>`));
-    }
-    list.addEventListener('click', (e) => {
-      const b = e.target.closest('button[data-go]');
-      if (b) show(b.dataset.go);
-    });
-  } else {
-    list.append(el('<div class="card alert" data-level="ok"><span>Бүх зүйл хэвийн. Анхаарах зүйл алга.</span></div>'));
-  }
+  // The word one seat leaves for the others, above everything.
+  if (v.banner) view.append(el(`<div class="callout overview-banner" data-k="info" id="banner"><b>Зарлал</b><span>${esc(v.banner)}</span></div>`));
 
+  // What needs somebody: the server's alerts, and the businesses waiting for a yes, which the desk has in hand already.
+  const todo = v.alerts.map((a) => ({ ...a, tab: a.tab ?? ALERT_TAB.find(([re]) => re.test(a.text))?.[1] }));
+  const waitingOrgs = hasPage('orgs') ? cache.orgs.filter((o) => o.state === 'applied').length : 0;
+  if (waitingOrgs) todo.push({ level: 'info', text: `${waitingOrgs} байгууллага бүртгэлээ батлуулахыг хүлээж байна.`, tab: 'orgs' });
+  todo.sort((a, b) => (LEVEL_RANK[a.level] ?? 3) - (LEVEL_RANK[b.level] ?? 3));
+  const alerts = el(`<section class="section"><h2 class="section-label">Хийх ажил${todo.length ? `<span class="n">${todo.length}</span>` : ''}</h2><div class="card alerts" id="alerts" data-rows></div></section>`);
+  const list = alerts.querySelector('#alerts');
+  for (const a of todo) {
+    const go = a.tab && hasPage(a.tab) ? `<button type="button" class="btn" data-size="sm" data-go="${esc(a.tab)}">${esc(GO_WORD[a.tab] ?? 'Очих')}</button>` : '';
+    list.append(el(`<div class="alert" data-level="${esc(a.level)}"><span class="alert-text">${esc(a.text)}</span>${go}</div>`));
+  }
+  if (!todo.length) list.append(el('<div class="alert" data-level="ok"><span class="alert-text">Одоогоор хийх ажил алга. Шинэ хүсэлт, олголт ирвэл энд гарна.</span></div>'));
+  list.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-go]');
+    if (b) show(b.dataset.go);
+  });
+
+  // The house as it stands: what is going on, who sells, who eats, and whose money Basu holds.
   const w = v.wallet;
+  const live = v.dine.live + v.idesh.live;
+  const knowsSuppliers = can('desk.suppliers') || can('desk.orders');
+  const selling = cache.suppliers.filter((s) => s.state === 'contracted' && s.active);
+  const listings = selling.reduce((n, s) => n + (s.listings ?? 0), 0);
+  const asked = v.idesh.applied;
+  const kitchens = v.dine.restaurants;
+  const cell = (label, value, caption, attrs = '') => el(`<div class="card kpi"${attrs}><div class="lab">${label}</div><b>${value}</b><span>${caption}</span></div>`);
   const nowSection = el('<section class="section"><h2 class="section-label">Одоо</h2><div class="kpis kpi-band" id="now"></div></section>');
-  const drift = w.drift === 0 ? 'ledger тэнцсэн' : `ledger зөрүү ${mnt(w.drift)}`;
   nowSection.querySelector('#now').append(
-    el(`<div class="card kpi"><div class="lab">Зочдын түрийвч</div><b>${money(w.liability_mnt)}</b><span>зочдод өгөх өр · нийлүүлэгчид өгөх ${mnt(w.payable_mnt)}</span></div>`),
-    el(`<div class="card kpi"${w.drift === 0 ? '' : ' data-tone="bad"'}><div class="lab">Basu-гийн данс</div><b>${money(w.revenue_mnt)}</b><span>${drift}</span></div>`),
-    el(`<div class="card kpi"><div class="lab">Идэвхтэй захиалга</div><b>${v.dine.live + v.idesh.live}</b><span>хоол ${v.dine.live} · идэш ${v.idesh.live}${v.dine.held ? ` · түр зогсоосон ${v.dine.held}` : ''}</span></div>`),
-    el(`<div class="card kpi"><div class="lab">Зочид</div><b>${v.guests.total}</b><span>нээлттэй сесс ${v.guests.sessions_open} · push утас ${v.notify.devices}</span></div>`),
-    el(`<div class="card kpi"${v.dine.restaurants.offline ? ' data-tone="warn"' : ''}><div class="lab">Ресторан</div><b>${v.dine.restaurants.active}</b><span>${v.dine.restaurants.offline ? `гал тогоо хаалттай ${v.dine.restaurants.offline}` : 'бүх гал тогоо нээлттэй'}</span></div>`),
-    el(`<div class="card kpi"${v.notify.stuck ? ' data-tone="bad"' : ''}><div class="lab">Мэдэгдлийн дараалал</div><b>${v.notify.queued}</b><span>${v.notify.stuck ? `гацсан ${v.notify.stuck}` : 'илгээгдэхийг хүлээж буй'}${w.topups.pending ? ` · цэнэглэлт хүлээгдэж буй ${w.topups.pending}` : ''}</span></div>`),
+    cell('Идэвхтэй захиалга', live, live ? `идэш ${v.idesh.live} · хоол ${v.dine.live}${v.dine.held ? ` · ${v.dine.held} түр зогссон` : ''}` : 'одоогоор явагдаж буй захиалга алга'),
+    knowsSuppliers
+      ? cell('Нийлүүлэгч', selling.length, selling.length ? `${listings} зар${asked ? ` · ${asked} хүсэлт хүлээж буй` : ''}` : asked ? `${asked} хүсэлт хүлээж буй` : 'гэрээт нийлүүлэгч алга')
+      : cell('Мэдэгдлийн дараалал', v.notify.queued, v.notify.stuck ? `${v.notify.stuck} нь гацсан` : 'илгээгдэхийг хүлээж буй', v.notify.stuck ? ' data-tone="bad"' : ''),
+    cell(
+      'Ресторан',
+      kitchens.active,
+      !kitchens.active ? 'идэвхтэй ресторан алга' : kitchens.offline ? `${kitchens.offline} гал тогоо хаалттай` : 'бүх гал тогоо нээлттэй',
+      kitchens.offline ? ' data-tone="warn"' : '',
+    ),
+    cell('Зочид', v.guests.total, `өнөөдөр шинээр ${v.guests.joined.today} · ${v.guests.sessions_open} нэвтэрсэн`),
+    cell('Зочдын түрийвч', money(w.liability_mnt), `зочдод өгөх өр${w.payable_mnt ? ` · гадагш өгөх ${mnt(w.payable_mnt)}` : ''}`),
+    cell('Basu-гийн данс', money(w.revenue_mnt), w.drift === 0 ? 'дэвтэр тэнцсэн' : `дэвтэр зөрүү ${mnt(w.drift)}`, w.drift === 0 ? '' : ' data-tone="bad"'),
   );
 
-  const flowSection = el('<section class="section"><h2 class="section-label"></h2><div class="kpis kpi-band"></div></section>');
+  // What a period brought: the switch at the top of the page picks it.
+  const flowSection = el('<section class="section"><h2 class="section-label"></h2><div class="kpis kpi-band" id="flow"></div></section>');
   const flowHead = flowSection.querySelector('h2');
   const flow = flowSection.querySelector('.kpis');
   const pair = el(`<div class="pair-cols">
-      <section class="section"><h2 class="section-label">Хоол ба идэш</h2><div class="card"><div class="table-wrap" id="cross"></div></div></section>
-      <section class="section"><h2 class="section-label">Мэдэгдэл</h2><div class="card"><div class="table-wrap" id="msgs"></div></div></section>
+      <section class="section"><h2 class="section-label">Идэш ба хоол</h2><div class="card"><div class="table-wrap" id="cross"></div></div></section>
+      <section class="section"><h2 class="section-label">Мэдэгдэл</h2><div class="card"><div class="table-wrap" id="msgs"></div><div class="card-foot cap" id="queue"></div></div></section>
     </div>`);
   const cross = pair.querySelector('#cross');
   const msgs = pair.querySelector('#msgs');
+  pair.querySelector('#queue').textContent = `Одоо дараалалд ${v.notify.queued}${v.notify.stuck ? `, үүнээс ${v.notify.stuck} нь гацсан` : ''} · push авах утас ${v.notify.devices}`;
   const draw = () => {
     const t = (o) => o[period];
     flowHead.textContent = periodWord();
+    const sold = (count, sales, cancelled, none) => (count ? `${mnt(sales)} борлуулалт${cancelled ? ` · ${cancelled} цуцлагдсан` : ''}` : none);
+    const refunds = t(w.refunds.mnt) + t(v.idesh.refund_mnt);
     flow.replaceChildren(
-      el(`<div class="card kpi"><div class="lab">Шинэ зочин</div><b>${t(v.guests.joined)}</b><span>апп нээсэн ${t(v.guests.active)}</span></div>`),
-      el(`<div class="card kpi"><div class="lab">Хоолны захиалга</div><b>${t(v.dine.placed)}</b><span>${mnt(t(v.dine.sales_mnt))}${t(v.dine.cancelled) ? ` · цуцлагдсан ${t(v.dine.cancelled)}` : ''}</span></div>`),
-      el(`<div class="card kpi"><div class="lab">Идэшний захиалга</div><b>${t(v.idesh.paid)}</b><span>${mnt(t(v.idesh.sales_mnt))}${t(v.idesh.cancelled) ? ` · цуцлагдсан ${t(v.idesh.cancelled)}` : ''}</span></div>`),
-      el(`<div class="card kpi"><div class="lab">Цэнэглэлт</div><b>${money(t(w.topups.settled_mnt))}</b><span>${t(w.topups.settled)} удаа${t(w.topups.failed) ? ` · амжилтгүй ${t(w.topups.failed)}` : ''}</span></div>`),
-      el(`<div class="card kpi"><div class="lab">Орлого (Basu)</div><b>${money(t(w.revenue))}</b><span>идэшний шимтгэл ${mnt(t(v.idesh.commission_mnt))}</span></div>`),
-      el(`<div class="card kpi"><div class="lab">Буцаалт</div><b>${money(t(w.refunds.mnt) + t(v.idesh.refund_mnt))}</b><span>түрийвчид ${t(w.refunds.count)} удаа · идэшний данс руу ${mnt(t(v.idesh.refund_mnt))}</span></div>`),
+      cell('Шинэ зочин', t(v.guests.joined), `${t(v.guests.active)} хүн апп нээсэн`),
+      cell('Идэшний захиалга', t(v.idesh.paid), sold(t(v.idesh.paid), t(v.idesh.sales_mnt), t(v.idesh.cancelled), 'төлсөн захиалга алга')),
+      cell('Хоолны захиалга', t(v.dine.placed), sold(t(v.dine.placed), t(v.dine.sales_mnt), t(v.dine.cancelled), 'захиалга алга')),
+      cell('Цэнэглэлт', money(t(w.topups.settled_mnt)), t(w.topups.settled) ? `${t(w.topups.settled)} удаа${t(w.topups.failed) ? ` · ${t(w.topups.failed)} амжилтгүй` : ''}` : 'цэнэглэлт алга'),
+      cell('Орлого (Basu)', money(t(w.revenue)), `идэшний шимтгэл ${mnt(t(v.idesh.commission_mnt))}`),
+      cell('Буцаалт', money(refunds), refunds ? `түрийвчид ${t(w.refunds.count)} удаа · данс руу ${mnt(t(v.idesh.refund_mnt))}` : 'буцаалт алга'),
     );
-    cross.replaceChildren(el(`<table class="table"><thead><tr><th></th><th class="num">Хоол</th><th class="num">Идэш</th></tr></thead><tbody>
-      <tr><td>Захиалга</td><td class="num">${t(v.dine.placed)}</td><td class="num">${t(v.idesh.paid)}</td></tr>
-      <tr><td>Борлуулалт</td><td class="num">${money(t(v.dine.sales_mnt))}</td><td class="num">${money(t(v.idesh.sales_mnt))}</td></tr>
-      <tr><td>Дууссан</td><td class="num">${t(v.dine.closed)}</td><td class="num">${t(v.idesh.handed)}</td></tr>
-      <tr><td>Цуцлагдсан</td><td class="num">${t(v.dine.cancelled)}</td><td class="num">${t(v.idesh.cancelled)}</td></tr>
-      <tr><td>Ирээгүй зочин</td><td class="num">${t(v.dine.no_shows)}</td><td class="num">—</td></tr>
+    cross.replaceChildren(el(`<table class="table"><thead><tr><th></th><th class="num">Идэш</th><th class="num">Хоол</th></tr></thead><tbody>
+      <tr><td>Захиалга</td><td class="num">${t(v.idesh.paid)}</td><td class="num">${t(v.dine.placed)}</td></tr>
+      <tr><td>Борлуулалт</td><td class="num">${money(t(v.idesh.sales_mnt))}</td><td class="num">${money(t(v.dine.sales_mnt))}</td></tr>
+      <tr><td>Дууссан</td><td class="num">${t(v.idesh.handed)}</td><td class="num">${t(v.dine.closed)}</td></tr>
+      <tr><td>Цуцлагдсан</td><td class="num">${t(v.idesh.cancelled)}</td><td class="num">${t(v.dine.cancelled)}</td></tr>
+      <tr><td>Ирээгүй зочин</td><td class="num">—</td><td class="num">${t(v.dine.no_shows)}</td></tr>
     </tbody></table>`));
     msgs.replaceChildren(el(`<table class="table"><thead><tr><th></th><th class="num">Илгээсэн</th><th class="num">Амжилтгүй</th></tr></thead><tbody>
       <tr><td>SMS</td><td class="num">${t(v.notify.sms.sent)}</td><td class="num">${t(v.notify.sms.failed)}</td></tr>
@@ -2177,14 +2531,21 @@ const PLATFORM_WORD = { ios: 'iPhone', android: 'Android', web: 'Вэб' };
 let guestQ = '';
 
 function renderGuests(view) {
-  view.append(head('Зочид', 'Утас, имэйл эсвэл нэрээр ол. Мөр дээр дарж түрийвч, сесс, захиалга, мэдэгдлийг нь нэг хуудсанд үзнэ.'));
+  view.append(head('Зочид', 'Утас, имэйл, нэрээр хайж, мөр дээр дарж зочны хуудсыг нээнэ.'));
   const table = dataTable({
     columns: [
       {
         key: 'name',
         label: 'Зочин',
         value: (g) => g.name ?? '',
-        render: (g) => dtCell.two(g.name ?? (g.closed_at ? 'Хаагдсан бүртгэл' : 'Нэргүй зочин'), (g.ways ?? []).map((w) => WAY_WORD[w] ?? w).join(' · ')),
+        // How they sign in, when it says more than the phone and email columns beside it do. Somebody with no
+        // name is said quietly, so the names there are stand out down the list.
+        render: (g) => {
+          const ways = (g.ways ?? []).some((w) => w === 'google' || w === 'apple') || (g.ways ?? []).length > 1 ? `нэвтэрдэг: ${(g.ways ?? []).map((w) => WAY_WORD[w] ?? w).join(', ')}` : '';
+          return g.name
+            ? dtCell.two(g.name, ways)
+            : dtCell.twoHtml(`<span class="dt-unnamed">${g.closed_at ? 'Хаагдсан бүртгэл' : 'Нэр оруулаагүй'}</span>`, esc(ways));
+        },
       },
       { key: 'phone', label: 'Утас', render: (g) => dtCell.mono(g.phone) },
       { key: 'email', label: 'Имэйл', render: (g) => (g.email ? esc(g.email) : dtCell.none()) },
@@ -2237,54 +2598,99 @@ async function loadGuests(table) {
 }
 
 const WAY_WORD = { phone: 'утас', email: 'имэйл', google: 'Google', apple: 'Apple' };
-async function openGuest(id) {
+/**
+ * The way back from a file: to the list it was opened from, or — opened
+ * from another file — back to that one. `from` is { label, go }.
+ */
+function backTo(view, from) {
+  const b = el(`<button class="back link" type="button" id="back">${CHEV}${esc(from.label)}</button>`);
+  b.addEventListener('click', () => from.go());
+  view.append(b);
+  // A file opened from the keyboard goes on from its top: the way back holds the focus, the page does not jump.
+  b.focus({ preventScroll: true });
+}
+
+/**
+ * A file on its way: the way back and the shape of what is coming, drawn the
+ * moment the row is pressed, so the press answers before the server does.
+ * Returns whether this file is still the one wanted when its answer comes —
+ * a second press in the meantime wins, and a page left meanwhile stays left.
+ */
+let fileSeq = 0;
+function opening(view, from) {
+  const mine = ++fileSeq;
+  const page = tab;
+  view.replaceChildren();
+  window.scrollTo(0, 0);
+  backTo(view, from);
+  // The file's own shape — facts across, the sections and the rail beside them — so nothing moves when it lands.
+  view.append(el(`
+    <div class="file-skel" role="status" aria-busy="true" aria-label="Ачаалж байна">
+      <span class="skel skel-h1"></span><span class="skel skel-line"></span>
+      <div class="skel-grid">
+        <div class="card skel-facts"><span class="skel"></span><span class="skel"></span><span class="skel"></span><span class="skel"></span></div>
+        <div class="card skel-card skel-main"></div>
+        <div class="card skel-rail"><span class="skel"></span><span class="skel"></span></div>
+      </div>
+    </div>`));
+  view.querySelector('.skel-main').append(busy());
+  return () => mine === fileSeq && tab === page && view.isConnected;
+}
+
+async function openGuest(id, from = { label: 'Зочид', go: () => show('guests') }) {
   const view = document.getElementById('view');
+  const wanted = opening(view, from);
   let f;
   try {
     f = await ops(`/v1/ops/guests/${id}`);
   } catch (error) {
     toast(error.message, 'bad');
+    if (wanted()) from.go();
     return;
   }
+  if (!wanted()) return;
   const g = f.guest;
   const closed = Boolean(g.closed_at);
   view.replaceChildren();
-  const back = el(`<button class="back link" type="button" id="back">${CHEV}Зочид</button>`);
-  back.addEventListener('click', () => show('guests'));
-  view.append(back);
+  backTo(view, from);
   view.append(head(
     `${esc(g.name ?? (closed ? 'Хаагдсан бүртгэл' : 'Нэргүй зочин'))}${closed ? ' <span class="pill" data-s="off">хаагдсан</span>' : ''}`,
-    `${g.phone ? `${tel(g.phone)} · ` : ''}${g.email ? `${esc(g.email)} · ` : ''}бүртгүүлсэн ${when(g.joined_at)}${g.ways?.length ? ` · нэвтэрдэг: ${esc(g.ways.map((w) => WAY_WORD[w] ?? w).join(', '))}` : ''}`,
+    [g.phone ? tel(g.phone) : '', g.email ? esc(g.email) : '', `бүртгүүлсэн ${when(g.joined_at)}`].filter(Boolean).join(' · '),
   ));
+  // A file opened from here comes back here.
+  const here = { label: g.name ?? 'Зочин', go: () => openGuest(id, from) };
+  const liveDine = f.dine_orders.filter((o) => DINE_LIVE.includes(o.state)).length;
+  const liveIdesh = f.idesh_orders.filter((o) => ['PAID', 'PREPARING', 'READY', 'DISPATCHED'].includes(o.state)).length;
+  const ways = (g.ways ?? []).map((w) => WAY_WORD[w] ?? w).join(', ');
   const page = el(`
     <div class="detail">
-      <div>
-        <div class="card">
-          <div class="facts">
-            <div><div class="lab">Түрийвч</div><b>${money(f.wallet.balance_mnt)}</b><br>${f.wallet.lines.length} гүйлгээ</div>
-            <div><div class="lab">Хоол</div><b>${f.dine_orders.length} захиалга</b><br>${f.dine_orders.filter((o) => ['PLACED', 'ACCEPTED', 'SCHEDULED', 'ARMED', 'HELD', 'FIRED', 'COOKING', 'READY', 'SERVED'].includes(o.state)).length} идэвхтэй</div>
-            <div><div class="lab">Идэш</div><b>${f.idesh_orders.length} захиалга</b><br>${f.idesh_orders.filter((o) => ['PAID', 'PREPARING', 'READY', 'DISPATCHED'].includes(o.state)).length} идэвхтэй</div>
-            <div><div class="lab">Нэвтэрсэн</div><b>${f.sessions.length} сесс</b><br>${f.devices.length} push утас</div>
+      <div class="card detail-facts"><div class="facts">
+        <div><span class="lab">Түрийвч</span><b>${money(f.wallet.balance_mnt)}</b><span class="fact-sub">${f.wallet.lines.length} гүйлгээ</span></div>
+        <div><span class="lab">Идэш</span><b>${f.idesh_orders.length} захиалга</b><span class="fact-sub">${liveIdesh ? `${liveIdesh} нь явагдаж байна` : 'идэвхтэй алга'}</span></div>
+        <div><span class="lab">Хоол</span><b>${f.dine_orders.length} захиалга</b><span class="fact-sub">${liveDine ? `${liveDine} нь явагдаж байна` : 'идэвхтэй алга'}</span></div>
+        <div><span class="lab">Нэвтрэх арга</span><b>${ways ? esc(ways[0].toUpperCase() + ways.slice(1)) : '—'}</b><span class="fact-sub">${f.sessions.length} төхөөрөмж нэвтэрсэн</span></div>
+      </div></div>
+      <aside class="detail-rail">
+        <h2 class="section-label">Нэвтэрсэн төхөөрөмж</h2>
+        <div class="card" id="acts">
+          <div class="card-body acts">
+            ${f.sessions.length ? f.sessions.map((s) => `
+              <div class="sess"><span>${esc(s.label ?? 'Утас')}<small>сүүлд ${when(s.last_seen_at ?? s.created_at)} ${clockOf(s.last_seen_at ?? s.created_at)}</small></span>
+              ${can('desk.guests:sessions') ? `<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-sid="${s.id}">Гаргах</button>` : ''}</div>`).join('') : '<div class="hint">Одоо нэвтэрсэн төхөөрөмж алга.</div>'}
+            ${f.devices.length ? `<div class="hint">Push мэдэгдэл авдаг: ${f.devices.map((d) => esc(`${PLATFORM_WORD[d.platform] ?? d.platform}${d.label ? ` · ${d.label}` : ''}`)).join(', ')}</div>` : ''}
+            ${closed ? `<div class="sep"></div><div class="hint">Бүртгэл ${when(g.closed_at)}-нд хаагдсан. Захиалга, гүйлгээ нь бүртгэлд үлдсэн.</div>` : `
+            <div class="sep"></div>
+            ${can('desk.guests:close') ? `
+            <button class="btn" data-v="danger" type="button" data-a="close">Бүртгэл хаах</button>
+            <div class="hint">Түрийвчид мөнгөтэй эсвэл идэвхтэй захиалгатай бол хаагдахгүй. Нэр, утас арилна; захиалга, гүйлгээ бүртгэлд үлдэнэ.</div>` : '<div class="hint">Бүртгэл хаахыг зөвхөн админ хийнэ.</div>'}`}
           </div>
         </div>
-        <section class="section"><h2 class="section-label">Түрийвчийн хуулга</h2><div data-t="wallet"></div></section>
-        <section class="section"><h2 class="section-label">Хоолны захиалга</h2><div data-t="dine"></div></section>
+      </aside>
+      <div class="detail-main">
         <section class="section"><h2 class="section-label">Идэшний захиалга</h2><div data-t="idesh"></div></section>
+        <section class="section"><h2 class="section-label">Хоолны захиалга</h2><div data-t="dine"></div></section>
+        <section class="section"><h2 class="section-label">Түрийвчийн хуулга</h2><div data-t="wallet"></div></section>
         <section class="section"><h2 class="section-label">Мэдэгдэл</h2><div data-t="messages"></div></section>
-      </div>
-      <div class="card" id="acts">
-        <div class="card-head"><h3>Сесс ба төхөөрөмж</h3></div>
-        <div class="card-body acts">
-          ${f.sessions.length ? f.sessions.map((s) => `
-            <div class="sess"><span>${esc(s.label ?? 'Утас')}<small>сүүлд ${when(s.last_seen_at ?? s.created_at)} ${clockOf(s.last_seen_at ?? s.created_at)}</small></span>
-            ${can('desk.guests:sessions') ? `<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-sid="${s.id}">Гаргах</button>` : ''}</div>`).join('') : '<div class="hint">Нээлттэй сесс алга.</div>'}
-          ${f.devices.length ? `<div class="hint">Push: ${f.devices.map((d) => esc(`${PLATFORM_WORD[d.platform] ?? d.platform}${d.label ? ` · ${d.label}` : ''}`)).join(', ')}</div>` : ''}
-          ${closed ? '' : `
-          <div class="sep"></div>
-          ${can('desk.guests:close') ? `
-          <button class="btn" data-v="danger" type="button" data-a="close">Бүртгэл хаах</button>
-          <div class="hint">Түрийвчид мөнгөтэй эсвэл идэвхтэй захиалгатай бол хаагдахгүй. Нэр, утас арилна; захиалга, гүйлгээ бүртгэлд үлдэнэ.</div>` : '<div class="hint">Бүртгэл хаахыг зөвхөн админ хийнэ.</div>'}`}
-        </div>
       </div>
     </div>`);
   const put = (key, table) => page.querySelector(`[data-t="${key}"]`).replaceWith(table.el);
@@ -2310,7 +2716,7 @@ async function openGuest(id) {
     ],
     search: false,
     sort: { key: 'slot_starts_at', desc: true },
-    onRow: (o) => openLunch(o.id),
+    onRow: (o) => openLunch(o.id, here),
     rowAttrs: (o) => ({ 'data-lunch': o.id }),
     noun: 'захиалга',
     empty: { title: 'Хоолны захиалга алга', text: '' },
@@ -2320,13 +2726,13 @@ async function openGuest(id) {
     columns: [
       { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(`<span class="mono">№${esc(o.code)}</span>`, esc(`${o.title} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}`)) },
       { key: 'supplier', label: 'Нийлүүлэгч', value: (o) => o.supplier.name },
-      { key: 'receive_on', label: 'Өдөр', render: (o) => `<span class="mono">${dayLabel(o.receive_on)}</span>` },
+      { key: 'receive_on', label: 'Өдөр', render: (o) => `<span class="mono nowrap">${dayLabel(o.receive_on)}</span>` },
       { key: 'state', label: 'Төлөв', value: (o) => STATE_WORD[o.state] ?? o.state, render: (o) => dtCell.pill(o.state, STATE_WORD[o.state] ?? o.state) },
       { key: 'total_mnt', label: 'Дүн', align: 'end', numeric: true, render: (o) => dtCell.money(o.total_mnt) },
     ],
     search: false,
     sort: { key: 'receive_on', desc: true },
-    onRow: (o) => openOrder(o.id),
+    onRow: (o) => openOrder(o.id, here),
     rowAttrs: (o) => ({ 'data-order': o.id }),
     noun: 'захиалга',
     empty: { title: 'Идэшний захиалга алга', text: '' },
@@ -2353,14 +2759,14 @@ async function openGuest(id) {
     if (b.dataset.a === 'revoke') {
       const session = f.sessions.find((x) => String(x.id) === b.dataset.sid);
       void confirmPopup({
-        title: 'Сесс гаргах',
-        text: `<b>${esc(session?.label ?? 'Энэ төхөөрөмж')}</b> дээрх нэвтрэлт хаагдана. Тэнд дахин нэвтрэх шаардлагатай болно.`,
+        title: 'Төхөөрөмжөөс гаргах',
+        text: `<b>${esc(session?.label ?? 'Энэ төхөөрөмж')}</b> дээрх нэвтрэлт хаагдана. Утсаа алдсан бол ингэнэ: тэр төхөөрөмжөөр дахин нэвтрэхэд код, нууц үг хэрэгтэй болно.`,
         ok: 'Гаргах',
         danger: true,
         onConfirm: async () => {
           await ops(`/v1/ops/guests/${id}/sessions/${b.dataset.sid}/revoke`, { method: 'POST', body: {} });
-          toast('Сесс гаргалаа.', 'good');
-          await openGuest(id);
+          toast('Төхөөрөмжөөс гаргалаа.', 'good');
+          await openGuest(id, from);
         },
       });
     } else if (b.dataset.a === 'close') {
@@ -2373,7 +2779,7 @@ async function openGuest(id) {
         onConfirm: async (note) => {
           await ops(`/v1/ops/guests/${id}/close`, { method: 'POST', body: { note } });
           toast('Бүртгэл хаагдлаа.', 'good');
-          await openGuest(id);
+          await openGuest(id, from);
         },
       });
     }
@@ -2399,10 +2805,32 @@ const dineActor = (a) => {
   return { 'system:planner': 'төлөвлөгч', 'system:scheduler': 'хуваарьлагч' }[a] ?? a;
 };
 const stars = (n) => `<span class="stars" aria-label="${n} од">${Array.from({ length: 5 }, (_, i) => (i < n ? STAR : STAR.replace('<svg', '<svg data-off'))).join('')}</span>`;
+/** A kitchen station by its code, as the kitchens call it (a code nobody named stays as it is). */
+const STATION_WORD = { grill: 'Шарах', wok: 'Хуурга', soup: 'Шөл', cold: 'Хүйтэн', steam: 'Жигнэх' };
+/** How a lunch goes on the fire: by itself, once the kitchen says yes, or by the cook's hand. */
+const FIRE_WORD = { AUTO: 'автоматаар', CONFIRM: 'гал тогоо батлаад', MANUAL: 'тогооч гараар' };
 let venueCache = [];
 
+/** A restaurant taken off the guests' map, or put back: what it means for the orders it holds, and a reason for the record. */
+function toggleVenue(r, done) {
+  return confirmPopup({
+    title: r.active ? 'Ресторан зогсоох' : 'Ресторан идэвхжүүлэх',
+    text: r.active
+      ? `<b>${esc(r.name)}</b> зочдод харагдахаа болиж, шинэ захиалга авахгүй. Авсан захиалга хэвээр үргэлжилнэ.`
+      : `<b>${esc(r.name)}</b> дахин зочдод харагдаж, захиалга авна.`,
+    ok: r.active ? 'Зогсоох' : 'Идэвхжүүлэх',
+    danger: r.active,
+    reason: { label: r.active ? 'Шалтгаан' : 'Тэмдэглэл', placeholder: 'Бүртгэлд үлдэнэ', required: r.active },
+    onConfirm: async (note) => {
+      await ops(`/v1/ops/dine/restaurants/${r.id}/active`, { method: 'POST', body: { active: !r.active, note } });
+      toast(r.active ? 'Зогсоолоо.' : 'Идэвхжлээ.', 'good');
+      await done();
+    },
+  });
+}
+
 async function renderVenues(view) {
-  view.append(head('Ресторан', 'Гал тогоо бүр нээлттэй эсэх, өнөөдрийн захиалга, цэс, үнэлгээ. Мөр дээр дарж цэсийг нь үзнэ.'));
+  view.append(head('Ресторан', 'Гал тогоо нээлттэй эсэх, өнөөдрийн захиалга, цэс, үнэлгээ.'));
   const manage = can('desk.venues:manage');
   const table = dataTable({
     columns: [
@@ -2422,7 +2850,7 @@ async function renderVenues(view) {
         numeric: true,
         render: (r) =>
           dtCell.twoHtml(
-            r.online ? dtCell.pill('contracted', 'нээлттэй') : dtCell.pill('declined', 'хаалттай'),
+            r.online ? dtCell.pill('contracted', 'нээлттэй') : dtCell.pill('off', 'хаалттай'),
             !r.org_id ? 'байгууллагагүй' : r.kitchen_seen_at ? `сүүлд ${when(r.kitchen_seen_at)} ${clockOf(r.kitchen_seen_at)}` : 'хэзээ ч нээгээгүй',
           ),
       },
@@ -2467,23 +2895,9 @@ async function renderVenues(view) {
     ],
     actions: manage
       ? (r) => {
-          const b = el(`<button class="btn${r.active ? ' ink-stop' : ''}" data-size="sm" data-v="quiet" type="button" data-a="active">${r.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>`);
-          b.addEventListener('click', () =>
-            confirmPopup({
-              title: r.active ? 'Ресторан зогсоох' : 'Ресторан идэвхжүүлэх',
-              text: r.active
-                ? `<b>${esc(r.name)}</b> зочдод харагдахаа болиж, шинэ захиалга авахгүй. Авсан захиалга хэвээр үргэлжилнэ.`
-                : `<b>${esc(r.name)}</b> дахин зочдод харагдаж, захиалга авна.`,
-              ok: r.active ? 'Зогсоох' : 'Идэвхжүүлэх',
-              danger: r.active,
-              reason: { label: r.active ? 'Шалтгаан' : 'Тэмдэглэл', placeholder: 'Бүртгэлд үлдэнэ', required: r.active },
-              onConfirm: async (note) => {
-                await ops(`/v1/ops/dine/restaurants/${r.id}/active`, { method: 'POST', body: { active: !r.active, note } });
-                toast(r.active ? 'Зогсоолоо.' : 'Идэвхжлээ.', 'good');
-                await loadVenues(table);
-              },
-            }),
-          );
+          // Quiet in the row; the red is the popup's, where the stop is said and confirmed.
+          const b = el(`<button class="btn" data-size="sm" data-v="quiet" type="button" data-a="active">${r.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>`);
+          b.addEventListener('click', () => toggleVenue(r, () => loadVenues(table)));
           return b;
         }
       : null,
@@ -2491,11 +2905,11 @@ async function renderVenues(view) {
     onRow: (r) => openVenue(r),
     rowAttrs: (r) => ({ 'data-venue': r.id, 'data-state': r.active ? 'on' : 'off' }),
     noun: 'ресторан',
-    empty: { title: 'Ресторан алга', text: 'Хоолны талд ресторан бүртгэгдээгүй.' },
+    empty: { title: 'Ресторан алга', text: 'Хоолны апп-д одоогоор ресторан холбогдоогүй байна.' },
     stateKey: 'basu.dt.venues',
   });
   table.el.id = 'venues';
-  view.append(table.el, el('<p class="cap" style="margin-top:12px">Рестораны ажилтнууд гал тогоог өөрсдийн бүртгэлээр /kds-д нэвтэрч нээнэ — код, таблет холболт гэж байхгүй.</p>'));
+  view.append(table.el, el('<p class="page-note">Рестораны ажилтнууд гал тогооны дэлгэцийг (/kds) өөрсдийн бүртгэлээр нээнэ — код, таблет холболт хэрэггүй.</p>'));
   await loadVenues(table);
 }
 
@@ -2509,14 +2923,35 @@ async function loadVenues(table) {
   }
 }
 
-/** One restaurant: its menu, each dish with the switch that takes it off. */
-async function openVenue(r) {
+/** One restaurant: how its kitchen and its day stand, then its menu, each dish with the switch that takes it off. */
+async function openVenue(r, from = { label: 'Ресторан', go: () => show('venues') }) {
   const view = document.getElementById('view');
   view.replaceChildren();
-  const back = el(`<button class="back link" type="button" id="back">${CHEV}Ресторан</button>`);
-  back.addEventListener('click', () => show('venues'));
-  view.append(back, head(esc(r.name), `Цэс — ${r.menu.active}/${r.menu.total} хоол цэсэнд${r.menu.sold_out ? `, ${r.menu.sold_out} нь өнөөдөр дууссан` : ''}.`));
+  window.scrollTo(0, 0);
+  backTo(view, from);
   const manage = can('desk.venues:manage');
+  const h = head(
+    `${esc(r.name)}${r.active ? '' : ` ${dtCell.pill('off', 'зогссон')}`}`,
+    `${esc(r.slot_minutes)} минутын цагаар захиалга авна · ${r.auto_accept ? 'автоматаар батална' : 'гараар батална'}`,
+  );
+  if (manage) {
+    const again = async () => {
+      ({ restaurants: venueCache } = await ops('/v1/ops/dine/restaurants'));
+      const now = venueCache.find((x) => x.id === r.id);
+      if (now) await openVenue(now, from);
+    };
+    headActs(h, button(r.active ? 'Ресторан зогсоох' : 'Идэвхжүүлэх', () => toggleVenue(r, again), `data-a="active"${r.active ? '' : ' data-v="primary"'}`));
+  }
+  view.append(h);
+  const seen = !r.org_id ? 'байгууллагад холбогдоогүй' : r.kitchen_seen_at ? `сүүлд ${when(r.kitchen_seen_at)} ${clockOf(r.kitchen_seen_at)}` : 'хэзээ ч нээгээгүй';
+  view.append(el(`
+    <div class="card facts-card"><div class="facts">
+      <div><span class="lab">Гал тогоо</span><b>${r.online ? 'Нээлттэй' : 'Хаалттай'}</b><span class="fact-sub">${seen}</span></div>
+      <div><span class="lab">Өнөөдөр</span><b>${r.today.placed} захиалга</b><span class="fact-sub">${r.today.live} идэвхтэй · ${mnt(r.today.sales_mnt)}${r.today.held ? ` · ${r.today.held} түр зогссон` : ''}</span></div>
+      <div><span class="lab">Цэс</span><b>${r.menu.active}/${r.menu.total} хоол</b><span class="fact-sub">${r.menu.sold_out ? `${r.menu.sold_out} нь өнөөдөр дууссан` : 'бүгд бэлэн'}</span></div>
+      <div><span class="lab">Үнэлгээ</span><b>${r.rating ? `${stars(Math.round(r.rating.stars))} <span class="mono">${esc(r.rating.stars)}</span>` : '—'}</b><span class="fact-sub">${r.rating ? `${r.rating.count} үнэлгээ${r.rating.on_time_share === null ? '' : ` · цагтаа ${Math.round(r.rating.on_time_share * 100)}%`}` : 'үнэлгээ алга'}</span></div>
+      <div><span class="lab">ТТД</span><b class="mono">${r.merchant_tin ? esc(r.merchant_tin) : '<span class="ink-stop">алга</span>'}</b><span class="fact-sub">${r.merchant_tin ? 'е-баримт гарна' : 'е-баримт гарахгүй'}</span></div>
+    </div></div>`));
   const table = dataTable({
     columns: [
       { key: 'name', label: 'Хоол', render: (m) => `<b>${esc(m.name)}</b>` },
@@ -2527,7 +2962,7 @@ async function openVenue(r) {
         key: 'state',
         label: 'Төлөв',
         value: (m) => (m.active ? (m.sold_out_until ? 'дууссан' : 'цэсэнд') : 'нуусан'),
-        render: (m) => (m.active ? (m.sold_out_until ? dtCell.pill('off', 'дууссан') : dtCell.pill('contracted', 'цэсэнд')) : dtCell.pill('declined', 'нуусан')),
+        render: (m) => (m.active ? (m.sold_out_until ? dtCell.pill('off', 'дууссан') : dtCell.pill('contracted', 'цэсэнд')) : dtCell.pill('off', 'нуусан')),
       },
     ],
     search: { placeholder: 'Хоолны нэр, цех…' },
@@ -2557,7 +2992,9 @@ async function openVenue(r) {
     empty: { title: 'Цэс хоосон', text: 'Энэ ресторанд хоол бүртгэгдээгүй.' },
   });
   table.el.id = 'menu';
-  view.append(table.el);
+  const menu = el('<section class="section"><h2 class="section-label">Цэс</h2></section>');
+  menu.append(table.el);
+  view.append(menu);
   try {
     table.setRows((await ops(`/v1/ops/dine/restaurants/${r.id}/menu`)).items);
   } catch (error) {
@@ -2571,7 +3008,7 @@ async function openVenue(r) {
 let lunchFilter = { scope: 'live', restaurant: '', day: '', q: '' };
 
 async function renderLunches(view) {
-  view.append(head('Хоолны захиалга', 'Өнөөдрийн болон өмнөх захиалгууд. Мөр дээр дарж дэлгэрэнгүйг үзнэ.'));
+  view.append(head('Хоолны захиалга', 'Ресторанд урьдчилж өгсөн хоолны захиалгууд.'));
   if (!venueCache.length) {
     try {
       ({ restaurants: venueCache } = await ops('/v1/ops/dine/restaurants'));
@@ -2647,51 +3084,86 @@ async function loadLunches(table) {
   }
 }
 
-async function openLunch(id) {
+/**
+ * The rail beside a file: links to the files around it — the guest, the
+ * restaurant, the supplier — each a row that opens it. `links` are
+ * [{ label, sub, go }]; one with no `go` is left out.
+ */
+function related(links) {
+  const shown = links.filter((l) => l && l.go);
+  if (!shown.length) return null;
+  const box = el('<section class="rail-sec related"><h2 class="section-label">Холбоотой</h2><div class="card" data-rows></div></section>');
+  for (const l of shown) {
+    const row = el(`<button type="button" class="row" data-chev><span class="main"><span class="title">${esc(l.label)}</span><span class="sub">${esc(l.sub ?? '')}</span></span></button>`);
+    row.addEventListener('click', l.go);
+    box.querySelector('[data-rows]').append(row);
+  }
+  return box;
+}
+
+async function openLunch(id, from = { label: 'Хоолны захиалга', go: () => show('lunches') }) {
   const view = document.getElementById('view');
+  const wanted = opening(view, from);
   let d;
   try {
     d = await ops(`/v1/ops/dine/orders/${id}`);
   } catch (error) {
     toast(error.message, 'bad');
+    if (wanted()) from.go();
     return;
   }
+  if (!wanted()) return;
   const o = d.order;
   view.replaceChildren();
-  const back = el(`<button class="back link" type="button" id="back">${CHEV}Хоолны захиалга</button>`);
-  back.addEventListener('click', () => show('lunches'));
-  view.append(back);
+  backTo(view, from);
   view.append(head(`№${esc(o.code)} <span class="pill" data-s="${esc(o.state)}">${esc(DINE_WORD[o.state] ?? o.state)}</span>`, `${esc(o.restaurant.name)} · ${when(o.slot_starts_at)} ${clockOf(o.slot_starts_at)} · ${esc(o.party_size)} хүн`));
+  const here = { label: `№${o.code}`, go: () => openLunch(id, from) };
+  const manage = can('desk.lunches:manage');
+  const cancellable = DINE_FREE.includes(o.state);
+  const noShow = ['ARMED', 'HELD', 'FIRED', 'COOKING', 'READY'].includes(o.state);
+  const acts = manage && (cancellable || noShow)
+    ? `<h2 class="section-label">Үйлдэл</h2><div class="card" id="acts">
+        <div class="card-body acts">
+          ${cancellable ? '<button class="btn" data-v="danger" type="button" data-a="cancel">Зочны өмнөөс цуцлах</button><div class="hint">Гал дээр гараагүй тул мөнгө бүтнээрээ түрийвч рүү буцна.</div>' : '<div class="hint">Гал дээр гарсан тул цуцлах боломжгүй.</div>'}
+          ${noShow ? '<div class="sep"></div><button class="btn" type="button" data-a="no-show">Зочин ирээгүй гэж тэмдэглэх</button><div class="hint">Ширээ суллагдана; мөнгө буцахгүй.</div>' : ''}
+        </div>
+      </div>`
+    : `<h2 class="section-label">Үйлдэл</h2><p class="rail-note" id="acts">${!manage ? 'Захиалгыг цуцлах, тэмдэглэх нь ops, админы ажил.' : DINE_LIVE.includes(o.state) ? 'Зочинд үйлчилсэн тул хийх үйлдэл алга.' : 'Дууссан захиалга — хийх үйлдэл алга.'}</p>`;
+  const fire = o.fired_at ? `гарсан ${clockOf(o.fired_at)}` : o.late ? '<span class="ink-stop">хоцорч байна</span>' : o.fire_mode ? esc(FIRE_WORD[o.fire_mode] ?? o.fire_mode) : 'товлоогүй';
   const page = el(`
     <div class="detail">
-      <div>
-        <div class="card">
-          <div class="facts">
-            <div><div class="lab">Зочин</div><b>${esc(o.guest ?? 'зочин')}</b><br>${o.guest_phone ? tel(o.guest_phone) : ''}</div>
-            <div><div class="lab">Ширээ</div><b>${o.table ? esc(o.table) : '—'}</b><br>${o.seated_at ? `суусан ${clockOf(o.seated_at)}` : 'суугаагүй'}</div>
-            <div><div class="lab">Гал</div><b class="mono">${o.fire_at ? clockOf(o.fire_at) : '—'}</b><br>${o.fired_at ? `гарсан ${clockOf(o.fired_at)}` : o.late ? '<span class="ink-stop">хоцорч байна</span>' : esc(o.fire_mode ?? 'товлоогүй')}</div>
-            <div><div class="lab">Бэлэн</div><b class="mono">${o.ready_at ? clockOf(o.ready_at) : '—'}</b><br>${o.eta_at ? `ирэх ${clockOf(o.eta_at)}` : ''}</div>
-            <div><div class="lab">Дүн</div><b>${money(o.total_mnt)}</b><br>түрийвчээс</div>
-          </div>
-        </div>
-        <section class="section"><h2 class="section-label">Хоол</h2><div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Нэр</th><th>Цех</th><th class="num">Тоо</th><th class="num">Үнэ</th></tr></thead><tbody>${d.lines
-          .map((l) => `<tr${l.cancelled ? ' data-off' : ''}><td><b>${esc(l.name)}</b>${l.notes ? `<span class="sub">${esc(l.notes)}</span>` : ''}</td><td>${esc(l.station ?? '')}</td><td class="num">${l.qty}</td><td class="num">${money(l.unit_price_mnt * l.qty)}</td></tr>`)
+      <div class="card detail-facts"><div class="facts">
+        <div><span class="lab">Зочин</span><b>${esc(o.guest ?? 'зочин')}</b><span class="fact-sub">${o.guest_phone ? tel(o.guest_phone) : ''}</span></div>
+        <div><span class="lab">Ширээ</span><b>${o.table ? esc(o.table) : '—'}</b><span class="fact-sub">${o.seated_at ? `суусан ${clockOf(o.seated_at)}` : 'суугаагүй'}</span></div>
+        <div><span class="lab">Гал</span><b class="mono">${o.fire_at ? clockOf(o.fire_at) : '—'}</b><span class="fact-sub">${fire}</span></div>
+        <div><span class="lab">Бэлэн</span><b class="mono">${o.ready_at ? clockOf(o.ready_at) : '—'}</b><span class="fact-sub">${o.eta_at ? `зочин ирэх ${clockOf(o.eta_at)}` : ''}</span></div>
+        <div><span class="lab">Дүн</span><b>${money(o.total_mnt)}</b><span class="fact-sub">түрийвчээс төлсөн</span></div>
+      </div></div>
+      <aside class="detail-rail">${acts}</aside>
+      <div class="detail-main">
+        <section class="section"><h2 class="section-label">Хоол</h2><div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Хоол, цех</th><th class="num">Тоо</th><th class="num">Үнэ</th></tr></thead><tbody>${d.lines
+          .map((l) => {
+            // The station under the dish, with the guest's note: three columns that fit a phone.
+            const under = [STATION_WORD[l.station] ?? l.station, l.notes].filter(Boolean).map((s) => esc(s)).join(' · ');
+            return `<tr${l.cancelled ? ' data-off' : ''}><td><b>${esc(l.name)}</b>${under ? `<span class="sub">${under}</span>` : ''}</td><td class="num">${l.qty}</td><td class="num">${money(l.unit_price_mnt * l.qty)}</td></tr>`;
+          })
           .join('')}</tbody></table></div></div></section>
-        ${d.review ? `<section class="section"><h2 class="section-label">Үнэлгээ</h2><div class="card card-body">${stars(d.review.stars)} ${d.review.on_time === null ? '' : d.review.on_time ? '· цагтаа' : '· хоцорсон'}${d.review.comment ? `<br>${esc(d.review.comment)}` : ''}</div></section>` : ''}
+        ${d.review ? `<section class="section"><h2 class="section-label">Үнэлгээ</h2><div class="card card-body review-body">${stars(d.review.stars)}${d.review.on_time === null ? '' : d.review.on_time ? ' <span class="muted">цагтаа</span>' : ' <span class="ink-stop">хоцорсон</span>'}${d.review.comment ? `<p>${esc(d.review.comment)}</p>` : ''}</div></section>` : ''}
         <section class="section"><h2 class="section-label">Явц</h2><div class="card card-body"><ol class="story stepper" data-stepper>${d.events
           .map((e) => step(e.type, DINE_EVENT[e.type] ?? e.type, `${e.actor ? dineActor(e.actor) : ''}${e.payload?.reason ? ` · ${e.payload.reason}` : ''}`, e.at))
           .join('')}</ol></div></section>
       </div>
-      <div class="card" id="acts">
-        <div class="card-head"><h3>Ops-ийн үйлдэл</h3></div>
-        <div class="card-body acts">
-          ${!can('desk.lunches:manage') ? '<div class="hint">Үйлдлийг ops, админ хийнэ.</div>' : DINE_FREE.includes(o.state) || ['ARMED', 'HELD', 'FIRED', 'COOKING', 'READY'].includes(o.state) ? `
-          ${DINE_FREE.includes(o.state) ? '<button class="btn" data-v="danger" type="button" data-a="cancel">Зочны өмнөөс цуцлах</button><div class="hint">Гал дээр гараагүй тул мөнгө бүтэн түрийвч рүү буцна.</div>' : '<div class="hint">Гал дээр гарсан: цуцлах боломжгүй.</div>'}
-          ${['ARMED', 'HELD', 'FIRED', 'COOKING', 'READY'].includes(o.state) ? '<div class="sep"></div><button class="btn" type="button" data-a="no-show">Зочин ирээгүй гэж тэмдэглэх</button><div class="hint">Ширээ суллагдана; мөнгө буцахгүй.</div>' : ''}
-          ` : `<div class="hint">${DINE_LIVE.includes(o.state) ? 'Үйлчилсэн: ops-ийн үйлдэл алга.' : 'Дууссан захиалгад үйлдэл алга.'}</div>`}
-        </div>
-      </div>
     </div>`);
+  const venue = async () => {
+    if (!venueCache.length) ({ restaurants: venueCache } = await ops('/v1/ops/dine/restaurants'));
+    const r = venueCache.find((x) => x.id === o.restaurant.id);
+    if (r) await openVenue(r, here);
+  };
+  const links = related([
+    o.guest_id && hasPage('guests') ? { label: o.guest ?? 'Зочин', sub: 'Зочны хуудас: түрийвч, захиалгууд', go: () => openGuest(o.guest_id, here) } : null,
+    hasPage('venues') ? { label: o.restaurant.name, sub: 'Рестораны хуудас: гал тогоо, цэс', go: () => venue().catch((error) => toast(error.message, 'bad')) } : null,
+  ]);
+  if (links) page.querySelector('.detail-rail').append(links);
   page.querySelector('#acts').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-a]');
     if (!b) return;
@@ -2699,7 +3171,7 @@ async function openLunch(id) {
     void confirmPopup({
       title: cancel ? 'Зочны өмнөөс цуцлах' : 'Зочин ирээгүй',
       text: cancel
-        ? `№${esc(o.code)} цуцлагдаж, <b>${mnt(o.total_mnt)}</b> зочны түрийвч рүү бүтэн буцна.`
+        ? `№${esc(o.code)} цуцлагдаж, <b>${mnt(o.total_mnt)}</b> зочны түрийвч рүү бүтнээрээ буцна.`
         : `№${esc(o.code)}: зочин ирээгүй гэж тэмдэглэнэ. Ширээ суллагдана; мөнгө буцахгүй.`,
       ok: cancel ? 'Цуцлах' : 'Тэмдэглэх',
       danger: true,
@@ -2707,7 +3179,7 @@ async function openLunch(id) {
       onConfirm: async (note) => {
         await ops(`/v1/ops/dine/orders/${id}/${b.dataset.a}`, { method: 'POST', body: { note } });
         toast(cancel ? 'Цуцлагдлаа, мөнгө буцлаа.' : 'Тэмдэглэлээ.', 'good');
-        await openLunch(id);
+        await openLunch(id, from);
       },
     });
   });
@@ -2719,7 +3191,7 @@ async function openLunch(id) {
 let reviewVenue = '';
 
 async function renderReviews(view) {
-  view.append(head('Үнэлгээ', 'Зочдын одоор өгсөн үнэлгээ ба сэтгэгдэл. Мөр дээр дарж захиалгыг нь үзнэ.'));
+  view.append(head('Үнэлгээ', 'Хооллосон зочдын одоор өгсөн үнэлгээ, сэтгэгдэл.'));
   if (!venueCache.length) {
     try {
       ({ restaurants: venueCache } = await ops('/v1/ops/dine/restaurants'));
@@ -2761,7 +3233,7 @@ async function renderReviews(view) {
       void loadReviews(table);
     },
     sort: { key: 'at', desc: true },
-    onRow: (v) => openLunch(v.order_id),
+    onRow: (v) => openLunch(v.order_id, { label: 'Үнэлгээ', go: () => show('reviews') }),
     rowAttrs: (v) => ({ 'data-lunch': v.order_id }),
     noun: 'үнэлгээ',
     empty: { title: 'Үнэлгээ алга', text: 'Хооллосон зочид үнэлгээ өгөөгүй байна.' },
@@ -2815,7 +3287,7 @@ async function download(path, name) {
 }
 
 function renderMoney(view) {
-  view.append(head('Мөнгө', 'Ledger данс бүрээр, гүйлгээ, QPay цэнэглэлт, е-баримт. Нягтлан руу CSV.'));
+  view.append(head('Мөнгө', 'Дэвтрийн данс, гүйлгээ, цэнэглэлт, е-баримт. Нягтланд CSV.'));
   const seg = el(`<div class="seg">${[['checks', 'Нэгтгэл'], ['transfers', 'Гүйлгээ'], ['topups', 'Цэнэглэлт'], ['receipts', 'Е-баримт']].map(([k, l]) => `<button type="button" data-m="${k}"${moneyView === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
   seg.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-m]');
@@ -2848,20 +3320,24 @@ async function moneyChecks() {
   const ok = (good) => (good ? '' : ' data-tone="bad"');
   const page = el(`<div>
     <div class="kpis kpi-band">
-      <div class="card kpi"${c.drift === 0 ? ' data-word data-tone="good"' : ' data-tone="bad"'}><div class="lab">Ledger</div><b>${c.drift === 0 ? 'тэнцсэн' : money(c.drift)}</b><span>${c.accounts} данс · бүх бичилтийн нийлбэр ${c.drift === 0 ? '0' : 'тэг биш'}</span></div>
-      <div class="card kpi"${c.qpay.gap_mnt === 0 ? ' data-word data-tone="good"' : ' data-tone="bad"'}><div class="lab">QPay ↔ ledger</div><b>${c.qpay.gap_mnt === 0 ? 'таарсан' : money(c.qpay.gap_mnt)}</b><span>орсон ${mnt(c.qpay.settled_mnt)} · клиринг ${mnt(c.qpay.clearing_mnt)}</span></div>
+      <div class="card kpi"${c.drift === 0 ? ' data-word data-tone="good"' : ' data-tone="bad"'}><div class="lab">Дэвтэр</div><b>${c.drift === 0 ? 'тэнцсэн' : money(c.drift)}</b><span>${c.accounts} данс · ${c.drift === 0 ? 'бүх бичилтийн нийлбэр тэг' : 'бичилтийн нийлбэр тэг биш'}</span></div>
+      <div class="card kpi"${c.qpay.gap_mnt === 0 ? ' data-word data-tone="good"' : ' data-tone="bad"'}><div class="lab">QPay ба дэвтэр</div><b>${c.qpay.gap_mnt === 0 ? 'таарсан' : money(c.qpay.gap_mnt)}</b><span>орсон ${mnt(c.qpay.settled_mnt)} · клиринг ${mnt(c.qpay.clearing_mnt)}</span></div>
       <div class="card kpi"${c.qpay.stuck ? ' data-tone="warn"' : ''}><div class="lab">Хүлээгдэж буй цэнэглэлт</div><b>${c.qpay.pending}</b><span>${c.qpay.stuck ? `${c.qpay.stuck} нь хагас цагаас дээш` : 'гацсан алга'}</span></div>
       <div class="card kpi"><div class="lab">Зочдын түрийвч</div><b>${money(c.wallets.liability_mnt)}</b><span>${m.wallets.holding} түрийвчид мөнгөтэй · нийт ${m.wallets.count}</span></div>
       <div class="card kpi"><div class="lab">Гадагш өгөх</div><b>${money(c.wallets.payable_mnt)}</b><span>нийлүүлэгч, буцаалт · банкаар гарсан ${mnt(c.bank.out_mnt)}</span></div>
       <div class="card kpi" data-word${ok(c.receipts.failed === 0) || (c.receipts.gap === 0 ? ' data-tone="good"' : ' data-tone="warn"')}><div class="lab">Е-баримт</div><b>${c.receipts.gap === 0 ? 'бүрэн' : `${c.receipts.gap} дутуу`}</b><span>гарсан ${c.receipts.issued} · дараалалд ${c.receipts.queued} · амжилтгүй ${c.receipts.failed}</span></div>
     </div>
-    ${canMoney() ? '<div class="run-row"><button class="btn" type="button" id="run">Шалгалт одоо ажиллуулах</button><span class="cap">Ledger, е-баримтын нэгтгэл ба дараалал. Ердийн үедээ 23:30-д автоматаар.</span></div>' : ''}
+    ${canMoney() ? '<div class="run-row"><button class="btn" type="button" id="run">Шалгалт одоо ажиллуулах</button><span class="cap">Дэвтэр, е-баримтын тулгалт ба дараалал. Өдөр бүр 23:30-д өөрөө ажилладаг.</span></div>' : ''}
     <section class="section"><h2 class="section-label">Данс бүрээр</h2><div data-accounts></div></section>
   </div>`);
+  /** A ledger account's kind, in the words of the books. */
+  const KIND_ACCOUNT = { guest: 'Зочин', house: 'Basu', payable: 'Өгөх өр', provider: 'Төлбөрийн суваг', external: 'Банк' };
+  /** A label with a long id in it keeps the id's first eight characters; the whole of it is on hover. */
+  const short = (label) => label.replace(/([0-9a-f]{8})-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, '$1…');
   const accounts = dataTable({
     columns: [
       { key: 'name', label: 'Данс', render: (a) => dtCell.twoHtml(esc(a.name), a.sub) },
-      { key: 'kind', label: 'Төрөл', render: (a) => dtCell.mono(a.kind) },
+      { key: 'kind', label: 'Төрөл', value: (a) => KIND_ACCOUNT[a.kind] ?? a.kind },
       { key: 'balance_mnt', label: 'Үлдэгдэл', align: 'end', numeric: true, render: (a) => dtCell.money(a.balance_mnt) },
       { key: 'entries', label: 'Бичилт', align: 'end', numeric: true, render: (a) => (a.entries === null ? dtCell.none() : dtCell.num(a.entries)) },
       { key: 'last_at', label: 'Сүүлд', render: (a) => dtCell.when(a.last_at) },
@@ -2870,7 +3346,7 @@ async function moneyChecks() {
     noun: 'данс',
     rows: [
       { name: 'Зочдын түрийвч', sub: `${m.wallets.count} данс нэг мөрөнд`, kind: 'guest', balance_mnt: m.wallets.balance_mnt, entries: null, last_at: null },
-      ...m.accounts.map((a) => ({ ...a, sub: a.label ? `<span class="mono">${esc(a.label)}</span>` : '' })),
+      ...m.accounts.map((a) => ({ ...a, sub: a.label ? `<span class="mono" title="${esc(a.label)}">${esc(short(a.label))}</span>` : '' })),
     ],
   });
   page.querySelector('[data-accounts]').replaceWith(accounts.el);
@@ -2878,7 +3354,7 @@ async function moneyChecks() {
     e.target.disabled = true;
     try {
       const r = await ops('/v1/ops/money/checks', { method: 'POST', body: {} });
-      toast(`Ledger зөрүү ${r.ledger.drift} · е-баримт дутуу ${r.receipts.gap} · гаргасан ${r.pushed.issued}, амжилтгүй ${r.pushed.failed}`, r.ledger.drift === 0 && r.pushed.failed === 0 ? 'good' : 'bad');
+      toast(`Шалгалт дууслаа: дэвтрийн зөрүү ${r.ledger.drift} · е-баримт дутуу ${r.receipts.gap} · гаргасан ${r.pushed.issued}, амжилтгүй ${r.pushed.failed}`, r.ledger.drift === 0 && r.pushed.failed === 0 ? 'good' : 'bad');
       await drawMoney();
     } catch (error) {
       toast(error.message, 'bad');
@@ -2925,7 +3401,7 @@ async function moneyTransfers() {
         key: 'kind',
         label: 'Төрөл',
         value: (t) => KIND_WORD[t.kind] ?? t.kind,
-        render: (t) => dtCell.pill(t.kind === 'refund' ? 'declined' : t.kind === 'topup' ? 'contracted' : 'PAID', KIND_WORD[t.kind] ?? t.kind),
+        render: (t) => dtCell.pill(t.kind === 'refund' ? 'REFUNDED' : t.kind === 'topup' ? 'contracted' : 'PAID', KIND_WORD[t.kind] ?? t.kind),
       },
       { key: 'route', label: 'Хаанаас → хаашаа', value: (t) => `${t.from.name} ${t.to.name}`, render: (t) => `${esc(t.from.name)} <span class="muted">→</span> ${esc(t.to.name)}` },
       { key: 'memo', label: 'Тайлбар', value: (t) => `${t.memo ?? ''} ${t.id}`, render: (t) => dtCell.twoHtml(esc(t.memo ?? '—'), `<span class="mono">${esc(t.id.slice(0, 8))}</span>`), phone: false },
@@ -3011,7 +3487,7 @@ async function moneyReceipts() {
     },
     actions: (r) => {
       if (r.state !== 'failed' || !canMoney()) return null;
-      const retry = el(`<button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${r.id}">Дахин</button>`);
+      const retry = el(`<button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${r.id}">Дахин илгээх</button>`);
       retry.addEventListener('click', async () => {
         try {
           await ops(`/v1/ops/money/receipts/${r.id}/retry`, { method: 'POST', body: {} });
@@ -3045,8 +3521,8 @@ let notifyView = localStorage.getItem('basu.ops.notify') ?? 'log';
 let msgFilter = { q: '', state: '', channel: '' };
 
 function renderNotify(view) {
-  view.append(head('Мэдэгдэл', 'Зочдод илгээсэн SMS, push бүр. Амжилтгүйг дахин илгээх, сарын зардлыг харах.'));
-  const seg = el(`<div class="seg">${[['log', 'Лог'], ['volume', 'Сарын хэмжээ']].map(([k, l]) => `<button type="button" data-n="${k}"${notifyView === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
+  view.append(head('Мэдэгдэл', 'Зочдод илгээсэн SMS, push. Амжилтгүйг дахин илгээнэ.'));
+  const seg = el(`<div class="seg">${[['log', 'Бүх мэдэгдэл'], ['volume', 'Сараар']].map(([k, l]) => `<button type="button" data-n="${k}"${notifyView === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
   seg.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-n]');
     if (!b) return;
@@ -3114,7 +3590,7 @@ async function notifyLog() {
     },
     actions: (m) => {
       if (m.state !== 'failed' || !can('desk.notify:retry')) return null;
-      const retry = el(`<button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${m.id}">Дахин</button>`);
+      const retry = el(`<button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${m.id}">Дахин илгээх</button>`);
       retry.addEventListener('click', async () => {
         try {
           await ops(`/v1/ops/notify/messages/${m.id}/retry`, { method: 'POST', body: {} });
@@ -3150,7 +3626,7 @@ async function loadMessages(table) {
 
 async function notifyVolume() {
   const v = await ops('/v1/ops/notify/volume');
-  const wrap = el(`<div><div data-volume></div><p class="cap" style="margin-top:12px">Нэгж үнэ: SMS ${mnt(v.unit.sms_mnt)} · push ${mnt(v.unit.push_mnt)}. «Систем» хэсгээс өөрчилнө.</p></div>`);
+  const wrap = el(`<div><div data-volume></div><p class="page-note">Нэгж үнэ: SMS ${mnt(v.unit.sms_mnt)} · push ${mnt(v.unit.push_mnt)}. «Систем» хэсгээс өөрчилнө.</p></div>`);
   const table = dataTable({
     columns: [
       { key: 'month', label: 'Сар', render: (m) => `<b class="mono">${esc(m.month)}</b>` },
@@ -3184,8 +3660,16 @@ const ago = (iso, nowIso) => {
   return `${Math.round(s / 86400)} хоног өмнө`;
 };
 
+/** A setting's value as it reads: tugriks with their sign, days as days, an empty text as a dash. */
+function settingValue(k) {
+  if (String(k.value) === '') return '<span class="muted">—</span>';
+  if (k.kind === 'number' && /_mnt$/.test(k.key)) return `<b>${money(Number(k.value))}</b>`;
+  if (k.kind === 'number' && /_days$/.test(k.key)) return `<b><span class="mono">${esc(String(k.value))}</span> хоног</b>`;
+  return `<b${k.kind === 'number' ? ' class="mono"' : ''}>${esc(String(k.value))}</b>`;
+}
+
 async function renderSystem(view) {
-  view.append(head('Систем', 'Холболтууд, scheduler, өгөгдлийн сан, тохиргоо. Ямар нэг зүйл унавал энд эхлээд харагдана.'));
+  view.append(head('Систем', 'Холболт, хуваарьлагч, өгөгдлийн сан, тохиргоо.'));
   view.append(el('<div id="system"></div>'));
   view.querySelector('#system').append(busy());
   await drawSystem();
@@ -3205,9 +3689,9 @@ async function drawSystem() {
   const sch = s.scheduler;
   const page = el(`<div>
     <div class="kpis kpi-band" id="integrations">
-      <div class="card kpi" data-word data-tone="${sch.ok ? 'good' : 'bad'}"><div class="lab">Scheduler</div><b>${sch.ok ? 'ажиллаж байна' : 'зогссон'}</b><span>сүүлийн тойрог ${ago(sch.last_at, s.now)}${sch.last_took_ms !== null ? ` · ${sch.last_took_ms} мс` : ''} · цагт ${sch.ticks_last_hour}${s.mode === 'demo' ? ' · demo: тойрог гараар' : ''}</span></div>
+      <div class="card kpi" data-word data-tone="${sch.ok ? 'good' : 'bad'}"><div class="lab">Scheduler</div><b>${sch.ok ? 'ажиллаж байна' : 'зогссон'}</b><span>сүүлийн тойрог ${ago(sch.last_at, s.now)}${sch.last_took_ms !== null ? ` · ${sch.last_took_ms} мс` : ''} · сүүлийн цагт ${sch.ticks_last_hour} удаа${s.mode === 'demo' ? ' · туршилтын орчинд гараар' : ''}</span></div>
       ${s.integrations.map((i) => `<div class="card kpi" data-word${i.flavour === 'fake' ? '' : i.ok ? ' data-tone="good"' : ' data-tone="bad"'} data-integration="${esc(i.key)}"><div class="lab">${esc(i.name)}</div><b>${i.flavour === 'fake' ? 'туршилтын' : i.ok ? 'хэвийн' : 'алдаатай'}</b><span>${i.detail.last_ok_at !== undefined ? `сүүлд ${ago(i.detail.last_ok_at, s.now)} · ` : ''}${Object.entries(i.detail).filter(([k]) => k !== 'last_ok_at').map(([k, v]) => `${{ pending: 'хүлээгдэж', stuck: 'гацсан', gap_mnt: 'зөрүү', queued: 'дараалалд', issued: 'гарсан', failed: 'амжилтгүй', sent_day: '24ц илгээсэн', failed_day: '24ц амжилтгүй' }[k] ?? esc(k)} ${k === 'gap_mnt' ? mnt(v) : esc(v)}`).join(' · ')}</span></div>`).join('')}
-      <div class="card kpi"><div class="lab">Өгөгдлийн сан</div><b>${esc(s.database.size)}</b><span>${s.database.migrations} migration · сүүлийнх ${esc(s.database.last_migration ?? '—')}</span></div>
+      <div class="card kpi"><div class="lab">Өгөгдлийн сан</div><b>${esc(s.database.size)}</b><span title="${esc(s.database.last_migration ?? '')}">${s.database.migrations} өөрчлөлт · сүүлийнх №${esc((s.database.last_migration ?? '—').split('_')[0])}</span></div>
     </div>
     <div class="pair-cols">
       <section class="section"><h2 class="section-label">Сүүлийн 24 цаг</h2><div class="card"><div class="table-wrap"><table class="table"><tbody>
@@ -3217,21 +3701,25 @@ async function drawSystem() {
         <tr><td>Мэдэгдэл илгээсэн</td><td class="num">${sch.day.notified}</td></tr>
         <tr><td>Е-баримт гаргасан</td><td class="num">${sch.day.receipts}</td></tr>
       </tbody></table></div></div>
-      <h2 class="section-label">Процесс</h2><div class="card"><div class="table-wrap"><table class="table"><tbody>
-        <tr><td>Горим</td><td class="num"><span class="pill" data-s="${s.mode === 'production' ? 'contracted' : 'PAID'}">${s.mode === 'production' ? 'production' : 'demo'}</span></td></tr>
+      <h2 class="section-label">Сервер</h2><div class="card"><div class="table-wrap"><table class="table"><tbody>
+        <tr><td>Орчин</td><td class="num"><span class="pill" data-s="${s.mode === 'production' ? 'contracted' : 'PAID'}">${s.mode === 'production' ? 'Бодит' : 'Туршилтын'}</span></td></tr>
         <tr><td>Хувилбар</td><td class="num">${esc(s.version)} · node ${esc(s.node)}</td></tr>
         <tr><td>Асаасан</td><td class="num">${when(s.started_at)} ${clockOf(s.started_at)}</td></tr>
-        <tr><td>Идэшний дүрэм</td><td class="end">шимтгэл ${s.rules.commission_pct}% · суутгал ${s.rules.forfeit_pct}% · ирээгүй ${s.rules.no_show_days} хоног</td></tr>
+      </tbody></table></div></div>
+      <h2 class="section-label">Идэшний дүрэм</h2><div class="card"><div class="table-wrap"><table class="table"><tbody>
+        <tr><td>Шимтгэл<span class="sub">хүлээлгэн өгсөн захиалгын махны үнээс</span></td><td class="num">${s.rules.commission_pct}%</td></tr>
+        <tr><td>Суутгал<span class="sub">мал нядалсны дараа зочны буруугаас цуцлахад</span></td><td class="num">${s.rules.forfeit_pct}%</td></tr>
+        <tr><td>Ирээгүй зочин<span class="sub">мах бэлэн болсноос хойш</span></td><td class="num">${s.rules.no_show_days} хоног</td></tr>
       </tbody></table></div></div></section>
       <section class="section"><h2 class="section-label">Тохиргоо</h2><div class="card" data-rows id="settings">${s.settings
         .map(
           (k) => `
         <div class="row" data-key="${esc(k.key)}">
           <div class="main"><span class="title">${esc(k.label)}</span><span class="sub">${esc(k.hint)}${k.updated_by ? ` · ${esc(k.updated_by.replace('ops:', ''))}, ${when(k.updated_at)}` : ''}</span></div>
-          <div class="end setting-value">${String(k.value) === '' ? '<span class="muted">—</span>' : `<b${k.kind === 'number' ? ' class="mono"' : ''}>${esc(String(k.value))}</b>`}</div>
+          <div class="end setting-value">${settingValue(k)}</div>
         </div>`,
         )
-        .join('')}</div>${can('desk.system:manage') ? '' : '<p class="cap" style="margin-top:10px">Тохиргоог зөвхөн админ өөрчилнө.</p>'}</section>
+        .join('')}</div>${can('desk.system:manage') ? '' : '<p class="page-note">Тохиргоог зөвхөн админ өөрчилнө.</p>'}</section>
     </div>
   </div>`);
   if (can('desk.system:manage')) {
@@ -3273,7 +3761,7 @@ async function drawSystem() {
 /* ── the numbers ── */
 
 async function renderStats(view) {
-  view.append(head('Тоон үзүүлэлт', 'Захиалга, борлуулалт, шимтгэл, буцаалт — өнөөдөр, долоо хоног, улирал.'));
+  view.append(head('Тоон үзүүлэлт', 'Идэшний захиалга, борлуулалт, шимтгэл, буцаалт.'));
   view.append(busy());
   let st;
   try {
@@ -3300,12 +3788,17 @@ async function renderStats(view) {
   draw();
   const perSupplier = dataTable({
     columns: [
-      { key: 'name', label: 'Нийлүүлэгч', render: (r) => `<b>${esc(r.name)}</b>${r.active ? '' : ` ${dtCell.pill('off', 'түр зогссон')}`}` },
+      { key: 'name', label: 'Нийлүүлэгч', width: '24%', render: (r) => `<b>${esc(r.name)}</b>${r.active ? '' : ` ${dtCell.pill('off', 'түр зогссон')}`}` },
       { key: 'paid', label: 'Төлсөн', align: 'end', numeric: true, render: (r) => dtCell.num(r.paid) },
       { key: 'handed', label: 'Өгсөн', align: 'end', numeric: true, render: (r) => dtCell.num(r.handed) },
-      { key: 'cancelled', label: 'Цуцалсан', align: 'end', numeric: true, render: (r) => dtCell.num(r.cancelled) },
-      { key: 'supplier_fault', label: 'Өөрийн буруу', align: 'end', numeric: true, render: (r) => dtCell.num(r.supplier_fault), phone: false },
-      { key: 'no_shows', label: 'Ирээгүй зочин', align: 'end', numeric: true, render: (r) => dtCell.num(r.no_shows), phone: false },
+      // Cancelled, and under it why: the supplier's own fault, guests who never came.
+      {
+        key: 'cancelled',
+        label: 'Цуцалсан',
+        align: 'end',
+        numeric: true,
+        render: (r) => dtCell.twoHtml(dtCell.num(r.cancelled), r.cancelled ? `өөрийн буруу ${r.supplier_fault}${r.no_shows ? ` · ирээгүй ${r.no_shows}` : ''}` : ''),
+      },
       { key: 'ready_hours', label: 'Бэлэн болтол, цаг', align: 'end', numeric: true, render: (r) => dtCell.num(r.ready_hours), phone: false },
       { key: 'sales_mnt', label: 'Борлуулалт', align: 'end', numeric: true, render: (r) => dtCell.money(r.sales_mnt) },
       { key: 'commission_mnt', label: 'Шимтгэл', align: 'end', numeric: true, render: (r) => dtCell.money(r.commission_mnt) },
@@ -3343,7 +3836,7 @@ let orderFilter = { scope: 'live', supplier: '', day: '', q: '' };
 
 function renderOrders(view) {
   const suppliers = cache.suppliers.filter((s) => s.state === 'contracted');
-  view.append(head('Захиалгууд', 'Бүх нийлүүлэгчийн захиалга нэг хүснэгтэд. Мөр дээр дарж мөнгө, явц, үйлдлийг нь үзнэ.'));
+  view.append(head('Захиалгууд', 'Бүх нийлүүлэгчийн идэшний захиалга нэг дор.'));
   const day = el(`<input class="input dt-date" type="date" id="day" value="${esc(orderFilter.day)}" title="Авах, хүргэх өдөр" aria-label="Авах, хүргэх өдөр">`);
   const table = dataTable({
     columns: [
@@ -3413,65 +3906,73 @@ async function loadOrders(table) {
 }
 
 /** One order, its money, its story — and the three things ops may do to it. */
-async function openOrder(id) {
+async function openOrder(id, from = { label: 'Захиалгууд', go: () => show('orders') }) {
   const view = document.getElementById('view');
+  const wanted = opening(view, from);
   let d;
   try {
     d = await ops(`/v1/ops/orders/${id}`);
   } catch (error) {
     toast(error.message, 'bad');
+    if (wanted()) from.go();
     return;
   }
+  if (!wanted()) return;
   const o = d.order;
   const live = ['PAID', 'PREPARING', 'READY', 'DISPATCHED'].includes(o.state);
+  const manage = can('desk.orders:manage');
   view.replaceChildren();
-  const back = el(`<button class="back link" type="button" id="back">${CHEV}Захиалгууд</button>`);
-  back.addEventListener('click', () => show('orders'));
-  view.append(back);
+  backTo(view, from);
   view.append(head(`№${esc(o.code)} <span class="pill" data-s="${esc(o.state)}">${esc(STATE_WORD[o.state] ?? o.state)}</span>`, `${esc(o.title)} ×${esc(o.qty)}${o.unit === 'kg' ? ' кг' : ''} · ${esc(o.supplier.name)}`));
+  const here = { label: `№${o.code}`, go: () => openOrder(id, from) };
+  // Who bought it: the story's first line is the guest's own, by their account.
+  const guestId = d.events.map((e) => /^guest:([0-9a-f-]{36})$/.exec(e.actor ?? '')?.[1]).find(Boolean) ?? null;
+  const acts = live && manage
+    ? `<h2 class="section-label">Үйлдэл</h2><div class="card" id="acts">
+        <div class="card-body acts">
+          ${['READY', 'DISPATCHED'].includes(o.state) ? '<button class="btn" data-v="primary" type="button" data-a="hand">Хүлээлгэн өгсөн гэж тэмдэглэх</button><div class="hint">Нийлүүлэгч тэмдэглэж амжаагүй бол.</div>' : ''}
+          <button class="btn" type="button" data-a="resend">Мэдэгдэл дахин илгээх</button>
+          <div class="sep"></div>
+          <button class="btn" data-v="danger" type="button" data-a="cancel">Нийлүүлэгчийн өмнөөс цуцлах</button>
+          <div class="hint">Хэдийг буцаахыг шалтгаан ба дүрэм тогтооно; хүн сонгохгүй.</div>
+        </div>
+      </div>`
+    : `<h2 class="section-label">Үйлдэл</h2><p class="rail-note" id="acts">${live ? 'Захиалгад үйлдэл хийх нь ops, админы ажил.' : 'Дууссан захиалга — хийх үйлдэл алга.'}</p>`;
   const page = el(`
     <div class="detail">
-      <div>
-        <div class="card">
-          <div class="facts">
-            <div><div class="lab">Зочин</div><b>${esc(o.guest ?? 'зочин')}</b><br>${o.guest_phone ? tel(o.guest_phone) : ''}</div>
-            <div><div class="lab">${o.receive === 'delivery' ? 'Хүргэх' : 'Өөрөө авах'}</div><b>${dayLabel(o.receive_on)}</b><br>${o.receive === 'delivery' ? `${esc(o.address)} · <span class="mono">${esc(o.address_phone)}</span>` : 'нийлүүлэгчийн авах цэгээс'}</div>
-            <div><div class="lab">Нийт төлсөн</div><b>${money(o.total_mnt)}</b><br>${o.delivery_fee_mnt ? `хүргэлт ${mnt(o.delivery_fee_mnt)} орсон` : 'хүргэлтгүй'}</div>
-            <div><div class="lab">Нийлүүлэгчид</div><b>${money(o.payout_mnt)}</b><br>шимтгэл хассан</div>
-            ${o.cancel_reason ? `<div><div class="lab">Цуцлалт</div><b>${esc(REASON[o.cancel_reason] ?? o.cancel_reason)}</b><br>буцаалт ${mnt(o.refund_mnt ?? 0)}${o.forfeit_mnt ? ` · суутгал ${mnt(o.forfeit_mnt)}` : ''}</div>` : ''}
-          </div>
-        </div>
+      <div class="card detail-facts"><div class="facts">
+        <div><span class="lab">Зочин</span><b>${esc(o.guest ?? 'зочин')}</b><span class="fact-sub">${o.guest_phone ? tel(o.guest_phone) : ''}</span></div>
+        <div><span class="lab">${o.receive === 'delivery' ? 'Хүргэлтээр' : 'Өөрөө очиж авна'}</span><b class="nowrap">${dayLabel(o.receive_on)}</b><span class="fact-sub">${o.receive === 'delivery' ? `${esc(o.address)} · <span class="mono">${esc(o.address_phone)}</span>` : 'нийлүүлэгчийн авах цэгээс'}</span></div>
+        <div><span class="lab">Зочин төлсөн</span><b>${money(o.total_mnt)}</b><span class="fact-sub">${o.delivery_fee_mnt ? `хүргэлт ${mnt(o.delivery_fee_mnt)} орсон` : 'хүргэлтгүй'}</span></div>
+        <div><span class="lab">Нийлүүлэгчид очих</span><b>${money(o.payout_mnt)}</b><span class="fact-sub">шимтгэл хассан</span></div>
+        ${o.cancel_reason ? `<div><span class="lab">Цуцлалт</span><b>${esc(REASON[o.cancel_reason] ?? o.cancel_reason)}</b><span class="fact-sub">буцаалт ${mnt(o.refund_mnt ?? 0)}${o.forfeit_mnt ? ` · суутгал ${mnt(o.forfeit_mnt)}` : ''}</span></div>` : ''}
+      </div></div>
+      <aside class="detail-rail">${acts}</aside>
+      <div class="detail-main">
         <section class="section"><h2 class="section-label">Мөнгө</h2><div id="money"></div></section>
         <section class="section"><h2 class="section-label">Явц</h2><div class="card card-body"><ol class="story stepper" data-stepper>${d.events
           .map((e) => step(e.type, EVENT_WORD[e.type] ?? e.type, `${actorWord(e.actor)}${e.payload?.reason ? ` · ${REASON[e.payload.reason] ?? e.payload.reason}` : ''}${e.payload?.state ? ` · ${STATE_WORD[e.payload.state] ?? ''}` : ''}`, e.at))
           .join('')}</ol></div></section>
       </div>
-      <div class="card" id="acts">
-        <div class="card-head"><h3>Ops-ийн үйлдэл</h3></div>
-        <div class="card-body acts">
-          ${live && !can('desk.orders:manage') ? '<div class="hint">Үйлдлийг ops, админ хийнэ.</div>' : live ? `
-          ${['READY', 'DISPATCHED'].includes(o.state) ? '<button class="btn" data-v="primary" type="button" data-a="hand">Хүлээлгэн өгсөн гэж тэмдэглэх</button>' : ''}
-          <button class="btn" type="button" data-a="resend">Мэдэгдэл дахин илгээх</button>
-          <div class="sep"></div>
-          <button class="btn" data-v="danger" type="button" data-a="cancel">Нийлүүлэгчийн өмнөөс цуцлах</button>
-          <div class="hint">Буцаалтын дүнг шалтгаан ба дүрэм тогтооно; хүн сонгохгүй.</div>
-          ` : '<div class="hint">Дууссан захиалгад үйлдэл алга.</div>'}
-        </div>
-      </div>
     </div>`);
   const moneyBox = page.querySelector('#money');
   if (d.settlements.length) moneyBox.append(settlementTable(d.settlements, false).el);
-  else moneyBox.append(el('<div class="card empty">Тооцоо үүсээгүй — хүлээлгэн өгснөөс хойш нэг хоногт үүснэ.</div>'));
-  const acts = page.querySelector('#acts');
+  else moneyBox.append(el(`<div class="card empty">${o.state === 'CANCELLED' || o.state === 'REFUNDED' ? 'Буцаалт үүсээгүй байна.' : 'Олголт хүлээлгэн өгснөөс хойш нэг хоногийн дараа үүснэ.'}</div>`));
+  const links = related([
+    guestId && hasPage('guests') ? { label: o.guest ?? 'Зочин', sub: 'Зочны хуудас: түрийвч, захиалгууд', go: () => openGuest(guestId, here) } : null,
+    hasPage('suppliers') && cache.suppliers.some((s) => s.id === o.supplier.id) ? { label: o.supplier.name, sub: 'Нийлүүлэгчийн хуудас: гэрээ, данс, зар', go: () => openSupplier(o.supplier.id, here) } : null,
+  ]);
+  if (links) page.querySelector('.detail-rail').append(links);
+  const acted = page.querySelector('#acts');
   const done = async () => {
     await refresh();
-    await openOrder(id);
+    await openOrder(id, from);
   };
   const ASK = {
-    hand: { title: 'Хүлээлгэн өгсөн', text: `№${esc(o.code)}-г зочинд хүлээлгэн өгсөн гэж тэмдэглэнэ. Нийлүүлэгчийн олголт нэг хоногийн дараа үүснэ.`, ok: 'Тэмдэглэх' },
+    hand: { title: 'Хүлээлгэн өгсөн гэж тэмдэглэх', text: `№${esc(o.code)}-г зочинд хүлээлгэн өгсөн гэж тэмдэглэнэ. Нийлүүлэгчийн олголт нэг хоногийн дараа үүснэ.`, ok: 'Тэмдэглэх' },
     resend: { title: 'Мэдэгдэл дахин илгээх', text: `№${esc(o.code)}-ийн сүүлийн мэдэгдлийг зочинд дахин илгээнэ.`, ok: 'Илгээх' },
   };
-  acts.addEventListener('click', (e) => {
+  acted.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-a]');
     if (!b) return;
     const action = b.dataset.a;
@@ -3483,7 +3984,10 @@ async function openOrder(id) {
         danger: true,
         submit: 'Цуцлах',
         fields: [
-          { type: 'note', text: 'Буцаалтын дүнг сонгосон шалтгаан ба дүрэм тогтооно; хүн сонгохгүй.' },
+          {
+            type: 'note',
+            html: 'Буцаалтыг шалтгаан ба дүрэм тогтооно: нийлүүлэгчийн буруу эсвэл мал нядлахаас өмнө бол <b>бүтнээрээ</b>; мал нядалсны дараа зочны буруугаас бол <b>суутгалтай</b>.',
+          },
           { name: 'reason', label: 'Шалтгаан', type: 'select', required: true, wide: true, options: [['', 'Сонгох…'], ...Object.entries(REASON).filter(([k]) => k !== 'draft_expired')] },
           { name: 'note', label: 'Тэмдэглэл', type: 'textarea', placeholder: 'Бүртгэлд үлдэнэ' },
         ],
@@ -3546,20 +4050,21 @@ const declineSupplier = (s, done) =>
 const registerSupplier = () =>
   popup({
     title: 'Нийлүүлэгч бүртгэх',
-    sub: 'Гэрээ байгуулсан нийлүүлэгч. Эзэмшигч нь Basu-д бүртгэлтэй байх ёстой — бүртгэмэгц өөрийн бүртгэлээр /supplier-д орно.',
+    sub: 'Гэрээ байгуулсан нийлүүлэгчийг шууд бүртгэнэ. Эзэмшигч нь Basu-д өмнө нь нэвтэрсэн байх ёстой — бүртгэмэгц өөрийн бүртгэлээр /supplier-д орно.',
     width: 640,
     id: 'new-supplier',
     fields: [
-      { name: 'name', label: 'Нэр', placeholder: 'Хэнтий · «Хэрлэн» хоршоо', required: true, wide: true },
-      { name: 'phone', label: 'Утас', type: 'tel', placeholder: '+976XXXXXXXX', required: true },
-      { name: 'owner', label: 'Эзэмшигчийн Basu бүртгэл', inputmode: 'email', placeholder: 'Утас эсвэл имэйл', hint: 'Хоосон бол дээрх утас.' },
-      { name: 'address', label: 'Мах авах цэг', placeholder: 'Дүүрэг, зах, хаалга', required: true, wide: true },
-      { name: 'lat', label: 'Өргөрөг', inputmode: 'decimal', placeholder: '47.9…' },
+      { name: 'name', label: 'Нэр', placeholder: 'Хэнтий · «Хэрлэн» хоршоо', required: true, wide: true, hint: 'Зочдод харагдах нэр: аймаг, газар, айл эсвэл газрын нэр.' },
+      { name: 'phone', label: 'Утас', type: 'tel', inputmode: 'tel', placeholder: '+976 9911 2233', required: true, hint: 'Зочид, Basu энэ дугаар руу залгана.' },
+      { name: 'owner', label: 'Эзэмшигчийн Basu бүртгэл', inputmode: 'email', placeholder: 'Утас эсвэл имэйл', hint: 'Хоосон бол дээрх утсаар хайна.' },
+      { name: 'address', label: 'Мах авах цэг', placeholder: 'Дүүрэг, зах, хаалга', required: true, wide: true, hint: 'Зочин «өөрөө очиж авах» үед ирэх газар.' },
+      { name: 'lat', label: 'Өргөрөг', inputmode: 'decimal', placeholder: '47.9…', hint: 'Газрын зураг дээрх цэг. Заавал биш.' },
       { name: 'lon', label: 'Уртраг', inputmode: 'decimal', placeholder: '106.9…' },
-      { name: 'tin', label: 'ТТД', inputmode: 'numeric', placeholder: '7–10 орон' },
+      { name: 'tin', label: 'ТТД', inputmode: 'numeric', placeholder: '7–10 орон', hint: 'Е-баримт энэ ТТД-аар гарна.' },
+      { type: 'note', html: '<b>Олголт очих данс</b> — гэрээнд байгаа данс. Basu баталгаажуулсны дараа олголт энэ данс руу явна.' },
       { name: 'bank_name', label: 'Банк', placeholder: 'Хаан банк' },
       { name: 'bank_account', label: 'Данс', inputmode: 'numeric', placeholder: '5012345678' },
-      { name: 'bank_holder', label: 'Данс эзэмшигч', placeholder: 'Гэрээний нэр' },
+      { name: 'bank_holder', label: 'Данс эзэмшигч', placeholder: 'Гэрээн дээрх нэр', wide: true },
     ],
     submit: 'Бүртгэх',
     onSubmit: async (v) => {
@@ -3583,7 +4088,7 @@ function renderSuppliers(view) {
   const runs = can('desk.suppliers:manage');
   view.append(
     headActs(
-      head('Нийлүүлэгчид', 'Гэрээт нийлүүлэгчид ба ирсэн хүсэлтүүд. Мөр дээр дарж нөхцөл, данс, зарыг нь үзнэ.'),
+      head('Нийлүүлэгчид', 'Гэрээт нийлүүлэгчид, ирсэн хүсэлтүүд.'),
       runs && button(`${NAV_ICON.plus}Нийлүүлэгч бүртгэх`, registerSupplier, 'data-v="primary" id="add-supplier"'),
     ),
   );
@@ -3612,7 +4117,7 @@ function renderSuppliers(view) {
       rows: applied,
     });
     asked.el.id = 'applied';
-    const section = el(`<section class="section"><h2 class="section-label">Хариу хүлээж буй хүсэлт · ${applied.length}</h2></section>`);
+    const section = el(`<section class="section"><h2 class="section-label">Хариу хүлээж буй хүсэлт<span class="n">${applied.length}</span></h2><p class="section-note">Батлахад хүсэлт гаргасан хүн эзэн нь болж, зараа тавьж эхэлнэ. Татгалзвал шалтгааныг нь хүсэлт гаргагч харж, засаад дахин хүсэж болно.</p></section>`);
     section.append(asked.el);
     view.append(section);
   }
@@ -3661,8 +4166,11 @@ function renderSuppliers(view) {
   view.append(section);
 }
 
-/** One supplier, whole: who, the contract's terms, the money's account, the listings — and what ops may do, each in a popup. */
-async function openSupplier(id) {
+/**
+ * One supplier, whole: who, the contract's terms, the money's account, the
+ * listings, its orders and payouts — and what ops may do, each in a popup.
+ */
+async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: () => show('suppliers') }) {
   const view = document.getElementById('view');
   const s = cache.suppliers.find((x) => x.id === id);
   if (!s) return show('suppliers');
@@ -3675,11 +4183,11 @@ async function openSupplier(id) {
     } catch (error) {
       toast(error.message, 'bad');
     }
-    await openSupplier(id);
+    await openSupplier(id, from);
   };
+  const here = { label: s.name, go: () => openSupplier(id, from) };
   view.replaceChildren();
-  const back = el(`<button class="back link" type="button" id="back">${CHEV}Нийлүүлэгчид</button>`);
-  back.addEventListener('click', () => show('suppliers'));
+  window.scrollTo(0, 0);
   const [tone, word] = supplierState(s);
   const h = head(`${esc(s.name)} ${dtCell.pill(tone, word)}`, `${tel(s.phone)} · ${esc(s.pickup_address)}`);
 
@@ -3709,17 +4217,16 @@ async function openSupplier(id) {
       ),
     );
   }
-  view.append(back, h);
+  backTo(view, from);
+  view.append(h);
 
   const terms = el(`
     <section class="section"><h2 class="section-label">Гэрээ, данс</h2>
       <div class="card"><div class="facts">
-        <div><span class="lab">Шимтгэл</span><b>${s.state === 'declined' ? '—' : `${s.commission_pct}%`}</b></div>
-        <div><span class="lab">ТТД</span><b class="mono">${esc(s.merchant_tin ?? '—')}</b></div>
-        <div><span class="lab">Банк</span><b>${esc(s.bank_name ?? '—')}</b></div>
-        <div><span class="lab">Данс</span><b class="mono">${esc(s.bank_account ?? '—')}</b>${s.bank_account ? (s.bank_verified ? ' <span class="pill" data-s="verified">баталгаажсан</span>' : ' <span class="pill" data-s="warn">баталгаажаагүй</span>') : ''}</div>
-        <div><span class="lab">Данс эзэмшигч</span><b>${esc(s.bank_holder ?? '—')}</b></div>
-        <div><span class="lab">${s.state === 'applied' ? 'Хүсэлт' : s.state === 'declined' ? 'Татгалзсан' : 'Гэрээ'}</span><b>${when(s.state === 'applied' ? s.applied_at : s.state === 'declined' ? s.decided_at : s.contracted_at)}</b>${s.state === 'declined' && s.decline_reason ? `<br><small class="muted">${esc(s.decline_reason)}</small>` : ''}</div>
+        <div><span class="lab">${s.state === 'applied' ? 'Хүсэлт ирсэн' : s.state === 'declined' ? 'Татгалзсан' : 'Гэрээ'}</span><b class="nowrap">${when(s.state === 'applied' ? s.applied_at : s.state === 'declined' ? s.decided_at : s.contracted_at)}</b>${s.state === 'declined' && s.decline_reason ? `<span class="fact-sub">${esc(s.decline_reason)}</span>` : ''}</div>
+        <div><span class="lab">Шимтгэл</span><b>${s.state === 'declined' ? '—' : `${s.commission_pct}%`}</b><span class="fact-sub">хүлээлгэн өгсөн захиалгаас</span></div>
+        <div><span class="lab">ТТД</span><b class="mono">${s.merchant_tin ? esc(s.merchant_tin) : '—'}</b><span class="fact-sub">${s.merchant_tin ? 'е-баримт гарна' : '<span class="ink-stop">е-баримт гарахгүй</span>'}</span></div>
+        <div><span class="lab">Олголт очих данс</span><b>${s.bank_account ? `${esc(s.bank_name ?? '')} <span class="mono">${esc(s.bank_account)}</span>` : '—'}</b><span class="fact-sub">${s.bank_account ? `${esc(s.bank_holder ?? '')} ${s.bank_verified ? dtCell.pill('verified', 'баталгаажсан') : dtCell.pill('warn', 'баталгаажаагүй')}` : 'данс оруулаагүй'}</span></div>
       </div></div>
     </section>`);
   const label = terms.querySelector('.section-label');
@@ -3776,6 +4283,22 @@ async function openSupplier(id) {
   if (tools.childElementCount) label.append(tools);
   view.append(terms);
   if (s.about) view.append(el(`<section class="section"><h2 class="section-label">Тухай</h2><div class="card"><div class="card-body">${esc(s.about)}</div></div></section>`));
+  // The business this supplier is the idesh side of: its people and their roles are kept there.
+  if (s.org_id && hasPage('orgs')) {
+    const link = el(`
+      <section class="section"><h2 class="section-label">Холбоотой</h2>
+        <div class="card" data-rows>
+          <a class="row" href="#desk/orgs" data-chev data-go-org>
+            <span class="main"><span class="title">Байгууллагын хуудас</span><span class="sub">Хүмүүс, тэдний үүрэг, бүртгэлийн мэдээлэл</span></span>
+          </a>
+        </div>
+      </section>`);
+    link.querySelector('a').addEventListener('click', (e) => {
+      e.preventDefault();
+      void openOrgAccess(s.org_id, { label: s.name, go: () => openSupplier(id, from) });
+    });
+    view.append(link);
+  }
 
   if (s.state === 'contracted') {
     const listings = dataTable({
@@ -3816,11 +4339,52 @@ async function openSupplier(id) {
     const section = el('<section class="section"><h2 class="section-label">Зарууд</h2></section>');
     section.append(listings.el);
     view.append(section);
+
+    // What it sold: its orders, newest first, each opening its file — the same list the orders page asks for, for this supplier.
+    let orders = null;
+    if (hasPage('orders')) {
+      orders = dataTable({
+        columns: [
+          { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(`<span class="mono">№${esc(o.code)}</span>`, esc(`${o.title} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}`)) },
+          { key: 'guest', label: 'Зочин', value: (o) => `${o.guest ?? ''} ${o.guest_phone ?? ''}`, render: (o) => dtCell.twoHtml(esc(o.guest ?? 'зочин'), o.guest_phone ? `<span class="mono">${esc(o.guest_phone)}</span>` : '') },
+          { key: 'receive_on', label: 'Өдөр', render: (o) => dtCell.twoHtml(`<span class="mono nowrap">${dayLabel(o.receive_on)}</span>`, o.receive === 'delivery' ? 'хүргэлт' : 'өөрөө авна'), phone: false },
+          { key: 'state', label: 'Төлөв', value: (o) => STATE_WORD[o.state] ?? o.state, render: (o) => dtCell.pill(o.state, STATE_WORD[o.state] ?? o.state) },
+          { key: 'total_mnt', label: 'Дүн', align: 'end', numeric: true, render: (o) => dtCell.money(o.total_mnt) },
+        ],
+        search: false,
+        sort: { key: 'receive_on', desc: true },
+        onRow: (o) => openOrder(o.id, here),
+        rowAttrs: (o) => ({ 'data-order': o.id }),
+        noun: 'захиалга',
+        empty: { title: 'Захиалга алга', text: 'Энэ нийлүүлэгчээс одоогоор захиалга ирээгүй.' },
+      });
+      orders.el.id = 'supplier-orders';
+      const box = el('<section class="section"><h2 class="section-label">Захиалгууд</h2></section>');
+      box.append(orders.el);
+      view.append(box);
+    }
+
+    // What Basu owes it: the payouts the desk already holds, when there are any.
+    const payouts = hasPage('pay') ? cache.settlements.filter((t) => t.kind === 'payout' && t.supplier?.id === s.id) : [];
+    if (payouts.length) {
+      const box = el('<section class="section"><h2 class="section-label">Олголт</h2></section>');
+      box.append(settlementTable(payouts, false).el);
+      view.append(box);
+    }
+
     try {
       listings.setRows((await ops(`/v1/ops/suppliers/${s.id}/listings`)).listings);
     } catch (error) {
       toast(error.message, 'bad');
       listings.setRows([]);
+    }
+    if (orders) {
+      try {
+        orders.setRows((await ops(`/v1/ops/orders?${new URLSearchParams({ scope: 'all', supplier: s.id, q: '' })}`)).orders);
+      } catch (error) {
+        toast(error.message, 'bad');
+        orders.setRows([]);
+      }
     }
   }
 }
@@ -3844,7 +4408,7 @@ const settlementState = (t) =>
  * where it stands — and on a row that is due, the one half of the two-person
  * release this member may press. The whole list on «Олголт», one order's on its page.
  */
-function settlementTable(rows, withFilters = true) {
+function settlementTable(rows, withFilters = true, opensOn = 'open') {
   return dataTable({
     columns: [
       {
@@ -3884,6 +4448,7 @@ function settlementTable(rows, withFilters = true) {
         key: 'state',
         label: 'Төлөв',
         options: [['open', 'Хийх'], ['needs_account', 'Данс хүлээж буй'], ['paid', 'Шилжүүлсэн'], ['all', 'Бүгд']],
+        initial: opensOn,
         test: (t, v) => v === 'all' || (v === 'open' ? t.state === 'due' : t.state === v),
       },
       {
@@ -3950,7 +4515,7 @@ const PROMO_STANDING = {
   live: ['active', 'Идэвхтэй'],
   pending: ['pending', 'Төлбөр хүлээж буй'],
   over: ['CLOSED', 'Дууссан'],
-  ended: ['declined', 'Зогсоосон'],
+  ended: ['off', 'Зогсоосон'],
   cancelled: ['CANCELLED', 'Төлөгдөөгүй'],
 };
 
@@ -3962,11 +4527,10 @@ const PROMO_STANDING = {
 async function renderPromotions(view) {
   const manages = can('desk.promotions:manage');
   view.append(
-    head('Онцлох зар', 'Нийлүүлэгчийн Basu-д төлж онцолсон зарууд. Үнэ, хоногийг «Систем» хуудасны тохиргооноос өөрчилнө.'),
+    head('Онцлох зар', 'Нийлүүлэгчийн төлж онцолсон зарууд. Үнэ, хоногийг «Систем»-ээс тохируулна.'),
   );
-  const band = el('<div class="kpis kpi-band" id="promo-kpis"></div>');
-  view.append(el('<section class="section"></section>'));
-  view.lastElementChild.append(band);
+  const band = el('<div class="kpis kpi-band band-gap" id="promo-kpis"></div>');
+  view.append(band);
   const table = dataTable({
     columns: [
       { key: 'created_at', label: 'Хэзээ', render: (p) => dtCell.when(p.created_at) },
@@ -3975,7 +4539,7 @@ async function renderPromotions(view) {
         key: 'tier',
         label: 'Зэрэглэл',
         value: (p) => p.name,
-        render: (p) => dtCell.twoHtml(`<span class="pill" data-tone="${p.tier === 'vip' ? 'hi' : 'accent'}" data-strong>${p.tier === 'vip' ? '★ VIP' : 'Онцгой'}</span>`, `${p.days} хоног`),
+        render: (p) => dtCell.twoHtml(`<span class="pill" data-tone="${p.tier === 'vip' ? 'hi' : 'accent'}" data-strong>${p.tier === 'vip' ? 'VIP' : 'Онцгой'}</span>`, `${p.days} хоног`),
       },
       { key: 'price_mnt', label: 'Үнэ', render: (p) => dtCell.money(p.price_mnt) },
       { key: 'buyer', label: 'Төлсөн', value: (p) => `${p.buyer ?? ''} ${p.buyer_contact ?? ''}`, render: (p) => dtCell.two(p.buyer ?? 'Нэргүй', p.buyer_contact ?? '') },
@@ -4034,9 +4598,9 @@ async function renderPromotions(view) {
   try {
     const { summary, promotions } = await ops('/v1/ops/promotions');
     band.replaceChildren(
-      el(`<div class="card kpi"><div class="lab">Одоо онцлогдсон</div><b>${summary.live}</b><span>үүнээс VIP ${summary.live_vip}</span></div>`),
-      el(`<div class="card kpi"><div class="lab">Сүүлийн 30 хоногийн орлого</div><b>${money(summary.revenue_30d_mnt)}</b><span>онцлох зарын төлбөр</span></div>`),
-      el(`<div class="card kpi"${summary.pending ? ' data-tone="warn"' : ''}><div class="lab">Төлбөр хүлээж буй</div><b>${summary.pending}</b><span>нэхэмжлэх гарсан, төлөгдөөгүй</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Одоо онцлогдсон</div><b>${summary.live}</b><span>${summary.live ? `үүнээс VIP ${summary.live_vip}` : 'онцлогдсон зар алга'}</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Орлого, 30 хоног</div><b>${money(summary.revenue_30d_mnt)}</b><span>онцлох зарын төлбөр</span></div>`),
+      el(`<div class="card kpi"${summary.pending ? ' data-tone="warn"' : ''}><div class="lab">Төлбөр хүлээж буй</div><b>${summary.pending}</b><span>${summary.pending ? 'нэхэмжлэх гарсан, төлөгдөөгүй' : 'төлөгдөөгүй нэхэмжлэх алга'}</span></div>`),
     );
     table.setRows(promotions);
   } catch (error) {
@@ -4049,14 +4613,17 @@ function renderPay(view) {
   const due = cache.settlements.filter((t) => t.state === 'due');
   const waiting = cache.settlements.filter((t) => t.state === 'needs_account');
   const paid = cache.settlements.filter((t) => t.state === 'paid');
-  view.append(head('Олголт, буцаалт', 'Basu-гийн банкаар гараар шилжүүлж, энд «Шилжүүлсэн» гэж тэмдэглэнэ. Нэг хүн батлаж, өөр хүн шилжүүлнэ.'));
+  view.append(head('Олголт, буцаалт', 'Нийлүүлэгчийн олголт, зочны буцаалт. Нэг хүн батлаж, өөр хүн шилжүүлнэ.'));
   view.append(el(`<div class="kpis kpi-band">
-    <div class="card kpi"><div class="lab">Шилжүүлэх ёстой</div><b>${money(due.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${due.length} мөр, данс бэлэн</span></div>
-    <div class="card kpi"><div class="lab">Данс хүлээж байна</div><b>${money(waiting.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${waiting.length} буцаалт — зочин дансаа оруулаагүй</span></div>
-    <div class="card kpi"><div class="lab">Шилжүүлсэн (30 хоног)</div><b>${money(paid.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${paid.length} мөр</span></div>
+    <div class="card kpi"${due.length ? ' data-tone="warn"' : ''}><div class="lab">Шилжүүлэх</div><b>${money(due.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${due.length ? `${due.length} олголт, буцаалт данс бэлэн` : 'одоо шилжүүлэх зүйл алга'}</span></div>
+    <div class="card kpi"><div class="lab">Данс хүлээж буй</div><b>${money(waiting.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${waiting.length ? `${waiting.length} буцаалт — зочин дансаа оруулаагүй` : 'данс хүлээж буй буцаалт алга'}</span></div>
+    <div class="card kpi"><div class="lab">Шилжүүлсэн, 30 хоног</div><b>${money(paid.reduce((s, t) => s + t.amount_mnt, 0))}</b><span>${paid.length ? `${paid.length} удаа` : 'сүүлийн 30 хоногт шилжүүлээгүй'}</span></div>
   </div>`));
-  const table = settlementTable(cache.settlements);
+  // The table opens on what is to be done; with nothing to send, on what waits, else on everything —
+  // unless this person chose a view before, which the table remembers.
+  const table = settlementTable(cache.settlements, true, due.length ? 'open' : waiting.length ? 'needs_account' : 'all');
   table.el.id = 'pay';
+  // The band above says once whether anything is due and what waits; the table opens on it.
   const section = el('<section class="section"></section>');
   section.append(table.el);
   view.append(section);
@@ -4073,10 +4640,10 @@ const ACTION = {
   'ledger.checks': 'Мөнгөний шалгалт ажиллуулсан', 'ledger.export': 'Мөнгөний CSV татсан', 'receipt.retry': 'Е-баримт дахин илгээсэн', 'message.retry': 'Мэдэгдэл дахин илгээсэн',
   'guest.close': 'Зочны бүртгэл хаасан', 'guest.session_revoke': 'Зочны нэвтрэлт хаасан',
   'restaurant.activate': 'Ресторан идэвхжүүлсэн', 'restaurant.suspend': 'Ресторан зогсоосон', 'menu.show': 'Хоол цэсэнд буцаасан', 'menu.hide': 'Хоол цэснээс нуусан',
-  'member.upsert': 'Гишүүн нэмсэн', 'member.grant': 'Ops эрх олгосон', 'member.role': 'Гишүүний эрх өөрчилсөн', 'member.approve': 'Ops эрх олгосон', 'member.decline': 'Эрхийн хүсэлт татгалзсан',
+  'member.upsert': 'Гишүүн нэмсэн', 'member.grant': 'Ширээнд гишүүн нэмсэн', 'member.role': 'Гишүүний үүрэг өөрчилсөн', 'member.approve': 'Ширээнд гишүүн нэмсэн', 'member.decline': 'Ширээний хүсэлт татгалзсан',
   'member.activate': 'Гишүүн нээсэн', 'member.deactivate': 'Гишүүн хаасан',
-  'org.approve': 'Байгууллага баталсан', 'org.decline': 'Байгууллага татгалзсан', 'org.member_role': 'Байгууллагын хүний эрх өөрчилсөн', 'org.roles': 'Байгууллагын эрхүүд өөрчилсөн',
-  'role.create': 'Эрх үүсгэсэн', 'role.update': 'Эрх өөрчилсөн', 'role.delete': 'Эрх устгасан',
+  'org.approve': 'Байгууллага баталсан', 'org.decline': 'Байгууллага татгалзсан', 'org.member_role': 'Байгууллагын хүний үүрэг өөрчилсөн', 'org.roles': 'Байгууллагад нээх үүрэг өөрчилсөн',
+  'role.create': 'Үүрэг үүсгэсэн', 'role.update': 'Үүрэг өөрчилсөн', 'role.delete': 'Үүрэг устгасан',
   'menu.save': 'Цэс өөрчилсөн', 'menu.module': 'Модуль нэмсэн', 'menu.module_remove': 'Модуль устгасан', 'menu.link': 'Холбоос нэмсэн', 'menu.link_remove': 'Холбоос устгасан',
   'setting.change': 'Тохиргоо өөрчилсөн',
   'promotion.end': 'Онцлолт зогсоосон',
@@ -4085,7 +4652,7 @@ const ACTION = {
 /** What an action was done to, in the words of the desk's own sections. */
 const TARGET_WORD = {
   order: 'Идэш', listing: 'Идэш', supplier: 'Нийлүүлэгч', settlement: 'Мөнгө', ledger: 'Мөнгө', receipt: 'Мөнгө', guest: 'Зочин',
-  member: 'Гишүүд', org: 'Байгууллага', role: 'Эрх, цэс', menu: 'Эрх, цэс', restaurant: 'Хоол', device: 'Хоол', menu_item: 'Хоол',
+  member: 'Гишүүд', org: 'Байгууллага', role: 'Үүрэг, цэс', menu: 'Үүрэг, цэс', restaurant: 'Хоол', device: 'Хоол', menu_item: 'Хоол',
   message: 'Мэдэгдэл', setting: 'Систем', promotion: 'Онцлох зар',
 };
 
@@ -4123,7 +4690,7 @@ function auditWho(a) {
 }
 
 async function renderAudit(view) {
-  view.append(head('Үйлдлийн түүх', 'Ширээнд хийсэн үйлдэл бүр — хэн, хэзээ, юуг, ямар тэмдэглэлтэй.'));
+  view.append(head('Үйлдлийн түүх', 'Ширээнд хийсэн үйлдэл бүр: хэн, хэзээ, юуг, ямар тэмдэглэлтэй.'));
   const areas = [...new Set(Object.values(TARGET_WORD))];
   const table = dataTable({
     columns: [
@@ -4170,16 +4737,16 @@ async function renderAudit(view) {
 async function renderMembers(view) {
   const roleList = await deskRoleList();
   const roleNames = new Map(roleList.map((r) => [r.key, r.name]));
-  const roleOptions = roleList.map((r) => [r.key, r.description ? `${r.name} — ${r.description}` : r.name]);
+  const roleOptions = roleList.map((r) => [r.key, r.name]);
   view.append(
     headActs(
-      head('Гишүүд', 'Хэн энэ хуудсанд орж, юу хийж болох вэ. Basu-д бүртгэлтэй хэрэглэгчдээс сонгож эрх олгоно.'),
+      head('Гишүүд', 'Basu-гийн ширээнд ажилладаг хүмүүс, тэдний үүрэг.'),
       button(
         `${NAV_ICON.plus}Гишүүн нэмэх`,
-        () =>
-          popup({
+        () => {
+          void popup({
             title: 'Гишүүн нэмэх',
-            sub: 'Basu-д бүртгэлтэй хэрэглэгчдээс сонгоод эрх олгоно. Тэр dashboard-аа нээхэд ops хэсэг нь шууд нээгдэнэ.',
+            sub: 'Basu-д нэвтэрсэн хэрэглэгчдээс хүнээ сонгоод үүрэг өгнө. Тэр дараагийн удаа нэвтрэхэд Basu-гийн ширээ нь нээгдэнэ.',
             width: 600,
             id: 'member-new',
             fields: [
@@ -4203,16 +4770,18 @@ async function renderMembers(view) {
                     disabled: Boolean(p.member?.active),
                   })),
               },
-              { name: 'role', label: 'Олгох эрх', type: 'select', options: roleOptions, value: 'ops', wide: true },
+              { name: 'role', label: 'Үүрэг', type: 'select', options: roleOptions, value: 'ops', wide: true, hint: roleList.find((r) => r.key === 'ops')?.description || ' ' },
             ],
-            submit: 'Эрх олгох',
+            submit: 'Гишүүн нэмэх',
             onSubmit: async (v) => {
               if (!v.guest_id) throw new Error('Хэрэглэгчээ жагсаалтаас сонгоно уу.');
               const added = await ops('/v1/ops/members', { method: 'POST', body: { guest_id: v.guest_id, role: v.role } });
-              toast(`${added.name}: ${roleNames.get(added.role) ?? added.role} эрх олголоо.`, 'good');
+              toast(`${added.name}: ${roleNames.get(added.role) ?? added.role} үүрэгтэй нэмэгдлээ.`, 'good');
               show('members');
             },
-          }),
+          });
+          roleHint(document.getElementById('member-new'), roleList);
+        },
         'data-v="primary" id="add-member"',
       ),
     ),
@@ -4227,7 +4796,7 @@ async function renderMembers(view) {
         value: (m) => `${m.phone ?? ''} ${m.email ?? ''}`,
         render: (m) => dtCell.twoHtml(m.phone ? `<span class="mono">${esc(m.phone)}</span>` : esc(m.email ?? '—'), m.phone && m.email ? esc(m.email) : ''),
       },
-      { key: 'role', label: 'Эрх', value: (m) => roleNames.get(m.role) ?? m.role },
+      { key: 'role', label: 'Үүрэг', value: (m) => roleNames.get(m.role) ?? m.role },
       { key: 'state', label: 'Төлөв', value: (m) => memberState(m)[1], render: (m) => dtCell.pill(...memberState(m)) },
     ],
     search: { placeholder: 'Нэр, утас, имэйл…' },
@@ -4236,20 +4805,23 @@ async function renderMembers(view) {
       if (m.id === me?.id) return null;
       return [
         button(
-          'Эрх солих',
-          () =>
-            popup({
-              title: 'Эрх солих',
+          'Үүрэг солих',
+          () => {
+            void popup({
+              title: 'Үүрэг солих',
               sub: `${esc(m.name)} · ${esc(m.email ?? m.phone ?? '')}`,
               width: 520,
-              fields: [{ name: 'role', label: 'Эрх', type: 'select', options: roleOptions, value: m.role, wide: true }],
+              id: 'member-role',
+              fields: [{ name: 'role', label: 'Үүрэг', type: 'select', options: roleOptions, value: m.role, wide: true, hint: roleList.find((r) => r.key === m.role)?.description || ' ' }],
               onSubmit: async (v) => {
                 if (v.role === m.role) return true;
                 await ops(`/v1/ops/members/${m.id}/role`, { method: 'POST', body: { role: v.role } });
-                toast(`${m.name}: ${roleNames.get(v.role) ?? v.role} эрхтэй боллоо.`, 'good');
+                toast(`${m.name}: ${roleNames.get(v.role) ?? v.role} үүрэгтэй боллоо.`, 'good');
                 show('members');
               },
-            }),
+            });
+            roleHint(document.getElementById('member-role'), roleList);
+          },
           'data-v="quiet" data-size="sm" data-a="role"',
         ),
         button(
@@ -4261,7 +4833,7 @@ async function renderMembers(view) {
               // corner at its next step, and their account and sign-ins are theirs.
               text: m.active
                 ? `<b>${esc(m.name)}</b> ops-ийн хэсэгт шууд орохоо болино — нээлттэй байгаа ops хэсэг нь ч дараагийн алхамд хаагдана. Бүртгэл нь хэвээр, Basu-гийн вэб, апп-д нэвтэрсэн хэвээр үлдэнэ. Дараа нь дахин нээж болно.`
-                : `<b>${esc(m.name)}</b> ${esc(roleNames.get(m.role) ?? m.role)} эрхээрээ дахин орно.`,
+                : `<b>${esc(m.name)}</b> ${esc(roleNames.get(m.role) ?? m.role)} үүргээрээ ширээнд дахин орно.`,
               ok: m.active ? 'Хаах' : 'Нээх',
               danger: m.active,
               onConfirm: async () => {
@@ -4291,7 +4863,7 @@ async function renderMembers(view) {
   }
   // What each role opens, before a role is handed to anybody: made and changed on the roles page.
   if (hasPage('roles')) {
-    const go = el('<p class="cap" style="margin-top:20px" id="desk-roles">Үүрэг бүр ямар хуудас, үйлдэл нээхийг <a class="link" href="#desk/roles">«Үүрэг, эрх»</a> хуудсанд үүсгэж, засна.</p>');
+    const go = el('<p class="page-note" id="desk-roles">Үүрэг бүр ямар хуудас, үйлдэл нээхийг <a href="#desk/roles">«Үүрэг, эрх»</a> хуудсанд үүсгэж, засна.</p>');
     go.querySelector('a').addEventListener('click', (e) => {
       e.preventDefault();
       show('roles');

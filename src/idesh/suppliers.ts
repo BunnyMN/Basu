@@ -436,6 +436,8 @@ export interface SupplierRow {
   bankVerified: boolean;
   bankChangedAt: Date | null;
   listings: number;
+  /** The business this supplier is the idesh side of, when it is one (every supplier with an owner is). */
+  orgId: string | null;
 }
 
 /** Every supplier and would-be supplier, for ops. Applications first. */
@@ -461,11 +463,13 @@ export async function listSuppliers(db: Db = getPool()): Promise<SupplierRow[]> 
     bank_verified_at: Date | null;
     bank_changed_at: Date | null;
     listings: number;
+    org_id: string | null;
   }>(
     `SELECT s.id, s.name, s.phone, s.ebarimt_merchant_tin, s.pickup_address, s.about,
             s.lat, s.lon, s.state, s.active, s.applied_at, s.contracted_at, s.decline_reason,
             s.commission_pct, s.bank_name, s.bank_account, s.bank_holder, s.bank_verified_at, s.bank_changed_at,
-            (SELECT count(*)::int FROM idesh.listing l WHERE l.supplier_id = s.id AND l.active) AS listings
+            (SELECT count(*)::int FROM idesh.listing l WHERE l.supplier_id = s.id AND l.active) AS listings,
+            s.org_id
        FROM idesh.supplier s
       ORDER BY (s.state = 'applied') DESC, s.applied_at DESC NULLS LAST, s.name`,
   );
@@ -490,6 +494,7 @@ export async function listSuppliers(db: Db = getPool()): Promise<SupplierRow[]> 
     bankVerified: r.bank_verified_at !== null,
     bankChangedAt: r.bank_changed_at,
     listings: r.listings,
+    orgId: r.org_id,
   }));
 }
 
