@@ -1062,6 +1062,19 @@ describe('the kitchen display', () => {
     expect(ticket.textContent).toContain('Хүлээн авах');
     expect(ticket.textContent).toContain('Татгалзах');
 
+    // Refusing sends the guest's money back and cannot be undone: it asks
+    // first, and «Болих» leaves the ticket where it was.
+    ([...ticket.querySelectorAll('button')].find((b) => b.textContent?.includes('Татгалзах')) as HTMLElement).click();
+    await until(kds, 'the question', (d) => Boolean(d.querySelector('#reject-order')));
+    expect(kds.window.document.querySelector('#reject-order')?.textContent).toContain('бүтнээр');
+    (kds.window.document.querySelector('#reject-order [data-cancel]') as HTMLElement).click();
+    await until(kds, 'the question to go', (d) => !d.querySelector('.sheet.popup[data-open]'));
+    expect(
+      [...kds.window.document.querySelectorAll('.ticket')].some(
+        (t) => t.textContent?.includes('Хуушуур') && t.textContent?.includes('Хүлээн авах'),
+      ),
+    ).toBe(true);
+
     // Accepting moves it out of "awaiting the restaurant" and gives the chef
     // the two controls that matter for a ticket that is now scheduled.
     (
