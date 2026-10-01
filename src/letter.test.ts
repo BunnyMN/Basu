@@ -31,6 +31,15 @@ describe('the letter', () => {
     expect(html).toContain('basuappmn@gmail.com');
   });
 
+  it('lets the promises at its foot break between them, so it is no wider than a phone', () => {
+    const html = renderLetter({ preheader: 'x', title: 'Нэвтрэх код', paragraphs: ['x'], code: '482913' });
+    const foot = /<td[^>]*>(<span style="white-space:nowrap">[\s\S]*?)<\/td>/.exec(html)?.[1] ?? '';
+    // Each promise stays whole; what joins them is a space a line may break at.
+    expect(foot.match(/white-space:nowrap/g)).toHaveLength(3);
+    expect(foot).toContain('</span> · <span');
+    expect(foot).not.toMatch(/&nbsp;·|·&nbsp;/);
+  });
+
   it('points its button at the site, wherever the site lives', () => {
     process.env['PUBLIC_ORIGIN'] = 'https://example.mn/';
     const html = renderLetter({ preheader: 'x', title: 'Идэш баталгаажлаа', paragraphs: ['x'], action: actionFor('idesh.paid', 'abc') });
