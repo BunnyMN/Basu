@@ -41,7 +41,14 @@
   .so-skel .s-skel:nth-child(3){display:none}
 }
 
-/* one order */
+/* one order, and its shape while it loads */
+.od-wait{padding-top:8px}
+.od-wait .t{height:40px;width:min(380px,70%)}
+.od-wait .w{height:20px;width:min(300px,55%);margin-top:16px}
+.od-wait .g{display:grid;grid-template-columns:minmax(0,7fr) minmax(320px,5fr);gap:32px;margin-top:28px}
+.od-wait .a{height:360px;border-radius:18px}
+.od-wait .b{height:240px;border-radius:18px}
+@media (max-width:960px){.od-wait .g{grid-template-columns:1fr;gap:20px}.od-wait .a{height:280px}}
 .od{display:grid;grid-template-columns:minmax(0,7fr) minmax(320px,5fr);gap:20px 32px;align-items:start;margin-top:24px}
 /* One column on a phone; once the meat is ready or on its way, the handover code comes first. */
 @media (max-width:960px){
@@ -364,6 +371,8 @@ if (token) {
       const sent = new URLSearchParams(location.search);
       const fresh = sent.has('new') && (sent.has('earlier') ? 'earlier' : 'new');
       if (fresh) history.replaceState(null, '', location.pathname);
+      // While it comes: blocks in the shape of the order, so nothing jumps when it lands.
+      page.replaceChildren(el(`<a class="s-crumb" href="/orders">${MARK.back}Миний захиалга</a>`), el('<div class="od-wait" role="status" aria-busy="true" aria-label="Захиалга ачаалж байна"><span class="s-skel t"></span><span class="s-skel w"></span><div class="g"><span class="s-skel a"></span><span class="s-skel b"></span></div></div>'));
       const o = await drawOrder(orderId, fresh);
       // Still going: look again now and then, so a supplier starting shows here.
       if (LIVE.includes(o.state)) {

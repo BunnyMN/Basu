@@ -157,6 +157,15 @@
 .sd-gone b{font-size:1.0625rem}
 .sd-gone p{margin:0;color:var(--ink-2);line-height:1.55}
 
+/* a stall while it loads */
+.sd-wait{padding-top:8px}
+.sd-wait .t{height:40px;width:min(420px,70%)}
+.sd-wait .w{height:20px;width:min(320px,55%);margin-top:16px}
+.sd-wait .g{display:grid;grid-template-columns:minmax(0,7fr) minmax(340px,5fr);gap:40px;margin-top:24px}
+.sd-wait .p{aspect-ratio:16/10;border-radius:20px}
+.sd-wait .b{height:440px;border-radius:18px}
+@media (max-width:960px){.sd-wait .g{grid-template-columns:1fr;gap:24px}.sd-wait .p{aspect-ratio:4/3}.sd-wait .b{height:320px}}
+
 /* on a phone: the total and the way to the order box, at the thumb, until the box itself is on screen */
 .sd-dock{display:none}
 @media (max-width:960px){
@@ -317,11 +326,11 @@ function paintGrid() {
     grid.append(none);
     return;
   }
-  for (const l of list) {
+  for (const [i, l] of list.entries()) {
     const gone = l.remaining === 0;
     grid.append(
       el(`<a class="sh-card" href="/shop/${esc(l.id)}" data-id="${esc(l.id)}" data-kind="${esc(l.kind)}"${l.tier ? ` data-tier="${esc(l.tier)}"` : ''}${gone ? ' data-gone' : ''}>
-            <span class="ph"><img src="${PHOTO(l.kind)}" alt="" loading="lazy" width="960" height="720">
+            <span class="ph"><img src="${PHOTO(l.kind)}" alt="" loading="${i < 4 ? 'eager' : 'lazy'}" decoding="async" width="960" height="720">
               <span class="tags">${
                 l.tier ? `<span class="s-pill" data-tone="${l.tier === 'vip' ? 'vip' : 'pine'}">${l.tier === 'vip' ? '★ VIP' : `${MARK.check}Онцгой`}</span>` : '<span></span>'
               }${l.delivers ? `<span class="s-pill" data-tone="hi">${MARK.truckSm}Хүргэлттэй</span>` : ''}</span></span>
@@ -622,6 +631,19 @@ function drawStall(l) {
       showProblem(null);
       paint();
     });
+    // A radio group answers the arrow keys: the next way that can be chosen, chosen and focused.
+    buy.querySelector('.sd-ways').addEventListener('keydown', (event) => {
+      const by = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key];
+      if (!by) return;
+      event.preventDefault();
+      const ways = [...buy.querySelectorAll('.sd-way:not([disabled])')];
+      const at = ways.findIndex((w) => w.dataset.r === form.receive);
+      const next = ways[(at + by + ways.length) % ways.length];
+      form.receive = next.dataset.r;
+      showProblem(null);
+      paint();
+      next.focus();
+    });
     buy.querySelector('#when').addEventListener('change', (e) => {
       form.receiveOn = e.target.value;
       typed(e);
@@ -746,6 +768,11 @@ const couldNot = (error, again) =>
 
 const stallId = location.pathname.match(/^\/shop\/([0-9a-f-]{36})$/)?.[1];
 if (stallId) {
+  // While it comes: blocks in the shape of the page, so nothing jumps when it lands.
+  page.replaceChildren(
+    el(`<a class="s-crumb" href="/shop">${MARK.back}Бүх зар</a>`),
+    el(`<div class="sd-wait" role="status" aria-busy="true" aria-label="Зар ачаалж байна"><span class="s-skel t"></span><span class="s-skel w"></span><div class="g"><span class="s-skel p"></span><span class="s-skel b"></span></div></div>`),
+  );
   try {
     const [{ listing, today }] = await Promise.all([api(`/v1/idesh/listings/${stallId}`), load()]);
     market.today = today;
