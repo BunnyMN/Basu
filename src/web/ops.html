@@ -3082,8 +3082,12 @@ async function openLunch(id, from = { label: 'Хоолны захиалга', go
       </div></div>
       <aside class="detail-rail">${acts}</aside>
       <div class="detail-main">
-        <section class="section"><h2 class="section-label">Хоол</h2><div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Нэр</th><th>Цех</th><th class="num">Тоо</th><th class="num">Үнэ</th></tr></thead><tbody>${d.lines
-          .map((l) => `<tr${l.cancelled ? ' data-off' : ''}><td><b>${esc(l.name)}</b>${l.notes ? `<span class="sub">${esc(l.notes)}</span>` : ''}</td><td>${esc(STATION_WORD[l.station] ?? l.station ?? '')}</td><td class="num">${l.qty}</td><td class="num">${money(l.unit_price_mnt * l.qty)}</td></tr>`)
+        <section class="section"><h2 class="section-label">Хоол</h2><div class="card"><div class="table-wrap"><table class="table"><thead><tr><th>Хоол, цех</th><th class="num">Тоо</th><th class="num">Үнэ</th></tr></thead><tbody>${d.lines
+          .map((l) => {
+            // The station under the dish, with the guest's note: three columns that fit a phone.
+            const under = [STATION_WORD[l.station] ?? l.station, l.notes].filter(Boolean).map((s) => esc(s)).join(' · ');
+            return `<tr${l.cancelled ? ' data-off' : ''}><td><b>${esc(l.name)}</b>${under ? `<span class="sub">${under}</span>` : ''}</td><td class="num">${l.qty}</td><td class="num">${money(l.unit_price_mnt * l.qty)}</td></tr>`;
+          })
           .join('')}</tbody></table></div></div></section>
         ${d.review ? `<section class="section"><h2 class="section-label">Үнэлгээ</h2><div class="card card-body review-body">${stars(d.review.stars)}${d.review.on_time === null ? '' : d.review.on_time ? ' <span class="muted">цагтаа</span>' : ' <span class="ink-stop">хоцорсон</span>'}${d.review.comment ? `<p>${esc(d.review.comment)}</p>` : ''}</div></section>` : ''}
         <section class="section"><h2 class="section-label">Явц</h2><div class="card card-body"><ol class="story stepper" data-stepper>${d.events
