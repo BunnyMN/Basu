@@ -50,7 +50,10 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-right,
 body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var(--tabbar-h) + var(--safe-b))}
 #map .maplibregl-ctrl-group{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-ctl)}
 #map .maplibregl-ctrl-group:not(:empty){box-shadow:var(--shadow)}
-#map .maplibregl-ctrl-group button{width:40px;height:40px}
+/* every control the thumb's 44 (4.5) */
+#map .maplibregl-ctrl-group button{width:44px;height:44px}
+/* the attribution's «i» keeps its 24px look; the box around it is the 44 a thumb needs */
+#map .maplibregl-ctrl-attrib-button{width:44px;height:44px;top:-10px;right:-10px;background-color:transparent;background-position:center;background-repeat:no-repeat}
 #map .maplibregl-ctrl-group button+button{border-top:1px solid var(--line)}
 #map .maplibregl-ctrl-group button:focus:first-child{border-radius:var(--r-ctl) var(--r-ctl) 0 0}
 #map .maplibregl-ctrl-group button:focus:last-child{border-radius:0 0 var(--r-ctl) var(--r-ctl)}
@@ -63,9 +66,9 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var
    veils it; only MapLibre's control glyphs, drawn dark, are lifted. Both
    dark blocks, like app.css, so an explicit theme wins either way. */
 @media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]) #map .maplibregl-ctrl-icon{filter:invert(.88)}
+  :root:not([data-theme="light"]) #map :is(.maplibregl-ctrl-icon,.maplibregl-ctrl-attrib-button){filter:invert(.88)}
 }
-:root[data-theme="dark"] #map .maplibregl-ctrl-icon{filter:invert(.88)}
+:root[data-theme="dark"] #map :is(.maplibregl-ctrl-icon,.maplibregl-ctrl-attrib-button){filter:invert(.88)}
 /* On a desk the sheet docks on the right; the controls step out from under
    it, and the dock starts below the demo clock strip when there is one. */
 @media (min-width:900px){
@@ -101,6 +104,8 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var
 /* A menu is read, so the sheet is paper, not glass: the map under a
    frosted menu showed through behind every dish as a grey smudge. */
 #sheet{background:var(--surface)}
+/* The sheet's name takes the focus as the sheet opens, so a screen reader starts there; it is not a control, and draws no ring. */
+#sheet-name:focus{outline:none}
 /* Never over the bar: with the status bar's inset the bar is 111pt tall,
    and 88% of the screen reached into it. */
 @media (max-width:899px){#sheet{max-height:min(88dvh,calc(100dvh - var(--bar-h) - var(--safe-t) - 12px))}}
@@ -251,21 +256,21 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var
 </style>
 </head>
 <body>
-<div id="map">
-  <div class="topbar" data-fixed>
+<main id="map">
+  <header class="topbar" data-fixed>
     <a class="home" href="/app" id="home" aria-label="Basu нүүр"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Basu</a>
-    <div class="title" id="badge"><b>Үдийн хоол</b><span>Ирэхээс тань өмнө гал тавина</span></div>
+    <div class="title" id="badge"><h1>Үдийн хоол</h1><span>Ирэхээс тань өмнө гал тавина</span></div>
     <span class="act"></span>
-  </div>
+  </header>
   <section class="blank" id="blank" aria-live="polite" hidden></section>
-</div>
+</main>
 
 <div class="scrim" id="scrim" data-dock></div>
 
 <section class="sheet" id="sheet" aria-label="Ресторан" data-dock>
   <header>
     <div>
-      <h2 id="sheet-name">—</h2>
+      <h2 id="sheet-name" tabindex="-1">—</h2>
       <div class="sub" id="sheet-sub"></div>
       <div class="walk" id="sheet-walk"></div>
     </div>
@@ -275,7 +280,8 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var
   <footer id="sheet-foot"></footer>
 </section>
 
-<button class="orderbar" id="orderbar" type="button" aria-label="Захиалгаа харах">
+<!-- Named by what it shows — the order's number, what is happening, when — as a screen reader should say it. -->
+<button class="orderbar" id="orderbar" type="button">
   <span>
     <span class="code mono" id="ob-code">—</span>
     <span class="what" id="ob-what"></span>
@@ -287,7 +293,7 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js" integrity="sha512-hoXlvOdSmh58mppUyZHZsscHkR/yXl6zLpTMTNwA6IZ61DpeaCNjosRu1WJ2DeIpkfW5MsJJ9H89zjV4IBGqRw==" crossorigin="anonymous"></script>
 <script type="module">
 import { api, store, shell, toast, mountClock, mnt, money, hhmm, HEADLINE, signInSheet, confirmPopup, whatWentWrong } from '/api.js';
-import { mapStyle, mapTheme, onMapTheme, repaintMap, pinImage, ULAANBAATAR, isCovered, metresBetween, walkMinutes } from '/mapStyle.js';
+import { mapStyle, mapTheme, onMapTheme, repaintMap, pinImage, ULAANBAATAR, isCovered, metresBetween, walkMinutes, MAP_LOCALE } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (html) => {
@@ -472,6 +478,8 @@ function mountMap() {
     pitch: CAMERA.pitch,
     bearing: CAMERA.bearing,
     attributionControl: { compact: true, customAttribution: '© OpenStreetMap' },
+    // What a screen reader says for the map and its buttons, in Mongolian.
+    locale: MAP_LOCALE,
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
 
@@ -880,6 +888,26 @@ async function loadVenues() {
 
 /* ── the sheet ──────────────────────────────────────────────────── */
 
+/**
+ * The sheet's name is where reading starts as the sheet comes up — a screen
+ * reader is not left on the map behind it — unless the focus is in the sheet
+ * already (a poll redrawing it). Closing gives the focus back: to the bar
+ * that brings the order back, or to what opened the sheet.
+ */
+let sheetOpener = null;
+function sheetOpened() {
+  const now = document.activeElement;
+  if (now && $('sheet').contains(now)) return;
+  sheetOpener = now instanceof HTMLElement && now !== document.body ? now : null;
+  $('sheet-name').focus({ preventScroll: true });
+}
+function sheetClosed() {
+  const inside = $('sheet').contains(document.activeElement);
+  const back = $('orderbar').dataset.open ? $('orderbar') : sheetOpener;
+  sheetOpener = null;
+  if (inside && back?.isConnected) back.focus({ preventScroll: true });
+}
+
 function closeSheet() {
   $('sheet').removeAttribute('data-open');
   $('scrim').removeAttribute('data-open');
@@ -888,8 +916,10 @@ function closeSheet() {
     // The order is still live: keep its route on the map and leave a bar to
     // bring the detail back. Someone walking there wants to see both.
     $('orderbar').dataset.open = '1';
+    sheetClosed();
     return;
   }
+  sheetClosed();
   // No order — the route belonged to a venue nobody chose.
   map?.getSource(ROUTE)?.setData(emptyLine());
   state.venue = null;
@@ -897,6 +927,10 @@ function closeSheet() {
 }
 $('sheet-close').addEventListener('click', closeSheet);
 $('scrim').addEventListener('click', closeSheet);
+// Esc closes the sheet, as it closes every popup — unless a popup over it took the key first.
+addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !event.defaultPrevented && $('sheet').dataset.open) closeSheet();
+});
 $('orderbar').addEventListener('click', () => {
   $('orderbar').removeAttribute('data-open');
   void showStatus(true).catch((error) => toast(whatWentWrong(error), 'bad'));
@@ -941,6 +975,7 @@ async function openVenue(venue) {
   $('sheet-foot').replaceChildren();
   $('sheet').dataset.open = '1';
   $('scrim').dataset.open = '1';
+  sheetOpened();
 
   document.getElementById('sheet-walk').textContent = '';
   if (state.here) {
@@ -1117,7 +1152,7 @@ async function appendComments(venueId) {
       el(`<div class="one">
             <div class="who">
               <b>${escapeHtml(c.by)}</b>
-              <span class="rating" aria-label="${c.stars} од"><i>${ICON.star.repeat(c.stars)}</i></span>
+              <span class="rating" role="img" aria-label="${c.stars} од"><i>${ICON.star.repeat(c.stars)}</i></span>
               ${c.onTime === false ? '<span class="late chip" data-tone="hold" data-inline>цагтаа ирээгүй</span>' : ''}
             </div>
             <div class="txt">${escapeHtml(c.comment)}</div>
@@ -1371,6 +1406,7 @@ async function showStatus(force) {
   sheet.dataset.open = '1';
   $('scrim').dataset.open = '1';
   $('sheet-name').textContent = `№${order.code}`;
+  sheetOpened();
   $('sheet-name').classList.add('mono'); // a code, not a name
   // Where, when to be there, and which table: the arrival time is the
   // guest's half of the plan, so it is said here as what it is — while the

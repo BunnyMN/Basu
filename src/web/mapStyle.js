@@ -87,6 +87,25 @@ const MAP_PALETTES = {
  */
 const LANDMARKS = ['memorial', 'monument', 'park', 'college', 'university', 'museum', 'theatre', 'place_of_worship', 'hospital', 'stadium', 'attraction', 'library', 'town_hall'];
 
+/**
+ * MapLibre's own words — the names a screen reader says for the map and its
+ * buttons, and the tips they show — in Mongolian. MapLibre's defaults are
+ * English («Zoom in», «Find my location»); a Map takes these as `locale`.
+ */
+export const MAP_LOCALE = {
+  'Map.Title': 'Газрын зураг',
+  'Marker.Title': 'Газрын зургийн тэмдэг',
+  'NavigationControl.ZoomIn': 'Ойртуулах',
+  'NavigationControl.ZoomOut': 'Холдуулах',
+  'NavigationControl.ResetBearing': 'Хойд зүг рүү эргүүлэх',
+  'GeolocateControl.FindMyLocation': 'Миний байршил',
+  'GeolocateControl.LocationNotAvailable': 'Байршил тодорхойгүй',
+  'AttributionControl.ToggleAttribution': 'Газрын зургийн эх сурвалж',
+  'AttributionControl.MapFeedback': 'Газрын зургийн санал',
+  'Popup.Close': 'Хаах',
+  'CooperativeGesturesHandler.MobileHelpText': 'Газрын зургийг хоёр хуруугаар хөдөлгөнө',
+};
+
 /** `'dark'` or `'light'`: the page's theme — pinned by `data-theme`, else the phone's. */
 export function mapTheme() {
   if (typeof document === 'undefined') return 'light';
