@@ -126,7 +126,7 @@ main:has(.live[data-any]) .hello,main:has(.live[data-loading]) .hello{display:no
 </main>
 
 <script type="module">
-import { api, store, hhmm, mountClock, HEADLINE, IDESH_HEADLINE, IDESH_STATE, headlineWord, dayShort } from '/api.js';
+import { api, store, hhmm, mountClock, money, HEADLINE, IDESH_HEADLINE, IDESH_STATE, headlineWord, dayShort, ubParts } from '/api.js';
 
 /** Text into markup, never the other way: a supplier's name is a name. Quotes too, so nothing inside an attribute can end it. */
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -279,10 +279,31 @@ function dineRow(order) {
   };
 }
 
-function ideshRow(order) {
+/** An идэш's own states that are past its day: handed over, or given back. */
+const IDESH_PAST = ['HANDED', 'CLOSED', 'CANCELLED', 'REFUNDED'];
+
+/**
+ * A cancelled order's refund in a word, as the идэш page and the website say
+ * it: the guest's step in the tone that asks for one, Basu's transfer in the
+ * tone of waiting on the other side; once sent, the state's own word.
+ */
+const REFUND_WORD = {
+  needs_account: ['Данс оруулна уу', ' data-tone="hold" data-strong'],
+  due: ['Буцаалт хүлээгдэж байна', ' data-tone="route"'],
+  paid: [IDESH_STATE.REFUNDED, ''],
+};
+
+/**
+ * `seen` is the order itself, for one past its day (loadLive): its row says
+ * what became of it — a cancelled one what its money waits for and how much
+ * comes back, a handed-over one the day it was received — never the day it
+ * was coming.
+ */
+function ideshRow(order, seen) {
   const word = IDESH_STATE[order.state] ?? '';
   const cap = IDESH_HEADLINE[order.state]?.[1] ?? '';
-  return {
+  const delivery = order.receive === 'delivery';
+  const row = {
     // Noon on the day, in the restaurant's zone: a day, not an instant.
     at: new Date(`${order.receive_on}T12:00:00+08:00`),
     href: `/idesh?order=${order.id}`,
@@ -292,10 +313,24 @@ function ideshRow(order) {
     code: order.code,
     state: order.state,
     word,
-    // A cancelled order is still here for its refund, not for a day.
-    time: order.state === 'CANCELLED' ? '—' : dayShort(order.receive_on),
-    label: order.state === 'CANCELLED' ? 'буцаалт' : order.receive === 'delivery' ? 'ирэх' : 'авах',
+    time: dayShort(order.receive_on),
+    label: delivery ? 'ирэх' : 'авах',
   };
+  if (order.state === 'CANCELLED' || order.state === 'REFUNDED') {
+    // Still here for its refund, not for a day: the chip says what the money waits for, the corner how much it is.
+    const refund = seen?.refund?.state ?? (order.state === 'REFUNDED' ? 'paid' : 'due');
+    const amount = seen?.refund?.amount_mnt ?? seen?.refund_mnt ?? null;
+    [row.word, row.tone] = REFUND_WORD[refund] ?? REFUND_WORD.due;
+    // The dot says whom it waits on, as for every row: the guest's account, or Basu's transfer.
+    row.dot = { needs_account: 'hold', due: 'route' }[refund];
+    if (order.state === 'CANCELLED') row.what = `${esc(order.title)} ×${order.qty} · ${IDESH_STATE.CANCELLED}`;
+    row.corner = `<span class="when val">${amount === null ? '—' : money(amount)}<small>${refund === 'paid' ? 'буцаасан' : 'буцаалт'}</small></span>`;
+  } else if (IDESH_PAST.includes(order.state)) {
+    // Received: the day it was, or no day rather than a wrong one.
+    const at = seen?.handed_at;
+    row.corner = at ? `<span class="when val" data-size="lg">${dayShort(ubParts(at).day)}<small>${delivery ? 'ирсэн' : 'авсан'}</small></span>` : '';
+  }
+  return row;
 }
 
 /**
@@ -326,7 +361,10 @@ async function loadLive() {
     ask('/v1/idesh', 'orders'),
     loadSupplierTile(),
   ]);
-  const rows = [...lunches.map(dineRow), ...provisions.map(ideshRow)];
+  // An идэш past its day is looked at for what became of it (ideshRow); one that cannot be, keeps a calm corner.
+  const past = provisions.filter((o) => IDESH_PAST.includes(o.state));
+  const seen = new Map(await Promise.all(past.map(async (o) => [o.id, await api(`/v1/idesh/${o.id}`, { token }).catch(() => null)])));
+  const rows = [...lunches.map(dineRow), ...provisions.map((o) => ideshRow(o, seen.get(o.id)))];
   rows.sort((a, b) => a.at - b.at);
   paint(rows);
 }
@@ -348,13 +386,13 @@ function paint(rows) {
   for (const row of rows) {
     const card = el(`
       <a class="card row" href="${row.href}" data-source="${row.source}" data-chev>
-        <span class="lead"><span class="dot" data-tone="${TONE[row.state] ?? 'neutral'}"></span></span>
+        <span class="lead"><span class="dot" data-tone="${row.dot ?? TONE[row.state] ?? 'neutral'}"></span></span>
         <span class="who main">
           <span class="venue title">${esc(row.title)}</span>
           <span class="what sub">${row.what}</span>
-          <span class="code meta">${row.source} · №${esc(row.code)}${row.word ? `<span class="chip" data-s="${esc(row.state)}" data-inline>${esc(row.word)}</span>` : ''}</span>
+          <span class="code meta">${row.source} · №${esc(row.code)}${row.word ? `<span class="chip"${row.tone ?? ` data-s="${esc(row.state)}"`} data-inline>${esc(row.word)}</span>` : ''}</span>
         </span>
-        <span class="end"><span class="when val" data-size="lg">${esc(row.time)}<small>${row.label}</small></span></span>
+        <span class="end">${row.corner ?? `<span class="when val" data-size="lg">${esc(row.time)}<small>${row.label}</small></span>`}</span>
       </a>`);
     list.append(card);
   }

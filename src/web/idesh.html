@@ -61,10 +61,9 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 /* «14 зар · 4 гэрээт нийлүүлэгч» is a sentence, not a section eyebrow: sans, 13, ink-2 */
 .market > .section-label{min-height:0;margin:0 0 10px}
 .market .tally{font-family:var(--sans);font-size:var(--t-cap);line-height:1.4;letter-spacing:0;text-transform:none;color:var(--ink-2)}
+/* On a phone the pill itself is the thumb's 44 (app.css, `.filter > button`
+   under pointer:coarse): no invisible area around a smaller face (Appendix B). */
 .kinds{margin:0 0 12px}
-/* the pill stays 36px to look at; the thumb gets the full 44px (4.5) */
-.kinds > button{position:relative}
-.kinds > button::after{content:"";position:absolute;inset:-4px -3px}
 .listings{margin:0}
 /* three rows of the shape that is coming, until the stalls arrive */
 .listings .skel-row{align-items:flex-start;padding:14px 16px}
@@ -106,6 +105,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 .listing .price b{display:block;font-weight:600;line-height:1.2}
 .listing .price .money{font-size:var(--t-title-3)}
 .listing .price small{display:block;font-size:var(--t-cap);color:var(--ink-2);margin-top:2px;white-space:normal}
+.listing .price small .per{display:block}
 .listing[data-gone] .title{color:var(--ink-2)}
 /* a tier the supplier paid for: a warm or a pine wash on the row, and its mark before the name */
 .listing[data-tier="vip"]{background:color-mix(in srgb,var(--hi-soft) 70%,var(--surface))}
@@ -170,6 +170,9 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
    under «‹ Буцах», so a long sub line is cut, never run under the button */
 .screen .topbar{flex:none;grid-template-columns:minmax(max-content,1fr) minmax(0,auto) minmax(max-content,1fr)}
 .bar .bar-title{padding:6px 0}
+/* The screen's title takes the focus as the screen opens, so a screen reader
+   starts there; it is not a control, and draws no ring. */
+#screen-title:focus{outline:none}
 .screen-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:24px}
 .screen-foot{
   flex:none;padding:12px var(--s-5) calc(12px + var(--safe-b));border-top:1px solid var(--line);
@@ -296,6 +299,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 .panel .v{font-size:var(--t-body-lg);font-weight:500;line-height:1.4;color:var(--ink);min-width:0;overflow-wrap:break-word}
 .panel .v small{display:block;font-weight:400;font-size:var(--t-cap);color:var(--ink-2);margin-top:4px;line-height:1.4}
 .panel .v .badge{margin-left:6px}
+/* on a phone the number is the thumb's 44 tall, its line as tall as before (app.css, `.tel` under pointer:coarse) */
 .panel .v a.tel{display:inline-flex;align-items:center;gap:5px;color:var(--ink);font-weight:500;vertical-align:baseline}
 .panel .v a.tel svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 #refund .field{margin:12px 0 0;font-weight:400}
@@ -362,23 +366,25 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
   </div>
 </main>
 
-<section class="screen" id="screen" aria-label="Зар">
+<section class="screen" id="screen" aria-labelledby="screen-title">
   <header class="bar topbar">
     <button class="back" type="button" id="screen-back" aria-label="Буцах">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Буцах
     </button>
-    <div class="bar-title title"><b id="screen-title">—</b><span id="screen-sub"></span></div>
+    <div class="bar-title title"><b id="screen-title" role="heading" aria-level="1" tabindex="-1">—</b><span id="screen-sub"></span></div>
     <span class="act"></span>
   </header>
   <div class="screen-body" id="screen-body"></div>
   <footer class="screen-foot" id="screen-foot"></footer>
+  <!-- An order that moves on while it is on the screen is said aloud: the supplier starting, the meat ready, the money sent. -->
+  <p class="sr-only" id="screen-said" role="status"></p>
 </section>
 
 <!-- MapLibre from cdnjs, held to cdnjs's own hash of the file: bytes that ever differ do not run. A new version takes its new hash, here and on the stylesheet. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js" integrity="sha512-hoXlvOdSmh58mppUyZHZsscHkR/yXl6zLpTMTNwA6IZ61DpeaCNjosRu1WJ2DeIpkfW5MsJJ9H89zjV4IBGqRw==" crossorigin="anonymous"></script>
 <script type="module">
-import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, KIND, dayLabel, dayShort, ubParts, signInSheet, passwordPopup, dropSession, whatWentWrong } from '/api.js';
-import { mapStyle, mapTheme, onMapTheme, repaintMap, ULAANBAATAR } from '/mapStyle.js';
+import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, IDESH_STATE, KIND, BANK_NAMES, dayLabel, dayShort, ubParts, signInSheet, passwordPopup, dropSession, whatWentWrong } from '/api.js';
+import { mapStyle, mapTheme, onMapTheme, repaintMap, ULAANBAATAR, MAP_LOCALE } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (html) => {
@@ -725,9 +731,17 @@ function phoneShown(raw) {
   return m ? `+976 ${m[1]} ${m[2]}` : String(raw ?? '');
 }
 
-/** «бүтэн · ~38 кг» / «1 кг · доод тал нь 20 кг» — what the price is for. */
+/**
+ * «бүтэн · ≈140 кг» over «≈11,800₮/кг» / «1 кг · доод тал нь 20 кг» — what the
+ * price is for. A whole animal also says what its rough weight makes a kilo,
+ * rounded to the hundred as the website's market card says it (shop.html),
+ * so a whole animal and a stall by the kilo compare on the list.
+ */
 function priceFor(l) {
-  return l.unit === 'whole' ? `бүтэн · ≈${l.approx_kg} кг` : `1 кг · доод тал нь ${l.min_qty} кг`;
+  if (l.unit !== 'whole') return `1 кг · доод тал нь ${l.min_qty} кг`;
+  const kg = Number(l.approx_kg);
+  // The kilo on a line of its own: the caption is narrower than both, and a run broken after a «·» reads as unfinished.
+  return kg > 0 ? `бүтэн · ≈${kg} кг <span class="per">≈${mnt(Math.round(l.price_mnt / kg / 100) * 100)}/кг</span>` : 'бүтэн';
 }
 
 /**
@@ -821,6 +835,7 @@ function showScreen(name, title, sub, { replace = false } = {}) {
   // An order number is a number: mono only when the title is one.
   $('screen-title').classList.toggle('mono', /^№\d{4}$/.test(title));
   $('screen-sub').textContent = sub;
+  $('screen-said').textContent = '';
   $('screen-body').replaceChildren();
   $('screen-foot').replaceChildren();
   $('screen-body').scrollTop = 0;
@@ -830,11 +845,24 @@ function showScreen(name, title, sub, { replace = false } = {}) {
   document.body.style.overflow = 'hidden';
   if (replace && !first) history.replaceState({ screen: name }, '');
   else history.pushState({ screen: name }, '');
+  // The list under the screen is out of reach while the screen is up — a
+  // screen reader no longer wanders behind it — and the screen's own title
+  // is where reading starts, face after face. Closing gives the focus back
+  // to the row that opened it.
+  if (first) opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  for (const behind of [$('bar'), $('list')]) behind.toggleAttribute('inert', true);
+  $('screen-title').focus({ preventScroll: true });
 }
+
+/** What had the focus when the screen opened: it gets it back when the screen closes. */
+let opener = null;
 
 function closeScreen() {
   $('screen').removeAttribute('data-open');
   document.body.style.overflow = '';
+  for (const behind of [$('bar'), $('list')]) behind.removeAttribute('inert');
+  if (opener?.isConnected) opener.focus({ preventScroll: true });
+  opener = null;
   state.screen = null;
   state.listing = null;
   state.form = null;
@@ -854,8 +882,11 @@ function dropMap() {
   }
 }
 
-/** «Буцах» is history: the face underneath, or the list. */
+/** «Буцах» is history: the face underneath, or the list. Esc is «Буцах» too — unless a popup over the screen took the key first. */
 $('screen-back').addEventListener('click', () => history.back());
+addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !event.defaultPrevented && state.screen) history.back();
+});
 
 addEventListener('popstate', (event) => {
   const face = event.state?.screen ?? null;
@@ -1119,6 +1150,8 @@ function mountMap(container) {
     center: f.lon ? [f.lon, f.lat] : [ULAANBAATAR.lon, ULAANBAATAR.lat],
     zoom: 13.2,
     attributionControl: false,
+    // What a screen reader says for the map, in Mongolian.
+    locale: MAP_LOCALE,
   });
   state.map = map;
   const PIN = 'drop';
@@ -1160,12 +1193,12 @@ function renderFoot() {
   sayClosed(!able, $('screen-body').querySelector('.facts'));
   // What stops the order, over its button: payments first — nothing typed fixes that.
   const needs = able ? missing() : null;
-  if (!able) foot.append(el(`<p class="why" data-calm>${MARK.info}${CLOSED_SHORT}</p>`));
-  else if (needs) foot.append(el(`<p class="why">${MARK.warn}${needs}</p>`));
+  if (!able) foot.append(el(`<p class="why" data-calm id="next-why">${MARK.info}${CLOSED_SHORT}</p>`));
+  else if (needs) foot.append(el(`<p class="why" id="next-why">${MARK.warn}${needs}</p>`));
   const row = el(`
     <div class="foot-row">
       <div class="sum"><span>${f.qty} ${unitWord(l)}${f.receive === 'delivery' ? ' + хүргэлт' : ''} · нийт</span><b>${money(total())}</b></div>
-      <button class="btn" data-v="primary" type="button" id="next"${needs || !able ? ' disabled' : ''}>Захиалах${MARK.next}</button>
+      <button class="btn" data-v="primary" type="button" id="next"${needs || !able ? ' disabled aria-describedby="next-why"' : ''}>Захиалах${MARK.next}</button>
     </div>`);
   row.querySelector('#next').addEventListener('click', () => renderReview());
   foot.append(row);
@@ -1229,11 +1262,11 @@ function renderReview({ replace = false } = {}) {
 
   const foot = $('screen-foot');
   foot.replaceChildren();
-  if (!able) foot.append(el(`<p class="why" data-calm>${MARK.info}${CLOSED_SHORT}</p>`));
+  if (!able) foot.append(el(`<p class="why" data-calm id="pay-why">${MARK.info}${CLOSED_SHORT}</p>`));
   const row = el(`
     <div class="foot-row">
       <div class="sum"><span>${state.paymentsOpen ? 'Түрийвчнээс · дутвал QPay' : 'Түрийвчнээс'}</span><b>${money(total())}</b></div>
-      <button class="btn" data-v="primary" type="button" id="pay"${able ? '' : ' disabled'}>Төлөх</button>
+      <button class="btn" data-v="primary" type="button" id="pay"${able ? '' : ' disabled aria-describedby="pay-why"'}>Төлөх</button>
     </div>`);
   row.querySelector('#pay').addEventListener('click', () => {
     // Nothing to pay with: never on to a sign-in that ends at «хаалттай».
@@ -1532,7 +1565,8 @@ const REASON_WORDS = {
   draft_expired: 'төлөгдөөгүй',
 };
 const FORFEIT_PCT = 10;
-const BANKS = ['Хаан банк', 'Голомт банк', 'Худалдаа хөгжлийн банк', 'Хас банк', 'Төрийн банк', 'Капитрон банк', 'Ариг банк', 'Богд банк', 'М банк'];
+/** «Бусад банк»: a bank not on the shared list (api.js BANK_NAMES), its name typed in the field under it — as on the website. */
+const OTHER_BANK = '__other';
 
 /** «14:05», Ulaanbaatar's clock, for a step that is done — whatever zone the phone is set to. */
 const clockOf = (iso) => ubParts(iso).clock;
@@ -1557,19 +1591,31 @@ function refundPanel(order) {
             <span class="lab">Буцаалт авах данс</span>
             <div class="v"><span class="mono">${money(r.amount_mnt)}</span><small>Аль банкны ямар данс руу шилжүүлэхийг бичнэ үү. Basu шилжүүлмэгц мэдэгдэл ирнэ.</small></div>
             <div class="field"><label for="bank">Банк</label>
-              <input id="bank" list="banks" placeholder="Хаан банк" autocomplete="off">
-              <datalist id="banks">${BANKS.map((b) => `<option value="${b}">`).join('')}</datalist></div>
+              <select id="bank">
+                <option value="" selected>Банкаа сонгоно уу</option>
+                ${BANK_NAMES.map((b) => `<option value="${escapeHtml(b)}">${escapeHtml(b)}</option>`).join('')}
+                <option value="${OTHER_BANK}">Бусад банк</option>
+              </select></div>
+            <div class="field" id="bank-other-step" hidden><label for="bank-other">Банкны нэр</label>
+              <input id="bank-other" autocomplete="off" aria-describedby="bank-other-help">
+              <small class="help" id="bank-other-help">Жагсаалтад байхгүй банкныхаа нэрийг бичнэ үү.</small></div>
             <div class="field"><label for="account">Дансны дугаар</label>
-              <input id="account" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="5012345678"></div>
+              <input id="account" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" aria-describedby="account-help">
+              <small class="help" id="account-help">IBAN (MN + 18 орон) эсвэл дансны дугаар (6–20 орон).</small></div>
             <div class="field"><label for="holder">Данс эзэмшигчийн нэр</label>
-              <input id="holder" placeholder="Банкинд бүртгэлтэй нэр"></div>
+              <input id="holder" autocomplete="name" aria-describedby="holder-help">
+              <small class="help" id="holder-help">Банкинд бүртгэлтэй нэрээр.</small></div>
             <div class="field" id="otp-step" hidden><label for="otp">Нууц үгээ оруулж баталгаажуулна уу</label>
-              <input id="otp" type="password" autocomplete="current-password" placeholder="Нууц үг"></div>
-            <p class="why" data-calm id="refund-why">${MARK.warn}Гурвууланг нь бичнэ үү.</p>
-            <button class="btn" data-v="primary" data-size="lg" type="button" id="send-account" disabled>Данс илгээх</button>
+              <input id="otp" type="password" autocomplete="current-password"></div>
+            <p class="why" data-calm id="refund-why">${MARK.warn}Банк, данс, эзэмшигчийн нэрээ оруулна уу.</p>
+            <button class="btn" data-v="primary" data-size="lg" type="button" id="send-account" aria-describedby="refund-why" disabled>Данс илгээх</button>
           </div></div>`),
     );
     const bank = panel.querySelector('#bank');
+    const otherStep = panel.querySelector('#bank-other-step');
+    const other = panel.querySelector('#bank-other');
+    // The bank's name as it goes to Basu: the one picked, or the one typed under «Бусад банк».
+    const bankName = () => (bank.value === OTHER_BANK ? other.value.trim() : bank.value);
     const account = panel.querySelector('#account');
     const holder = panel.querySelector('#holder');
     const send = panel.querySelector('#send-account');
@@ -1579,25 +1625,42 @@ function refundPanel(order) {
     const check = () => {
       // The rule the server holds every account to: the number, or the IBAN — MN and eighteen digits.
       const number = account.value.replace(/\s+/g, '').toUpperCase();
-      const problem = !bank.value.trim()
+      const problem = !bank.value
         ? 'Банкаа сонгоно уу.'
-        : !/^(MN\d{18}|\d{6,20})$/.test(number)
-          ? 'Дансны дугаар 6–20 оронтой тоо, эсвэл MN-ээр эхэлсэн IBAN байна.'
-          : holder.value.trim().length < 2
-            ? 'Данс эзэмшигчийн нэрээ бичнэ үү.'
-            : !otpStep.hidden && !otp.value
-              ? 'Нууц үгээ бичнэ үү.'
-              : null;
+        : !bankName()
+          ? 'Банкныхаа нэрийг бичнэ үү.'
+          : !number
+            ? 'Дансны дугаараа бичнэ үү.'
+            : !/^(MN\d{18}|\d{6,20})$/.test(number)
+              ? 'Дансны дугаар 6–20 оронтой тоо, эсвэл MN-ээр эхэлсэн IBAN байна.'
+              : holder.value.trim().length < 2
+                ? 'Данс эзэмшигчийн нэрээ бичнэ үү.'
+                : !otpStep.hidden && !otp.value
+                  ? 'Нууц үгээ бичнэ үү.'
+                  : null;
       // A hint while the form is being filled in, calm; the server's refusal
-      // (below) is the only thing said in the stop colour.
+      // (below) is the only thing said in the stop colour — and the only
+      // thing said aloud as it comes: the hint is read with the button.
       delete why.dataset.tone;
+      why.removeAttribute('role');
       why.setAttribute('data-calm', '');
       why.hidden = !problem;
       if (problem) why.innerHTML = `${MARK.warn}${problem}`;
       send.disabled = Boolean(problem);
     };
     // The password typed after a refusal is the next try: the refusal goes, and the button wakes, as it is typed.
-    for (const input of [bank, account, holder, otp]) input.addEventListener('input', check);
+    for (const input of [other, account, holder, otp]) input.addEventListener('input', check);
+    // «Бусад банк» opens the field for its name; a bank on the list needs none.
+    const pick = () => {
+      const typing = bank.value === OTHER_BANK;
+      if (otherStep.hidden === typing) {
+        otherStep.hidden = !typing;
+        if (typing) other.focus();
+      }
+      check();
+    };
+    bank.addEventListener('input', pick);
+    bank.addEventListener('change', pick);
     /**
      * The account, confirmed with `password`; a refusal of the password opens
      * its field. `chosen`: the password was set just now, and the one word at
@@ -1608,7 +1671,7 @@ function refundPanel(order) {
       try {
         await guestApi(`/v1/idesh/${state.orderId}/refund-account`, {
           method: 'POST',
-          body: { bank_name: bank.value, bank_account: account.value, bank_holder: holder.value, password: password || undefined },
+          body: { bank_name: bankName(), bank_account: account.value, bank_holder: holder.value, password: password || undefined },
         });
         toast(chosen ? 'Нууц үг, данс хоёулаа хадгалагдлаа. Шилжүүлмэгц мэдэгдэл ирнэ.' : 'Данс бүртгэгдлээ. Шилжүүлмэгц мэдэгдэл ирнэ.');
         shell.ordersChanged();
@@ -1622,6 +1685,7 @@ function refundPanel(order) {
           why.hidden = false;
           // Asked for, it is a calm word; refused, it is said in the stop colour — until the next key (check, above).
           const wrong = error.code === 'BAD_PASSWORD';
+          why.setAttribute('role', 'alert');
           why.toggleAttribute('data-calm', !wrong);
           if (wrong) why.dataset.tone = 'stop';
           else delete why.dataset.tone;
@@ -1631,6 +1695,7 @@ function refundPanel(order) {
         }
         // Said by the button it is about, in words, not only in a toast.
         why.hidden = false;
+        why.setAttribute('role', 'alert');
         why.removeAttribute('data-calm');
         why.dataset.tone = 'stop';
         why.innerHTML = `${MARK.warn}<span></span>`;
@@ -1657,6 +1722,8 @@ function refundPanel(order) {
           });
           // Closed before the account went: the button wakes as the form stands. A refusal woke it already, saying why.
           if (done === null && send.disabled) check();
+          // …and the focus is back on it — the popup could not give it back to a button that was asleep.
+          if (done === null && send.isConnected && !gone) send.focus({ preventScroll: true });
           return;
         }
       }
@@ -1690,7 +1757,8 @@ async function showStatus(force, { replace = false } = {}) {
   // A poll that found no news changes nothing. News redraws: the supplier
   // starting is worth it.
   if (!force && signature === rendered) return;
-  if (rendered !== null && signature !== rendered) shell.ordersChanged();
+  const moved = rendered !== null && signature !== rendered;
+  if (moved) shell.ordersChanged();
   rendered = signature;
 
   const face = FACE[order.state] ?? { mark: 'check', word: order.state, cap: () => '' };
@@ -1709,8 +1777,10 @@ async function showStatus(force, { replace = false } = {}) {
     </div>`);
 
   // The steps: done ones ticked with the time, the next one ringed with what
-  // it will take. A cancelled order has no road ahead to draw.
-  if (order.state !== 'CANCELLED' && order.state !== 'REFUNDED') {
+  // it will take. A cancelled order has no road ahead to draw, and nor has
+  // one that ended without a handover.
+  const handed = Boolean(order.handed_at);
+  if (live || handed) {
     const at = {
       paid: order.paid_at,
       preparing: order.preparing_at,
@@ -1738,6 +1808,8 @@ async function showStatus(force, { replace = false } = {}) {
     card.append(timeline);
   }
   body.append(card);
+  // News found by a look in the background is said, not only drawn.
+  $('screen-said').textContent = moved ? `${face.word}. ${card.querySelector('.cap').textContent}` : '';
 
   // A cancelled order asks one thing of the guest — where the money goes —
   // so that comes before anything they already know.
@@ -1755,25 +1827,34 @@ async function showStatus(force, { replace = false } = {}) {
     );
   }
 
-  /* where and when */
-  const plan = el('<div class="panel card"></div>');
-  plan.append(
-    el(`<div class="line">${MARK.day}<div>
-          <span class="lab">${delivery ? 'Хүргэх өдөр' : 'Очиж авах өдөр'}</span>
-          <div class="v">${dayLabel(order.receive_on)}<small>${
-            delivery ? 'Хүргэгч ирэхийн өмнө утсаар залгана.' : 'Нийлүүлэгч тэр өдөр утсаар цагаа тохирно.'
-          }</small></div>
-        </div></div>`),
-  );
-  plan.append(
-    el(`<div class="line">${MARK.pin}<div>
-          <span class="lab">${delivery ? 'Хүргэх хаяг' : 'Авах цэг'}</span>
-          <div class="v">${escapeHtml(delivery ? order.address : order.pickup_address)}${
-            delivery ? `<small>Залгах утас: <span class="mn">${escapeHtml(phoneShown(order.address_phone))}</span></small>` : ''
-          }</div>
-        </div></div>`),
-  );
-  body.append(plan);
+  /* where and when: a promise while the meat is coming, what happened once
+     it came — and for a cancelled order nothing, since nothing is coming:
+     the refund above is its news */
+  if (live || handed) {
+    const plan = el('<div class="panel card"></div>');
+    plan.append(
+      live
+        ? el(`<div class="line">${MARK.day}<div>
+              <span class="lab">${delivery ? 'Хүргэх өдөр' : 'Очиж авах өдөр'}</span>
+              <div class="v">${dayLabel(order.receive_on)}<small>${
+                delivery ? 'Хүргэгч ирэхийн өмнө утсаар залгана.' : 'Нийлүүлэгч тэр өдөр утсаар цагаа тохирно.'
+              }</small></div>
+            </div></div>`)
+        : el(`<div class="line">${MARK.day}<div>
+              <span class="lab">Хүлээн авсан</span>
+              <div class="v">${dayLabel(ubParts(order.handed_at).day)}<small>${delivery ? 'Хаягаар тань хүргэж өгсөн' : 'Авах цэг дээрээс авсан'} · <span class="mn">${clockOf(order.handed_at)}</span></small></div>
+            </div></div>`),
+    );
+    plan.append(
+      el(`<div class="line">${MARK.pin}<div>
+            <span class="lab">${delivery ? (live ? 'Хүргэх хаяг' : 'Хүргэсэн хаяг') : 'Авах цэг'}</span>
+            <div class="v">${escapeHtml(delivery ? order.address : order.pickup_address)}${
+              delivery && live ? `<small>Залгах утас: <span class="mn">${escapeHtml(phoneShown(order.address_phone))}</span></small>` : ''
+            }</div>
+          </div></div>`),
+    );
+    body.append(plan);
+  }
 
   /* the supplier: who they are, and that they can be rung */
   const who = el('<div class="panel card"></div>');
@@ -1847,9 +1928,10 @@ async function loadMine() {
   if (!store.guestToken) return paintMine([]);
   try {
     const { orders } = await guestApi('/v1/idesh');
+    const facts = await afterTheDay(orders);
     if (gone) return;
     showStale(false);
-    paintMine(orders);
+    paintMine(orders, facts);
   } catch (error) {
     if (gone) return;
     // Nobody signed in any more: nothing of theirs to show. The network out:
@@ -1864,7 +1946,64 @@ function showStale(on) {
   $('stale').hidden = !on;
 }
 
-function paintMine(orders) {
+/**
+ * An order past its day is not coming: its row says what is true of it
+ * instead. The list's answer carries none of that, so each such order is
+ * looked at (as the website's «Миний захиалга» does, site.js stillGoing): a
+ * cancelled one for its refund — what it waits for, and how much — and a
+ * handed-over one for the day it was received. One that cannot be looked at
+ * just now is drawn with what is known (`refundOf`, `cornerOf`).
+ */
+async function afterTheDay(orders) {
+  const past = orders.filter((o) => DONE.includes(o.state));
+  // The session the list was asked with, and never a sign-in from a look in the background.
+  const token = store.guestToken;
+  const looked = await Promise.all(past.map((o) => api(`/v1/idesh/${o.id}`, { token }).catch(() => null)));
+  return new Map(past.map((o, i) => [o.id, looked[i]]));
+}
+
+/**
+ * A cancelled order's refund in a word, the website's (site.js refundPill):
+ * the guest's step in the tone that asks for one, Basu's transfer in the
+ * tone of waiting on the other side; once sent, the state's own word.
+ */
+const REFUND_WORD = {
+  needs_account: ['Данс оруулна уу', ' data-tone="hold" data-strong'],
+  due: ['Буцаалт хүлээгдэж байна', ' data-tone="route"'],
+  paid: [IDESH_STATE.REFUNDED, ''],
+};
+
+/**
+ * What a cancelled order's money waits for, and how much it is, from the
+ * order itself (`seen`). Not looked at, it waits for Basu — as the website
+ * takes it (site.js stillGoing).
+ */
+function refundOf(order, seen) {
+  return {
+    state: seen?.refund?.state ?? (order.state === 'REFUNDED' ? 'paid' : 'due'),
+    amount: seen?.refund?.amount_mnt ?? seen?.refund_mnt ?? null,
+  };
+}
+
+/**
+ * The row's corner: the day the meat comes while it is coming; the day it
+ * came once handed over; and for a cancelled order the money coming back —
+ * never the day of a delivery that is not happening.
+ */
+function cornerOf(order, seen, refund) {
+  const delivery = order.receive === 'delivery';
+  if (refund) {
+    return `<span class="when val">${refund.amount === null ? '—' : money(refund.amount)}<small>${refund.state === 'paid' ? 'буцаасан' : 'буцаалт'}</small></span>`;
+  }
+  if (DONE.includes(order.state)) {
+    // Handed over: the day it was, from the order itself; not known, no day at all rather than a wrong one.
+    const at = seen?.handed_at;
+    return at ? `<span class="when val">${dayShort(ubParts(at).day)}<small>${delivery ? 'ирсэн' : 'авсан'}</small></span>` : '';
+  }
+  return `<span class="when val">${dayShort(order.receive_on)}<small>${delivery ? 'ирэх' : 'авах'}</small></span>`;
+}
+
+function paintMine(orders, seen = new Map()) {
   state.mine = orders;
   const list = $('mine-list');
   list.replaceChildren();
@@ -1874,15 +2013,21 @@ function paintMine(orders) {
   }
   $('mine').dataset.any = String(orders.length);
   for (const order of orders) {
-    const [word, cap] = IDESH_HEADLINE[order.state] ?? [order.state, ''];
+    const known = seen.get(order.id);
+    const refund = order.state === 'CANCELLED' || order.state === 'REFUNDED' ? refundOf(order, known) : null;
+    // The state's one word, the same on every page (IDESH_STATE) — or, for a
+    // cancelled order, what its money waits for, as the website's row says
+    // it; then the line under the name says it was cancelled.
+    const [word, tone] = refund ? (REFUND_WORD[refund.state] ?? REFUND_WORD.due) : [IDESH_STATE[order.state] ?? '', ` data-s="${escapeHtml(order.state)}"`];
+    const cap = order.state === 'CANCELLED' ? IDESH_STATE.CANCELLED : (IDESH_HEADLINE[order.state]?.[1] ?? '');
     const card = el(`
       <button class="card row" type="button" data-order="${order.id}" data-chev>
         <span class="who main">
           <span class="venue title">${escapeHtml(order.supplier.name)}</span>
-          <span class="what sub">${escapeHtml(order.title)} ×${escapeHtml(order.qty)} · ${escapeHtml(cap)}</span>
-          <span class="code meta">№${escapeHtml(order.code)}<span class="chip" data-s="${escapeHtml(order.state)}" data-inline>${escapeHtml(word)}</span></span>
+          <span class="what sub">${escapeHtml(order.title)} ×${escapeHtml(order.qty)}${cap ? ` · ${escapeHtml(cap)}` : ''}</span>
+          <span class="code meta">№${escapeHtml(order.code)}${word ? `<span class="chip"${tone} data-inline>${escapeHtml(word)}</span>` : ''}</span>
         </span>
-        <span class="end"><span class="when val">${dayShort(order.receive_on)}<small>${order.receive === 'delivery' ? 'ирэх' : 'авах'}</small></span></span>
+        <span class="end">${cornerOf(order, known, refund)}</span>
       </button>`);
     card.addEventListener('click', () => {
       state.listing = null;
