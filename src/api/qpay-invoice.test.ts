@@ -372,6 +372,25 @@ describe('an идэш paid by QPay on Wire’s page', () => {
     expect(await balanceOf(guest)).toBe(0);
   });
 
+  it('lets nothing go, and gives no draft back, while Wire does not answer', async () => {
+    const guest = await signIn();
+    const id = await anOrder(guest);
+    expect((await pay(guest, id)).statusCode).toBe(202);
+    paidAtWire('pi_test_1');
+    // Past both the invoice's twelve minutes and the draft's thirty — and Wire down.
+    later(31 * 60_000);
+    failGets = 100;
+    await housekeeping(ctx);
+    expect(await stateOf(guest, id)).toBe('DRAFT');
+    expect(intents.get('pi_test_1')?.status).toBe('succeeded');
+    // Back: the payment Wire took buys the order.
+    failGets = 0;
+    later(60_000);
+    expect((await housekeeping(ctx)).bought).toBe(1);
+    expect(await stateOf(guest, id)).toBe('PAID');
+    expect(await balanceOf(guest)).toBe(0);
+  });
+
   it('pays from the wallet at once when the wallet covers it', async () => {
     const guest = await signIn();
     // Money already in the wallet (a top-up through Wire, paid).

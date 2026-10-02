@@ -355,6 +355,9 @@ export async function payOrder(ctx: Ctx, orderId: string): Promise<void> {
     // As for meat: a server with no payment provider says it is closed,
     // rather than «try again» at a button that cannot work today.
     if (error instanceof LedgerError && error.code === 'PAYMENTS_CLOSED') throw error;
+    // Short of the wallet where a lunch is the wallet's alone (a real provider, no page for an invoice):
+    // «top up first», which can work — not «try again», which cannot.
+    if (error instanceof LedgerError && error.code === 'INSUFFICIENT_FUNDS') throw error;
     throw new OrderError('PAYMENT_FAILED', (error as Error).message);
   }
 

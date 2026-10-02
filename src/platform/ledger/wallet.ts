@@ -25,7 +25,7 @@ const OUT = 'bank:out';
 
 export class LedgerError extends Error {
   constructor(
-    readonly code: 'INSUFFICIENT_FUNDS' | 'TOPUP_FAILED' | 'NOT_PAID_YET' | 'PAYMENTS_CLOSED' | 'NOT_FOUND' | 'PAYMENT_FAILED',
+    readonly code: 'INSUFFICIENT_FUNDS' | 'TOPUP_FAILED' | 'NOT_PAID_YET' | 'PAYMENTS_CLOSED' | 'NOT_FOUND' | 'PAYMENT_FAILED' | 'PROVIDER_UNREACHABLE',
     message: string,
   ) {
     super(message);
@@ -244,7 +244,8 @@ export async function settleTopup(ctx: Ctx, topupId: string): Promise<number> {
     try {
       arrived = await ctx.payments.paid(topup.provider_ref);
     } catch (error) {
-      throw new LedgerError('NOT_PAID_YET', (error as Error).message);
+      // No answer is not «not paid»: nothing is let go or given back on it, and the next look asks again.
+      throw new LedgerError('PROVIDER_UNREACHABLE', (error as Error).message);
     }
     if (!arrived) {
       if (topup.state === 'expired') throw new LedgerError('TOPUP_FAILED', 'the invoice was let go unpaid');
@@ -579,6 +580,8 @@ export async function collectOrInvoice(
       toppedUp = open.amountMnt;
     } catch (error) {
       if (!(error instanceof LedgerError)) throw error;
+      // The provider not answering just now: the same invoice, still to wait on — never let go on silence.
+      if (error.code === 'PROVIDER_UNREACHABLE') return { state: 'awaiting', invoice: open };
       if (error.code === 'NOT_PAID_YET') {
         const ageMinutes = (ctx.clock.now().getTime() - open.createdAt.getTime()) / 60_000;
         // Covered by the wallet by now (a payment that came in late, a top-up): this invoice is not
@@ -596,6 +599,13 @@ export async function collectOrInvoice(
 
   const shortfall = Math.max(0, input.amountMnt - (await balance(input.guestId)));
   if (shortfall > 0) {
+    // Short, because another ask (the page, the provider's callback, the scheduler) settled this
+    // purchase's invoice and bought it a moment ago: that purchase — not «no invoice», and not a second
+    // one. Its money and its record are one commit, and the balance above was read after it.
+    const meanwhile = await getPool().query<{ id: string }>('SELECT id FROM ledger.transfer WHERE idempotency_key = $1', [input.idempotencyKey]);
+    if (meanwhile.rows[0]) {
+      return { state: 'collected', replayed: true, transferId: meanwhile.rows[0].id, amountMnt: input.amountMnt, fromWalletMnt: input.amountMnt, toppedUpMnt: 0 };
+    }
     if (typeof ctx.payments.paid !== 'function') {
       // A provider taken at its word (the demo's; a closed one refuses here): the shortfall arrives on the spot.
       const topup = await startTopup(ctx, { guestId: input.guestId, amountMnt: shortfall });

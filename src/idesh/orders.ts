@@ -609,6 +609,8 @@ export async function finishInvoiceFor(
       await settleTopup(ctx, invoice.topupId);
     } catch (error) {
       if (!(error instanceof LedgerError)) throw error;
+      // No answer from the provider: still waiting — nothing let go, nothing given back, on silence.
+      if (error.code === 'PROVIDER_UNREACHABLE') return 'WAITING';
       if (error.code !== 'NOT_PAID_YET') return 'LAPSED'; // refused by the provider, marked so
       // Unpaid, but the wallet covers the order by now (a payment that came in late): bought from there,
       // the invoice let go — rather than left out for the guest to pay a second time.
@@ -665,10 +667,10 @@ export async function housekeeping(
     const out = await pendingInvoice('idesh', row.id);
     if (out) {
       if (now.getTime() - out.createdAt.getTime() < INVOICE_LIFETIME_MINUTES * 60_000) continue;
-      if ((await finishInvoiceFor(ctx, row.id, out)) === 'PAID') {
-        bought++;
-        continue;
-      }
+      const looked = await finishInvoiceFor(ctx, row.id, out);
+      if (looked === 'PAID') bought++;
+      // Bought, or the provider gave no answer: not given back on this tick.
+      if (looked === 'PAID' || looked === 'WAITING') continue;
     }
     try {
       await cancelIdesh(ctx, row.id, { actor: 'system:scheduler', role: 'system' }, 'draft_expired');

@@ -157,6 +157,7 @@ const LEDGER_ERRORS: Record<LedgerError['code'], Spec> = {
   // nobody here can keep on the day it is read.
   PAYMENTS_CLOSED: { status: 503, mn: 'Онлайн төлбөр одоогоор хаалттай байна.' },
   NOT_PAID_YET: { status: 409, mn: 'Төлбөр хараахан хийгдээгүй байна. Төлсний дараа дахин шалгана уу.' },
+  PROVIDER_UNREACHABLE: { status: 503, mn: 'Төлбөрийн үйлчилгээ түр хариу өгөхгүй байна. Хэдэн секундын дараа дахин шалгана уу.' },
   TOPUP_FAILED: {
     status: 402,
     mn: 'Цэнэглэлт амжилтгүй боллоо. Дахин оролдоно уу.',
