@@ -1650,6 +1650,9 @@ function refundPanel(order) {
       why.setAttribute('data-calm', '');
       why.hidden = !problem;
       if (problem) why.innerHTML = `${MARK.warn}${problem}`;
+      // The button is described by its reason only while there is one: a hidden line keeps its old words.
+      if (problem) send.setAttribute('aria-describedby', 'refund-why');
+      else send.removeAttribute('aria-describedby');
       send.disabled = Boolean(problem);
     };
     // The password typed after a refusal is the next try: the refusal goes, and the button wakes, as it is typed.
@@ -1679,6 +1682,8 @@ function refundPanel(order) {
         });
         toast(chosen ? 'Нууц үг, данс хоёулаа хадгалагдлаа. Шилжүүлмэгц мэдэгдэл ирнэ.' : 'Данс бүртгэгдлээ. Шилжүүлмэгц мэдэгдэл ирнэ.');
         shell.ordersChanged();
+        // The list asks again what became of this order, rather than a look from before the account.
+        for (const key of afterLooks.keys()) if (key.startsWith(`${state.orderId}|`)) afterLooks.delete(key);
         if (!gone) await Promise.all([showStatus(true), loadMine()]);
         return true;
       } catch (error) {
@@ -1687,6 +1692,7 @@ function refundPanel(order) {
           otpStep.hidden = false;
           otp.focus();
           why.hidden = false;
+          send.setAttribute('aria-describedby', 'refund-why');
           // Asked for, it is a calm word; refused, it is said in the stop colour — until the next key (check, above).
           const wrong = error.code === 'BAD_PASSWORD';
           why.setAttribute('role', 'alert');
@@ -1699,6 +1705,7 @@ function refundPanel(order) {
         }
         // Said by the button it is about, in words, not only in a toast.
         why.hidden = false;
+        send.setAttribute('aria-describedby', 'refund-why');
         why.setAttribute('role', 'alert');
         why.removeAttribute('data-calm');
         why.dataset.tone = 'stop';
@@ -1715,6 +1722,7 @@ function refundPanel(order) {
       if (!otp.value) {
         const me = await guestApi('/v1/me').catch(() => null);
         if (me && !me.has_password) {
+          let tried = false;
           const done = await passwordPopup({
             token: store.guestToken,
             email: me.email,
@@ -1722,12 +1730,16 @@ function refundPanel(order) {
             // One word at the end, from the account, for the password and the account both.
             quiet: true,
             // Set just now — or already set elsewhere (null), and then asked for in its field.
-            then: ({ password }) => submit(password ?? '', Boolean(password)),
+            then: ({ password }) => {
+              tried = true;
+              return submit(password ?? '', Boolean(password));
+            },
           });
           // Closed before the account went: the button wakes as the form stands. A refusal woke it already, saying why.
           if (done === null && send.disabled) check();
-          // …and the focus is back on it — the popup could not give it back to a button that was asleep.
-          if (done === null && send.isConnected && !gone) send.focus({ preventScroll: true });
+          // …and the focus is back on it — the popup could not give it back to a button that was asleep. Not when the
+          // account was tried and its password field was opened: the keyboard is in that field now.
+          if (done === null && !tried && send.isConnected && !gone) send.focus({ preventScroll: true });
           return;
         }
       }

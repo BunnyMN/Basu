@@ -352,14 +352,33 @@ function ideshRow(order, seen) {
  */
 const afterLooks = new Map();
 const AFTER_FRESH = 30000;
+/** Looks on their way, by `id|state`: two loads at once (the clock's and the first) ask once. */
+const afterAsking = new Map();
 async function lookAfter(o, token) {
   const key = `${o.id}|${o.state}`;
   const had = afterLooks.get(key);
   if (had && (o.state === 'HANDED' || o.state === 'CLOSED' || Date.now() - had.at < AFTER_FRESH)) return had.order;
-  const order = await api(`/v1/idesh/${o.id}`, { token }).catch(() => null);
-  if (order) afterLooks.set(key, { at: Date.now(), order });
+  if (!afterAsking.has(key)) {
+    afterAsking.set(
+      key,
+      api(`/v1/idesh/${o.id}`, { token })
+        .then((order) => {
+          if (order) afterLooks.set(key, { at: Date.now(), order });
+          return order;
+        })
+        .catch(() => null)
+        .finally(() => afterAsking.delete(key)),
+    );
+  }
+  const order = await afterAsking.get(key);
   return order ?? had?.order ?? null;
 }
+// Shown again from the back-forward cache (back from «Идэш», where a refund's account may have just been given): look afresh.
+addEventListener('pageshow', (e) => {
+  if (!e.persisted) return;
+  afterLooks.clear();
+  void loadLive();
+});
 
 async function loadLive() {
   const token = store.guestToken;

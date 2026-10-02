@@ -223,11 +223,14 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var
 .review{padding:16px 20px 20px;border-top:1px solid var(--line)}
 .review p.lead{margin:2px 0 10px;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}
 .review > .stars{margin:0 -10px}
-.review .row{display:flex;align-items:center;gap:12px;min-height:52px;padding:6px 0;border-top:1px solid var(--line)}
+/* A dish keeps room to say its name (7em) beside its picture; where the line has no room for its five
+   stars as well (a phone), they go under the name, to the right — still a thumb's 44 each, never over the
+   words — and every row of the review the same way. */
+.review .row{display:flex;align-items:center;flex-wrap:wrap;gap:0 12px;min-height:52px;padding:6px 0;border-top:1px solid var(--line)}
 .review > .stars + .row{margin-top:8px}
 .review .row img{width:40px;height:40px;border-radius:var(--r-sm);background:var(--surface-2);object-fit:cover;flex:none}
-.review .row .n{flex:1;min-width:0;font-size:var(--t-body-lg);color:var(--ink)}
-.review .row .stars{margin-right:-13px}
+.review .row .n{flex:1 1 7em;min-width:0;font-size:var(--t-body-lg);color:var(--ink)}
+.review .row .stars{margin-left:auto;margin-right:-13px}
 .review textarea{margin-top:12px}
 /* The timing question is the product's own metric and is asked separately:
    a four-star lunch that came late is a success by one measure and a failure
