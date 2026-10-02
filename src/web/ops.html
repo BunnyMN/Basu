@@ -439,11 +439,11 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 .acts{display:flex;flex-direction:column;gap:10px}
 .acts .hint{font-size:var(--t-cap);line-height:1.45;color:var(--ink-3)}
 .acts .sep{height:1px;background:var(--line);margin:4px 0}
-/* a finger's target on a touch screen — app.css grows the shared controls; these are the page's own small ones:
-   a number that dials, the door's brand, a link in a line, the role editor's «Бүгдийг дэлгэх» and its
+/* a finger's target on a touch screen — app.css grows the shared controls (a number that dials among them);
+   these are the page's own small ones, or own sizes that would undo it: the door's brand, the link in a line
+   whose min-height this page takes away, the role editor's «Бүгдийг дэлгэх» (kept on its line) and its
    Хаах / Харах / Бүрэн. Each grows around its words, so the line keeps its place. */
 @media (pointer:coarse){
-  a.tel{min-height:var(--target);margin-block:-12px}
   .door-brand{padding-block:9px;margin-top:-9px;margin-bottom:19px}
   .org-you .link{min-height:var(--target);margin-block:-12px}
   .role-sec-head [data-unfold]{min-height:var(--target);margin-block:-15px}
@@ -1820,6 +1820,19 @@ function openRoleSheet(data, mods, role, { manage, from = null, onCopy }) {
   const scrim = el('<div class="scrim"></div>');
   let editor = null;
   let closed = false;
+  // While it is open the page behind it sleeps (inert), as popup()'s page does: a reader reads only the
+  // editor, the keyboard cannot wander under the dim. The toast stays awake, so what it says is heard.
+  const hushed = [];
+  const hush = () => {
+    for (const node of document.body.children) {
+      if (node === scrim || node === editor.root || node.id === 'toast' || node.classList.contains('toast-old') || node.hasAttribute('inert')) continue;
+      node.setAttribute('inert', '');
+      hushed.push(node);
+    }
+  };
+  const wake = () => {
+    for (const node of hushed.splice(0)) node.removeAttribute('inert');
+  };
   /** Close, or — with something typed and not saved — ask first, and do `after` once it is closed. */
   const close = (force = false, after = null) => {
     if (closed) return true;
@@ -1850,6 +1863,8 @@ function openRoleSheet(data, mods, role, { manage, from = null, onCopy }) {
       sheet.remove();
       scrim.remove();
     }, 260);
+    // The page wakes before the keyboard goes back to what opened the editor: a sleeping button takes no focus.
+    wake();
     if (opener?.isConnected) opener.focus();
     return true;
   };
@@ -1885,6 +1900,7 @@ function openRoleSheet(data, mods, role, { manage, from = null, onCopy }) {
   scrim.addEventListener('click', () => close());
   document.addEventListener('keydown', onKey, true);
   document.body.append(scrim, editor.root);
+  hush();
   document.documentElement.setAttribute('data-modal-open', '');
   void editor.root.offsetWidth; // the closed state is drawn once, so opening is a movement rather than a jump
   scrim.setAttribute('data-open', '');
