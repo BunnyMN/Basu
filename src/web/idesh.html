@@ -856,6 +856,8 @@ function showScreen(name, title, sub, { replace = false } = {}) {
 
 /** What had the focus when the screen opened: it gets it back when the screen closes. */
 let opener = null;
+/** Finished orders as last looked at (lookAfter, below) — here, before anything can close a screen. */
+const afterLooks = new Map();
 
 function closeScreen() {
   $('screen').removeAttribute('data-open');
@@ -863,6 +865,8 @@ function closeScreen() {
   for (const behind of [$('bar'), $('list')]) behind.removeAttribute('inert');
   if (opener?.isConnected) opener.focus({ preventScroll: true });
   opener = null;
+  // The order just looked at is asked again by the list: its refund may have moved on its screen.
+  for (const key of afterLooks.keys()) if (key.startsWith(`${state.orderId}|`)) afterLooks.delete(key);
   state.screen = null;
   state.listing = null;
   state.form = null;
@@ -1958,8 +1962,26 @@ async function afterTheDay(orders) {
   const past = orders.filter((o) => DONE.includes(o.state));
   // The session the list was asked with, and never a sign-in from a look in the background.
   const token = store.guestToken;
-  const looked = await Promise.all(past.map((o) => api(`/v1/idesh/${o.id}`, { token }).catch(() => null)));
+  const looked = await Promise.all(past.map((o) => lookAfter(o, token)));
   return new Map(past.map((o, i) => [o.id, looked[i]]));
+}
+
+/**
+ * What an order past its day became, as last looked at: `id|state` → { at, order }.
+ * A handover's day never changes, so a handed or closed order is looked at
+ * once; a refund still on its way at most every half minute — not on every
+ * 4-second tick of the list — and again as soon as its own screen closes
+ * (the account may have just been given there). A look that fails keeps what
+ * was known.
+ */
+const AFTER_FRESH = 30000;
+async function lookAfter(o, token) {
+  const key = `${o.id}|${o.state}`;
+  const had = afterLooks.get(key);
+  if (had && (o.state === 'HANDED' || o.state === 'CLOSED' || Date.now() - had.at < AFTER_FRESH)) return had.order;
+  const order = await api(`/v1/idesh/${o.id}`, { token }).catch(() => null);
+  if (order) afterLooks.set(key, { at: Date.now(), order });
+  return order ?? had?.order ?? null;
 }
 
 /**

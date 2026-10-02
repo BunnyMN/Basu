@@ -343,6 +343,24 @@ function ideshRow(order, seen) {
  * Two calls, one per vertical, merged here: the launcher is the one place
  * that knows there are two, and each app's list stays its own.
  */
+/**
+ * What an идэш past its day became, as last looked at: `id|state` → { at, order }.
+ * A handover's day never changes, so a handed or closed order is looked at
+ * once while the launcher is open; a refund still on its way at most every
+ * half minute — not on every 4-second tick. A look that fails keeps what was
+ * known.
+ */
+const afterLooks = new Map();
+const AFTER_FRESH = 30000;
+async function lookAfter(o, token) {
+  const key = `${o.id}|${o.state}`;
+  const had = afterLooks.get(key);
+  if (had && (o.state === 'HANDED' || o.state === 'CLOSED' || Date.now() - had.at < AFTER_FRESH)) return had.order;
+  const order = await api(`/v1/idesh/${o.id}`, { token }).catch(() => null);
+  if (order) afterLooks.set(key, { at: Date.now(), order });
+  return order ?? had?.order ?? null;
+}
+
 async function loadLive() {
   const token = store.guestToken;
   if (!token) return paint([]);
@@ -363,7 +381,7 @@ async function loadLive() {
   ]);
   // An идэш past its day is looked at for what became of it (ideshRow); one that cannot be, keeps a calm corner.
   const past = provisions.filter((o) => IDESH_PAST.includes(o.state));
-  const seen = new Map(await Promise.all(past.map(async (o) => [o.id, await api(`/v1/idesh/${o.id}`, { token }).catch(() => null)])));
+  const seen = new Map(await Promise.all(past.map(async (o) => [o.id, await lookAfter(o, token)])));
   const rows = [...lunches.map(dineRow), ...provisions.map((o) => ideshRow(o, seen.get(o.id)))];
   rows.sort((a, b) => a.at - b.at);
   paint(rows);
