@@ -2,7 +2,7 @@
    the foot, the way to /login and back, and calls made as the person
    signed in. Every page of the website imports this; the app's pages do not. */
 
-import { api, store, dropSession, endSession, authReturn, IDESH_LIVE } from '/api.js';
+import { api, store, dropSession, endSession, authReturn, IDESH_LIVE, phoneText } from '/api.js';
 
 /**
  * Text into markup, for everything a page draws from what people wrote: a
@@ -141,8 +141,12 @@ export async function me() {
   return meAsked;
 }
 
-/** A Mongolian number the way people read it: +976 9911 2233. Anything else as it came. */
-export const phoneShown = (p) => String(p ?? '').replace(/^\+976(\d{4})(\d{4})$/, '+976 $1 $2');
+/**
+ * A Mongolian number the way people read it: +976 9911 2233 — from +97699112233
+ * and from the eight digits a delivery phone is kept as (99112233) alike, as
+ * api.js phoneText writes it everywhere else. Anything else as it came.
+ */
+export const phoneShown = (p) => phoneText(p);
 export const nameOf = (p) => p?.display_name || p?.email || phoneShown(p?.phone) || 'Basu хэрэглэгч';
 const initialOf = (p) => (p?.display_name || p?.email || 'B').trim().charAt(0) || 'B';
 
@@ -313,6 +317,8 @@ export function mountFrame(active) {
   const drawn = document.querySelector('header.s-bar[data-static]');
   if (drawn) drawn.replaceWith(bar);
   else document.body.prepend(bar);
+  // The lines a screen reader hears `say` on, in place before anything is said.
+  liveLines();
   // Asked once the page's own script has drawn its first shapes (a microtask on: it runs on until it awaits).
   queueMicrotask(() => {
     const loading = () => Boolean(document.querySelector('main [aria-busy="true"]'));
@@ -329,10 +335,52 @@ export function mountFrame(active) {
   return accountSlot(bar.querySelector('#s-account'));
 }
 
-/** A message at the bottom of the screen, for a moment: `good` once something is done, `bad` when it failed. */
+/**
+ * Where a screen reader hears what `say` shows: two unseen lines kept on the
+ * page from its start — `#s-said` (role=status) for what is done, `#s-alarm`
+ * (role=alert) for what failed. A live region put in with its words already
+ * in it, as the toast is, is often not read out at all; words changed in one
+ * that was there before are. mountFrame puts them in.
+ */
+function liveLines() {
+  if (!document.getElementById('s-said')) {
+    document.body.append(el('<div class="s-sr" id="s-said" role="status"></div>'), el('<div class="s-sr" id="s-alarm" role="alert"></div>'));
+  }
+  return { said: document.getElementById('s-said'), alarm: document.getElementById('s-alarm') };
+}
+
+/**
+ * Words into a live line, to be heard. While a popup is open the page behind
+ * it sleeps (api.js puts it `inert`), the live lines with it, and words put
+ * into a sleeping line are never read out — `say` is often called from inside
+ * a popup's answer, just before it closes. So they wait for the page to wake,
+ * and come a moment after, once the line is back where a screen reader looks.
+ */
+function speak(line, message) {
+  if (!line.closest('[inert]')) {
+    line.textContent = message;
+    return;
+  }
+  const watch = new MutationObserver(() => {
+    if (line.closest('[inert]')) return;
+    watch.disconnect();
+    setTimeout(() => (line.textContent = message), 120);
+  });
+  watch.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['inert'] });
+}
+
+/**
+ * A message at the bottom of the screen, for a moment: `good` once something
+ * is done, `bad` when it failed. The toast is for the eye; the same words go
+ * to the live lines for the ear (liveLines), so they are said once.
+ */
 export function say(message, tone) {
+  const { said, alarm } = liveLines();
+  said.textContent = '';
+  alarm.textContent = '';
+  speak(tone === 'bad' ? alarm : said, message);
   document.querySelector('.s-toast')?.remove();
-  const box = el(`<div class="s-toast" role="${tone === 'bad' ? 'alert' : 'status'}"${tone ? ` data-tone="${tone}"` : ''}></div>`);
+  const box = el(`<div class="s-toast" aria-hidden="true"${tone ? ` data-tone="${tone}"` : ''}></div>`);
   box.textContent = message;
   document.body.append(box);
   setTimeout(() => box.remove(), tone === 'bad' ? 6000 : 4200);
@@ -389,13 +437,17 @@ export const meatPhoto = (kind) => `/brand/meat/${['sheep', 'goat', 'beef', 'hor
 
 /**
  * An empty place that says what it is for and gives the one next step:
- * `actions` are [label, href, 'dark' | 'line'] — at most one dark.
+ * `actions` are [label, href, 'dark' | 'line'] — at most one dark. `heading`
+ * (1 or 2) when the empty place is all the page has to say — a listing or an
+ * order that is not there, a page that could not load: its title is then the
+ * page's heading, for a screen reader's list of headings, looking the same.
  */
-export function siteEmpty({ icon = 'info', title, text = '', actions = [], card = false }) {
+export function siteEmpty({ icon = 'info', title, text = '', actions = [], card = false, heading = 0 }) {
+  const tag = heading === 1 || heading === 2 ? `h${heading}` : 'b';
   return el(`
     <div class="s-empty${card ? ' s-card' : ''}">
       <span class="s-mark" aria-hidden="true">${ICON[icon] ?? ICON.info}</span>
-      <b>${esc(title)}</b>${text ? `<p>${esc(text)}</p>` : ''}
+      <${tag} class="s-empty-title">${esc(title)}</${tag}>${text ? `<p>${esc(text)}</p>` : ''}
       ${actions.length ? `<div class="s-acts">${actions.map(([label, href, kind = 'line']) => `<a class="s-btn s-btn-${kind}" href="${esc(href)}">${esc(label)}</a>`).join('')}</div>` : ''}
     </div>`);
 }
