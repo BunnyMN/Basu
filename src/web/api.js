@@ -847,8 +847,10 @@ const atLetterCode = (error) => (error instanceof ApiError && /CODE|EXPIRED/.tes
  * who pressed «Данс нэмэх» knows why «Имэйл холбох» came up.
  * `then(address)` is the next step once it is linked. Resolves with what it
  * returned (or the address), or null when the popup was closed first.
+ * `steps` is the whole road's count when more steps come after these two (a
+ * password's: «Алхам 1/4», «2/4», then the password's «3/4», «4/4»).
  */
-async function emailPopup({ token, hasPassword = false, why = '', then }) {
+async function emailPopup({ token, hasPassword = false, why = '', steps = 2, then }) {
   let sent = null;
   const linked = await popup({
     title: 'Имэйл холбох',
@@ -860,7 +862,7 @@ async function emailPopup({ token, hasPassword = false, why = '', then }) {
     ],
     submit: 'Код авах',
     width: 480,
-    steps: 2,
+    steps,
     onSubmit: async (v, { step }) => {
       if (!sent) {
         await api('/v1/me/email/code', { method: 'POST', token, body: { email: v.email, password: v.current || undefined } });
@@ -903,13 +905,18 @@ async function emailPopup({ token, hasPassword = false, why = '', then }) {
  * popup says one word at its end for both, rather than two toasts standing
  * over each other. Should that step be left without an answer (`then`
  * resolves to null), the password kept is said after all.
+ *
+ * `steps` is the count the password's own two steps end: 2 alone («Алхам
+ * 1/2», «2/2»); after an address added first, the address's two and the
+ * password's two are one road of 4 («1/4» … «4/4»), not «1/2» twice.
  */
-export async function passwordPopup({ token, email = null, why = '', quiet = false, then } = {}) {
+export async function passwordPopup({ token, email = null, why = '', quiet = false, steps = 2, then } = {}) {
   if (!email) {
     return emailPopup({
       token,
       why: `${why ? `${why} ` : ''}Нууц үгийн код имэйлээр ирдэг тул хамгийн түрүүнд имэйлээ холбоно.`,
-      then: (address) => passwordPopup({ token, email: address, why, quiet, then }),
+      steps: steps + 2,
+      then: (address) => passwordPopup({ token, email: address, why, quiet, steps: steps + 2, then }),
     });
   }
   let sent = null;
@@ -919,7 +926,8 @@ export async function passwordPopup({ token, email = null, why = '', quiet = fal
     fields: [{ type: 'note', text: why || 'Дараагийн алхамд кодоо оруулж, шинэ нууц үгээ сонгоно.' }],
     submit: 'Код авах',
     width: 480,
-    steps: 2,
+    steps,
+    firstStep: steps - 1,
     onSubmit: async (v, { step, el, say }) => {
       if (!sent) {
         const asked = await api('/v1/me/password/code', { method: 'POST', token }).catch((error) => {
@@ -1223,7 +1231,10 @@ function popupMissing(control) {
  * «Код дахин авах» — says its own trouble in the same place, with
  * `popup.say(...)`. While the answer is on the way the button turns and the
  * form holds still. `steps: 2` puts «Алхам 1/2» over the title, and each
- * `step()` that draws new fields moves it on. `danger` makes the button the
+ * `step()` that draws new fields moves it on. `firstStep` is the number the
+ * first step shows when a popup goes on from another one: an address's two
+ * steps, then a password's two, read «Алхам 1/4» to «4/4» as one road, not
+ * «1/2» twice (passwordPopup). `danger` makes the button the
  * filled red of a step that cannot be undone. `focus` is where the keyboard
  * goes when a step is drawn: 'auto' (the default: the first field where there
  * is a mouse, the popup itself on a touch screen — the phone's keyboard stays
@@ -1231,7 +1242,7 @@ function popupMissing(control) {
  * 'sheet' (the popup itself everywhere). Closed without an answer, the
  * promise resolves to null.
  */
-export function popup({ title, sub = '', fields = [], submit = 'Хадгалах', cancel = 'Болих', danger = false, width = 560, steps = 0, focus = 'auto', onSubmit = async () => true, id = null }) {
+export function popup({ title, sub = '', fields = [], submit = 'Хадгалах', cancel = 'Болих', danger = false, width = 560, steps = 0, firstStep = 1, focus = 'auto', onSubmit = async () => true, id = null }) {
   return new Promise((resolve) => {
     // Where the keyboard goes when a step is drawn: its first field, or — on a touch screen with
     // focus 'auto', or anywhere with 'sheet' — the popup itself, so a phone's keyboard does not
@@ -1346,7 +1357,7 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
       }
     };
 
-    let at = 1;
+    let at = Math.min(Math.max(1, Math.trunc(firstStep) || 1), Math.max(steps, 1));
     const drawSteps = () => {
       const box = $('.popup-steps');
       if (!(steps > 1)) {
@@ -1431,7 +1442,12 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
       }, 260);
       // The page wakes before the keyboard goes back to what opened the popup: a sleeping button takes no focus.
       wake();
-      if (opener?.isConnected) opener.focus?.();
+      // …unless the answer has put the keyboard somewhere already (a sheet under this one closed and gave it
+      // back to its own opener, or a new popup took it), or what opened this one sits in a sheet that is
+      // closing: focus sent there would fall to <body> once that sheet is gone.
+      const here = document.activeElement;
+      const placed = here && here !== document.body && !sheet.contains(here);
+      if (!placed && opener?.isConnected && !opener.closest?.('[inert], .sheet:not([data-open])')) opener.focus?.();
       resolve(answer);
     };
 
