@@ -91,6 +91,11 @@ input.s-input[type="date"]{display:flex;align-items:center}
 .s-nav a[aria-current="page"]{color:var(--accent-ink);font-weight:600}
 .s-nav a[aria-current="page"]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:2px;background:var(--accent)}
 @media (hover:hover){.s-nav a:hover{color:var(--ink)}}
+/* under a thumb (a tablet) a short word — «Зах» — is still 44px wide: room either side of it, given back outside it, so nothing moves */
+@media (pointer:coarse){
+  .s-nav a{padding-inline:10px;margin-inline:-10px}
+  .s-nav a[aria-current="page"]::after{left:10px;right:10px}
+}
 .s-right{margin-left:auto;display:flex;align-items:center;gap:8px;min-width:0}
 .s-burger{display:none;width:44px;height:44px;margin-right:-8px;border:0;border-radius:12px;background:none;color:var(--ink);cursor:pointer}
 .s-burger svg{width:24px;height:24px}
@@ -148,6 +153,8 @@ input.s-input[type="date"]{display:flex;align-items:center}
   .s-foot nav{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;order:-1}
   .s-foot nav a{min-height:44px}
 }
+/* the links in a row under a thumb (a tablet): 44px tall, and a short one («Зах») 44px wide, its room given back outside it */
+@media (pointer:coarse) and (min-width:761px){.s-foot nav a{min-height:44px;padding-inline:10px;margin-inline:-10px}}
 
 /* ── a page's head ───────────────────────────────────────────────── */
 .s-head{padding:44px 0 28px}

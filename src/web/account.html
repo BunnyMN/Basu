@@ -113,8 +113,8 @@ async function draw() {
         ${fact('Бүртгүүлсэн', since(me.member_since))}
       </dl>
     </div>`);
-  profileHead.querySelector('#edit-name').addEventListener('click', () =>
-    void popup({
+  profileHead.querySelector('#edit-name').addEventListener('click', async () => {
+    const saved = await popup({
       title: 'Нэр засах',
       sub: 'Нийлүүлэгч захиалгад тань энэ нэрийг харна.',
       width: 460,
@@ -134,11 +134,12 @@ async function draw() {
         corner?.querySelector('.s-ini')?.replaceChildren((v.name || me.email || 'B').trim().charAt(0) || 'B');
         corner?.setAttribute('aria-label', `${named} — бүртгэлийн цэс`);
         await draw();
-        // The page was drawn anew: the focus goes back to «Нэр засах», as the popup would have put it.
-        document.getElementById('edit-name')?.focus();
       },
-    }),
-  );
+    });
+    // The page was drawn anew under the popup: once it has closed (and the page woken), the focus goes
+    // back to «Нэр засах», as the popup puts it on what opened it — that button is a new one now.
+    if (saved) document.getElementById('edit-name')?.focus();
+  });
 
   const waysHead = el('<div class="s-sec"><h2>Нэвтрэх арга</h2></div>');
   const ways = el('<div class="sa-ways"></div>');
@@ -179,8 +180,8 @@ async function draw() {
   box.removeAttribute('role');
   box.replaceChildren(profileHead, profile, waysHead, ways, devicesHead, devices, out);
   // Signing every other device out cannot be taken back: it is asked first, saying how many.
-  devices.querySelector('#others').addEventListener('click', () =>
-    void confirmPopup({
+  devices.querySelector('#others').addEventListener('click', async () => {
+    const done = await confirmPopup({
       title: 'Бусад төхөөрөмжөөс гарах',
       text: `Энэ төхөөрөмжөөс бусад <b>${esc(devices.dataset.others)}</b> төхөөрөмж дээрх нэвтрэлт хаагдана. Тэнд дахин нэвтрэх хүртэл Basu-д орохгүй. Энэ төхөөрөмж нэвтэрсэн хэвээр үлдэнэ.`,
       ok: 'Бусдаас гаргах',
@@ -194,15 +195,15 @@ async function draw() {
         }
         say(revoked ? `${revoked} төхөөрөмжөөс гаргалаа.` : 'Өөр төхөөрөмж алга.', 'good');
         paintSessions((await authed('/v1/me/sessions')).sessions);
-        // The button goes once nothing else is signed in: the focus goes to the line that now says so.
-        const why = devices.querySelector('#others-why');
-        if (devices.querySelector('#others').hidden && why) {
-          why.tabIndex = -1;
-          why.focus();
-        }
       },
-    }),
-  );
+    });
+    // The button goes once nothing else is signed in: with the popup closed, the focus goes to the line that now says so.
+    const why = devices.querySelector('#others-why');
+    if (done && devices.querySelector('#others').hidden && why) {
+      why.tabIndex = -1;
+      why.focus();
+    }
+  });
   out.querySelector('#out').addEventListener('click', () => void signOut());
 }
 

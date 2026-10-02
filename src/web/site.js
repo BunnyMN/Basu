@@ -350,6 +350,26 @@ function liveLines() {
 }
 
 /**
+ * Words into a live line, to be heard. While a popup is open the page behind
+ * it sleeps (api.js puts it `inert`), the live lines with it, and words put
+ * into a sleeping line are never read out — `say` is often called from inside
+ * a popup's answer, just before it closes. So they wait for the page to wake,
+ * and come a moment after, once the line is back where a screen reader looks.
+ */
+function speak(line, message) {
+  if (!line.closest('[inert]')) {
+    line.textContent = message;
+    return;
+  }
+  const watch = new MutationObserver(() => {
+    if (line.closest('[inert]')) return;
+    watch.disconnect();
+    setTimeout(() => (line.textContent = message), 120);
+  });
+  watch.observe(document.body, { subtree: true, attributes: true, attributeFilter: ['inert'] });
+}
+
+/**
  * A message at the bottom of the screen, for a moment: `good` once something
  * is done, `bad` when it failed. The toast is for the eye; the same words go
  * to the live lines for the ear (liveLines), so they are said once.
@@ -358,7 +378,7 @@ export function say(message, tone) {
   const { said, alarm } = liveLines();
   said.textContent = '';
   alarm.textContent = '';
-  (tone === 'bad' ? alarm : said).textContent = message;
+  speak(tone === 'bad' ? alarm : said, message);
   document.querySelector('.s-toast')?.remove();
   const box = el(`<div class="s-toast" aria-hidden="true"${tone ? ` data-tone="${tone}"` : ''}></div>`);
   box.textContent = message;

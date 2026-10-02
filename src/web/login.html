@@ -26,7 +26,7 @@ if (/FBAN|FBAV|FB_IAB|Instagram|Line\//.test(navigator.userAgent)) document.docu
    like the rest of the website. */
 
 .l{position:relative;flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-height:100vh;min-height:100dvh}
-.l-art{position:relative;overflow:hidden;background:var(--deep);color:#fff}
+.l-art{position:relative;overflow:hidden;background:var(--deep);color:#fff;--focus:var(--accent-line)}
 .l-art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:46% 50%}
 .l-art::after{content:"";position:absolute;inset:0;
   background:linear-gradient(180deg,rgba(18,58,44,.6) 0%,rgba(18,58,44,0) 28%,rgba(18,58,44,0) 48%,rgba(18,58,44,.92) 100%);
@@ -97,8 +97,9 @@ html[data-in-app] .l-in-app{display:flex}
   /* the way home rides on the picture, so the form starts at the top of the pane */
   .l-top{position:absolute;z-index:2;top:calc(8px + var(--safe-t));right:16px}
   .l-home{color:#fff}
-  /* on the picture the pine focus ring would not show: white, as the words are */
-  .l-home:focus-visible{outline-color:#fff}
+  /* on the picture the pine focus ring would not show: the pale pine (--focus, which app.css's ring reads), as on the landing's bands */
+  .l-top{--focus:var(--accent-line)}
+  .l-home:focus-visible{outline-color:var(--focus)}
   .l-pane{padding:4px 24px calc(28px + var(--safe-b))}
   .l-body{justify-content:flex-start;padding:24px 0 8px}
   .l-body h1{font-size:1.75rem}
@@ -142,8 +143,9 @@ html[data-in-app] .l-in-app{display:flex}
       <div class="l-step" data-step="code" hidden>
         <button class="l-back" type="button" data-go="start"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Буцах</button>
         <h1>Имэйлээ шалгана уу</h1>
-        <p class="l-lead"><b id="sent-to"></b> хаяг руу 6 оронтой код илгээлээ. 10 минут хүчинтэй.</p>
-        <div class="l-otp" id="otp"><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-label="Имэйлд ирсэн 6 оронтой код" aria-describedby="code-error"></div>
+        <!-- the field below is described by this line too: a screen reader landing in it hears where the code went and for how long -->
+        <p class="l-lead" id="code-lead"><b id="sent-to"></b> хаяг руу 6 оронтой код илгээлээ. 10 минут хүчинтэй.</p>
+        <div class="l-otp" id="otp"><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-label="Имэйлд ирсэн 6 оронтой код" aria-describedby="code-lead code-error"></div>
         <p class="s-error" id="code-error" role="alert"></p>
         <div class="l-again"><span id="again-hint">Ирээгүй юу? Спам хавтсаа шалгаарай.</span><button class="s-link" type="button" id="resend">Код дахин авах</button></div>
       </div>

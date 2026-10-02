@@ -412,13 +412,16 @@ function askAccount(o, password = null) {
       say(password ? 'Нууц үг, данс хоёулаа хадгалагдлаа. Шилжүүлмэгц мэдэгдэл ирнэ.' : 'Данс бүртгэгдлээ. Шилжүүлмэгц мэдэгдэл ирнэ.', 'good');
       drawn = null;
       await drawOrder(o.id);
-      // «Данс оруулах» is gone with the account given: the focus goes to the refund's heading, not lost to the page's top.
-      const head = document.querySelector('.od-refund h2');
-      if (head) {
-        head.tabIndex = -1;
-        head.focus();
-      }
     },
+  }).then((given) => {
+    // «Данс оруулах» is gone with the account given: once the popup has closed (and the page woken), the
+    // focus goes to the refund's heading, not lost to the page's top.
+    const head = given && document.querySelector('.od-refund h2');
+    if (head) {
+      head.tabIndex = -1;
+      head.focus();
+    }
+    return given;
   });
 }
 

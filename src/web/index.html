@@ -81,6 +81,8 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 .logo{display:inline-flex;align-items:center;min-height:44px;text-decoration:none;font-size:1.375rem;font-weight:600;letter-spacing:-.035em;color:var(--accent-ink)}
 .bar nav{display:flex;gap:26px}
 .bar nav a{display:inline-flex;align-items:center;min-height:44px;text-decoration:none;font-size:.9375rem;font-weight:500;color:var(--ink-2)}
+/* under a thumb (a tablet) a short word — «Мах» — is still 44px wide, its room given back outside it */
+@media (pointer:coarse){.bar nav a{padding-inline:10px;margin-inline:-10px}}
 @media (hover:hover){.bar nav a:hover{color:var(--ink)}}
 .bar .right{margin-left:auto;display:flex;align-items:center;gap:8px}
 .bar .go{min-height:40px;padding:0 18px;font-size:.9375rem}
@@ -313,8 +315,10 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 .photos p{margin:10px 0 0;line-height:1.7}
 .photos a{color:inherit}
 
-/* On the deep pine bands the pine focus ring would vanish into its own colour: white there. */
-:is(.hero,.steps-band,.trade) :focus-visible{outline-color:#fff}
+/* On the deep pine bands the pine focus ring would vanish into its own colour: the pale pine there (8:1).
+   --focus is the ring's colour app.css reads; the outline's colour is said here too, for the ring drawn before it read one. */
+:is(.hero,.steps-band,.cuts,.trade){--focus:var(--accent-line)}
+:is(.hero,.steps-band,.cuts,.trade) :focus-visible{outline-color:var(--focus)}
 
 /* things arrive as they come into view */
 .reveal{opacity:0;transform:translateY(16px);transition:opacity 700ms var(--ease),transform 700ms var(--ease)}
