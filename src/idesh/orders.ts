@@ -943,6 +943,7 @@ export async function ownedBySupplier(
 }
 
 export interface BoardTicket extends IdeshSummary {
+  /** The name the guest chose — on the supplier's screens null when they chose none (the desk's lists say who in its place). */
   guest: string | null;
   /** Paid for, so the supplier may ring: the review promised both ways. */
   guestPhone: string | null;
@@ -982,7 +983,8 @@ export async function boardFor(supplierId: string, db: Db = getPool()): Promise<
   );
 
   // One call for the whole board rather than a join: identity is a module.
-  const names = await displayNamesFor(rows.map((r) => r.guest_id));
+  // Only the names people chose: a piece of somebody's address is no name to greet at the counter.
+  const names = await displayNamesFor(rows.map((r) => r.guest_id), { fallback: false });
   const contacts = await contactsFor(rows.map((r) => r.guest_id));
 
   const lanes: Board['lanes'] = { paid: [], preparing: [], ready: [], dispatched: [] };
@@ -1132,7 +1134,8 @@ export async function ordersOf(
   opts: { scope?: OrderScope; q?: string; limit?: number } = {},
   db: Db = getPool(),
 ): Promise<SupplierOrder[]> {
-  return listOrders({ ...opts, supplierId }, db);
+  // The supplier is told the names people chose, never a piece of their number or address in its place.
+  return listOrders({ ...opts, supplierId }, db, { fallback: false });
 }
 
 export interface OrderFilter {
@@ -1152,7 +1155,7 @@ export async function allOrders(opts: OrderFilter = {}, db: Db = getPool()): Pro
   return listOrders(opts, db);
 }
 
-async function listOrders(opts: OrderFilter, db: Db): Promise<SupplierOrder[]> {
+async function listOrders(opts: OrderFilter, db: Db, { fallback = true }: { fallback?: boolean } = {}): Promise<SupplierOrder[]> {
   const scope = opts.scope ?? 'all';
   const states = opts.state ? [opts.state] : SCOPE_STATES[scope];
   const { rows } = await db.query<OrderRow & { handed_at: Date | null; cancelled_at: Date | null; created_at: Date }>(
@@ -1165,7 +1168,7 @@ async function listOrders(opts: OrderFilter, db: Db): Promise<SupplierOrder[]> {
       LIMIT 500`,
     [states, opts.supplierId ?? null, opts.day ?? null, opts.guestId ?? null],
   );
-  const names = await displayNamesFor(rows.map((r) => r.guest_id));
+  const names = await displayNamesFor(rows.map((r) => r.guest_id), { fallback });
   const contacts = await contactsFor(rows.map((r) => r.guest_id));
   const q = (opts.q ?? '').trim().toLowerCase().replace(/\s+/g, '');
   const digits = q.replace(/\D/g, '');

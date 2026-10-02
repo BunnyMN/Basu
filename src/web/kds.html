@@ -120,7 +120,7 @@
 /* ── the door: one card in the middle of the ground ── */
 .door{width:min(420px,calc(100% - 2 * var(--gutter)));margin:var(--s-8) auto;padding:var(--s-6)}
 .door > .eyebrow{display:block;margin-bottom:10px}
-.door > h2{margin-bottom:6px}
+.door > h1{font-size:var(--t-title-2);line-height:1.2;letter-spacing:-.015em;margin-bottom:6px}
 .door > p{margin:0 0 var(--s-5);color:var(--ink-2)}
 .door .dev{margin:var(--s-5) calc(-1 * var(--s-6)) calc(-1 * var(--s-6));padding-bottom:var(--s-2);border-top:1px solid var(--line)}
 .door .dev > summary{
@@ -183,12 +183,12 @@ async function showDoor() {
   root.replaceChildren();
   boardSig = '';
   const card = el(`
-    <div class="door card">
+    <main class="door card">
       <span class="eyebrow">Basu</span>
-      <h2>Гал тогоо</h2>
+      <h1>Гал тогоо</h1>
       <p>Өөрийн бүртгэлээр нэвтэрнэ үү. Рестораны эзэн эсвэл менежер танд эрх өгсөн байх ёстой.</p>
       <div data-doors></div>
-    </div>`);
+    </main>`);
   card.querySelector('[data-doors]').replaceWith(
     signInDoors({
       device: 'Гал тогоо',
@@ -233,12 +233,12 @@ async function showDoor() {
 function showNotHere() {
   boardSig = '';
   root.replaceChildren(el(`
-    <div class="door card">
+    <main class="door card">
       <span class="eyebrow">Basu</span>
-      <h2>Гал тогоо нээх эрхгүй</h2>
+      <h1>Гал тогоо нээх эрхгүй</h1>
       <p>Энэ бүртгэл аль ч рестораны ажилтан биш байна. Рестораны эзэн эсвэл менежер Бизнес хэсгийн «Ажилтнууд» хуудаснаас танд эрх өгнө.</p>
       <button class="btn" data-size="lg" type="button" id="other">Өөр бүртгэлээр нэвтрэх</button>
-    </div>`));
+    </main>`));
   root.querySelector('#other').addEventListener('click', signOut);
 }
 
@@ -290,8 +290,10 @@ function renderBoard(data) {
         </div>
         <div class="lanes seg" data-fill></div>
       </header>
-      <div class="stale-strip" role="alert" hidden>Холболт тасарсан — самбар <span class="mono"></span>-ийн байдлаар байна. Дахин холбогдож байна…</div>
-      <div class="board"></div>
+      <main class="kds-main">
+        <div class="stale-strip" role="alert" hidden>Холболт тасарсан — самбар <span class="mono"></span>-ийн байдлаар байна. Дахин холбогдож байна…</div>
+        <div class="board"></div>
+      </main>
     </div>`);
 
   const board = frame.querySelector('.board');
@@ -302,7 +304,7 @@ function renderBoard(data) {
     const tickets = data.lanes[lane.key] ?? [];
     const column = el(`
       <section class="lane" data-key="${lane.key}">
-        <h2 class="section-title"><span>${lane.title}</span><span class="count" data-tone="neutral">${tickets.length}</span></h2>
+        <h2 class="section-title"><span>${lane.title}</span> <span class="count" data-tone="neutral">${tickets.length}</span></h2>
         <div class="stack"></div>
       </section>`);
     const stack = column.querySelector('.stack');
@@ -316,13 +318,16 @@ function renderBoard(data) {
     board.append(column);
 
     const tab = el(`
-      <button type="button" data-key="${lane.key}"${lane.key === shownLane ? ' data-on' : ''}>${
+      <button type="button" data-key="${lane.key}" aria-pressed="${lane.key === shownLane}"${lane.key === shownLane ? ' data-on' : ''}>${
         lane.title
-      }<span class="count" data-tone="neutral">${tickets.length}</span></button>`);
+      } <span class="count" data-tone="neutral">${tickets.length}</span></button>`);
     tab.addEventListener('click', () => {
       shownLane = lane.key;
       board.dataset.show = shownLane;
-      for (const other of picker.children) other.toggleAttribute('data-on', other === tab);
+      for (const other of picker.children) {
+        other.toggleAttribute('data-on', other === tab);
+        other.setAttribute('aria-pressed', String(other === tab));
+      }
     });
     picker.append(tab);
   }

@@ -28,6 +28,7 @@ import {
   type CancelReason,
   type IdeshState,
   type OrderScope,
+  type Settlement,
   type SupplierOrder,
   type SupplierRow,
   type Tally,
@@ -748,6 +749,19 @@ export async function registerOpsRoutes(
     guest_email: guests.get(o.guestId)?.email ?? null,
   });
 
+  /**
+   * Payouts and refunds as the desk reads them: the shared shape, and for a
+   * refund the address and the number its account signs in with — what tells
+   * two refunds to people who gave no name apart, as the guests' list does.
+   */
+  const deskSettlements = async (list: Settlement[]) => {
+    const guests = await guestCards(list.flatMap((t) => (t.guest ? [t.guest.id] : [])));
+    return list.map((t) => {
+      const card = t.guest ? guests.get(t.guest.id) : undefined;
+      return { ...shapeSettlement(t), guest_email: card?.email ?? null, guest_phone: card?.phone ?? null };
+    });
+  };
+
   app.get<{ Querystring: { scope?: string; state?: string; supplier?: string; day?: string; q?: string } }>(
     '/v1/ops/orders',
     desk('desk.orders'),
@@ -773,7 +787,7 @@ export async function registerOpsRoutes(
     return reply.send({
       order: deskOrder(found.order, await guestCards([found.order.guestId])),
       events: found.events.map((e) => ({ seq: e.seq, type: e.type, actor: e.actor, payload: e.payload, at: e.at.toISOString() })),
-      settlements: found.settlements.map(shapeSettlement),
+      settlements: await deskSettlements(found.settlements),
     });
   });
 
@@ -1036,7 +1050,7 @@ export async function registerOpsRoutes(
 
   /** Everything owed outside, unpaid first. */
   app.get('/v1/ops/settlements', desk('desk.pay'), async () => ({
-    settlements: (await listSettlements()).map(shapeSettlement),
+    settlements: await deskSettlements(await listSettlements()),
   }));
 
   /** «Батлах»: this one should be paid. The person who presses it may not be the one who pays. */
