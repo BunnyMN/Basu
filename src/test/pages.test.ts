@@ -1423,6 +1423,46 @@ describe('the website', () => {
     expect(s.getElementById('pay')?.textContent).toBe('Нэвтэрч төлөх →');
   });
 
+  it('speaks of paying at the door only to whoever came from a stall’s «Нэвтэрч төлөх →»', async () => {
+    storage.removeItem('basu.guest');
+    const id = await fullestStall();
+    const lead = async (search: string) => {
+      const door = await openPage('login.html', search);
+      await until(door, 'the door', (d) => d.documentElement.hasAttribute('data-ready'));
+      return door.window.document.querySelector('.l-step[data-step="start"] .l-lead')?.textContent ?? '';
+    };
+    // The header's «Нэвтрэх» on a stall: back to the listing, nothing about paying.
+    const fromHeader = await lead(`?next=${encodeURIComponent(`/shop/${id}`)}`);
+    expect(fromHeader).toContain('Нэвтэрмэгц үзэж байсан зар руугаа буцна.');
+    expect(fromHeader).not.toContain('төлөх');
+    // The review's own button sends `for=pay` with it.
+    expect(await lead(`?next=${encodeURIComponent(`/shop/${id}`)}&for=pay`)).toContain('Захиалгаа төлөхийн тулд нэвтэрнэ үү');
+  });
+
+  it('prints the courier’s number on an order as people read it, the eight digits a stall sends included', async () => {
+    await ownGuest('+97699005037');
+    const token = storage.getItem('basu.guest')!;
+    const { listings, today } = (await (await fetch(`${base}/v1/idesh/listings`)).json()) as {
+      today: string;
+      listings: Array<{ id: string; delivers: boolean; unit: string; remaining: number; ready_from: string }>;
+    };
+    const stall = listings.find((l) => l.delivers && l.unit === 'whole' && l.remaining > 0)!;
+    const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
+    const made = await fetch(`${base}/v1/idesh`, {
+      method: 'POST',
+      headers: { ...headers, 'idempotency-key': 'courier-number-1' },
+      // What the stall sends: «9911 2233» as typed, the space taken out.
+      body: JSON.stringify({ listing_id: stall.id, qty: 1, receive: 'delivery', receive_on: stall.ready_from > today ? stall.ready_from : today, address: 'Баянзүрх, 3-р хороо', address_phone: '99112233' }),
+    });
+    const order = (await made.json()) as { id: string };
+    expect(made.status, JSON.stringify(order)).toBe(201);
+    expect((await fetch(`${base}/v1/idesh/${order.id}/pay`, { method: 'POST', headers, body: '{}' })).status).toBe(200);
+    const page = await openPage('orders.html', `/${order.id}`);
+    await until(page, 'the order', (d) => Boolean(d.querySelector('.od-box')));
+    const line = [...page.window.document.querySelectorAll('.od-box small')].map((s) => s.textContent).find((t) => t?.startsWith('Залгах утас'));
+    expect(line).toBe('Залгах утас: +976 9911 2233');
+  });
+
   it('opens on the animal the address names, and on all of them for a name that is none of the four', async () => {
     storage.removeItem('basu.guest');
     const beef = await openPage('shop.html', '?kind=beef');
@@ -1540,6 +1580,34 @@ describe('the website', () => {
       (s.getElementById('pay') as HTMLButtonElement).click();
       await until(stall, 'the way to the order', () => left.count > 0);
       expect(await ideshOf('+97699005034')).toEqual({ orders: 1, payments: 1 });
+    } finally {
+      ctx.payments = open;
+    }
+  });
+
+  it('says how far a wallet short of the order reaches while payments are closed, not only that they are', async () => {
+    await ownGuest('+97699005036');
+    const token = storage.getItem('basu.guest')!;
+    const id = await fullestStall();
+    const { listing } = (await (await fetch(`${base}/v1/idesh/listings/${id}`)).json()) as { listing: { price_mnt: number; min_qty: number } };
+    // Enough for the least the stall sells, and not one head more.
+    for (let left = listing.price_mnt * listing.min_qty + 1000; left > 0; left -= 2_000_000) await topUp(token, Math.min(left, 2_000_000));
+    const open = ctx.payments;
+    ctx.payments = new ClosedPaymentProvider();
+    try {
+      const stall = await openPage('shop.html', `/${id}`);
+      const s = stall.window.document;
+      await until(stall, 'the order form', () => Boolean(s.getElementById('next')));
+      expect((s.getElementById('next') as HTMLButtonElement).disabled).toBe(false);
+      // One head more than the wallet holds: grey, and the reason says how far the wallet does reach.
+      (s.querySelector('.sd-qty [data-d="1"]') as HTMLButtonElement).click();
+      expect((s.getElementById('next') as HTMLButtonElement).disabled).toBe(true);
+      expect(s.getElementById('next-why')?.textContent).toBe(`Basu түрийвч тань ${listing.min_qty} толгойд л хүрэлцэнэ — онлайн төлбөр хаалттай.`);
+      expect(s.querySelector('.sd-dock [data-what]')?.textContent).toBe('Түрийвч хүрэлцэхгүй');
+      // Back to what it covers: on again, saying it pays from the wallet.
+      (s.querySelector('.sd-qty [data-d="-1"]') as HTMLButtonElement).click();
+      expect((s.getElementById('next') as HTMLButtonElement).disabled).toBe(false);
+      expect(s.querySelector('#buy .sd-wallet')?.textContent).toContain('түрийвч');
     } finally {
       ctx.payments = open;
     }

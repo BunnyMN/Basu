@@ -72,7 +72,7 @@ html[data-in-app] .l-in-app{display:flex}
    phone's «from Messages» both land whole */
 .l-otp{position:relative;display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:0 0 14px}
 .l-otp i{display:grid;place-items:center;aspect-ratio:1/1.12;border:1px solid var(--line-2);border-radius:14px;background:var(--surface);font-family:var(--mono);font-size:1.5rem;font-weight:600;font-style:normal;color:var(--ink);transition:border-color var(--dur),box-shadow var(--dur)}
-.l-otp i[data-on]{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.l-otp i[data-on]{border-color:var(--accent);box-shadow:var(--ring)}
 .l-otp[data-bad] i{border-color:var(--stop)}
 .l-otp input{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;color:transparent;caret-color:transparent;font-size:16px;outline:none;letter-spacing:40px}
 .l-otp input::selection{background:transparent}
@@ -82,7 +82,7 @@ html[data-in-app] .l-in-app{display:flex}
 
 .l-eye{position:relative;display:block}
 .l-eye .s-input{padding-right:52px}
-.l-eye button{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:40px;height:40px;border:0;border-radius:10px;background:none;color:var(--ink-3);cursor:pointer}
+.l-eye button{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:10px;background:none;color:var(--ink-3);cursor:pointer}
 .l-eye button svg{width:20px;height:20px}
 .l-eye button[aria-pressed="true"]{color:var(--accent-ink)}
 
@@ -97,6 +97,8 @@ html[data-in-app] .l-in-app{display:flex}
   /* the way home rides on the picture, so the form starts at the top of the pane */
   .l-top{position:absolute;z-index:2;top:calc(8px + var(--safe-t));right:16px}
   .l-home{color:#fff}
+  /* on the picture the pine focus ring would not show: white, as the words are */
+  .l-home:focus-visible{outline-color:#fff}
   .l-pane{padding:4px 24px calc(28px + var(--safe-b))}
   .l-body{justify-content:flex-start;padding:24px 0 8px}
   .l-body h1{font-size:1.75rem}
@@ -141,7 +143,7 @@ html[data-in-app] .l-in-app{display:flex}
         <button class="l-back" type="button" data-go="start"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Буцах</button>
         <h1>Имэйлээ шалгана уу</h1>
         <p class="l-lead"><b id="sent-to"></b> хаяг руу 6 оронтой код илгээлээ. 10 минут хүчинтэй.</p>
-        <div class="l-otp" id="otp"><i></i><i></i><i></i><i></i><i></i><i></i><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-label="Имэйлд ирсэн 6 оронтой код" aria-describedby="code-error"></div>
+        <div class="l-otp" id="otp"><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-label="Имэйлд ирсэн 6 оронтой код" aria-describedby="code-error"></div>
         <p class="s-error" id="code-error" role="alert"></p>
         <div class="l-again"><span id="again-hint">Ирээгүй юу? Спам хавтсаа шалгаарай.</span><button class="s-link" type="button" id="resend">Код дахин авах</button></div>
       </div>
@@ -168,7 +170,7 @@ html[data-in-app] .l-in-app{display:flex}
         <p class="l-lead" id="forgot-lead">Бүртгэлтэй имэйл эсвэл утасны дугаараа бичнэ үү. Бүртгэлийн имэйл рүү тань код илгээнэ.</p>
         <form id="forgot-form" novalidate>
           <label class="s-field" data-f="login"><span>Имэйл эсвэл утасны дугаар</span><input class="s-input" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="нэр@gmail.com · 8811 2233" aria-describedby="forgot-error"></label>
-          <label class="s-field" data-f="code" hidden><span>Имэйлд ирсэн код</span><span class="l-otp" data-otp><i></i><i></i><i></i><i></i><i></i><i></i><input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-describedby="forgot-error"></span></label>
+          <label class="s-field" data-f="code" hidden><span>Имэйлд ирсэн код</span><span class="l-otp" data-otp><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><i aria-hidden="true"></i><input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-describedby="forgot-error"></span></label>
           <label class="s-field" data-f="password" hidden><span>Шинэ нууц үг <small>— дор хаяж 8 тэмдэгт</small></span><span class="l-eye"><input class="s-input" name="password" type="password" autocomplete="new-password" placeholder="Шинэ нууц үг" aria-describedby="forgot-error"><button type="button" data-eye aria-label="Нууц үгийг харах" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></span></label>
           <p class="s-error" id="forgot-error" role="alert"></p>
           <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="submit" id="forgot-go">Код авах</button>
@@ -223,9 +225,19 @@ const arrive = () => {
  */
 const forgot = new URLSearchParams(location.search).has('forgot');
 
-// Sent here on the way to pay, or to an order: the door says so, and that it brings them back.
+/**
+ * Sent here on the way to pay, or to an order: the door says so, and that it
+ * brings them back. «To pay» only for whoever pressed «Нэвтэрч төлөх →» on a
+ * stall's review (shop.html sends `for=pay` with it) — never for the header's
+ * «Нэвтрэх» on a stall, nor while online payments are closed (that button is
+ * grey then, and sends nobody here). Anybody else from a stall is told the
+ * plain truth: they come back to the listing they were looking at.
+ */
+const toPay = new URLSearchParams(location.search).get('for') === 'pay';
 const why = next.startsWith('/shop/')
-  ? 'Захиалгаа төлөхийн тулд нэвтэрнэ үү — дараа нь шууд захиалга руугаа буцна.'
+  ? toPay
+    ? 'Захиалгаа төлөхийн тулд нэвтэрнэ үү — дараа нь шууд захиалга руугаа буцна.'
+    : 'Нэвтэрмэгц үзэж байсан зар руугаа буцна.'
   : next.startsWith('/orders')
     ? 'Захиалгаа харахын тулд нэвтэрнэ үү.'
     : next.startsWith('/account')

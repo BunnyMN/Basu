@@ -84,6 +84,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 @media (hover:hover){.bar nav a:hover{color:var(--ink)}}
 .bar .right{margin-left:auto;display:flex;align-items:center;gap:8px}
 .bar .go{min-height:40px;padding:0 18px;font-size:.9375rem}
+@media (pointer:coarse){.bar .go{min-height:44px}}
 @media (max-width:900px){.bar nav{display:none}}
 @media (max-width:480px){
   .bar .wrap{gap:12px;min-height:56px}
@@ -276,8 +277,9 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 .trade .ph img{width:100%;aspect-ratio:4/5;object-fit:cover}
 @media (max-width:900px){.trade .ph img{aspect-ratio:4/3}}
 .trade .steps li::before{background:rgba(217,164,65,.18);color:var(--hi)}
-.roles{display:flex;flex-wrap:wrap;gap:8px;margin-top:26px}
-.roles span{padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.18);font-size:.875rem;color:rgba(255,255,255,.85)}
+/* who can be given a seat: words to read, not buttons — no outline, no pill, the names in a line with dots between */
+.roles{display:flex;flex-wrap:wrap;margin:26px 0 0;padding:0;list-style:none;font-size:.9375rem;font-weight:500;line-height:1.6;color:rgba(255,255,255,.85)}
+.roles li + li::before{content:"·";content:"·" / "";margin:0 10px;color:rgba(255,255,255,.45)}
 .trade .fine{margin:14px 0 0;font-size:.9375rem;line-height:1.6;color:rgba(255,255,255,.64)}
 .trade .btns{margin-top:32px}
 
@@ -300,6 +302,8 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 .foot{border-top:1px solid var(--line);padding:48px 0 calc(40px + var(--safe-b))}
 .foot-top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:28px 48px}
 .foot .who{margin:12px 0 0;font-size:.9375rem;line-height:1.7;color:var(--ink-2)}
+/* the address under a thumb: 44px to press, the lines around it where they were */
+@media (pointer:coarse){.foot .who a{padding-block:13px}}
 .foot .links{display:grid;grid-template-columns:repeat(2,auto);gap:0 40px;align-content:start}
 .foot .links a{display:inline-flex;align-items:center;min-height:36px;text-decoration:none;color:var(--ink-2);font-size:.9375rem}
 @media (pointer:coarse){.foot .links a{min-height:44px}}
@@ -308,6 +312,9 @@ section.band{padding:clamp(72px,9vw,120px) 0}
 .photos summary{padding:12px 0;cursor:pointer}
 .photos p{margin:10px 0 0;line-height:1.7}
 .photos a{color:inherit}
+
+/* On the deep pine bands the pine focus ring would vanish into its own colour: white there. */
+:is(.hero,.steps-band,.trade) :focus-visible{outline-color:#fff}
 
 /* things arrive as they come into view */
 .reveal{opacity:0;transform:translateY(16px);transition:opacity 700ms var(--ease),transform 700ms var(--ease)}
@@ -387,13 +394,13 @@ section.band{padding:clamp(72px,9vw,120px) 0}
         <p class="reveal">Нийлүүлэгч бүр малаа өөрөө зарлана: бүтэн толгойгоор нь, эсвэл кг-аар. Зар бүр дээр мал аль нутгийнх, ойролцоогоор хэдэн кг мах гарах, хэзээ бэлэн болох нь бичээстэй.</p>
       </div>
       <div class="animals">
-        <a class="animal reveal" href="/shop" data-kind="sheep"><div class="ph"><img src="/brand/meat/sheep.webp" srcset="/brand/meat/sheep-480.webp 480w, /brand/meat/sheep-720.webp 720w, /brand/meat/sheep.webp 960w" sizes="(max-width: 900px) calc(50vw - 27px), (max-width: 1200px) calc(25vw - 31px), 270px" alt="Хонины гуя" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Хонь</b><small>Толгойгоор · кг-аар</small></a>
-        <a class="animal reveal" href="/shop" data-kind="goat"><div class="ph"><img src="/brand/meat/goat.webp" srcset="/brand/meat/goat-480.webp 480w, /brand/meat/goat-720.webp 720w, /brand/meat/goat.webp 960w" sizes="(max-width: 900px) calc(50vw - 27px), (max-width: 1200px) calc(25vw - 31px), 270px" alt="Жижиглэсэн улаан мах" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Ямаа</b><small>Толгойгоор · кг-аар</small></a>
-        <a class="animal reveal" href="/shop" data-kind="beef"><div class="ph"><img src="/brand/meat/beef.webp" srcset="/brand/meat/beef-480.webp 480w, /brand/meat/beef-720.webp 720w, /brand/meat/beef.webp 960w" sizes="(max-width: 900px) calc(50vw - 27px), (max-width: 1200px) calc(25vw - 31px), 270px" alt="Үхрийн цул мах" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Үхэр</b><small>Толгойгоор · кг-аар</small></a>
-        <a class="animal reveal" href="/shop" data-kind="horse"><div class="ph"><img src="/brand/meat/horse.webp" srcset="/brand/meat/horse-480.webp 480w, /brand/meat/horse-720.webp 720w, /brand/meat/horse.webp 960w" sizes="(max-width: 900px) calc(50vw - 27px), (max-width: 1200px) calc(25vw - 31px), 270px" alt="Давс цацсан туранхай улаан мах" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Адуу</b><small>Толгойгоор · кг-аар</small></a>
+        <a class="animal reveal" href="/shop" data-kind="sheep"><div class="ph"><img src="/brand/meat/sheep.webp" srcset="/brand/meat/sheep-480.webp 480w, /brand/meat/sheep-720.webp 720w, /brand/meat/sheep.webp 960w" sizes="(max-width: 900px) calc(50vw - 27px), (max-width: 1200px) calc(25vw - 31px), 270px" alt="" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Хонь</b><small>Толгойгоор · кг-аар</small></a>
+        <a class="animal reveal" href="/shop" data-kind="goat"><div class="ph"><img src="/brand/meat/goat.webp" srcset="/brand/meat/goat-480.webp 480w, /brand/meat/goat-720.webp 720w, /brand/meat/goat.webp 960w" sizes="(max-width: 900px) calc(50vw - 27px), (max-width: 1200px) calc(25vw - 31px), 270px" alt="" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Ямаа</b><small>Толгойгоор · кг-аар</small></a>
+        <a class="animal reveal" href="/shop" data-kind="beef"><div class="ph"><img src="/brand/meat/beef.webp" srcset="/brand/meat/beef-480.webp 480w, /brand/meat/beef-720.webp 720w, /brand/meat/beef.webp 960w" sizes="(max-width: 900px) calc(50vw - 27px), (max-width: 1200px) calc(25vw - 31px), 270px" alt="" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Үхэр</b><small>Толгойгоор · кг-аар</small></a>
+        <a class="animal reveal" href="/shop" data-kind="horse"><div class="ph"><img src="/brand/meat/horse.webp" srcset="/brand/meat/horse-480.webp 480w, /brand/meat/horse-720.webp 720w, /brand/meat/horse.webp 960w" sizes="(max-width: 900px) calc(50vw - 27px), (max-width: 1200px) calc(25vw - 31px), 270px" alt="" loading="lazy" width="960" height="720"><span class="ktag"></span></div><b>Адуу</b><small>Толгойгоор · кг-аар</small></a>
       </div>
 
-      <div class="board" id="board" hidden aria-live="polite">
+      <div class="board" id="board" hidden>
         <div class="board-head"><b id="board-title">Одоо зартай</b><a class="onward" href="/shop">Бүх зар</a></div>
         <div class="board-list" id="board-list"></div>
         <div class="board-empty" id="board-empty" hidden>
@@ -546,7 +553,7 @@ section.band{padding:clamp(72px,9vw,120px) 0}
           <li class="reveal"><b>Бид шалгана</b><span>Мэдээллийг тань хянаж, гэрээ байгуулна.</span></li>
           <li class="reveal"><b>Захиалга авна</b><span>Зараа оруулж, захиалга, орлогоо Basu Бизнес хэсгээс хянана.</span></li>
         </ol>
-        <div class="roles reveal"><span>Эзэн</span><span>Менежер</span><span>Ажилтан</span><span>Нягтлан</span></div>
+        <ul class="roles reveal" aria-label="Үүргүүд"><li>Эзэн</li><li>Менежер</li><li>Ажилтан</li><li>Нягтлан</li></ul>
         <p class="fine reveal">Хамт ажиллагсаддаа эрх өгнө. Хүн бүр өөрийн ажлаа л харна. Ресторанд зориулсан цэс, гал тогооны самбарыг эхний ресторануудтайгаа хамт тохируулж байна.</p>
         <div class="btns reveal">
           <a class="go go-light" href="/dashboard?join=business">Бизнесээ бүртгүүлэх →</a>
@@ -646,6 +653,11 @@ for (const node of document.querySelectorAll('.reveal')) {
   if (io) io.observe(node);
   else node.setAttribute('data-in', '');
 }
+// Reached by the keyboard before it scrolled into view: shown at once, never a focus ring around nothing.
+document.addEventListener('focusin', (event) => {
+  const node = event.target.closest?.('.reveal:not([data-in])');
+  if (node) node.setAttribute('data-in', '');
+});
 
 /**
  * How much meat a household eats in a winter, roughly: people × months × what

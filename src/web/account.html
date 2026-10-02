@@ -43,6 +43,7 @@
 .sa-sessions small{display:block;margin-top:2px;font-size:.8125rem;color:var(--ink-3)}
 .sa-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:14px 0 18px;border-top:1px solid var(--line)}
 .sa-foot p{margin:0;font-size:.875rem;color:var(--ink-3)}
+.sa-foot p:focus{outline:none}
 .sa-out{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px;margin-top:40px;padding:20px 24px}
 .sa-out p{margin:0;font-size:.9375rem;color:var(--ink-2)}
 .sa-out p b{display:block;color:var(--ink)}
@@ -128,7 +129,13 @@ async function draw() {
         // The corner says the new name too.
         const named = nameOf({ ...me, display_name: v.name || null });
         for (const node of document.querySelectorAll('.s-acct > button span, .s-menu .who b')) node.textContent = named;
+        // …its first letter in the circle, and the name a screen reader gives the button.
+        const corner = document.querySelector('.s-acct > button');
+        corner?.querySelector('.s-ini')?.replaceChildren((v.name || me.email || 'B').trim().charAt(0) || 'B');
+        corner?.setAttribute('aria-label', `${named} — бүртгэлийн цэс`);
         await draw();
+        // The page was drawn anew: the focus goes back to «Нэр засах», as the popup would have put it.
+        document.getElementById('edit-name')?.focus();
       },
     }),
   );
@@ -187,6 +194,12 @@ async function draw() {
         }
         say(revoked ? `${revoked} төхөөрөмжөөс гаргалаа.` : 'Өөр төхөөрөмж алга.', 'good');
         paintSessions((await authed('/v1/me/sessions')).sessions);
+        // The button goes once nothing else is signed in: the focus goes to the line that now says so.
+        const why = devices.querySelector('#others-why');
+        if (devices.querySelector('#others').hidden && why) {
+          why.tabIndex = -1;
+          why.focus();
+        }
       },
     }),
   );

@@ -33,12 +33,14 @@
 .sh-check{display:inline-flex;align-items:center;gap:10px;min-height:44px;font-size:.9375rem;color:var(--ink-2);cursor:pointer}
 .sh-check input{width:20px;height:20px;margin:0;accent-color:var(--accent)}
 .sh-sort{min-height:40px;padding:0 40px 0 16px;border:1px solid var(--line);border-radius:999px;background:var(--surface) var(--chev) no-repeat right 14px center/16px;font:inherit;font-size:.9375rem;color:var(--ink);-webkit-appearance:none;appearance:none;cursor:pointer}
-@media (pointer:coarse){.sh-sort{min-height:44px}}
+/* on a touch screen 16px: below that iOS zooms the page in when the select is tapped */
+@media (pointer:coarse){.sh-sort{min-height:44px;font-size:1rem}}
 .sh-count{font-size:.875rem;color:var(--ink-3)}
 @media (max-width:760px){
   /* the animals in one row that slides, so the cards start higher */
   .sh-bar{gap:12px}
-  .sh-bar .s-chips{flex-wrap:nowrap;width:calc(100% + 2 * var(--s-gutter));margin:0 calc(-1 * var(--s-gutter));padding:2px var(--s-gutter);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  /* 4px inside the slider, given back outside it: a chip's focus ring is not clipped, nothing moves */
+  .sh-bar .s-chips{flex-wrap:nowrap;width:calc(100% + 2 * var(--s-gutter));margin:-2px calc(-1 * var(--s-gutter));padding:4px var(--s-gutter);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
   .sh-bar .s-chips::-webkit-scrollbar{display:none}
   .sh-tools{width:100%;justify-content:space-between}
 }
@@ -158,6 +160,8 @@
 .sd-fine{margin:14px 0 0;font-size:.8125rem;line-height:1.55;color:var(--ink-3)}
 .sd-fine a{color:var(--ink-2);text-decoration:underline;text-underline-offset:.2em}
 .sd-review h2{margin:0;font-size:1.25rem;letter-spacing:-.015em}
+/* where the focus is put when the box changes step (the box itself, the review's heading): a place to read from, not a control — no ring */
+.sd-review h2:focus,.sd-buy:focus{outline:none}
 .sd-review .sd-sub{margin-bottom:16px}
 .sd-review dl{margin:0 0 6px;border-top:1px solid var(--line)}
 .sd-review .sd-sum{margin-top:0;border-top:0}
@@ -383,8 +387,9 @@ function drawMarket() {
               <option value="dear">Үнэ: ихээс бага</option>
             </select>
           </div>
+          <p class="s-sr" id="sh-said" role="status"></p>
         </div>`),
-    el('<div class="sh-grid" id="grid" aria-live="polite" aria-busy="true"></div>'),
+    el('<div class="sh-grid" id="grid" aria-busy="true"></div>'),
   );
   document.getElementById('sort').value = view.sort;
   document.getElementById('sort').addEventListener('change', (e) => {
@@ -395,7 +400,7 @@ function drawMarket() {
   document.getElementById('delivers').addEventListener('change', (e) => {
     view.delivers = e.target.checked;
     showInAddress();
-    if (loaded) paintGrid();
+    if (loaded) paintGrid(true);
   });
   const grid = document.getElementById('grid');
   // A card opened: where the market was, for the way back.
@@ -419,7 +424,9 @@ function paintKinds() {
       // The choice is in the address, so a shared or reloaded link shows the same.
       showInAddress();
       paintKinds();
-      paintGrid();
+      paintGrid(true);
+      // The chip pressed was drawn anew: the focus stays on it, not lost to the page's top.
+      document.querySelector(`#kinds [data-kind="${key}"]`)?.focus();
     });
     box.append(button);
   }
@@ -438,10 +445,17 @@ function shown() {
   return list;
 }
 
-function paintGrid() {
+/**
+ * The cards for the filter as it stands. `announce` when a filter was just
+ * changed: how many there are now is said to a screen reader in one short
+ * line (#sh-said) — not every card read out again.
+ */
+function paintGrid(announce = false) {
   const grid = document.getElementById('grid');
   grid.removeAttribute('aria-busy');
   grid.replaceChildren();
+  const said = document.getElementById('sh-said');
+  if (said) said.textContent = '';
   // Nothing for sale yet: no filters for nothing, and what to do meanwhile.
   document.getElementById('sh-bar').hidden = !market.listings.length;
   if (!market.listings.length) {
@@ -472,11 +486,15 @@ function paintGrid() {
       document.getElementById('delivers').checked = false;
       showInAddress();
       paintKinds();
-      paintGrid();
+      paintGrid(true);
+      // The button pressed is gone with the empty card: the focus goes to the filter it set, «Бүгд».
+      document.querySelector('#kinds [data-kind="all"]')?.focus();
     });
     grid.append(none);
+    if (announce && said) said.textContent = none.querySelector('b').textContent;
     return;
   }
+  if (announce && said) said.textContent = `${list.length} зар`;
   for (const [i, l] of list.entries()) {
     const gone = l.remaining === 0;
     // Under the price, what it is for: a whole animal's rough weight and what
@@ -636,6 +654,25 @@ function drawStall(l) {
   const gone = l.remaining === 0;
   const whole = l.unit === 'whole';
   const unit = unitWord(l);
+  /**
+   * Why the order cannot go on, said under the grey button: online payment is
+   * closed — and when the person's Basu wallet holds something but not this
+   * total, that too, with how much of it the wallet does reach (in the
+   * stall's own steps, the delivery fee counted), so one fewer head is a
+   * choice they can see. `short` for the bar at the foot.
+   */
+  const notNow = (closedWords) => {
+    if (!pay.wallet || pay.wallet <= 0) return { why: closedWords, short: 'Онлайн төлбөр хаалттай' };
+    const fee = form.receive === 'delivery' ? l.delivery_fee_mnt : 0;
+    const steps = Math.floor(((pay.wallet - fee) / l.price_mnt - l.min_qty) / step);
+    const reach = steps >= 0 ? Math.min(l.min_qty + steps * step, l.remaining) : 0;
+    return {
+      why: reach
+        ? `Basu түрийвч тань ${reach} ${whole ? 'толгойд' : 'кг-д'} л хүрэлцэнэ — онлайн төлбөр хаалттай.`
+        : 'Basu түрийвч тань энэ захиалгад хүрэлцэхгүй — онлайн төлбөр хаалттай.',
+      short: 'Түрийвч хүрэлцэхгүй',
+    };
+  };
 
   page.replaceChildren(
     crumb(),
@@ -691,7 +728,12 @@ function drawStall(l) {
     const top = buy.getBoundingClientRect().top + window.scrollY - (document.querySelector('.s-bar')?.offsetHeight ?? 0) - 12;
     window.scrollTo({ top, behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   };
-  dock.querySelector('button').addEventListener('click', toBox);
+  // The bar hides once the box is on screen: the focus goes into the box with the eye, not left on a bar that is gone.
+  buy.tabIndex = -1;
+  dock.querySelector('button').addEventListener('click', () => {
+    toBox();
+    buy.focus({ preventScroll: true });
+  });
   if (!gone) {
     dock.hidden = false;
     document.documentElement.setAttribute('data-dock', '');
@@ -754,7 +796,11 @@ function drawStall(l) {
       buy.querySelector('#qty').innerHTML = `${form.qty}<small> ${unit}</small>`;
       buy.querySelector('[data-d="-1"]').disabled = form.qty - step < l.min_qty;
       buy.querySelector('[data-d="1"]').disabled = form.qty + step > l.remaining;
-      for (const way of buy.querySelectorAll('.sd-way')) way.setAttribute('aria-checked', String(way.dataset.r === form.receive));
+      // A radio group is one stop for Tab — the way chosen; the arrow keys move between them.
+      for (const way of buy.querySelectorAll('.sd-way')) {
+        way.setAttribute('aria-checked', String(way.dataset.r === form.receive));
+        way.tabIndex = way.dataset.r === form.receive ? 0 : -1;
+      }
       buy.querySelector('#where').hidden = form.receive !== 'delivery';
       buy.querySelector('#when-label').textContent = form.receive === 'delivery' ? 'Хүргүүлэх өдөр' : 'Очиж авах өдөр';
       buy.querySelector('#sum').innerHTML = `
@@ -771,10 +817,11 @@ function drawStall(l) {
       else if (!slot.querySelector('.sh-closed')) slot.replaceChildren(closedNote());
       buy.querySelector('#next').disabled = !able;
       const why = buy.querySelector('#next-why');
+      const not = able ? null : notNow('Онлайн төлбөр хаалттай тул одоохондоо захиалах боломжгүй.');
       why.hidden = able;
-      why.textContent = able ? '' : 'Онлайн төлбөр хаалттай тул одоохондоо захиалах боломжгүй.';
+      why.textContent = not?.why ?? '';
       if (able) dockSays(`${form.qty} ${unit} · ${form.receive === 'delivery' ? 'хүргүүлнэ' : 'очиж авна'}`, 'Захиалах');
-      else dockSays('Онлайн төлбөр хаалттай', 'Захиалах', true);
+      else dockSays(not.short, 'Захиалах', true);
     };
     /**
      * What stops the order going on, said under the field it is about: the
@@ -850,6 +897,8 @@ function drawStall(l) {
       if (problem) return;
       paintReview();
       keepInView();
+      // The button pressed is gone with the form: the focus goes to the review's heading, where its reading starts.
+      buy.querySelector('.sd-review h2')?.focus({ preventScroll: true });
     });
     paint();
   }
@@ -860,9 +909,10 @@ function drawStall(l) {
     // Back at the review after signing in while payments are closed, and the
     // wallet short of the total: said here too, and «Төлөх» grey with its reason.
     const able = canPay(total());
+    const not = able ? null : notNow('Онлайн төлбөр хаалттай тул одоохондоо төлөх боломжгүй.');
     buy.replaceChildren(
       el(`<div class="sd-review">
-            <h2>Захиалгаа шалгана уу</h2>
+            <h2 tabindex="-1">Захиалгаа шалгана уу</h2>
             <p class="sd-sub">Төлөхөөс өмнө нэг харна уу.</p>
             ${pay.open ? '' : able ? '<p class="sd-wallet">Онлайн төлбөр одоогоор хаалттай тул Basu түрийвчнээсээ төлнө.</p>' : '<div id="closed-slot"></div>'}
             <dl>
@@ -879,7 +929,7 @@ function drawStall(l) {
             <p class="s-error" id="pay-error" role="alert"></p>
             <div class="sd-actions">
               <button class="s-btn s-btn-dark s-btn-lg s-btn-block" type="button" id="pay"${able ? '' : ' disabled aria-describedby="pay-why"'}>${store.guestToken ? `Төлөх · ${mnt(total())}` : 'Нэвтэрч төлөх →'}</button>
-              ${able ? '' : '<p class="sd-why" id="pay-why">Онлайн төлбөр хаалттай тул одоохондоо төлөх боломжгүй.</p>'}
+              ${able ? '' : `<p class="sd-why" id="pay-why">${esc(not.why)}</p>`}
               <button class="s-btn s-btn-line s-btn-block" type="button" id="edit">Засах</button>
             </div>
             ${store.guestToken ? '' : '<p class="sd-fine">Нэвтэрмэгц энэ захиалга руугаа буцна — сонголт тань хадгалагдана.</p>'}
@@ -892,10 +942,12 @@ function drawStall(l) {
           </div>`),
     );
     buy.querySelector('#closed-slot')?.replaceChildren(closedNote());
-    dockSays(able ? 'Нийт төлөх' : 'Онлайн төлбөр хаалттай', 'Төлөх', !able);
+    dockSays(able ? 'Нийт төлөх' : not.short, 'Төлөх', !able);
     buy.querySelector('#edit').addEventListener('click', () => {
       paintForm();
       keepInView();
+      // Back on the form, the focus on its first control rather than lost with the button pressed.
+      buy.querySelector('.sd-form :is(button,input,textarea):not(:disabled):not([tabindex="-1"])')?.focus({ preventScroll: true });
     });
     buy.querySelector('#pay').addEventListener('click', async (event) => {
       // Nothing to pay with: never on to a sign-in that ends at «хаалттай».
@@ -907,7 +959,8 @@ function drawStall(l) {
         } catch {
           // Without storage the form is filled again, that is all.
         }
-        location.href = loginUrl(`/shop/${l.id}`);
+        // `for=pay`: the door says «to pay» for this press alone, not for the header's «Нэвтрэх» on the same stall.
+        location.href = `${loginUrl(`/shop/${l.id}`)}&for=pay`;
         return;
       }
       const button = event.currentTarget;
@@ -969,9 +1022,9 @@ async function load() {
   pay.open = market.payments_open !== false;
 }
 
-/** What a page that could not be drawn says, with the way to try again. */
-const couldNot = (error, again) =>
-  siteEmpty({ icon: 'alert', title: 'Зарыг ачаалж чадсангүй', text: whatWentWrong(error), actions: [['Дахин ачаалах', again, 'dark']], card: true });
+/** What a page that could not be drawn says, with the way to try again. On a stall's page, where nothing else is, its title is the page's heading. */
+const couldNot = (error, again, heading = 0) =>
+  siteEmpty({ icon: 'alert', title: 'Зарыг ачаалж чадсангүй', text: whatWentWrong(error), actions: [['Дахин ачаалах', again, 'dark']], card: true, heading });
 
 const stallId = location.pathname.match(/^\/shop\/([0-9a-f-]{36})$/)?.[1];
 if (stallId) {
@@ -997,8 +1050,9 @@ if (stallId) {
             text: 'Энэ зар устгагдсан эсвэл нуугдсан байж магадгүй. Одоо байгаа зарыг үзээрэй.',
             actions: [['Бүх зар', '/shop', 'dark']],
             card: true,
+            heading: 1,
           })
-        : couldNot(error, location.pathname),
+        : couldNot(error, location.pathname, 1),
     );
   }
 } else {
