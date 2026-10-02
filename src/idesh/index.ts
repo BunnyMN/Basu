@@ -86,6 +86,7 @@ export {
 export {
   registerSupplier,
   supplierForOrg,
+  openSupplierOf,
   type SupplierRole,
   applySupplier,
   applicationOf,

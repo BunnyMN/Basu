@@ -33,6 +33,7 @@ import {
   type SupplierRow,
   type Tally,
   supplierForOrg,
+  openSupplierOf,
 } from '../idesh/index.js';
 import { limits } from './hardening.js';
 import { need, needAny } from './guards.js';
@@ -410,6 +411,17 @@ export async function registerOpsRoutes(
       const pending = await orgById(request.params.id);
       if (pending?.supplier && pending.state === 'applied' && (!pending.phone || !pending.address)) {
         return badRequest(reply, 'Нийлүүлэгчид утас, хаяг заавал хэрэгтэй.', 'a supplier needs a phone and an address');
+      }
+      // One supplier per person: one who already runs one is told so before anything is approved — never a
+      // business made active with no supplier behind it. (An application still waiting is taken over below.)
+      if (pending?.supplier && pending.state === 'applied' && (await openSupplierOf(pending.appliedBy))?.state === 'contracted') {
+        return reply.status(409).send({
+          error: {
+            code: 'ALREADY_SUPPLIER',
+            message_mn: 'Бүртгүүлсэн хүн аль хэдийн нийлүүлэгч ажиллуулж байна — нэг хүн нэг л нийлүүлэгч эзэмшинэ. Энэ бүртгэлийг татгалзана уу.',
+            message_en: 'the registrant already runs a contracted supplier',
+          },
+        });
       }
       const org = await approveOrg({ id: request.params.id, by: who(request), now: ctx.clock.now() });
       if (org.supplier) {

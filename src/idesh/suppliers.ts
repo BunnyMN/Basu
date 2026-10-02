@@ -141,8 +141,27 @@ async function giveOrganisation(supplierId: string, db: Db = getPool()): Promise
 }
 
 /**
+ * The supplier row this person owns that is still open — an application
+ * waiting, or a contract — if any. One per person (supplier_applicant_open_idx):
+ * what the desk asks before it approves a supplier business, so a second
+ * contract is refused before anything is approved, never half-way through.
+ */
+export async function openSupplierOf(guestId: string): Promise<{ id: string; state: 'applied' | 'contracted'; orgId: string | null } | null> {
+  const { rows } = await getPool().query<{ id: string; state: 'applied' | 'contracted'; org_id: string | null }>(
+    `SELECT id, state, org_id FROM idesh.supplier WHERE owner_guest_id = $1 AND state IN ('applied', 'contracted') LIMIT 1`,
+    [guestId],
+  );
+  const r = rows[0];
+  return r ? { id: r.id, state: r.state, orgId: r.org_id } : null;
+}
+
+/**
  * The supplier of an organisation the desk has just approved: contracted at
- * once, its owner the organisation's owner.
+ * once, its owner the organisation's owner. A person who also asked on the
+ * supplier's own screen has that application open — one open row per person —
+ * so it becomes this business's supplier, with the business's name, phone and
+ * address (and the bank account the application gave), rather than a second
+ * row the database refuses.
  */
 export async function supplierForOrg(input: {
   orgId: string;
@@ -155,6 +174,16 @@ export async function supplierForOrg(input: {
   tin?: string | null;
   about?: string | null;
 }): Promise<string> {
+  const adopted = await getPool().query<{ id: string }>(
+    `UPDATE idesh.supplier
+        SET name = $1, phone = $2, ebarimt_merchant_tin = COALESCE($3, ebarimt_merchant_tin), pickup_address = $4,
+            lat = COALESCE($5, lat), lon = COALESCE($6, lon), about = COALESCE($7, about),
+            state = 'contracted', contracted_at = now(), org_id = $9, decided_at = now()
+      WHERE owner_guest_id = $8 AND state = 'applied' AND org_id IS NULL
+      RETURNING id`,
+    [input.name, input.phone, input.tin ?? null, input.address, input.lat ?? null, input.lon ?? null, input.about ?? null, input.ownerId, input.orgId],
+  );
+  if (adopted.rows[0]) return adopted.rows[0].id;
   const { rows } = await getPool().query<{ id: string }>(
     `INSERT INTO idesh.supplier
        (name, phone, ebarimt_merchant_tin, pickup_address, lat, lon, about, state, contracted_at, owner_guest_id, org_id, decided_at)

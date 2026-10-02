@@ -102,6 +102,37 @@ describe('registering a business', () => {
     expect((await call('GET', '/v1/supplier/money', owner)).statusCode).toBe(200);
   });
 
+  it('takes over the application its owner also sent from the supplier screen, rather than failing on a second', async () => {
+    const owner = await person('+97699110001', 'Дорж');
+    const made = await call('POST', '/v1/orgs', owner, { name: 'Хэрлэн мах', supplier: true, phone: '88110001', address: 'Нарантуул, 3-р хаалга' });
+    expect(made.statusCode, made.body).toBe(201);
+    // The same person, on /supplier, does not see the business waiting and asks again there.
+    const asked = await call('POST', '/v1/supplier/apply', owner, { name: 'Дорж мах', tin: '6505678901', address: 'Хархорин зах', about: 'хонь' });
+    expect(asked.statusCode, asked.body).toBe(201);
+
+    const yes = await app.inject({ method: 'POST', url: `/v1/ops/orgs/${made.json().id}/approve`, headers: desk() });
+    expect(yes.statusCode, yes.body).toBe(200);
+    expect((await call('GET', '/v1/supplier/me', owner)).json().supplier).toMatchObject({ name: 'Хэрлэн мах', state: 'contracted' });
+    expect((await call('GET', '/v1/supplier/board', owner)).statusCode).toBe(200);
+    // One supplier, the business's — not an application left waiting beside an active business with none.
+    const suppliers = (await app.inject({ method: 'GET', url: '/v1/ops/suppliers', headers: desk() })).json().suppliers as { name: string; state: string }[];
+    expect(suppliers.map((x) => [x.name, x.state])).toEqual([['Хэрлэн мах', 'contracted']]);
+  });
+
+  it('is refused before anything is approved when its owner already runs a supplier', async () => {
+    const owner = await person('+97699110001', 'Дорж');
+    await aButcher(owner);
+    const second = await call('POST', '/v1/orgs', owner, { name: 'Хоёр дахь мах', supplier: true, phone: '88110002', address: 'Бөмбөгөр' });
+    expect(second.statusCode, second.body).toBe(201);
+    const no = await app.inject({ method: 'POST', url: `/v1/ops/orgs/${second.json().id}/approve`, headers: desk() });
+    expect(no.statusCode, no.body).toBe(409);
+    expect(no.json().error.code).toBe('ALREADY_SUPPLIER');
+    // Still waiting, for the desk to decline — nothing made active with no supplier behind it.
+    const mine = (await call('GET', '/v1/orgs/mine', owner)).json().orgs as { name: string; state: string }[];
+    expect(mine.find((o) => o.name === 'Хоёр дахь мах')).toMatchObject({ state: 'applied' });
+    expect((await app.inject({ method: 'POST', url: `/v1/ops/orgs/${second.json().id}/decline`, headers: desk(), payload: { reason: 'Давхар' } })).statusCode).toBe(200);
+  });
+
   it('can be declined with a reason, which the registrant sees', async () => {
     const owner = await person('+97699110001', 'Дорж');
     const made = (await call('POST', '/v1/orgs', owner, { name: 'Хэрлэн мах', supplier: true, phone: '88110001', address: 'x' })).json();
