@@ -820,6 +820,10 @@ function setTodo(n) {
   if (count) {
     count.hidden = !n;
     count.textContent = n > 99 ? '99+' : String(n);
+    // Heard as words, not «Өнөөдөр2»: the tab's own name first, then what the number counts.
+    const tab = count.closest('button');
+    if (n) tab?.setAttribute('aria-label', `${tab.querySelector('.t')?.textContent ?? 'Өнөөдөр'}, ${n} хийх ажил`);
+    else tab?.removeAttribute('aria-label');
   }
   deskNav?.badge?.('idesh.today', n, true);
 }
@@ -853,7 +857,7 @@ function renderBoard(data) {
   for (const lane of LANES) {
     const tickets = data.lanes[lane.key] ?? [];
     if (!tickets.length) continue;
-    const group = el(`<section class="group lane"><h2 class="section-title">${lane.title}<span class="n count" data-tone="neutral">${tickets.length}</span></h2><div class="stack"></div></section>`);
+    const group = el(`<section class="group lane"><h2 class="section-title">${lane.title} <span class="n count" data-tone="neutral">${tickets.length}</span></h2><div class="stack"></div></section>`);
     const stack = group.querySelector('.stack');
     for (const ticket of tickets) stack.append(renderTicket(ticket, lane.key));
     board.append(group);
@@ -2337,7 +2341,7 @@ function renderOrders(view) {
         <input type="search" class="input search" id="q" placeholder="Хайх…" aria-label="Захиалга хайх" value="${esc(orderQuery.q)}" autocomplete="off">
         <div class="seg" data-fill>
           ${[['live', 'Идэвхтэй'], ['done', 'Дууссан'], ['all', 'Бүгд']]
-            .map(([k, l]) => `<button type="button" data-scope="${k}"${orderQuery.scope === k ? ' data-on' : ''}>${l}</button>`)
+            .map(([k, l]) => `<button type="button" data-scope="${k}" aria-pressed="${orderQuery.scope === k}"${orderQuery.scope === k ? ' data-on' : ''}>${l}</button>`)
             .join('')}
         </div>
       </div>
@@ -2353,7 +2357,10 @@ function renderOrders(view) {
     const b = e.target.closest('button[data-scope]');
     if (!b) return;
     orderQuery.scope = b.dataset.scope;
-    for (const c of view.querySelectorAll('.seg button')) c.toggleAttribute('data-on', c === b);
+    for (const c of view.querySelectorAll('.seg button')) {
+      c.toggleAttribute('data-on', c === b);
+      c.setAttribute('aria-pressed', String(c === b));
+    }
     void loadOrders();
   });
   void loadOrders();

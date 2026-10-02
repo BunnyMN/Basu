@@ -440,13 +440,14 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 .acts .hint{font-size:var(--t-cap);line-height:1.45;color:var(--ink-3)}
 .acts .sep{height:1px;background:var(--line);margin:4px 0}
 /* a finger's target on a touch screen — app.css grows the shared controls; these are the page's own small ones:
-   a number that dials, the door's brand, a link in a line, the role editor's «Бүгдийг дэлгэх». Each grows
-   around its words, so the line keeps its place. */
+   a number that dials, the door's brand, a link in a line, the role editor's «Бүгдийг дэлгэх» and its
+   Хаах / Харах / Бүрэн. Each grows around its words, so the line keeps its place. */
 @media (pointer:coarse){
   a.tel{min-height:var(--target);margin-block:-12px}
   .door-brand{padding-block:9px;margin-top:-9px;margin-bottom:19px}
   .org-you .link{min-height:var(--target);margin-block:-12px}
   .role-sec-head [data-unfold]{min-height:var(--target);margin-block:-15px}
+  .role-level button{min-height:var(--target)}
 }
 .stars{display:inline-flex;gap:1px;vertical-align:middle}
 .stars svg{width:14px;height:14px;fill:var(--star)}
@@ -1588,8 +1589,21 @@ async function renderOrgsDesk(view) {
   table.el.id = 'orgs';
   view.append(table.el);
   if (orgsOpenOn) {
-    // Pressed as the person would press it, so the table remembers it as their own choice.
+    // Opened on the ones waiting, as the person would press it — but not remembered: the next visit from the
+    // menu opens on what they last chose themselves, not on a list that may be empty by then.
+    let kept = null;
+    try {
+      kept = localStorage.getItem('basu.dt.orgs');
+    } catch {
+      /* a private window keeps nothing */
+    }
     table.el.querySelector(`.dt-filters button[data-v="${orgsOpenOn}"]`)?.click();
+    try {
+      if (kept === null) localStorage.removeItem('basu.dt.orgs');
+      else localStorage.setItem('basu.dt.orgs', kept);
+    } catch {
+      /* nothing kept */
+    }
     orgsOpenOn = null;
   }
   try {
@@ -1627,7 +1641,7 @@ async function deskRoleList() {
 
 /** Desk or business: the switch the roles and menu pages share. */
 function scopeSeg(onChange) {
-  const seg = el(`<div class="seg">${['desk', 'org'].map((k) => `<button type="button" data-scope="${k}"${accessScope === k ? ' data-on' : ''}>${SCOPE_WORD[k]}</button>`).join('')}</div>`);
+  const seg = el(`<div class="seg">${['desk', 'org'].map((k) => `<button type="button" data-scope="${k}" aria-pressed="${accessScope === k}"${accessScope === k ? ' data-on' : ''}>${SCOPE_WORD[k]}</button>`).join('')}</div>`);
   seg.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-scope]');
     if (!b || b.dataset.scope === accessScope) return;
@@ -1901,7 +1915,7 @@ function roleEditor(data, mods, role, { manage, from, close, copy }) {
   ].filter(Boolean).join('');
   const root = el(`
     <div class="sheet role-sheet" data-center id="role-edit" role="dialog" aria-modal="true" aria-labelledby="role-edit-title" tabindex="-1">
-      <header>
+      <header role="none">
         <div class="role-top">
           ${roleMark(role)}
           <div class="role-id">
@@ -1933,7 +1947,7 @@ function roleEditor(data, mods, role, { manage, from, close, copy }) {
           <div class="role-mod-list" data-mods></div>
         </section>
       </div>
-      ${manage ? `<footer>
+      ${manage ? `<footer role="none">
         <span class="sum" data-foot-sum></span>
         ${!fresh && !role.builtin ? '<button class="btn" data-v="danger" type="button" data-drop>Устгах</button>' : ''}
         ${fresh ? '' : '<button class="btn" type="button" data-copy>Хуулах</button>'}
@@ -2826,13 +2840,16 @@ let period = localStorage.getItem('basu.ops.period') ?? 'today';
 
 /** The period switch every numbers page shares; `draw` is called again on each change. */
 function periodSeg(draw) {
-  const seg = el(`<div class="seg">${PERIODS.map(([k, l]) => `<button type="button" data-p="${k}"${period === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
+  const seg = el(`<div class="seg">${PERIODS.map(([k, l]) => `<button type="button" data-p="${k}" aria-pressed="${period === k}"${period === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
   seg.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-p]');
     if (!b) return;
     period = b.dataset.p;
     localStorage.setItem('basu.ops.period', period);
-    for (const c of seg.querySelectorAll('button')) c.toggleAttribute('data-on', c === b);
+    for (const c of seg.querySelectorAll('button')) {
+      c.toggleAttribute('data-on', c === b);
+      c.setAttribute('aria-pressed', String(c === b));
+    }
     draw();
   });
   return seg;
@@ -3816,13 +3833,16 @@ async function download(path, name) {
 
 function renderMoney(view) {
   view.append(head('Мөнгө', 'Дэвтрийн данс, гүйлгээ, цэнэглэлт, е-баримт. Нягтланд CSV.'));
-  const seg = el(`<div class="seg">${[['checks', 'Нэгтгэл'], ['transfers', 'Гүйлгээ'], ['topups', 'Цэнэглэлт'], ['receipts', 'Е-баримт']].map(([k, l]) => `<button type="button" data-m="${k}"${moneyView === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
+  const seg = el(`<div class="seg">${[['checks', 'Нэгтгэл'], ['transfers', 'Гүйлгээ'], ['topups', 'Цэнэглэлт'], ['receipts', 'Е-баримт']].map(([k, l]) => `<button type="button" data-m="${k}" aria-pressed="${moneyView === k}"${moneyView === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
   seg.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-m]');
     if (!b) return;
     moneyView = b.dataset.m;
     localStorage.setItem('basu.ops.money', moneyView);
-    for (const c of seg.querySelectorAll('button')) c.toggleAttribute('data-on', c === b);
+    for (const c of seg.querySelectorAll('button')) {
+      c.toggleAttribute('data-on', c === b);
+      c.setAttribute('aria-pressed', String(c === b));
+    }
     void drawMoney();
   });
   view.querySelector('.page-head').append(seg);
@@ -4050,13 +4070,16 @@ let msgFilter = { q: '', state: '', channel: '' };
 
 function renderNotify(view) {
   view.append(head('Мэдэгдэл', 'Зочдод илгээсэн SMS, push. Амжилтгүйг дахин илгээнэ.'));
-  const seg = el(`<div class="seg">${[['log', 'Бүх мэдэгдэл'], ['volume', 'Сараар']].map(([k, l]) => `<button type="button" data-n="${k}"${notifyView === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
+  const seg = el(`<div class="seg">${[['log', 'Бүх мэдэгдэл'], ['volume', 'Сараар']].map(([k, l]) => `<button type="button" data-n="${k}" aria-pressed="${notifyView === k}"${notifyView === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
   seg.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-n]');
     if (!b) return;
     notifyView = b.dataset.n;
     localStorage.setItem('basu.ops.notify', notifyView);
-    for (const c of seg.querySelectorAll('button')) c.toggleAttribute('data-on', c === b);
+    for (const c of seg.querySelectorAll('button')) {
+      c.toggleAttribute('data-on', c === b);
+      c.setAttribute('aria-pressed', String(c === b));
+    }
     void drawNotify();
   });
   view.querySelector('.page-head').append(seg);

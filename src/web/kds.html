@@ -304,7 +304,7 @@ function renderBoard(data) {
     const tickets = data.lanes[lane.key] ?? [];
     const column = el(`
       <section class="lane" data-key="${lane.key}">
-        <h2 class="section-title"><span>${lane.title}</span><span class="count" data-tone="neutral">${tickets.length}</span></h2>
+        <h2 class="section-title"><span>${lane.title}</span> <span class="count" data-tone="neutral">${tickets.length}</span></h2>
         <div class="stack"></div>
       </section>`);
     const stack = column.querySelector('.stack');
@@ -318,13 +318,16 @@ function renderBoard(data) {
     board.append(column);
 
     const tab = el(`
-      <button type="button" data-key="${lane.key}"${lane.key === shownLane ? ' data-on' : ''}>${
+      <button type="button" data-key="${lane.key}" aria-pressed="${lane.key === shownLane}"${lane.key === shownLane ? ' data-on' : ''}>${
         lane.title
-      }<span class="count" data-tone="neutral">${tickets.length}</span></button>`);
+      } <span class="count" data-tone="neutral">${tickets.length}</span></button>`);
     tab.addEventListener('click', () => {
       shownLane = lane.key;
       board.dataset.show = shownLane;
-      for (const other of picker.children) other.toggleAttribute('data-on', other === tab);
+      for (const other of picker.children) {
+        other.toggleAttribute('data-on', other === tab);
+        other.setAttribute('aria-pressed', String(other === tab));
+      }
     });
     picker.append(tab);
   }
