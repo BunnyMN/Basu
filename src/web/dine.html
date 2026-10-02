@@ -212,7 +212,8 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var
 .stars button svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
 .stars button[data-on]{color:var(--star)}
 .stars button[data-on] svg{fill:currentColor}
-.stars[data-size="sm"] button{width:32px;height:36px}
+/* the small stars are small to look at, not to hit: each is the thumb's 44 (4.5), as the big ones are */
+.stars[data-size="sm"] button{width:44px;height:44px}
 .stars[data-size="sm"] button svg{width:18px;height:18px}
 .rating{display:inline-flex;align-items:center;gap:3px;color:var(--ink-2)}
 .rating i{display:inline-flex;color:var(--star)}
@@ -226,7 +227,7 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var
 .review > .stars + .row{margin-top:8px}
 .review .row img{width:40px;height:40px;border-radius:var(--r-sm);background:var(--surface-2);object-fit:cover;flex:none}
 .review .row .n{flex:1;min-width:0;font-size:var(--t-body-lg);color:var(--ink)}
-.review .row .stars{margin-right:-7px}
+.review .row .stars{margin-right:-13px}
 .review textarea{margin-top:12px}
 /* The timing question is the product's own metric and is asked separately:
    a four-star lunch that came late is a success by one measure and a failure
@@ -278,6 +279,8 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var
   </header>
   <div class="body" id="sheet-body"></div>
   <footer id="sheet-foot"></footer>
+  <!-- A lunch that moves on while its sheet is open is said aloud: accepted, on the fire, ready. -->
+  <p class="sr-only" id="sheet-said" role="status"></p>
 </section>
 
 <!-- Named by what it shows — the order's number, what is happening, when — as a screen reader should say it. -->
@@ -325,24 +328,27 @@ const ICON = {
  *
  * They redraw themselves rather than asking the form to rebuild: rebuilding
  * the block would take the caret out of the comment box somebody was typing in.
+ * To a screen reader they are one choice of five (`label` names what is
+ * rated), the chosen one said as chosen; the star just pressed keeps the focus.
  */
-function starPicker(value, onPick, size) {
-  const box = el(`<div class="stars"${size ? ` data-size="${size}"` : ''}></div>`);
+function starPicker(value, onPick, size, label = 'Үнэлгээ') {
+  const box = el(`<div class="stars" role="radiogroup" aria-label="${escapeHtml(label)}"${size ? ` data-size="${size}"` : ''}></div>`);
   let picked = value;
 
-  const paint = () => {
+  const paint = (focus = 0) => {
     box.replaceChildren();
     for (let n = 1; n <= 5; n++) {
       const star = el(
-        `<button type="button" aria-label="${n} од"${n <= picked ? ' data-on' : ''}>${ICON.star}</button>`,
+        `<button type="button" role="radio" aria-checked="${n === picked}" aria-label="${n} од"${n <= picked ? ' data-on' : ''}>${ICON.star}</button>`,
       );
       star.addEventListener('click', () => {
         picked = n;
-        paint();
+        paint(n);
         onPick(n);
       });
       box.append(star);
     }
+    if (focus) box.children[focus - 1]?.focus();
   };
 
   paint();
@@ -968,6 +974,7 @@ async function openVenue(venue) {
 
   $('sheet-name').textContent = venue.name;
   $('sheet-name').classList.remove('mono'); // a name, not a code
+  $('sheet-said').textContent = '';
   delete $('sheet').dataset.busy;
   state.walk = walk;
   venueSub(venue);
@@ -1373,7 +1380,8 @@ async function showStatus(force) {
   // has just closed, which used to come back four seconds later. News
   // reopens it: the kitchen accepting or firing is worth interrupting for.
   if (!force && signature === rendered) return;
-  if (rendered !== null && signature !== rendered) shell.ordersChanged();
+  const moved = rendered !== null && signature !== rendered;
+  if (moved) shell.ordersChanged();
   rendered = signature;
 
   // The order's place on the map, even when the list of venues has not come
@@ -1460,6 +1468,9 @@ async function showStatus(force) {
   }
   card.append(timeline);
   body.append(card);
+  // News found by a look in the background is said, not only drawn.
+  // The step it reached and the sentence under it («Гал дээр гарлаа. Хоол хийгдэж эхэллээ»), or a cancel's word and what becomes of the money.
+  $('sheet-said').textContent = moved ? (negative ? [word, cap] : [lastStep, sub || big]).filter(Boolean).join('. ') : '';
 
   // Once the kitchen has taken the order there is a walk to make, so the map
   // shows it — and this is the moment to ask where the guest is, rather than
@@ -1609,6 +1620,7 @@ function appendReview(body, foot, order) {
         draft.dishes.get(line.menu_item_id) ?? 0,
         (n) => draft.dishes.set(line.menu_item_id, n),
         'sm',
+        `${line.name} — үнэлгээ`,
       ),
     );
     box.append(row);
