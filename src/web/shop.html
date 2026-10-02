@@ -542,7 +542,28 @@ const earliest = (l) => (l.ready_from > market.today ? l.ready_from : market.tod
  * and shows again on the way back from the order buys the same order
  * again as a second animal somebody meant.
  */
-let attempt = null;
+/**
+ * Kept in the tab's own storage as well as here: a page reloaded after a lost
+ * answer, or come back to from QPay's page, is the same attempt — the same
+ * order, never a second animal. It used to live only here, and a reload made
+ * a new one.
+ */
+const ATTEMPT = 'basu.shop.attempt';
+let attempt = (() => {
+  try {
+    return JSON.parse(sessionStorage.getItem(ATTEMPT) ?? 'null');
+  } catch {
+    return null;
+  }
+})();
+function keepAttempt() {
+  try {
+    if (attempt) sessionStorage.setItem(ATTEMPT, JSON.stringify(attempt));
+    else sessionStorage.removeItem(ATTEMPT);
+  } catch {
+    // Without storage the attempt lives as long as the page, as it always did.
+  }
+}
 
 function currentAttempt(body) {
   const what = JSON.stringify(body);
@@ -579,6 +600,7 @@ async function purchase(body) {
     return await run;
   } finally {
     if (buying === run) buying = null;
+    keepAttempt();
   }
 }
 
@@ -615,13 +637,16 @@ async function buyOnce(body) {
     // A connection that drops an answer is retried; the same key must not sell a second animal.
     const order = await authed('/v1/idesh', { method: 'POST', idempotencyKey: `idesh-${current.nonce}`, body });
     current.order = order.id;
+    keepAttempt();
   }
   const id = current.order;
   try {
     // Paying can lose its answer too. Under the attempt's own key the retry
     // is handed the payment already made, rather than told the order is paid
     // for and left in front of «Төлөх» for it.
-    await authed(`/v1/idesh/${id}/pay`, { method: 'POST', idempotencyKey: `pay-${current.nonce}` });
+    const answer = await authed(`/v1/idesh/${id}/pay`, { method: 'POST', idempotencyKey: `pay-${current.nonce}` });
+    // Not covered by the wallet: QPay's invoice for it, paid on QPay's own page (202). The order waits as it is.
+    if (answer?.state === 'AWAITING_PAYMENT') return { id, what: current.what, invoice: answer.invoice };
   } catch (error) {
     if (error.code !== 'WRONG_STATE') throw error;
     // The order has left its draft without this press. Paid for by a press
@@ -975,7 +1000,20 @@ function drawStall(l) {
         ...(delivery ? { address: form.address.trim(), address_phone: form.phone.replace(/\s+/g, '') } : {}),
       };
       try {
-        const bought = await purchase(body);
+        let bought = await purchase(body);
+        // QPay's invoice, still being raised by a press a moment earlier: asked again, once it has its page.
+        for (let tries = 0; bought.invoice && !bought.invoice.action_url && tries < 4; tries++) {
+          await new Promise((done) => setTimeout(done, 1500));
+          bought = await purchase(body);
+        }
+        if (bought.invoice) {
+          // To QPay's page, in this tab: paid there, it sends the person to the order's page, which asks until
+          // the payment is confirmed. The attempt is kept, so coming back here is the same order, not a second.
+          if (!bought.invoice.action_url) throw new Error('QPay-ийн нэхэмжлэл үүсгэж чадсангүй. Дахин оролдоно уу.');
+          button.textContent = 'QPay руу шилжиж байна…';
+          location.href = bought.invoice.action_url;
+          return;
+        }
         try {
           sessionStorage.removeItem(`basu.shop.${l.id}`);
         } catch {
@@ -985,6 +1023,7 @@ function drawStall(l) {
         // the order. An order from before a change, bought by a press whose
         // answer was slow or lost, is the one gone to, and its page says so.
         attempt = null;
+        keepAttempt();
         location.href = `/orders/${bought.id}?new=1${bought.what === JSON.stringify(body) ? '' : '&earlier=1'}`;
       } catch (error) {
         // A review drawn again since this press has a press of its own to

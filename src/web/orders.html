@@ -71,6 +71,8 @@
 .od-state{padding:26px}
 .od-state .big{font-size:1.5rem;font-weight:600;letter-spacing:-.02em}
 .od-state .cap{margin:6px 0 0;max-width:60ch;font-size:.9375rem;line-height:1.6;color:var(--ink-2)}
+/* back from QPay, not paid yet: the way back to its page, and to look again */
+.od-pay-acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
 .od-steps{list-style:none;margin:24px 0 0;padding:0}
 .od-steps li{position:relative;display:grid;grid-template-columns:28px 1fr auto;gap:14px;padding:0 0 22px}
 .od-steps li:last-child{padding-bottom:0}
@@ -128,7 +130,14 @@
 import { store, mnt, dayLabel, dayShort, ubParts, IDESH_STATE, IDESH_LIVE, BANK_NAMES, popup, passwordPopup, whatWentWrong } from '/api.js';
 import { mountFrame, requireSignIn, authed, esc, el, say, me, siteEmpty, howToBuy, statePill, tugrik, phoneShown, meatPhoto, stillGoing, refundPill } from '/site.js';
 
-const token = requireSignIn();
+/**
+ * Back from QPay's page (`?paying=1`, the address Wire sends a person to once
+ * they have paid). A browser with nobody signed in is one the Basu app sent
+ * there — the app's purchase, and the app's session, are not this browser's:
+ * it is told to go back to the app rather than asked to sign in.
+ */
+const payingBack = new URLSearchParams(location.search).has('paying');
+const token = payingBack && !store.guestToken ? null : requireSignIn();
 void mountFrame('orders');
 const page = document.getElementById('page');
 
@@ -433,9 +442,76 @@ function askAccount(o, password = null) {
   });
 }
 
+/* ── back from QPay ────────────────────────────────────────────────── */
+
+/**
+ * The purchase, asked again until it goes through: the money can take a few
+ * seconds to be confirmed after QPay's page says it is paid. Then the order
+ * as a fresh purchase («Төлбөр амжилттай»). Not paid after a while — QPay
+ * closed without paying, or slow — the way back to the same invoice, and to
+ * look again; a payment confirmed later buys the order on its own (Basu asks
+ * QPay every minute), so nothing is lost by leaving.
+ */
+async function drawPaying(id) {
+  const card = el(`<div class="s-card od-state" role="status" aria-live="polite">
+      <div class="big">Төлбөр шалгаж байна…</div>
+      <p class="cap">QPay-ээс баталгаа ирмэгц захиалга тань энд гарна.</p>
+      <div class="od-pay-acts" hidden></div>
+    </div>`);
+  page.replaceChildren(el(`<a class="s-crumb" href="/orders">${MARK.back}Миний захиалга</a>`), el('<div class="s-head od-top"><div class="od-head"><h1>Төлбөр</h1></div></div>'), card);
+  let invoice = null;
+  for (let round = 0; round < 30; round++) {
+    let answer;
+    try {
+      // 202s are never kept as the answer to a key, so one key serves every ask; the 200 is kept.
+      answer = await authed(`/v1/idesh/${id}/pay`, { method: 'POST', idempotencyKey: `pay-back-${id}` });
+    } catch (error) {
+      // Not a draft any more: bought by another ask (QPay's callback, Basu's own check) or given back — the order says.
+      if (error.code === 'WRONG_STATE') break;
+      throw error;
+    }
+    if (answer?.state === 'PAID') break;
+    invoice = answer?.invoice ?? invoice;
+    await new Promise((done) => setTimeout(done, 3000));
+  }
+  const o = await authed(`/v1/idesh/${id}`);
+  if (o.state !== 'DRAFT') {
+    // Bought: the stall's attempt is over — a next press there is a next animal.
+    try {
+      sessionStorage.removeItem('basu.shop.attempt');
+    } catch {
+      // nothing kept
+    }
+    drawn = null;
+    await drawOrder(id, o.paid_at ? 'new' : false);
+    return o;
+  }
+  card.querySelector('.big').textContent = 'Төлбөр хараахан ороогүй байна';
+  card.querySelector('.cap').textContent = 'QPay-ээр төлсөн бол хэдэн минутын дотор өөрөө баталгаажна — энэ хуудсыг хааж болно. Төлөөгүй бол доорх товчоор төлнө үү.';
+  const acts = card.querySelector('.od-pay-acts');
+  acts.hidden = false;
+  acts.append(
+    ...(invoice?.action_url ? [el(`<a class="s-btn s-btn-dark" href="${esc(invoice.action_url)}">QPay-ээр төлөх</a>`)] : []),
+    el(`<a class="s-btn s-btn-line" href="${esc(`/orders/${id}?paying=1`)}">Дахин шалгах</a>`),
+  );
+  return o;
+}
+
 /* ── which page this is ────────────────────────────────────────────── */
 
 const orderId = location.pathname.match(/^\/orders\/([0-9a-f-]{36})$/)?.[1];
+if (!token && payingBack) {
+  page.replaceChildren(
+    siteEmpty({
+      icon: 'orders',
+      title: 'Basu апп руугаа буцна уу',
+      text: 'Төлбөр тань орж ирмэгц захиалга Basu апп дээр баталгаажна. Аппаа нээгээд «Миний идэш»-ээс захиалгаа харна уу.',
+      actions: [['Basu апп нээх', orderId ? `basu://order/${orderId}` : 'basu://', 'dark']],
+      card: true,
+      heading: 1,
+    }),
+  );
+}
 if (token) {
   try {
     if (orderId) {
@@ -443,10 +519,10 @@ if (token) {
       // order from before a change. Said once; the address forgets it.
       const sent = new URLSearchParams(location.search);
       const fresh = sent.has('new') && (sent.has('earlier') ? 'earlier' : 'new');
-      if (fresh) history.replaceState(null, '', location.pathname);
+      if (fresh || payingBack) history.replaceState(null, '', location.pathname);
       // While it comes: blocks in the shape of the order, so nothing jumps when it lands.
       page.replaceChildren(el(`<a class="s-crumb" href="/orders">${MARK.back}Миний захиалга</a>`), el('<div class="od-wait" role="status" aria-busy="true" aria-label="Захиалга ачаалж байна"><span class="s-skel t"></span><span class="s-skel w"></span><div class="g"><span class="s-skel a"></span><span class="s-skel b"></span></div></div>'));
-      const o = await drawOrder(orderId, fresh);
+      const o = payingBack ? await drawPaying(orderId) : await drawOrder(orderId, fresh);
       // Still going: look again now and then, so a supplier starting shows here.
       if (LIVE.includes(o.state)) {
         const poll = setInterval(() => {

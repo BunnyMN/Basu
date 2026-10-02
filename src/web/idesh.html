@@ -860,6 +860,7 @@ let opener = null;
 const afterLooks = new Map();
 
 function closeScreen() {
+  stopQpay();
   $('screen').removeAttribute('data-open');
   document.body.style.overflow = '';
   for (const behind of [$('bar'), $('list')]) behind.removeAttribute('inert');
@@ -1314,7 +1315,27 @@ function orderBody() {
  * the money has gone, and until the guest has seen it, a tap is a retry of
  * it. After that, the same order again is a second animal somebody meant.
  */
-let attempt = null;
+/**
+ * Kept in the web view's own storage as well as here: a page reloaded after a
+ * lost answer, or back from QPay's page, is the same attempt — the same
+ * order, never a second animal. It used to live only here.
+ */
+const ATTEMPT = 'basu.idesh.attempt';
+let attempt = (() => {
+  try {
+    return JSON.parse(sessionStorage.getItem(ATTEMPT) ?? 'null');
+  } catch {
+    return null;
+  }
+})();
+function keepAttempt() {
+  try {
+    if (attempt) sessionStorage.setItem(ATTEMPT, JSON.stringify(attempt));
+    else sessionStorage.removeItem(ATTEMPT);
+  } catch {
+    // Without storage the attempt lives as long as the page, as it always did.
+  }
+}
 
 function currentAttempt(body) {
   const what = JSON.stringify(body);
@@ -1351,6 +1372,7 @@ async function purchase(body) {
     return await run;
   } finally {
     if (buying === run) buying = null;
+    keepAttempt();
   }
 }
 
@@ -1388,13 +1410,16 @@ async function buyOnce(body) {
     // A phone on a patchy connection retries; the same key must not sell a second animal.
     const order = await guestApi('/v1/idesh', { method: 'POST', idempotencyKey: `idesh-${current.nonce}`, body });
     current.order = order.id;
+    keepAttempt();
   }
   const id = current.order;
   try {
     // Paying can lose its answer too. Under the attempt's own key the retry
     // is handed the payment already made, rather than told the order is paid
     // for and left in front of a Pay button for it.
-    await guestApi(`/v1/idesh/${id}/pay`, { method: 'POST', idempotencyKey: `pay-${current.nonce}` });
+    const answer = await guestApi(`/v1/idesh/${id}/pay`, { method: 'POST', idempotencyKey: `pay-${current.nonce}` });
+    // Not covered by the wallet: QPay's invoice for it, paid on QPay's own page (202). The order waits as it is.
+    if (answer?.state === 'AWAITING_PAYMENT') return { id, what: current.what, invoice: answer.invoice };
   } catch (error) {
     if (error.code !== 'WRONG_STATE') throw error;
     // The order has left its draft without this tap. Paid for by a tap whose
@@ -1416,23 +1441,20 @@ async function placeOrder() {
   const body = orderBody();
   let paid = false;
   try {
-    const bought = await purchase(body);
+    let bought = await purchase(body);
+    // QPay's invoice, still being raised by a tap a moment earlier: asked again, once it has its page.
+    for (let tries = 0; bought.invoice && !bought.invoice.action_url && tries < 4; tries++) {
+      await new Promise((done) => setTimeout(done, 1500));
+      bought = await purchase(body);
+    }
+    if (bought.invoice) {
+      if (!bought.invoice.action_url) throw new Error('QPay-ийн нэхэмжлэл үүсгэж чадсангүй. Дахин оролдоно уу.');
+      if (!gone) awaitQpay(bought.invoice, body);
+      return;
+    }
     paid = true;
     if (gone) return;
-    // The card outside the page, on a phone, should say so now.
-    shell.ordersChanged();
-    state.listing = null;
-    state.form = null;
-    dropMap();
-    state.orderId = bought.id;
-    rendered = null;
-    // Paid: back from here goes to the list, not to a form for a sheep
-    // that is already bought.
-    await Promise.all([showStatus(true, { replace: true }), loadMine(), loadListings()]);
-    // The animal bought is the order from before a change, bought by a tap
-    // whose answer was slow or lost: the guest looked over another one a
-    // moment ago, and is told why this one is on the screen.
-    if (bought.what !== JSON.stringify(body)) toast('Өмнөх захиалга тань төлөгдсөн байна.');
+    await boughtNow(bought, body);
   } catch (error) {
     const said = whatWentWrong(error);
     // Paid for, and only the look at it failed: a bought animal never offers
@@ -1454,6 +1476,77 @@ async function placeOrder() {
       button.closest('.foot-row')?.before(why);
     }
   }
+}
+
+/** Bought: the order's own screen in the review's place, as for any purchase. */
+async function boughtNow(bought, body) {
+  stopQpay();
+  attempt = null;
+  keepAttempt();
+  // The card outside the page, on a phone, should say so now.
+  shell.ordersChanged();
+  state.listing = null;
+  state.form = null;
+  dropMap();
+  state.orderId = bought.id;
+  rendered = null;
+  // Paid: back from here goes to the list, not to a form for a sheep
+  // that is already bought.
+  await Promise.all([showStatus(true, { replace: true }), loadMine(), loadListings()]);
+  // The animal bought is the order from before a change, bought by a tap
+  // whose answer was slow or lost: the guest looked over another one a
+  // moment ago, and is told why this one is on the screen.
+  if (bought.what !== JSON.stringify(body)) toast('Өмнөх захиалга тань төлөгдсөн байна.');
+}
+
+/**
+ * Not covered by the wallet: QPay's invoice, paid on QPay's own page — the
+ * phone's browser, or the bank app it hands over to; the shell opens it, the
+ * app stays where it is. The review's foot says so and waits: back in the app
+ * (the page shown again), and every few seconds while it is shown, the
+ * purchase is asked again, and paid it goes on as any purchase. Left
+ * altogether, a payment made is not lost: Basu asks QPay itself every minute
+ * and buys the order, which then shows in «Миний идэш».
+ */
+let qpay = null;
+function awaitQpay(invoice, body) {
+  stopQpay();
+  const foot = $('screen-foot');
+  foot.replaceChildren(
+    el(`<div class="qpay-wait">
+          <p class="why" data-calm role="status">${MARK.info}<span>QPay-ээр <b>${money(invoice.amount_mnt)}</b> төлөөд энд буцаж ирнэ үү — төлбөр орж ирмэгц захиалга тань баталгаажна.</span></p>
+          <div class="foot-row">
+            <a class="btn" data-v="primary" id="qpay-open" href="${escapeHtml(invoice.action_url)}">QPay нээх</a>
+            <button class="btn" data-v="quiet" type="button" id="qpay-check">Төлсөн, шалгах</button>
+          </div>
+        </div>`),
+  );
+  const check = async () => {
+    if (!qpay || qpay.asking) return;
+    qpay.asking = true;
+    try {
+      const bought = await purchase(body);
+      if (!bought.invoice && qpay) await boughtNow(bought, body);
+    } catch {
+      // The network, for a moment: the next look tries again.
+    } finally {
+      if (qpay) qpay.asking = false;
+    }
+  };
+  const onShown = () => {
+    if (!document.hidden) void check();
+  };
+  qpay = { asking: false, timer: setInterval(onShown, 4000), onShown };
+  document.addEventListener('visibilitychange', onShown);
+  $('qpay-check').addEventListener('click', () => void check());
+  // The first time without a second tap: QPay's page, now.
+  location.href = invoice.action_url;
+}
+function stopQpay() {
+  if (!qpay) return;
+  clearInterval(qpay.timer);
+  document.removeEventListener('visibilitychange', qpay.onShown);
+  qpay = null;
 }
 
 /* ── the status ──────────────────────────────────────────────────── */
