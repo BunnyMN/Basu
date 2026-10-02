@@ -1609,29 +1609,38 @@ function toastDrop(old) {
   toastRestack();
 }
 
+/** `#toast`, the live region every toast speaks through: found, or put at the end of the page (empty and still). */
+function toastLive() {
+  let el = document.getElementById('toast');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'toast';
+  el.setAttribute('role', 'status');
+  el.addEventListener('click', () => {
+    clearTimeout(toastTimer);
+    delete el.dataset.show;
+    toastRestack();
+  });
+  document.body.appendChild(el);
+  return el;
+}
+// There before the first word, so the first word is heard.
+if (typeof document !== 'undefined' && document.body) toastLive();
+
 /**
  * One line at the bottom of the screen, gone after 3.2s (an error after
  * 5.2s). `kind` is 'good' (a check), 'bad' (an alert) or 'info' (an «i»); it
  * lands on `#toast` as `data-kind` and is cleared again when the next toast
  * has none. A toast that comes while another is showing puts the other one
  * up a step instead of wiping it, so two quick words are both read; three at
- * most. A tap puts one away. The element is created on first use with
- * `role=status`, it always holds the newest words, and `data-show` is what
- * the tests read on a timeout — all as they were.
+ * most. A tap puts one away. The element (`role=status`) is there, empty,
+ * from the moment the page loads — a screen reader hears a live region's
+ * words only if the region was already there when they came, so the first
+ * toast is heard as well as the tenth. It always holds the newest words, and
+ * `data-show` is what the tests read on a timeout — all as they were.
  */
 export function toast(message, kind) {
-  let el = document.getElementById('toast');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'toast';
-    el.setAttribute('role', 'status');
-    el.addEventListener('click', () => {
-      clearTimeout(toastTimer);
-      delete el.dataset.show;
-      toastRestack();
-    });
-    document.body.appendChild(el);
-  }
+  const el = toastLive();
   if (el.dataset.show && el.textContent && el.textContent !== message) {
     const old = el.cloneNode(true);
     old.removeAttribute('id');

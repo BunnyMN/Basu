@@ -1594,7 +1594,7 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
   .sidebar .go-home{height:var(--target);padding:0 14px 0 12px}
   .acct .out{width:var(--target);height:var(--target);margin:-9px -8px -9px 0}
 }
-/* the popup's cross on a tablet: the desk's quiet 36px look, a 44px target */
+/* the popup's cross on a tablet: the desk's quiet look (no plate), at a finger's 44px */
 @media (min-width:720px) and (pointer:coarse){
   .popup > header{grid-template-columns:minmax(0,1fr) var(--target)}
   .popup > header .x{width:var(--target);height:var(--target);margin:-6px -8px 0 0}

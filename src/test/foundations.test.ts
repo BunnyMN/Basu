@@ -571,6 +571,16 @@ describe('the desk', () => {
 });
 
 describe('reached by a keyboard and a reader', () => {
+  it('has the toast’s live region on the page, empty, before the first word — so the first word is heard', () => {
+    const live = document.getElementById('toast') as HTMLElement;
+    expect(live.getAttribute('role')).toBe('status');
+    expect(live.textContent).toBe('');
+    expect(live.hasAttribute('data-show')).toBe(false);
+    window.toast('Хадгалагдлаа', 'good');
+    expect(document.getElementById('toast')).toBe(live);
+    expect(live.textContent).toBe('Хадгалагдлаа');
+  });
+
   it('puts the page to sleep behind a popup — its header no banner, the toast awake — and wakes it before the focus goes back', async () => {
     const page = document.createElement('main');
     page.innerHTML = '<button id="opener">Нэмэх</button>';
