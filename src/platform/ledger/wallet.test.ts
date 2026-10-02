@@ -288,6 +288,19 @@ describe('a server with no payment provider', () => {
   });
 });
 
+describe('a purchase that cannot show an invoice', () => {
+  it('is the wallet’s alone with a real provider: short of it, refused — no invoice left at the provider', async () => {
+    const { HostedFakePaymentProvider } = await import('../../ports.js');
+    const hosted = new HostedFakePaymentProvider();
+    const real = { ...ctx, payments: hosted };
+    await expect(
+      collect(real, { guestId, amountMnt: 18_500, subject: 'order', subjectId: '00000000-0000-4000-8000-000000000009', idempotencyKey: 'lunch:short' }),
+    ).rejects.toMatchObject({ code: 'INSUFFICIENT_FUNDS' });
+    expect(hosted.authorized).toHaveLength(0);
+    expect(await balance(guestId)).toBe(0);
+  });
+});
+
 describe('a purchase paid for by an invoice', () => {
   it('never credits an invoice still being raised', async () => {
     // A second press found the purchase's invoice before the provider answered the first: no provider_ref yet.

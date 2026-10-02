@@ -460,17 +460,24 @@ async function drawPaying(id) {
     </div>`);
   page.replaceChildren(el(`<a class="s-crumb" href="/orders">${MARK.back}Миний захиалга</a>`), el('<div class="s-head od-top"><div class="od-head"><h1>Төлбөр</h1></div></div>'), card);
   let invoice = null;
+  let lapsed = false;
   for (let round = 0; round < 30; round++) {
     let answer;
     try {
-      // 202s are never kept as the answer to a key, so one key serves every ask; the 200 is kept.
-      answer = await authed(`/v1/idesh/${id}/pay`, { method: 'POST', idempotencyKey: `pay-back-${id}` });
+      // Only asks (`check=1`): never a new invoice. 202s are never kept as the answer to a key, so one key
+      // serves every ask; the 200 is kept.
+      answer = await authed(`/v1/idesh/${id}/pay?check=1`, { method: 'POST', idempotencyKey: `pay-back-${id}` });
     } catch (error) {
       // Not a draft any more: bought by another ask (QPay's callback, Basu's own check) or given back — the order says.
       if (error.code === 'WRONG_STATE') break;
       throw error;
     }
     if (answer?.state === 'PAID') break;
+    // Its invoice let go (QPay's page left past its time): nothing to wait for — a fresh one on a press.
+    if (answer?.invoice === null) {
+      lapsed = true;
+      break;
+    }
     invoice = answer?.invoice ?? invoice;
     await new Promise((done) => setTimeout(done, 3000));
   }
@@ -484,14 +491,41 @@ async function drawPaying(id) {
     }
     drawn = null;
     await drawOrder(id, o.paid_at ? 'new' : false);
+    // Given back unpaid while QPay was open: a payment made all the same waits in the Basu wallet.
+    if (!o.paid_at) {
+      const held = await authed('/v1/wallet').then((w) => w.balance_mnt).catch(() => 0);
+      if (held > 0) {
+        page.append(el(`<div class="od-new" role="status">${MARK.done}<div><b>Таны Basu түрийвчинд ${esc(mnt(held))} байна</b><span>Төлбөр захиалга цуцлагдсаны дараа орж ирсэн бол энд хадгалагдсан — дараагийн захиалгад ашиглана, эсвэл буцаалт хүсвэл basuappmn@gmail.com.</span></div></div>`));
+      }
+    }
+    return o;
+  }
+  const acts = card.querySelector('.od-pay-acts');
+  acts.hidden = false;
+  if (lapsed || !invoice?.action_url) {
+    card.querySelector('.big').textContent = 'QPay-ийн нэхэмжлэлийн хугацаа дууслаа';
+    card.querySelector('.cap').textContent = 'Төлөөгүй бол шинэ нэхэмжлэлээр дахин төлнө үү. Захиалга тань хэвээр хүлээж байна.';
+    const again = el('<button class="s-btn s-btn-dark" type="button">Дахин төлөх</button>');
+    again.addEventListener('click', async () => {
+      if (again.hasAttribute('data-busy')) return;
+      again.setAttribute('data-busy', '');
+      try {
+        const answer = await authed(`/v1/idesh/${id}/pay`, { method: 'POST', idempotencyKey: `pay-again-${id}-${Date.now()}` });
+        if (answer?.state === 'PAID') return location.replace(`/orders/${id}?new=1`);
+        if (answer?.invoice?.action_url) return location.assign(answer.invoice.action_url);
+        throw new Error('QPay-ийн нэхэмжлэл үүсгэж чадсангүй. Дахин оролдоно уу.');
+      } catch (error) {
+        again.removeAttribute('data-busy');
+        say(whatWentWrong(error), 'bad');
+      }
+    });
+    acts.append(again);
     return o;
   }
   card.querySelector('.big').textContent = 'Төлбөр хараахан ороогүй байна';
   card.querySelector('.cap').textContent = 'QPay-ээр төлсөн бол хэдэн минутын дотор өөрөө баталгаажна — энэ хуудсыг хааж болно. Төлөөгүй бол доорх товчоор төлнө үү.';
-  const acts = card.querySelector('.od-pay-acts');
-  acts.hidden = false;
   acts.append(
-    ...(invoice?.action_url ? [el(`<a class="s-btn s-btn-dark" href="${esc(invoice.action_url)}">QPay-ээр төлөх</a>`)] : []),
+    el(`<a class="s-btn s-btn-dark" href="${esc(invoice.action_url)}">QPay-ээр төлөх</a>`),
     el(`<a class="s-btn s-btn-line" href="${esc(`/orders/${id}?paying=1`)}">Дахин шалгах</a>`),
   );
   return o;
@@ -504,9 +538,12 @@ if (!token && payingBack) {
   page.replaceChildren(
     siteEmpty({
       icon: 'orders',
-      title: 'Basu апп руугаа буцна уу',
-      text: 'Төлбөр тань орж ирмэгц захиалга Basu апп дээр баталгаажна. Аппаа нээгээд «Миний идэш»-ээс захиалгаа харна уу.',
-      actions: [['Basu апп нээх', orderId ? `basu://order/${orderId}` : 'basu://', 'dark']],
+      title: 'Төлбөрөө шалгахын тулд нэвтэрнэ үү',
+      text: 'Энэ хөтөч дээр нэвтрээгүй байна. Basu аппаар захиалсан бол аппаа нээнэ үү — төлбөр орж ирмэгц «Миний идэш»-д баталгаажна. Вэбээр захиалсан бол нэвтэрч захиалгаа харна уу.',
+      actions: [
+        ['Basu апп нээх', orderId ? `basu://order/${orderId}` : 'basu://', 'dark'],
+        ['Нэвтрэх', `/login?next=${encodeURIComponent(location.pathname + location.search)}`, 'line'],
+      ],
       card: true,
       heading: 1,
     }),

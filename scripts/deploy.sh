@@ -221,9 +221,27 @@ if [ -n "$incoming" ]; then
     value=${line#*=}
     case "$MANAGED_KEYS" in *" $key "*) ;; *) echo "  .env: ignored a key the deploy does not manage"; continue ;; esac
     [ -n "$value" ] || continue
+    # «-» takes the key out: how a door is turned off from GitHub alone (WIRE_SECRET_KEY set to «-» closes
+    # online payment on the next deploy) — an emptied or deleted secret is simply not sent.
+    if [ "$value" = "-" ]; then
+      if grep -q "^$key=" .env; then
+        tmp=$(mktemp .env.XXXXXX)
+        { grep -v "^$key=" .env || true; } > "$tmp"
+        chown --reference=.env "$tmp"
+        chmod 600 "$tmp"
+        mv "$tmp" .env
+        echo "  .env: $key removed by the repository's secrets"
+      fi
+      continue
+    fi
     case "$value" in *'"'*) echo "  .env: $key refused — a double quote in the value"; continue ;; esac
     wanted="$key=\"$value\""
-    grep -qxF "$wanted" .env && continue
+    # Compared in the shell, not by grep: a value on a command line is readable by anyone listing processes.
+    same=0
+    while IFS= read -r existing || [ -n "$existing" ]; do
+      if [ "$existing" = "$wanted" ]; then same=1; break; fi
+    done < .env
+    [ "$same" = 1 ] && continue
     tmp=$(mktemp .env.XXXXXX)
     { grep -v "^$key=" .env || true; printf '%s\n' "$wanted"; } > "$tmp"
     # Each its own step: any of them failing stops the deploy, red.

@@ -74,7 +74,17 @@ export interface TickOptions {
   batch?: number;
   /** Tests drive time by hand and do not want to wait between fires. */
   spacingMs?: number;
+  /**
+   * Whether this tick asks the payment provider about the идэш invoices out (`invoices`) and about the
+   * ones let go in the last hour (`lapsed`). Every tick when a test drives it; `run` asks at its own pace.
+   */
+  invoices?: boolean;
+  lapsed?: boolean;
 }
+
+/** How often the running scheduler asks the provider: invoices out every 20 s, the let-go ones every 5 min. */
+const INVOICE_LOOK_MS = 20_000;
+const LAPSED_LOOK_MS = 5 * 60_000;
 
 export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport> {
   const { workerId = `worker-${process.pid}`, batch = 50, spacingMs = FIRE_SPACING_MS } = opts;
@@ -129,7 +139,7 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
 
   /* 6. The other vertical's housekeeping. Before the outbox, for the same
    *    reason everything else is: a refund it posts wants relaying now. */
-  const idesh = await ideshHousekeeping(ctx);
+  const idesh = await ideshHousekeeping(ctx, { invoices: opts.invoices ?? true, lapsed: opts.lapsed ?? true });
   report.ideshExpired = idesh.expired;
   report.ideshClosed = idesh.closed;
   report.ideshBought = idesh.bought;
@@ -230,10 +240,17 @@ export async function recoverOnBoot(
 export async function run(ctx: Ctx, intervalMs = 1000): Promise<() => void> {
   await recoverOnBoot(ctx);
   let stopped = false;
+  let invoicesAt = 0;
+  let lapsedAt = 0;
   const loop = async () => {
     while (!stopped) {
       try {
-        await tick(ctx);
+        const wall = Date.now();
+        const invoices = wall - invoicesAt >= INVOICE_LOOK_MS;
+        const lapsed = wall - lapsedAt >= LAPSED_LOOK_MS;
+        if (invoices) invoicesAt = wall;
+        if (lapsed) lapsedAt = wall;
+        await tick(ctx, { invoices, lapsed });
       } catch (error) {
         console.error('[scheduler] tick failed', error);
       }

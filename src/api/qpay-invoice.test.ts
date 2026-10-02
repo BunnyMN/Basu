@@ -29,6 +29,8 @@ let wireBase: string;
 const intents = new Map<string, { id: string; status: string; amount: number; metadata: Record<string, string> }>();
 const byKey = new Map<string, string>();
 const returns = new Map<string, string>();
+/** Wire answering the next status lookups with a 503, as a busy day does. */
+let failGets = 0;
 
 let app: FastifyInstance;
 let clock: VirtualClock;
@@ -89,7 +91,10 @@ beforeAll(async () => {
       const path = request.url ?? '';
       const body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
       const key = request.headers['idempotency-key'] as string | undefined;
-      response.writeHead(200, { 'content-type': 'application/json' });
+      const send = (status: number, value: unknown) => {
+        response.writeHead(status, { 'content-type': 'application/json' });
+        response.end(JSON.stringify(value));
+      };
       if (path === '/payment_intents' && request.method === 'POST') {
         const seen = key ? byKey.get(key) : undefined;
         const id = seen ?? `pi_test_${intents.size + 1}`;
@@ -97,21 +102,23 @@ beforeAll(async () => {
           intents.set(id, { id, status: 'requires_payment_method', amount: Number(body['amount']), metadata: body['metadata'] as Record<string, string> });
           if (key) byKey.set(key, id);
         }
-        response.end(JSON.stringify(intents.get(id)));
+        send(200, intents.get(id));
       } else if (path === '/checkout/sessions') {
         const pi = String(body['payment_intent']);
         if (typeof body['success_url'] === 'string') returns.set(pi, body['success_url']);
-        response.end(JSON.stringify({ url: `https://pay.wire.test/c/${pi}` }));
+        send(200, { url: `https://pay.wire.test/c/${pi}` });
       } else if (path.endsWith('/cancel')) {
         const intent = intents.get(decodeURIComponent(path.split('/')[2] ?? ''));
         if (intent && intent.status !== 'succeeded') intent.status = 'canceled';
-        response.end(JSON.stringify(intent ?? {}));
+        send(200, intent ?? {});
       } else {
+        if (failGets > 0) {
+          failGets--;
+          return send(503, { error: { code: 'unavailable' } });
+        }
         const intent = intents.get(decodeURIComponent(path.split('/')[2] ?? ''));
-        if (!intent) {
-          response.writeHead(404);
-          response.end(JSON.stringify({ error: { code: 'not_found' } }));
-        } else response.end(JSON.stringify(intent));
+        if (!intent) send(404, { error: { code: 'not_found' } });
+        else send(200, intent);
       }
     });
   });
@@ -125,6 +132,7 @@ beforeEach(async () => {
   intents.clear();
   byKey.clear();
   returns.clear();
+  failGets = 0;
   clock = new VirtualClock(at('11:40'));
   notifier = new FakeNotifier();
   ctx = {
@@ -295,6 +303,73 @@ describe('an идэш paid by QPay on Wire’s page', () => {
     later(60_000);
     await housekeeping(ctx);
     expect(await balanceOf(guest)).toBe(460_000);
+  });
+
+  it('never fails a paid invoice on a passing error from Wire, and never shows a second QR for it', async () => {
+    const guest = await signIn();
+    const id = await anOrder(guest);
+    expect((await pay(guest, id)).statusCode).toBe(202);
+    paidAtWire('pi_test_1');
+    failGets = 1;
+    const busy = await pay(guest, id);
+    expect(busy.statusCode, busy.body).toBe(202);
+    expect(busy.json().invoice.action_url).toMatch(/pi_test_1$/);
+    const bought = await pay(guest, id);
+    expect(bought.statusCode, bought.body).toBe(200);
+    expect(intents.size).toBe(1);
+    expect(await balanceOf(guest)).toBe(0);
+  });
+
+  it('asks only, with check=1: no invoice is raised, and one let go is said as gone', async () => {
+    const guest = await signIn();
+    const id = await anOrder(guest);
+    const nothing = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/pay?check=1`, headers: auth(guest) });
+    expect(nothing.statusCode, nothing.body).toBe(202);
+    expect(nothing.json()).toEqual({ state: 'AWAITING_PAYMENT', invoice: null });
+    expect(intents.size).toBe(0);
+
+    expect((await pay(guest, id)).statusCode).toBe(202);
+    later(13 * 60_000);
+    const gone = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/pay?check=1`, headers: auth(guest) });
+    expect(gone.json()).toEqual({ state: 'AWAITING_PAYMENT', invoice: null });
+    expect(intents.size).toBe(1);
+    expect(intents.get('pi_test_1')?.status).toBe('canceled');
+  });
+
+  it('buys from the wallet, and lets the newer invoice go, when a late payment already covers the order', async () => {
+    const guest = await signIn();
+    const id = await anOrder(guest);
+    expect((await pay(guest, id)).statusCode).toBe(202);
+    later(13 * 60_000);
+    // Let go, a fresh invoice raised on the next press…
+    const fresh = await pay(guest, id, 'again');
+    expect(fresh.json().invoice.action_url).toMatch(/pi_test_2$/);
+    // …and the first one paid after all, found by Basu's own look: the money is in the wallet.
+    intents.get('pi_test_1')!.status = 'succeeded';
+    later(60_000);
+    await housekeeping(ctx);
+    expect(await stateOf(guest, id)).toBe('PAID');
+    // Never both: the second QR is let go at Wire, and nothing is left over.
+    expect(intents.get('pi_test_2')?.status).toBe('canceled');
+    expect(await balanceOf(guest)).toBe(0);
+  });
+
+  it('answers «paid» to every ask that races to finish one invoice — never «payment failed»', async () => {
+    const guest = await signIn();
+    const id = await anOrder(guest);
+    expect((await pay(guest, id)).statusCode).toBe(202);
+    paidAtWire('pi_test_1');
+    const answers = await Promise.all(
+      ['a', 'b', 'c', 'd'].map((key) => app.inject({ method: 'POST', url: `/v1/idesh/${id}/pay?check=1`, headers: { ...auth(guest), 'idempotency-key': key } })),
+    );
+    for (const answer of answers) {
+      // Bought by one of them; the others are told so (PAID), or that it is no longer a draft (WRONG_STATE, read as bought).
+      expect([200, 409], answer.body).toContain(answer.statusCode);
+      if (answer.statusCode === 409) expect(answer.json().error.code).toBe('WRONG_STATE');
+    }
+    expect(answers.some((a) => a.statusCode === 200)).toBe(true);
+    expect(await stateOf(guest, id)).toBe('PAID');
+    expect(await balanceOf(guest)).toBe(0);
   });
 
   it('pays from the wallet at once when the wallet covers it', async () => {

@@ -93,7 +93,9 @@ export class WirePayments implements PaymentProvider {
     // A retry that arrives while the first call is still running gets 409
     // rather than a second invoice. Waiting is the whole point of the key.
     for (let attempt = 0; ; attempt++) {
-      const init: RequestInit = { method, headers };
+      // Eight seconds and no more: the scheduler asks about invoices in its tick, and a provider that
+      // never answers must not hold up the kitchen's fires, the outbox and the receipts behind it.
+      const init: RequestInit = { method, headers, signal: AbortSignal.timeout(8000) };
       if (opts.body !== undefined) init.body = JSON.stringify(opts.body);
       const response = await fetch(`${this.#config.apiBase ?? DEFAULT_API_BASE}${path}`, init);
       const data = (await response.json().catch(() => ({}))) as { error?: { code?: string; message?: string; request_id?: string } };

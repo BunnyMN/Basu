@@ -92,6 +92,7 @@ jobs:
           # Wire (wire.mn → QPay): the key opens online payment, the webhook
           # secret lets Wire say «paid» the moment it is, and the return URL
           # is where its page sends a person who has no purchase page to go to.
+          # A secret set to «-» takes its key off the server (payments closed).
           WIRE_SECRET_KEY: ${{ secrets.WIRE_SECRET_KEY }}
           WIRE_WEBHOOK_SECRET: ${{ secrets.WIRE_WEBHOOK_SECRET }}
           WIRE_RETURN_URL: ${{ secrets.WIRE_RETURN_URL }}

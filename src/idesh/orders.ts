@@ -2,6 +2,7 @@ import { getPool, tx, type Db } from '../db/pool.js';
 import { contactsFor, displayNamesFor } from '../platform/identity/index.js';
 import {
   assertCollectable,
+  balance,
   collectOrInvoice,
   dropInvoice,
   INVOICE_LIFETIME_MINUTES,
@@ -298,9 +299,16 @@ export async function payIdesh(ctx: Ctx, orderId: string, opts: { returnUrl?: st
     throw new IdeshError('PAYMENT_FAILED', (error as Error).message);
   }
   if (outcome.state === 'awaiting') return { state: 'AWAITING_PAYMENT', invoice: outcome.invoice };
-  // Taken before under this key while the order stayed a draft — the old two
-  // steps, one of them lost: the order follows its money now.
   if (outcome.replayed) {
+    // Bought a moment ago by another ask under the same key (the page, QPay's callback and the scheduler
+    // finishing one invoice at once): said as bought, and nothing sent twice.
+    const nowState = (await billingFacts(orderId))?.state;
+    if (nowState && nowState !== 'DRAFT') {
+      if (nowState === 'CANCELLED' || nowState === 'CLOSED') throw new IdeshError('WRONG_STATE', `cannot pay in ${nowState}`);
+      return { state: 'PAID' };
+    }
+    // Taken before under this key while the order stayed a draft — the old two steps, one of them lost:
+    // the order follows its money now.
     await tx((client) => markPaid(client, outcome.transferId, { fromWalletMnt: outcome.fromWalletMnt, toppedUpMnt: outcome.toppedUpMnt }));
   }
   const collected = outcome;
@@ -400,7 +408,10 @@ export async function cancelIdesh(
     ? splitRefund({ state: facts.state, reason, meatMnt, deliveryFeeMnt: facts.deliveryFeeMnt })
     : { refundMnt: 0, forfeitMnt: 0 };
 
-  const from: readonly IdeshState[] = ['DRAFT', 'PAID', 'PREPARING', 'READY', 'DISPATCHED'];
+  // Only from the state the refund above was worked out for: a draft bought in the moment between (by
+  // QPay's callback, the page) is not the draft whose refund was nothing — closing it would keep the
+  // money and give no refund.
+  const from: readonly IdeshState[] = (['DRAFT', 'PAID', 'PREPARING', 'READY', 'DISPATCHED'] as const).filter((s) => s === facts.state);
 
   const cancelled = await tx(async (client) => {
     const ok = await transition(client, orderId, from, 'CANCELLED', {
@@ -552,13 +563,20 @@ export async function markHanded(ctx: Ctx, orderId: string, actor: string): Prom
  * there, never lost); lapsed unpaid, let go. Also what the provider's
  * callback does for the one it names (`finishInvoiceFor`).
  */
-async function finishInvoices(ctx: Ctx): Promise<number> {
+async function finishOpenInvoices(ctx: Ctx): Promise<number> {
   let bought = 0;
   for (const invoice of await openInvoices('idesh')) {
     if ((await finishInvoiceFor(ctx, invoice.subjectId, invoice)) === 'PAID') bought++;
   }
-  // Let go unpaid, then paid in the moment after: the money lands in the wallet, and buys the order if it
-  // still waits — given back meanwhile, it stays in the wallet, the guest's to spend or have refunded.
+  return bought;
+}
+
+/**
+ * Let go unpaid, then paid in the moment after: the money lands in the wallet, and buys the order if it
+ * still waits — given back meanwhile, it stays in the wallet, the guest's to spend or have refunded.
+ */
+async function finishLapsedInvoices(ctx: Ctx): Promise<number> {
+  let bought = 0;
   for (const lapsed of await lapsedInvoices('idesh', ctx.clock.now())) {
     try {
       await settleTopup(ctx, lapsed.topupId);
@@ -592,9 +610,15 @@ export async function finishInvoiceFor(
     } catch (error) {
       if (!(error instanceof LedgerError)) throw error;
       if (error.code !== 'NOT_PAID_YET') return 'LAPSED'; // refused by the provider, marked so
-      if (ctx.clock.now().getTime() - invoice.createdAt.getTime() < INVOICE_LIFETIME_MINUTES * 60_000) return 'WAITING';
-      await dropInvoice(ctx, invoice.topupId);
-      return 'LAPSED';
+      // Unpaid, but the wallet covers the order by now (a payment that came in late): bought from there,
+      // the invoice let go — rather than left out for the guest to pay a second time.
+      const facts = await billingFacts(orderId);
+      const covered = facts?.state === 'DRAFT' && (await balance(facts.guestId)) >= facts.totalMnt;
+      if (!covered) {
+        if (ctx.clock.now().getTime() - invoice.createdAt.getTime() < INVOICE_LIFETIME_MINUTES * 60_000) return 'WAITING';
+        await dropInvoice(ctx, invoice.topupId);
+        return 'LAPSED';
+      }
     }
   }
   // In the wallet now — settled just above, or by the callback just before: the purchase goes through
@@ -610,14 +634,24 @@ export async function finishInvoiceFor(
  * What the tick does for this vertical: drafts nobody paid for give their
  * animal back, and handed-over orders leave the launcher a day later.
  */
-export async function housekeeping(ctx: Ctx): Promise<{ expired: number; closed: number; bought: number }> {
+export async function housekeeping(
+  ctx: Ctx,
+  /**
+   * Whether this tick looks at the invoices out (`invoices`) and at the ones let go in the last hour
+   * (`lapsed`) — each a question to the provider. The scheduler ticks every second and asks at its own
+   * slower pace; a test asks every time.
+   */
+  { invoices = true, lapsed = true }: { invoices?: boolean; lapsed?: boolean } = {},
+): Promise<{ expired: number; closed: number; bought: number }> {
   const now = ctx.clock.now();
   const db = getPool();
 
   // Invoices out for drafts: one paid while nobody was looking buys its order
   // — the person may never come back to the page, and the provider's callback
   // may never come — and one that lapsed unpaid is let go.
-  const bought = await finishInvoices(ctx);
+  let bought = 0;
+  if (invoices) bought += await finishOpenInvoices(ctx);
+  if (lapsed) bought += await finishLapsedInvoices(ctx);
 
   const { rows: stale } = await db.query<{ id: string }>(
     `SELECT id FROM idesh.idesh_order
@@ -626,9 +660,16 @@ export async function housekeeping(ctx: Ctx): Promise<{ expired: number; closed:
   );
   let expired = 0;
   for (const row of stale) {
-    // Somebody paying it right now, on the provider's page: theirs a little longer.
+    // Somebody paying it right now, on the provider's page: theirs a little longer. An older invoice is
+    // looked at first — paid, the order is bought instead of given back; unpaid, it is let go.
     const out = await pendingInvoice('idesh', row.id);
-    if (out && now.getTime() - out.createdAt.getTime() < INVOICE_LIFETIME_MINUTES * 60_000) continue;
+    if (out) {
+      if (now.getTime() - out.createdAt.getTime() < INVOICE_LIFETIME_MINUTES * 60_000) continue;
+      if ((await finishInvoiceFor(ctx, row.id, out)) === 'PAID') {
+        bought++;
+        continue;
+      }
+    }
     try {
       await cancelIdesh(ctx, row.id, { actor: 'system:scheduler', role: 'system' }, 'draft_expired');
       expired++;

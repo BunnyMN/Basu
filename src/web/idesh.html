@@ -1511,6 +1511,8 @@ async function boughtNow(bought, body) {
 let qpay = null;
 function awaitQpay(invoice, body) {
   stopQpay();
+  const id = attempt?.order;
+  const what = JSON.stringify(body);
   const foot = $('screen-foot');
   foot.replaceChildren(
     el(`<div class="qpay-wait">
@@ -1521,14 +1523,33 @@ function awaitQpay(invoice, body) {
           </div>
         </div>`),
   );
+  /**
+   * Only asks — `?check=1`: never a new order, never a new invoice. Paid, the order is shown bought; its
+   * invoice let go (QPay's page left past its time), the person is offered to pay again; the order given
+   * back meanwhile, they are told so and the form is theirs again.
+   */
   const check = async () => {
-    if (!qpay || qpay.asking) return;
+    if (!qpay || qpay.asking || !id) return;
     qpay.asking = true;
     try {
-      const bought = await purchase(body);
-      if (!bought.invoice && qpay) await boughtNow(bought, body);
-    } catch {
-      // The network, for a moment: the next look tries again.
+      const answer = await guestApi(`/v1/idesh/${id}/pay?check=1`, { method: 'POST', idempotencyKey: `pay-check-${id}` });
+      if (!qpay) return;
+      if (answer?.state === 'PAID') return void (await boughtNow({ id, what }, body));
+      if (answer?.invoice === null) return void qpayLapsed(body);
+      const url = answer?.invoice?.action_url;
+      if (url) $('qpay-open')?.setAttribute('href', url);
+    } catch (error) {
+      if (qpay && error.code === 'WRONG_STATE') {
+        // Not a draft any more: bought another way (QPay's own word to Basu), or given back.
+        const order = await guestApi(`/v1/idesh/${id}`).catch(() => null);
+        if (order?.paid_at) return void (await boughtNow({ id, what }, body));
+        stopQpay();
+        attempt = null;
+        keepAttempt();
+        renderFoot();
+        $('screen-foot').prepend(el(`<p class="why" data-tone="stop" role="alert">${MARK.warn}<span>Төлбөр хугацаандаа ороогүй тул захиалга цуцлагдлаа. Дахин захиалж болно.</span></p>`));
+      }
+      // Otherwise the network, for a moment: the next look tries again.
     } finally {
       if (qpay) qpay.asking = false;
     }
@@ -1541,6 +1562,19 @@ function awaitQpay(invoice, body) {
   $('qpay-check').addEventListener('click', () => void check());
   // The first time without a second tap: QPay's page, now.
   location.href = invoice.action_url;
+}
+
+/** QPay's invoice let go unpaid (its page left past its time): the same order, paid with a fresh one on a tap. */
+function qpayLapsed(body) {
+  stopQpay();
+  const foot = $('screen-foot');
+  foot.replaceChildren(
+    el(`<div class="qpay-wait">
+          <p class="why" data-calm role="status">${MARK.info}<span>QPay-ийн нэхэмжлэлийн хугацаа дууслаа. Төлөөгүй бол дахин нээж төлнө үү.</span></p>
+          <div class="foot-row"><button class="btn" data-v="primary" type="button" id="pay">Дахин төлөх</button></div>
+        </div>`),
+  );
+  $('pay').addEventListener('click', () => void placeOrder());
 }
 function stopQpay() {
   if (!qpay) return;
