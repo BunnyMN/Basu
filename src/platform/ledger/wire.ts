@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import type { PaymentIntent, PaymentProvider } from '../../ports.js';
+import type { AuthorizeInput, PaymentIntent, PaymentProvider } from '../../ports.js';
 
 /**
  * Real money, through Wire (wire.mn) onto QPay.
@@ -111,24 +111,26 @@ export class WirePayments implements PaymentProvider {
     }
   }
 
-  async authorize(input: { reference: string; amountMnt: number }): Promise<PaymentIntent> {
+  async authorize(input: AuthorizeInput): Promise<PaymentIntent> {
     const intent = await this.#call<WireIntent>('POST', '/payment_intents', {
       idempotencyKey: `pi-${input.reference}`,
       body: {
         amount: input.amountMnt * 100,
         currency: 'MNT',
-        description: `Basu түрийвч цэнэглэлт`,
+        description: input.description ?? `Basu түрийвч цэнэглэлт`,
         allowed_operators: this.#operators,
         metadata: { topup_id: input.reference },
       },
     });
     // The intent cancels itself after about ten minutes, so the session is
     // made in the same breath rather than when the phone gets round to it.
+    // Back to the purchase's own page when it has one; the server's fallback otherwise.
+    const back = input.returnUrl ?? this.#config.returnUrl;
     const session = await this.#call<{ url: string }>('POST', '/checkout/sessions', {
       idempotencyKey: `cs-${input.reference}`,
       body: {
         payment_intent: intent.id,
-        ...(this.#config.returnUrl ? { success_url: this.#config.returnUrl, cancel_url: this.#config.returnUrl } : {}),
+        ...(back ? { success_url: back, cancel_url: back } : {}),
       },
     });
     return { providerRef: intent.id, actionUrl: session.url };

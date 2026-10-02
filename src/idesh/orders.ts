@@ -1,6 +1,18 @@
 import { getPool, tx, type Db } from '../db/pool.js';
 import { contactsFor, displayNamesFor } from '../platform/identity/index.js';
-import { assertCollectable, collect, LedgerError, queueReceipt, receiptsFor } from '../platform/ledger/index.js';
+import {
+  assertCollectable,
+  collectOrInvoice,
+  dropInvoice,
+  INVOICE_LIFETIME_MINUTES,
+  LedgerError,
+  openInvoices,
+  pendingInvoice,
+  queueReceipt,
+  receiptsFor,
+  settleTopup,
+  type Invoice,
+} from '../platform/ledger/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
 import { IdeshError } from './errors.js';
@@ -228,22 +240,39 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
   });
 }
 
+export type PayOutcome = { state: 'PAID' } | { state: 'AWAITING_PAYMENT'; invoice: Invoice | null };
+
 /**
  * The whole price, once, out of the wallet.
  *
  * Idesh never talks to QPay. It says «collect 420 000 ₮ from this guest for
  * this order» and the ledger decides whether that is a balance they already
- * hold or a shortfall to pull from a card first. The receipt is queued now,
- * on the supplier's TIN: the sale is complete the moment the money moves.
+ * hold or a shortfall the guest pays first — on the provider's own page, by
+ * QPay. Then the answer is AWAITING_PAYMENT with the invoice, the order
+ * still a draft; asked again (the page, the provider's callback, the
+ * scheduler), a paid invoice buys it. The receipt is queued now, on the
+ * supplier's TIN: the sale is complete the moment the money moves.
+ *
+ * The money taken and the order marked paid are one transaction. They used
+ * to be two: a draft the scheduler gave back in between was left with its
+ * money taken, unpaid, and no refund.
  */
-export async function payIdesh(ctx: Ctx, orderId: string): Promise<void> {
+export async function payIdesh(ctx: Ctx, orderId: string, opts: { returnUrl?: string; raise?: boolean } = {}): Promise<PayOutcome> {
   const facts = await billingFacts(orderId);
   if (!facts) throw new IdeshError('NOT_FOUND', 'no such order');
   if (facts.state !== 'DRAFT') throw new IdeshError('WRONG_STATE', `cannot pay in ${facts.state}`);
 
-  let collected;
+  const now = ctx.clock.now();
+  const markPaid = async (client: Db, transferId: string, split: { fromWalletMnt: number; toppedUpMnt: number }) => {
+    await client.query('UPDATE idesh.idesh_order SET ledger_transfer_id = $2 WHERE id = $1', [orderId, transferId]);
+    const moved = await transition(client, orderId, ['DRAFT'], 'PAID', { paid_at: now });
+    if (!moved) throw new IdeshError('WRONG_STATE', 'order left DRAFT while paying');
+    await appendEvent(client, orderId, 'PAID', `guest:${facts.guestId}`, { amountMnt: facts.totalMnt, ...split });
+  };
+
+  let outcome;
   try {
-    collected = await collect(ctx, {
+    outcome = await collectOrInvoice(ctx, {
       guestId: facts.guestId,
       amountMnt: facts.totalMnt,
       subject: 'idesh',
@@ -252,28 +281,28 @@ export async function payIdesh(ctx: Ctx, orderId: string): Promise<void> {
       // an идэш is; the vertical names itself here.
       memo: `Идэш · ${facts.supplier} №${facts.code}`,
       idempotencyKey: `idesh:${orderId}:purchase`,
+      forSubject: 'idesh',
+      forSubjectId: orderId,
+      returnUrl: opts.returnUrl,
+      description: `Basu · Идэш №${facts.code}`,
+      within: markPaid,
+      raise: opts.raise,
     });
   } catch (error) {
+    // Given back while paying: said as it is, the money left in the wallet.
+    if (error instanceof IdeshError) throw error;
     // A server with no payment provider says so in its own words. «Try
     // again» would send the guest back to a button that cannot work today.
     if (error instanceof LedgerError && error.code === 'PAYMENTS_CLOSED') throw error;
     throw new IdeshError('PAYMENT_FAILED', (error as Error).message);
   }
-
-  const now = ctx.clock.now();
-  await tx(async (client) => {
-    await client.query('UPDATE idesh.idesh_order SET ledger_transfer_id = $2 WHERE id = $1', [
-      orderId,
-      collected.transferId,
-    ]);
-    const moved = await transition(client, orderId, ['DRAFT'], 'PAID', { paid_at: now });
-    if (!moved) throw new IdeshError('WRONG_STATE', 'order left DRAFT while paying');
-    await appendEvent(client, orderId, 'PAID', `guest:${facts.guestId}`, {
-      amountMnt: facts.totalMnt,
-      fromWalletMnt: collected.fromWalletMnt,
-      toppedUpMnt: collected.toppedUpMnt,
-    });
-  });
+  if (outcome.state === 'awaiting') return { state: 'AWAITING_PAYMENT', invoice: outcome.invoice };
+  // Taken before under this key while the order stayed a draft — the old two
+  // steps, one of them lost: the order follows its money now.
+  if (outcome.replayed) {
+    await tx((client) => markPaid(client, outcome.transferId, { fromWalletMnt: outcome.fromWalletMnt, toppedUpMnt: outcome.toppedUpMnt }));
+  }
+  const collected = outcome;
 
   await queueReceipt({
     transferId: collected.transferId,
@@ -317,6 +346,7 @@ export async function payIdesh(ctx: Ctx, orderId: string): Promise<void> {
       });
     }
   }
+  return { state: 'PAID' };
 }
 
 /**
@@ -516,12 +546,63 @@ export async function markHanded(ctx: Ctx, orderId: string, actor: string): Prom
 /* ── the scheduler ─────────────────────────────────────────────────── */
 
 /**
+ * Every invoice out for an идэш, looked at: paid, its order is bought (the
+ * money lands in the wallet first, so an order given back meanwhile leaves it
+ * there, never lost); lapsed unpaid, let go. Also what the provider's
+ * callback does for the one it names (`finishInvoiceFor`).
+ */
+async function finishInvoices(ctx: Ctx): Promise<number> {
+  let bought = 0;
+  for (const invoice of await openInvoices('idesh')) {
+    if ((await finishInvoiceFor(ctx, invoice.subjectId, invoice)) === 'PAID') bought++;
+  }
+  return bought;
+}
+
+/**
+ * The invoice out for this order, looked at once: 'PAID' when it was paid
+ * and the order is bought now, 'WAITING' while it may still be paid,
+ * 'LAPSED' when it was let go unpaid. The provider's callback calls this for
+ * the purchase it names.
+ */
+export async function finishInvoiceFor(
+  ctx: Ctx,
+  orderId: string,
+  known?: { topupId: string; createdAt: Date },
+): Promise<'PAID' | 'WAITING' | 'LAPSED' | 'NONE'> {
+  const invoice = known ?? (await pendingInvoice('idesh', orderId));
+  if (invoice) {
+    try {
+      await settleTopup(ctx, invoice.topupId);
+    } catch (error) {
+      if (!(error instanceof LedgerError)) throw error;
+      if (error.code !== 'NOT_PAID_YET') return 'LAPSED'; // refused by the provider, marked so
+      if (ctx.clock.now().getTime() - invoice.createdAt.getTime() < INVOICE_LIFETIME_MINUTES * 60_000) return 'WAITING';
+      await dropInvoice(ctx, invoice.topupId);
+      return 'LAPSED';
+    }
+  }
+  // In the wallet now — settled just above, or by the callback just before: the purchase goes through
+  // from there, if the order still waits for it. Never a new invoice: nobody is here to pay one.
+  try {
+    return (await payIdesh(ctx, orderId, { raise: false })).state === 'PAID' ? 'PAID' : 'WAITING';
+  } catch {
+    return 'NONE';
+  }
+}
+
+/**
  * What the tick does for this vertical: drafts nobody paid for give their
  * animal back, and handed-over orders leave the launcher a day later.
  */
-export async function housekeeping(ctx: Ctx): Promise<{ expired: number; closed: number }> {
+export async function housekeeping(ctx: Ctx): Promise<{ expired: number; closed: number; bought: number }> {
   const now = ctx.clock.now();
   const db = getPool();
+
+  // Invoices out for drafts: one paid while nobody was looking buys its order
+  // — the person may never come back to the page, and the provider's callback
+  // may never come — and one that lapsed unpaid is let go.
+  const bought = await finishInvoices(ctx);
 
   const { rows: stale } = await db.query<{ id: string }>(
     `SELECT id FROM idesh.idesh_order
@@ -530,6 +611,9 @@ export async function housekeeping(ctx: Ctx): Promise<{ expired: number; closed:
   );
   let expired = 0;
   for (const row of stale) {
+    // Somebody paying it right now, on the provider's page: theirs a little longer.
+    const out = await pendingInvoice('idesh', row.id);
+    if (out && now.getTime() - out.createdAt.getTime() < INVOICE_LIFETIME_MINUTES * 60_000) continue;
     try {
       await cancelIdesh(ctx, row.id, { actor: 'system:scheduler', role: 'system' }, 'draft_expired');
       expired++;
@@ -579,7 +663,7 @@ export async function housekeeping(ctx: Ctx): Promise<{ expired: number; closed:
     });
   }
 
-  return { expired, closed };
+  return { expired, closed, bought };
 }
 
 /* ── money back ────────────────────────────────────────────────────── */

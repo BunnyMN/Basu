@@ -26,7 +26,7 @@ export interface PaymentProvider {
    * there were wallets. The provider only echoes it back on the statement, and
    * a provider that thinks in orders cannot be asked to top up a balance.
    */
-  authorize(input: { reference: string; amountMnt: number }): Promise<PaymentIntent>;
+  authorize(input: AuthorizeInput): Promise<PaymentIntent>;
   capture(providerRef: string): Promise<void>;
   /**
    * Has the money actually arrived?
@@ -38,7 +38,27 @@ export interface PaymentProvider {
    * is taken at its word.
    */
   paid?(providerRef: string): Promise<boolean>;
+  /**
+   * Let an unpaid invoice go, so it cannot be paid after Basu has given up on
+   * it. Best effort: a provider that cannot be asked leaves this out, and one
+   * that cancels unpaid invoices on its own (Wire's, after about ten minutes)
+   * is only being told sooner.
+   */
+  cancel?(providerRef: string): Promise<void>;
   refund(input: { providerRef: string; amountMnt: number }): Promise<void>;
+}
+
+/** What a provider is asked for an invoice. */
+export interface AuthorizeInput {
+  reference: string;
+  amountMnt: number;
+  /**
+   * Where the provider's own page sends the person once they have paid (or
+   * gone back): the purchase's page rather than the server's one fallback.
+   */
+  returnUrl?: string | undefined;
+  /** What the person sees they are paying for on the provider's page. */
+  description?: string | undefined;
 }
 
 /* ── tax ───────────────────────────────────────────────────────────── */
@@ -161,7 +181,7 @@ export class FakePaymentProvider implements PaymentProvider {
   failNext = false;
   #seq = 0;
 
-  async authorize(input: { reference: string; amountMnt: number }): Promise<PaymentIntent> {
+  async authorize(input: AuthorizeInput): Promise<PaymentIntent> {
     this.#guard();
     const providerRef = `qpay-${++this.#seq}-${input.reference.slice(0, 8)}`;
     this.authorized.push(providerRef);
@@ -183,6 +203,48 @@ export class FakePaymentProvider implements PaymentProvider {
       this.failNext = false;
       throw new Error('payment provider unavailable');
     }
+  }
+}
+
+/**
+ * The demo's provider with a page of its own, the way a real one has: an
+ * invoice is paid on `/dev/pay/<ref>` (the demo server's), and until then
+ * `paid` says no — so the pages' waiting step, the scheduler finishing a
+ * purchase nobody came back to, and the draft that lapses unpaid can all be
+ * walked through on a developer's machine. Chosen with FAKE_PAYMENTS=hosted;
+ * without it the demo's fake pays on the spot, as it always has.
+ */
+export class HostedFakePaymentProvider extends FakePaymentProvider {
+  /** Paid on the demo's page: providerRef → when. */
+  readonly paidAt = new Map<string, Date>();
+  /** Where each invoice's page sends the person back to. */
+  readonly returns = new Map<string, string>();
+  readonly cancelled = new Set<string>();
+
+  override async authorize(input: AuthorizeInput): Promise<PaymentIntent> {
+    const intent = await super.authorize(input);
+    if (input.returnUrl) this.returns.set(intent.providerRef, input.returnUrl);
+    return { providerRef: intent.providerRef, actionUrl: `/dev/pay/${encodeURIComponent(intent.providerRef)}` };
+  }
+
+  async paid(providerRef: string): Promise<boolean> {
+    return this.paidAt.has(providerRef) && !this.cancelled.has(providerRef);
+  }
+
+  override async capture(providerRef: string): Promise<void> {
+    if (!(await this.paid(providerRef))) throw new Error('the invoice is not paid');
+    await super.capture(providerRef);
+  }
+
+  async cancel(providerRef: string): Promise<void> {
+    if (!this.paidAt.has(providerRef)) this.cancelled.add(providerRef);
+  }
+
+  /** The demo page's «Төлөх»: false for an invoice that was let go. */
+  pay(providerRef: string, at: Date): boolean {
+    if (this.cancelled.has(providerRef) || !this.authorized.includes(providerRef)) return false;
+    if (!this.paidAt.has(providerRef)) this.paidAt.set(providerRef, at);
+    return true;
   }
 }
 

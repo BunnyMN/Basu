@@ -3,6 +3,7 @@ import { apnsConfigFromEnv, ApnsNotifier, SmtpMailer, smtpConfigFromEnv, smtpHos
 import {
   ClosedPaymentProvider,
   FakeMailer,
+  HostedFakePaymentProvider,
   FakeNotifier,
   FakePaymentProvider,
   FakeTaxProvider,
@@ -40,6 +41,9 @@ class ConsoleMailer extends FakeMailer {
   }
 }
 
+/** The demo pays on a page of its own, the way production pays on Wire's: FAKE_PAYMENTS=hosted. */
+const hostedFake = () => process.env['FAKE_PAYMENTS']?.trim() === 'hosted';
+
 export function buildProviders(log: (line: string) => void = console.log): Ctx {
   const wire = wireConfigFromEnv();
   const apns = apnsConfigFromEnv();
@@ -64,7 +68,9 @@ export function buildProviders(log: (line: string) => void = console.log): Ctx {
       ? `[providers] payments: Wire → QPay (${wire.secretKey.startsWith('sk_test_') ? 'sandbox' : 'live'}${wire.webhookSecret ? ', webhook on' : ', polling only'})`
       : mode() === 'production'
         ? '[providers] payments: CLOSED — production without WIRE_SECRET_KEY refuses every top-up'
-        : '[providers] payments: fake (set WIRE_SECRET_KEY to take real money)',
+        : hostedFake()
+          ? '[providers] payments: fake, paid on the demo\'s own page /dev/pay (FAKE_PAYMENTS=hosted)'
+          : '[providers] payments: fake (set WIRE_SECRET_KEY to take real money)',
   );
   log(
     smtp
@@ -82,7 +88,13 @@ export function buildProviders(log: (line: string) => void = console.log): Ctx {
   log(sealing() ? '[providers] bank details: encrypted at rest' : '[providers] bank details: PLAIN TEXT (set BANK_KEY to encrypt)');
   return {
     clock: buildClock(),
-    payments: wire ? new WirePayments(wire) : mode() === 'production' ? new ClosedPaymentProvider() : new FakePaymentProvider(),
+    payments: wire
+      ? new WirePayments(wire)
+      : mode() === 'production'
+        ? new ClosedPaymentProvider()
+        : hostedFake()
+          ? new HostedFakePaymentProvider()
+          : new FakePaymentProvider(),
     tax: new FakeTaxProvider(),
     notifier,
     ...(mailer ? { mailer } : {}),

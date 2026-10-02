@@ -35,6 +35,8 @@ export interface TickReport {
   /** Idesh drafts that gave their animal back, and handovers that closed. */
   ideshExpired: number;
   ideshClosed: number;
+  /** Идэш orders bought by an invoice paid while nobody was on the page. */
+  ideshBought: number;
   /**
    * Yesterday's one-time codes swept out of both tables, and the answers
    * kept for retries that can no longer come.
@@ -58,6 +60,7 @@ const EMPTY: TickReport = {
   abandoned: 0,
   ideshExpired: 0,
   ideshClosed: 0,
+  ideshBought: 0,
   purged: 0,
   activitiesUpdated: 0,
   activitiesEnded: 0,
@@ -129,6 +132,7 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
   const idesh = await ideshHousekeeping(ctx);
   report.ideshExpired = idesh.expired;
   report.ideshClosed = idesh.closed;
+  report.ideshBought = idesh.bought;
 
   /* 7. Anything the state changes promised the outside world. */
   report.relayed = await relayOutbox(ctx);

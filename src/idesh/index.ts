@@ -121,6 +121,8 @@ export {
   markDispatched,
   markHanded,
   housekeeping,
+  finishInvoiceFor,
+  type PayOutcome,
   liveFor,
   allFor,
   detailFor,

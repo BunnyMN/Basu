@@ -92,7 +92,9 @@ export function rememberAnswers(app: FastifyInstance, ctx: Ctx): void {
     // retried request buying lunch twice — not to make a failure permanent.
     // Caching a 401 would mean a client that signs in and tries again gets
     // handed the same rejection forever.
-    if (typeof key !== 'string' || request.method !== 'POST' || reply.statusCode >= 400) {
+    // Nor a 202: «under way, not done» — the purchase waiting on its invoice. Kept, the same key would be
+    // handed «still waiting» for a day after the money arrived.
+    if (typeof key !== 'string' || request.method !== 'POST' || reply.statusCode >= 400 || reply.statusCode === 202) {
       return payload;
     }
     // Nothing is kept for a request without a session, and a replay is kept already.

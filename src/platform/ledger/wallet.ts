@@ -146,22 +146,45 @@ export interface TopupStarted {
  */
 export async function startTopup(
   ctx: Ctx,
-  input: { guestId: string; amountMnt: number },
+  input: {
+    guestId: string;
+    amountMnt: number;
+    /** The purchase this money is for (`collectOrInvoice`): one open invoice each. */
+    forSubject?: string;
+    forSubjectId?: string;
+    returnUrl?: string | undefined;
+    description?: string | undefined;
+  },
 ): Promise<TopupStarted> {
   if (!Number.isInteger(input.amountMnt) || input.amountMnt <= 0) {
     throw new LedgerError('TOPUP_FAILED', 'a top-up has to be a positive whole number of tugriks');
   }
   const now = ctx.clock.now();
   const { rows } = await getPool().query<{ id: string }>(
-    `INSERT INTO ledger.topup (guest_id, amount_mnt, provider, state, created_at)
-     VALUES ($1, $2, $3, 'pending', $4) RETURNING id`,
-    [input.guestId, input.amountMnt, ctx.payments.name, now],
+    `INSERT INTO ledger.topup (guest_id, amount_mnt, provider, state, created_at, for_subject, for_subject_id)
+     VALUES ($1, $2, $3, 'pending', $4, $5, $6)
+     ON CONFLICT (for_subject, for_subject_id) WHERE for_subject IS NOT NULL AND state = 'pending' DO NOTHING
+     RETURNING id`,
+    [input.guestId, input.amountMnt, ctx.payments.name, now, input.forSubject ?? null, input.forSubjectId ?? null],
   );
-  const topupId = rows[0]!.id;
+  if (!rows[0]) {
+    // Two presses at once for one purchase: the other one raised it. The same
+    // invoice, never a second — its link may still be on its way, and the
+    // page asks again.
+    const open = await pendingInvoice(input.forSubject!, input.forSubjectId!);
+    if (!open) throw new LedgerError('TOPUP_FAILED', 'the purchase invoice could not be raised');
+    return { topupId: open.topupId, amountMnt: open.amountMnt, actionUrl: open.actionUrl ?? undefined, state: 'pending' };
+  }
+  const topupId = rows[0].id;
 
   let intent;
   try {
-    intent = await ctx.payments.authorize({ reference: topupId, amountMnt: input.amountMnt });
+    intent = await ctx.payments.authorize({
+      reference: topupId,
+      amountMnt: input.amountMnt,
+      returnUrl: input.returnUrl,
+      description: input.description,
+    });
   } catch (error) {
     await getPool().query(`UPDATE ledger.topup SET state = 'failed' WHERE id = $1`, [topupId]);
     // "Try again" would be a lie when there is no provider to try.
@@ -206,6 +229,10 @@ export async function settleTopup(ctx: Ctx, topupId: string): Promise<number> {
   if (!topup) throw new LedgerError('NOT_FOUND', 'no such top-up');
   if (topup.state === 'settled') return balance(topup.guest_id);
   if (topup.state !== 'pending') throw new LedgerError('TOPUP_FAILED', `top-up is ${topup.state}`);
+  // Still being raised — a second press found the purchase's invoice before
+  // the provider had answered the first: there is nothing to ask about yet,
+  // and nothing may be credited without asking.
+  if (!topup.provider_ref) throw new LedgerError('NOT_PAID_YET', 'the invoice is still being raised');
 
   // Asking too early is what a phone does while a person is still typing
   // their PIN into a bank app. That leaves the top-up pending, to be asked
@@ -256,6 +283,72 @@ export async function settleTopup(ctx: Ctx, topupId: string): Promise<number> {
   });
 
   return balance(topup.guest_id);
+}
+
+/* ── an invoice for one purchase ───────────────────────────────────── */
+
+/**
+ * A purchase the guest pays by QPay on the provider's own page: the money
+ * first lands in their wallet (a top-up, as any), and the purchase is taken
+ * from there. What ties the two together is the top-up's purchase
+ * (`for_subject`, `for_subject_id`): one open invoice per purchase.
+ *
+ * Wire lets an unpaid intent go after about ten minutes; past this, an open
+ * invoice is let go here too and a new one is raised for the next press.
+ */
+export const INVOICE_LIFETIME_MINUTES = 12;
+
+export interface Invoice {
+  topupId: string;
+  /** The provider's page; null for a moment while a second press waits on the first. */
+  actionUrl: string | null;
+  amountMnt: number;
+  createdAt: Date;
+}
+
+/** The open invoice for this purchase, if one is out. */
+export async function pendingInvoice(subject: string, subjectId: string): Promise<Invoice | null> {
+  const { rows } = await getPool().query<{ id: string; action_url: string | null; amount_mnt: string; created_at: Date }>(
+    `SELECT id, action_url, amount_mnt, created_at FROM ledger.topup
+      WHERE for_subject = $1 AND for_subject_id = $2 AND state = 'pending'`,
+    [subject, subjectId],
+  );
+  const r = rows[0];
+  return r ? { topupId: r.id, actionUrl: r.action_url, amountMnt: Number(r.amount_mnt), createdAt: r.created_at } : null;
+}
+
+/** Every open invoice for this kind of purchase: what the scheduler finishes or lets go. */
+export async function openInvoices(subject: string): Promise<Array<{ topupId: string; subjectId: string; createdAt: Date }>> {
+  const { rows } = await getPool().query<{ id: string; for_subject_id: string; created_at: Date }>(
+    `SELECT id, for_subject_id, created_at FROM ledger.topup
+      WHERE for_subject = $1 AND state = 'pending' ORDER BY created_at`,
+    [subject],
+  );
+  return rows.map((r) => ({ topupId: r.id, subjectId: r.for_subject_id, createdAt: r.created_at }));
+}
+
+/** The purchase a top-up was raised for — what the provider's callback goes on to. */
+export async function purchaseOfTopup(topupId: string): Promise<{ subject: string; subjectId: string } | null> {
+  const { rows } = await getPool().query<{ for_subject: string | null; for_subject_id: string | null }>(
+    'SELECT for_subject, for_subject_id FROM ledger.topup WHERE id = $1',
+    [topupId],
+  );
+  const r = rows[0];
+  return r?.for_subject && r.for_subject_id ? { subject: r.for_subject, subjectId: r.for_subject_id } : null;
+}
+
+/**
+ * An invoice nobody paid, let go: it can no longer be paid at the provider
+ * (best effort — Wire lets it go by itself soon after), and the next press
+ * raises a fresh one. Only a pending one; a paid one is never let go.
+ */
+export async function dropInvoice(ctx: Ctx, topupId: string): Promise<void> {
+  const { rows } = await getPool().query<{ provider_ref: string | null }>(
+    `UPDATE ledger.topup SET state = 'expired' WHERE id = $1 AND state = 'pending' RETURNING provider_ref`,
+    [topupId],
+  );
+  const ref = rows[0]?.provider_ref;
+  if (ref && ctx.payments.cancel) await ctx.payments.cancel(ref).catch(() => {});
 }
 
 /* ── spending ──────────────────────────────────────────────────────── */
@@ -333,7 +426,24 @@ export async function collect(ctx: Ctx, input: CollectInput): Promise<Collected>
     await settleTopup(ctx, topup.topupId);
   }
 
-  const transferId = await tx(async (client) => {
+  const transferId = await debit(input);
+
+  return {
+    transferId,
+    amountMnt: input.amountMnt,
+    fromWalletMnt: input.amountMnt - shortfall,
+    toppedUpMnt: shortfall,
+  };
+}
+
+/**
+ * The purchase out of the wallet, in one transaction — and with it whatever
+ * the caller's own state has to say about it (`within`), so a purchase and
+ * the order it pays for are written together or not at all. An order given
+ * back in the meantime throws in `within`, and the money stays in the wallet.
+ */
+async function debit(input: CollectInput, within?: (db: Db, transferId: string) => Promise<void>): Promise<string> {
+  return tx(async (client) => {
     const wallet = await walletAccount(client, input.guestId);
     // Serialise everything that spends this wallet, so two requests cannot
     // both read a balance of 20 000 ₮ and both spend it.
@@ -359,15 +469,118 @@ export async function collect(ctx: Ctx, input: CollectInput): Promise<Collected>
       memo: input.memo,
       idempotencyKey: input.idempotencyKey,
     });
+    if (within) await within(client, transfer.id);
     return transfer.id;
   });
+}
 
-  return {
-    transferId,
-    amountMnt: input.amountMnt,
-    fromWalletMnt: input.amountMnt - shortfall,
-    toppedUpMnt: shortfall,
-  };
+export type CollectOutcome =
+  | (Collected & { state: 'collected'; /** Taken before, under the same key: nothing new was written. */ replayed: boolean })
+  | { state: 'awaiting'; /** Null when asked not to raise one (`raise: false`) and none is out. */ invoice: Invoice | null };
+
+/**
+ * Take money for a purchase the guest pays for on the provider's own page.
+ *
+ * `collect` takes a shortfall on the spot, which only a provider that is
+ * taken at its word can do (the demo's). A real one (it can be asked whether
+ * it was paid — Wire) needs the person to pay first: the shortfall becomes
+ * an invoice for this purchase, and the answer is `awaiting` with it, the
+ * purchase still not made. Asked again — the page polling, the person back
+ * from their bank app, the provider's callback, the scheduler — the invoice
+ * is looked at: paid, the money lands in the wallet and the purchase is
+ * taken from there; not yet, the same invoice is handed back; lapsed, it is
+ * let go and a fresh one raised.
+ *
+ * The purchase and the caller's own record of it are one transaction
+ * (`within`, given the transaction and the transfer): an order given back by
+ * the scheduler between the two can no longer leave the money taken and the
+ * order unpaid — the purchase rolls back and the money stays in the wallet.
+ */
+export async function collectOrInvoice(
+  ctx: Ctx,
+  input: CollectInput & {
+    forSubject: string;
+    forSubjectId: string;
+    returnUrl?: string | undefined;
+    description?: string | undefined;
+    within?: (db: Db, transferId: string, split: { fromWalletMnt: number; toppedUpMnt: number }) => Promise<void>;
+    /**
+     * False for a caller that only finishes what the person started (the
+     * provider's callback, the scheduler): no new invoice is ever raised by
+     * somebody who is not there to pay it.
+     */
+    raise?: boolean | undefined;
+  },
+): Promise<CollectOutcome> {
+  if (!Number.isInteger(input.amountMnt) || input.amountMnt <= 0) {
+    throw new LedgerError('PAYMENT_FAILED', 'amount has to be a positive whole number of tugriks');
+  }
+
+  const already = await getPool().query<{ id: string }>(
+    'SELECT id FROM ledger.transfer WHERE idempotency_key = $1',
+    [input.idempotencyKey],
+  );
+  if (already.rows[0]) {
+    return {
+      state: 'collected',
+      replayed: true,
+      transferId: already.rows[0].id,
+      amountMnt: input.amountMnt,
+      fromWalletMnt: input.amountMnt,
+      toppedUpMnt: 0,
+    };
+  }
+
+  // An invoice already out for this purchase: paid by now, or still the one to pay.
+  let toppedUp = 0;
+  const open = await pendingInvoice(input.forSubject, input.forSubjectId);
+  if (open) {
+    try {
+      await settleTopup(ctx, open.topupId);
+      toppedUp = open.amountMnt;
+    } catch (error) {
+      if (!(error instanceof LedgerError)) throw error;
+      if (error.code === 'NOT_PAID_YET') {
+        const ageMinutes = (ctx.clock.now().getTime() - open.createdAt.getTime()) / 60_000;
+        if (ageMinutes < INVOICE_LIFETIME_MINUTES) return { state: 'awaiting', invoice: open };
+        // Lapsed unpaid: let go, and a fresh one below.
+        await dropInvoice(ctx, open.topupId);
+      } else if (error.code !== 'TOPUP_FAILED') {
+        // TOPUP_FAILED: the provider refused it (cancelled, expired) and it is marked so; a fresh one below.
+        throw error;
+      }
+    }
+  }
+
+  const shortfall = Math.max(0, input.amountMnt - (await balance(input.guestId)));
+  if (shortfall > 0) {
+    if (typeof ctx.payments.paid !== 'function') {
+      // A provider taken at its word (the demo's; a closed one refuses here): the shortfall arrives on the spot.
+      const topup = await startTopup(ctx, { guestId: input.guestId, amountMnt: shortfall });
+      await settleTopup(ctx, topup.topupId);
+      toppedUp += shortfall;
+    } else if (input.raise === false) {
+      return { state: 'awaiting', invoice: null };
+    } else {
+      const topup = await startTopup(ctx, {
+        guestId: input.guestId,
+        amountMnt: shortfall,
+        forSubject: input.forSubject,
+        forSubjectId: input.forSubjectId,
+        returnUrl: input.returnUrl,
+        description: input.description,
+      });
+      return {
+        state: 'awaiting',
+        invoice: { topupId: topup.topupId, actionUrl: topup.actionUrl ?? null, amountMnt: topup.amountMnt, createdAt: ctx.clock.now() },
+      };
+    }
+  }
+
+  const split = { fromWalletMnt: input.amountMnt - Math.min(toppedUp, input.amountMnt), toppedUpMnt: Math.min(toppedUp, input.amountMnt) };
+  const within = input.within;
+  const transferId = await debit(input, within ? (db, id) => within(db, id, split) : undefined);
+  return { state: 'collected', replayed: false, transferId, amountMnt: input.amountMnt, ...split };
 }
 
 /**

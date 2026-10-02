@@ -353,8 +353,22 @@ export async function registerIdeshRoutes(
       return forbidden(reply, 'not your order');
     }
     try {
-      await payIdesh(ctx, request.params.id);
-      return reply.send({ state: 'PAID' });
+      // Back from the provider's page to the order's own: the website's order page, which on a phone
+      // whose Basu is the app says so (the app's page is not a website's to open).
+      const back = `${(process.env['PUBLIC_ORIGIN']?.trim() || 'https://basu.burzai.cloud').replace(/\/+$/, '')}/orders/${request.params.id}?paying=1`;
+      const outcome = await payIdesh(ctx, request.params.id, { returnUrl: back });
+      if (outcome.state === 'PAID') return reply.send({ state: 'PAID' });
+      if (!outcome.invoice) return sendError(reply, new IdeshError('PAYMENT_FAILED', 'no invoice was raised'));
+      // Not yet: the guest pays this invoice on the provider's page, and asks again (202: under way, not done —
+      // never kept as the answer to the key, so the next ask is answered afresh).
+      return reply.status(202).send({
+        state: 'AWAITING_PAYMENT',
+        invoice: {
+          topup_id: outcome.invoice.topupId,
+          action_url: outcome.invoice.actionUrl,
+          amount_mnt: outcome.invoice.amountMnt,
+        },
+      });
     } catch (error) {
       return sendError(reply, error);
     }

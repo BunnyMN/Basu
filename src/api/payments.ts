@@ -1,5 +1,7 @@
 import type { FastifyInstance } from 'fastify';
+import { finishInvoiceFor } from '../idesh/index.js';
 import {
+  purchaseOfTopup,
   settleTopup,
   topupByProviderRef,
   verifyWireWebhook,
@@ -63,6 +65,13 @@ export async function registerPaymentRoutes(app: FastifyInstance, ctx: Ctx, wire
         // Already settled, or the provider says it is not paid after all.
         // Either way the callback has been heard and must not be retried.
         request.log.warn({ err: error, topupId }, 'wire webhook could not settle');
+      }
+      // Raised for a purchase: the purchase goes through now, whether or not the person comes back to the page.
+      const purchase = await purchaseOfTopup(topupId);
+      if (purchase?.subject === 'idesh') {
+        await finishInvoiceFor(ctx, purchase.subjectId).catch((error: unknown) => {
+          request.log.warn({ err: error, topupId }, 'wire webhook could not finish the purchase');
+        });
       }
       return reply.send({ received: true });
     });

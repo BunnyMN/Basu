@@ -54,7 +54,7 @@ import { registerAuthRoutes } from './auth.js';
 import { registerOrgRoutes } from './orgs.js';
 import { registerAccessRoutes } from './access.js';
 import { ensureRoles } from '../platform/access/index.js';
-import { FakeMailer, type Ctx } from '../ports.js';
+import { FakeMailer, HostedFakePaymentProvider, type Ctx } from '../ports.js';
 
 /**
  * The HTTP surface.
@@ -990,6 +990,44 @@ async function mountDevRoutes(app: FastifyInstance, ctx: Ctx): Promise<void> {
     const letter = ctx.mailer instanceof FakeMailer ? ctx.mailer.to(request.query.to?.trim().toLowerCase() ?? '') : undefined;
     if (!letter) return reply.status(404).send({ error: { code: 'NOT_FOUND', message_mn: 'Захидал алга.', message_en: 'no letter to that address' } });
     return { to: letter.to, subject: letter.subject, text: letter.text };
+  });
+
+  /**
+   * The demo's QPay page (FAKE_PAYMENTS=hosted), standing in for Wire's own:
+   * the invoice, «Төлөх» or «Буцах», and back to the page the purchase named
+   * (on this server — the address it was given is the public one).
+   */
+  const devInvoiceBack = (fake: HostedFakePaymentProvider, ref: string) => {
+    const back = fake.returns.get(ref);
+    if (!back) return '/';
+    try {
+      const url = new URL(back);
+      return `${url.pathname}${url.search}`;
+    } catch {
+      return back.startsWith('/') ? back : '/';
+    }
+  };
+  app.get<{ Params: { ref: string } }>('/dev/pay/:ref', async (request, reply) => {
+    const fake = ctx.payments;
+    if (!(fake instanceof HostedFakePaymentProvider) || !fake.authorized.includes(request.params.ref)) {
+      return reply.status(404).send({ error: { code: 'NOT_FOUND', message_mn: 'Нэхэмжлэл алга.', message_en: 'no such invoice' } });
+    }
+    const ref = encodeURIComponent(request.params.ref);
+    reply.type('text/html; charset=utf-8');
+    return `<!doctype html><html lang="mn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>QPay (демо)</title></head>
+<body><h1>QPay — демо нэхэмжлэл</h1><p>Бодит мөнгө хөдлөхгүй. Энэ хуудас Wire-ийн төлбөрийн хуудасны оронд.</p>
+<p><a href="/dev/pay/${ref}/paid">Төлөх</a></p><p><a href="/dev/pay/${ref}/back">Төлөхгүй буцах</a></p></body></html>`;
+  });
+  app.get<{ Params: { ref: string } }>('/dev/pay/:ref/paid', async (request, reply) => {
+    const fake = ctx.payments;
+    if (!(fake instanceof HostedFakePaymentProvider)) return reply.status(404).send({ error: { code: 'NOT_FOUND' } });
+    fake.pay(request.params.ref, ctx.clock.now());
+    return reply.redirect(devInvoiceBack(fake, request.params.ref), 303);
+  });
+  app.get<{ Params: { ref: string } }>('/dev/pay/:ref/back', async (request, reply) => {
+    const fake = ctx.payments;
+    if (!(fake instanceof HostedFakePaymentProvider)) return reply.status(404).send({ error: { code: 'NOT_FOUND' } });
+    return reply.redirect(devInvoiceBack(fake, request.params.ref), 303);
   });
 
   /**

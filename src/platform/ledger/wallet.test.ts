@@ -10,7 +10,7 @@ import {
   type PaymentProvider,
 } from '../../ports.js';
 import { seedGuest, truncateAll } from '../../test/seed.js';
-import { balance, collect, LedgerError, reconcileLedger, refund, settleTopup, startTopup, wallet } from './index.js';
+import { balance, collect, collectOrInvoice, LedgerError, reconcileLedger, refund, settleTopup, startTopup, wallet } from './index.js';
 
 /**
  * The ledger under pressure.
@@ -285,5 +285,49 @@ describe('a server with no payment provider', () => {
     const guest = await seedGuest();
     await expect(startTopup(closed, { guestId: guest, amountMnt: 10_000 })).rejects.toMatchObject({ code: 'PAYMENTS_CLOSED' });
     expect(await balance(guest)).toBe(0);
+  });
+});
+
+describe('a purchase paid for by an invoice', () => {
+  it('never credits an invoice still being raised', async () => {
+    // A second press found the purchase's invoice before the provider answered the first: no provider_ref yet.
+    const { rows } = await pool().query<{ id: string }>(
+      `INSERT INTO ledger.topup (guest_id, amount_mnt, provider, state, created_at, for_subject, for_subject_id)
+       VALUES ($1, 460000, 'qpay', 'pending', $2, 'idesh', gen_random_uuid()) RETURNING id`,
+      [guestId, clock.now()],
+    );
+    await expect(settleTopup(ctx, rows[0]!.id)).rejects.toMatchObject({ code: 'NOT_PAID_YET' });
+    expect(await balance(guestId)).toBe(0);
+  });
+
+  it('takes the money and the caller’s own record together, or neither', async () => {
+    await fund(500_000);
+    const purchase = {
+      guestId,
+      amountMnt: 460_000,
+      subject: 'idesh',
+      subjectId: '00000000-0000-4000-8000-000000000001',
+      idempotencyKey: 'idesh:race:purchase',
+      forSubject: 'idesh',
+      forSubjectId: '00000000-0000-4000-8000-000000000001',
+    };
+    // The order was given back while it was being paid: its record refuses, and the purchase goes with it.
+    await expect(
+      collectOrInvoice(ctx, {
+        ...purchase,
+        within: async () => {
+          throw new Error('order left DRAFT while paying');
+        },
+      }),
+    ).rejects.toThrow('order left DRAFT while paying');
+    expect(await balance(guestId)).toBe(500_000);
+    const kept = await pool().query('SELECT 1 FROM ledger.transfer WHERE idempotency_key = $1', ['idesh:race:purchase']);
+    expect(kept.rowCount).toBe(0);
+    expect(await reconcileLedger()).toMatchObject({ drift: 0 });
+
+    // Asked again with an order that takes it: one purchase.
+    const done = await collectOrInvoice(ctx, { ...purchase, within: async () => {} });
+    expect(done).toMatchObject({ state: 'collected', replayed: false, fromWalletMnt: 460_000, toppedUpMnt: 0 });
+    expect(await balance(guestId)).toBe(40_000);
   });
 });
