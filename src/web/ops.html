@@ -1631,6 +1631,26 @@ const SCOPE_WORD = { desk: 'Basu-гийн ширээ', org: 'Байгуулла�
 let accessScope = localStorage.getItem('basu.ops.access') === 'org' ? 'org' : 'desk';
 /** The role the roles page opens on next: the one just made or saved. */
 let rolePick = null;
+/** What opened the role editor ({ role } a row, { id } a button), for the keyboard to go back to once a save or a delete has drawn the roles page anew. */
+let roleBack = null;
+
+/**
+ * Where the keyboard goes back to from the role editor: what opened it — a
+ * role's row, «Шинэ үүрэг» — found again if the page has been drawn anew
+ * since; with that gone (a role deleted), «Шинэ үүрэг», else the page's
+ * heading. Never the <body> a closing popup would leave it on.
+ */
+function roleComeBack(back) {
+  const view = document.getElementById('view') ?? document;
+  const to =
+    (back?.role && [...view.querySelectorAll('tr[data-role]')].find((tr) => tr.dataset.role === back.role)) ||
+    (back?.id && document.getElementById(back.id)) ||
+    document.getElementById('role-new') ||
+    view.querySelector('.page-head h1');
+  if (!to) return;
+  if (to.tagName === 'H1') to.tabIndex = -1;
+  to.focus();
+}
 
 /** The desk's roles, for the pickers that seat somebody: asked once a page, and again after the roles change. */
 let deskRoles = null;
@@ -1748,6 +1768,8 @@ const draftRole = (data, from) => ({
 async function renderRoles(view) {
   const lit = rolePick;
   rolePick = null;
+  const back = roleBack;
+  roleBack = null;
   const manage = can('desk.roles:manage');
   // The switch between the desk's roles and businesses' roles, and the one way to add a role: together, at the head's right.
   const h = head('Үүрэг, эрх', 'Үүрэг бүр ямар хуудас, үйлдэл нээхийг тохируулна. Хүний цэс үүнээс гарна.');
@@ -1807,6 +1829,8 @@ async function renderRoles(view) {
     });
     body.append(row);
   }
+  // Back from the editor after a save or a delete: the page is new, and the keyboard goes to what opened the editor in it.
+  if (back && (!document.activeElement || document.activeElement === document.body)) roleComeBack(back);
 }
 
 /**
@@ -1817,6 +1841,8 @@ async function renderRoles(view) {
  */
 function openRoleSheet(data, mods, role, { manage, from = null, onCopy }) {
   const opener = document.activeElement;
+  // The same opener, as the page would draw it again: a save or a delete draws the roles page anew.
+  const back = opener?.dataset?.role ? { role: opener.dataset.role } : opener?.id ? { id: opener.id } : {};
   const scrim = el('<div class="scrim"></div>');
   let editor = null;
   let closed = false;
@@ -1864,8 +1890,11 @@ function openRoleSheet(data, mods, role, { manage, from = null, onCopy }) {
       scrim.remove();
     }, 260);
     // The page wakes before the keyboard goes back to what opened the editor: a sleeping button takes no focus.
+    // Asked first («Хадгалахгүй хаах»), the question's popup closes after this and leaves the focus here
+    // (api.js popup() never hands it back into a sheet that is closing).
     wake();
-    if (opener?.isConnected) opener.focus();
+    if (opener?.isConnected && opener !== document.body) opener.focus();
+    else roleComeBack(back);
     return true;
   };
   const onKey = (e) => {
@@ -1892,6 +1921,7 @@ function openRoleSheet(data, mods, role, { manage, from = null, onCopy }) {
   editor = roleEditor(data, mods, role, {
     manage,
     from,
+    back,
     close,
     copy: () => {
       if (close(false, () => onCopy(role))) onCopy(role);
@@ -1914,7 +1944,7 @@ function openRoleSheet(data, mods, role, { manage, from = null, onCopy }) {
  * module's level, a page's box and an action's box never disagree. An action
  * brings its page along; a page taken away takes its actions with it.
  */
-function roleEditor(data, mods, role, { manage, from, close, copy }) {
+function roleEditor(data, mods, role, { manage, from, back = {}, close, copy }) {
   const fresh = !role.key;
   const fixed = role.locked || !manage;
   const org = data.scope === 'org';
@@ -2132,6 +2162,7 @@ function roleEditor(data, mods, role, { manage, from, close, copy }) {
         close(true);
         toast('Устгалаа.', 'good');
         deskRoles = null;
+        roleBack = back;
         await reload();
       },
     });
@@ -2164,6 +2195,7 @@ function roleEditor(data, mods, role, { manage, from, close, copy }) {
       toast(fresh ? 'Үүрэг үүслээ.' : 'Хадгалагдлаа.', 'good');
       deskRoles = null;
       rolePick = saved.key;
+      roleBack = back;
       await reload();
     } catch (error) {
       toast(error.message, 'bad');

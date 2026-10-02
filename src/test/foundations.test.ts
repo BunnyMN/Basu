@@ -135,6 +135,43 @@ describe('a popup', () => {
     expect(go.getAttribute('data-v')).toBe('danger');
     expect(go.hasAttribute('data-fill')).toBe(true);
   });
+
+  it('counts on from the popup before it: an address added on the way to a password reads 1/4 to 4/4, not «1/2» twice', async () => {
+    const asked: string[] = [];
+    Object.assign(window, {
+      fetch: async (path: string) => {
+        asked.push(path);
+        const answer = path === '/v1/me/password/code' ? { to: 'bat@gmail.com' } : path === '/v1/me/password' ? { revoked: 0 } : {};
+        return { ok: true, status: 200, text: async () => JSON.stringify(answer) };
+      },
+    });
+    const counter = () => `${open().querySelector('.popup-steps')?.textContent} ${open().querySelectorAll('.popup-steps b[data-on]').length}/${open().querySelectorAll('.popup-steps b').length}`;
+    const seen: string[] = [];
+    const done = window.passwordPopup({ token: 't' });
+    await tick(5);
+    seen.push(`${counter()} ${open().querySelector('header h2')?.textContent}`);
+    field('email').value = 'bat@gmail.com';
+    (open().querySelector('[data-submit]') as HTMLElement).click();
+    await tick(5);
+    seen.push(`${counter()} ${open().querySelector('header h2')?.textContent}`);
+    field('code').value = '123456';
+    (open().querySelector('[data-submit]') as HTMLElement).click();
+    await tick(5);
+    seen.push(`${counter()} ${open().querySelector('header h2')?.textContent}`);
+    (open().querySelector('[data-submit]') as HTMLElement).click();
+    await tick(5);
+    seen.push(`${counter()} ${open().querySelector('header h2')?.textContent}`);
+    field('code').value = '654321';
+    field('next').value = 'шинэ-нууц-үг';
+    (open().querySelector('[data-submit]') as HTMLElement).click();
+    expect(await done).toEqual({ password: 'шинэ-нууц-үг', revoked: 0 });
+    expect(seen).toEqual(['Алхам 1/4 1/4 Имэйл холбох', 'Алхам 2/4 2/4 Имэйл холбох', 'Алхам 3/4 3/4 Нууц үг тохируулах', 'Алхам 4/4 4/4 Нууц үг тохируулах']);
+    expect(asked).toEqual(['/v1/me/email/code', '/v1/me/email', '/v1/me/password/code', '/v1/me/password']);
+    await tick(300);
+    // an account with its address already: the password's own two steps, as before
+    void window.passwordPopup({ token: 't', email: 'bat@gmail.com' });
+    expect(counter()).toBe('Алхам 1/2 1/2');
+  });
 });
 
 describe('a toast', () => {
@@ -604,6 +641,41 @@ describe('reached by a keyboard and a reader', () => {
     document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(page.hasAttribute('inert')).toBe(false);
     expect(document.activeElement).toBe(opener);
+    await tick(300);
+  });
+
+  it('never hands the focus back into a sheet that is closing: a question asked over an editor leaves it where the editor put it', async () => {
+    // The desk's role editor: its own sheet over the page, asking «discard?» in a popup before it closes.
+    const page = document.createElement('main');
+    page.innerHTML = '<button id="row">Ops</button>';
+    const editor = document.createElement('div');
+    editor.className = 'sheet';
+    editor.setAttribute('data-open', '');
+    editor.innerHTML = '<button id="x">Хаах</button>';
+    document.body.append(page, editor);
+    const row = document.getElementById('row') as HTMLButtonElement;
+    const x = document.getElementById('x') as HTMLButtonElement;
+    x.focus();
+    void window.confirmPopup({
+      title: 'Хадгалаагүй өөрчлөлт',
+      ok: 'Хадгалахгүй хаах',
+      onConfirm: () => {
+        editor.removeAttribute('data-open'); // the editor closes…
+        row.focus(); // …and gives the keyboard back to its own opener
+        return true;
+      },
+    });
+    expect(editor.hasAttribute('inert')).toBe(true);
+    (open().querySelector('[data-submit]') as HTMLElement).click();
+    await tick(5);
+    expect(document.activeElement).toBe(row);
+    expect(document.querySelectorAll('[inert]')).toHaveLength(0);
+    // a popup opened from inside a sheet that is still open gives the focus back to it, as always
+    editor.setAttribute('data-open', '');
+    x.focus();
+    void window.confirmPopup({ title: 'Итгэлтэй юу' });
+    document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.activeElement).toBe(x);
     await tick(300);
   });
 

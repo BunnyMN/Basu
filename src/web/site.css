@@ -150,7 +150,8 @@ input.s-input[type="date"]{display:flex;align-items:center}
 @media (hover:hover){.s-foot a:hover{color:var(--ink)}}
 @media (max-width:760px){
   .s-foot .s-wrap{flex-direction:column;align-items:stretch}
-  .s-foot nav{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;order:-1}
+  /* the links on top, the address line under them: site.js puts them in that order (not CSS `order`), so Tab reads as the eye does */
+  .s-foot nav{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
   .s-foot nav a{min-height:44px}
 }
 /* the links in a row under a thumb (a tablet): 44px tall, and a short one («Зах») 44px wide, its room given back outside it */

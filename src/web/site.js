@@ -289,6 +289,16 @@ export function mountFrame(active) {
       </div>
     </footer>`);
 
+  // The foot's two parts stand in the order the eye reads them, so Tab goes the same way: on a wide
+  // screen the address line is left of the links; on a phone (≤760px, site.css) the links are the grid
+  // on top and the address line under them. They are put in that order, not drawn out of it with CSS
+  // `order`, which would send the keyboard from the address at the bottom back up to the links.
+  const footRow = foot.querySelector('.s-wrap');
+  const footNarrow = typeof matchMedia === 'function' ? matchMedia('(max-width:760px)') : null;
+  const footOrder = () => footRow.append(footNarrow?.matches ? footRow.querySelector('.who') : footRow.querySelector('nav'));
+  footOrder();
+  footNarrow?.addEventListener?.('change', footOrder);
+
   const burger = bar.querySelector('.s-burger');
   const drawer = bar.querySelector('.s-drawer');
   const fold = (open, focus = false) => {
