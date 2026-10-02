@@ -376,6 +376,10 @@ describe('the desk’s window onto orders', () => {
     const one = await app.inject({ method: 'GET', url: `/v1/ops/orders/${id}`, headers: desk() });
     expect(one.json().events.at(-2)).toMatchObject({ type: 'CANCELLED', actor: 'ops:Демо' });
     expect(one.json().settlements).toEqual([expect.objectContaining({ kind: 'refund', state: 'needs_account', amount_mnt: 460_000 })]);
+    // The refund says whose account it is by how the account signs in: two people with no name are told apart.
+    expect(one.json().settlements[0]).toMatchObject({ guest: { name: '···4009' }, guest_phone: '+97699004009', guest_email: null });
+    const list = await app.inject({ method: 'GET', url: '/v1/ops/settlements', headers: desk() });
+    expect(list.json().settlements.find((t: { order_id: string }) => t.order_id === id)).toMatchObject({ kind: 'refund', guest_phone: '+97699004009', guest_email: null });
 
     const audit = await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: desk() });
     expect(audit.json().audit[0]).toMatchObject({ who: 'ops:Демо', action: 'order.cancel', target_id: id, note: 'зочин утсаар хүссэн, нийлүүлэгч холбогдохгүй' });

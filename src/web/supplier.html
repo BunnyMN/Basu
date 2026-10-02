@@ -19,8 +19,8 @@
 /* ── the doors: sign in, apply, waiting ── */
 .door{max-width:440px;margin:32px auto;padding:0 var(--gutter) calc(24px + var(--safe-b))}
 .door .card{padding:24px 20px}
-.door .brand{display:inline-flex;align-items:center;min-height:var(--target);margin:-10px 0 6px;color:var(--ink);text-decoration:none}
-.door h2{font-size:var(--t-title-2);line-height:1.2;letter-spacing:-.015em;margin-bottom:6px;text-wrap:balance}
+.door .brand{display:inline-flex;align-items:center;min-width:var(--target);min-height:var(--target);margin:-10px 0 6px;color:var(--ink);text-decoration:none}
+.door :is(h1,h2){font-size:var(--t-title-2);line-height:1.2;letter-spacing:-.015em;margin-bottom:6px;text-wrap:balance}
 .door .lead{color:var(--ink-2);margin:0 0 20px;text-wrap:pretty}
 .door .form-group > .cap{margin:-2px 0 14px}
 .door .foot{display:flex;flex-direction:column;gap:8px;margin-top:4px}
@@ -86,6 +86,9 @@
 #conn{margin:0 0 16px;border:1px solid var(--stop-line);border-radius:var(--r-ctl)}
 #conn .mono{margin-left:0}
 #board[data-stale]{opacity:.55;transition:opacity var(--dur) var(--ease)}
+/* a guest who gave no name, said quietly: the number beside it is what the counter rings */
+.unnamed{font-weight:400;color:var(--ink-3)}
+.nowrap{white-space:nowrap}
 
 /* ── today ── */
 /* what stands between the supplier and their orders or money, before the numbers: one line each */
@@ -94,8 +97,8 @@
 .stats{margin-bottom:24px}
 .group{margin-top:28px}
 .group:first-child{margin-top:0}
-.group h3{display:flex;align-items:center;gap:8px;margin:0 0 12px}
-.group h3 .n{margin:0}
+.group h2{display:flex;align-items:center;gap:8px;margin:0 0 12px}
+.group h2 .n{margin:0}
 .stack{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));align-items:start}
 .stack > *{min-width:0}
 /* one order: a state band on top, the facts, the money, one button */
@@ -230,11 +233,15 @@
 .facts dd .mn{font-weight:500}
 .facts dd small{display:block;font-size:var(--t-cap);font-weight:400;color:var(--ink-2);margin-top:2px}
 .facts dd[data-none]{font-weight:400;color:var(--ink-3)}
+/* a number on the profile dials too: a 44px target around the line, the line where it was */
+.facts a.tel{min-height:var(--target);margin:-12px 0}
 :root[data-desk] .facts{padding:20px}
 .card-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--line)}
 .card-foot .cap{flex:1 1 260px;margin:0}
 .card-foot .cap a{color:var(--accent-ink);text-decoration:underline;text-underline-offset:.15em;overflow-wrap:anywhere}
 :root[data-desk] .card-foot{padding:12px 20px}
+/* a card's title is the h2 under the page's h1 (app.css draws .card-head h3): the same size, the right level */
+.card-head h2{flex:1;min-width:0;font-size:var(--t-title-3);line-height:var(--lh-snug);letter-spacing:0}
 .card-head .chip{flex:none}
 .card-head + .card-foot{border-top:0}
 .cards{display:grid;gap:16px}
@@ -248,7 +255,7 @@
 <div id="root"></div>
 
 <script type="module">
-import { api, store, shell, toast, mnt, money, KIND, IDESH_STATE, dayLabel, dayShort, ubParts, signInDoors, accountWays, authReturn, popup, passwordPopup, BANK_NAMES, dropSession, whatWentWrong } from '/api.js';
+import { api, store, shell, toast, mnt, money, KIND, IDESH_STATE, dayLabel, dayShort, ubParts, signInDoors, accountWays, authReturn, popup, passwordPopup, BANK_NAMES, phoneText, dropSession, whatWentWrong } from '/api.js';
 import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -370,7 +377,7 @@ const ICON = {
  * primary, id }.
  */
 function blank({ icon = ICON.orders, title, text = '', action = null, size, tone, frame = false }) {
-  const box = el(`<div class="empty-state"${size ? ` data-size="${size}"` : ''}${tone ? ` data-tone="${tone}"` : ''}${frame ? ' data-frame' : ''}><span class="es-mark" aria-hidden="true">${icon}</span><h3 class="es-title"></h3><p class="es-text"></p></div>`);
+  const box = el(`<div class="empty-state"${size ? ` data-size="${size}"` : ''}${tone ? ` data-tone="${tone}"` : ''}${frame ? ' data-frame' : ''}><span class="es-mark" aria-hidden="true">${icon}</span><h2 class="es-title"></h2><p class="es-text"></p></div>`);
   box.querySelector('.es-title').textContent = title ?? '';
   box.querySelector('.es-text').textContent = text ?? '';
   if (action) {
@@ -384,14 +391,19 @@ function blank({ icon = ICON.orders, title, text = '', action = null, size, tone
   return box;
 }
 
-/** A Mongolian number the way people read it: `+97699112233` → `+976 9911 2233`. Anything else as it came. */
-function phoneLine(value) {
-  const raw = String(value ?? '');
-  const m = /^(?:\+?976)?(\d{4})(\d{4})$/.exec(raw.replace(/[\s-]/g, ''));
-  return m ? `+976 ${m[1]} ${m[2]}` : raw;
-}
-/** A number that dials: the digits in the link, the number as written on the screen. */
-const tel = (n) => `<a class="tel" href="tel:${esc(String(n).replace(/[^\d+]/g, ''))}">${ICON.phone}${esc(phoneLine(n))}</a>`;
+/** A number that dials: the digits in the link, the number as people read it on the screen («+976 9911 2233»). */
+const tel = (n) => `<a class="tel" href="tel:${esc(String(n).replace(/[^\d+]/g, ''))}">${ICON.phone}${esc(phoneText(n))}</a>`;
+
+/**
+ * Who an order is for, as the counter greets and rings them: the name they
+ * chose — or, with none, said so quietly (never a piece of their address) —
+ * and the number to ring: their own, or the one they gave for the delivery.
+ * The server sends nothing more of them than that.
+ */
+const guestName = (o) => (o.guest ? esc(o.guest) : '<span class="unnamed">Нэр оруулаагүй</span>');
+const guestNumber = (o) => o.guest_phone || o.address_phone || null;
+/** The same in one line under a popup's title: «Сарнай · +976 9911 2233». */
+const guestLine = (o) => [guestName(o), guestNumber(o) ? `<span class="mn nowrap">${esc(phoneText(guestNumber(o)))}</span>` : ''].filter(Boolean).join(' · ');
 
 /** A button at work: its words stay (for a reader and for textContent), a spinner turns, no second press. */
 function pressing(button, on) {
@@ -433,10 +445,10 @@ const brand = () => (shell.present ? '<div class="brand wordmark" data-size="sm"
  */
 function signInCard() {
   const card = el(`
-    <div class="door">
+    <main class="door">
       <div class="card" id="signin">
         ${brand()}
-        <h2>Нийлүүлэгчийн хэсэг</h2>
+        <h1>Нийлүүлэгчийн хэсэг</h1>
         <p class="lead">Нэвтэрч ороод нийлүүлэгч болох хүсэлтээ илгээнэ үү. Гэрээт нийлүүлэгч бол гэрээний утас, нууц үгээрээ нэвтэрнэ.</p>
         <div data-doors></div>
       </div>
@@ -445,7 +457,7 @@ function signInCard() {
         <li><span class="n">2</span><span><b>Зараа оруулна</b>Зар оруулах үнэгүй. Үнэ, тоо, бэлэн болох өдрөө өөрөө тавина.</span></li>
         <li><span class="n">3</span><span><b>Захиалга авна</b>Хүлээлгэн өгсөн захиалга бүрийн мөнгө таны банкны данс руу шилжинэ.</span></li>
       </ol>
-    </div>`);
+    </main>`);
   card.append(doorFoot());
   const doors = signInDoors({ device: 'Нийлүүлэгчийн дэлгэц', returnTo: '/supplier', onToken: () => boot() });
   card.querySelector('[data-doors]').replaceWith(doors);
@@ -551,8 +563,17 @@ async function showApply() {
 const ACCOUNT = /^(MN\d{18}|\d{6,20})$/;
 /** What a number the rule refuses is told, under its field. */
 const ACCOUNT_WORDS = 'IBAN бол MN-ээр эхэлсэн 20 тэмдэгт, эсвэл 6–20 оронтой дансны дугаар бичнэ үү.';
-/** The banks a person in Ulaanbaatar has an account at, most common first. */
-const BANKS = ['Хаан банк', 'Голомт банк', 'Худалдаа хөгжлийн банк', 'Хас банк', 'Төрийн банк', 'Капитрон банк', 'Ариг банк', 'Богд банк', 'М банк'];
+/**
+ * The bank is picked from Basu's one list (BANK_NAMES, as the refund on
+ * /orders picks it), and a bank that is not on it is typed under «Бусад банк».
+ * A saved name that is not on the list comes back as «Бусад банк» with the
+ * name filled in, so nothing a supplier wrote is lost.
+ */
+const OTHER_BANK = '__other';
+const bankPick = (saved) => (!saved ? '' : BANK_NAMES.includes(saved) ? saved : OTHER_BANK);
+const bankOptions = (first) => [['', first], ...BANK_NAMES.map((b) => [b, b]), [OTHER_BANK, 'Бусад банк']];
+/** The bank's name a form holds: the one picked, or the one typed under «Бусад банк». */
+const bankOf = (picked, typed) => (picked === OTHER_BANK ? String(typed ?? '').trim() : picked);
 
 /**
  * Say under a field what is wrong with it, or clear it. The first refused
@@ -580,10 +601,10 @@ function fieldSays(input, message) {
 
 function applyForm(needsPhone = false) {
   const card = el(`
-    <div class="door">
+    <main class="door">
       <div class="card" id="apply">
         ${brand()}
-        <h2>Нийлүүлэгч болох</h2>
+        <h1>Нийлүүлэгч болох</h1>
         <p class="lead">Basu хүсэлтийг тань үзээд утсаар холбогдож, гэрээ байгуулна. Батлагдвал энэ бүртгэлээрээ нэвтэрч ажиллана.</p>
         <div class="callout form-error" data-k="stop" role="alert" hidden><span></span></div>
         <div class="form-group">
@@ -597,14 +618,16 @@ function applyForm(needsPhone = false) {
         <div class="form-group">
           <div class="section-label">Олголт очих данс</div>
           <p class="cap">Мөнгө тань энэ данс руу очно — гэрээнд бичигдэж, Basu тулгаж шалгана. Одоо бөглөхгүй бол дараа нь профайлаасаа нэмнэ.</p>
-          <label class="field"><span>Банк</span><input name="bank_name" list="banks" autocomplete="off"></label>
-          <datalist id="banks">${BANKS.map((b) => `<option value="${b}">`).join('')}</datalist>
+          <label class="field"><span>Банк</span><select name="bank_name">${bankOptions('Банкаа сонгоно уу')
+            .map(([v, w]) => `<option value="${esc(v)}">${esc(w)}</option>`)
+            .join('')}</select></label>
+          <label class="field" data-other-bank hidden><span>Банкны нэр</span><input name="bank_other" autocomplete="off" placeholder="Жагсаалтад байхгүй банк" disabled></label>
           <label class="field"><span>Дансны дугаар</span><input name="bank_account" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="MN12 0005 0050 1234 5678"><small>IBAN (MN + 18 орон) эсвэл дансны дугаар (6–20 орон).</small></label>
           <label class="field"><span>Данс эзэмшигчийн нэр</span><input name="bank_holder" autocomplete="name"><small>Гэрээнд гарын үсэг зурах хүний нэр.</small></label>
         </div>
         <div class="foot"><button class="btn" data-v="primary" data-size="lg" type="button" id="submit">Хүсэлт илгээх</button></div>
       </div>
-    </div>`);
+    </main>`);
   card.append(doorFoot(true));
   const field = (name) => card.querySelector(`[name="${name}"]`);
   const v = (name) => field(name)?.value.trim() ?? '';
@@ -612,6 +635,15 @@ function applyForm(needsPhone = false) {
   // Typing into a refused field takes its complaint away; the next press checks again.
   card.addEventListener('input', (e) => {
     if (e.target.matches?.('[aria-invalid]')) fieldSays(e.target, null);
+  });
+  // «Бусад банк» opens the field for its name; a bank on the list needs none.
+  const otherBank = card.querySelector('[data-other-bank]');
+  field('bank_name').addEventListener('change', () => {
+    const on = field('bank_name').value === OTHER_BANK;
+    otherBank.hidden = !on;
+    field('bank_other').disabled = !on;
+    if (on) field('bank_other').focus();
+    else fieldSays(field('bank_other'), null);
   });
 
   /** What the server would refuse, said before anything is sent — and in words about the field, not the order. */
@@ -628,6 +660,7 @@ function applyForm(needsPhone = false) {
     }
     say('address', v('address').length < 4 ? 'Зочин ирж авах газраа бичнэ үү.' : null);
     say('tin', v('tin') && !/^\d{7,10}$/.test(v('tin')) ? 'ТТД 7–10 оронтой тоо байна.' : null);
+    say('bank_other', v('bank_name') === OTHER_BANK && !v('bank_other') ? 'Банкныхаа нэрийг бичнэ үү.' : null);
     const account = v('bank_account').replace(/\s+/g, '').toUpperCase();
     say('bank_account', account && !ACCOUNT.test(account) ? ACCOUNT_WORDS : null);
     wrong[0]?.focus();
@@ -650,7 +683,7 @@ function applyForm(needsPhone = false) {
           tin: v('tin'),
           address: v('address'),
           about: v('about'),
-          bank_name: v('bank_name'),
+          bank_name: bankOf(v('bank_name'), v('bank_other')),
           bank_account: v('bank_account').replace(/\s+/g, '').toUpperCase(),
           bank_holder: v('bank_holder'),
         },
@@ -662,7 +695,9 @@ function applyForm(needsPhone = false) {
       // Said on the form, over the fields, where the person is looking.
       problem.querySelector('span').textContent = error.message;
       problem.hidden = false;
-      problem.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+      // Taken to it — gliding only for whoever has not asked for less motion.
+      const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      problem.scrollIntoView?.({ block: 'center', behavior: still ? 'auto' : 'smooth' });
       pressing(submit, false);
     }
   });
@@ -693,16 +728,16 @@ const dayFigure = (iso) => (iso ? dayShort(ubParts(iso).day) : '');
 function statusCard(a, needsPhone = false) {
   const [word, cap] = APPLICATION[a.state] ?? [a.state, ''];
   const card = el(`
-    <div class="door">
+    <main class="door">
       <div class="card" id="application">
         ${brand()}
-        <h2>${esc(a.name)}</h2>
+        <h1>${esc(a.name)}</h1>
         <div class="status" data-s="${esc(a.state)}">
           <div class="big">${esc(word)}</div>
           <div class="cap">${a.state === 'declined' ? `Шалтгаан: ${esc(a.decline_reason)}` : cap}</div>
         </div>
       </div>
-    </div>`);
+    </main>`);
   card.append(doorFoot(true));
   const inner = card.querySelector('.card');
   if (a.state === 'applied') {
@@ -818,7 +853,7 @@ function renderBoard(data) {
   for (const lane of LANES) {
     const tickets = data.lanes[lane.key] ?? [];
     if (!tickets.length) continue;
-    const group = el(`<section class="group lane"><h3 class="section-title">${lane.title}<span class="n count" data-tone="neutral">${tickets.length}</span></h3><div class="stack"></div></section>`);
+    const group = el(`<section class="group lane"><h2 class="section-title">${lane.title}<span class="n count" data-tone="neutral">${tickets.length}</span></h2><div class="stack"></div></section>`);
     const stack = group.querySelector('.stack');
     for (const ticket of tickets) stack.append(renderTicket(ticket, lane.key));
     board.append(group);
@@ -857,6 +892,18 @@ function nothingToDo(listings) {
   });
 }
 
+/**
+ * A step redraws the board, and the button that was pressed goes with it: the
+ * keyboard carries on from the same order's card — its next step — rather
+ * than from the top of the page. Nothing moves for a finger: no scroll, and
+ * only when the focus was lost.
+ */
+function keepPlace(id) {
+  if (document.activeElement && document.activeElement !== document.body) return;
+  const card = [...document.querySelectorAll('.ticket[data-ticket]')].find((t) => t.dataset.ticket === id);
+  card?.querySelector('.btns button:not([disabled])')?.focus({ preventScroll: true });
+}
+
 /** The words on each primary button, and what the toast says when it is done. */
 const DONE_WORD = {
   prepare: 'бэлтгэж эхэллээ',
@@ -876,8 +923,10 @@ function renderTicket(ticket, lane, { page = false } = {}) {
   const live = lane in LANE_STATE;
   const away = live ? dayAway(ticket.receive_on) : null;
   const urgent = away && (away.tone === 'hold' || away.tone === 'stop');
+  // The number to ring sits beside the guest; the delivery's own line repeats it only when it is another number.
+  const ring = guestNumber(ticket);
   const node = el(`
-    <article class="card ticket" data-lane="${lane}"${urgent ? ' data-due' : ''}>
+    <article class="card ticket" data-lane="${lane}" data-ticket="${esc(ticket.id)}"${urgent ? ' data-due' : ''}>
       ${page ? '' : `<div class="top">
         <span class="dot"${STATE_TONE[state] ? ` data-tone="${STATE_TONE[state]}"` : ''}></span><span>${STATE_WORD[state] ?? ''}</span>
         <span class="id">№${esc(ticket.code)}</span>
@@ -885,16 +934,12 @@ function renderTicket(ticket, lane, { page = false } = {}) {
       <div class="body">
         <div class="what">${esc(ticket.title)} ×${esc(ticket.qty)}${ticket.unit === 'kg' ? ' кг' : ''}</div>
         <div class="facts-rows">
-          <div class="who"><span class="k">Зочин</span><span class="v">${
-            ticket.guest || ticket.guest_phone
-              ? `${ticket.guest ? `<span>${esc(ticket.guest)}</span>` : ''}${ticket.guest_phone ? tel(ticket.guest_phone) : ''}`
-              : '—'
-          }</span></div>
+          <div class="who"><span class="k">Зочин</span><span class="v"><span>${guestName(ticket)}</span>${ring ? tel(ring) : ''}</span></div>
           <div class="on"><span class="k">${delivery ? 'Хүргэх өдөр' : 'Авах өдөр'}</span><span class="v"><span>${dayLong(ticket.receive_on)}</span>${
             away ? `<span class="rel"${away.tone ? ` data-tone="${away.tone}"` : ''}>${away.word}</span>` : ''
           }</span></div>
           <div class="where"><span class="k">${delivery ? 'Хүргэлт' : 'Авах'}</span><span class="v">${
-            delivery ? `<span>${esc(ticket.address)}</span>${ticket.address_phone ? tel(ticket.address_phone) : ''}` : 'Өөрөө ирж авна'
+            delivery ? `<span>${esc(ticket.address)}</span>${ticket.address_phone && ticket.address_phone !== ring ? tel(ticket.address_phone) : ''}` : 'Өөрөө ирж авна'
           }</span></div>
         </div>
         <div class="sum"><span>Нийт</span>${money(ticket.total_mnt)}</div>
@@ -922,6 +967,7 @@ function renderTicket(ticket, lane, { page = false } = {}) {
       toast(`№${ticket.code} ${DONE_WORD[action] ?? ''}.`, 'good');
       await refreshBoard();
       await onActed?.();
+      keepPlace(ticket.id);
     } catch (error) {
       if (error.status === 401) {
         signOut();
@@ -979,7 +1025,7 @@ async function handOver(ticket) {
   const answer = await popup({
     id: 'hand-order',
     title: delivery ? 'Хүргэлт зочинд хүрсэн үү?' : 'Хүлээлгэн өгөх',
-    sub: `${esc(ticket.title)} ×${esc(ticket.qty)}${ticket.unit === 'kg' ? ' кг' : ''}${ticket.guest ? ` · ${esc(ticket.guest)}` : ''}`,
+    sub: `${esc(ticket.title)} ×${esc(ticket.qty)}${ticket.unit === 'kg' ? ' кг' : ''} · ${guestLine(ticket)}`,
     width: 460,
     fields: [
       {
@@ -1009,7 +1055,7 @@ async function startPreparing(ticket) {
   const answer = await popup({
     id: 'prepare-order',
     title: 'Бэлтгэж эхлэх',
-    sub: `<span class="mn">№${esc(ticket.code)}</span> · ${esc(ticket.title)} ×${esc(ticket.qty)}${ticket.unit === 'kg' ? ' кг' : ''}${ticket.guest ? ` · ${esc(ticket.guest)}` : ''}`,
+    sub: `<span class="mn">№${esc(ticket.code)}</span> · ${esc(ticket.title)} ×${esc(ticket.qty)}${ticket.unit === 'kg' ? ' кг' : ''} · ${guestLine(ticket)}`,
     width: 480,
     fields: [
       { type: 'note', text: 'Бэлтгэж эхэлбэл малыг нядалсанд тооцно: буцаах боломжгүй, мал зар руу буцахгүй. Зочинд «бэлтгэгдэж эхэллээ» гэж мэдэгдэнэ.' },
@@ -1049,7 +1095,7 @@ async function cancelOrder(ticket, lane, reasons) {
   const answer = popup({
     id: 'cancel-order',
     title: 'Захиалгыг цуцлах',
-    sub: `<span class="mn">№${esc(ticket.code)}</span> · ${esc(ticket.title)} ×${esc(ticket.qty)}${ticket.guest ? ` · ${esc(ticket.guest)}` : ''}`,
+    sub: `<span class="mn">№${esc(ticket.code)}</span> · ${esc(ticket.title)} ×${esc(ticket.qty)}${ticket.unit === 'kg' ? ' кг' : ''} · ${guestLine(ticket)}`,
     width: 520,
     fields: [
       {
@@ -1604,7 +1650,7 @@ function bankCard(b) {
   const [state, word, says] = bankState(b);
   const card = el(`
     <section class="card bank" id="bank">
-      <div class="card-head"><h3>Олголт очих данс</h3>${word ? `<span class="chip" data-s="${state}">${word}</span>` : ''}</div>
+      <div class="card-head"><h2>Олголт очих данс</h2>${word ? `<span class="chip" data-s="${state}">${word}</span>` : ''}</div>
       ${
         b.bank_account
           ? `<dl class="facts">
@@ -1664,7 +1710,9 @@ async function changeBank(b, password = null) {
     sub: 'Олголт энэ данс руу очно',
     width: 560,
     fields: [
-      { name: 'bank_name', label: 'Банк', value: b.bank_name ?? '', required: true },
+      // «Бусад банк» opens the field for its name; a bank on the list needs none.
+      { name: 'bank_name', label: 'Банк', type: 'select', options: bankOptions('Банкаа сонгоно уу'), value: bankPick(b.bank_name), required: true, onChange: (picked, form) => form.show('bank_other', picked === OTHER_BANK) },
+      { name: 'bank_other', label: 'Банкны нэр', placeholder: 'Жагсаалтад байхгүй банк', value: bankPick(b.bank_name) === OTHER_BANK ? b.bank_name : '', required: true },
       // An IBAN starts with MN: the keyboard with letters, the letters up as they are typed.
       { name: 'bank_account', label: 'Дансны дугаар', inputmode: 'text', autocomplete: 'off', placeholder: 'MN12 0005 0050 1234 5678', hint: 'IBAN (MN + 18 орон) эсвэл дансны дугаар (6–20 орон).', value: b.bank_account ?? '', required: true, attrs: { autocapitalize: 'characters', spellcheck: 'false' } },
       { name: 'bank_holder', label: 'Данс эзэмшигчийн нэр', value: b.bank_holder ?? '', required: true, wide: true },
@@ -1675,11 +1723,13 @@ async function changeBank(b, password = null) {
     onSubmit: async (v) => {
       const account = v.bank_account.replace(/\s+/g, '').toUpperCase();
       const badForm = ACCOUNT_WORDS;
+      const bank = bankOf(v.bank_name, v.bank_other);
+      if (!bank) throw refuse(v.bank_name === OTHER_BANK ? 'bank_other' : 'bank_name', 'Банкныхаа нэрийг бичнэ үү.');
       if (!ACCOUNT.test(account)) throw refuse('bank_account', badForm);
       try {
         await sup('/v1/supplier/profile', {
           method: 'PATCH',
-          body: { bank_name: v.bank_name, bank_account: account, bank_holder: v.bank_holder, password: password ?? v.password },
+          body: { bank_name: bank, bank_account: account, bank_holder: v.bank_holder, password: password ?? v.password },
         });
       } catch (error) {
         // The server takes the same forms the application does; the one thing this change can say
@@ -1692,15 +1742,8 @@ async function changeBank(b, password = null) {
       return true;
     },
   });
-  // The banks most people have, offered as they type.
   const sheet = document.getElementById('bank-change');
   noKeyboard(sheet);
-  const bankInput = sheet?.querySelector('[name="bank_name"]');
-  if (bankInput) {
-    bankInput.setAttribute('list', 'popup-banks');
-    bankInput.setAttribute('autocomplete', 'off');
-    sheet.append(el(`<datalist id="popup-banks">${BANK_NAMES.map((name) => `<option value="${name}">`).join('')}</datalist>`));
-  }
   if (!(await done)) return null;
   toast(password ? 'Нууц үг, данс хоёулаа хадгалагдлаа. Basu санхүү шалгаж баталгаажуулна.' : 'Данс хадгалагдлаа. Basu санхүү шалгаж баталгаажуулна.', 'good');
   show(tab);
@@ -1777,7 +1820,7 @@ async function renderMoney(bank = false) {
   cards.append(
     bankCard({ ...data, bank_verified: profile?.bank_verified ?? null }),
     el(`<section class="card terms">
-      <div class="card-head"><h3>Хэрхэн олгох вэ</h3></div>
+      <div class="card-head"><h2>Хэрхэн олгох вэ</h2></div>
       <dl class="facts">
         <div><dt>Шимтгэл</dt><dd><span class="mn">${data.commission_pct ?? '—'}%</span><small>махны үнээс; хүргэлтийн төлбөрөөс авахгүй</small></dd></div>
         <div><dt>Хэзээ</dt><dd>Хүлээлгэн өгснөөс хойш нэг хоногт<small>олголт үүсч, Basu ажлын өдөрт шилжүүлнэ</small></dd></div>
@@ -2160,7 +2203,8 @@ async function renderNotes() {
   if (!box) return;
   const notes = [];
   if (open === false) {
-    notes.push(el('<div class="callout" data-k="info" id="payments-closed"><span>Basu дээр төлбөр түр хаалттай тул зочид одоогоор захиалга өгч чадахгүй байна. Төлбөр нээгдмэгц шинэ захиалга энд гарна.</span></div>'));
+    // What is true while it is closed: a guest with money already in their Basu wallet can still order — so an order may stand right under this line.
+    notes.push(el('<div class="callout" data-k="info" id="payments-closed"><span>Онлайн төлбөр түр хаалттай — одоогоор зөвхөн Basu түрийвчээр захиалга орж ирнэ.</span></div>'));
   }
   if (held && !held.bank_account) {
     const note = el('<div class="callout" data-k="warn" id="bank-missing"><b>Олголт очих данс алга</b><span>Данс нэмэхгүй бол хүлээлгэн өгсөн захиалгын мөнгийг тань шилжүүлж чадахгүй.</span></div>');
@@ -2247,8 +2291,9 @@ function renderOrders(view) {
         {
           key: 'guest',
           label: 'Зочин',
-          value: (o) => `${o.guest ?? ''} ${o.guest_phone ?? ''}`,
-          render: (o) => dtCell.twoHtml(esc(o.guest ?? '—'), o.guest_phone ? `<span class="mono">${esc(phoneLine(o.guest_phone))}</span>` : ''),
+          value: (o) => `${o.guest ?? ''} ${guestNumber(o) ?? ''} ${phoneText(guestNumber(o) ?? '')}`,
+          // A narrow column: the number may break after +976, never inside «9555 0002».
+          render: (o) => dtCell.twoHtml(guestName(o), guestNumber(o) ? `<span class="mono">${esc(phoneText(guestNumber(o))).replace(/ (?=\d{4}$)/, '\u00a0')}</span>` : ''),
         },
         { key: 'receive', label: 'Авах', phone: false, render: (o) => (o.receive === 'delivery' ? 'Хүргэлт' : 'Өөрөө авна') },
         { key: 'receive_on', label: 'Өдөр', render: (o) => esc(dayLabel(o.receive_on)) },
@@ -2353,7 +2398,7 @@ async function loadOrders() {
       <button class="order row" type="button" data-order="${esc(o.id)}" data-chev>
         <span class="main">
           <span class="title t">${what(o)}</span>
-          <span class="sub s">${[o.guest ? esc(o.guest) : '', o.guest_phone ? `<span class="mn">${esc(phoneLine(o.guest_phone))}</span>` : ''].filter(Boolean).join(' · ') || '—'}</span>
+          <span class="sub s">${guestLine(o)}</span>
           <span class="meta" data-sans><span class="mn">№${esc(o.code)}</span> · <span class="mn">${esc(dayShort(o.receive_on))}</span> · ${o.receive === 'delivery' ? 'хүргэлт' : 'өөрөө авна'}</span>
         </span>
         <span class="end right">
@@ -2479,7 +2524,7 @@ async function renderProfile(view, bank = false) {
   const cards = section.querySelector('.cards');
   cards.append(
     el(`<section class="card profile">
-      <div class="card-head"><h3>Зочдод харагдах</h3></div>
+      <div class="card-head"><h2>Зочдод харагдах</h2></div>
       <dl class="facts">
         ${fact('Нэр', p.name)}
         ${fact('Хотод мах авах цэг', p.pickup_address)}
@@ -2488,7 +2533,7 @@ async function renderProfile(view, bank = false) {
       ${edits ? '' : '<div class="card-foot"><span class="cap">Мэдээллийг эзэн эсвэл менежер засна.</span></div>'}
     </section>`),
     el(`<section class="card contract">
-      <div class="card-head"><h3>Гэрээ</h3></div>
+      <div class="card-head"><h2>Гэрээ</h2></div>
       <dl class="facts" data-short>
         <div><dt>Утас</dt><dd>${p.phone ? tel(p.phone) : '—'}</dd></div>
         ${fact('ТТД', p.merchant_tin, { mono: true, none: 'Алга' })}
@@ -2613,7 +2658,7 @@ function waiting() {
 
 /** The seat could not be asked — the network, the server: said where the module would be, with the way to try again. */
 function cannotReach(message) {
-  const card = el('<div class="door"></div>');
+  const card = el('<main class="door"></main>');
   card.append(
     blank({
       icon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 8.5a15 15 0 0 1 20 0M5.5 12a10 10 0 0 1 13 0M9 15.5a5 5 0 0 1 6 0"/><path d="M12 19h.01M3 3l18 18"/></svg>',
@@ -2629,14 +2674,14 @@ function cannotReach(message) {
 /** Opened from the dashboard for a business this person does not work at as a supplier. */
 function notHere(message) {
   const card = el(`
-    <div class="door">
+    <main class="door">
       <div class="card">
         ${brand()}
-        <h2>Нээх эрхгүй байна</h2>
+        <h1>Нээх эрхгүй байна</h1>
         <p class="lead">${esc(message)} Энэ байгууллагын нийлүүлэгчийн хэсэгт та ажилладаггүй байна.</p>
         <a class="btn" data-v="primary" data-size="lg" href="/dashboard">Бизнес рүү буцах</a>
       </div>
-    </div>`);
+    </main>`);
   card.append(doorFoot(true));
   return card;
 }

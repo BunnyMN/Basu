@@ -127,9 +127,14 @@ export async function contactsFor(guestIds: readonly string[]): Promise<Map<stri
  * name a guest we barely know", and four verticals inventing it separately is
  * how the fourth one ends up printing +976 99001122 on a screen in a dining
  * room.
+ *
+ * `fallback: false` leaves out whoever chose no name, rather than calling them
+ * by a piece of their number or address: a supplier at the counter greets a
+ * person by a name, and a mailbox's first letters are no name to greet.
  */
 export async function displayNamesFor(
   guestIds: readonly string[],
+  { fallback: withFallback = true }: { fallback?: boolean } = {},
 ): Promise<Map<string, string>> {
   if (guestIds.length === 0) return new Map();
   const { rows } = await getPool().query<{ id: string; name: string | null; phone: string | null; email: string | null }>(
@@ -147,5 +152,11 @@ export async function displayNamesFor(
       : r.email
         ? `${r.email.split('@')[0]!.slice(0, 3)}\u00b7\u00b7\u00b7`
         : '\u00b7\u00b7\u00b7';
-  return new Map(rows.map((r) => [r.id, r.name?.trim().split(' ')[0] || fallback(r)]));
+  return new Map(
+    rows.flatMap((r) => {
+      const chosen = r.name?.trim().split(' ')[0];
+      if (chosen) return [[r.id, chosen] as const];
+      return withFallback ? [[r.id, fallback(r)] as const] : [];
+    }),
+  );
 }

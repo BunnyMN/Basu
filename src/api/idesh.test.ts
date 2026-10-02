@@ -727,6 +727,29 @@ describe('the supplier’s own module', () => {
     expect((await app.inject({ method: 'GET', url: '/v1/supplier/home', headers: auth(nobody) })).statusCode).toBe(401);
   });
 
+  it('names the guest to the supplier by the name they chose, never by a piece of their address or number', async () => {
+    // Somebody who gave no name: the counter is told no name — not «···4005», nor an address's first letters
+    // («sar···» for an email sign-up, the same stand-in) — and rings the number the order carries.
+    const guest = await signIn('+97699004005');
+    await topUp(guest, 500_000);
+    const { id } = await placeAndPay(guest);
+    const owner = await signIn('+97688010001');
+
+    const board = await app.inject({ method: 'GET', url: '/v1/supplier/board', headers: auth(owner) });
+    const ticket = board.json().lanes.paid.find((t: { id: string }) => t.id === id);
+    expect(ticket).toMatchObject({ guest: null, guest_phone: '+97699004005' });
+    const list = await app.inject({ method: 'GET', url: '/v1/supplier/orders?scope=live', headers: auth(owner) });
+    expect(list.json().orders.find((o: { id: string }) => o.id === id)).toMatchObject({ guest: null });
+    const one = await app.inject({ method: 'GET', url: `/v1/supplier/orders/${id}`, headers: auth(owner) });
+    expect(one.json().order.guest).toBeNull();
+    for (const body of [board.body, list.body, one.body]) expect(body).not.toContain('···');
+
+    // A name chosen is said, the first word of it.
+    await app.inject({ method: 'PATCH', url: '/v1/me', headers: auth(guest), payload: { display_name: 'Сарнай Болд' } });
+    const named = await app.inject({ method: 'GET', url: '/v1/supplier/board', headers: auth(owner) });
+    expect(named.json().lanes.paid.find((t: { id: string }) => t.id === id).guest).toBe('Сарнай');
+  });
+
   it('shows today, the season, the list, and one order with its story', async () => {
     const guest = await signIn('+97699004004');
     await topUp(guest, 500_000);

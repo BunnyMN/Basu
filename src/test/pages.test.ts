@@ -3297,13 +3297,13 @@ describe('who sees what', () => {
   it('takes somebody who came to register a business from its own door to the popup, «Идэшний нийлүүлэгч» ticked, and says a missing kind under the boxes', async () => {
     // Signed out: the door says this is the way to register, and what comes after signing in.
     const door = await openPage('ops.html', '?join=business', asInProduction, device());
-    await until(door, 'the door', (d) => Boolean(d.querySelector('.door .door-card h2')));
-    expect(door.window.document.querySelector('.door .door-card h2')?.textContent).toBe('Бизнесээ бүртгүүлэх');
+    await until(door, 'the door', (d) => Boolean(d.querySelector('.door .door-card h1')));
+    expect(door.window.document.querySelector('.door .door-card h1')?.textContent).toBe('Бизнесээ бүртгүүлэх');
     expect(door.window.document.querySelector('.door .door-for')?.textContent).toContain('бүртгэлийн цонх нээгдэнэ');
     // Without the wish it is the plain door.
     const plain = await openPage('ops.html', '', asInProduction, device());
-    await until(plain, 'the door', (d) => Boolean(d.querySelector('.door .door-card h2')));
-    expect(plain.window.document.querySelector('.door .door-card h2')?.textContent).toBe('Нэвтрэх');
+    await until(plain, 'the door', (d) => Boolean(d.querySelector('.door .door-card h1')));
+    expect(plain.window.document.querySelector('.door .door-card h1')?.textContent).toBe('Нэвтрэх');
 
     // Signed in: their own corner, the registration open on it, the supplier ticked — and the wish taken, once.
     const person = await account('+97688030091', 'Баатар');
