@@ -50,9 +50,9 @@ beforeAll(async () => {
     request.on('end', () => {
       const path = request.url ?? '';
       response.writeHead(200, { 'content-type': 'application/json' });
-      if (path === '/payment_intents') response.end(JSON.stringify({ id: 'pi_live_1', status: 'new', amount: 5_000_000 }));
+      if (path === '/payment_intents') response.end(JSON.stringify({ id: 'pi_live_1', status: 'new', amount: 50_000 }));
       else if (path === '/checkout/sessions') response.end(JSON.stringify({ url: 'https://pay.wire.mn/c/zz' }));
-      else response.end(JSON.stringify({ id: 'pi_live_1', status: intentStatus, amount: 5_000_000, metadata: { topup_id: 'x' } }));
+      else response.end(JSON.stringify({ id: 'pi_live_1', status: intentStatus, amount: 50_000, metadata: { topup_id: 'x' } }));
     });
   });
   await new Promise<void>((resolve) => wire.listen(0, '127.0.0.1', resolve));

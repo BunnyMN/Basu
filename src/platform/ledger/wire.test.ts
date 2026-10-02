@@ -7,7 +7,7 @@ import { verifyWireWebhook, WireError, WirePayments } from './wire.js';
  * The payment provider, against a stand-in for Wire.
  *
  * A fake HTTP server rather than a stubbed `fetch`: what has to be right is
- * the shape of the call — the idempotency key, the minor units, the operator
+ * the shape of the call — the idempotency key, the whole tugriks, the operator
  * — and only a server that receives the real request can check that.
  */
 
@@ -59,8 +59,8 @@ beforeEach(() => {
 const live = () => new WirePayments({ secretKey: 'sk_live_test', apiBase: base, returnUrl: 'https://basu.burzai.cloud/' });
 
 describe('taking money through Wire', () => {
-  it('asks for an invoice in minor units, on QPay, keyed to the top-up', async () => {
-    answers.set('POST /payment_intents', { status: 200, body: { id: 'pi_1', status: 'requires_payment_method', amount: 5_000_000 } });
+  it('asks for an invoice in whole tugriks, on QPay, keyed to the top-up', async () => {
+    answers.set('POST /payment_intents', { status: 200, body: { id: 'pi_1', status: 'requires_payment_method', amount: 50_000 } });
     answers.set('POST /checkout/sessions', { status: 200, body: { id: 'cs_1', url: 'https://pay.wire.mn/c/abc' } });
 
     const intent = await live().authorize({ reference: 'topup-uuid', amountMnt: 50_000 });
@@ -71,7 +71,8 @@ describe('taking money through Wire', () => {
     // The retry a dropped connection causes must not become a second invoice.
     expect(made!.headers['idempotency-key']).toBe('pi-topup-uuid');
     expect(made!.body).toMatchObject({
-      amount: 5_000_000, // 50,000₮ in minor units
+      // 50,000₮ is 50000: Wire's page shows the amount as sent. ×100 made a 400,000₮ order a 40,000,000₮ invoice.
+      amount: 50_000,
       currency: 'MNT',
       allowed_operators: ['qpay'],
       metadata: { topup_id: 'topup-uuid' },
@@ -98,7 +99,8 @@ describe('taking money through Wire', () => {
 
     answers.set('GET /payment_intents/pi_1', { status: 200, body: { id: 'pi_1', status: 'succeeded', amount: 100, metadata: { topup_id: 't1' } } });
     await expect(live().capture('pi_1')).resolves.toBeUndefined();
-    expect(await live().status('pi_1')).toEqual({ paid: true, status: 'succeeded', amountMnt: 1, topupId: 't1' });
+    // Whole tugriks back, as sent: 100 is 100₮.
+    expect(await live().status('pi_1')).toEqual({ paid: true, status: 'succeeded', amountMnt: 100, topupId: 't1' });
   });
 
   it('hands back Wire’s own code so callers can branch on it', async () => {

@@ -20,8 +20,10 @@ import type { AuthorizeInput, PaymentIntent, PaymentProvider } from '../../ports
  * Wire, not a credited wallet. The fake provider says yes to everything,
  * which is exactly why the demo must never be the production server.
  *
- * Amounts: Wire counts in minor units (1₮ = 100). Basu counts whole tugriks
- * everywhere, so the conversion lives here and nowhere else.
+ * Amounts: whole tugriks, as Basu counts them everywhere — an intent of 1000
+ * is the «1,000₮» Wire's page shows (checked against Wire on 2026-10-02). It
+ * was sent ×100, as if in möngö, and a 400,000₮ order was a 40,000,000₮
+ * invoice.
  */
 
 const DEFAULT_API_BASE = 'https://api.wire.mn/v1';
@@ -117,7 +119,7 @@ export class WirePayments implements PaymentProvider {
     const intent = await this.#call<WireIntent>('POST', '/payment_intents', {
       idempotencyKey: `pi-${input.reference}`,
       body: {
-        amount: input.amountMnt * 100,
+        amount: input.amountMnt,
         currency: 'MNT',
         description: input.description ?? `Basu түрийвч цэнэглэлт`,
         allowed_operators: this.#operators,
@@ -156,7 +158,7 @@ export class WirePayments implements PaymentProvider {
     return {
       paid: intent.status === 'succeeded',
       status: intent.status,
-      amountMnt: Math.round(intent.amount / 100),
+      amountMnt: Math.round(intent.amount),
       topupId: intent.metadata?.['topup_id'] ?? null,
     };
   }
