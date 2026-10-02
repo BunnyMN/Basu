@@ -269,6 +269,34 @@ describe('an идэш paid by QPay on Wire’s page', () => {
     expect(intents.get('pi_test_1')?.status).toBe('canceled');
   });
 
+  it('lands a payment made just after its invoice was let go — in the order if it still waits, else in the wallet', async () => {
+    const guest = await signIn();
+    const id = await anOrder(guest);
+    expect((await pay(guest, id)).statusCode).toBe(202);
+    // Unpaid at twelve minutes: let go (cancelled at Wire)…
+    later(13 * 60_000);
+    await housekeeping(ctx);
+    expect(intents.get('pi_test_1')?.status).toBe('canceled');
+    // …and yet paid in the moment after (Wire took it): the next look buys the order.
+    intents.get('pi_test_1')!.status = 'succeeded';
+    later(60_000);
+    const swept = await housekeeping(ctx);
+    expect(swept.bought).toBe(1);
+    expect(await stateOf(guest, id)).toBe('PAID');
+    expect(await balanceOf(guest)).toBe(0);
+
+    // The same, for a draft given back meanwhile: the money waits in the wallet, never stranded at Wire.
+    const other = await anOrder(guest);
+    expect((await pay(guest, other, 'second')).statusCode).toBe(202);
+    later(31 * 60_000);
+    await housekeeping(ctx);
+    expect(await stateOf(guest, other)).toBe('CLOSED');
+    intents.get('pi_test_2')!.status = 'succeeded';
+    later(60_000);
+    await housekeeping(ctx);
+    expect(await balanceOf(guest)).toBe(460_000);
+  });
+
   it('pays from the wallet at once when the wallet covers it', async () => {
     const guest = await signIn();
     // Money already in the wallet (a top-up through Wire, paid).

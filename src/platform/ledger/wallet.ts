@@ -228,7 +228,9 @@ export async function settleTopup(ctx: Ctx, topupId: string): Promise<number> {
   const topup = rows[0];
   if (!topup) throw new LedgerError('NOT_FOUND', 'no such top-up');
   if (topup.state === 'settled') return balance(topup.guest_id);
-  if (topup.state !== 'pending') throw new LedgerError('TOPUP_FAILED', `top-up is ${topup.state}`);
+  // Let go by Basu (an invoice nobody paid in time, `dropInvoice`) is still asked about: paid after all —
+  // the provider took the money — it lands in the wallet like any other. Only a refusal stays refused.
+  if (topup.state !== 'pending' && topup.state !== 'expired') throw new LedgerError('TOPUP_FAILED', `top-up is ${topup.state}`);
   // Still being raised — a second press found the purchase's invoice before
   // the provider had answered the first: there is nothing to ask about yet,
   // and nothing may be credited without asking.
@@ -244,7 +246,12 @@ export async function settleTopup(ctx: Ctx, topupId: string): Promise<number> {
     } catch (error) {
       throw new LedgerError('NOT_PAID_YET', (error as Error).message);
     }
-    if (!arrived) throw new LedgerError('NOT_PAID_YET', 'the provider has not been paid yet');
+    if (!arrived) {
+      if (topup.state === 'expired') throw new LedgerError('TOPUP_FAILED', 'the invoice was let go unpaid');
+      throw new LedgerError('NOT_PAID_YET', 'the provider has not been paid yet');
+    }
+  } else if (topup.state === 'expired') {
+    throw new LedgerError('TOPUP_FAILED', 'the invoice was let go unpaid');
   }
 
   try {
@@ -325,6 +332,22 @@ export async function openInvoices(subject: string): Promise<Array<{ topupId: st
     [subject],
   );
   return rows.map((r) => ({ topupId: r.id, subjectId: r.for_subject_id, createdAt: r.created_at }));
+}
+
+/**
+ * Invoices for this kind of purchase let go unpaid in the last two hours: asked about once more, now and
+ * then, because a person may have paid one in the moment after Basu let it go — and that money must reach
+ * their wallet, not stay at the provider.
+ */
+export async function lapsedInvoices(subject: string, now: Date): Promise<Array<{ topupId: string; subjectId: string }>> {
+  const { rows } = await getPool().query<{ id: string; for_subject_id: string }>(
+    `SELECT id, for_subject_id FROM ledger.topup
+      WHERE for_subject = $1 AND state = 'expired' AND provider_ref IS NOT NULL
+        AND created_at > $2::timestamptz - interval '2 hours'
+      ORDER BY created_at`,
+    [subject, now],
+  );
+  return rows.map((r) => ({ topupId: r.id, subjectId: r.for_subject_id }));
 }
 
 /** The purchase a top-up was raised for — what the provider's callback goes on to. */

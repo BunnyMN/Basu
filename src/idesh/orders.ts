@@ -5,6 +5,7 @@ import {
   collectOrInvoice,
   dropInvoice,
   INVOICE_LIFETIME_MINUTES,
+  lapsedInvoices,
   LedgerError,
   openInvoices,
   pendingInvoice,
@@ -555,6 +556,20 @@ async function finishInvoices(ctx: Ctx): Promise<number> {
   let bought = 0;
   for (const invoice of await openInvoices('idesh')) {
     if ((await finishInvoiceFor(ctx, invoice.subjectId, invoice)) === 'PAID') bought++;
+  }
+  // Let go unpaid, then paid in the moment after: the money lands in the wallet, and buys the order if it
+  // still waits — given back meanwhile, it stays in the wallet, the guest's to spend or have refunded.
+  for (const lapsed of await lapsedInvoices('idesh', ctx.clock.now())) {
+    try {
+      await settleTopup(ctx, lapsed.topupId);
+    } catch {
+      continue; // still unpaid, as it was let go
+    }
+    try {
+      if ((await payIdesh(ctx, lapsed.subjectId, { raise: false })).state === 'PAID') bought++;
+    } catch {
+      // given back, or bought by now: the money is in the wallet either way
+    }
   }
   return bought;
 }

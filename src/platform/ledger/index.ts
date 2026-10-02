@@ -15,6 +15,7 @@ export {
   collectOrInvoice,
   dropInvoice,
   INVOICE_LIFETIME_MINUTES,
+  lapsedInvoices,
   openInvoices,
   pendingInvoice,
   purchaseOfTopup,
