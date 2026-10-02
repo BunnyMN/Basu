@@ -406,22 +406,9 @@ async function loadLive() {
   paint(rows);
 }
 
-function paint(rows) {
-  const list = $('live-list');
-  // The section label is the list's own first row: it survives every repaint,
-  // and the skeleton under it does not.
-  const label = list.querySelector('.section-label');
-  list.replaceChildren(...(label ? [label] : []));
-  list.removeAttribute('aria-busy');
-  delete $('live').dataset.loading;
-  if (!rows.length) {
-    $('live').removeAttribute('data-any');
-    return;
-  }
-  $('live').dataset.any = String(rows.length);
-
-  for (const row of rows) {
-    const card = el(`
+/** One row of ИДЭВХТЭЙ as markup: all it says is in here, so the same markup is the same row. */
+function liveRow(row) {
+  return `
       <a class="card row" href="${row.href}" data-source="${row.source}" data-chev>
         <span class="lead"><span class="dot" data-tone="${row.dot ?? TONE[row.state] ?? 'neutral'}"></span></span>
         <span class="who main">
@@ -430,9 +417,74 @@ function paint(rows) {
           <span class="code meta">${row.source} · №${esc(row.code)}${row.word ? `<span class="chip"${row.tone ?? ` data-s="${esc(row.state)}"`} data-inline>${esc(row.word)}</span>` : ''}</span>
         </span>
         <span class="end">${row.corner ?? `<span class="when val" data-size="lg">${esc(row.time)}<small>${row.label}</small></span>`}</span>
-      </a>`);
-    list.append(card);
+      </a>`;
+}
+
+/** ИДЭВХТЭЙ as it stands on the screen: the order's link → { node, html }, the row and the markup it was drawn from. */
+const liveDrawn = new Map();
+
+function paint(rows) {
+  const list = $('live-list');
+  // The section label is the list's own first row: it survives every repaint,
+  // and the skeleton under it does not. Each order is its link: one per order, and a lunch's never an идэш's.
+  const label = list.querySelector('.section-label');
+  drawRows(list, liveDrawn, rows.map((row) => [row.href, liveRow(row)]), null, label);
+  list.removeAttribute('aria-busy');
+  delete $('live').dataset.loading;
+  if (!rows.length) $('live').removeAttribute('data-any');
+  else if ($('live').dataset.any !== String(rows.length)) $('live').dataset.any = String(rows.length);
+}
+
+/**
+ * Rows drawn over the rows already on the screen, matched by key — the list
+ * is asked for every 4 seconds, and the answer is nearly always the one
+ * already drawn. A row whose markup is the same is not touched; a row whose
+ * words moved on keeps its element and gets new insides; only a row that
+ * came or went is added or taken out. Drawn afresh every tick, the focus fell
+ * to the page and VoiceOver went back to the top every 4 seconds. Now it
+ * stays on its row; and if that row had to move, it is given the focus again,
+ * without a scroll — or, with its order gone, the row now in its place.
+ * `wire` readies a row that is new to the list; `drawn` is the list's memory;
+ * the rows go after `after` (the section label) and anything below them goes.
+ */
+function drawRows(list, drawn, rows, wire, after = null) {
+  const keys = [...drawn.keys()];
+  const focused = keys.find((key) => drawn.get(key).node.contains(document.activeElement));
+  const next = new Map();
+  for (const [key, html] of rows) {
+    const was = drawn.get(key);
+    if (was?.html === html) {
+      next.set(key, was);
+      continue;
+    }
+    const fresh = el(html);
+    if (was && was.node.cloneNode(false).outerHTML === fresh.cloneNode(false).outerHTML) {
+      was.node.replaceChildren(...fresh.childNodes);
+      next.set(key, { node: was.node, html });
+    } else {
+      wire?.(fresh);
+      next.set(key, { node: fresh, html });
+    }
   }
+  // Rows that went, out first: a row that stays is then never moved past them.
+  for (const [key, { node }] of drawn) if (next.get(key)?.node !== node) node.remove();
+  // In order; a row already in its place stays where it is.
+  let at = after ? after.nextElementSibling : list.firstElementChild;
+  for (const { node } of next.values()) {
+    if (node === at) at = at.nextElementSibling;
+    else list.insertBefore(node, at);
+  }
+  // Anything else under the rows (the skeleton) has had its turn.
+  while (at) {
+    const extra = at;
+    at = at.nextElementSibling;
+    extra.remove();
+  }
+  drawn.clear();
+  for (const [key, value] of next) drawn.set(key, value);
+  if (focused === undefined || list.contains(document.activeElement)) return;
+  const shown = [...next.values()];
+  (next.get(focused) ?? shown[Math.min(keys.indexOf(focused), shown.length - 1)])?.node.focus({ preventScroll: true });
 }
 
 /* ── boot ─────────────────────────────────────────────────────────── */

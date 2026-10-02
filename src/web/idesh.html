@@ -2037,24 +2037,15 @@ function cornerOf(order, seen, refund) {
   return `<span class="when val">${dayShort(order.receive_on)}<small>${delivery ? 'ирэх' : 'авах'}</small></span>`;
 }
 
-function paintMine(orders, seen = new Map()) {
-  state.mine = orders;
-  const list = $('mine-list');
-  list.replaceChildren();
-  if (!orders.length) {
-    $('mine').removeAttribute('data-any');
-    return;
-  }
-  $('mine').dataset.any = String(orders.length);
-  for (const order of orders) {
-    const known = seen.get(order.id);
-    const refund = order.state === 'CANCELLED' || order.state === 'REFUNDED' ? refundOf(order, known) : null;
-    // The state's one word, the same on every page (IDESH_STATE) — or, for a
-    // cancelled order, what its money waits for, as the website's row says
-    // it; then the line under the name says it was cancelled.
-    const [word, tone] = refund ? (REFUND_WORD[refund.state] ?? REFUND_WORD.due) : [IDESH_STATE[order.state] ?? '', ` data-s="${escapeHtml(order.state)}"`];
-    const cap = order.state === 'CANCELLED' ? IDESH_STATE.CANCELLED : (IDESH_HEADLINE[order.state]?.[1] ?? '');
-    const card = el(`
+/** One row of «Миний идэш» as markup: all it says is in here, so the same markup is the same row. */
+function mineRow(order, known) {
+  const refund = order.state === 'CANCELLED' || order.state === 'REFUNDED' ? refundOf(order, known) : null;
+  // The state's one word, the same on every page (IDESH_STATE) — or, for a
+  // cancelled order, what its money waits for, as the website's row says
+  // it; then the line under the name says it was cancelled.
+  const [word, tone] = refund ? (REFUND_WORD[refund.state] ?? REFUND_WORD.due) : [IDESH_STATE[order.state] ?? '', ` data-s="${escapeHtml(order.state)}"`];
+  const cap = order.state === 'CANCELLED' ? IDESH_STATE.CANCELLED : (IDESH_HEADLINE[order.state]?.[1] ?? '');
+  return `
       <button class="card row" type="button" data-order="${order.id}" data-chev>
         <span class="who main">
           <span class="venue title">${escapeHtml(order.supplier.name)}</span>
@@ -2062,19 +2053,80 @@ function paintMine(orders, seen = new Map()) {
           <span class="code meta">№${escapeHtml(order.code)}${word ? `<span class="chip"${tone} data-inline>${escapeHtml(word)}</span>` : ''}</span>
         </span>
         <span class="end">${cornerOf(order, known, refund)}</span>
-      </button>`);
+      </button>`;
+}
+
+/** «Миний идэш» as it stands on the screen: order id → { node, html }, the row and the markup it was drawn from. */
+const mineDrawn = new Map();
+
+function paintMine(orders, seen = new Map()) {
+  state.mine = orders;
+  const list = $('mine-list');
+  drawRows(list, mineDrawn, orders.map((order) => [order.id, mineRow(order, seen.get(order.id))]), (card) => {
     card.addEventListener('click', () => {
       state.listing = null;
       state.form = null;
-      state.orderId = order.id;
+      state.orderId = card.dataset.order;
       rendered = null;
       void showStatus(true).catch((error) => {
         state.orderId = null;
         toast(whatWentWrong(error), 'bad');
       });
     });
-    list.append(card);
+  });
+  if (!orders.length) $('mine').removeAttribute('data-any');
+  else if ($('mine').dataset.any !== String(orders.length)) $('mine').dataset.any = String(orders.length);
+}
+
+/**
+ * Rows drawn over the rows already on the screen, matched by key — the list
+ * is asked for every 4 seconds, and the answer is nearly always the one
+ * already drawn. A row whose markup is the same is not touched; a row whose
+ * words moved on keeps its element and gets new insides; only a row that
+ * came or went is added or taken out. Drawn afresh every tick, the focus fell
+ * to the page and VoiceOver went back to the top every 4 seconds. Now it
+ * stays on its row; and if that row had to move, it is given the focus again,
+ * without a scroll — or, with its order gone, the row now in its place.
+ * `wire` readies a row that is new to the list; `drawn` is the list's memory.
+ */
+function drawRows(list, drawn, rows, wire, after = null) {
+  const keys = [...drawn.keys()];
+  const focused = keys.find((key) => drawn.get(key).node.contains(document.activeElement));
+  const next = new Map();
+  for (const [key, html] of rows) {
+    const was = drawn.get(key);
+    if (was?.html === html) {
+      next.set(key, was);
+      continue;
+    }
+    const fresh = el(html);
+    if (was && was.node.cloneNode(false).outerHTML === fresh.cloneNode(false).outerHTML) {
+      was.node.replaceChildren(...fresh.childNodes);
+      next.set(key, { node: was.node, html });
+    } else {
+      wire?.(fresh);
+      next.set(key, { node: fresh, html });
+    }
   }
+  // Rows that went, out first: a row that stays is then never moved past them.
+  for (const [key, { node }] of drawn) if (next.get(key)?.node !== node) node.remove();
+  // In order; a row already in its place stays where it is.
+  let at = after ? after.nextElementSibling : list.firstElementChild;
+  for (const { node } of next.values()) {
+    if (node === at) at = at.nextElementSibling;
+    else list.insertBefore(node, at);
+  }
+  // Anything else under the rows has had its turn.
+  while (at) {
+    const extra = at;
+    at = at.nextElementSibling;
+    extra.remove();
+  }
+  drawn.clear();
+  for (const [key, value] of next) drawn.set(key, value);
+  if (focused === undefined || list.contains(document.activeElement)) return;
+  const shown = [...next.values()];
+  (next.get(focused) ?? shown[Math.min(keys.indexOf(focused), shown.length - 1)])?.node.focus({ preventScroll: true });
 }
 
 /* ── boot ────────────────────────────────────────────────────────── */
