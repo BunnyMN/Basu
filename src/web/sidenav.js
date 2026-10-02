@@ -144,7 +144,7 @@ export function deskFrame({ workspaces, current, account, brand = 'Бизнес'
   const item = (it, sub) => {
     const href = navHref(it.href);
     const away = Boolean(href && /^https?:/.test(href));
-    const inner = `${sub ? '' : icon(it.icon)}<span class="t">${esc(it.label)}</span>${away ? `<span class="away" aria-label="шинэ цонхонд">${NAV_ICON.away}</span>` : ''}<span class="n" data-badge="${esc(it.key)}" hidden></span>`;
+    const inner = `${sub ? '' : icon(it.icon)}<span class="t">${esc(it.label)}</span>${away ? `<span class="away" role="img" aria-label="шинэ цонхонд">${NAV_ICON.away}</span>` : ''}<span class="n" data-badge="${esc(it.key)}" hidden></span>`;
     const cls = sub ? 'nav-item sub' : 'nav-item';
     return href
       ? `<a class="${cls}" data-tab="${esc(it.key)}" href="${esc(href)}"${away ? ' target="_blank" rel="noopener noreferrer"' : ''}>${inner}</a>`
@@ -198,10 +198,11 @@ export function deskFrame({ workspaces, current, account, brand = 'Бизнес'
   const t = document.createElement('template');
   t.innerHTML = `
     <div class="app desk-frame">
+      <a class="nav-skip" href="#view">Цэсийг алгасах</a>
       <header class="deskbar">
         <button class="nav-open" type="button" aria-label="Цэс" aria-controls="sidebar" aria-expanded="false">${NAV_ICON.burger}</button>
         <div class="deskbar-t"><b data-title></b><span>${esc(current.name)}</span></div>
-        <button class="deskbar-me" type="button" aria-label="${esc(`Нэвтэрсэн: ${whole}`)}" title="${esc(whole)}" aria-controls="sidebar"><span aria-hidden="true">${avatarMark}</span></button>
+        <button class="deskbar-me" type="button" aria-label="${esc(`Нэвтэрсэн: ${whole}`)}" title="${esc(whole)}" aria-controls="sidebar" aria-expanded="false"><span aria-hidden="true">${avatarMark}</span></button>
       </header>
       <aside class="side sidebar" id="sidebar" aria-label="Хажуугийн цэс">
         <div class="brand">${
@@ -215,7 +216,7 @@ export function deskFrame({ workspaces, current, account, brand = 'Бизнес'
             <span class="ws-text"><b>${esc(current.name)}</b><small>${esc(current.sub)}</small></span>
             ${workspaces.length > 1 || actions.length ? NAV_ICON.updown : ''}
           </button>
-          <div class="ws-menu" role="menu" hidden>
+          <div class="ws-menu" role="menu" aria-label="Ажлын орчин" hidden>
             <div class="ws-lab">Ажлын орчин</div>
             ${listed
               .map(
@@ -252,6 +253,7 @@ export function deskFrame({ workspaces, current, account, brand = 'Бизнес'
     side.toggleAttribute('data-open', open);
     scrim.hidden = !open;
     opener.setAttribute('aria-expanded', String(open));
+    root.querySelector('.deskbar-me').setAttribute('aria-expanded', String(open));
     document.documentElement.toggleAttribute('data-nav-open', open);
     // The keyboard goes into the drawer as it opens, and back to the menu button as it closes.
     if (!narrow()) return;
@@ -285,6 +287,21 @@ export function deskFrame({ workspaces, current, account, brand = 'Бизнес'
     if (!wsMenu.hidden && !e.target.closest('.ws')) menu(false);
   };
   document.addEventListener('click', away);
+  // Tabbed on past its last line, the menu closes as a menu does — it does not hang open over the page's menu.
+  wsMenu.addEventListener('focusout', (e) => {
+    const to = e.relatedTarget;
+    if (to && !wsMenu.contains(to) && to !== wsBtn) menu(false);
+  });
+
+  /* ── past the menu, straight to the page ── */
+  // The first stop of the keyboard on every desk page: over the menu to what the page shows. The address
+  // stays as it is (the dashboard keeps its place in the #hash), the keyboard lands on the page itself.
+  const view = root.querySelector('#view');
+  root.querySelector('.nav-skip').addEventListener('click', (e) => {
+    e.preventDefault();
+    view.tabIndex = -1;
+    view.focus();
+  });
   root.addEventListener('keydown', (e) => {
     // An open drawer keeps the keyboard inside it, as a popup does.
     if (e.key === 'Tab' && side.hasAttribute('data-open') && narrow()) {

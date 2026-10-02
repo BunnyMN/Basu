@@ -253,10 +253,16 @@ export function dataTable(options) {
     } else {
       const seg = dtEl(`<div class="seg dt-seg" role="group" aria-label="${dtEsc(f.label)}"></div>`);
       const buttons = [];
+      // The chosen one is said to a reader too (aria-pressed), not only drawn (data-on).
+      const press = (b, on) => {
+        b.toggleAttribute('data-on', on);
+        b.setAttribute('aria-pressed', String(on));
+      };
       for (const [v, w] of f.options) {
-        const b = dtEl(`<button type="button" data-v="${dtEsc(v)}"${v === chosen[f.key] ? ' data-on' : ''}>${dtEsc(w)}</button>`);
+        const b = dtEl(`<button type="button" data-v="${dtEsc(v)}">${dtEsc(w)}</button>`);
+        press(b, v === chosen[f.key]);
         b.addEventListener('click', () => {
-          for (const other of seg.children) other.toggleAttribute('data-on', other === b);
+          for (const other of seg.children) press(other, other === b);
           refilter(f.key, v);
         });
         seg.append(b);
@@ -264,7 +270,7 @@ export function dataTable(options) {
       }
       $('.dt-filters').append(seg);
       dtShown[f.key] = (value) => {
-        for (const [b, v] of buttons) b.toggleAttribute('data-on', v === value);
+        for (const [b, v] of buttons) press(b, v === value);
         return buttons.find(([, v]) => v === value)?.[0] ?? null;
       };
     }
@@ -324,6 +330,7 @@ export function dataTable(options) {
       const c = header.column.columnDef.meta;
       const th = document.createElement('th');
       th.scope = 'col';
+      th.dataset.key = c.key;
       if (c.align === 'end') th.dataset.align = 'end';
       if (c.width) th.style.width = c.width;
       if (c.phone === false) th.dataset.phone = 'off';
@@ -345,6 +352,9 @@ export function dataTable(options) {
   function drawBody() {
     const tbody = $('tbody');
     tbody.replaceChildren();
+    // While it loads the table says it is busy; the shape of the rows is for the eye only, never read out as empty cells.
+    if (all === null) $('.dt-table').setAttribute('aria-busy', 'true');
+    else $('.dt-table').removeAttribute('aria-busy');
     if (all === null) {
       // The shape of what is coming, while it loads, at the size of the rows
       // that will replace it: a name and a line under it first, numbers at
@@ -352,7 +362,7 @@ export function dataTable(options) {
       const cells = columns
         .map((c, i) => `<td${c.align === 'end' ? ' data-align="end"' : ''}${c.phone === false ? ' data-phone="off"' : ''}><span class="skel"></span>${i === 0 ? '<span class="skel"></span>' : ''}</td>`)
         .join('');
-      for (let i = 0; i < 4; i++) tbody.append(dtEl(`<tr class="dt-skel">${cells}${actions ? '<td class="dt-act"><span class="skel"></span></td>' : ''}</tr>`));
+      for (let i = 0; i < 4; i++) tbody.append(dtEl(`<tr class="dt-skel" aria-hidden="true">${cells}${actions ? '<td class="dt-act"><span class="skel"></span></td>' : ''}</tr>`));
       root.removeAttribute('data-empty');
       root.removeAttribute('data-bare');
       return;
@@ -487,9 +497,21 @@ export function dataTable(options) {
   if (typeof ResizeObserver === 'function') new ResizeObserver(fit).observe(wrap);
 
   function draw() {
+    // The keyboard stays where it was: a heading pressed to sort, or a page chosen, is drawn anew —
+    // the focus goes to the new one rather than falling out of the table to the top of the page.
+    const was = typeof document !== 'undefined' ? document.activeElement : null;
+    const inside = Boolean(was && root.contains(was));
+    const sortKey = inside && was.classList.contains('dt-sort') ? was.closest('th')?.dataset.key ?? null : null;
+    const pageWas = inside && was.classList.contains('dt-page') ? was.getAttribute('aria-label') ?? '' : null;
     drawHead();
     drawBody();
     drawFoot();
+    if (sortKey !== null) [...root.querySelectorAll('thead th')].find((th) => th.dataset.key === sortKey)?.querySelector('.dt-sort')?.focus();
+    else if (pageWas !== null) {
+      const pages = [...root.querySelectorAll('.dt-pages .dt-page')];
+      // «Өмнөх» / «Дараах» while it can still go that way, else the page now open.
+      (pages.find((b) => pageWas && b.getAttribute('aria-label') === pageWas && !b.disabled) ?? pages.find((b) => b.getAttribute('aria-current') === 'page'))?.focus();
+    }
     if (typeof requestAnimationFrame === 'function') requestAnimationFrame(fit);
   }
 

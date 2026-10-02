@@ -193,6 +193,10 @@
   --ctl-h:40px; --ctl-fs:.9375rem;
   --t-eyebrow:.71875rem; --t-meta:.75rem;
 }
+/* …but a desk opened on a phone or a tablet keeps the phone's controls: 16px
+   type (iOS Safari zooms into anything smaller the moment it is tapped — a
+   supplier registering from his phone, every popup) and a 44px target. */
+@media (max-width:899px),(pointer:coarse){ :root[data-desk]{--ctl-h:44px; --ctl-fs:1rem} }
 @media (min-width:900px){ :root{--gutter:32px} }
 
 /* ── base ─────────────────────────────────────────────────────────── */
@@ -228,11 +232,20 @@ a{color:var(--accent-ink);text-decoration:none}
 .doc .toc a{text-decoration:none}
 hr{border:0;border-top:1px solid var(--line);margin:16px 0}
 /* Outline, not box-shadow: it never fights an element's own shadow and
-   follows the element's radius in every current engine. */
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+   follows the element's radius in every current engine. One ring for every
+   control: 2px of pine, 2px off the edge — the dark theme's pine on a dark
+   page, so it reads on both. A band of night pine on a light page (the front
+   page's hero, the door) sets --focus:var(--accent-line) on itself: the pale
+   pine reads there (8:1), where the pine itself would vanish. */
+:focus-visible{outline:2px solid var(--focus,var(--accent));outline-offset:2px}
 [data-rows] > :focus-visible,[data-rows] > li > :focus-visible{outline-offset:-3px}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:0ms!important;animation-duration:0ms!important}}
+/* Less motion asked for, none given: slides, fades, the skeleton's sheen and
+   the spinners stop (a spinner holds still, still saying «busy»), and a
+   scroll jumps rather than glides. */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:0ms!important;animation-duration:0ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+}
 
 /* ── type roles ───────────────────────────────────────────────────── */
 /* Mono is for numerals, codes, timestamps and the eyebrow label — never
@@ -833,6 +846,16 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 .desk-frame{--sticky-top:0px;display:grid;grid-template-columns:var(--side) minmax(0,1fr);min-height:100dvh}   /* --sticky-top: where a sticky table header stops — under the deskbar on a phone */
 .desk-frame > .main{min-width:0}
 .deskbar,.nav-scrim{display:none}
+/* «Цэсийг алгасах»: the keyboard's first stop on a desk page — a plain card held just above the top
+   edge until it is reached, then at the top corner; it takes the keyboard over the menu to the page.
+   The page it lands on takes the focus quietly (no ring round the whole page). */
+.nav-skip{
+  position:fixed;top:calc(8px + var(--safe-t));left:8px;z-index:calc(var(--z-sheet) + 1);display:inline-flex;align-items:center;
+  min-height:var(--target);padding:0 16px;border:1px solid var(--line);border-radius:var(--r-ctl);background:var(--surface);box-shadow:var(--shadow-float);
+  color:var(--accent-ink);font-size:var(--t-body);font-weight:500;text-decoration:none;white-space:nowrap;
+}
+.nav-skip:not(:focus){transform:translateY(calc(-100% - 16px - var(--safe-t)));box-shadow:none}
+.desk-frame .page[tabindex="-1"]:focus{outline:none}
 .sidebar{
   position:sticky;top:0;height:100dvh;width:var(--side);flex:none;display:flex;flex-direction:column;
   background:var(--surface);border-right:1px solid var(--line);padding:18px 12px 12px;
@@ -955,8 +978,9 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
   .deskbar-t{display:flex;flex-direction:column;min-width:0}
   .deskbar-t b{font-size:var(--t-row);font-weight:600;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .deskbar-t span{font-size:var(--t-meta);line-height:1.35;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .sidebar{position:fixed;inset:0 auto 0 0;z-index:var(--z-sheet);width:min(86vw,304px);height:100dvh;padding:calc(16px + var(--safe-t)) 12px calc(12px + var(--safe-b));transform:translateX(-104%);transition:transform var(--dur-sheet) var(--ease)}
-  .sidebar[data-open]{transform:none;box-shadow:var(--shadow-float)}
+  /* closed, the drawer is out of sight and out of the tab order — after it has slid away, as a sheet is */
+  .sidebar{position:fixed;inset:0 auto 0 0;z-index:var(--z-sheet);width:min(86vw,304px);height:100dvh;padding:calc(16px + var(--safe-t)) 12px calc(12px + var(--safe-b));transform:translateX(-104%);visibility:hidden;transition:transform var(--dur-sheet) var(--ease),visibility 0s linear var(--dur-sheet)}
+  .sidebar[data-open]{transform:none;visibility:visible;box-shadow:var(--shadow-float);transition:transform var(--dur-sheet) var(--ease),visibility 0s}
   .sidebar .brand{align-items:center;padding-bottom:12px}
   .sidebar .nav-close{display:inline-grid;place-items:center;width:36px;height:36px;margin-left:auto;padding:0;border:0;border-radius:var(--r-sm);background:none;color:var(--ink-3)}
   .sidebar .go-home + .nav-close{margin-left:0}
@@ -1442,14 +1466,16 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 .dt-table tbody tr:last-child > td:first-child{border-bottom-left-radius:calc(var(--r-md) - 1px)}
 .dt-table tbody tr:last-child > td:last-child{border-bottom-right-radius:calc(var(--r-md) - 1px)}
 .dt-table th[data-align="end"]{text-align:right}
-.dt-sort{display:inline-flex;align-items:center;gap:4px;min-height:40px;margin:0;padding:0;border:0;background:none;font:inherit;color:inherit;cursor:pointer;white-space:nowrap;border-radius:var(--r-xs)}
+/* 6px of room either side of the words (taken back from the cell's padding, so the heading stays where it
+   was): the focus ring sits inside the cell, and the target is wider than a short heading like «№» */
+.dt-sort{display:inline-flex;align-items:center;gap:4px;min-height:40px;margin:0 -6px;padding:0 6px;border:0;background:none;font:inherit;color:inherit;cursor:pointer;white-space:nowrap;border-radius:var(--r-xs)}
 /* a number's heading sits flush over its numbers: the arrow goes before the word */
 .dt-table th[data-align="end"] .dt-sort{flex-direction:row-reverse}
 .dt-sort svg{width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:0;transition:opacity var(--dur)}
 .dt-sort[data-sorted]{color:var(--ink);font-weight:600}
 .dt-sort[data-sorted] svg{opacity:1}
 @media (hover:hover){.dt-sort:hover{color:var(--ink)}.dt-sort:not([data-sorted]):hover svg{opacity:.55}}
-.dt-sort:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.dt-sort:focus-visible{outline:2px solid var(--focus,var(--accent));outline-offset:-2px}   /* inside the cell: a card that scrolls sideways clips anything outside it */
 .dt-sort:focus-visible svg{opacity:.55}
 .dt-table td{padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:middle;color:var(--ink);transition:background-color 120ms}
 .dt-table tbody tr:last-child td{border-bottom:0}
@@ -1534,4 +1560,42 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
   .dt-pages{margin-left:0;width:100%;justify-content:center}
   .dt-page{min-width:40px;height:40px}
   .dt-size select{height:40px}
+}
+
+/* ── a finger's target: 44px on a touch screen ───────────────────── */
+/* On a phone or a tablet (a coarse pointer) every shared control a person
+   taps is at least 44×44, and every text control types at 16px — iOS zooms
+   into anything smaller the moment it is tapped. Under a mouse the desk keeps
+   its density. The control itself grows, not an invisible area around a
+   small face (Appendix B): what a thumb can hit is what it sees. */
+@media (pointer:coarse){
+  .btn[data-size="sm"]{min-height:var(--target)}
+  .btn[data-size="sm"][data-icon]{width:var(--target)}
+  .btn:where([data-v="link"]){min-height:var(--target)}
+  .filter > button{min-height:var(--target)}
+  /* a phone number dials: 44px tall to a thumb, the line it sits in as tall as before (it has no face to grow) */
+  .tel{padding-block:13px;margin-block:-13px}
+  .seg button,.seg[data-fill] button,.dt-seg button{min-height:var(--target)}
+  .doc .toc a{min-height:var(--target)}
+  .popup .popup-icons label{height:var(--target)}
+  /* the data table: its toolbar, headings, row actions and pages */
+  .dt-search input,.dt-select,.dt-tools .input,.dt-size select,.dt-table .dt-select{height:var(--target);min-height:var(--target);font-size:1rem}
+  .dt-tools .btn{min-height:var(--target)}
+  .dt-tools .btn[data-icon]{width:var(--target)}
+  .dt-table th{height:var(--target)}
+  .dt-sort{min-height:var(--target)}
+  .dt-act .btn,.dt-table tr.dt-row > td.dt-act .btn{min-height:var(--target)}
+  .dt-act .btn[data-icon],.dt-table tr.dt-row > td.dt-act .btn[data-icon]{width:var(--target)}
+  .dt-page{min-width:var(--target);height:var(--target)}
+  /* the desk's frame: its menu, the switcher, the way home and the way out */
+  .sidebar [data-tab],.sidebar [data-tab].sub,.sidebar .mod,.ws-act{min-height:var(--target)}
+  .sidebar .nav-close{width:var(--target);height:var(--target)}
+  .sidebar .brand-home{padding-block:9px}
+  .sidebar .go-home{height:var(--target);padding:0 14px 0 12px}
+  .acct .out{width:var(--target);height:var(--target);margin:-9px -8px -9px 0}
+}
+/* the popup's cross on a tablet: the desk's quiet 36px look, a 44px target */
+@media (min-width:720px) and (pointer:coarse){
+  .popup > header{grid-template-columns:minmax(0,1fr) var(--target)}
+  .popup > header .x{width:var(--target);height:var(--target);margin:-6px -8px 0 0}
 }

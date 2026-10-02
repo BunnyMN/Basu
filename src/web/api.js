@@ -687,15 +687,17 @@ export function signInSheet(reason = 'Үргэлжлүүлэхийн тулд н
     sheet.setAttribute('role', 'dialog');
     sheet.setAttribute('aria-modal', 'true');
     sheet.setAttribute('aria-labelledby', 'signin-title');
+    sheet.tabIndex = -1;
     sheet.innerHTML = `
-      <header>
+      <header role="none">
         <div><h2 id="signin-title">Нэвтрэх</h2><div class="sub"></div></div>
-        <button class="x" type="button" aria-label="Хаах"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+        <button class="x" type="button" aria-label="Хаах"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       </header>
       <div class="body" style="padding:16px 20px 20px"></div>`;
     sheet.querySelector('header .sub').textContent = reason;
 
     let settled = false;
+    let wake = () => {};
     const opener = document.activeElement;
     // Esc closes it, as it closes a popup; the focus goes back to what opened it.
     const onKey = (e) => {
@@ -713,6 +715,7 @@ export function signInSheet(reason = 'Үргэлжлүүлэхийн тулд н
         sheet.remove();
         scrim.remove();
       }, 260);
+      wake();
       if (!token && opener?.isConnected) opener.focus?.();
       if (token) resolve(token);
       else reject(new ApiError(401, { error: { code: 'SIGN_IN', message_mn: 'Нэвтрээгүй байна.' } }));
@@ -720,7 +723,12 @@ export function signInSheet(reason = 'Үргэлжлүүлэхийн тулд н
 
     sheet.querySelector('.body').append(signInDoors({ device: 'Вэб', onToken: close }));
     document.body.append(scrim, sheet);
-    requestAnimationFrame(() => sheet.setAttribute('data-open', ''));
+    // As a popup: the page sleeps behind it, and the keyboard starts inside it.
+    wake = popupHush(scrim, sheet);
+    requestAnimationFrame(() => {
+      sheet.setAttribute('data-open', '');
+      sheet.focus?.();
+    });
     sheet.querySelector('.x').addEventListener('click', () => close(null));
     scrim.addEventListener('click', () => close(null));
     document.addEventListener('keydown', onKey, true);
@@ -968,6 +976,26 @@ let popupSeq = 0;
 const popupEsc = (value) =>
   String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const POPUP_X = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+
+/**
+ * While a popup or a sheet that asks for an answer is open, the page behind it
+ * sleeps (`inert`): a screen reader reads only the popup, the keyboard cannot
+ * wander under the dim, and a tap that misses lands on nothing. The toast
+ * stays awake, so what it says is still heard. Returns the way to wake what
+ * this call put to sleep — and only that, so a popup over a popup wakes its
+ * own page and nothing else.
+ */
+function popupHush(...awake) {
+  const hushed = [];
+  for (const node of document.body?.children ?? []) {
+    if (awake.includes(node) || node.id === 'toast' || node.classList.contains('toast-old') || node.hasAttribute('inert')) continue;
+    node.setAttribute('inert', '');
+    hushed.push(node);
+  }
+  return () => {
+    for (const node of hushed) node.removeAttribute('inert');
+  };
+}
 
 /** Attributes a field asks for beyond the usual — maxlength, min, step, pattern — each escaped. */
 const popupAttrs = (attrs = {}) =>
@@ -1222,13 +1250,14 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
     sheet.tabIndex = -1;
     sheet.style.setProperty('--sheet-w', `${width}px`);
     if (id) sheet.id = id;
+    // The header and the foot are the popup's own parts, not the page's banner and footer landmarks (role none).
     sheet.innerHTML = `
-      <header><div><div class="popup-steps"></div><h2 id="popup-title-${n}"></h2><div class="sub" id="popup-sub-${n}"></div></div><button class="x" type="button" aria-label="Хаах">${POPUP_X}</button></header>
+      <header role="none"><div><div class="popup-steps"></div><h2 id="popup-title-${n}"></h2><div class="sub" id="popup-sub-${n}"></div></div><button class="x" type="button" aria-label="Хаах">${POPUP_X}</button></header>
       <form class="body" novalidate>
         <div class="callout popup-error" data-k="stop" role="alert" hidden><span></span></div>
         <div class="fields"></div>
       </form>
-      <footer><button class="btn" data-v="quiet" type="button" data-cancel></button><button class="btn" type="button" data-submit></button></footer>`;
+      <footer role="none"><button class="btn" data-v="quiet" type="button" data-cancel></button><button class="btn" type="button" data-submit></button></footer>`;
     const $ = (selector) => sheet.querySelector(selector);
     const form = $('form');
     const errorBox = $('.popup-error');
@@ -1387,6 +1416,7 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
     form.addEventListener('change', heard);
 
     let closed = false;
+    let wake = () => {};
     const close = (answer) => {
       if (closed) return;
       closed = true;
@@ -1399,6 +1429,8 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
         sheet.remove();
         scrim.remove();
       }, 260);
+      // The page wakes before the keyboard goes back to what opened the popup: a sleeping button takes no focus.
+      wake();
       if (opener?.isConnected) opener.focus?.();
       resolve(answer);
     };
@@ -1491,6 +1523,7 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
     scrim.addEventListener('click', () => close(null));
     document.addEventListener('keydown', onKey, true);
     document.body.append(scrim, sheet);
+    wake = popupHush(scrim, sheet);
     document.documentElement.setAttribute('data-modal-open', '');
     void sheet.offsetWidth; // drawn closed once, so opening is a movement rather than a jump
     scrim.setAttribute('data-open', '');

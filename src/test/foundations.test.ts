@@ -569,3 +569,84 @@ describe('the desk', () => {
     expect(f.el.querySelectorAll('tbody tr.dt-row')).toHaveLength(1);
   });
 });
+
+describe('reached by a keyboard and a reader', () => {
+  it('puts the page to sleep behind a popup — its header no banner, the toast awake — and wakes it before the focus goes back', async () => {
+    const page = document.createElement('main');
+    page.innerHTML = '<button id="opener">Нэмэх</button>';
+    document.body.append(page);
+    window.toast('Хадгалагдлаа');
+    const opener = document.getElementById('opener') as HTMLButtonElement;
+    opener.focus();
+    void window.popup({ title: 'Нэр засах', fields: [{ name: 'name', label: 'Нэр' }] });
+    expect(page.hasAttribute('inert')).toBe(true);
+    expect(document.getElementById('toast')?.hasAttribute('inert')).toBe(false);
+    expect(open().querySelector(':scope > header')?.getAttribute('role')).toBe('none');
+    expect(open().querySelector(':scope > footer')?.getAttribute('role')).toBe('none');
+    // a popup over it puts the first one to sleep, and wakes only what it put to sleep
+    void window.confirmPopup({ title: 'Итгэлтэй юу', text: 'Энэ нэр хадгалагдана.' });
+    const [first, second] = [...document.querySelectorAll('.sheet.popup[data-open]')] as [HTMLElement, HTMLElement];
+    expect(first.hasAttribute('inert')).toBe(true);
+    document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(second.hasAttribute('data-open')).toBe(false);
+    expect(first.hasAttribute('inert')).toBe(false);
+    expect(page.hasAttribute('inert')).toBe(true);
+    document.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(page.hasAttribute('inert')).toBe(false);
+    expect(document.activeElement).toBe(opener);
+    await tick(300);
+  });
+
+  it('keeps the keyboard on a sorted heading and on the pager as the table is drawn anew, and says it is busy while it loads', () => {
+    const t = window.dataTable({ columns: [{ key: 'name', label: 'Нэр' }, { key: 'n', label: 'Тоо', align: 'end', numeric: true }], pageSize: 25 });
+    document.body.append(t.el);
+    const table = t.el.querySelector('.dt-table') as HTMLElement;
+    expect(table.getAttribute('aria-busy')).toBe('true');
+    expect([...t.el.querySelectorAll('tbody tr.dt-skel')].every((tr) => tr.getAttribute('aria-hidden') === 'true')).toBe(true);
+    t.setRows(Array.from({ length: 60 }, (_, i) => ({ name: `Хүн ${i}`, n: i })));
+    expect(table.hasAttribute('aria-busy')).toBe(false);
+    const sortOf = (key: string) => t.el.querySelector(`thead th[data-key="${key}"] .dt-sort`) as HTMLButtonElement;
+    sortOf('n').focus();
+    sortOf('n').click();
+    expect(document.activeElement).toBe(sortOf('n'));
+    expect(sortOf('n').closest('th')?.getAttribute('aria-sort')).not.toBe('none');
+    const next = t.el.querySelector('.dt-pages [aria-label="Дараах"]') as HTMLButtonElement;
+    next.focus();
+    next.click();
+    expect(t.el.querySelector('.dt-pages [aria-current="page"]')?.textContent).toBe('2');
+    expect((document.activeElement as HTMLElement).getAttribute('aria-label')).toBe('Дараах');
+    (document.activeElement as HTMLElement).click(); // the last page: «Дараах» is off, the keyboard goes to the page now open
+    expect((document.activeElement as HTMLElement).getAttribute('aria-current')).toBe('page');
+    expect(document.activeElement?.textContent).toBe('3');
+    // a filter's chosen button is said, not only drawn
+    const f = window.dataTable({
+      columns: [{ key: 'name', label: 'Нэр' }],
+      filters: [{ key: 'open', label: 'Төлөв', options: [['all', 'Бүгд'], ['open', 'Нээлттэй']], test: () => true }],
+    });
+    f.setRows([{ name: 'Бат' }]);
+    const pressed = () => [...f.el.querySelectorAll('.dt-seg button')].map((b) => `${b.textContent}:${b.getAttribute('aria-pressed')}`).join(' ');
+    expect(pressed()).toBe('Бүгд:true Нээлттэй:false');
+    ([...f.el.querySelectorAll('.dt-seg button')][1] as HTMLElement).click();
+    expect(pressed()).toBe('Бүгд:false Нээлттэй:true');
+  });
+
+  it('opens every desk page with «Цэсийг алгасах», which takes the keyboard to the page and leaves the address alone', () => {
+    const { root } = window.deskFrame({
+      workspaces: [{ id: 'desk', kind: 'desk', name: 'Basu', sub: 'Ширээ · Админ' }],
+      current: { id: 'desk', kind: 'desk', name: 'Basu', sub: 'Ширээ · Админ', menu: [{ key: 'top', label: '', items: [{ key: 'overview', label: 'Самбар', icon: 'overview' }] }] },
+      account: null,
+      onPage: () => {},
+      onWorkspace: () => {},
+      onSignOut: () => {},
+    }) as { root: HTMLElement };
+    document.body.append(root);
+    window.location.hash = '#desk/overview';
+    const skip = root.firstElementChild as HTMLAnchorElement;
+    expect(skip.matches('a.nav-skip')).toBe(true);
+    expect(skip.textContent).toBe('Цэсийг алгасах');
+    skip.click();
+    expect(document.activeElement?.id).toBe('view');
+    expect(window.location.hash).toBe('#desk/overview');
+    expect(root.querySelector('.ws-menu')?.getAttribute('aria-label')).toBe('Ажлын орчин');
+  });
+});
