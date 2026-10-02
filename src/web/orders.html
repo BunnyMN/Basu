@@ -354,11 +354,19 @@ async function refundBox(o) {
       ${needsPassword ? `<div class="s-note">${MARK.key}<span><b>Эхлээд нууц үг тохируулна</b>${way}</span></div>` : ''}
       <button class="s-btn s-btn-dark" type="button" data-account>Данс оруулах</button>
     </div>`);
-  box.querySelector('[data-account]').addEventListener('click', () => {
-    if (!needsPassword) return void askAccount(o);
+  const press = box.querySelector('[data-account]');
+  press.addEventListener('click', async () => {
+    if (press.hasAttribute('aria-busy')) return;
+    // The account as it is now, not as the page first found it: a password (or an address) set a moment
+    // ago — in this popup, closed before the bank step; in another tab — changes the way. Asked from the
+    // page's first look, the next press began again at «Имэйл холбох» and was refused it.
+    press.setAttribute('aria-busy', 'true');
+    const now = needsPassword ? await authed('/v1/me').catch(() => person) : person;
+    press.removeAttribute('aria-busy');
+    if (!now || now.has_password) return void askAccount(o);
     void passwordPopup({
       token: store.guestToken,
-      email: person.email,
+      email: now.email,
       why: 'Мөнгө тань руу очих дансыг нууц үгээр баталгаажуулдаг. Нууц үгээ тохируулмагц дансаа оруулна.',
       // One word at the end, from the account's popup, for the password and the account both.
       quiet: true,
