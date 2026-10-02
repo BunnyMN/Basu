@@ -1108,8 +1108,10 @@ describe('the desk’s record names the account and the session that acted', () 
     ]);
     for (const row of written) {
       expect(row).toMatchObject({ who: 'ops:ops@gmail.com', actor_guest: account, actor_session: session.id, actor_member: seatId });
-      // That an account came with it, never the account's number.
-      for (const digits of ['5012', '1105012345', '1105067890']) expect(JSON.stringify(row)).not.toContain(digits);
+      // That an account came with it, never the account's number. The row's own ids are random hex and
+      // may hold «5012» by chance (a session id did, once), so they are read past.
+      const said = JSON.stringify(row).replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g, '');
+      for (const digits of ['5012', '1105012345', '1105067890']) expect(said).not.toContain(digits);
     }
   });
 
