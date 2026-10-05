@@ -93,6 +93,7 @@ struct RootView: View {
   @State private var path: [Destination] = []
   @State private var splash = true
   @State private var debugPush = false
+  @State private var debugPay: PayRequest?
 
   var body: some View {
     ZStack {
@@ -159,11 +160,15 @@ struct RootView: View {
       Text(model.notice ?? "")
     }
     .onOpenURL { url in open(url) }
+    .sheet(item: $debugPay) { request in
+      QPaySheet(request: request, check: { false }) { debugPay = nil }
+    }
     .sheet(isPresented: $debugPush) {
       PushAsk(audience: .guest) { debugPush = false }
     }
     .onChange(of: splash) { _, showing in
       if !showing, Self.debugAsksPush { debugPush = true }
+      if !showing, debugPay == nil { debugPay = Self.debugPayment }
     }
     .task {
       // APNs answers whenever it answers — before a sign-in or long after it —
@@ -372,6 +377,48 @@ struct RootView: View {
       ProcessInfo.processInfo.environment["BASU_SCREEN"] == "splash"
     #else
       false
+    #endif
+  }
+
+  /// `BASU_SCREEN=qpay`: the payment sheet over the launcher, with QPay's
+  /// banks as Wire listed them on 2026-10-05 and a QR that pays nothing.
+  fileprivate static var debugPayment: PayRequest? {
+    #if DEBUG
+      let environment = ProcessInfo.processInfo.environment
+      guard environment["BASU_SCREEN"] == "qpay" else { return nil }
+      // `BASU_QPAY_BANKS=n`: the first n only, to photograph what is under them.
+      let shown = Int(environment["BASU_QPAY_BANKS"] ?? "") ?? .max
+      return PayRequest(id: "debug", amountMnt: 460_000, invoice: QPayInvoice(
+        qr: "BASU-DEMO",
+        banks: Array([
+          .init(name: "qPay wallet", description: "qPay хэтэвч", logo: "https://s3.qpay.mn/p/e9bbdc69-3544-4c2f-aff0-4c292bc094f6/launcher-icon-ios.jpg", link: "qpaywallet://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Khan bank", description: "Хаан банк", logo: "https://qpay.mn/q/logo/khanbank.png", link: "khanbank://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "State bank 3.0", description: "Төрийн банк 3.0", logo: "https://qpay.mn/q/logo/state_3.png", link: "statebankmongolia://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Xac bank", description: "Хас банк", logo: "https://qpay.mn/q/logo/xacbank.png", link: "xacbank://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Trade and Development bank", description: "TDB online", logo: "https://qpay.mn/q/logo/tdbbank.png", link: "tdbbank://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Social Pay", description: "Голомт банк", logo: "https://qpay.mn/q/logo/socialpay.png", link: "socialpay-payment://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Most money", description: "МОСТ мони", logo: "https://qpay.mn/q/logo/most.png", link: "most://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "National investment bank", description: "Үндэсний хөрөнгө оруулалтын банк", logo: "https://qpay.mn/q/logo/nibank.jpeg", link: "nibank://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Chinggis khaan bank", description: "Чингис Хаан банк", logo: "https://qpay.mn/q/logo/ckbank.png", link: "ckbank://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Capitron bank", description: "Капитрон банк", logo: "https://qpay.mn/q/logo/capitronbank.png", link: "capitronbank://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Bogd bank", description: "Богд банк", logo: "https://qpay.mn/q/logo/bogdbank.png", link: "bogdbank://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Trans bank", description: "Тээвэр хөгжлийн банк", logo: "https://qpay.mn/q/logo/transbank.png", link: "transbank://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "M bank", description: "М банк", logo: "https://qpay.mn/q/logo/mbank.png", link: "mbank://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Ard App", description: "Ард Апп", logo: "https://qpay.mn/q/logo/ard.png?v=2", link: "ard://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Toki App", description: "Toki App", logo: "https://qpay.mn/q/logo/tokipay.png", link: "toki://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Arig bank", description: "Ариг банк", logo: "https://qpay.mn/q/logo/arig.png", link: "arig://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Monpay", description: "Мон Пэй", logo: "https://qpay.mn/q/logo/monpay.png", link: "monpay://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Hipay", description: "Hipay", logo: "https://qpay.mn/q/logo/hipay.png", link: "hipay://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Happy Pay", description: "Happy Pay MN", logo: "https://qpay.mn/q/logo/tdbwallet.png", link: "tdbwallet://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Sono", description: "Sono", logo: "https://qpay.mn/q/logo/sono.png", link: "sono://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "PayOn", description: "PayOn", logo: "https://qpay.mn/q/logo/payon.png", link: "payon://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Tino", description: "Tino", logo: "https://qpay.mn/q/logo/tino.png", link: "tino://q?qPay_QRcode=BASU-DEMO"),
+          .init(name: "Pass.mn", description: "Pass.mn", logo: "https://qpay.mn/q/logo/pass.png", link: "pass://q?qPay_QRcode=BASU-DEMO"),
+        ].prefix(shown)),
+        expiresAt: Date.now.addingTimeInterval(15 * 60),
+      ))
+    #else
+      nil
     #endif
   }
 

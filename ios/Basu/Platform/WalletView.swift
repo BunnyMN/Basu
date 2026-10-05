@@ -75,6 +75,12 @@ struct WalletView: View {
     .sheet(item: $showing) { line in
       MovementSheet(line: line)
     }
+    // QPay, paid without leaving the app: the bank apps and the QR.
+    .sheet(item: Binding(get: { platform.paying }, set: { platform.paying = $0 })) { request in
+      QPaySheet(request: request, check: { await platform.lookAtTopup() }) {
+        platform.paying = nil
+      }
+    }
     .refreshable { await platform.loadWallet() }
     .task { await platform.loadWallet() }
   }

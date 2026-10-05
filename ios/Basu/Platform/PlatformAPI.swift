@@ -158,14 +158,46 @@ struct TopupStarted: Decodable, Sendable {
   let topupId: String
   let amountMnt: Int
   let actionUrl: String?
+  /// Raised for the app's own sheet: QPay's QR and the bank apps, no page.
+  let qpay: QPayInvoice?
   let state: String
 
   enum CodingKeys: String, CodingKey {
-    case state
+    case state, qpay
     case topupId = "topup_id"
     case amountMnt = "amount_mnt"
     case actionUrl = "action_url"
   }
+}
+
+/// A QPay invoice the app draws itself: the QR's text, and every bank app
+/// that pays it with one tap.
+struct QPayInvoice: Decodable, Sendable, Equatable {
+  let qr: String
+  let banks: [QPayBank]
+  /// When QPay lets it go unpaid.
+  let expiresAt: Date?
+
+  enum CodingKeys: String, CodingKey {
+    case qr, banks
+    case expiresAt = "expires_at"
+  }
+}
+
+/// One bank app: its name, its logo, and the link that opens it on the invoice.
+struct QPayBank: Decodable, Sendable, Equatable, Identifiable {
+  let name: String
+  let description: String
+  let logo: String
+  let link: String
+  var id: String { link }
+}
+
+/// What the payment sheet is paying: how much, and QPay's invoice for it.
+struct PayRequest: Identifiable, Equatable {
+  let id: String
+  let amountMnt: Int
+  let invoice: QPayInvoice
 }
 
 struct InboxMessage: Decodable, Sendable, Identifiable, Equatable {
@@ -311,12 +343,13 @@ extension API {
     _ = try await send(.init(path: "/v1/me", method: "DELETE", token: token), as: API.Blank.self)
   }
 
-  /// Asking for money. Nothing is credited until `settleTopup`.
+  /// Asking for money. Nothing is credited until `settleTopup`. `native`:
+  /// QPay's QR and bank apps for the app's own sheet, rather than a page.
   func startTopup(amountMnt: Int, token: String) async throws -> TopupStarted {
     try await send(.init(
       path: "/v1/wallet/topup",
       method: "POST",
-      body: ["amount_mnt": amountMnt],
+      body: ["amount_mnt": amountMnt, "native": true],
       token: token,
     ))
   }

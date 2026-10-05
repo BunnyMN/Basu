@@ -30,6 +30,8 @@ final class Platform {
   /// being looked at now that the person is back (`checkTopup`).
   private var awaitingTopup: String?
   private(set) var checkingTopup = false
+  /// The top-up being paid in the app's own sheet (`QPaySheet`), while it is up.
+  var paying: PayRequest?
   private(set) var trouble: String?
 
   /**
@@ -306,6 +308,12 @@ final class Platform {
     do {
       let started = try await api.startTopup(amountMnt: amountMnt, token: token)
       noteTopups(open: true)
+      // QPay's own QR and bank apps, drawn in the app's sheet: nothing to leave the app for.
+      if let invoice = started.qpay {
+        awaitingTopup = started.topupId
+        paying = PayRequest(id: started.topupId, amountMnt: started.amountMnt, invoice: invoice)
+        return true
+      }
       if let raw = started.actionUrl, let url = URL(string: raw),
          UIApplication.shared.canOpenURL(url) {
         awaitingTopup = started.topupId
@@ -333,6 +341,21 @@ final class Platform {
    unpaid after about a minute, it is left to the server, which keeps asking
    for a week and tells the person when it lands.
    */
+  /// One look, for the payment sheet: whether its top-up has landed. Landed,
+  /// the wallet is read afresh before the sheet says so.
+  func lookAtTopup() async -> Bool {
+    guard let id = paying?.id ?? awaitingTopup, let token = session.token else { return false }
+    do {
+      _ = try await api.settleTopup(id, token: token)
+      if awaitingTopup == id { awaitingTopup = nil }
+      await loadWallet()
+      await refresh()
+      return true
+    } catch {
+      return false
+    }
+  }
+
   func checkTopup() async {
     guard let id = awaitingTopup, !checkingTopup, let token = session.token else { return }
     checkingTopup = true

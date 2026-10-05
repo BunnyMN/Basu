@@ -14,7 +14,7 @@ import WebKit
  `pages.test.ts`. Writing it a second time in Swift meant every fix landing
  twice or, more often, once.
 
- Three things cross the line between the two, and only three:
+ Four things cross the line between the two, and only four:
 
  - **The session.** The shell signs the guest in and keeps the token in the
    keychain. Before the page loads, the token is put where the page already
@@ -30,6 +30,14 @@ import WebKit
    The first time something is running, it is also the moment to ask whether
    its progress may come to the lock screen (`PushAsk`) — or, for a supplier,
    the moment their counter opens.
+
+ - **Paying.** A page that needs QPay hands its invoice over (`pay`) — the
+   QR's text and the bank apps, raised for this sheet — and the shell's own
+   `QPaySheet` takes it: the person taps their bank, pays, and is back. The
+   sheet's «Төлсөн, шалгах» asks through the page, and the page says when
+   the purchase is settled (`paid`) and the sheet closes. The page knows the
+   shell can by `window.__basuPays`, set before it runs; a build without it
+   gets QPay's page, as before.
 
  Nothing else. The page does not know it is inside an app beyond the one
  message handler, and a page that works in Safari works here.
@@ -51,6 +59,8 @@ struct ServiceView: View {
   @State private var page = ServicePage()
   @State private var signingIn = false
   @State private var askingPush = false
+  /// QPay's invoice the page handed over, paid in the shell's own sheet.
+  @State private var paying: PayRequest?
   /// A beat after opening. A page that draws within it never shows the
   /// shell's chip or spinner at all, rather than flashing them.
   @State private var slow = false
@@ -114,6 +124,16 @@ struct ServiceView: View {
         Task { await PushRegistrar.shared.askIfNeeded() }
       }
     }
+    // The page's purchase, paid without leaving the app. Its «Төлсөн, шалгах»
+    // asks the page, which closes the sheet itself once the order is bought.
+    .sheet(item: $paying) { request in
+      QPaySheet(request: request, check: {
+        page.askToCheck()
+        return false
+      }) {
+        paying = nil
+      }
+    }
     // The supplier's counter is where new orders arrive, and push is how they
     // reach a supplier who is not looking: asked as it opens, not after an
     // order of their own they will never place.
@@ -124,6 +144,8 @@ struct ServiceView: View {
     .onAppear {
       page.home = back
       page.signIn = { signingIn = true }
+      page.pay = { paying = $0 }
+      page.paid = { paying = nil }
       page.changed = {
         Task {
           await model.refreshLive()
@@ -238,6 +260,9 @@ final class ServicePage: NSObject {
   var home: (() -> Void)?
   var signIn: (() -> Void)?
   var changed: (() -> Void)?
+  /// The page's QPay invoice, for the shell's sheet; and the word that it is settled.
+  var pay: ((PayRequest) -> Void)?
+  var paid: (() -> Void)?
 
   private var base = Endpoint.base
   private var pending: URLRequest?
@@ -310,6 +335,13 @@ final class ServicePage: NSObject {
     // carries the shell's guest rather than nobody.
     controller.addUserScript(WKUserScript(
       source: Self.sessionScript(token: token),
+      injectionTime: .atDocumentStart,
+      forMainFrameOnly: true,
+    ))
+    // This shell pays in its own sheet (`pay` below): said before the page runs,
+    // so it asks for QPay's QR and bank apps rather than a page to open.
+    controller.addUserScript(WKUserScript(
+      source: "window.__basuPays = true;",
       injectionTime: .atDocumentStart,
       forMainFrameOnly: true,
     ))
@@ -389,6 +421,11 @@ final class ServicePage: NSObject {
     path == "/kds" || path.hasPrefix("/kds/")
   }
 
+  /// «Төлсөн, шалгах» in the shell's sheet: the page asks, as its own button would.
+  func askToCheck() {
+    webView.evaluateJavaScript("if (typeof window.__basuCheckPay === 'function') window.__basuCheckPay();")
+  }
+
   // MARK: the page's messages
 
   fileprivate func received(_ body: Any) {
@@ -397,8 +434,36 @@ final class ServicePage: NSObject {
     case "signIn": signIn?()
     case "orders": changed?()
     case "home": home?()
+    case "pay":
+      if let request = Self.payRequest(message["invoice"]) { pay?(request) }
+    case "paid": paid?()
     default: break
     }
+  }
+
+  /// `{ amount_mnt, qpay: { qr, banks, expires_at } }`, as the page has it from the server.
+  private static func payRequest(_ value: Any?) -> PayRequest? {
+    guard let value, JSONSerialization.isValidJSONObject(value),
+          let data = try? JSONSerialization.data(withJSONObject: value)
+    else { return nil }
+    struct Handed: Decodable {
+      let amountMnt: Int
+      let qpay: QPayInvoice
+      enum CodingKeys: String, CodingKey {
+        case qpay
+        case amountMnt = "amount_mnt"
+      }
+    }
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .custom { decoder in
+      let text = try decoder.singleValueContainer().decode(String.self)
+      guard let date = ISODate.parse(text) else {
+        throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "not a date: \(text)"))
+      }
+      return date
+    }
+    guard let handed = try? decoder.decode(Handed.self, from: data) else { return nil }
+    return PayRequest(id: handed.qpay.qr, amountMnt: handed.amountMnt, invoice: handed.qpay)
   }
 
   /// The content controller keeps its handlers strongly, so a page that held

@@ -85,7 +85,7 @@ targets:
       properties:
         CFBundleDisplayName: Basu
         CFBundleShortVersionString: "1.0.5"
-        CFBundleVersion: "10"
+        CFBundleVersion: "11"
         UIAppFonts: *fonts
         # Dark whatever the phone's own setting: «Тансаг хар» has no light
         # palette, so sheets, alerts and the keyboard are dark too.
@@ -98,6 +98,33 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: mn.basu.app$(BASU_ID_SUFFIX)
             CFBundleURLSchemes: [basu]
+        # The bank apps a QPay invoice opens (QPaySheet), asked about so the
+        # sheet can put the ones on this phone first. Wire's list of
+        # 2026-10-05; a bank not named here is still offered, only not first.
+        LSApplicationQueriesSchemes:
+          - qpaywallet
+          - khanbank
+          - statebankmongolia
+          - xacbank
+          - tdbbank
+          - tdbwallet
+          - socialpay-payment
+          - most
+          - nibank
+          - ckbank
+          - capitronbank
+          - bogdbank
+          - transbank
+          - mbank
+          - ard
+          - toki
+          - arig
+          - monpay
+          - hipay
+          - sono
+          - payon
+          - tino
+          - pass
         UILaunchScreen:
           UIColorName: LaunchBackground
         UISupportedInterfaceOrientations:
@@ -169,7 +196,7 @@ targets:
       properties:
         CFBundleDisplayName: Basu
         CFBundleShortVersionString: "1.0.5"
-        CFBundleVersion: "10"
+        CFBundleVersion: "11"
         BasuAppGroup: group.mn.basu.shared$(BASU_ID_SUFFIX)
         UIAppFonts: *fonts
         NSExtension:
