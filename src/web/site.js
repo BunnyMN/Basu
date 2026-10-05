@@ -2,7 +2,7 @@
    the foot, the way to /login and back, and calls made as the person
    signed in. Every page of the website imports this; the app's pages do not. */
 
-import { api, store, dropSession, endSession, authReturn, IDESH_LIVE, phoneText } from '/api.js';
+import { api, store, dropSession, endSession, authReturn, IDESH_LIVE, phoneText, ideshStage } from '/api.js';
 
 /**
  * Text into markup, for everything a page draws from what people wrote: a
@@ -38,6 +38,7 @@ const ICON = {
   phone: SVG('<path d="M6 3h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 12l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/>'),
   key: SVG('<circle cx="8" cy="15" r="4"/><path d="m11 12 8-8M16 7l2 2M14 9l2 2"/>'),
   bank: SVG('<path d="M3 9.5 12 4l9 5.5M5 10v7M9.5 10v7M14.5 10v7M19 10v7M3.5 20h17"/>'),
+  arrow: SVG('<path d="M5 12h14M13 6l6 6-6 6"/>', 2),
 };
 export { ICON };
 
@@ -181,7 +182,7 @@ export async function accountSlot(slot) {
             : ''
         }</div>
         ${item('/home', 'home', 'Миний Basu')}
-        ${item('/shop', 'shop', 'Зах')}
+        ${item('/shop', 'shop', 'Идэш')}
         ${item('/orders', 'orders', 'Миний захиалга')}
         ${item('/account', 'person', 'Бүртгэл')}
         <hr>
@@ -241,10 +242,38 @@ export async function accountSlot(slot) {
  */
 const NAV = [
   ['home', '/home', 'Миний Basu', 'home', 'Нүүр'],
-  ['shop', '/shop', 'Зах', 'shop'],
+  ['shop', '/shop', 'Идэш', 'shop'],
   ['orders', '/orders', 'Миний захиалга', 'orders'],
-  ['business', '/dashboard', 'Бизнест', 'business'],
+  ['business', '/dashboard', 'Бизнес', 'business'],
 ];
+
+/** Basu on the App Store: lunch (Хоол) is ordered in the iPhone app. */
+const APP_STORE = 'https://apps.apple.com/app/id6810541939';
+
+/**
+ * The website's foot, the front page's too: the wordmark large, four short
+ * columns — the market, lunch (the iPhone app's), business, the address —
+ * and the year with the two legal pages on a hairline. In the order the eye
+ * reads them at every width, so Tab goes the same way. On Android there is
+ * no app yet: the column that leads to the App Store is left out.
+ */
+export function siteFoot() {
+  const foot = el(`
+    <footer class="s-foot">
+      <div class="s-wrap">
+        <div class="s-cols">
+          <div><a class="s-fword" href="/" aria-label="Basu, нүүр хуудас">Basu</a></div>
+          <nav aria-label="Идэш"><b class="s-lab">Идэш</b><ul><li><a href="/shop">Зах</a></li><li><a href="/orders">Миний захиалга</a></li></ul></nav>
+          <nav aria-label="Хоол" data-store><b class="s-lab">Хоол</b><ul><li><a href="${APP_STORE}">iPhone апп</a></li></ul></nav>
+          <nav aria-label="Бизнес"><b class="s-lab">Бизнес</b><ul><li><a href="/supplier">Нийлүүлэгч</a></li><li><a href="/dashboard?join=business">Бүртгүүлэх</a></li></ul></nav>
+          <div><b class="s-lab">Холбоо</b><ul><li><a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a></li></ul></div>
+        </div>
+        <div class="s-fbot"><span>© ${new Date().getFullYear()} Basu · Улаанбаатар</span><nav aria-label="Нөхцөл"><a href="/privacy">Нууцлал</a><a href="/terms">Үйлчилгээний нөхцөл</a></nav></div>
+      </div>
+    </footer>`);
+  if (/Android/i.test(navigator.userAgent)) for (const node of foot.querySelectorAll('[data-store]')) node.hidden = true;
+  return foot;
+}
 
 /**
  * The header and the foot, around a page's own <main>. `active` names the
@@ -256,8 +285,8 @@ const NAV = [
  * wordmark and the links, no account and no menu button yet —
  *
  *   <header class="s-bar" data-static><div class="s-wrap"><a class="s-word" href="/">Basu</a>
- *     <nav class="s-nav" aria-label="Цэс"><a href="/home">Нүүр</a><a href="/shop">Зах</a>
- *     <a href="/orders">Миний захиалга</a><a href="/dashboard">Бизнест</a></nav>
+ *     <nav class="s-nav" aria-label="Цэс"><a href="/home">Нүүр</a><a href="/shop">Идэш</a>
+ *     <a href="/orders">Миний захиалга</a><a href="/dashboard">Бизнес</a></nav>
  *     <div class="s-right"></div></div></header>
  *
  * (`aria-current="page"` on the page's own link). This one takes its place;
@@ -281,23 +310,7 @@ export function mountFrame(active) {
       </div>
       <nav class="s-drawer" id="s-drawer" aria-label="Цэс" hidden>${NAV.map((n) => link(n, true)).join('')}</nav>
     </header>`);
-  const foot = el(`
-    <footer class="s-foot">
-      <div class="s-wrap">
-        <span class="who">© ${new Date().getFullYear()} Basu · Улаанбаатар · <a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a></span>
-        <nav aria-label="Холбоос"><a href="/">Basu-гийн тухай</a><a href="/home">Миний Basu</a><a href="/shop">Зах</a><a href="/dashboard">Бизнест</a><a href="/terms">Үйлчилгээний нөхцөл</a><a href="/privacy">Нууцлалын бодлого</a></nav>
-      </div>
-    </footer>`);
-
-  // The foot's two parts stand in the order the eye reads them, so Tab goes the same way: on a wide
-  // screen the address line is left of the links; on a phone (≤760px, site.css) the links are the grid
-  // on top and the address line under them. They are put in that order, not drawn out of it with CSS
-  // `order`, which would send the keyboard from the address at the bottom back up to the links.
-  const footRow = foot.querySelector('.s-wrap');
-  const footNarrow = typeof matchMedia === 'function' ? matchMedia('(max-width:760px)') : null;
-  const footOrder = () => footRow.append(footNarrow?.matches ? footRow.querySelector('.who') : footRow.querySelector('nav'));
-  footOrder();
-  footNarrow?.addEventListener?.('change', footOrder);
+  const foot = siteFoot();
 
   const burger = bar.querySelector('.s-burger');
   const drawer = bar.querySelector('.s-drawer');
@@ -402,23 +415,21 @@ export function say(message, tone) {
 export const tugrik = (value) => `${Number(value).toLocaleString('mn-MN')}<span class="cur">₮</span>`;
 
 /**
- * The tone of an идэш's state, the same on every page that shows one: waiting
- * on the supplier in the route blue, on the fire in honey, done in green.
- * A cancelled or refunded order is over, not an alarm: no tone.
+ * An идэш's state, the same on every page that shows one: its one word and
+ * the four bars under it (api.js ideshStage) — paid, being prepared, ready,
+ * on the road or handed over. Cancelled and refunded are the word alone.
  */
-export const ORDER_TONE = { PAID: 'route', PREPARING: 'hi', READY: 'ready', DISPATCHED: 'route', HANDED: 'ready' };
-export const statePill = (state, word) =>
-  `<span class="s-pill" data-state="${esc(state)}"${ORDER_TONE[state] ? ` data-tone="${ORDER_TONE[state]}"` : ''}>${esc(word)}</span>`;
+export const statePill = (state) => ideshStage(state);
 
 /**
- * A cancelled order that is still going on says what its money waits for:
- * the guest's bank account — a step that is theirs, in the tone that asks for
- * one — or Basu's transfer.
+ * A cancelled order that is still going on says what its money waits for,
+ * in a word and no bars: the guest's bank account — a step that is theirs,
+ * in the gold that asks for one — or Basu's transfer, quietly.
  */
 export const refundPill = (refund) =>
   refund === 'needs_account'
-    ? '<span class="s-pill" data-state="CANCELLED" data-tone="hold">Данс оруулна уу</span>'
-    : '<span class="s-pill" data-state="CANCELLED" data-tone="route">Буцаалт хүлээгдэж байна</span>';
+    ? '<span class="stage" data-s="CANCELLED" data-tone="hold"><b>Данс оруулна уу</b></span>'
+    : '<span class="stage" data-s="CANCELLED" data-tone="quiet"><b>Буцаалт хүлээгдэж байна</b></span>';
 
 /**
  * What of the person's is still going on — «Идэвхтэй» on /home and /orders
@@ -463,24 +474,23 @@ export function siteEmpty({ icon = 'info', title, text = '', actions = [], card 
 }
 
 /** What the paying step says, while money can be taken and while it cannot. */
-export const PAY_STEP = { open: 'Өөрийн банкны аппаас нэг удаа төлнө.', closed: 'Онлайн төлбөр одоогоор хаалттай байна.' };
+export const PAY_STEP = { open: 'QPay-ээр шууд төл.', closed: 'Онлайн төлбөр одоогоор хаалттай байна.' };
 
 /**
- * How an идэш goes, in the words the front page uses: for wherever somebody
- * is about to start one. The paying step says how it stands: while online
- * payment is closed (the listings' `payments_open`) it is not offered as
- * something to do now. `paymentsOpen` when the page has asked already;
- * without it, the listings are asked here.
+ * How an идэш goes, in the front page's three steps — a verb each, a gold
+ * numeral before it: for wherever somebody is about to start one. The paying
+ * step says how it stands: while online payment is closed (the listings'
+ * `payments_open`) it is not offered as something to do now. `paymentsOpen`
+ * when the page has asked already; without it, the listings are asked here.
  */
 export function howToBuy({ paymentsOpen } = {}) {
   const box = el(`
     <section class="s-how" aria-labelledby="s-how-title">
-      <h2 id="s-how-title">Хэрхэн захиалах вэ</h2>
+      <h2 id="s-how-title">Гурван алхам</h2>
       <ol>
-        <li><b>Зараа сонгоно</b><span>Мал, хэмжээ, авах өдөр, хүргэлтээ сонгоно.</span></li>
-        <li data-pay><b>QPay-ээр төлнө</b><span>${paymentsOpen === false ? PAY_STEP.closed : PAY_STEP.open}</span></li>
-        <li><b>Нийлүүлэгч бэлтгэнэ</b><span>Төлбөр орсны дараа мал нядалж, махыг бэлтгэнэ.</span></li>
-        <li><b>Хүлээн авна</b><span>Хаалган дээрээ, эсвэл нийлүүлэгчийн цэгээс кодоо хэлээд авна.</span></li>
+        <li><i aria-hidden="true">1</i><b>Сонгох</b><span>Мал, жин, авах өдрөө сонго.</span></li>
+        <li data-pay><i aria-hidden="true">2</i><b>Төлөх</b><span>${paymentsOpen === false ? PAY_STEP.closed : PAY_STEP.open}</span></li>
+        <li><i aria-hidden="true">3</i><b>Авах</b><span>Өөрөө ав, эсвэл хүргүүл.</span></li>
       </ol>
     </section>`);
   if (paymentsOpen === undefined) {
