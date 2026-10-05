@@ -1,229 +1,247 @@
-/* Basu — the website.
+/* Basu — the website, «Тансаг хар».
 
    The app's pages (/app, /idesh, /dine) are the phone shell's: one column,
    a sheet from the bottom, a thumb's reach. These are for somebody at a
    desk or in a phone's browser — a header with the places to go, pages as
    wide as the screen allows, and the account in the corner. They sit on
-   app.css for the tokens and the faces and carry their own layout here, every
-   class prefixed `s-` so nothing of the app's leaks in or out.
+   app.css for the tokens and the two faces and carry their own layout here,
+   every class prefixed `s-` so nothing of the app's leaks in or out.
 
-   Pinned light, like the front page: every website page says
-   data-theme="light". Every colour here is still a token, so a dark website
-   — an option the owner has not taken — would be app.css's dark palette,
-   not a rewrite. The ground is the warm pale, cards are the surface, and
-   the pine carries the one primary action on a screen. */
+   Dark, like everything since 2026-10-05: the warm charcoal ground with
+   only the meat lit on it, one crimson pill for the one thing a screen
+   asks, gold for hairlines and step numbers, the condensed display for
+   headings and money. Measured from the prototype (scratchpad/redesign/A):
+   an 80px gutter and a 96px bar on a wide screen, 24 and 64 on a phone. */
 
 html[data-site]{background:var(--bg);background-image:none}
 /* a field focused after a mistake, or a #section, lands under the sticky bar, not behind it */
 html[data-site]{scroll-padding-top:calc(var(--s-bar) + var(--safe-t) + 16px)}
 html[data-site] body{background:var(--bg);min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
-:root{--s-wrap:1200px;--s-gutter:max(20px,min(4vw,40px));--s-bar:64px;--s-dock:0px}
-@media (max-width:760px){:root{--s-bar:56px}}
+:root{--s-wrap:1440px;--s-gutter:clamp(24px,5.56vw,80px);--s-bar:96px;--s-dock:0px}
+@media (max-width:760px){:root{--s-bar:64px}}
 
 .s-wrap{width:100%;max-width:var(--s-wrap);margin:0 auto;padding:0 var(--s-gutter)}
 /* Until site.js puts the bar in (mountFrame), its room is kept, so nothing on the page moves when
    it comes. A page that draws the bar in its HTML (header.s-bar[data-static]) has it from the first
    paint and never needs this; the door (/login) has no bar and no .s-main, and gets none. */
 html[data-site] body:not(:has(> .s-bar)):has(> main.s-main){padding-top:calc(var(--s-bar) + var(--safe-t) + 1px)}
-.s-main{flex:1 0 auto;padding-bottom:72px}
+.s-main{flex:1 0 auto;padding-bottom:96px}
+@media (max-width:760px){.s-main{padding-bottom:64px}}
 .s-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* ── buttons ─────────────────────────────────────────────────────── */
-.s-btn{--spin:var(--ink);position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:0 22px;border-radius:999px;border:1px solid transparent;font:inherit;font-size:.9375rem;font-weight:600;line-height:1.2;text-decoration:none;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:background var(--dur),border-color var(--dur),color var(--dur),transform 140ms var(--ease)}
+/* Pills. The one thing a screen asks is the crimson with its glow (.s-btn-dark — the name is
+   older than the colour); everything beside it is an outlined pill or words. */
+.s-btn{--spin:var(--ink);position:relative;display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:48px;padding:0 24px;border-radius:999px;border:1px solid transparent;font-family:var(--sans);font-size:1rem;font-weight:700;line-height:1.2;letter-spacing:.005em;text-decoration:none;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:background var(--dur),border-color var(--dur),color var(--dur),box-shadow var(--dur),transform 140ms var(--ease)}
 .s-btn:active{transform:scale(.985)}
-.s-btn svg{width:18px;height:18px;flex:none}
-.s-btn[disabled]{background:var(--surface-2);border-color:var(--line);color:var(--ink-3);cursor:default;transform:none}
-.s-btn-dark{--spin:var(--on-accent);background:var(--accent);color:var(--on-accent)}
-.s-btn-line{background:var(--surface);color:var(--ink);border-color:var(--line-2)}
-.s-btn-quiet{background:transparent;color:var(--ink-2)}
-.s-btn-lg{min-height:54px;padding:0 28px;font-size:1rem}
-.s-btn-sm{min-height:40px;padding:0 16px;font-size:.875rem}
-@media (pointer:coarse){.s-btn-sm{min-height:44px}}
+.s-btn svg{width:20px;height:20px;flex:none}
+.s-btn-dark{--spin:var(--on-accent);background:var(--accent);color:var(--on-accent);box-shadow:var(--glow)}
+.s-btn-dark:not([disabled]):active{background:var(--accent-press)}
+.s-btn-line{background:transparent;color:var(--ink);border-color:var(--line-2);font-weight:600}
+.s-btn-quiet{background:transparent;color:var(--ink-2);font-weight:600}
+.s-btn-lg{min-height:60px;padding:0 30px 0 32px;font-size:1.125rem;gap:12px}
+.s-btn-lg svg{width:22px;height:22px;stroke-width:2.2}
+.s-btn-sm{min-height:44px;padding:0 20px;font-size:.9375rem}
 .s-btn-block{width:100%}
+.s-btn[disabled]{background:var(--surface-2);border-color:var(--line);color:var(--ink-3);box-shadow:none;cursor:default;transform:none}
 @media (hover:hover){
   .s-btn-dark:not([disabled]):hover{background:var(--accent-hover)}
-  .s-btn-line:not([disabled]):hover{border-color:var(--ink-3)}
-  .s-btn-quiet:not([disabled]):hover{color:var(--ink);background:var(--surface-2)}
+  .s-btn-line:not([disabled]):hover{border-color:var(--ink-3);background:var(--hover)}
+  .s-btn-quiet:not([disabled]):hover{color:var(--ink);background:var(--hover)}
 }
 /* Busy: the words stay (a test and a screen reader read them), unseen, under a spinner in the button's own ink. */
 .s-btn[data-busy]{color:transparent!important;pointer-events:none}
 .s-btn[data-busy] > *{visibility:hidden}
 .s-btn[data-busy]::after{content:"";position:absolute;left:50%;top:50%;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;border:2px solid color-mix(in srgb,var(--spin) 28%,transparent);border-top-color:var(--spin);animation:s-spin 700ms linear infinite}
 @keyframes s-spin{to{transform:rotate(360deg)}}
-.s-link{display:inline;background:none;border:0;padding:0;font:inherit;font-weight:600;color:var(--accent-ink);text-decoration:underline;text-underline-offset:.22em;text-decoration-thickness:1px;cursor:pointer}
+/* A quiet action in words: the ink with a gold hairline under it — a link, not an alarm. */
+.s-link{display:inline;background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--ink);text-decoration:underline;text-decoration-color:var(--gold-line);text-underline-offset:.26em;text-decoration-thickness:1px;cursor:pointer}
+@media (hover:hover){.s-link:not([disabled]):hover{text-decoration-color:var(--gold)}}
 .s-link[disabled]{color:var(--ink-3);text-decoration:none;cursor:default;font-weight:500}
 
-/* A popup or a sheet on the website (api.js popup(), confirmPopup(), signInSheet()) wears
-   the website's buttons: pills, as every other button on these pages — not the app's
-   rounded rectangles. A text-only link stays a link; an icon button stays its circle. */
-html[data-site] .sheet .btn:not([data-v="link"]):not([data-icon]){border-radius:999px;padding-inline:20px}
-
 /* ── fields ──────────────────────────────────────────────────────── */
-.s-field{display:block;margin:0 0 16px}
-.s-field > span:first-child{display:block;margin:0 0 8px;font-size:.875rem;font-weight:600;color:var(--ink)}
-.s-field > span:first-child small{font-weight:400;color:var(--ink-3)}
-.s-input{width:100%;min-height:52px;padding:0 16px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;font-size:1rem;outline:none;-webkit-appearance:none;appearance:none;transition:border-color var(--dur),box-shadow var(--dur)}
+.s-field{display:block;margin:0 0 18px}
+.s-field > span:first-child{display:block;margin:0 0 8px;font-size:.875rem;font-weight:600;color:var(--ink-2)}
+.s-field > span:first-child small{font-weight:500;color:var(--ink-3)}
+.s-input{width:100%;min-height:52px;padding:0 16px;border:1px solid var(--line-2);border-radius:12px;background:var(--surface);color:var(--ink);font:inherit;font-size:1rem;font-weight:500;outline:none;-webkit-appearance:none;appearance:none;transition:border-color var(--dur),box-shadow var(--dur)}
 textarea.s-input{min-height:96px;padding:14px 16px;resize:vertical;line-height:1.5}
 select.s-input{padding-right:44px;background:var(--surface) var(--chev) no-repeat right 14px center/18px;cursor:pointer}
+select.s-input option{background:var(--surface);color:var(--ink)}
 input.s-input[type="date"]{display:flex;align-items:center}
+input.s-input[type="date"]::-webkit-datetime-edit{flex:1 1 auto}
+input.s-input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(.8);cursor:pointer}
 .s-input::placeholder{color:var(--ink-3);font-family:var(--sans);letter-spacing:0}
-/* the focus ring app.css's fields wear (--ring): the pale pine wash alone hardly showed on white */
-.s-input:focus{border-color:var(--accent);box-shadow:var(--ring)}
-.s-input[aria-invalid="true"]{border-color:var(--stop);box-shadow:0 0 0 3px var(--stop-soft)}
+@media (hover:hover){.s-input:not(:focus):not([aria-invalid="true"]):hover{border-color:var(--ink-3)}}
+/* focus: the ink's edge and its faint ring — never the crimson, which is for what went wrong */
+.s-input:focus{border-color:var(--focus);box-shadow:var(--ring)}
+.s-input[aria-invalid="true"]{border-color:var(--accent-ink);box-shadow:var(--ring-stop)}
 /* +976 before a number, ₮ after an amount */
 .s-affix{position:relative;display:block}
-.s-affix > i{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-style:normal;font-family:var(--mono);font-size:1rem;color:var(--ink-3);pointer-events:none}
+.s-affix > i{position:absolute;left:16px;top:50%;transform:translateY(-50%);font-style:normal;font-family:var(--sans);font-size:1rem;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink-3);pointer-events:none}
 .s-affix > .s-input{padding-left:66px}
 .s-help{display:block;margin:8px 0 0;font-size:.8125rem;line-height:1.5;color:var(--ink-3)}
-.s-error{display:flex;gap:8px;align-items:flex-start;margin:10px 0 0;font-size:.875rem;font-weight:500;line-height:1.45;color:var(--stop)}
+.s-error{display:flex;gap:8px;align-items:flex-start;margin:10px 0 0;font-size:.875rem;font-weight:600;line-height:1.45;color:var(--accent-ink)}
 .s-error::before{content:"";flex:none;width:16px;height:16px;margin-top:1px;background:currentColor;-webkit-mask:var(--s-alert) center/16px no-repeat;mask:var(--s-alert) center/16px no-repeat}
 .s-error:empty{display:none}
 :root{--s-alert:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7.5v5.5M12 16.5h.01'/%3E%3C/svg%3E");
   --s-tick:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7'/%3E%3C/svg%3E")}
 
 /* ── the bar ─────────────────────────────────────────────────────── */
-.s-bar{position:sticky;top:0;z-index:var(--z-bar);padding-top:var(--safe-t);background:rgba(255,255,255,.92);background:color-mix(in srgb,var(--surface) 92%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--line)}
-.s-bar > .s-wrap{display:flex;align-items:center;gap:36px;min-height:var(--s-bar)}
-.s-word{display:inline-flex;align-items:center;min-height:44px;font-size:1.375rem;font-weight:600;letter-spacing:-.035em;color:var(--accent-ink);text-decoration:none}
+/* The wordmark in the display, three words beside it, the account at the far end; the charcoal under
+   a breath of glass while the page slides beneath it. */
+.s-bar{position:sticky;top:0;z-index:var(--z-bar);padding-top:var(--safe-t);background:rgba(16,13,12,.9);-webkit-backdrop-filter:blur(16px) saturate(1.2);backdrop-filter:blur(16px) saturate(1.2);border-bottom:1px solid var(--line)}
+.s-bar > .s-wrap{display:flex;align-items:center;gap:56px;min-height:var(--s-bar)}
+.s-word{display:inline-flex;align-items:center;min-height:44px;font-family:var(--display);font-size:2.5rem;font-weight:800;line-height:1;letter-spacing:.01em;color:var(--ink);text-decoration:none}
 /* the links keep to one line each, whatever name is in the corner: the corner gives way («…») instead */
-.s-nav{display:flex;align-self:stretch;flex:none;gap:28px}
-.s-nav a{position:relative;display:flex;align-items:center;font-size:.9375rem;font-weight:500;color:var(--ink-2);text-decoration:none;white-space:nowrap}
-.s-nav a[aria-current="page"]{color:var(--accent-ink);font-weight:600}
-.s-nav a[aria-current="page"]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;border-radius:2px;background:var(--accent)}
+.s-nav{display:flex;align-self:stretch;flex:none;gap:36px}
+.s-nav a{position:relative;display:flex;align-items:center;font-size:1rem;font-weight:600;color:var(--ink-2);text-decoration:none;white-space:nowrap}
+.s-nav a[aria-current="page"]{color:var(--ink)}
+.s-nav a[aria-current="page"]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--gold)}
 @media (hover:hover){.s-nav a:hover{color:var(--ink)}}
-/* under a thumb (a tablet) a short word — «Зах» — is still 44px wide: room either side of it, given back outside it, so nothing moves */
+/* under a thumb (a tablet) a short word is still 44px wide: room either side of it, given back outside it, so nothing moves */
 @media (pointer:coarse){
   .s-nav a{padding-inline:10px;margin-inline:-10px}
   .s-nav a[aria-current="page"]::after{left:10px;right:10px}
 }
 .s-right{margin-left:auto;display:flex;align-items:center;gap:8px;min-width:0}
-.s-burger{display:none;width:44px;height:44px;margin-right:-8px;border:0;border-radius:12px;background:none;color:var(--ink);cursor:pointer}
+.s-burger{display:none;width:44px;height:44px;margin-right:-10px;border:0;border-radius:999px;background:none;color:var(--ink);cursor:pointer}
 .s-burger svg{width:24px;height:24px}
 .s-burger .x{display:none}
 .s-burger[aria-expanded="true"] .x{display:block}
 .s-burger[aria-expanded="true"] .lines{display:none}
+@media (max-width:1100px){.s-bar > .s-wrap{gap:36px}.s-nav{gap:28px}}
 @media (max-width:760px){
   .s-nav{display:none}
   .s-bar > .s-wrap{gap:12px}
+  .s-word{font-size:2rem}
   .s-burger{display:grid;place-items:center}
 }
 /* the places, on a phone: a panel under the bar */
-.s-drawer{position:absolute;left:0;right:0;top:100%;padding:8px var(--s-gutter) 16px;background:var(--surface);border-bottom:1px solid var(--line);box-shadow:var(--shadow-float);animation:s-drop var(--dur) var(--ease)}
-.s-drawer a{display:flex;align-items:center;gap:14px;min-height:52px;padding:0 12px;margin:0 -12px;border-radius:12px;font-size:1rem;font-weight:500;color:var(--ink);text-decoration:none}
+.s-drawer{position:absolute;left:0;right:0;top:100%;padding:8px var(--s-gutter) 20px;background:var(--bg);border-bottom:1px solid var(--line);box-shadow:var(--shadow-float);animation:s-drop var(--dur) var(--ease)}
+.s-drawer a{display:flex;align-items:center;gap:14px;min-height:52px;padding:0 14px;margin:0 -14px;border-radius:12px;font-size:1rem;font-weight:600;color:var(--ink-2);text-decoration:none}
 .s-drawer a svg{width:20px;height:20px;color:var(--ink-3)}
-.s-drawer a[aria-current="page"]{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+.s-drawer a[aria-current="page"]{background:var(--surface-2);color:var(--ink);box-shadow:inset 2px 0 0 var(--gold)}
+.s-drawer a[aria-current="page"] svg{color:var(--ink)}
 .s-drawer a:focus-visible{outline-offset:-2px}
-.s-drawer a[aria-current="page"] svg{color:var(--accent-ink)}
 .s-drawer a:active{background:var(--surface-2)}
 @keyframes s-drop{from{opacity:0;transform:translateY(-6px)}}
 
 /* the account: a name in the corner, and a menu under it */
 .s-acct{position:relative;min-width:0}
-.s-acct > button{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:4px 12px 4px 4px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font:inherit;font-size:.9375rem;font-weight:500;color:var(--ink);cursor:pointer;max-width:min(260px,100%)}
+.s-acct > button{display:inline-flex;align-items:center;gap:10px;min-height:44px;padding:4px 14px 4px 4px;border:1px solid var(--line-2);border-radius:999px;background:transparent;font:inherit;font-size:.9375rem;font-weight:600;color:var(--ink);cursor:pointer;max-width:min(260px,100%)}
 .s-acct > button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .s-acct > button svg{width:16px;height:16px;flex:none;color:var(--ink-3)}
-.s-ini{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--on-accent);font-size:.8125rem;font-style:normal;font-weight:600;text-transform:uppercase}
-@media (hover:hover){.s-acct > button:hover{border-color:var(--line-2)}}
+.s-ini{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:var(--surface-3);color:var(--ink);font-size:.8125rem;font-style:normal;font-weight:700;text-transform:uppercase}
+@media (hover:hover){.s-acct > button:hover{border-color:var(--ink-3)}}
 @media (max-width:520px){.s-acct > button span{display:none}.s-acct > button{padding:4px 8px 4px 4px;gap:4px}}
-.s-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:2;min-width:248px;max-width:calc(100vw - 32px);padding:8px;border-radius:16px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-float);animation:s-drop var(--dur) var(--ease)}
+.s-menu{position:absolute;right:0;top:calc(100% + 10px);z-index:2;min-width:256px;max-width:calc(100vw - 32px);padding:8px;border-radius:16px;background:var(--surface-2);border:1px solid rgba(255,244,236,.07);box-shadow:var(--shadow-float);animation:s-drop var(--dur) var(--ease)}
 .s-menu[hidden]{display:none}
 .s-menu .who{padding:10px 12px 12px;border-bottom:1px solid var(--line);margin-bottom:6px}
-.s-menu .who b{display:block;font-size:.9375rem;overflow-wrap:anywhere}
-.s-menu .who small{display:block;margin-top:2px;font-family:var(--mono);font-size:.75rem;color:var(--ink-3);overflow-wrap:anywhere}
-.s-menu a,.s-menu button{display:flex;width:100%;align-items:center;gap:10px;min-height:44px;padding:0 12px;border:0;border-radius:10px;background:none;font:inherit;font-size:.9375rem;color:var(--ink);text-decoration:none;cursor:pointer;text-align:left}
-.s-menu a[aria-current="page"]{color:var(--accent-ink);font-weight:600}
+.s-menu .who b{display:block;font-size:.9375rem;font-weight:700;overflow-wrap:anywhere}
+.s-menu .who small{display:block;margin-top:2px;font-family:var(--sans);font-size:.8125rem;font-weight:500;font-variant-numeric:tabular-nums;color:var(--ink-3);overflow-wrap:anywhere}
+.s-menu a,.s-menu button{display:flex;width:100%;align-items:center;gap:12px;min-height:44px;padding:0 12px;border:0;border-radius:12px;background:none;font:inherit;font-size:.9375rem;font-weight:600;color:var(--ink-2);text-decoration:none;cursor:pointer;text-align:left}
+.s-menu a[aria-current="page"]{color:var(--ink);background:var(--surface-3)}
 .s-menu svg{width:18px;height:18px;color:var(--ink-3)}
 .s-menu a:focus-visible,.s-menu button:focus-visible{outline-offset:-2px}
-@media (hover:hover){.s-menu a:hover,.s-menu button:hover{background:var(--surface-2)}}
-.s-menu [data-out]{color:var(--stop)}
-.s-menu [data-out] svg{color:currentColor}
+@media (hover:hover){.s-menu a:hover,.s-menu button:hover{background:var(--surface-3);color:var(--ink)}}
 .s-menu hr{margin:6px 0;border:0;border-top:1px solid var(--line)}
 
 /* ── the foot ────────────────────────────────────────────────────── */
-.s-foot{flex:none;border-top:1px solid var(--line);padding:32px 0 calc(32px + var(--safe-b) + var(--s-dock))}
-.s-foot .s-wrap{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:16px 40px;font-size:.875rem;color:var(--ink-3)}
-.s-foot nav{display:flex;flex-wrap:wrap;gap:0 20px}
-.s-foot a{display:inline-flex;align-items:center;min-height:36px;color:var(--ink-2);text-decoration:none}
-.s-foot .who a{min-height:0;color:inherit;text-decoration:underline;text-decoration-color:color-mix(in srgb,currentColor 38%,transparent);text-underline-offset:.2em}
-/* the address under a thumb: 44px to press, the line it sits on no taller */
-@media (pointer:coarse){.s-foot .who a{min-height:44px;margin-block:-12px}}
+/* The wordmark large, four short columns, then the year and the two legal pages on a hairline. */
+.s-foot{flex:none;border-top:1px solid var(--line);padding:72px 0 calc(56px + var(--safe-b) + var(--s-dock))}
+.s-foot .s-cols{display:grid;grid-template-columns:1.4fr repeat(4,minmax(0,1fr));gap:32px}
+.s-foot .s-fword{display:inline-flex;align-self:start;font-family:var(--display);font-size:4rem;font-weight:800;line-height:1;letter-spacing:.01em;color:var(--ink);text-decoration:none}
+.s-foot .s-lab{display:block;margin:0 0 20px;font-size:.8125rem;font-weight:700;line-height:1;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.s-foot ul{display:grid;gap:16px;margin:0;padding:0;list-style:none}
+.s-foot li{margin:0}
+.s-foot a{color:var(--ink-2);font-size:1rem;font-weight:500;line-height:1.25;text-decoration:none;overflow-wrap:anywhere}
+.s-foot .s-fbot{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px 28px;margin-top:56px;padding-top:24px;border-top:1px solid var(--line);font-size:.875rem;font-weight:500;color:var(--ink-3)}
+.s-foot .s-fbot nav{display:flex;flex-wrap:wrap;gap:4px 28px}
+.s-foot .s-fbot a{font-size:.875rem;color:var(--ink-3)}
 @media (hover:hover){.s-foot a:hover{color:var(--ink)}}
-@media (max-width:760px){
-  .s-foot .s-wrap{flex-direction:column;align-items:stretch}
-  /* the links on top, the address line under them: site.js puts them in that order (not CSS `order`), so Tab reads as the eye does */
-  .s-foot nav{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
-  .s-foot nav a{min-height:44px}
+@media (max-width:900px){
+  .s-foot{padding-top:48px}
+  .s-foot .s-cols{grid-template-columns:repeat(2,minmax(0,1fr));gap:36px 24px}
+  .s-foot .s-cols > :first-child,.s-foot .s-cols > :last-child{grid-column:1 / -1}
+  .s-foot .s-fword{font-size:3rem}
+  .s-foot .s-fbot{margin-top:40px}
 }
-/* the links in a row under a thumb (a tablet): 44px tall, and a short one («Зах») 44px wide, its room given back outside it */
-@media (pointer:coarse) and (min-width:761px){.s-foot nav a{min-height:44px;padding-inline:10px;margin-inline:-10px}}
+/* the links under a thumb: 44px to press, the lists no taller for it */
+@media (pointer:coarse){
+  .s-foot ul{gap:0}
+  .s-foot ul a,.s-foot .s-fbot a{display:inline-flex;align-items:center;min-height:44px;min-width:44px}
+  .s-foot .s-lab{margin-bottom:8px}
+}
 
 /* ── a page's head ───────────────────────────────────────────────── */
-.s-head{padding:44px 0 28px}
-.s-head h1{margin:0;font-size:clamp(2rem,3.6vw,2.75rem);line-height:1.08;letter-spacing:-.03em}
-.s-head p{margin:10px 0 0;max-width:40em;font-size:1.0625rem;line-height:1.6;color:var(--ink-2)}
-@media (max-width:760px){.s-head{padding:28px 0 20px}}
-.s-crumb{display:inline-flex;align-items:center;gap:6px;min-height:44px;margin:16px 0 0;padding-right:8px;font-size:.875rem;font-weight:500;color:var(--ink-2);text-decoration:none}
-.s-crumb svg{width:16px;height:16px}
+.s-head{padding:56px 0 36px}
+.s-head h1{margin:0;font-family:var(--display);font-size:clamp(2.75rem,6.2vw,5.5rem);font-weight:800;line-height:.88;letter-spacing:-.004em}
+.s-head p{margin:18px 0 0;max-width:40em;font-size:1.125rem;font-weight:500;line-height:1.45;color:var(--ink-2)}
+@media (max-width:760px){.s-head{padding:28px 0 24px}.s-head p{font-size:1.0625rem;margin-top:14px}}
+.s-crumb{display:inline-flex;align-items:center;gap:6px;min-height:44px;margin:20px 0 0;padding-right:8px;font-size:.9375rem;font-weight:600;color:var(--ink-2);text-decoration:none}
+.s-crumb svg{width:18px;height:18px}
 @media (hover:hover){.s-crumb:hover{color:var(--ink)}}
-.s-sec{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:44px;margin:36px 0 8px}
-.s-sec h2{margin:0;font-size:1.25rem;letter-spacing:-.015em}
-.s-sec a,.s-sec .s-link{display:inline-flex;align-items:center;min-height:44px;font-size:.9375rem;font-weight:600;color:var(--accent-ink)}
+.s-sec{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;min-height:44px;margin:56px 0 20px}
+.s-sec h2{margin:0;font-family:var(--display);font-size:clamp(1.8125rem,3vw,2.25rem);font-weight:800;line-height:.95;letter-spacing:-.004em}
+/* «Бүгдийг үзэх →»: the ink, a gold hairline under it */
+.s-sec a,.s-sec .s-link{display:inline-flex;align-items:center;gap:8px;min-height:44px;font-size:.9375rem;font-weight:700;color:var(--ink);text-decoration:none;border-bottom:1px solid var(--gold-line)}
+@media (hover:hover){.s-sec a:hover{border-bottom-color:var(--gold)}}
+@media (max-width:760px){.s-sec{margin:40px 0 16px}}
 
 /* ── pieces ──────────────────────────────────────────────────────── */
-.s-card{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
-.s-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);font-size:.75rem;font-weight:600;line-height:1.3;color:var(--ink-2);white-space:nowrap}
-.s-pill svg{width:13px;height:13px;flex:none}
-.s-pill[data-tone="ready"]{background:var(--ready-soft);border-color:var(--ready-line);color:var(--ready)}
-.s-pill[data-tone="route"]{background:var(--route-soft);border-color:var(--route-line);color:var(--route)}
-.s-pill[data-tone="hold"]{background:var(--hold-soft);border-color:var(--hold-line);color:var(--hold)}
-.s-pill[data-tone="stop"]{background:var(--stop-soft);border-color:var(--stop-line);color:var(--stop)}
-.s-pill[data-tone="brand"]{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink)}
-.s-pill[data-tone="hi"]{background:var(--hi-soft);border-color:var(--hi-line);color:var(--hi-ink)}
-/* the paid tiers: VIP in honey, Онцгой in pine, both solid so they read at a glance */
-.s-pill[data-tone="vip"]{background:var(--hi);border-color:var(--hi);color:#2B1F05}
-.s-pill[data-tone="pine"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-/* a state: a dot in its tone and the word, calm beside the money */
-.s-pill[data-state]::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
-.s-money{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em;white-space:nowrap;color:var(--ink)}
-.s-money .cur,.money .cur{font-family:var(--sans);font-weight:500;margin-left:.08em;letter-spacing:0}
+.s-card{background:var(--surface);border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow-1)}
+/* A small word in a pill: outlined, never filled — the crimson fill is the screen's one action. */
+.s-pill{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:0 12px;border-radius:999px;border:1px solid var(--line-2);background:transparent;font-size:.8125rem;font-weight:700;line-height:1.2;color:var(--ink-2);white-space:nowrap}
+.s-pill svg{width:14px;height:14px;flex:none}
+.s-pill:is([data-tone="ready"],[data-tone="brand"],[data-tone="route"]){color:var(--ink)}
+.s-pill:is([data-tone="hold"],[data-tone="hi"],[data-tone="vip"]){color:var(--gold);border-color:var(--gold-line)}
+.s-pill[data-tone="stop"]{color:var(--accent-ink);border-color:var(--stop-line)}
+.s-money{font-family:var(--display);font-weight:800;font-variant-numeric:tabular-nums lining-nums;letter-spacing:.01em;white-space:nowrap;color:var(--ink)}
+.s-money .cur,.money .cur{font-family:inherit;font-weight:inherit;margin-left:.06em;letter-spacing:0}
 
-/* A filter or a tab: chosen is the pine wash, never the pine fill — that is the screen's one primary. */
+/* A filter or a tab: pills on the surface; the chosen one off-white — never the crimson, which is the screen's one action. */
 .s-chips{display:flex;flex-wrap:wrap;gap:8px}
-.s-chips button{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 16px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font:inherit;font-size:.9375rem;font-weight:500;color:var(--ink-2);cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:background var(--dur),border-color var(--dur),color var(--dur)}
-.s-chips button small{font-family:var(--mono);font-size:.75rem;font-weight:500;color:var(--ink-3)}
-.s-chips button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink);font-weight:600}
-.s-chips button[aria-pressed="true"] small{color:var(--accent-ink)}
+.s-chips button{display:inline-flex;align-items:center;gap:10px;min-height:48px;padding:0 22px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font:inherit;font-size:1rem;font-weight:700;color:var(--ink-2);cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:background var(--dur),border-color var(--dur),color var(--dur)}
+.s-chips button small{font-family:var(--sans);font-size:.875rem;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink-3)}
+.s-chips button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--on-light)}
+.s-chips button[aria-pressed="true"] small{color:#6E625B}
 @media (hover:hover){.s-chips button:not([aria-pressed="true"]):hover{border-color:var(--line-2);color:var(--ink)}}
-@media (pointer:coarse){.s-chips button{min-height:44px}}
+@media (max-width:760px){.s-chips button{min-height:44px;padding:0 18px;font-size:.9375rem}}
 
-/* Empty: what this place is for, and the one next step. */
-.s-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:48px 24px;text-align:center;color:var(--ink-2)}
-.s-empty.s-card{padding:48px 24px 44px}
-.s-empty .s-mark{display:grid;place-items:center;width:56px;height:56px;margin-bottom:10px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink)}
-.s-empty .s-mark svg{width:26px;height:26px}
-.s-empty b,.s-empty .s-empty-title{display:block;margin:0;font-size:1.1875rem;font-weight:600;line-height:1.3;letter-spacing:0;color:var(--ink);text-wrap:balance}
-.s-empty p{max-width:44ch;margin:0;font-size:.9375rem;line-height:1.6;text-wrap:pretty}
-.s-empty .s-acts{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:18px}
+/* Empty: one line, one button. A dark round mark, the title in the display, the line under it. */
+.s-empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:56px 24px;text-align:center;color:var(--ink-2)}
+.s-empty.s-card{padding:56px 24px 52px}
+.s-empty .s-mark{display:grid;place-items:center;width:56px;height:56px;margin-bottom:12px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line-2);box-shadow:var(--shadow-1);color:var(--ink-2)}
+.s-empty .s-mark svg{width:24px;height:24px}
+.s-empty b,.s-empty .s-empty-title{display:block;margin:0;font-family:var(--display);font-size:1.8125rem;font-weight:800;line-height:.95;letter-spacing:-.004em;color:var(--ink);text-wrap:balance}
+.s-empty p{max-width:46ch;margin:4px 0 0;font-size:1rem;font-weight:500;line-height:1.55;text-wrap:pretty}
+.s-empty .s-acts{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:22px}
 
-/* How an order goes, in four steps: shown where somebody is about to start one. */
-.s-how{margin:56px 0 0;padding:28px;border-radius:18px;background:var(--surface-2);border:1px solid var(--line)}
-.s-how h2{margin:0;font-size:1.125rem;letter-spacing:-.01em}
-.s-how ol{list-style:none;counter-reset:how;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px 28px;margin:20px 0 0;padding:0}
-.s-how li{counter-increment:how;display:grid;grid-template-columns:32px 1fr;gap:2px 12px;align-content:start}
-.s-how li::before{content:counter(how);grid-row:span 2;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent-ink);font-family:var(--mono);font-size:.875rem;font-weight:600}
-.s-how b{font-size:.9375rem;font-weight:600;line-height:1.35;color:var(--ink)}
-.s-how span{font-size:.875rem;line-height:1.5;color:var(--ink-2)}
-@media (max-width:980px){.s-how ol{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:560px){.s-how{padding:22px 20px}.s-how ol{grid-template-columns:1fr;gap:16px}}
+/* How an order goes: three steps, a gold outlined numeral and one verb each — as on the front page. */
+.s-how{margin:96px 0 0}
+.s-how h2{margin:0;font-family:var(--display);font-size:clamp(2.25rem,4.4vw,4.5rem);font-weight:800;line-height:.88;letter-spacing:-.004em}
+.s-how ol{list-style:none;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px;margin:36px 0 0;padding:0}
+.s-how li{display:grid;grid-template-columns:auto 1fr;column-gap:24px;align-items:start;padding-top:24px;border-top:1px solid var(--gold-line)}
+.s-how li > i{grid-row:span 2;font-family:var(--display);font-size:5.5rem;font-style:normal;font-weight:800;line-height:.78;color:transparent;-webkit-text-stroke:1.25px var(--gold)}
+.s-how b{font-family:var(--display);font-size:2.25rem;font-weight:800;line-height:.95;color:var(--ink)}
+.s-how span{margin-top:10px;font-size:1rem;font-weight:500;line-height:1.45;color:var(--ink-2)}
+@media (max-width:900px){
+  .s-how{margin-top:56px;padding-top:22px;border-top:1px solid var(--gold-line)}
+  .s-how ol{grid-template-columns:1fr;gap:0;margin-top:12px}
+  .s-how li{grid-template-columns:44px 1fr;column-gap:18px;align-items:center;padding:16px 0;border-top:0;border-bottom:1px solid var(--line)}
+  .s-how li:last-child{border-bottom:0}
+  .s-how li > i{font-size:2.75rem;line-height:1;-webkit-text-stroke-width:1px}
+  .s-how b{font-family:var(--sans);font-size:1.125rem;font-weight:700;line-height:1.2}
+  .s-how span{margin-top:3px;font-size:.9375rem}
+}
 
 /* A word to the side of the flow: info, a warning, a stop. */
-.s-note{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border-radius:14px;background:var(--surface-2);border:1px solid var(--line);font-size:.9375rem;line-height:1.55;color:var(--ink-2)}
+.s-note{display:flex;gap:12px;align-items:flex-start;padding:16px 18px;border-radius:16px;background:var(--surface-2);border:1px solid var(--line);font-size:.9375rem;line-height:1.55;color:var(--ink-2)}
 .s-note > svg{flex:none;width:20px;height:20px;margin-top:1px;color:var(--ink-3)}
-.s-note b{display:block;color:var(--ink);font-weight:600}
-.s-note[data-k="warn"]{background:var(--hold-soft);border-color:var(--hold-line)}
-.s-note[data-k="warn"] > svg{color:var(--hold)}
-.s-note[data-k="ok"]{background:var(--ready-soft);border-color:var(--ready-line)}
-.s-note[data-k="ok"] > svg{color:var(--ready)}
+.s-note b{display:block;color:var(--ink);font-weight:700}
+.s-note[data-k="warn"]{background:var(--gold-soft);border-color:var(--gold-line)}
+.s-note[data-k="warn"] > svg{color:var(--gold)}
+.s-note[data-k="ok"] > svg{color:var(--ink)}
 
 /* ── /terms and /privacy in a browser ───────────────────────────────
    The pages are app.css's .doc; in a browser (data-site, set by their
@@ -234,27 +252,27 @@ input.s-input[type="date"]{display:flex;align-items:center}
 html[data-site] .topbar{display:none}
 /* the bar drawn in their HTML is the website's: in the app's web view it never shows */
 html:not([data-site]) .s-bar{display:none}
-html[data-site] .doc{flex:1 0 auto;padding-top:32px;padding-bottom:56px}
+html[data-site] .doc{flex:1 0 auto;padding-top:40px;padding-bottom:72px}
 html[data-site] .doc h2{scroll-margin-top:calc(var(--s-bar) + var(--safe-t) + 20px)}
 html[data-site] .doc .toc a:not(.btn):not(.link):not(.go){text-decoration:none}
 .doc-aside{display:none}
 @media (max-width:480px){html[data-site] .doc{padding-top:0}html[data-site] .doc-card{border-top:0}}
 @media (min-width:760px){
-  html[data-site] main.doc{max-width:760px}
-  html[data-site] .doc-card{padding:36px 40px;border-radius:18px}
+  html[data-site] main.doc{max-width:800px}
+  html[data-site] .doc-card{padding:44px 48px;border-radius:22px}
+  html[data-site] .doc h1{font-size:3.5rem}
 }
 @media (min-width:1100px){
-  html[data-site] main.doc{max-width:1080px;display:grid;grid-template-columns:232px minmax(0,1fr);gap:48px;align-items:start}
+  html[data-site] main.doc{max-width:1120px;display:grid;grid-template-columns:240px minmax(0,1fr);gap:56px;align-items:start}
   /* The text holds its column from the first paint; the contents arrive beside it, not in front of it. */
   html[data-site] main.doc > .doc-card{grid-column:2;grid-row:1}
   html[data-site] .doc-aside{display:block;grid-column:1;grid-row:1;position:sticky;top:calc(var(--s-bar) + var(--safe-t) + 32px)}
-  html[data-site] .doc-aside .eyebrow{margin:8px 0 12px}
-  html[data-site] .doc-aside .toc a{min-height:36px;margin:0 -10px;padding:0 10px;border-radius:8px;font-size:.875rem;color:var(--ink-2)}
-  html[data-site] .doc-aside .toc a[aria-current]{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
-  html[data-site] .doc-aside .toc a[aria-current] .n{color:var(--accent-ink)}
+  html[data-site] .doc-aside .eyebrow{margin:12px 0 14px}
+  html[data-site] .doc-aside .toc a{min-height:40px;margin:0 -12px;padding:0 12px;border-radius:12px;font-size:.9375rem;color:var(--ink-2)}
+  html[data-site] .doc-aside .toc a[aria-current]{background:var(--surface-2);color:var(--ink);box-shadow:inset 2px 0 0 var(--gold)}
   html[data-site] .doc-card > .toc{display:none}
 }
-/* the contents under a thumb, in the card or beside it: 44px a line (app.css draws them 40, the side 36);
+/* the contents under a thumb, in the card or beside it: 44px a line (app.css draws them 40, the side 40);
    the address a fact holds alone («Холбоо барих») 44px to press, its row no taller */
 @media (pointer:coarse){
   html[data-site] .doc .toc a{min-height:44px}
@@ -262,13 +280,14 @@ html[data-site] .doc .toc a:not(.btn):not(.link):not(.go){text-decoration:none}
 }
 
 /* Loading: blocks in the shape of what comes. */
-.s-skel{display:block;border-radius:12px;background:linear-gradient(90deg,var(--surface-2) 0%,color-mix(in srgb,var(--line) 70%,var(--surface-2)) 50%,var(--surface-2) 100%);background-size:200% 100%;animation:s-shine 1.2s linear infinite}
+.s-skel{display:block;border-radius:12px;background:linear-gradient(90deg,var(--surface) 0%,var(--surface-2) 50%,var(--surface) 100%);background-size:200% 100%;animation:s-shine 1.3s linear infinite}
 @keyframes s-shine{to{background-position:-200% 0}}
 @media (prefers-reduced-motion:reduce){.s-skel{animation:none}}
 
-/* A moment's word at the foot of the screen; above the order bar where one is up. */
-.s-toast{position:fixed;left:50%;bottom:calc(24px + var(--safe-b) + var(--s-dock));z-index:var(--z-toast);display:flex;gap:10px;align-items:flex-start;transform:translateX(-50%);width:max-content;max-width:min(560px,calc(100vw - 32px));padding:13px 18px;border-radius:14px;background:var(--deep);color:#fff;font-size:.9375rem;font-weight:500;line-height:1.45;box-shadow:0 18px 40px -18px rgba(0,0,0,.5);animation:s-rise var(--dur) var(--ease)}
-.s-toast[data-tone]::before{content:"";flex:none;width:18px;height:18px;margin-top:1px;background:var(--accent-line);-webkit-mask:var(--s-tick) center/18px no-repeat;mask:var(--s-tick) center/18px no-repeat}
-.s-toast[data-tone="bad"]{background:var(--stop);color:var(--on-stop)}
-.s-toast[data-tone="bad"]::before{background:currentColor;-webkit-mask-image:var(--s-alert);mask-image:var(--s-alert)}
+/* A moment's word at the foot of the screen; above the order bar where one is up. One dark pill for
+   every kind: the mark before the words says which (a check, or the alert in the crimson's ink). */
+.s-toast{position:fixed;left:50%;bottom:calc(24px + var(--safe-b) + var(--s-dock));z-index:var(--z-toast);display:flex;gap:10px;align-items:flex-start;transform:translateX(-50%);width:max-content;max-width:min(560px,calc(100vw - 32px));padding:14px 20px;border-radius:16px;background:var(--surface-3);border:1px solid rgba(255,244,236,.09);color:var(--ink);font-size:.9375rem;font-weight:600;line-height:1.45;box-shadow:var(--shadow-float);animation:s-rise var(--dur) var(--ease)}
+.s-toast[data-tone]::before{content:"";flex:none;width:18px;height:18px;margin-top:1px;background:var(--ink);-webkit-mask:var(--s-tick) center/18px no-repeat;mask:var(--s-tick) center/18px no-repeat}
+.s-toast[data-tone="bad"]{border-color:var(--stop-line);box-shadow:var(--shadow-float),0 0 0 4px rgba(242,86,107,.08)}
+.s-toast[data-tone="bad"]::before{background:var(--accent-ink);-webkit-mask-image:var(--s-alert);mask-image:var(--s-alert)}
 @keyframes s-rise{from{opacity:0;transform:translate(-50%,8px)}}

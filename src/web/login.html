@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="mn" data-theme="light" data-site>
+<html lang="mn" data-site>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#123A2C">
+<meta name="theme-color" content="#100D0C">
 <title>Нэвтрэх — Basu</title>
 <meta name="description" content="Basu-д нэвтэрч өвлийн идшээ захиалаарай.">
 <meta name="robots" content="noindex">
@@ -19,95 +19,94 @@ if (/FBAN|FBAV|FB_IAB|Instagram|Line\//.test(navigator.userAgent)) document.docu
 <link rel="stylesheet" href="/app.css">
 <link rel="stylesheet" href="/site.css">
 <style>
-/* The door. Half the screen is the meat, on pine, and says what Basu is;
-   the other half asks one thing at a time — an address, then the code that
-   went to it — and nothing else. On a phone the picture becomes a short band
-   so the first field and its button sit in the first screen. Pinned light,
-   like the rest of the website. */
+/* The door, «Тансаг хар». Half the screen is the lamb, lit on the charcoal,
+   with the front page's words set large; the other half asks one thing at a
+   time — an address, then the code that went to it — on the bare ground,
+   with the one crimson pill under it. On a phone the picture is a short band
+   so the first field and its button sit in the first screen. */
 
 .l{position:relative;flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-height:100vh;min-height:100dvh}
-.l-art{position:relative;overflow:hidden;background:var(--deep);color:#fff;--focus:var(--accent-line)}
-.l-art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:46% 50%}
-.l-art::after{content:"";position:absolute;inset:0;
-  background:linear-gradient(180deg,rgba(18,58,44,.6) 0%,rgba(18,58,44,0) 28%,rgba(18,58,44,0) 48%,rgba(18,58,44,.92) 100%);
-  background:linear-gradient(180deg,color-mix(in srgb,var(--deep) 60%,transparent) 0%,transparent 28%,transparent 48%,color-mix(in srgb,var(--deep) 92%,transparent) 100%)}
-.l-art .s-word{position:absolute;z-index:1;top:calc(24px + var(--safe-t));left:40px;color:#fff;font-size:1.5rem}
-.l-say{position:absolute;z-index:1;left:40px;right:40px;bottom:44px}
-.l-kick{display:inline-flex;align-items:center;gap:8px;margin-bottom:14px;padding:5px 12px;border-radius:999px;background:rgba(255,255,255,.12);font-style:normal;font-size:.8125rem;font-weight:500}
-.l-kick::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--hi)}
-.l-say b{display:block;font-size:clamp(2.2rem,3.6vw,3.25rem);font-weight:600;line-height:1.02;letter-spacing:-.035em}
-.l-say span{display:block;margin-top:14px;max-width:26em;font-size:1rem;line-height:1.6;color:rgba(255,255,255,.76)}
+.l-art{position:relative;overflow:hidden;background:#1A1514;color:var(--ink);isolation:isolate}
+.l-art img{position:absolute;inset:0;z-index:-2;width:100%;height:100%;object-fit:cover;object-position:46% 50%;filter:sepia(.14) saturate(1.25) contrast(1.14) brightness(1.03)}
+.l-art::after{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(16,13,12,.7) 0%,rgba(16,13,12,0) 26%,rgba(16,13,12,0) 44%,var(--bg) 100%),linear-gradient(90deg,rgba(16,13,12,0) 62%,var(--bg) 100%)}
+.l-art .s-word{position:absolute;top:calc(28px + var(--safe-t));left:clamp(24px,5.56vw,80px);color:var(--ink);font-size:2.5rem}
+.l-say{position:absolute;left:clamp(24px,5.56vw,80px);right:40px;bottom:64px}
+.l-say b{display:block;font-family:var(--display);font-size:clamp(3rem,5.4vw,5rem);font-weight:800;line-height:.86;letter-spacing:-.006em}
+.l-say span{display:block;margin-top:20px;max-width:26em;font-size:1.125rem;font-weight:500;line-height:1.45;color:var(--ink-2)}
 
-.l-pane{display:flex;flex-direction:column;padding:calc(20px + var(--safe-t)) clamp(24px,5vw,72px) calc(28px + var(--safe-b));background:var(--surface)}
-.l-top{display:flex;justify-content:flex-end;align-items:center;min-height:44px}
-.l-home{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 4px;font-size:.875rem;font-weight:500;color:var(--ink-2);text-decoration:none}
-.l-home svg{width:16px;height:16px}
+.l-pane{display:flex;flex-direction:column;padding:calc(24px + var(--safe-t)) clamp(24px,5vw,80px) calc(28px + var(--safe-b));background:var(--bg)}
+.l-top{display:flex;justify-content:flex-end;align-items:center;min-height:48px}
+.l-home{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:0 4px;font-size:.9375rem;font-weight:600;color:var(--ink-2);text-decoration:none}
+.l-home svg{width:18px;height:18px}
 @media (hover:hover){.l-home:hover{color:var(--ink)}}
-.l-body{flex:1;display:flex;flex-direction:column;justify-content:center;width:100%;max-width:400px;margin:0 auto;padding:32px 0}
-.l-body h1{margin:0;font-size:2rem;line-height:1.1;letter-spacing:-.03em}
-.l-lead{margin:10px 0 28px;font-size:1rem;line-height:1.6;color:var(--ink-2)}
+.l-body{flex:1;display:flex;flex-direction:column;justify-content:center;width:100%;max-width:420px;margin:0 auto;padding:32px 0}
+.l-body h1{margin:0;font-family:var(--display);font-size:clamp(2.75rem,4vw,3.5rem);font-weight:800;line-height:.9;letter-spacing:-.004em}
+.l-lead{margin:16px 0 32px;font-size:1rem;font-weight:500;line-height:1.55;color:var(--ink-2)}
 .l-lead b{color:var(--ink);overflow-wrap:anywhere}
+/* Google's own dark button: its fill, its edge, its four colours — next to the crimson, never the crimson */
+.l-google{background:#131314;border-color:#8E918F;color:#E3E3E3;font-weight:600}
+@media (hover:hover){.l-google:hover{background:#1F1F21!important;border-color:#8E918F!important}}
 .l-google svg{width:20px;height:20px}
 /* a narrow phone wraps the words rather than pushing the page sideways */
 .l-google{white-space:normal;text-align:center;line-height:1.25;padding-top:10px;padding-bottom:10px}
-.l-or{display:flex;align-items:center;gap:14px;margin:22px 0;font-size:.8125rem;color:var(--ink-3)}
+.l-or{display:flex;align-items:center;gap:14px;margin:24px 0;font-size:.8125rem;font-weight:600;color:var(--ink-3)}
 .l-or::before,.l-or::after{content:"";flex:1;height:1px;background:var(--line)}
-.l-alt{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 20px;margin:18px 0 0;font-size:.9375rem}
-.l-alt .s-link{display:inline-flex;align-items:center;min-height:44px}
+.l-alt{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 24px;margin:20px 0 0;font-size:.9375rem}
+.l-alt .s-link{display:inline-flex;align-items:center;min-height:44px;text-decoration:none;border-bottom:1px solid var(--gold-line);padding-top:2px}
+@media (hover:hover){.l-alt .s-link:hover{border-bottom-color:var(--gold)}}
 .l-step[hidden]{display:none}
 /* In Facebook's or Instagram's browser: no Google, and a line under the email door saying where it works. */
 html[data-in-app] #google,html[data-in-app] #or{display:none}
-.l-in-app{display:none;gap:10px;align-items:flex-start;margin:16px 0 0;padding:12px 14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);font-size:.875rem;line-height:1.5;color:var(--ink-2)}
-.l-in-app svg{flex:none;width:18px;height:18px;margin-top:1px;color:var(--ink-3)}
+.l-in-app{display:none;gap:10px;align-items:flex-start;margin:16px 0 0;padding:14px 16px;border-radius:16px;background:var(--surface-2);border:1px solid var(--line);font-size:.875rem;line-height:1.5;color:var(--ink-2)}
+.l-in-app svg{flex:none;width:18px;height:18px;margin-top:1px;color:var(--gold)}
 html[data-in-app] .l-in-app{display:flex}
-.l-back{display:inline-flex;align-items:center;gap:6px;min-height:44px;margin:-8px 0 12px -4px;padding:0 4px;border:0;background:none;font:inherit;font-size:.875rem;font-weight:500;color:var(--ink-2);cursor:pointer}
-.l-back svg{width:16px;height:16px}
+.l-back{display:inline-flex;align-items:center;gap:6px;min-height:44px;margin:-8px 0 16px -4px;padding:0 4px;border:0;background:none;font:inherit;font-size:.9375rem;font-weight:600;color:var(--ink-2);cursor:pointer}
+.l-back svg{width:18px;height:18px}
 @media (hover:hover){.l-back:hover{color:var(--ink)}}
-.l-legal{margin:32px 0 0;font-size:.8125rem;line-height:1.6;color:var(--ink-3)}
-.l-legal a{color:var(--ink-2);text-decoration:underline;text-underline-offset:.2em}
+.l-legal{margin:36px 0 0;font-size:.8125rem;line-height:1.6;color:var(--ink-3)}
+.l-legal a{color:var(--ink-2);text-decoration:underline;text-decoration-color:var(--gold-line);text-underline-offset:.2em}
 /* an error said between the field and its button */
-.l-step form .s-error{margin:-4px 0 16px}
+.l-step form .s-error{margin:-6px 0 16px}
 
 /* six boxes for the code: one real input over them, so paste and the
    phone's «from Messages» both land whole */
 .l-otp{position:relative;display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:0 0 14px}
-.l-otp i{display:grid;place-items:center;aspect-ratio:1/1.12;border:1px solid var(--line-2);border-radius:14px;background:var(--surface);font-family:var(--mono);font-size:1.5rem;font-weight:600;font-style:normal;color:var(--ink);transition:border-color var(--dur),box-shadow var(--dur)}
-.l-otp i[data-on]{border-color:var(--accent);box-shadow:var(--ring)}
-.l-otp[data-bad] i{border-color:var(--stop)}
+.l-otp i{display:grid;place-items:center;aspect-ratio:1/1.12;border:1px solid var(--line-2);border-radius:16px;background:var(--surface);font-family:var(--display);font-size:2rem;font-weight:800;font-style:normal;font-variant-numeric:tabular-nums;color:var(--ink);transition:border-color var(--dur),box-shadow var(--dur)}
+.l-otp i[data-on]{border-color:var(--focus);box-shadow:var(--ring)}
+.l-otp[data-bad] i{border-color:var(--accent-ink)}
 .l-otp input{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;color:transparent;caret-color:transparent;font-size:16px;outline:none;letter-spacing:40px}
 .l-otp input::selection{background:transparent}
 .l-otp input:disabled{cursor:progress}
+/* the keyboard's ring goes round the six boxes, not the unseen input over them */
+.l-otp:has(input:focus-visible){outline:2px solid var(--focus);outline-offset:4px;border-radius:18px}
 .l-again{display:flex;flex-wrap:wrap;align-items:center;gap:0 14px;font-size:.875rem;color:var(--ink-3)}
 .l-again .s-link{display:inline-flex;align-items:center;min-height:44px}
 
 .l-eye{position:relative;display:block}
 .l-eye .s-input{padding-right:52px}
-.l-eye button{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:10px;background:none;color:var(--ink-3);cursor:pointer}
+.l-eye button{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:999px;background:none;color:var(--ink-3);cursor:pointer}
 .l-eye button svg{width:20px;height:20px}
-.l-eye button[aria-pressed="true"]{color:var(--accent-ink)}
+.l-eye button[aria-pressed="true"]{color:var(--ink)}
 
 @media (max-width:900px){
   .l{grid-template-columns:minmax(0,1fr);grid-template-rows:auto 1fr}
-  .l-art{height:calc(clamp(176px,27vh,232px) + var(--safe-t))}
-  .l-art .s-word{top:calc(14px + var(--safe-t));left:24px}
-  .l-say{left:24px;right:24px;bottom:20px}
-  .l-kick{margin-bottom:10px}
-  .l-say b{font-size:1.75rem}
+  .l-art{height:calc(clamp(200px,30vh,260px) + var(--safe-t))}
+  .l-art .s-word{top:calc(14px + var(--safe-t));left:24px;font-size:2rem}
+  .l-art::after{background:linear-gradient(180deg,rgba(16,13,12,.6) 0%,rgba(16,13,12,0) 30%,rgba(16,13,12,0) 40%,var(--bg) 100%)}
+  .l-say{left:24px;right:24px;bottom:16px}
+  .l-say b{font-size:2.5rem}
   .l-say span{display:none}
   /* the way home rides on the picture, so the form starts at the top of the pane */
-  .l-top{position:absolute;z-index:2;top:calc(8px + var(--safe-t));right:16px}
-  .l-home{color:#fff}
-  /* on the picture the pine focus ring would not show: the pale pine (--focus, which app.css's ring reads), as on the landing's bands */
-  .l-top{--focus:var(--accent-line)}
-  .l-home:focus-visible{outline-color:var(--focus)}
+  .l-top{position:absolute;z-index:2;top:calc(10px + var(--safe-t));right:14px}
+  .l-home{color:var(--ink)}
   .l-pane{padding:4px 24px calc(28px + var(--safe-b))}
-  .l-body{justify-content:flex-start;padding:24px 0 8px}
-  .l-body h1{font-size:1.75rem}
-  .l-lead{margin-bottom:24px}
+  .l-body{justify-content:flex-start;padding:20px 0 8px}
+  .l-body h1{font-size:2.75rem}
+  .l-lead{margin:12px 0 24px}
 }
 @media (max-width:900px) and (max-height:700px){
-  .l-art{height:calc(152px + var(--safe-t))}
-  .l-kick{display:none}
+  .l-art{height:calc(160px + var(--safe-t))}
+  .l-say b{font-size:2rem}
 }
 </style>
 </head>
@@ -116,7 +115,7 @@ html[data-in-app] .l-in-app{display:flex}
   <aside class="l-art" aria-hidden="true">
     <img src="/brand/meat/hero-square.webp" alt="" width="1100" height="1100">
     <a class="s-word" href="/" tabindex="-1">Basu</a>
-    <div class="l-say"><i class="l-kick">Өвлийн идэш</i><b>Шинэ мах.<br>Эцсийн үнэ.</b><span>Хонь, ямаа, үхэр, адууны махыг гэрээт нийлүүлэгчээс. Мал таны захиалгаар нядлагдана.</span></div>
+    <div class="l-say"><b>Өвлийн идэшээ<br>эртхэн захиал.</b><span>Бүтэн мал эсвэл кг-аар. Гэрээт нийлүүлэгчээс.</span></div>
   </aside>
 
   <section class="l-pane">

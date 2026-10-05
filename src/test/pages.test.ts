@@ -1275,47 +1275,18 @@ describe('the kitchen display', () => {
 });
 
 describe('the front page', () => {
-  it('works out a winter of meat, in sheep and goats and kilograms', async () => {
-    const dom = await openPage('index.html');
-    const d = dom.window.document;
-    const text = (id: string) => d.getElementById(id)?.textContent;
-    const press = (selector: string, times = 1) => {
-      for (let i = 0; i < times; i++) (d.querySelector(selector) as HTMLButtonElement).click();
-    };
-    await until(dom, 'the sums', () => text('kg') !== null);
-
-    // Four people, four months, eating as most do: 4 × 4 × 7.
-    expect(text('kg')).toBe('112 кг');
-    expect(text('said')).toBe('6 хонь, эсвэл 7 ямаа орчим');
-    expect(d.querySelectorAll('#flock svg')).toHaveLength(6);
-
-    press('[data-step="people"][data-by="1"]');
-    expect(text('people')).toBe('5 хүн');
-    expect(text('kg')).toBe('140 кг');
-    press('[data-appetite="high"]');
-    expect(d.querySelector('[data-appetite="high"]')?.getAttribute('aria-pressed')).toBe('true');
-    expect(d.querySelector('[data-appetite="mid"]')?.getAttribute('aria-pressed')).toBe('false');
-    expect(text('kg')).toBe('200 кг');
-    expect(text('said')).toBe('10 хонь, эсвэл 13 ямаа орчим');
-
-    // Six months at most, one person at least: the buttons stop where the sums do.
-    press('[data-step="months"][data-by="1"]', 5);
-    expect(text('months')).toBe('6 сар');
-    expect((d.querySelector('[data-step="months"][data-by="1"]') as HTMLButtonElement).disabled).toBe(true);
-    press('[data-step="people"][data-by="-1"]', 9);
-    expect(text('people')).toBe('1 хүн');
-    expect((d.querySelector('[data-step="people"][data-by="-1"]') as HTMLButtonElement).disabled).toBe(true);
-    expect(text('kg')).toBe('60 кг');
-  });
-
   it('shows the stalls to anybody, signed in or not', async () => {
     storage.removeItem('basu.guest');
     const dom = await openPage('index.html');
     const d = dom.window.document;
     await until(dom, 'the stall board', () => !(d.getElementById('board') as HTMLElement).hidden);
     expect(d.querySelectorAll('.stall').length).toBeGreaterThan(0);
-    // The count on each animal a stall sells.
+    // The count on each animal a stall sells, and the cheapest of it under its name.
     expect([...d.querySelectorAll('.animal .ktag')].some((t) => /^\d+ зар$/.test(t.textContent ?? ''))).toBe(true);
+    expect([...d.querySelectorAll('.animal .m em')].some((t) => /^[\d,]+₮(\/кг)?$/.test(t.textContent ?? ''))).toBe(true);
+    // One listing of them floats on the opening, a press away.
+    expect((d.getElementById('chip') as HTMLElement).hidden).toBe(false);
+    expect(d.getElementById('chip')?.getAttribute('href')).toMatch(/^\/shop\/[0-9a-f-]{36}$/);
   });
 
   it('shows what is on sale from the stalls, and nothing it made up', async () => {
@@ -1329,7 +1300,9 @@ describe('the front page', () => {
     expect(stalls.length).toBeLessThanOrEqual(6);
     for (const stall of stalls) {
       expect(stall.getAttribute('href')).toMatch(/^\/shop\/[0-9a-f-]{36}$/);
-      expect(stall.querySelector('.money')?.textContent).toMatch(/₮ \/ (толгой|кг)$/);
+      // The price in the display face, and what it is for: a kilo, or a whole animal's rough weight.
+      expect(stall.querySelector('.pr .money')?.textContent).toMatch(/^[\d,]+₮$/);
+      expect(stall.querySelector('.pr small')?.textContent).toMatch(/^(\/кг|≈\d+ кг|)$/);
     }
     expect((d.getElementById('board-empty') as HTMLElement).hidden).toBe(true);
   });

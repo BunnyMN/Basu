@@ -3,19 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F3EE">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0F1110">
+<meta name="theme-color" content="#100D0C">
 <title>Өвлийн идэш · Үйлчилгээний нөхцөл</title>
 <script>
-/* In a browser this is a page of the website: its header and its foot, and
-   light, like every page of the website. In the phone app (the shell's web
-   view) it keeps the app's own bar and follows the phone's theme. Set before
-   the stylesheets are read and the body is drawn, so nothing shows and then
-   changes. */
+/* In a browser this is a page of the website: its header and its foot. In
+   the phone app (the shell's web view) it keeps the app's own bar. Dark in
+   both, like everything. Set before the stylesheets are read and the body is
+   drawn, so nothing shows and then changes. */
 if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.basu)) {
   document.documentElement.setAttribute('data-site', '');
-  document.documentElement.setAttribute('data-theme', 'light');
-  for (const meta of document.querySelectorAll('meta[name="theme-color"]')) meta.setAttribute('content', '#FFFFFF');
 }
 </script>
 <link rel="stylesheet" href="/app.css">
@@ -28,7 +24,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 </style>
 </head>
 <body>
-<header class="s-bar" data-static><div class="s-wrap"><a class="s-word" href="/">Basu</a><nav class="s-nav" aria-label="Цэс"><a href="/home">Нүүр</a><a href="/shop">Зах</a><a href="/orders">Миний захиалга</a><a href="/dashboard">Бизнест</a></nav><div class="s-right"></div></div></header>
+<header class="s-bar" data-static><div class="s-wrap"><a class="s-word" href="/">Basu</a><nav class="s-nav" aria-label="Цэс"><a href="/home">Нүүр</a><a href="/shop">Идэш</a><a href="/orders">Миний захиалга</a><a href="/dashboard">Бизнес</a></nav><div class="s-right"></div></div></header>
 <header class="topbar">
   <a class="back" href="/idesh" id="back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Буцах</a>
   <div class="title"><b>Үйлчилгээний нөхцөл</b></div>

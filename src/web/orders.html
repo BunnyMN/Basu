@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="mn" data-theme="light" data-site>
+<html lang="mn" data-site>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#FFFFFF">
+<meta name="theme-color" content="#100D0C">
 <title>Миний захиалга — Basu</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="/brand/favicon.png">
@@ -11,123 +11,130 @@
 <link rel="stylesheet" href="/app.css">
 <link rel="stylesheet" href="/site.css">
 <style>
-/* A person's orders, on the website: every one they paid for, then one of
-   them in full — where it stands, the code for the handover, who to ring,
-   and, when one was cancelled, where the money goes. The page shows; the
-   one thing it asks for (the refund's bank account) is asked in a popup. */
+/* A person's orders, on the website, «Тансаг хар»: every one they paid for,
+   a raised row each — the meat's photo, the title, the code, the money in the
+   display and its state in one word with the four bars under it — then one
+   of them in full: where it stands, the handover code large, who to ring,
+   and, when one was cancelled, where the money goes. The page shows; the one
+   thing it asks for (the refund's bank account) is asked in a popup. */
 
-.so-tabs{margin:0 0 20px}
-.so-list{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow)}
-.so-row{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:18px;align-items:center;min-height:86px;padding:16px 20px;color:inherit;text-decoration:none}
-.so-row + .so-row{border-top:1px solid var(--line)}
-/* the list clips what is outside it (its round corners): the focus ring goes inside the row */
-.so-row:focus-visible{outline-offset:-3px}
-@media (hover:hover){.so-row:hover{background:var(--surface-2)}}
+.so-tabs{margin:0 0 24px}
+.so-list{display:grid;gap:12px}
+.so-row{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:18px;align-items:center;min-height:100px;padding:14px 20px 14px 14px;border:1px solid var(--line);border-radius:22px;background:var(--surface);color:var(--ink);text-decoration:none;transition:border-color var(--dur)}
+@media (hover:hover){.so-row:hover{border-color:var(--line-2)}}
 .so-row:active{background:var(--surface-2)}
-.so-row img{width:72px;height:54px;border-radius:10px;object-fit:cover;background:var(--surface-2)}
-.so-row b{display:block;font-weight:600;line-height:1.35}
-.so-row small{display:block;margin-top:3px;font-size:.875rem;color:var(--ink-2)}
-.so-row small .mono{font-size:.8125rem;color:var(--ink-3)}
-.so-row .end{display:flex;flex-direction:column;align-items:flex-end;gap:6px;text-align:right}
-.so-row .end .s-money{font-size:1.0625rem}
-.so-skel{display:grid;grid-template-columns:72px minmax(0,1fr) 96px;gap:18px;align-items:center;min-height:86px;padding:16px 20px}
-.so-skel + .so-skel{border-top:1px solid var(--line)}
-.so-skel .s-skel:nth-child(1){height:54px}
-.so-skel .s-skel:nth-child(2){height:36px}
-.so-skel .s-skel:nth-child(3){height:36px}
+.so-row img{width:72px;height:72px;border-radius:14px;object-fit:cover;background:var(--surface-2)}
+.so-row b{display:block;font-size:1.0625rem;font-weight:700;line-height:1.3}
+.so-row small{display:block;margin-top:4px;font-size:.875rem;font-weight:500;color:var(--ink-2)}
+.so-row small .code{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink-3)}
+.so-row .end{display:flex;flex-direction:column;align-items:flex-end;gap:10px;text-align:right}
+.so-row .end .s-money{font-size:1.75rem;line-height:1}
+.so-row .end .stage{align-items:flex-end;width:132px}
+.so-row .end .stage > b{text-align:right}
+.so-skel{display:grid;grid-template-columns:72px minmax(0,1fr) 120px;gap:18px;align-items:center;min-height:100px;padding:14px 20px 14px 14px;border:1px solid var(--line);border-radius:22px;background:var(--surface)}
+.so-skel .s-skel:nth-child(1){height:72px;border-radius:14px}
+.so-skel .s-skel:nth-child(2){height:40px}
+.so-skel .s-skel:nth-child(3){height:44px}
 @media (max-width:620px){
-  .so-row{grid-template-columns:56px minmax(0,1fr);align-items:start;gap:14px;padding:14px 16px}
-  .so-row img{width:56px;height:44px}
+  .so-row{grid-template-columns:56px minmax(0,1fr);align-items:start;gap:14px;padding:14px}
+  .so-row img{width:56px;height:56px;border-radius:12px}
   .so-row .end{grid-column:2;flex-direction:row;justify-content:space-between;align-items:center;text-align:left}
-  .so-skel{grid-template-columns:56px minmax(0,1fr);padding:14px 16px}
+  .so-row .end .s-money{font-size:1.5rem}
+  .so-skel{grid-template-columns:56px minmax(0,1fr);padding:14px}
+  .so-skel .s-skel:nth-child(1){height:56px}
   .so-skel .s-skel:nth-child(3){display:none}
 }
 
 /* one order, and its shape while it loads */
-.od-wait{padding-top:8px}
-.od-wait .t{height:40px;width:min(380px,70%)}
-.od-wait .w{height:20px;width:min(300px,55%);margin-top:16px}
-.od-wait .g{display:grid;grid-template-columns:minmax(0,7fr) minmax(320px,5fr);gap:32px;margin-top:28px}
-.od-wait .a{height:360px;border-radius:18px}
-.od-wait .b{height:240px;border-radius:18px}
-@media (max-width:960px){.od-wait .g{grid-template-columns:1fr;gap:20px}.od-wait .a{height:280px}}
-.od{display:grid;grid-template-columns:minmax(0,7fr) minmax(320px,5fr);gap:20px 32px;align-items:start;margin-top:24px}
+.od-wait{padding-top:12px}
+.od-wait .t{height:56px;width:min(420px,70%)}
+.od-wait .w{height:20px;width:min(300px,55%);margin-top:18px}
+.od-wait .g{display:grid;grid-template-columns:minmax(0,7fr) minmax(340px,5fr);gap:32px;margin-top:32px}
+.od-wait .a{height:380px;border-radius:22px}
+.od-wait .b{height:260px;border-radius:22px}
+@media (max-width:960px){.od-wait .g{grid-template-columns:1fr;gap:20px}.od-wait .a{height:300px}}
+.od{display:grid;grid-template-columns:minmax(0,7fr) minmax(340px,5fr);gap:20px 32px;align-items:start;margin-top:28px}
 /* One column on a phone; once the meat is ready or on its way, the handover code comes first. */
 @media (max-width:960px){
-  .od{display:flex;flex-direction:column;gap:20px}
+  .od{display:flex;flex-direction:column;gap:16px}
   .od-main,.od-side{display:contents}
   .od[data-state="READY"] .od-code,.od[data-state="DISPATCHED"] .od-code{order:-1}
 }
-.od-top{padding-top:8px;padding-bottom:0}
-.od-head{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px}
-.od-head h1{margin:0;font-size:clamp(1.75rem,3vw,2.3rem);letter-spacing:-.03em}
-.od-head .s-pill{font-size:.8125rem;padding:5px 12px}
-.od-sub{margin:8px 0 0;font-size:1rem;color:var(--ink-2)}
-.od-new{display:flex;gap:14px;align-items:flex-start;margin:22px 0 0;padding:18px 20px;border-radius:16px;background:var(--ready-soft);border:1px solid var(--ready-line);color:var(--ready)}
-.od-new svg{flex:none;width:24px;height:24px}
-.od-new b{display:block;font-size:1.0625rem}
+.od-top{padding-top:12px;padding-bottom:0}
+.od-top + .s-card{margin-top:28px}
+.od-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px 32px}
+.od-head h1{margin:0;font-family:var(--display);font-size:clamp(2.75rem,5.4vw,4.5rem);font-weight:800;line-height:.9;letter-spacing:-.004em}
+.od-head .stage{min-width:180px;max-width:240px;margin-bottom:6px}
+.od-head .stage > b{font-size:1rem}
+.od-sub{margin:14px 0 0;font-size:1.0625rem;font-weight:500;color:var(--ink-2)}
+.od-new{display:flex;gap:14px;align-items:flex-start;margin:24px 0 0;padding:18px 20px;border-radius:16px;background:var(--surface-2);border:1px solid var(--line-2);color:var(--ink)}
+.od-new svg{flex:none;width:24px;height:24px;color:var(--ink)}
+.od-new b{display:block;font-size:1.0625rem;font-weight:700}
 .od-new span{display:block;margin-top:2px;color:var(--ink-2)}
 .od-main{display:grid;gap:20px}
-.od-state{padding:26px}
-.od-state .big{font-size:1.5rem;font-weight:600;letter-spacing:-.02em}
-.od-state .cap{margin:6px 0 0;max-width:60ch;font-size:.9375rem;line-height:1.6;color:var(--ink-2)}
+.od-state{padding:28px}
+.od-state .big{font-family:var(--display);font-size:clamp(2rem,3vw,2.5rem);font-weight:800;line-height:.95;letter-spacing:-.004em}
+.od-state .cap{margin:10px 0 0;max-width:60ch;font-size:1rem;line-height:1.55;color:var(--ink-2)}
 /* back from QPay, not paid yet: the way back to its page, and to look again */
-.od-pay-acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
-.od-steps{list-style:none;margin:24px 0 0;padding:0}
-.od-steps li{position:relative;display:grid;grid-template-columns:28px 1fr auto;gap:14px;padding:0 0 22px}
+.od-pay-acts{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+/* how it goes: done in the ink with a check, the step it waits on ringed in the crimson, the rest a quiet ring */
+.od-steps{list-style:none;margin:28px 0 0;padding:0}
+.od-steps li{position:relative;display:grid;grid-template-columns:28px 1fr auto;gap:16px;padding:0 0 24px}
 .od-steps li:last-child{padding-bottom:0}
-.od-steps li::before{content:"";position:absolute;left:13px;top:28px;bottom:2px;width:2px;background:var(--line)}
+.od-steps li::before{content:"";position:absolute;left:13px;top:30px;bottom:2px;width:2px;border-radius:1px;background:var(--line)}
 .od-steps li:last-child::before{display:none}
-.od-steps li[data-done]::before{background:var(--accent)}
-.od-steps i{position:relative;z-index:1;width:28px;height:28px;border-radius:50%;border:2px solid var(--line-2);background:var(--surface);display:grid;place-items:center}
-.od-steps li[data-done] i{border-color:var(--accent);background:var(--accent);color:var(--on-accent)}
-.od-steps li[data-next] i{border-color:var(--hi)}
-.od-steps li[data-next] i::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--hi)}
+.od-steps li[data-done]::before{background:var(--ink)}
+.od-steps i{position:relative;z-index:1;width:28px;height:28px;border-radius:50%;border:2px solid var(--line-2);background:var(--surface);display:grid;place-items:center;color:var(--on-light)}
+.od-steps li[data-done] i{border-color:var(--ink);background:var(--ink)}
+.od-steps li[data-next] i{border-color:var(--accent)}
+.od-steps li[data-next] i::after{content:"";width:10px;height:10px;border-radius:50%;background:var(--accent)}
 .od-steps i svg{width:14px;height:14px}
-.od-steps b{display:block;font-weight:600;line-height:1.3;color:var(--ink-3)}
+.od-steps b{display:block;font-weight:700;line-height:1.3;color:var(--ink-3)}
 .od-steps li[data-done] b,.od-steps li[data-next] b{color:var(--ink)}
 .od-steps span{display:block;margin-top:2px;font-size:.875rem;color:var(--ink-2)}
-.od-steps time{font-family:var(--mono);font-size:.8125rem;color:var(--ink-3);white-space:nowrap}
+.od-steps time{font-size:.8125rem;font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink-3);white-space:nowrap}
 /* the handover code: what the person says at the door, big and plain */
-.od-code{padding:22px;text-align:center}
-.od-code > span{display:block;font-size:.875rem;color:var(--ink-2)}
-.od-code b{display:block;margin:12px 0;padding:14px 0;border-radius:12px;background:var(--surface-2);border:1px solid var(--line);font-family:var(--mono);font-size:2.5rem;font-weight:600;letter-spacing:.14em;line-height:1;color:var(--ink)}
-.od-code small{display:block;font-size:.8125rem;line-height:1.5;color:var(--ink-3)}
+.od-code{padding:24px;text-align:center}
+.od-code > span{display:block;font-size:.75rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+.od-code b{display:block;margin:16px 0;padding:18px 0;border-radius:16px;background:var(--surface-2);border:1px solid var(--line);font-family:var(--display);font-size:3.5rem;font-weight:800;letter-spacing:.12em;line-height:1;font-variant-numeric:tabular-nums;color:var(--ink)}
+.od-code small{display:block;font-size:.875rem;line-height:1.5;color:var(--ink-2)}
 .od-side{display:grid;gap:16px}
-.od-box{padding:22px}
-.od-box h2{margin:0 0 12px;font-size:1rem;font-weight:600}
+.od-box{padding:24px}
+.od-box h2{margin:0 0 14px;font-family:var(--sans);font-size:.75rem;font-weight:700;line-height:1;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
 .od-box dl{margin:0}
-.od-box dl div{display:grid;grid-template-columns:120px 1fr;gap:12px;padding:10px 0;border-top:1px solid var(--line);font-size:.9375rem}
-.od-box dl div:first-child{border-top:0}
-.od-box dt{color:var(--ink-3)}
-.od-box dd{margin:0;font-weight:500;overflow-wrap:anywhere}
-.od-box dd small{display:block;font-family:var(--sans);font-weight:400;color:var(--ink-2)}
+.od-box dl div{display:grid;grid-template-columns:120px 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--line);font-size:.9375rem}
+.od-box dl div:first-child{border-top:0;padding-top:0}
+.od-box dt{color:var(--ink-3);font-weight:600}
+.od-box dd{margin:0;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+.od-box dd .s-money{font-size:1.5rem;line-height:1}
+.od-box dd small{display:block;margin-top:3px;font-family:var(--sans);font-weight:500;color:var(--ink-2)}
 /* the courier's number is read in one go: never broken over two lines */
-.od-box dd small .mono{white-space:nowrap}
-.od-box .s-btn{margin-top:14px}
-.od-box .s-btn .mono{font-weight:600}
-.od-note{margin:12px 0 0;font-size:.875rem;line-height:1.55;color:var(--ink-2)}
-.od-refund{padding:24px}
-.od-refund h2{margin:0;font-size:1.125rem}
+.od-box dd small .digits{white-space:nowrap}
+.od-box .digits,.od-refund .digits{font-variant-numeric:tabular-nums}
+.od-box .s-btn{margin-top:16px}
+.od-note{margin:14px 0 0;font-size:.875rem;line-height:1.55;color:var(--ink-2)}
+.od-refund{padding:28px}
+.od-refund h2{margin:0;font-family:var(--display);font-size:1.8125rem;font-weight:800;line-height:.95}
 .od-refund h2:focus{outline:none}
-.od-refund > p{margin:6px 0 0;max-width:60ch;color:var(--ink-2);line-height:1.55}
-.od-refund .s-note{margin-top:16px}
-.od-refund .s-btn{margin-top:18px}
-.od-refund dl{margin:14px 0 0}
-.od-refund dl div{display:grid;grid-template-columns:140px 1fr;gap:12px;padding:10px 0;border-top:1px solid var(--line);font-size:.9375rem}
-.od-refund dt{color:var(--ink-3)}
-.od-refund dd{margin:0;font-weight:500;overflow-wrap:anywhere}
-@media (max-width:520px){.od-box dl div,.od-refund dl div{grid-template-columns:1fr;gap:2px}}
+.od-refund > p{margin:10px 0 0;max-width:60ch;color:var(--ink-2);line-height:1.55}
+.od-refund > p .s-money{font-size:1.25rem}
+.od-refund .s-note{margin-top:18px}
+.od-refund .s-btn{margin-top:20px}
+.od-refund dl{margin:16px 0 0}
+.od-refund dl div{display:grid;grid-template-columns:140px 1fr;gap:12px;padding:12px 0;border-top:1px solid var(--line);font-size:.9375rem}
+.od-refund dt{color:var(--ink-3);font-weight:600}
+.od-refund dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+@media (max-width:520px){.od-box dl div,.od-refund dl div{grid-template-columns:1fr;gap:2px}.od-state,.od-refund{padding:22px 20px}}
 </style>
 </head>
 <body>
-<header class="s-bar" data-static><div class="s-wrap"><a class="s-word" href="/">Basu</a><nav class="s-nav" aria-label="Цэс"><a href="/home">Нүүр</a><a href="/shop">Зах</a><a href="/orders" aria-current="page">Миний захиалга</a><a href="/dashboard">Бизнест</a></nav><div class="s-right"></div></div></header>
+<header class="s-bar" data-static><div class="s-wrap"><a class="s-word" href="/">Basu</a><nav class="s-nav" aria-label="Цэс"><a href="/home">Нүүр</a><a href="/shop">Идэш</a><a href="/orders" aria-current="page">Миний захиалга</a><a href="/dashboard">Бизнес</a></nav><div class="s-right"></div></div></header>
 <main class="s-main">
   <div class="s-wrap" id="page"></div>
 </main>
 
 <script type="module">
-import { store, mnt, dayLabel, dayShort, ubParts, IDESH_STATE, IDESH_LIVE, BANK_NAMES, popup, passwordPopup, whatWentWrong } from '/api.js';
+import { store, mnt, dayLabel, dayShort, ubParts, IDESH_LIVE, BANK_NAMES, popup, passwordPopup, whatWentWrong } from '/api.js';
 import { mountFrame, requireSignIn, authed, esc, el, say, me, siteEmpty, howToBuy, statePill, tugrik, phoneShown, meatPhoto, stillGoing, refundPill } from '/site.js';
 
 /**
@@ -144,8 +151,8 @@ const page = document.getElementById('page');
 const unitWord = (o) => (o.unit === 'whole' ? 'толгой' : 'кг');
 /** Paid for and not yet handed over: an order whose page looks again now and then, and shows its handover code. */
 const LIVE = IDESH_LIVE;
-/** A state in its one word, the same on every page: «Цуцлагдсан», «Хүлээлгэн өгсөн». */
-const pill = (state) => statePill(state, IDESH_STATE[state] ?? state);
+/** A state in its one word and the four bars under it, the same on every page: «Бэлтгэж байна», «Цуцлагдсан». */
+const pill = (state) => statePill(state);
 const MARK = {
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
@@ -158,7 +165,7 @@ const MARK = {
 
 async function drawList() {
   page.replaceChildren(
-    el('<section class="s-head"><h1>Миний захиалга</h1><p>Төлсөн захиалга бүр энд. Нэгийг нь дарж явц, хүлээлгэн өгөх кодыг нь харна.</p></section>'),
+    el('<section class="s-head"><h1>Миний захиалга</h1><p>Төлсөн захиалга бүр энд, явцтайгаа.</p></section>'),
     el('<div class="so-tabs s-chips" id="tabs" role="group" aria-label="Захиалга" hidden></div>'),
     el(`<div id="list" role="status" aria-busy="true"><div class="so-list">${'<div class="so-skel" aria-hidden="true"><span class="s-skel"></span><span class="s-skel"></span><span class="s-skel"></span></div>'.repeat(3)}</div></div>`),
   );
@@ -175,7 +182,7 @@ async function drawList() {
       siteEmpty({
         icon: 'orders',
         title: 'Та одоохондоо захиалга өгөөгүй байна',
-        text: 'Өвлийн идшээ захиалахад энд гарна: явц нь, хүлээлгэн өгөх код, нийлүүлэгчийн утастайгаа.',
+        text: 'Захиалсан идэш тань энд явцтайгаа гарна.',
         actions: [['Зар үзэх', '/shop', 'dark']],
         card: true,
       }),
@@ -206,7 +213,7 @@ async function drawList() {
     if (!rows.length) {
       list.replaceChildren(
         tab === 'live'
-          ? siteEmpty({ icon: 'orders', title: 'Идэвхтэй захиалга алга', text: 'Дууссан захиалгууд «Дууссан» хэсэгт бий. Шинээр захиалахад энд гарна.', actions: [['Зар үзэх', '/shop', 'dark']], card: true })
+          ? siteEmpty({ icon: 'orders', title: 'Идэвхтэй захиалга алга', text: 'Дууссан захиалгууд «Дууссан» хэсэгт бий.', actions: [['Зар үзэх', '/shop', 'dark']], card: true })
           : siteEmpty({ icon: 'orders', title: 'Дууссан захиалга алга', text: 'Хүлээж авсан, цуцлагдсан захиалга энд гарна.', card: true }),
       );
       return;
@@ -215,8 +222,8 @@ async function drawList() {
     for (const o of rows) {
       box.append(
         el(`<a class="so-row" href="/orders/${o.id}" data-order="${o.id}">
-              <img src="${meatPhoto(o.kind)}" alt="" loading="lazy" width="72" height="54">
-              <span><b>${esc(o.title)} × ${o.qty} ${unitWord(o)}</b><small>${esc(o.supplier.name)} · ${o.receive === 'delivery' ? 'хүргэлт' : 'очиж авна'} ${dayLabel(o.receive_on)}</small><small><span class="mono">№${esc(o.code)}</span></small></span>
+              <img src="${meatPhoto(o.kind)}" alt="" loading="lazy" width="72" height="72">
+              <span><b>${esc(o.title)} × ${o.qty} ${unitWord(o)}</b><small>${esc(o.supplier.name)} · ${o.receive === 'delivery' ? 'хүргэлт' : 'очиж авна'} ${dayLabel(o.receive_on)}</small><small><span class="code">№${esc(o.code)}</span></small></span>
               <span class="end"><span class="s-money">${tugrik(o.total_mnt)}</span>${going.get(o.id) ? refundPill(going.get(o.id)) : pill(o.state)}</span>
             </a>`),
       );
@@ -317,15 +324,15 @@ async function drawOrder(id, fresh) {
           <h2>Захиалга</h2>
           <dl>
             <div><dt>${delivery ? 'Хүргэх өдөр' : 'Очиж авах өдөр'}</dt><dd>${dayLabel(o.receive_on)}</dd></div>
-            <div><dt>${delivery ? 'Хүргэх хаяг' : 'Авах цэг'}</dt><dd>${esc(delivery ? o.address : o.pickup_address)}${delivery && o.address_phone ? `<small>Залгах утас: <span class="mono">${esc(phoneShown(o.address_phone))}</span></small>` : ''}</dd></div>
+            <div><dt>${delivery ? 'Хүргэх хаяг' : 'Авах цэг'}</dt><dd>${esc(delivery ? o.address : o.pickup_address)}${delivery && o.address_phone ? `<small>Залгах утас: <span class="digits">${esc(phoneShown(o.address_phone))}</span></small>` : ''}</dd></div>
             <div><dt>Төлсөн</dt><dd><span class="s-money">${tugrik(o.total_mnt)}</span>${o.delivery_fee_mnt ? `<small>Хүргэлт ${mnt(o.delivery_fee_mnt)} орсон</small>` : ''}</dd></div>
-            ${o.receipt ? `<div><dt>Е-баримт</dt><dd>Сугалаа <span class="mono">${esc(o.receipt.lottery ?? '')}</span></dd></div>` : ''}
+            ${o.receipt ? `<div><dt>Е-баримт</dt><dd>Сугалаа <span class="digits">${esc(o.receipt.lottery ?? '')}</span></dd></div>` : ''}
           </dl>
         </div>`),
     el(`<div class="s-card od-box">
           <h2>Нийлүүлэгч</h2>
           <dl><div><dt>Нэр</dt><dd>${esc(o.supplier.name)}<small>Basu шалгаж, гэрээ байгуулсан</small></dd></div></dl>
-          ${o.supplier_phone ? `<a class="s-btn s-btn-line s-btn-block" href="tel:${esc(o.supplier_phone)}" aria-label="Нийлүүлэгч рүү залгах: ${esc(phoneShown(o.supplier_phone))}">${MARK.phone}<span class="mono">${esc(phoneShown(o.supplier_phone))}</span></a>` : ''}
+          ${o.supplier_phone ? `<a class="s-btn s-btn-line s-btn-block" href="tel:${esc(o.supplier_phone)}" aria-label="Нийлүүлэгч рүү залгах: ${esc(phoneShown(o.supplier_phone))}">${MARK.phone}<span class="digits">${esc(phoneShown(o.supplier_phone))}</span></a>` : ''}
           ${live ? '<p class="od-note">Өөрчлөх, цуцлах бол нийлүүлэгчтэй ярина уу — цуцлахыг тэр хийнэ.</p>' : ''}
         </div>`),
   );
@@ -347,7 +354,7 @@ async function refundBox(o) {
       <p>${r.state === 'paid' ? 'Данс руу тань шилжүүлсэн.' : 'Basu ажлын өдөрт шилжүүлээд мэдэгдэл илгээнэ.'}</p>
       <dl>
         <div><dt>Дүн</dt><dd><span class="s-money">${tugrik(r.amount_mnt)}</span></dd></div>
-        <div><dt>Данс</dt><dd>${esc(r.bank_name ?? '')} <span class="mono">${esc(r.bank_account ?? '')}</span></dd></div>
+        <div><dt>Данс</dt><dd>${esc(r.bank_name ?? '')} <span class="digits">${esc(r.bank_account ?? '')}</span></dd></div>
         <div><dt>Эзэмшигч</dt><dd>${esc(r.bank_holder ?? '')}</dd></div>
       </dl></div>`);
   }

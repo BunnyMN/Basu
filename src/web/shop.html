@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="mn" data-theme="light" data-site>
+<html lang="mn" data-site>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#FFFFFF">
+<meta name="theme-color" content="#100D0C">
 <title>Өвлийн идэш — Basu</title>
 <meta name="description" content="Хонь, ямаа, үхэр, адууны махыг гэрээт нийлүүлэгчээс эцсийн үнээр захиална. Мал төлбөр орсны дараа нядлагдана.">
 <meta property="og:type" content="website">
@@ -20,191 +20,238 @@
 <link rel="stylesheet" href="/app.css">
 <link rel="stylesheet" href="/site.css">
 <style>
-/* The market, for a browser: every stall on one screen as a card with its
-   picture and its price, a filter by animal, and a stall's own page with the
-   order beside it — on a phone, right under the picture, with a bar at the
-   foot that carries the total and the way to it. Open to anybody; paying
-   asks who you are. */
+/* The market, for a browser, «Тансаг хар»: the board's photograph sinking
+   into the charcoal behind one big word, the animals as pills (the chosen
+   one off-white), every stall a card — its photo at radius 22 with chips of
+   glass on it, the supplier, the title and the price in the display face, a
+   hairline, then what the price is for and the day it is ready. A stall's own
+   page: the big photo, the title and price large, the order box beside them
+   (on a phone right under the picture, with a glass bar at the foot that
+   carries the total and the one crimson «Захиалах»). Open to anybody;
+   paying asks who you are. */
 
-.sh-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:20px 40px}
-.sh-trust{display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0;list-style:none}
-.sh-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px 24px;padding:0 0 20px;border-bottom:1px solid var(--line);margin-bottom:28px}
-.sh-tools{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
-.sh-check{display:inline-flex;align-items:center;gap:10px;min-height:44px;font-size:.9375rem;color:var(--ink-2);cursor:pointer}
-.sh-check input{width:20px;height:20px;margin:0;accent-color:var(--accent)}
-.sh-sort{min-height:40px;padding:0 40px 0 16px;border:1px solid var(--line);border-radius:999px;background:var(--surface) var(--chev) no-repeat right 14px center/16px;font:inherit;font-size:.9375rem;color:var(--ink);-webkit-appearance:none;appearance:none;cursor:pointer}
-/* on a touch screen 16px: below that iOS zooms the page in when the select is tapped */
-@media (pointer:coarse){.sh-sort{min-height:44px;font-size:1rem}}
-.sh-count{font-size:.875rem;color:var(--ink-3)}
+/* ── the market's head ───────────────────────────────────────────── */
+.sh-head{position:relative;display:flex;align-items:flex-end;min-height:380px;margin:0 calc(-1 * var(--s-gutter));padding:0 var(--s-gutter) 40px;overflow:hidden;isolation:isolate}
+.sh-head .ph{position:absolute;right:-40px;top:-120px;width:min(980px,72%);height:653px;z-index:-2}
+.sh-head .ph img{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);filter:sepia(.22) saturate(1.15) contrast(1.05) brightness(1.1)}
+.sh-head::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(90deg,var(--bg) 0%,var(--bg) 36%,rgba(16,13,12,.5) 50%,rgba(16,13,12,0) 66%),linear-gradient(0deg,var(--bg) 0%,rgba(16,13,12,0) 30%),linear-gradient(180deg,rgba(16,13,12,.6) 0%,rgba(16,13,12,0) 25%)}
+.sh-head h1{margin:0;font-family:var(--display);font-size:clamp(5rem,9.2vw,8.25rem);font-weight:800;line-height:.82;letter-spacing:-.006em}
+.sh-head p{margin:20px 0 0;font-size:1.125rem;font-weight:500;line-height:1.4;color:var(--ink-2)}
+/* the head's own breathing room: the wrap's gutter is the photo's too */
+.s-main > .s-wrap > .sh-head:first-child{margin-top:0}
 @media (max-width:760px){
-  /* the animals in one row that slides, so the cards start higher */
-  .sh-bar{gap:12px}
-  /* 4px inside the slider, given back outside it: a chip's focus ring is not clipped, nothing moves */
-  .sh-bar .s-chips{flex-wrap:nowrap;width:calc(100% + 2 * var(--s-gutter));margin:-2px calc(-1 * var(--s-gutter));padding:4px var(--s-gutter);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-  .sh-bar .s-chips::-webkit-scrollbar{display:none}
-  .sh-tools{width:100%;justify-content:space-between}
+  .sh-head{min-height:240px;padding-bottom:24px}
+  .sh-head .ph{right:-120px;top:-40px;width:420px;height:300px}
+  .sh-head::after{background:linear-gradient(90deg,var(--bg) 0%,rgba(16,13,12,.6) 40%,rgba(16,13,12,0) 70%),linear-gradient(0deg,var(--bg) 0%,rgba(16,13,12,0) 40%)}
+  .sh-head p{margin-top:14px;font-size:1rem}
 }
 
-.sh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:28px 22px}
+/* ── the filters: the animals as pills, delivery as a switch, the order ─ */
+.sh-bar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px 24px;margin:0 0 40px}
+.sh-tools{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px}
+.sh-switch{position:relative;display:inline-flex;align-items:center;gap:12px;min-height:48px;font-size:.9375rem;font-weight:600;color:var(--ink-2);cursor:pointer;-webkit-tap-highlight-color:transparent}
+/* the checkbox itself, drawn as a switch: still the input a keyboard and a test press */
+.sh-switch input{position:relative;flex:none;width:44px;height:26px;margin:0;border-radius:13px;background:var(--surface-3);border:1px solid var(--line-2);-webkit-appearance:none;appearance:none;cursor:pointer;transition:background var(--dur),border-color var(--dur)}
+.sh-switch input::after{content:"";position:absolute;left:2px;top:2px;width:20px;height:20px;border-radius:50%;background:var(--ink-2);transition:transform var(--dur) var(--ease),background var(--dur)}
+.sh-switch input:checked{background:var(--ink);border-color:var(--ink)}
+.sh-switch input:checked::after{transform:translateX(18px);background:var(--on-light)}
+.sh-short{display:none}
+.sh-sort{min-height:48px;padding:0 44px 0 20px;border:1px solid var(--line);border-radius:999px;background:var(--surface) var(--chev) no-repeat right 16px center/16px;font:inherit;font-size:.9375rem;font-weight:600;color:var(--ink);-webkit-appearance:none;appearance:none;cursor:pointer}
+.sh-sort option{background:var(--surface);color:var(--ink)}
+@media (hover:hover){.sh-sort:hover{border-color:var(--line-2)}}
+/* on a touch screen 16px: below that iOS zooms the page in when the select is tapped */
+@media (pointer:coarse){.sh-sort{font-size:1rem}}
+@media (max-width:760px){
+  /* the animals in one row that slides, so the cards start higher */
+  .sh-bar{gap:12px;margin-bottom:28px}
+  /* 4px inside the slider, given back outside it: a chip's focus ring is not clipped, nothing moves */
+  .sh-bar .s-chips{flex-wrap:nowrap;width:calc(100% + 2 * var(--s-gutter));margin:-4px calc(-1 * var(--s-gutter));padding:4px var(--s-gutter);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .sh-bar .s-chips::-webkit-scrollbar{display:none}
+  .sh-tools{width:100%;flex-wrap:nowrap;justify-content:space-between}
+  /* the switch's word is shorter on a phone, so it and the order share a line; the long one is still what is read */
+  .sh-long{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .sh-short{display:inline}
+  .sh-sort{min-height:44px}
+}
+
+/* ── the cards ───────────────────────────────────────────────────── */
+.sh-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:56px 28px}
 .sh-grid > .s-empty{grid-column:1/-1}
-.sh-card{display:flex;flex-direction:column;height:100%;color:inherit;text-decoration:none;border-radius:16px;-webkit-tap-highlight-color:transparent}
-.sh-card .ph{position:relative;aspect-ratio:4/3;border-radius:16px;overflow:hidden;background:var(--surface-2)}
+@media (max-width:1100px){.sh-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:44px 20px}}
+@media (max-width:600px){.sh-grid{grid-template-columns:minmax(0,1fr);gap:40px}}
+.sh-card{display:flex;flex-direction:column;min-width:0;color:var(--ink);text-decoration:none;border-radius:22px;-webkit-tap-highlight-color:transparent}
+.sh-card .ph{position:relative;display:block;aspect-ratio:4/3;border-radius:22px;overflow:hidden;background:#1A1514}
 .sh-card .ph img{width:100%;height:100%;object-fit:cover;transition:transform 700ms var(--ease)}
 @media (hover:hover){.sh-card:hover .ph img{transform:scale(1.04)}}
 .sh-card:active .ph img{transform:scale(1.02)}
-.sh-card .tags{position:absolute;left:10px;top:10px;right:10px;display:flex;justify-content:space-between;gap:6px}
-.sh-card .tags .s-pill{border-color:transparent;box-shadow:0 1px 2px rgba(0,0,0,.12)}
-.sh-card .tags .s-pill[data-tone="hi"]{background:var(--hi-soft);color:var(--hi-ink)}
-/* the paid tiers: VIP two columns wide with a honey ring, Онцгой a pine ring */
-.sh-card[data-tier="vip"] .ph{box-shadow:0 0 0 3px var(--hi)}
-.sh-card[data-tier="featured"] .ph{box-shadow:0 0 0 2px var(--accent)}
-@media (min-width:600px){.sh-card[data-tier="vip"]{grid-column:span 2}.sh-card[data-tier="vip"] .ph{aspect-ratio:8/3}}
-.sh-card[data-gone] .ph::after{content:"Дууссан";position:absolute;inset:0;display:grid;place-items:center;background:rgba(255,255,255,.72);background:color-mix(in srgb,var(--surface) 72%,transparent);font-weight:600;color:var(--ink)}
-.sh-card .bd{flex:1;display:flex;flex-direction:column;padding:14px 2px 0}
-.sh-card b{font-size:1.0625rem;font-weight:600;line-height:1.35}
-.sh-card .who{margin-top:3px;font-size:.875rem;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sh-meta{margin-top:6px;font-size:.8125rem;line-height:1.45;color:var(--ink-3)}
-/* the price at the foot of every card, level across a row; under it what the price is for —
-   a whole animal's rough weight and what that makes a kilo, so two stalls compare at a glance */
-.sh-card .buy{margin-top:auto;padding-top:10px}
-.sh-card .price{display:block;font-size:1.25rem}
-.sh-card .price small{font-family:var(--sans);font-size:.8125rem;font-weight:500;color:var(--ink-3)}
-.sh-card .per{display:block;margin-top:2px;font-size:.8125rem;line-height:1.45;color:var(--ink-2)}
-.sh-skel .ph{display:block;aspect-ratio:4/3;border-radius:16px}
-.sh-skel .l1{height:18px;margin-top:16px;width:70%}
-.sh-skel .l2{height:14px;margin-top:10px;width:45%}
-.sh-skel .l3{height:20px;margin-top:14px;width:35%}
+/* glass on the photo: what kind of sale, a tier a supplier paid for, delivery */
+.sh-card .tags{position:absolute;left:14px;top:14px;right:14px;display:flex;flex-wrap:wrap;gap:6px}
+.sh-tag{display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:0 12px;border-radius:999px;background:rgba(16,13,12,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);font-size:.8125rem;font-weight:700;line-height:1;color:var(--ink);white-space:nowrap}
+.sh-tag svg{width:14px;height:14px;flex:none}
+.sh-tag[data-tier]{color:var(--gold);border-color:var(--gold-line)}
+.sh-card .go{position:absolute;right:14px;bottom:14px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:rgba(16,13,12,.7);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.12);color:var(--ink)}
+.sh-card .go svg{width:22px;height:22px}
+/* the paid tiers: VIP two columns wide with a gold hairline round its photo, Онцгой a hairline of ink */
+.sh-card[data-tier="vip"] .ph{box-shadow:0 0 0 1px var(--gold)}
+.sh-card[data-tier="featured"] .ph{box-shadow:0 0 0 1px var(--line-2)}
+@media (min-width:601px){.sh-card[data-tier="vip"]{grid-column:span 2}.sh-card[data-tier="vip"] .ph{aspect-ratio:auto;flex:1;min-height:0}}
+@media (min-width:601px){.sh-card[data-tier="vip"] .ph img{position:absolute;inset:0}}
+.sh-card[data-gone] .ph::after{content:"Дууссан";position:absolute;inset:0;display:grid;place-items:center;background:rgba(16,13,12,.72);font-family:var(--display);font-size:2.25rem;font-weight:800;color:var(--ink)}
+.sh-card .sup{display:block;margin-top:20px;font-size:.875rem;font-weight:600;line-height:1.2;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sh-card .ttl{display:block;margin-top:8px;font-family:var(--display);font-size:2.5rem;font-weight:800;line-height:.95;letter-spacing:-.004em;overflow-wrap:anywhere}
+.sh-card .price{display:flex;align-items:baseline;gap:6px;margin-top:14px}
+.sh-card .price .s-money{font-size:2.125rem;line-height:1}
+.sh-card .price small{font-size:.9375rem;font-weight:600;color:var(--ink-2)}
+.sh-card .meta{display:flex;justify-content:space-between;gap:12px;margin-top:auto;padding-top:14px;border-top:1px solid var(--line);font-size:.9375rem;font-weight:600;line-height:1.3;color:var(--ink-2)}
+.sh-card .meta > span:last-child{color:var(--ink-3);text-align:right;white-space:nowrap}
+/* the hairline under the price sits at the same height across a row */
+.sh-card .bd{flex:1;display:flex;flex-direction:column}
+.sh-card .bd .price{margin-bottom:18px}
+@media (max-width:760px){
+  .sh-card .ttl{font-size:2.25rem}
+  .sh-card .price .s-money{font-size:1.875rem}
+  .sh-card .meta{font-size:.875rem}
+}
+.sh-skel .ph{display:block;aspect-ratio:4/3;border-radius:22px}
+.sh-skel .l1{height:14px;margin-top:20px;width:40%}
+.sh-skel .l2{height:34px;margin-top:12px;width:75%}
+.sh-skel .l3{height:30px;margin-top:14px;width:45%}
 /* while the market loads the filter bar keeps its place, its chips drawn as shapes: nothing jumps when they come */
-.sh-bar .s-chips .s-skel{flex:none;width:76px;height:40px;border-radius:999px}
-.sh-bar .s-chips .s-skel:first-child{width:92px}
-@media (pointer:coarse){.sh-bar .s-chips .s-skel{height:44px}}
+.sh-bar .s-chips .s-skel{flex:none;width:92px;height:48px;border-radius:999px}
+.sh-bar .s-chips .s-skel:first-child{width:104px}
+@media (max-width:760px){.sh-bar .s-chips .s-skel{height:44px}}
 
 /* Payments closed: said calmly, before anybody fills a form or signs in, with what can be done meanwhile.
    Neutral, not the stop colour — nothing went wrong on the person's side. */
-.sh-closed{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:var(--surface-2);font-size:.875rem;line-height:1.55;color:var(--ink-2)}
-.sh-closed svg{width:20px;height:20px;flex:none;margin-top:1px;color:var(--ink-3)}
-.sh-closed b{display:block;margin-bottom:2px;font-size:.9375rem;font-weight:600;line-height:1.4;color:var(--ink)}
-.sh-closed a{color:var(--ink);font-weight:500;text-decoration:underline;text-underline-offset:.2em;overflow-wrap:anywhere}
-.sh-grid > .sh-closed{grid-column:1/-1;margin-bottom:-6px}
+.sh-closed{display:flex;gap:12px;align-items:flex-start;padding:16px 18px;border:1px solid var(--line);border-radius:16px;background:var(--surface-2);font-size:.9375rem;line-height:1.55;color:var(--ink-2)}
+.sh-closed svg{width:20px;height:20px;flex:none;margin-top:1px;color:var(--gold)}
+.sh-closed b{display:block;margin-bottom:2px;font-size:.9375rem;font-weight:700;line-height:1.4;color:var(--ink)}
+.sh-closed a{color:var(--ink);font-weight:600;text-decoration:underline;text-decoration-color:var(--gold-line);text-underline-offset:.2em;overflow-wrap:anywhere}
+.sh-grid > .sh-closed{grid-column:1/-1;margin-bottom:-24px}
 
-/* a stall's own page: the picture and its facts, the order box beside them, what to know under them */
-.sd-title{margin:4px 0 0}
-.sd-title h1{margin:0;font-size:clamp(1.75rem,3vw,2.5rem);line-height:1.1;letter-spacing:-.03em}
-.sd-who{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:12px;font-size:1rem;color:var(--ink-2)}
-.sd{display:grid;grid-template-columns:minmax(0,7fr) minmax(340px,5fr);grid-template-areas:"media buy" "info buy";gap:28px 40px;align-items:start;margin-top:24px}
+/* ── a stall's own page ──────────────────────────────────────────── */
+.sd{display:grid;grid-template-columns:minmax(0,7fr) minmax(360px,5fr);grid-template-areas:"media buy" "info buy";gap:36px 48px;align-items:start;margin-top:12px}
 .sd-media{grid-area:media}
 .sd-info{grid-area:info}
-.sd-buy{grid-area:buy;position:sticky;top:calc(var(--s-bar) + var(--safe-t) + 20px);padding:24px}
-.sd-photo{position:relative;margin:0;border-radius:20px;overflow:hidden;background:var(--surface-2)}
-/* the photos are Basu's, not this supplier's meat: said on the picture, quietly */
-.sd-photo figcaption{position:absolute;left:12px;bottom:12px;padding:4px 10px;border-radius:999px;background:rgba(18,26,21,.55);color:#fff;font-size:.75rem;font-weight:500;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.sd-buy{grid-area:buy;position:sticky;top:calc(var(--s-bar) + var(--safe-t) + 24px);padding:28px;border-radius:28px}
+.sd-photo{position:relative;margin:0;border-radius:22px;overflow:hidden;background:#1A1514}
 .sd-photo img{display:block;width:100%;height:auto;aspect-ratio:16/10;object-fit:cover}
-.sd-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:20px 0 0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--surface)}
-.sd-facts div{padding:16px 18px}
-.sd-facts div + div{border-left:1px solid var(--line)}
-.sd-facts > div > span{display:block;font-size:.8125rem;color:var(--ink-3)}
-.sd-facts b{display:block;margin-top:4px;font-size:1.0625rem;font-weight:600}
-.sd-facts b small{display:block;font-family:var(--sans);font-size:.8125rem;font-weight:500;color:var(--ink-3)}
-.sd-note{margin:0;font-size:1rem;line-height:1.7;color:var(--ink-2);white-space:pre-line;max-width:66ch}
+.sd-photo::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(10,8,7,.45) 0%,rgba(10,8,7,0) 26%,rgba(10,8,7,0) 74%,rgba(10,8,7,.45) 100%)}
+.sd-photo .tags{position:absolute;z-index:1;left:16px;top:16px;display:flex;flex-wrap:wrap;gap:6px}
+/* the photos are Basu's, not this supplier's meat: said on the picture, on glass */
+.sd-photo figcaption{position:absolute;z-index:1;left:16px;bottom:16px;display:inline-flex;align-items:center;min-height:30px;padding:0 12px;border-radius:999px;background:rgba(16,13,12,.72);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.1);color:var(--ink);font-size:.8125rem;font-weight:700}
+.sd-title{margin:28px 0 0}
+.sd-who{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;font-size:.9375rem;font-weight:600;color:var(--ink-2)}
+.sd-who .gold{display:inline-flex;align-items:center;gap:6px;min-height:26px;padding:0 10px;border-radius:13px;border:1px solid var(--gold-line);color:var(--gold);font-size:.75rem;font-weight:700}
+.sd-who .gold svg{width:13px;height:13px}
+.sd-title h1{margin:14px 0 0;font-family:var(--display);font-size:clamp(3rem,5.4vw,4.5rem);font-weight:800;line-height:.88;letter-spacing:-.004em;overflow-wrap:anywhere}
+.sd-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:28px 0 0}
+.sd-facts div{padding:18px 20px;border-radius:16px;background:var(--surface);border:1px solid var(--line)}
+.sd-facts > div > span{display:block;font-size:.8125rem;font-weight:600;color:var(--ink-3)}
+.sd-facts b{display:block;margin-top:10px;font-family:var(--display);font-size:1.75rem;font-weight:800;line-height:1;white-space:nowrap}
+.sd-facts b small{margin-left:4px;font-family:var(--sans);font-size:.8125rem;font-weight:600;color:var(--ink-2)}
+.sd-note{margin:0;font-size:1.0625rem;font-weight:500;line-height:1.6;color:var(--ink-2);white-space:pre-line;max-width:62ch}
 .sd-list{margin:0;padding:0;list-style:none;border-top:1px solid var(--line)}
-.sd-note + .sd-list{margin-top:22px}
-.sd-list li{display:grid;grid-template-columns:28px 1fr;gap:12px;padding:16px 0;border-bottom:1px solid var(--line)}
-.sd-list svg{width:22px;height:22px;color:var(--ink-2)}
-.sd-list b{display:block;font-weight:600}
-.sd-list span{display:block;margin-top:2px;font-size:.9375rem;line-height:1.55;color:var(--ink-2)}
+.sd-note + .sd-list{margin-top:24px}
+.sd-list li{display:grid;grid-template-columns:28px 1fr;gap:14px;padding:18px 0;border-bottom:1px solid var(--line)}
+.sd-list svg{width:22px;height:22px;color:var(--ink-3)}
+.sd-list b{display:block;font-weight:700;color:var(--ink)}
+.sd-list span{display:block;margin-top:3px;font-size:.9375rem;line-height:1.5;color:var(--ink-2)}
 @media (max-width:960px){
-  .sd{grid-template-columns:minmax(0,1fr);grid-template-areas:"media" "buy" "info";gap:24px}
-  .sd-buy{position:static}
+  .sd{grid-template-columns:minmax(0,1fr);grid-template-areas:"media" "buy" "info";gap:28px}
+  .sd-buy{position:static;padding:24px 20px}
   /* on a phone the order box says all of it, right under the picture */
   .sd-facts{display:none}
   .sd-photo img{aspect-ratio:4/3}
-}
-@media (max-width:620px){
-  .sd-facts{grid-template-columns:1fr 1fr}
-  .sd-facts div:nth-child(3){border-left:0}
-  .sd-facts div:nth-child(n+3){border-top:1px solid var(--line)}
-  .sd-facts div{padding:14px 16px}
-  .sd-buy{padding:20px}
+  .sd-photo{margin:0 calc(-1 * var(--s-gutter));border-radius:0}
+  .sd-title{margin-top:20px}
 }
 
 /* the order box */
 .sd-price{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 8px}
-.sd-price .s-money{font-size:1.75rem;line-height:1.1}
-.sd-price small{font-size:.9375rem;font-weight:500;color:var(--ink-3)}
-.sd-sub{margin:6px 0 0;font-size:.875rem;line-height:1.5;color:var(--ink-2)}
-.sd-form{margin-top:20px;padding-top:20px;border-top:1px solid var(--line)}
-.sd-q{margin:0 0 20px}
-.sd-q > span:first-child{display:block;margin-bottom:10px;font-size:.875rem;font-weight:600}
-.sd-qty{display:flex;align-items:center;gap:6px;width:max-content;border:1px solid var(--line-2);border-radius:999px;padding:3px;background:var(--surface)}
-.sd-qty button{display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:none;color:var(--accent-ink);cursor:pointer;-webkit-tap-highlight-color:transparent}
-.sd-qty button svg{width:18px;height:18px}
-.sd-qty button:disabled{color:var(--ink-3);opacity:.4;cursor:default}
-@media (hover:hover){.sd-qty button:not(:disabled):hover{background:var(--surface-2)}}
-.sd-qty output{min-width:88px;text-align:center;font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
-.sd-qty output small{font-family:var(--sans);font-weight:500;color:var(--ink-3)}
+.sd-price .s-money{font-size:2.75rem;line-height:1}
+.sd-price small{font-size:1rem;font-weight:600;color:var(--ink-2)}
+.sd-sub{margin:10px 0 0;font-size:.9375rem;font-weight:500;line-height:1.5;color:var(--ink-2)}
+.sd-form{margin-top:22px;padding-top:22px;border-top:1px solid var(--line)}
+.sd-q{margin:0 0 22px}
+.sd-q > span:first-child{display:block;margin-bottom:12px;font-size:.9375rem;font-weight:600;color:var(--ink-2)}
+.sd-q.sd-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.sd-q.sd-row > span:first-child{margin:0}
+.sd-q.sd-row .s-help{width:100%;margin:0;text-align:right}
+/* the stepper: a pill on the surface, two round buttons, the number in the display */
+.sd-qty{display:flex;align-items:center;gap:4px;width:max-content;height:52px;padding:4px;border:1px solid var(--line);border-radius:26px;background:var(--surface)}
+.sd-qty button{display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:var(--surface-3);color:var(--ink);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background var(--dur)}
+.sd-qty button svg{width:20px;height:20px}
+.sd-qty button:disabled{background:transparent;color:var(--ink-3);cursor:default}
+@media (hover:hover){.sd-qty button:not(:disabled):hover{background:var(--line-2)}}
+.sd-qty output{min-width:84px;text-align:center;font-family:var(--display);font-size:1.75rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.sd-qty output small{margin-left:3px;font-family:var(--sans);font-size:.9375rem;font-weight:600;color:var(--ink-2)}
+/* the ways to receive: two tiles, the chosen one ringed in the ink */
 .sd-ways{display:grid;gap:10px}
-.sd-way{display:grid;grid-template-columns:22px 1fr auto;gap:12px;align-items:start;padding:14px;border:1px solid var(--line-2);border-radius:14px;background:var(--surface);color:var(--ink);font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:border-color var(--dur),background var(--dur)}
-.sd-way:disabled{background:var(--surface-2);border-color:var(--line);cursor:default}
+.sd-way{display:grid;grid-template-columns:22px 1fr auto;gap:12px;align-items:start;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:border-color var(--dur),box-shadow var(--dur)}
+.sd-way:disabled{background:transparent;border-style:dashed;cursor:default}
 .sd-way:disabled b,.sd-way:disabled em{color:var(--ink-3)}
-.sd-way i{width:20px;height:20px;margin-top:1px;border:1.5px solid var(--line-2);border-radius:50%;transition:border-width var(--dur)}
-.sd-way[aria-checked="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);background:color-mix(in srgb,var(--accent-soft) 45%,var(--surface))}
-.sd-way[aria-checked="true"] i{border:6px solid var(--accent)}
-.sd-way b{display:block;font-weight:600}
-.sd-way small{display:block;margin-top:2px;font-size:.8125rem;line-height:1.45;color:var(--ink-2)}
-.sd-way em{font-style:normal;font-size:.875rem;font-weight:600;white-space:nowrap}
-.sd-way em .s-money{font-weight:600}
+.sd-way i{width:20px;height:20px;margin-top:1px;border:1.5px solid var(--line-2);border-radius:50%;transition:border-width var(--dur),border-color var(--dur)}
+.sd-way[aria-checked="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.sd-way[aria-checked="true"] i{border:6px solid var(--ink)}
+@media (hover:hover){.sd-way:not(:disabled):not([aria-checked="true"]):hover{border-color:var(--line-2)}}
+.sd-way b{display:block;font-weight:700}
+.sd-way small{display:block;margin-top:3px;font-size:.8125rem;font-weight:500;line-height:1.45;color:var(--ink-2)}
+.sd-way em{font-style:normal;font-size:.875rem;font-weight:700;white-space:nowrap;color:var(--ink-2)}
+.sd-way em .s-money{font-weight:800}
 .sd-sum{margin:6px 0 0;padding:14px 0 0;border-top:1px solid var(--line)}
-.sd-sum div{display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:.9375rem;color:var(--ink-2)}
-.sd-sum div.total{margin-top:6px;padding-top:12px;border-top:1px solid var(--line);font-size:1.0625rem;font-weight:600;color:var(--ink)}
-.sd-sum div.total .s-money{font-size:1.375rem}
-.sd-fine{margin:14px 0 0;font-size:.8125rem;line-height:1.55;color:var(--ink-3)}
-.sd-fine a{color:var(--ink-2);text-decoration:underline;text-underline-offset:.2em}
-.sd-review h2{margin:0;font-size:1.25rem;letter-spacing:-.015em}
+.sd-sum div{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:5px 0;font-size:.9375rem;color:var(--ink-2)}
+.sd-sum div .s-money{font-size:1.125rem}
+.sd-sum div.total{margin-top:8px;padding-top:14px;border-top:1px solid var(--line);font-size:1rem;font-weight:700;color:var(--ink)}
+.sd-sum div.total .s-money{font-size:2.125rem;line-height:1}
+.sd-fine{margin:16px 0 0;font-size:.8125rem;line-height:1.55;color:var(--ink-3)}
+.sd-fine a{color:var(--ink-2);text-decoration:underline;text-decoration-color:var(--gold-line);text-underline-offset:.2em}
+.sd-review h2{margin:0;font-family:var(--display);font-size:2.25rem;font-weight:800;line-height:.95}
 /* where the focus is put when the box changes step (the box itself, the review's heading): a place to read from, not a control — no ring */
 .sd-review h2:focus,.sd-buy:focus{outline:none}
-.sd-review .sd-sub{margin-bottom:16px}
+.sd-review .sd-sub{margin-bottom:18px}
 .sd-review dl{margin:0 0 6px;border-top:1px solid var(--line)}
 .sd-review .sd-sum{margin-top:0;border-top:0}
-.sd-review dl div{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:.9375rem}
-.sd-review dt{color:var(--ink-3)}
-.sd-review dd{margin:0;font-weight:500;overflow-wrap:anywhere}
-.sd-review dd small{display:block;font-weight:400;color:var(--ink-2)}
+.sd-review dl div{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);font-size:.9375rem}
+.sd-review dt{color:var(--ink-3);font-weight:600}
+.sd-review dd{margin:0;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+.sd-review dd small{display:block;margin-top:2px;font-weight:500;color:var(--ink-2)}
 /* the courier's number is read in one go: never broken over two lines */
-.sd-review .sd-tel{white-space:nowrap}
-.sd-actions{display:grid;gap:10px;margin-top:18px}
+.sd-review .sd-tel{white-space:nowrap;font-variant-numeric:tabular-nums}
+.sd-actions{display:grid;gap:10px;margin-top:20px}
 /* why the button above is grey, right under it */
 .sd-why{margin:0;font-size:.8125rem;line-height:1.5;color:var(--ink-2);text-align:center}
 .sd-why[hidden]{display:none}
-.sd-buy .sh-closed{margin-top:16px}
-.sd-wallet{margin:12px 0 0;font-size:.875rem;line-height:1.5;color:var(--ink-2)}
+.sd-buy .sh-closed{margin-top:18px}
+.sd-wallet{margin:14px 0 0;font-size:.875rem;line-height:1.5;color:var(--ink-2)}
 .sd-review .sh-closed,.sd-review .sd-wallet{margin:0 0 16px}
-.sd-after{margin:16px 0 0;padding:0;list-style:none}
+.sd-after{margin:18px 0 0;padding:0;list-style:none}
 .sd-after li{display:grid;grid-template-columns:18px 1fr;gap:10px;padding:4px 0;font-size:.875rem;line-height:1.5;color:var(--ink-2)}
-.sd-after svg{width:16px;height:16px;margin-top:2px;color:var(--ready)}
+.sd-after svg{width:16px;height:16px;margin-top:2px;color:var(--ink)}
 .sd-gone{display:grid;gap:12px;justify-items:start}
-.sd-gone b{font-size:1.0625rem}
+.sd-gone b{font-family:var(--display);font-size:2.25rem;font-weight:800;line-height:.95}
 .sd-gone p{margin:0;color:var(--ink-2);line-height:1.55}
 
 /* a stall while it loads: at least a screen tall, so the foot never starts on screen and then jumps away */
-.sd-wait{padding-top:8px;min-height:calc(100vh - var(--s-bar) - 60px);min-height:calc(100svh - var(--s-bar) - 60px)}
-.sd-wait .t{height:40px;width:min(420px,70%)}
+.sd-wait{padding-top:12px;min-height:calc(100vh - var(--s-bar) - 60px);min-height:calc(100svh - var(--s-bar) - 60px)}
+.sd-wait .g{display:grid;grid-template-columns:minmax(0,7fr) minmax(360px,5fr);gap:48px}
+.sd-wait .p{aspect-ratio:16/10;border-radius:22px}
+.sd-wait .t{height:56px;width:min(420px,70%);margin-top:28px}
 .sd-wait .w{height:20px;width:min(320px,55%);margin-top:16px}
-.sd-wait .g{display:grid;grid-template-columns:minmax(0,7fr) minmax(340px,5fr);gap:40px;margin-top:24px}
-.sd-wait .p{aspect-ratio:16/10;border-radius:20px}
-.sd-wait .b{height:440px;border-radius:18px}
+.sd-wait .b{height:520px;border-radius:28px}
 @media (max-width:960px){.sd-wait .g{grid-template-columns:1fr;gap:24px}.sd-wait .p{aspect-ratio:4/3}.sd-wait .b{height:320px}}
 
 /* on a phone: the total and the way to the order box, at the thumb, until the box itself is on screen */
 .sd-dock{display:none}
 @media (max-width:960px){
-  html[data-dock]{--s-dock:76px}
-  .sd-dock{position:fixed;left:0;right:0;bottom:0;z-index:25;display:flex;align-items:center;gap:16px;min-height:76px;padding:12px var(--s-gutter) calc(12px + var(--safe-b));background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border-top:1px solid var(--line);box-shadow:var(--shadow-sheet);transition:transform var(--dur-sheet) var(--ease),visibility var(--dur-sheet)}
+  html[data-dock]{--s-dock:96px}
+  .sd-dock{position:fixed;left:0;right:0;bottom:0;z-index:25;display:flex;align-items:center;gap:16px;min-height:96px;padding:14px var(--s-gutter) calc(14px + var(--safe-b));background:rgba(16,13,12,.94);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border-top:1px solid var(--line);transition:transform var(--dur-sheet) var(--ease),visibility var(--dur-sheet)}
   .sd-dock[data-away]{transform:translateY(110%);visibility:hidden}
   .sd-dock[hidden]{display:none}
   .sd-dock .what{flex:1;min-width:0}
-  .sd-dock .what .s-money{display:block;font-size:1.1875rem;line-height:1.2}
-  .sd-dock .what small{display:block;margin-top:2px;font-size:.8125rem;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .sd-dock .s-btn{flex:none;min-width:148px}
+  .sd-dock .what small{display:block;margin:0 0 6px;font-size:.8125rem;font-weight:600;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sd-dock .what .s-money{display:block;font-size:2.125rem;line-height:1}
+  .sd-dock .s-btn{flex:none;min-width:148px;min-height:56px}
   .sd-dock[data-closed] .what small{color:var(--ink)}
 }
 </style>
@@ -215,7 +262,7 @@
 </main>
 
 <script type="module">
-import { api, store, mnt, KIND, dayLabel, whatWentWrong, phoneText, phoneInput } from '/api.js';
+import { api, store, mnt, KIND, dayLabel, dayShort, whatWentWrong, phoneText, phoneInput } from '/api.js';
 import { mountFrame, authed, loginUrl, esc, el, siteEmpty, howToBuy, tugrik } from '/site.js';
 
 // Open to anybody: the stalls are shown to all, and only paying asks who you are.
@@ -232,15 +279,14 @@ const SRCSET = (kind) => {
   const at = PHOTO(kind).slice(0, -'.webp'.length);
   return `${at}-480.webp 480w, ${at}-720.webp 720w, ${at}.webp 960w`;
 };
-/** A card's width: one column up to 588px, two up to 895, three up to 1185, then four of the page's 1120. */
-const CARD_SIZES = '(max-width: 588px) calc(100vw - 40px), (max-width: 895px) calc(50vw - 42px), (max-width: 1185px) calc(33vw - 40px), 265px';
-/** A VIP card is two of them wide from 600px. */
-const VIP_SIZES = '(max-width: 599px) calc(100vw - 40px), (max-width: 895px) calc(100vw - 60px), (max-width: 1185px) calc(67vw - 50px), 552px';
+/** A card's width: one column up to 600px, two up to 1100, then three of the page's 1280. */
+const CARD_SIZES = '(max-width: 600px) calc(100vw - 48px), (max-width: 1100px) calc(50vw - 60px), 410px';
+/** A VIP card is two of them wide from 601px. */
+const VIP_SIZES = '(max-width: 600px) calc(100vw - 48px), (max-width: 1100px) calc(100vw - 100px), 850px';
 /** A stall's photo: the whole page on a phone, seven twelfths of it beside the order box on a desk. */
-const STALL_SIZES = '(max-width: 960px) calc(100vw - 40px), (max-width: 1200px) calc(58vw - 50px), 630px';
+const STALL_SIZES = '(max-width: 960px) 100vw, (max-width: 1440px) calc(58vw - 70px), 720px';
 const unitWord = (l) => (l.unit === 'whole' ? 'толгой' : 'кг');
 const MARK = {
-  shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>',
   tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.4"/></svg>',
   undo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v5h5"/></svg>',
   pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg>',
@@ -251,6 +297,7 @@ const MARK = {
   minus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
   info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5h.01"/></svg>',
+  arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
 };
 
 let market = { today: null, listings: [] };
@@ -368,18 +415,14 @@ function showInAddress() {
 
 function drawMarket() {
   page.replaceChildren(
-    el(`<section class="s-head sh-head">
-          <div><h1>Өвлийн идэш</h1><p>Гэрээт нийлүүлэгчээс, таны захиалгаар нядална. Зар дээрх үнэ эцсийнх.</p></div>
-          <ul class="sh-trust" aria-label="Баталгаа">
-            <li class="s-pill">${MARK.shield}Гэрээт нийлүүлэгч</li>
-            <li class="s-pill">${MARK.tag}Үнэ эцсийн</li>
-            <li class="s-pill">${MARK.undo}Нядлахаас өмнө бүтэн буцаалт</li>
-          </ul>
+    el(`<section class="sh-head">
+          <picture class="ph" aria-hidden="true"><source media="(max-width:760px)" srcset="/brand/meat/board-828.webp"><img src="/brand/meat/board-1600.webp" alt="" width="1600" height="1067" fetchpriority="high"></picture>
+          <div><h1>Идэш</h1><p id="sh-line">Гэрээт нийлүүлэгчээс, таны захиалгаар.</p></div>
         </section>`),
     el(`<div class="sh-bar" id="sh-bar">
           <div class="s-chips" id="kinds" role="group" aria-label="Малын төрөл">${'<span class="s-skel" aria-hidden="true"></span>'.repeat(5)}</div>
           <div class="sh-tools">
-            <label class="sh-check"><input type="checkbox" id="delivers"${view.delivers ? ' checked' : ''}>Хүргэлттэй</label>
+            <label class="sh-switch"><input type="checkbox" role="switch" id="delivers"${view.delivers ? ' checked' : ''}><span class="sh-long">Зөвхөн хүргэлттэй</span><span class="sh-short" aria-hidden="true">Хүргэлттэй</span></label>
             <select class="sh-sort" id="sort" aria-label="Эрэмбэ">
               <option value="suggested">Санал болгох</option>
               <option value="soon">Эрт бэлэн болох</option>
@@ -410,6 +453,16 @@ function drawMarket() {
   for (let i = 0; i < 6; i++) {
     grid.append(el('<div class="sh-skel" aria-hidden="true"><span class="s-skel ph"></span><span class="s-skel l1"></span><span class="s-skel l2"></span><span class="s-skel l3"></span></div>'));
   }
+}
+
+/** The line under «Идэш»: how many listings, from whom, and the first day meat is ready. */
+function paintLine() {
+  const line = document.getElementById('sh-line');
+  const open = market.listings.filter((l) => l.remaining > 0);
+  if (!line || !market.listings.length) return;
+  const first = open.map((l) => l.ready_from).sort()[0];
+  const when = !first ? '' : !market.today || first <= market.today ? ' · одоо бэлэн' : ` · ${dayLabel(first)}-нөөс`;
+  line.textContent = `${market.listings.length} зар · гэрээт нийлүүлэгчээс${when}`;
 }
 
 function paintKinds() {
@@ -463,8 +516,8 @@ function paintGrid(announce = false) {
       siteEmpty({
         icon: 'shop',
         title: 'Анхны зарууд удахгүй гарна',
-        text: 'Нийлүүлэгчид бүртгүүлж, Basu тэднийг шалгаж байна. Зар гармагц энд харагдана — үнэ, жин, бэлэн болох өдөртэйгөө.',
-        actions: [['Хэдэн хонь хэрэгтэйг бодох', '/#calc'], ['Мах нийлүүлдэг үү? Бүртгүүлэх', '/dashboard']],
+        text: 'Зар гармагц энд харагдана.',
+        actions: [['Мах нийлүүлдэг бол бүртгүүлэх', '/dashboard?join=business']],
         card: true,
       }),
     );
@@ -497,24 +550,25 @@ function paintGrid(announce = false) {
   if (announce && said) said.textContent = `${list.length} зар`;
   for (const [i, l] of list.entries()) {
     const gone = l.remaining === 0;
+    const whole = l.unit === 'whole';
     // Under the price, what it is for: a whole animal's rough weight and what
     // that makes a kilo — two stalls compare without opening either — or the
     // least a stall sells by the kilo.
     const kg = Number(l.approx_kg);
-    const per = l.unit === 'whole'
+    const per = whole
       ? kg > 0 ? `≈${kg} кг · ≈${mnt(Math.round(l.price_mnt / kg / 100) * 100)}/кг` : ''
       : `доод тал нь ${l.min_qty} кг`;
+    const tier = l.tier ? `<span class="sh-tag" data-tier="${esc(l.tier)}">${l.tier === 'vip' ? '★ VIP' : `${MARK.check}Онцгой`}</span>` : '';
     grid.append(
       el(`<a class="sh-card" href="/shop/${esc(l.id)}" data-id="${esc(l.id)}" data-kind="${esc(l.kind)}"${l.tier ? ` data-tier="${esc(l.tier)}"` : ''}${gone ? ' data-gone' : ''}>
-            <span class="ph"><img src="${PHOTO(l.kind)}" srcset="${SRCSET(l.kind)}" sizes="${l.tier === 'vip' ? VIP_SIZES : CARD_SIZES}" alt="" loading="${i < 4 ? 'eager' : 'lazy'}"${i === 0 ? ' fetchpriority="high"' : ''} decoding="async" width="960" height="720">
-              <span class="tags">${
-                l.tier ? `<span class="s-pill" data-tone="${l.tier === 'vip' ? 'vip' : 'pine'}">${l.tier === 'vip' ? '★ VIP' : `${MARK.check}Онцгой`}</span>` : '<span></span>'
-              }${l.delivers ? `<span class="s-pill" data-tone="hi">${MARK.truckSm}Хүргэлттэй</span>` : ''}</span></span>
+            <span class="ph"><img src="${PHOTO(l.kind)}" srcset="${SRCSET(l.kind)}" sizes="${l.tier === 'vip' ? VIP_SIZES : CARD_SIZES}" alt="" loading="${i < 3 ? 'eager' : 'lazy'}"${i === 0 ? ' fetchpriority="high"' : ''} decoding="async" width="960" height="720">
+              <span class="tags">${tier}<span class="sh-tag">${whole ? 'Бүтэн' : 'кг-аар'}</span>${l.delivers ? `<span class="sh-tag">${MARK.truckSm}Хүргэлттэй</span>` : ''}</span>
+              ${gone ? '' : `<span class="go" aria-hidden="true">${MARK.arrow}</span>`}</span>
             <span class="bd">
-              <b>${esc(l.title)}</b>
-              <span class="who">${esc(l.supplier.name)} · ${esc(l.origin)}</span>
-              <span class="sh-meta">${dayLabel(l.ready_from)}-нөөс бэлэн · ${gone ? 'дууссан' : `${l.remaining} ${unitWord(l)} үлдсэн`}</span>
-              <span class="buy"><span class="price s-money">${tugrik(l.price_mnt)}<small> / ${unitWord(l)}</small></span>${per ? `<span class="per">${per}</span>` : ''}</span>
+              <span class="sup">${esc(l.supplier.name)}</span>
+              <span class="ttl">${esc(l.title)}</span>
+              <span class="price"><span class="s-money">${tugrik(l.price_mnt)}</span>${whole ? '' : '<small>/кг</small>'}</span>
+              <span class="meta"><span class="per">${per}</span><span>${gone ? 'Дууссан' : `${dayLabel(l.ready_from)}-нөөс`}</span></span>
             </span>
           </a>`),
     );
@@ -701,18 +755,19 @@ function drawStall(l) {
 
   page.replaceChildren(
     crumb(),
-    el(`<div class="sd-title">
-          <h1>${esc(l.title)}</h1>
-          <div class="sd-who">${l.tier ? `<span class="s-pill" data-tone="${l.tier === 'vip' ? 'vip' : 'pine'}">${l.tier === 'vip' ? '★ VIP' : 'Онцгой'}</span>` : ''}${l.supplier.contracted ? `<span class="s-pill" data-tone="brand">${MARK.check}Гэрээт нийлүүлэгч</span>` : ''}<span>${esc(l.supplier.name)} · ${esc(l.origin)}</span></div>
-        </div>`),
     el(`<div class="sd">
           <div class="sd-media">
-            <figure class="sd-photo"><img src="${PHOTO(l.kind)}" srcset="${SRCSET(l.kind)}" sizes="${STALL_SIZES}" fetchpriority="high" decoding="async" alt="${esc(KIND[l.kind] ?? '')} — жишээ зураг" width="960" height="720"><figcaption>Жишээ зураг</figcaption></figure>
+            <figure class="sd-photo"><img src="${PHOTO(l.kind)}" srcset="${SRCSET(l.kind)}" sizes="${STALL_SIZES}" fetchpriority="high" decoding="async" alt="${esc(KIND[l.kind] ?? '')} — жишээ зураг" width="960" height="720">
+              <span class="tags">${l.tier ? `<span class="sh-tag" data-tier="${esc(l.tier)}">${l.tier === 'vip' ? '★ VIP' : 'Онцгой'}</span>` : ''}<span class="sh-tag">${whole ? 'Бүтэн' : 'кг-аар'}</span>${l.delivers ? `<span class="sh-tag">${MARK.truckSm}Хүргэлттэй</span>` : ''}</span>
+              <figcaption>Жишээ зураг</figcaption></figure>
+            <div class="sd-title">
+              <div class="sd-who"><span>${esc(l.supplier.name)} · ${esc(l.origin)}</span>${l.supplier.contracted ? `<span class="gold">${MARK.check}Гэрээт</span>` : ''}</div>
+              <h1>${esc(l.title)}</h1>
+            </div>
             <div class="sd-facts">
-              <div><span>Үнэ</span><b class="s-money">${tugrik(l.price_mnt)}<small>/ ${unit}</small></b></div>
-              <div><span>${whole ? 'Ойролцоо жин' : 'Доод захиалга'}</span><b>${whole ? `≈${l.approx_kg} кг` : `${l.min_qty} кг`}</b></div>
-              <div><span>Бэлэн болох</span><b>${dayLabel(l.ready_from)}</b></div>
-              <div><span>Үлдсэн</span><b>${l.remaining} ${unit}</b></div>
+              <div><span>${whole ? 'Ойролцоо жин' : 'Доод захиалга'}</span><b>${whole ? `≈${esc(l.approx_kg)}<small>кг</small>` : `${l.min_qty}<small>кг</small>`}</b></div>
+              <div><span>Бэлэн болох</span><b>${dayShort(l.ready_from)}</b></div>
+              <div><span>Үлдсэн</span><b>${l.remaining}<small>${unit}</small></b></div>
             </div>
           </div>
           <aside class="sd-buy s-card" id="buy" aria-label="Захиалах"></aside>
@@ -723,8 +778,8 @@ function drawStall(l) {
               <li>${MARK.truck}<div><b>${l.delivers ? 'Хүргэлттэй' : 'Хүргэлтгүй'}</b><span>${
                 l.delivers ? `Нийлүүлэгч таны хаяг руу хүргэнэ · ${mnt(l.delivery_fee_mnt)}` : 'Энэ нийлүүлэгчээс өөрөө очиж авна.'
               }</span></div></li>
-              <li>${MARK.tag}<div><b>Үнэ эцсийн</b><span>Мал нядалсны дараа жин нь зөрсөн ч нэмж төлөхгүй, зөрүү ч буцаагдахгүй.</span></div></li>
-              <li>${MARK.undo}<div><b>Цуцлах, буцаалт</b><span>Нядлахаас өмнө цуцлагдвал мөнгө бүтнээрээ буцна. Нядалсны дараа таны хүсэлтээр бол 10% суутгана.</span></div></li>
+              <li>${MARK.tag}<div><b>Үнэ эцсийн</b><span>Жин нь зөрсөн ч нэмж төлөхгүй.</span></div></li>
+              <li>${MARK.undo}<div><b>Цуцлах, буцаалт</b><span>Нядлахаас өмнө бол мөнгө бүтнээрээ буцна. Нядалсны дараа таны хүсэлтээр бол 10% суутгана.</span></div></li>
             </ul>
           </div>
         </div>`),
@@ -736,10 +791,11 @@ function drawStall(l) {
      at the foot carries the total and takes the thumb to it. */
   document.querySelector('.sd-dock')?.remove();
   const dock = el(`<div class="sd-dock" hidden>
-      <div class="what"><span class="s-money" data-total></span><small data-what></small></div>
-      <button class="s-btn s-btn-dark" type="button">Захиалах</button>
+      <div class="what"><small data-what></small><span class="s-money" data-total></span></div>
+      <button class="s-btn s-btn-dark s-btn-lg" type="button">Захиалах</button>
     </div>`);
-  document.body.append(dock);
+  // Inside the page's main, so what it says sits in a landmark (and sleeps with the page under a popup).
+  (document.querySelector('main') ?? document.body).append(dock);
   /** The bar at the foot: the total, a line under it, the way on — grey, with the reason as that line, while there is none. */
   const dockSays = (what, label, shut = false) => {
     dock.querySelector('[data-total]').innerHTML = tugrik(total());
@@ -789,7 +845,7 @@ function drawStall(l) {
             <p class="sd-sub">${whole ? `Нэг толгой ойролцоогоор ${l.approx_kg} кг` : `Доод тал нь ${l.min_qty} кг`} · ${l.remaining} ${unit} үлдсэн</p>
             <div id="closed-slot"></div>
             <div class="sd-form">
-              <div class="sd-q">
+              <div class="sd-q sd-row">
                 <span id="qty-label">${whole ? 'Хэдэн толгой' : 'Хэдэн кг'}</span>
                 <div class="sd-qty" role="group" aria-labelledby="qty-label">
                   <button type="button" data-d="-1" aria-label="Хасах">${MARK.minus}</button>
@@ -1070,7 +1126,7 @@ if (stallId) {
   // While it comes: blocks in the shape of the page, so nothing jumps when it lands.
   page.replaceChildren(
     crumb(),
-    el(`<div class="sd-wait" role="status" aria-busy="true" aria-label="Зар ачаалж байна"><span class="s-skel t"></span><span class="s-skel w"></span><div class="g"><span class="s-skel p"></span><span class="s-skel b"></span></div></div>`),
+    el(`<div class="sd-wait" role="status" aria-busy="true" aria-label="Зар ачаалж байна"><div class="g"><div><span class="s-skel p"></span><span class="s-skel w"></span><span class="s-skel t"></span></div><span class="s-skel b"></span></div></div>`),
   );
   try {
     // The stall's own answer says the day and whether money can be taken: the whole market is not asked for that.
@@ -1099,6 +1155,7 @@ if (stallId) {
   try {
     await load();
     loaded = true;
+    paintLine();
     paintKinds();
     paintGrid();
     // How it goes, under the cards, its paying step said from the market's own answer — not asked for a second time.
