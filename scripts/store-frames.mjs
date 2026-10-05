@@ -35,25 +35,27 @@ const font = (file) => `data:font/ttf;base64,${readFileSync(join(root, 'ios', 'F
 const png = (file) => `data:image/png;base64,${readFileSync(resolve(rawDir, file)).toString('base64')}`;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
+/**
+ * «Тансаг хар» (2026-10-05): one ground, the app's warm charcoal; the eyebrow
+ * in gold; the headline in Noto Sans Display Condensed at 800 and the line
+ * under it in Manrope — the app's own two faces, read from ios/Fonts.
+ */
 function page(shot) {
-  const dark = shot.theme === 'dark';
-  const ground = dark ? brand.darkGround : brand.lightGround;
-  const ink = dark ? '#F3F2EF' : '#161514';
-  const ink2 = dark ? 'rgba(243,242,239,.72)' : 'rgba(22,21,20,.66)';
   return `<!doctype html><html><head><meta charset="utf-8"><style>
-@font-face{font-family:Golos;font-weight:400;src:url(${font('GolosText-Regular.ttf')})}
-@font-face{font-family:Golos;font-weight:600;src:url(${font('GolosText-SemiBold.ttf')})}
+@font-face{font-family:Manrope;font-weight:500;src:url(${font('Manrope-Medium.ttf')})}
+@font-face{font-family:Manrope;font-weight:700;src:url(${font('Manrope-Bold.ttf')})}
+@font-face{font-family:Display;font-weight:800;src:url(${font('NotoSansDisplay-CondensedExtraBold.ttf')})}
 *{box-sizing:border-box;margin:0}
 html,body{width:${W}px;height:${H}px;overflow:hidden}
-body{font-family:Golos,sans-serif;background:${ground};color:${ink};position:relative}
+body{font-family:Manrope,sans-serif;background:${brand.ground};color:${brand.ink};position:relative}
 .glow{position:absolute;inset:0;background:radial-gradient(1100px 900px at 50% 16%, ${brand.glow}, transparent 70%)}
 .words{position:absolute;top:150px;left:96px;right:96px;text-align:center}
-.eyebrow{display:inline-block;font-size:34px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:${dark ? brand.accentDark ?? brand.accent : brand.accent};margin-bottom:34px}
-h1{font-size:${shot.headline.length > 34 ? 92 : 104}px;font-weight:600;line-height:1.07;letter-spacing:-.025em}
-p{margin-top:30px;font-size:44px;line-height:1.35;color:${ink2}}
+.eyebrow{display:inline-block;font-size:34px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${brand.gold};margin-bottom:34px}
+h1{font-family:Display,sans-serif;font-size:${shot.headline.length > 34 ? 124 : 140}px;font-weight:800;line-height:.92}
+p{margin-top:34px;font-size:44px;font-weight:500;line-height:1.35;color:${brand.ink2}}
 .phone{position:absolute;left:50%;top:${shot.eyebrow ? 640 : 580}px;width:1010px;transform:translateX(-50%);
   border-radius:150px;background:#0B0B0A;padding:22px;
-  box-shadow:0 60px 120px -30px rgba(0,0,0,${dark ? '.7' : '.32'}),0 0 0 3px rgba(255,255,255,${dark ? '.10' : '.0'})}
+  box-shadow:0 60px 120px -30px rgba(0,0,0,.8),0 0 0 3px rgba(255,244,236,.10)}
 .phone img{display:block;width:100%;border-radius:128px}
 .island{position:absolute;top:50px;left:50%;transform:translateX(-50%);width:250px;height:72px;border-radius:40px;background:#000}
 </style></head><body>
