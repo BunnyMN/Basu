@@ -118,7 +118,7 @@ export const FOREVER = 'public, max-age=31536000, immutable';
 /** A month, then a week more in the background while the browser asks again. */
 export const A_MONTH = 'public, max-age=2592000, stale-while-revalidate=604800';
 
-/** A font cut, named with the version of its cut: `fonts/GolosText-Regular.v2.woff2`. */
+/** A font cut, named with the version of its cut: `fonts/Manrope-Regular.v3.woff2`. */
 const FONT = /^fonts\/[^/]+\.v\d+\.woff2$/;
 /** The brand's art and photos, and the idesh animals. */
 const PICTURE = /^(brand|idesh)\/.+\.(webp|jpe?g|png|svg|avif)$/;

@@ -168,8 +168,8 @@ export function deskFrame({ workspaces, current, account, brand = 'Бизнес'
   /*
    * Whose session this is, said plainly at the foot (and at the end of the
    * phone's bar): the name, and under it the address or the number it signs
-   * in with. A number reads in the mono, «+976 9911 2233»; an address in the
-   * sans, which fits the foot. Without a name the address (or number) is the
+   * in with. A number reads with its digits lined up (data-mono), «+976 9911
+   * 2233»; an address as words. Without a name the address (or number) is the
    * one thing that says who it is: it takes the whole second line and wraps
    * rather than being cut short, under a quiet «Нэвтэрсэн», and the round
    * mark is a person — never two letters of an address.

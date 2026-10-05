@@ -188,7 +188,7 @@ describe('the server hands over the smallest copy the browser reads', () => {
   });
 
   it('sends every file as it is under tsx, where nothing is compressed beside it', async () => {
-    for (const url of ['/app.css', '/', '/login', '/fonts/GolosText-Regular.v2.woff2']) {
+    for (const url of ['/app.css', '/', '/login', '/fonts/Manrope-Regular.v3.woff2']) {
       const res = await get(bare, url, BROWSER);
       expect(res.statusCode, url).toBe(200);
       expect(res.headers['content-encoding'], url).toBeUndefined();
@@ -199,7 +199,7 @@ describe('the server hands over the smallest copy the browser reads', () => {
 
 describe('how long a browser keeps a file', () => {
   it('a font cut for a year, never asked about again', async () => {
-    const res = await get(built, '/fonts/JetBrainsMono-Regular.v2.woff2', BROWSER);
+    const res = await get(built, '/fonts/NotoSansDisplay-CondensedExtraBold.v3.woff2', BROWSER);
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toBe('font/woff2');
     expect(res.headers['content-encoding']).toBeUndefined();
@@ -219,7 +219,7 @@ describe('how long a browser keeps a file', () => {
   });
 
   it('a page, a style or a script never: their names stay across releases, so the browser asks each time', async () => {
-    for (const url of ['/', '/login', '/dashboard', '/app.css', '/api.js', '/site.css', '/vendor/table-core.js', '/fonts/OFL-GolosText.txt']) {
+    for (const url of ['/', '/login', '/dashboard', '/app.css', '/api.js', '/site.css', '/vendor/table-core.js', '/fonts/OFL-Manrope.txt']) {
       for (const app of [built, bare]) {
         expect((await get(app, url, BROWSER)).headers['cache-control'], url).toBe('public, max-age=0');
       }
@@ -227,9 +227,9 @@ describe('how long a browser keeps a file', () => {
   });
 
   it('is read off the path under the web root, a compressed copy as its file', () => {
-    expect(cacheControl('fonts/GolosText-SemiBold.v2.woff2')).toBe(FOREVER);
+    expect(cacheControl('fonts/Manrope-SemiBold.v3.woff2')).toBe(FOREVER);
     // A font with no version in its name could change under it: asked about every time.
-    expect(cacheControl('fonts/GolosText-SemiBold.woff2')).toBeUndefined();
+    expect(cacheControl('fonts/Manrope-SemiBold.woff2')).toBeUndefined();
     expect(cacheControl('brand/meat/cuts.webp')).toBe(A_MONTH);
     expect(cacheControl('brand/supplier-tile.svg.br')).toBe(A_MONTH);
     expect(cacheControl('idesh/horse.jpg')).toBe(A_MONTH);

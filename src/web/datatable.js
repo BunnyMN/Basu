@@ -70,14 +70,28 @@ export const dtCell = {
   two: (title, sub) => `<span class="dt-two"><b>${dtEsc(title)}</b>${sub ? `<small>${dtEsc(sub)}</small>` : ''}</span>`,
   /** The same, when the lines are already HTML. */
   twoHtml: (title, sub) => `<span class="dt-two"><b>${title}</b>${sub ? `<small>${sub}</small>` : ''}</span>`,
-  /** A state: its word, in the tone the design system gives that state. */
+  /** A state: its word, with the dot the design system gives that state. */
   pill: (state, word) => `<span class="pill" data-s="${dtEsc(state)}">${dtEsc(word)}</span>`,
+  /**
+   * A state that moves along — an идэш's — as Basu says one: its word, and
+   * under it `step` of `total` bars filled (api.js meter). No step: the word
+   * alone, in `tone` 'stop' (cancelled) or 'hold' (refunded, or waiting on a
+   * person).
+   */
+  stage: (word, step, total = 4, tone = '') => {
+    const all = Math.max(1, Math.trunc(total) || 4);
+    const n = Math.max(0, Math.min(all, Math.trunc(step) || 0));
+    const bars = n
+      ? `<span class="meter" data-step="${n}" data-total="${all}" aria-hidden="true">${Array.from({ length: all }, (_, i) => `<i${i < n ? ' data-on' : ''}${i === n - 1 && n < all ? ' data-now' : ''}></i>`).join('')}</span>`
+      : '';
+    return `<span class="stage"${tone ? ` data-tone="${dtEsc(tone)}"` : ''}><b>${dtEsc(word)}</b>${bars}</span>`;
+  },
   /** Tugriks, whole, with the sign after. */
   money: (mnt) =>
     mnt === null || mnt === undefined ? '<span class="dt-none">—</span>' : `<span class="dt-num">${Number(mnt).toLocaleString('en-US')}<span class="cur">₮</span></span>`,
   /** A count, or a figure. */
   num: (n) => (n === null || n === undefined ? '<span class="dt-none">—</span>' : `<span class="dt-num">${Number(n).toLocaleString('en-US')}</span>`),
-  /** Anything in the mono face: a phone, a code, a TIN. */
+  /** A code, a TIN: digits that line up (the display face, `.mono`). */
   mono: (text) => (text ? `<span class="mono">${dtEsc(text)}</span>` : '<span class="dt-none">—</span>'),
   /** A Mongolian number as people read it, «+976 9911 2233»; anything else as it came. */
   phone: (value) => {

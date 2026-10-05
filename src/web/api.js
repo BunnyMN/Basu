@@ -2097,6 +2097,44 @@ export const IDESH_STATE = {
  */
 export const IDESH_LIVE = ['PAID', 'PREPARING', 'READY', 'DISPATCHED'];
 
+/**
+ * How far an идэш has come, on the meter's four bars: paid, being prepared,
+ * ready, then on the road or in the guest's hands. A state not here — not
+ * paid yet, cancelled, refunded — has no meter: it is said in its word alone.
+ */
+export const IDESH_STEP = { PAID: 1, PREPARING: 2, READY: 3, DISPATCHED: 4, HANDED: 4, CLOSED: 4 };
+
+/**
+ * A state's progress as short bars (`.meter`, app.css): `step` of `total`
+ * filled in the ink, and the one it is at now — while it is not done — in
+ * the crimson on a customer's screen. HTML, for a template. It is a picture
+ * of the word beside it, so a reader skips it; give `label` when the bars
+ * stand alone and must say it themselves («Алхам 2/4»).
+ *
+ *   `<b>${IDESH_STATE.PREPARING}</b>${meter(2)}`
+ */
+export function meter(step, total = 4, { label = '' } = {}) {
+  const all = Math.max(1, Math.trunc(total) || 4);
+  const n = Math.max(0, Math.min(all, Math.trunc(step) || 0));
+  const bars = Array.from({ length: all }, (_, i) => `<i${i < n ? ' data-on' : ''}${i === n - 1 && n < all ? ' data-now' : ''}></i>`).join('');
+  const said = label ? ` role="img" aria-label="${popupEsc(label)}"` : ' aria-hidden="true"';
+  return `<span class="meter" data-step="${n}" data-total="${all}"${said}>${bars}</span>`;
+}
+
+/**
+ * An идэш's state as Basu says a state: one word, and the meter under it —
+ * or, cancelled or refunded, the word alone, in the crimson's ink or in gold.
+ * HTML (`.stage`), the same on the website, the app pages, the supplier's
+ * screen and the desk; the word is IDESH_STATE's, so a test or a reader finds
+ * it in the `b`.
+ */
+export function ideshStage(state) {
+  const word = IDESH_STATE[state] ?? '';
+  const tone = state === 'CANCELLED' ? 'stop' : state === 'REFUNDED' ? 'hold' : state === 'DRAFT' ? 'quiet' : '';
+  const step = IDESH_STEP[state];
+  return `<span class="stage" data-s="${popupEsc(state)}"${tone ? ` data-tone="${tone}"` : ''}><b>${popupEsc(word)}</b>${step ? meter(step) : ''}</span>`;
+}
+
 /** What each kind of animal is called, and the word for one of it. */
 export const KIND = {
   sheep: 'Хонь',
@@ -2129,12 +2167,12 @@ export const BANK_NAMES = [
 export const mnt = (value) => `${Number(value).toLocaleString('mn-MN')}₮`;
 
 /**
- * The same amount, for innerHTML: the digits in the mono, the ₮ set in the
- * sans beside them (the mono has no tugrik). textContent still reads
- * `28,000₮`, so anything that reads the amount as text sees what mnt() said.
+ * The same amount, for innerHTML: the digits in the display face, lined up,
+ * the ₮ a hair after them (`.cur`). textContent still reads `28,000₮`, so
+ * anything that reads the amount as text sees what mnt() said.
  *
- * `tone` names the movement, not a colour: 'credit' is +digits in ready,
- * 'debit' is −digits (a real minus, not a hyphen) in stop. Either sign goes in
+ * `tone` names the movement, not a colour: 'credit' is +digits in the ink,
+ * 'debit' is −digits (a real minus, not a hyphen) in the crimson's ink. Either sign goes in
  * front of the absolute value — the caller says which way the money went and
  * the number does not get to disagree. Without a tone a negative amount still
  * gets a real minus in ink.
