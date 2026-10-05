@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The session token never leaves the phone in a backup. -->
+<data-extraction-rules>
+    <cloud-backup><exclude domain="sharedpref" path="basu.session.xml" /></cloud-backup>
+    <device-transfer><exclude domain="sharedpref" path="basu.session.xml" /></device-transfer>
+</data-extraction-rules>

@@ -26,6 +26,9 @@
     "inspect": "node scripts/inspect.mjs",
     "probe:route": "node scripts/probe-route.mjs",
     "ios:pass": "node scripts/ios-pass.mjs",
+    "android": "node scripts/android.mjs",
+    "android:test": "node scripts/android.mjs test",
+    "android:apk": "node scripts/android.mjs apk",
     "check:prod": "node scripts/prod-check.mjs"
   },
   "type": "module",

@@ -31,6 +31,7 @@ npm run dev                # миграц + демо өгөгдөл + серве
 | Нийлүүлэгч | http://localhost:3000/supplier |
 | Dashboard (ops) | http://localhost:3000/dashboard |
 | iOS апп | `npm run ios` (симулятор) |
+| Android апп | `npm run android` (emulator эсвэл утас) |
 
 Docker хэрэггүй — локал Postgres 16 хангалттай. Тест `basu_test` санг ашиглаж,
 схемийг ажиллуулах бүрд шинээр босгодог.
@@ -99,6 +100,7 @@ src/db/         Pool, гүйлгээ, миграц, станцын дэвтэр
 src/ports.ts    Гадаад системүүдийн интерфейс + тестийн хуурамч хувилбарууд
 src/sim/        Өдрийн симуляц
 migrations/     Дугаарлагдсан .sql, зөвхөн урагш
+android/        iOS shell-ийн яг ижил Android хувилбар (Kotlin, Jetpack Compose); аппууд WebView-ээр
 ios/            Native shell: launcher, түрийвч/профайл/мэдэгдэл; аппууд WKWebView-ээр
   BasuKit/      Апп ба widget-ийн хамтын багц: токен, activity, snapshot, food tile
   BasuWidgets/  Live Activity (lock screen, Dynamic Island) + нүүрний widget
@@ -511,6 +513,52 @@ inline SVG: launcher өөрийгөө зурахын тулд сүлжээ хү�
 Нүүр өөрөө хэзээ ч сесс үүсгэдэггүй: нэвтрэх нь dine-in аппын хэрэг, зүгээр
 нэг нээж үзсэн хүнд данс нээж өгөх нь тэр зочилтын үнийг худал хэлж байгаа
 хэрэг.
+
+## Android апп
+
+`android/` — Kotlin, Jetpack Compose. iOS аппын **яг ижил** хувилбар: ижил
+дэлгэц, ижил үг, ижил өнгө («Тансаг хар»), ижил API. Хуваарь нь ч ижил —
+**shell нь native, аппууд нь вэб**: нүүр, захиалга, түрийвч, мэдэгдэл,
+профайл, нэвтрэх нь Compose; Идэш, Хоол, Нийлүүлэгч нь `ServiceView` доторх
+WebView-ээр нээгдэх яг тэр `/idesh`, `/dine`, `/supplier` хуудас.
+
+Файлууд iOS-ийнхтой нэг нэгээр тохирно:
+
+| iOS | Android |
+|---|---|
+| `BasuKit/DesignTokens.swift`, `Basu/Design/` | `design/` — токен, карт, товч, талбар, glyph, seed аватар |
+| `Basu/Core/` | `core/` — API, session (Keystore-оор шифрлэсэн), загвар, формат, түгжээ |
+| `Basu/App/`, `Basu/Home/`, `Basu/Services/` | `shell/` — root, таб бар, нүүр, захиалга, `ServiceView` |
+| `Basu/Auth/` | `auth/` — нэвтрэх |
+| `Basu/Platform/` | `platform/` — түрийвч, мэдэгдэл, профайл, төхөөрөмж |
+
+Вэб хуудас shell-тэй iOS дээрх шигээ `window.webkit.messageHandlers.basu`-аар
+ярьдаг; Android дээр тэр нэр нь хуудасны script ажиллахаас өмнө суулгадаг
+жижиг shim (`ServicePage`), тиймээс вэб талд Android-д зориулсан нэг ч мөр
+байхгүй. iOS дээр ажилладаг хуудас энд ч ажиллана.
+
+Android дээр өөр байгаа нь:
+
+- **Apple-ээр нэвтрэх байхгүй** (Android-д native байдаггүй). Google, имэйлийн
+  код, нууц үг хэвээр. Google нь системийн browser tab-аар явж `basu://auth`-аар
+  буцна.
+- **Түгжээ** нь Face ID-ийн оронд хурууны хээ / нүүр / утасны код
+  (`BiometricPrompt`).
+- **Push ирэхгүй** — FCM-д Firebase төсөл хэрэгтэй, сервер одоогоор зөвхөн
+  APNs руу илгээдэг. Мэдэгдэл бүр inbox-д хэвээр харагдана. Lock screen-ийн
+  Live Activity, widget-ийн Android хувилбар мөн хийгдээгүй.
+
+```bash
+npm run android              # build → холбогдсон утас/emulator дээр суулгаад нээнэ
+npm run android:test         # нэгжийн тест
+npm run android:apk          # хүнд өгөх debug APK
+BASU_API=http://10.0.2.2:3000 npm run android   # emulator-оос `npm run dev` рүү
+```
+
+Анхдагчаар pilot (`https://basu.burzai.cloud`) руу ярина; release build
+`BASU_API`-г үл тоодог. Release-д гарын үсэг зурахдаа `android/keystore.properties`
+(git-д ордоггүй) үүсгэнэ: `storeFile`, `storePassword`, `keyAlias`,
+`keyPassword` — тэгээд `./gradlew bundleRelease`.
 
 ## iOS апп
 

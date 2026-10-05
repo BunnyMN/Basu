@@ -1,0 +1,11 @@
+<resources>
+    <!-- «Тансаг хар»: dark whatever the phone's own setting. -->
+    <style name="Theme.Basu" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:colorAccent">#F6F0E8</item>
+    </style>
+</resources>
