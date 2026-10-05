@@ -442,7 +442,7 @@ describe('a wallet top-up paid on Wire’s page', () => {
     expect(await toldOf(guest)).toHaveLength(1);
   });
 
-  it('still lands when the person took an hour in their bank app — asked now and then for the rest of the day', async () => {
+  it('still lands when the person took an hour in their bank app — asked now and then for a week', async () => {
     const guest = await signIn();
     await topUp(guest, 50_000);
     later(60 * 60_000);
@@ -453,7 +453,7 @@ describe('a wallet top-up paid on Wire’s page', () => {
     expect(await balanceOf(guest)).toBe(50_000);
   });
 
-  it('credits nothing unpaid or while Wire does not answer, and lets a day-old one be', async () => {
+  it('credits nothing unpaid or while Wire does not answer, and lets one older than a week be', async () => {
     const guest = await signIn();
     await topUp(guest);
     expect((await tick(ctx, { spacingMs: 0 })).topups).toBe(0);
@@ -466,11 +466,16 @@ describe('a wallet top-up paid on Wire’s page', () => {
     expect((await tick(ctx, { spacingMs: 0 })).topups).toBe(1);
     expect(await balanceOf(guest)).toBe(1_000);
 
-    // One raised more than a day ago is not asked about any more.
+    // Three days on, a paid one still lands; one raised more than a week ago is not asked about any more.
     await topUp(guest);
-    later(25 * 60 * 60_000);
+    later(3 * 24 * 60 * 60_000);
     paidAtWire('pi_test_2');
+    expect((await tick(ctx, { spacingMs: 0 })).topups).toBe(1);
+    expect(await balanceOf(guest)).toBe(2_000);
+    await topUp(guest);
+    later(8 * 24 * 60 * 60_000);
+    paidAtWire('pi_test_3');
     expect((await tick(ctx, { spacingMs: 0 })).topups).toBe(0);
-    expect(await balanceOf(guest)).toBe(1_000);
+    expect(await balanceOf(guest)).toBe(2_000);
   });
 });

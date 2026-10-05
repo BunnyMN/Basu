@@ -331,7 +331,7 @@ final class Platform {
    Back from QPay: the top-up looked at until it lands — the bank's word can
    be a few seconds behind the person — then the wallet read afresh. Still
    unpaid after about a minute, it is left to the server, which keeps asking
-   for the rest of the day and tells the person when it lands.
+   for a week and tells the person when it lands.
    */
   func checkTopup() async {
     guard let id = awaitingTopup, !checkingTopup, let token = session.token else { return }

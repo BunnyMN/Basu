@@ -80,7 +80,7 @@ export interface TickOptions {
   /**
    * Whether this tick asks the payment provider about the идэш invoices out and the wallet top-ups of
    * the last quarter hour (`invoices`), and about the invoices let go in the last hour and the top-ups of
-   * the rest of the day (`lapsed`). Every tick when a test drives it; `run` asks at its own pace.
+   * the rest of the week (`lapsed`). Every tick when a test drives it; `run` asks at its own pace.
    */
   invoices?: boolean;
   lapsed?: boolean;
@@ -171,9 +171,13 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
   return report;
 }
 
-/** A wallet top-up is asked about on every invoice look for its first quarter hour, then now and then for a day. */
+/**
+ * A wallet top-up is asked about on every invoice look for its first quarter hour, then now and then for
+ * a week — long enough to reach back past 2026-10-02, when real payments opened and paid top-ups began to
+ * be left pending by the app.
+ */
 const TOPUP_YOUNG_MINUTES = 15;
-const TOPUP_ASKED_MINUTES = 24 * 60;
+const TOPUP_ASKED_MINUTES = 7 * 24 * 60;
 
 /**
  * Wallet top-ups paid at the provider and not yet in the wallet.
