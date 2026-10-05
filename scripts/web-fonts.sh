@@ -2,15 +2,17 @@
 #
 # The web's six font files, cut from the ones the iOS app bundles.
 #
-# ios/Fonts/*.ttf are Golos Text and JetBrains Mono whole: every language
-# their makers drew, 566 and 1,372 characters. A page only ever prints
-# Mongolian, Russian and English words, digits, ₮ and some punctuation, so
-# the web gets the same faces with the rest cut away — every OpenType
-# feature kept (tabular digits, JetBrains Mono's ligatures and alternates,
-# kerning), the outlines, metrics and hinting untouched — at about a third
-# of the weight for Golos and under half for JetBrains Mono. A character
-# outside the list is drawn by the next font in the stack (--sans/--mono in
-# app.css), as one these fonts never had always was.
+# Since 2026-10-05 («Тансаг хар») Basu speaks in two faces: Manrope for
+# reading (400/500/600/700) and Noto Sans Display Condensed for headings,
+# prices and big numbers (700/800). ios/Fonts/*.ttf are static instances of
+# Google's variable fonts (Manrope[wght], NotoSansDisplay[wdth,wght] at wdth
+# 62.5), already cut to the characters below, with their family and style
+# names set so iOS finds them by PostScript name. A page only ever prints
+# Mongolian, Russian and English words, digits, ₮ and some punctuation; the
+# web gets the same faces with every OpenType feature kept (tabular digits,
+# kerning). A character outside the list is drawn by the next font in the
+# stack (--display/--sans in app.css): Noto Sans Display has no «≈», which
+# Manrope draws.
 #
 # The files are served for a year and never asked about again (see
 # cacheControl in src/api/webFiles.ts), so a cut is never changed under its
@@ -28,8 +30,8 @@
 # PYTHON names another interpreter, a virtualenv's for one.
 set -euo pipefail
 
-VERSION=v2
-FACES="GolosText-Regular GolosText-Medium GolosText-SemiBold JetBrainsMono-Regular JetBrainsMono-Medium JetBrainsMono-SemiBold"
+VERSION=v3
+FACES="Manrope-Regular Manrope-Medium Manrope-SemiBold Manrope-Bold NotoSansDisplay-CondensedBold NotoSansDisplay-CondensedExtraBold"
 # Basic Latin, Latin-1 (« » × · ° and the like), Cyrillic with Mongolian's
 # Ө Ү, the Kazakh and Buryat letters a supplier from the west may sign
 # with (Ғ Қ Ң Ұ Һ Ә), general punctuation (– — … “ ” „ thin and narrow
