@@ -17,6 +17,7 @@ export {
   INVOICE_LIFETIME_MINUTES,
   lapsedInvoices,
   openInvoices,
+  openTopups,
   pendingInvoice,
   purchaseOfTopup,
   movement,

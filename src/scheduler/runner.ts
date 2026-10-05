@@ -2,10 +2,10 @@ import { getPool } from '../db/pool.js';
 import { addMinutes } from '../domain/time.js';
 import { ARM_LEAD_MINUTES, armOrder, findAbandoned, markNoShow } from '../services/orders.js';
 import { findPlannable, planAndSchedule } from '../services/planning.js';
-import { purgeCodes, relay as relayNotifications } from '../platform/notify/index.js';
+import { enqueue, purgeCodes, relay as relayNotifications } from '../platform/notify/index.js';
 import { purgeChallenges } from '../platform/identity/index.js';
 import { purgeAnswers } from '../api/idempotency.js';
-import { processReceipts } from '../platform/ledger/index.js';
+import { openTopups, processReceipts, settleTopup } from '../platform/ledger/index.js';
 import { recordTick } from '../ops/index.js';
 import { housekeeping as ideshHousekeeping } from '../idesh/index.js';
 import { claimDueJobs, findOverdue, fireOne } from './fireJobs.js';
@@ -37,6 +37,8 @@ export interface TickReport {
   ideshClosed: number;
   /** Идэш orders bought by an invoice paid while nobody was on the page. */
   ideshBought: number;
+  /** Wallet top-ups paid at the provider while the phone was not looking, credited. */
+  topups: number;
   /**
    * Yesterday's one-time codes swept out of both tables, and the answers
    * kept for retries that can no longer come.
@@ -61,6 +63,7 @@ const EMPTY: TickReport = {
   ideshExpired: 0,
   ideshClosed: 0,
   ideshBought: 0,
+  topups: 0,
   purged: 0,
   activitiesUpdated: 0,
   activitiesEnded: 0,
@@ -75,8 +78,9 @@ export interface TickOptions {
   /** Tests drive time by hand and do not want to wait between fires. */
   spacingMs?: number;
   /**
-   * Whether this tick asks the payment provider about the идэш invoices out (`invoices`) and about the
-   * ones let go in the last hour (`lapsed`). Every tick when a test drives it; `run` asks at its own pace.
+   * Whether this tick asks the payment provider about the идэш invoices out and the wallet top-ups of
+   * the last quarter hour (`invoices`), and about the invoices let go in the last hour and the top-ups of
+   * the rest of the day (`lapsed`). Every tick when a test drives it; `run` asks at its own pace.
    */
   invoices?: boolean;
   lapsed?: boolean;
@@ -144,6 +148,10 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
   report.ideshClosed = idesh.closed;
   report.ideshBought = idesh.bought;
 
+  /* 6b. Wallet top-ups paid while the phone was not looking — it asks once,
+   *     often before the person has paid — credited, and the person told. */
+  report.topups = await finishTopups(ctx, { young: opts.invoices ?? true, old: opts.lapsed ?? true });
+
   /* 7. Anything the state changes promised the outside world. */
   report.relayed = await relayOutbox(ctx);
   report.notified = await relayNotifications(ctx);
@@ -161,6 +169,50 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
   // The desk reads this line to know the machine is alive; it must never be the reason it is not.
   await recordTick(now, { ...report }, Date.now() - startedMs).catch(() => undefined);
   return report;
+}
+
+/** A wallet top-up is asked about on every invoice look for its first quarter hour, then now and then for a day. */
+const TOPUP_YOUNG_MINUTES = 15;
+const TOPUP_ASKED_MINUTES = 24 * 60;
+
+/**
+ * Wallet top-ups paid at the provider and not yet in the wallet.
+ *
+ * The app asks about its top-up once, the moment QPay opens — before anybody
+ * could have paid — and the provider's callback is not wired up, so a paid
+ * top-up used to stay pending: the money at the provider, nothing in the
+ * wallet. Credited here; the person is told, since nobody may be looking.
+ * Unpaid, or the provider silent: left pending, and asked again later.
+ */
+export async function finishTopups(
+  ctx: Ctx,
+  { young = true, old = true }: { young?: boolean; old?: boolean } = {},
+): Promise<number> {
+  const now = ctx.clock.now();
+  const due = [
+    ...(young ? await openTopups(now, TOPUP_YOUNG_MINUTES) : []),
+    ...(old ? await openTopups(now, TOPUP_ASKED_MINUTES, TOPUP_YOUNG_MINUTES) : []),
+  ];
+  let credited = 0;
+  for (const topup of due) {
+    try {
+      await settleTopup(ctx, topup.topupId);
+    } catch {
+      continue;
+    }
+    credited++;
+    await enqueue(ctx, {
+      guestId: topup.guestId,
+      subject: 'wallet',
+      subjectId: topup.topupId,
+      template: 'wallet.topup',
+      channel: 'push',
+      title: 'Түрийвч цэнэглэгдлээ',
+      body: `${topup.amountMnt.toLocaleString('mn-MN')}₮ түрийвчинд тань орлоо.`,
+      dedupeKey: `topup:${topup.topupId}:credited`,
+    });
+  }
+  return credited;
 }
 
 /**

@@ -356,6 +356,28 @@ export async function lapsedInvoices(subject: string, now: Date): Promise<Array<
   return rows.map((r) => ({ topupId: r.id, subjectId: r.for_subject_id }));
 }
 
+/**
+ * Wallet top-ups — money asked for with no purchase behind it — still pending at the provider, raised
+ * between `newestMinutes` and `oldestMinutes` ago. The phone asks about its top-up once, and a person
+ * can be in their bank app a while; with no callback from the provider, these are how a paid one is
+ * ever credited (the scheduler's `finishTopups`).
+ */
+export async function openTopups(
+  now: Date,
+  oldestMinutes: number,
+  newestMinutes = 0,
+): Promise<Array<{ topupId: string; guestId: string; amountMnt: number }>> {
+  const { rows } = await getPool().query<{ id: string; guest_id: string; amount_mnt: number }>(
+    `SELECT id, guest_id, amount_mnt FROM ledger.topup
+      WHERE for_subject IS NULL AND state = 'pending' AND provider_ref IS NOT NULL
+        AND created_at > $1::timestamptz - make_interval(mins => $2)
+        AND created_at <= $1::timestamptz - make_interval(mins => $3)
+      ORDER BY created_at`,
+    [now, oldestMinutes, newestMinutes],
+  );
+  return rows.map((r) => ({ topupId: r.id, guestId: r.guest_id, amountMnt: Number(r.amount_mnt) }));
+}
+
 /** The purchase a top-up was raised for — what the provider's callback goes on to. */
 export async function purchaseOfTopup(topupId: string): Promise<{ subject: string; subjectId: string } | null> {
   const { rows } = await getPool().query<{ for_subject: string | null; for_subject_id: string | null }>(

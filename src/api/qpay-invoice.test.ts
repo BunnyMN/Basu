@@ -8,6 +8,7 @@ import { VirtualClock } from '../domain/time.js';
 import { createListing, housekeeping, registerSupplier, type Listing } from '../idesh/index.js';
 import { WirePayments } from '../platform/ledger/index.js';
 import { FakeNotifier, FakeTaxProvider, type Ctx } from '../ports.js';
+import { tick } from '../scheduler/runner.js';
 import { truncateAll } from '../test/seed.js';
 import { buildServer } from './server.js';
 
@@ -406,5 +407,70 @@ describe('an идэш paid by QPay on Wire’s page', () => {
     expect(await stateOf(guest, id)).toBe('PAID');
     expect(await balanceOf(guest)).toBe(40_000);
     expect(intents.size).toBe(1);
+  });
+});
+
+describe('a wallet top-up paid on Wire’s page', () => {
+  const topUp = async (token: string, amount = 1_000) => {
+    const started = await app.inject({ method: 'POST', url: '/v1/wallet/topup', headers: auth(token), payload: { amount_mnt: amount } });
+    expect(started.statusCode, started.body).toBe(200);
+    return started.json().topup_id as string;
+  };
+  const toldOf = async (token: string) =>
+    ((await app.inject({ method: 'GET', url: '/v1/notifications', headers: auth(token) })).json().messages as Array<{ template: string; body: string }>)
+      .filter((m) => m.template === 'wallet.topup');
+
+  it('lands in the wallet on the scheduler’s look when the app asked before the person paid, and says so once', async () => {
+    const guest = await signIn();
+    const id = await topUp(guest);
+    // The app asks the moment QPay opens: nobody has paid yet, and it does not ask again.
+    const early = await app.inject({ method: 'POST', url: `/v1/wallet/topup/${id}/settle`, headers: auth(guest) });
+    expect(early.statusCode).toBe(409);
+    paidAtWire('pi_test_1');
+
+    later(2 * 60_000);
+    expect((await tick(ctx, { spacingMs: 0 })).topups).toBe(1);
+    expect(await balanceOf(guest)).toBe(1_000);
+    const told = await toldOf(guest);
+    expect(told).toHaveLength(1);
+    expect(told[0]!.body).toMatch(/^1[,.\s ]?000₮ /);
+
+    // Asked again: nothing more lands, nobody is told twice.
+    later(60_000);
+    expect((await tick(ctx, { spacingMs: 0 })).topups).toBe(0);
+    expect(await balanceOf(guest)).toBe(1_000);
+    expect(await toldOf(guest)).toHaveLength(1);
+  });
+
+  it('still lands when the person took an hour in their bank app — asked now and then for the rest of the day', async () => {
+    const guest = await signIn();
+    await topUp(guest, 50_000);
+    later(60 * 60_000);
+    paidAtWire('pi_test_1');
+    // The quarter-hour look is for the young ones; the day's look finds it.
+    expect((await tick(ctx, { spacingMs: 0, invoices: true, lapsed: false })).topups).toBe(0);
+    expect((await tick(ctx, { spacingMs: 0, invoices: false, lapsed: true })).topups).toBe(1);
+    expect(await balanceOf(guest)).toBe(50_000);
+  });
+
+  it('credits nothing unpaid or while Wire does not answer, and lets a day-old one be', async () => {
+    const guest = await signIn();
+    await topUp(guest);
+    expect((await tick(ctx, { spacingMs: 0 })).topups).toBe(0);
+
+    paidAtWire('pi_test_1');
+    failGets = 1;
+    expect((await tick(ctx, { spacingMs: 0 })).topups).toBe(0);
+    expect(await balanceOf(guest)).toBe(0);
+    // Wire answers again: the same top-up, still pending, lands.
+    expect((await tick(ctx, { spacingMs: 0 })).topups).toBe(1);
+    expect(await balanceOf(guest)).toBe(1_000);
+
+    // One raised more than a day ago is not asked about any more.
+    await topUp(guest);
+    later(25 * 60 * 60_000);
+    paidAtWire('pi_test_2');
+    expect((await tick(ctx, { spacingMs: 0 })).topups).toBe(0);
+    expect(await balanceOf(guest)).toBe(1_000);
   });
 });
