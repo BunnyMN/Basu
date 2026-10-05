@@ -34,13 +34,21 @@ const H = 2868;
 const font = (file) => `data:font/ttf;base64,${readFileSync(join(root, 'ios', 'Fonts', file)).toString('base64')}`;
 const png = (file) => `data:image/png;base64,${readFileSync(resolve(rawDir, file)).toString('base64')}`;
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+/** Escaped, with a dash held to the word before it: no line starts with «—». */
+const words = (s) => esc(s).replace(/ ([—–])/g, '\u00a0$1');
 
 /**
  * «Тансаг хар» (2026-10-05): one ground, the app's warm charcoal; the eyebrow
  * in gold; the headline in Noto Sans Display Condensed at 800 and the line
  * under it in Manrope — the app's own two faces, read from ios/Fonts.
+ *
+ * The phone sits at the same height in every picture, and the words stand on
+ * it: their last line is always the same distance above the phone, so a short
+ * headline leaves air at the top rather than a gap over the screen. A headline
+ * is two lines at most (see `fit`).
  */
 function page(shot) {
+  const phoneTop = shot.eyebrow ? 640 : 580;
   return `<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face{font-family:Manrope;font-weight:500;src:url(${font('Manrope-Medium.ttf')})}
 @font-face{font-family:Manrope;font-weight:700;src:url(${font('Manrope-Bold.ttf')})}
@@ -49,11 +57,11 @@ function page(shot) {
 html,body{width:${W}px;height:${H}px;overflow:hidden}
 body{font-family:Manrope,sans-serif;background:${brand.ground};color:${brand.ink};position:relative}
 .glow{position:absolute;inset:0;background:radial-gradient(1100px 900px at 50% 16%, ${brand.glow}, transparent 70%)}
-.words{position:absolute;top:150px;left:96px;right:96px;text-align:center}
+.words{position:absolute;bottom:${H - phoneTop + 72}px;left:96px;right:96px;text-align:center}
 .eyebrow{display:inline-block;font-size:34px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:${brand.gold};margin-bottom:34px}
-h1{font-family:Display,sans-serif;font-size:${shot.headline.length > 34 ? 124 : 140}px;font-weight:800;line-height:.92}
-p{margin-top:34px;font-size:44px;font-weight:500;line-height:1.35;color:${brand.ink2}}
-.phone{position:absolute;left:50%;top:${shot.eyebrow ? 640 : 580}px;width:1010px;transform:translateX(-50%);
+h1{font-family:Display,sans-serif;font-size:140px;font-weight:800;line-height:.92;text-wrap:balance}
+p{margin-top:34px;font-size:44px;font-weight:500;line-height:1.35;color:${brand.ink2};text-wrap:balance}
+.phone{position:absolute;left:50%;top:${phoneTop}px;width:1010px;transform:translateX(-50%);
   border-radius:150px;background:#0B0B0A;padding:22px;
   box-shadow:0 60px 120px -30px rgba(0,0,0,.8),0 0 0 3px rgba(255,244,236,.10)}
 .phone img{display:block;width:100%;border-radius:128px}
@@ -62,11 +70,28 @@ p{margin-top:34px;font-size:44px;font-weight:500;line-height:1.35;color:${brand.
 <div class="glow"></div>
 <div class="words">
   ${shot.eyebrow ? `<div class="eyebrow">${esc(shot.eyebrow)}</div>` : ''}
-  <h1>${esc(shot.headline)}</h1>
-  ${shot.sub ? `<p>${esc(shot.sub)}</p>` : ''}
+  <h1>${words(shot.headline)}</h1>
+  ${shot.sub ? `<p>${words(shot.sub)}</p>` : ''}
 </div>
 <div class="phone"><img src="${png(shot.screen)}"><div class="island"></div></div>
 </body></html>`;
+}
+
+/**
+ * Two lines of headline at most, and the words never up into the top margin:
+ * a long headline is set smaller, measured in the page with the real faces,
+ * rather than allowed to run into the line under it or behind the phone.
+ */
+function fit() {
+  const h1 = document.querySelector('h1');
+  const block = document.querySelector('.words');
+  let size = parseFloat(getComputedStyle(h1).fontSize);
+  const lines = () => Math.round(h1.getBoundingClientRect().height / (size * 0.92));
+  while ((lines() > 2 || block.getBoundingClientRect().top < 120) && size > 96) {
+    size -= 2;
+    h1.style.fontSize = `${size}px`;
+  }
+  return { size, lines: lines() };
 }
 
 mkdirSync(outDir, { recursive: true });
@@ -82,9 +107,10 @@ try {
     }
     await tab.setContent(page(shot), { waitUntil: 'load' });
     await tab.evaluate(() => document.fonts.ready);
+    const set = await tab.evaluate(fit);
     const file = join(outDir, `${String(i + 1).padStart(2, '0')}-${shot.name}.png`);
     await tab.screenshot({ path: file, type: 'png' });
-    console.log(file);
+    console.log(`${file}  (headline ${set.size}px, ${set.lines} line${set.lines > 1 ? 's' : ''})`);
   }
 } finally {
   await browser.close();
