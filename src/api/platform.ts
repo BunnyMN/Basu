@@ -23,6 +23,7 @@ import {
   startTopup,
   wallet,
 } from '../platform/ledger/index.js';
+import { ownsIdesh } from '../idesh/index.js';
 import { liveOrderCount } from '../services/orders.js';
 import {
   dismiss,
@@ -35,7 +36,7 @@ import {
   setPreferences,
   unreadCount,
 } from '../platform/notify/index.js';
-import { addEmailFirst, badRequest, leaveTheDeskFirst, noSuchSession, sendError, signInAgain } from './errors.js';
+import { addEmailFirst, badRequest, leaveTheDeskFirst, noSuchSession, notFound, sendError, signInAgain } from './errors.js';
 import { limits } from './hardening.js';
 import { deskSeatFor, seatedAtTheDesk } from './ops.js';
 import { topupsOpen, type Ctx } from '../ports.js';
@@ -550,17 +551,26 @@ export async function registerPlatformRoutes(
    * ActivityKit's push token for one order's Live Activity. Stored so the
    * lock screen can be moved without the app; sending to it is the relay's job
    * once APNs credentials exist, and until then the phone updates its own
-   * activity on every poll.
+   * activity on every poll. `subject` says which kind of order: `order` (a
+   * lunch, and what an app that predates the field means) or `idesh`.
    */
-  app.post<{ Params: { id: string }; Body: { push_token?: string } }>(
+  app.post<{ Params: { id: string }; Body: { push_token?: string; subject?: string } }>(
     '/v1/activities/:id/token',
     guarded,
     async (request, reply) => {
       const token = request.body?.push_token;
       if (!token) return badRequest(reply, 'Токен заагаагүй байна.', 'push_token is required');
+      const subject = request.body?.subject ?? 'order';
+      if (subject !== 'order' && subject !== 'idesh') {
+        return badRequest(reply, 'Захиалгын төрөл буруу байна.', 'subject is order or idesh');
+      }
+      // A card follows the guest's own order and nobody else's.
+      if (subject === 'idesh' && !(await ownsIdesh(request.guestId!, request.params.id))) {
+        return notFound(reply, 'Ийм идэш олдсонгүй.', 'no such idesh order of yours');
+      }
       await registerActivityToken({
         guestId: request.guestId!,
-        subject: 'order',
+        subject,
         subjectId: request.params.id,
         pushToken: token,
         at: ctx.clock.now(),

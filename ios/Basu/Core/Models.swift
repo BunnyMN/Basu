@@ -167,11 +167,15 @@ struct LiveIdesh: Decodable, Sendable, Identifiable, Hashable {
   let totalMnt: Int
   let receive: String
   let receiveOnDay: String
+  /// The supplier's own address, for a pickup. Nil for a delivery, and from
+  /// a server that predates it.
+  let pickupAddress: String?
 
   enum CodingKeys: String, CodingKey {
     case id, code, state, supplier, kind, title, qty, unit, receive
     case totalMnt = "total_mnt"
     case receiveOnDay = "receive_on"
+    case pickupAddress = "pickup_address"
   }
 
   /// Noon on the day, in Ulaanbaatar — an instant to sort by, never to print.

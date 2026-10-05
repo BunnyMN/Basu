@@ -85,7 +85,7 @@ targets:
       properties:
         CFBundleDisplayName: Basu
         CFBundleShortVersionString: "1.0.5"
-        CFBundleVersion: "9"
+        CFBundleVersion: "10"
         UIAppFonts: *fonts
         # Dark whatever the phone's own setting: «Тансаг хар» has no light
         # palette, so sheets, alerts and the keyboard are dark too.
@@ -169,7 +169,7 @@ targets:
       properties:
         CFBundleDisplayName: Basu
         CFBundleShortVersionString: "1.0.5"
-        CFBundleVersion: "9"
+        CFBundleVersion: "10"
         BasuAppGroup: group.mn.basu.shared$(BASU_ID_SUFFIX)
         UIAppFonts: *fonts
         NSExtension:

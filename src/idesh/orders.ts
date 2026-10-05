@@ -888,6 +888,8 @@ export interface IdeshSummary {
   /** `YYYY-MM-DD` */
   receiveOn: string;
   paidAt: Date | null;
+  /** Where a pickup is collected: the supplier's own address. The guest's lists carry it for the lock screen. */
+  pickupAddress?: string;
 }
 
 export interface IdeshDetail extends IdeshSummary {
@@ -977,7 +979,31 @@ function summary(r: OrderRow): IdeshSummary {
     receive: r.receive,
     receiveOn: r.receive_on,
     paidAt: r.paid_at,
+    pickupAddress: r.pickup_address,
   };
+}
+
+/** Where each of these orders stands, for the lock screen cards that follow them. */
+export async function ideshCardFacts(
+  orderIds: string[],
+  db: Db = getPool(),
+): Promise<Map<string, { state: IdeshState; receiveOn: string }>> {
+  if (orderIds.length === 0) return new Map();
+  const { rows } = await db.query<{ id: string; state: IdeshState; receive_on: string }>(
+    `SELECT id::text AS id, state, to_char(receive_on, 'YYYY-MM-DD') AS receive_on
+       FROM idesh.idesh_order WHERE id::text = ANY($1::text[])`,
+    [orderIds],
+  );
+  return new Map(rows.map((r) => [r.id, { state: r.state, receiveOn: r.receive_on }]));
+}
+
+/** Is this order this guest's? What a lock screen card may be registered against. */
+export async function ownsIdesh(guestId: string, orderId: string, db: Db = getPool()): Promise<boolean> {
+  const { rowCount } = await db.query(`SELECT 1 FROM idesh.idesh_order WHERE id::text = $1 AND guest_id = $2`, [
+    orderId,
+    guestId,
+  ]);
+  return (rowCount ?? 0) > 0;
 }
 
 /**

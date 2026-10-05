@@ -6,5 +6,6 @@ struct BasuWidgetBundle: WidgetBundle {
   var body: some Widget {
     OrderWidget()
     OrderLiveActivity()
+    IdeshLiveActivity()
   }
 }

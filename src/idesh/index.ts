@@ -124,6 +124,8 @@ export {
   finishInvoiceFor,
   type PayOutcome,
   liveFor,
+  ownsIdesh,
+  ideshCardFacts,
   allFor,
   detailFor,
   boardFor,

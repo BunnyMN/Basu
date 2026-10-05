@@ -633,6 +633,22 @@ describe('the inbox', () => {
       payload: {},
     });
     expect(empty.statusCode).toBe(400);
+
+    // An идэш card follows the guest's own order only; an unknown kind is refused.
+    const notMine = await app.inject({
+      method: 'POST',
+      url: `/v1/activities/${orderId}/token`,
+      headers: auth(token),
+      payload: { push_token: 'abc123', subject: 'idesh' },
+    });
+    expect(notMine.statusCode).toBe(404);
+    const odd = await app.inject({
+      method: 'POST',
+      url: `/v1/activities/${orderId}/token`,
+      headers: auth(token),
+      payload: { push_token: 'abc123', subject: 'taxi' },
+    });
+    expect(odd.statusCode).toBe(400);
   });
 
   it('remembers a phone to push to, and what the guest agreed to', async () => {

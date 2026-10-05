@@ -16,8 +16,9 @@ import WidgetKit
 final class OrderActivity {
   static let shared = OrderActivity()
 
-  /// How to hand a token to the server. Set by whoever owns the session.
-  var register: ((_ orderId: String, _ token: String) async -> Void)?
+  /// How to hand a token to the server: which kind of order (`order` for a
+  /// lunch, `idesh`), which one, and the token. Set by whoever owns the session.
+  var register: ((_ subject: String, _ orderId: String, _ token: String) async -> Void)?
 
   private var watching: Set<String> = []
 
@@ -86,7 +87,90 @@ final class OrderActivity {
     Task {
       for await data in activity.pushTokenUpdates {
         let token = data.map { String(format: "%02x", $0) }.joined()
-        await register?(id, token)
+        await register?("order", id, token)
+      }
+      watching.remove(id)
+    }
+  }
+
+  // MARK: - идэш
+
+  /// Orders whose card the guest swiped away: not put back up again.
+  private static let sweptKey = "idesh.activity.swept"
+
+  /**
+   The launcher's идэш list, on the lock screen: one card per order received
+   today (or already on the road), moved as the order moves, and closed once
+   the meat is in hand — left up half an hour on «Хүлээлгэн өгсөн», so the
+   last thing the card says is that it is done.
+
+   Only today's: an activity lives eight hours, and an идэш takes days.
+   */
+  func sync(idesh orders: [LiveIdesh]) async {
+    let today = BasuFormat.today()
+    var byID: [String: LiveIdesh] = [:]
+    for order in orders { byID[order.id] = order }
+    var swept = Set(UserDefaults.standard.stringArray(forKey: Self.sweptKey) ?? [])
+    // Forget the swept ones that are no longer anybody's business.
+    swept.formIntersection(byID.keys)
+    UserDefaults.standard.set(Array(swept), forKey: Self.sweptKey)
+
+    var up: Set<String> = []
+    for activity in Activity<IdeshActivityAttributes>.activities {
+      let id = activity.attributes.orderID
+      guard let order = byID[id] else {
+        await activity.end(nil, dismissalPolicy: .immediate)
+        continue
+      }
+      let content = ActivityContent(state: order.activityState, staleDate: order.cardStale)
+      if order.cardOver {
+        if activity.activityState == .active {
+          await activity.end(content, dismissalPolicy: .after(.now.addingTimeInterval(30 * 60)))
+        }
+      } else if order.wantsCard(today: today) {
+        if activity.content.state != order.activityState { await activity.update(content) }
+        up.insert(id)
+      } else {
+        await activity.end(nil, dismissalPolicy: .immediate)
+      }
+    }
+
+    guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+    for order in orders where order.wantsCard(today: today) && !up.contains(order.id) && !swept.contains(order.id) {
+      start(order.cardAttributes, content: ActivityContent(state: order.activityState, staleDate: order.cardStale))
+    }
+  }
+
+  private func start(_ attributes: IdeshActivityAttributes, content: ActivityContent<IdeshActivityAttributes.ContentState>) {
+    if let activity = try? Activity.request(attributes: attributes, content: content, pushType: .token) {
+      watch(activity)
+    } else if let activity = try? Activity.request(attributes: attributes, content: content, pushType: nil) {
+      watch(activity)
+    }
+  }
+
+  /// The token, for the server; and a swipe, so a card the guest put away
+  /// stays away. The system's own end — eight hours on — is not a swipe: it
+  /// goes by way of `ended`, and the card comes back when the app is opened.
+  private func watch(_ activity: Activity<IdeshActivityAttributes>) {
+    let id = activity.attributes.orderID
+    guard !watching.contains(id) else { return }
+    watching.insert(id)
+    Task {
+      for await data in activity.pushTokenUpdates {
+        let token = data.map { String(format: "%02x", $0) }.joined()
+        await register?("idesh", id, token)
+      }
+    }
+    Task {
+      var was = activity.activityState
+      for await now in activity.activityStateUpdates {
+        if now == .dismissed && was == .active {
+          var swept = Set(UserDefaults.standard.stringArray(forKey: Self.sweptKey) ?? [])
+          swept.insert(id)
+          UserDefaults.standard.set(Array(swept), forKey: Self.sweptKey)
+        }
+        was = now
       }
       watching.remove(id)
     }
@@ -107,6 +191,27 @@ final class OrderActivity {
       OrderSnapshotStore.write(snap)
       WidgetCenter.shared.reloadTimelines(ofKind: OrderSnapshotStore.widgetKind)
       await show(snap)
+    }
+
+    /// `BASU_SCREEN=idesh-activity`: a sheep ready for pickup today, on the
+    /// lock screen and in the island, with nothing bought. `BASU_IDESH_STATE`
+    /// picks the state to photograph. Debug only.
+    func showIdeshSample() async {
+      for activity in Activity<IdeshActivityAttributes>.activities {
+        await activity.end(nil, dismissalPolicy: .immediate)
+      }
+      let raw = ProcessInfo.processInfo.environment["BASU_IDESH_STATE"] ?? "READY"
+      let state = IdeshState(rawValue: raw) ?? .ready
+      let delivery = state == .dispatched
+      let attributes = IdeshActivityAttributes(
+        orderID: "sample-idesh", code: "7042", supplier: "Хангайн мах",
+        what: "Хонины мах · 1 толгой", receive: delivery ? "delivery" : "pickup",
+        pickupAddress: delivery ? nil : "БЗД, 26-р хороо, Шархад 3-р гудамж 14",
+      )
+      let content = IdeshActivityAttributes.ContentState(
+        state: state.rawValue, word: state.word, step: state.step, receiveOn: BasuFormat.today(),
+      )
+      _ = try? Activity.request(attributes: attributes, content: ActivityContent(state: content, staleDate: nil), pushType: nil)
     }
   #endif
 
@@ -146,5 +251,52 @@ extension LiveOrder {
       stage: state.stage, stageLabel: state.stage.label,
       seatingTime: slotStartsAt, fireTime: fireAt, takenAt: .now,
     )
+  }
+}
+
+extension IdeshState {
+  /// Along the meter: paid, being prepared, ready, on its way or handed over.
+  /// Unpaid, cancelled or refunded, there is no meter — the word says it.
+  var step: Int {
+    switch self {
+    case .paid: 1
+    case .preparing: 2
+    case .ready: 3
+    case .dispatched, .handed, .closed: 4
+    case .draft, .cancelled, .refunded: 0
+    }
+  }
+}
+
+extension LiveIdesh {
+  /// Wanted on the lock screen: still going, and either received today (or
+  /// late) or already on the road.
+  func wantsCard(today: String) -> Bool {
+    switch state {
+    case .dispatched: true
+    case .paid, .preparing, .ready: receiveOnDay <= today
+    default: false
+    }
+  }
+
+  /// Nothing more will happen: the card shows the last word and goes.
+  var cardOver: Bool {
+    [.handed, .closed, .cancelled, .refunded].contains(state)
+  }
+
+  var activityState: IdeshActivityAttributes.ContentState {
+    .init(state: state.rawValue, word: state.word, step: state.step, receiveOn: receiveOnDay)
+  }
+
+  var cardAttributes: IdeshActivityAttributes {
+    IdeshActivityAttributes(
+      orderID: id, code: code, supplier: supplier.name, what: "\(meat) · \(amount)",
+      receive: receive, pickupAddress: receive == "pickup" ? pickupAddress : nil,
+    )
+  }
+
+  /// Out of date at the end of the day it was for.
+  var cardStale: Date? {
+    ISODate.parse("\(receiveOnDay)T23:59:59+08:00")
   }
 }

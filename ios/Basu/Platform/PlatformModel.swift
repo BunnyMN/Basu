@@ -384,9 +384,9 @@ final class Platform {
   }
 
   /// ActivityKit's token for one order's lock screen card.
-  func registerActivityToken(_ pushToken: String, order orderId: String) async {
+  func registerActivityToken(_ pushToken: String, subject: String, order orderId: String) async {
     guard let session = session.token else { return }
-    try? await api.registerActivityToken(pushToken, order: orderId, token: session)
+    try? await api.registerActivityToken(pushToken, subject: subject, order: orderId, token: session)
   }
 
   private func note(_ error: Error) {

@@ -168,8 +168,8 @@ struct RootView: View {
       PushRegistrar.shared.onToken = { token in
         Task { await platform.registerPush(token: token) }
       }
-      OrderActivity.shared.register = { orderId, token in
-        await platform.registerActivityToken(token, order: orderId)
+      OrderActivity.shared.register = { subject, orderId, token in
+        await platform.registerActivityToken(token, subject: subject, order: orderId)
       }
       // A phone that already said yes tells the server where it is now; one
       // that has not been asked is asked after its first order, not here.
@@ -178,6 +178,9 @@ struct RootView: View {
       #if DEBUG
         if ProcessInfo.processInfo.environment["BASU_SCREEN"] == "activity" {
           await OrderActivity.shared.showSample()
+        }
+        if ProcessInfo.processInfo.environment["BASU_SCREEN"] == "idesh-activity" {
+          await OrderActivity.shared.showIdeshSample()
         }
       #endif
       await Self.signInForDebug(model)
@@ -297,6 +300,15 @@ struct RootView: View {
       } else if let destination = AppCatalogue.food.destination {
         path = [destination]
       }
+    case "idesh":
+      // The идэш lock screen card: straight to that order on the page.
+      tab = .home
+      if let id = url.pathComponents.dropFirst().first,
+         let destination = AppCatalogue.idesh.destination(order: id) {
+        path = [destination]
+      } else if let destination = AppCatalogue.idesh.destination {
+        path = [destination]
+      }
     case "dine":
       tab = .home
       if let destination = AppCatalogue.food.destination { path = [destination] }
@@ -313,7 +325,7 @@ struct RootView: View {
 
   // MARK: - the design pass
 
-  /// `BASU_SCREEN=orders|wallet|profile|inbox|splash|food|idesh|signin|push|activity` lands the app
+  /// `BASU_SCREEN=orders|wallet|profile|inbox|splash|food|idesh|signin|push|activity|idesh-activity` lands the app
   /// on a screen so the pass — and the store's pictures — can photograph it.
   /// `BASU_BROWSE=1` with `signin` looks around signed out instead of stopping
   /// at the way in. Debug only; production has no such door.

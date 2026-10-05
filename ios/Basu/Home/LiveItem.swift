@@ -196,17 +196,8 @@ extension LiveIdesh {
     }
   }
 
-  /// Along the meter: paid, being prepared, ready, on its way or handed over.
-  /// Unpaid, cancelled or refunded, there is no meter — the word says it.
-  var step: Int {
-    switch state {
-    case .paid: 1
-    case .preparing: 2
-    case .ready: 3
-    case .dispatched, .handed, .closed: 4
-    case .draft, .cancelled, .refunded: 0
-    }
-  }
+  /// Along the meter — the state's own step, the lock screen's too.
+  var step: Int { state.step }
 
   /// The animal's photograph, from the server — the one its stall shows.
   var photo: URL? {

@@ -15,6 +15,8 @@ export const shapeSummary = (o: IdeshSummary) => ({
   receive: o.receive,
   receive_on: o.receiveOn,
   paid_at: o.paidAt?.toISOString() ?? null,
+  // Only a pickup has somewhere to go; a delivery's address is the guest's own.
+  pickup_address: o.receive === 'pickup' ? (o.pickupAddress ?? null) : null,
 });
 
 /** An order as the supplier's screens and the ops desk read it. */

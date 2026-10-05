@@ -99,8 +99,9 @@ final class AppModel {
       return
     }
     // Two calls, one per service: the launcher is the one place that knows
-    // there are two. The lock screen follows the lunch only — a sheep due
-    // next week is not a thing to watch from the island. A third asks
+    // there are two. The lock screen follows the lunch, and an идэш only on
+    // the day it changes hands — a sheep due next week is not a thing to
+    // watch from the island. A third asks
     // whether this guest is a supplier, which draws or hides one tile.
     async let lunches = api.liveOrders(token: token)
     async let provisions = api.liveIdesh(token: token)
@@ -131,9 +132,11 @@ final class AppModel {
     // side: no tile, not an error.
     do {
       liveIdesh = try await provisions
+      await OrderActivity.shared.sync(idesh: liveIdesh)
     } catch is CancellationError {
       return
     } catch {
+      // Not known is not gone: the cards stay as they were.
       liveIdesh = []
     }
     if liveIdesh.contains(where: { $0.state == .handed }) { ReviewMoment.noteFinished() }

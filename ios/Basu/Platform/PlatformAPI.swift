@@ -356,12 +356,13 @@ extension API {
   }
 
   /// ActivityKit's push token for one order, so the server can move the lock
-  /// screen without the app being open.
-  func registerActivityToken(_ pushToken: String, order orderId: String, token: String) async throws {
+  /// screen without the app being open. `subject` is `order` for a lunch,
+  /// `idesh` for an идэш.
+  func registerActivityToken(_ pushToken: String, subject: String, order orderId: String, token: String) async throws {
     _ = try await send(
       .init(
         path: "/v1/activities/\(orderId)/token", method: "POST",
-        body: ["push_token": pushToken], token: token,
+        body: ["push_token": pushToken, "subject": subject], token: token,
       ),
       as: API.Blank.self,
     )

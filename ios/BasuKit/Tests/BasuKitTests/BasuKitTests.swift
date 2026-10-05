@@ -30,6 +30,32 @@ struct BasuKitTests {
     #expect(back.url.absoluteString == "basu://order/o1")
   }
 
+  @Test func theServersIdeshPushDecodesAsTheCardsState() throws {
+    // What the relay sends for an идэш (src/services/activities.ts).
+    let pushed = try JSONDecoder().decode(
+      IdeshActivityAttributes.ContentState.self,
+      from: Data("""
+        {"state":"READY","word":"Бэлэн","step":3,"receiveOn":"2026-09-12"}
+        """.utf8),
+    )
+    #expect(pushed == .init(state: "READY", word: "Бэлэн", step: 3, receiveOn: "2026-09-12"))
+    #expect(pushed.calling)
+    #expect(!pushed.finished)
+    #expect(pushed.short == "Бэлэн")
+    #expect(pushed.hint(delivery: false) == "Кодоо үзүүлээд аваарай")
+    #expect(pushed.hint(delivery: true) == "Удахгүй замд гарна")
+  }
+
+  @Test func aDayIsSaidTheWayAPersonSaysIt() {
+    // 2026-09-12 10:00 in Ulaanbaatar.
+    let now = Date(timeIntervalSince1970: 1_789_178_400)
+    #expect(BasuFormat.today(now) == "2026-09-12")
+    #expect(BasuFormat.dayWord("2026-09-12", now: now) == "Өнөөдөр")
+    #expect(BasuFormat.dayWord("2026-09-13", now: now) == "Маргааш")
+    #expect(BasuFormat.dayWord("2026-09-11", now: now) == "Өчигдөр")
+    #expect(BasuFormat.dayWord("2026-10-07", now: now) == "10-р сарын 7")
+  }
+
   @Test func theServersPushAndTheAppsOwnEncodingBothDecodeAsContentState() throws {
     // What the relay sends (src/services/activities.ts): ISO 8601 text.
     let pushed = try JSONDecoder().decode(

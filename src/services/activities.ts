@@ -5,6 +5,7 @@ import {
   forgetActivityToken,
   markActivityPushed,
 } from '../platform/notify/index.js';
+import { ideshCardFacts, type IdeshState } from '../idesh/index.js';
 import { PushTokenGone, type ActivityPush, type Ctx } from '../ports.js';
 
 /**
@@ -26,6 +27,10 @@ import { PushTokenGone, type ActivityPush, type Ctx } from '../ports.js';
  *
  * Three stages and their words are the app's (`OrderStage` in BasuKit); the
  * content state here is what its `ContentState` decodes.
+ *
+ * An идэш has a card of its own (`IdeshActivityAttributes`), up on the day
+ * the meat changes hands. Same loop, its own words, and no alert: the
+ * order's own messages (`idesh.ready`, `idesh.dispatched`) already say it.
  */
 
 const STAGE: Record<string, 'waiting' | 'cooking' | 'ready'> = {
@@ -51,11 +56,18 @@ const ALERT: Partial<Record<'waiting' | 'cooking' | 'ready', { title: string; bo
 
 interface CardState {
   over: boolean;
-  stage: 'waiting' | 'cooking' | 'ready';
   contentState: Record<string, unknown>;
-  seatingAt: Date;
+  /** After this the card is greyed as out of date. */
+  staleAt: Date;
+  /** Lit up and buzzed, for the one change worth it. */
+  alert?: { title: string; body: string };
+  /** A finished card stays up a quarter of an hour past this, or past now if later. */
+  lingerFrom?: Date;
   hash: string;
 }
+
+const digest = (over: boolean, contentState: Record<string, unknown>): string =>
+  createHash('sha256').update(JSON.stringify([over, contentState])).digest('hex').slice(0, 32);
 
 async function cardStates(orderIds: string[]): Promise<Map<string, CardState>> {
   if (orderIds.length === 0) return new Map();
@@ -76,14 +88,73 @@ async function cardStates(orderIds: string[]): Promise<Map<string, CardState>> {
       seatingTime: row.slot_starts_at.toISOString(),
       fireTime: row.fire_at?.toISOString() ?? null,
     };
-    const hash = createHash('sha256')
-      .update(JSON.stringify([over, contentState]))
-      .digest('hex')
-      .slice(0, 32);
-    out.set(row.id, { over, stage, contentState, seatingAt: row.slot_starts_at, hash });
+    const alert = ALERT[stage];
+    out.set(row.id, {
+      over,
+      contentState,
+      staleAt: new Date(row.slot_starts_at.getTime() + 30 * 60_000),
+      ...(alert && !over ? { alert } : {}),
+      lingerFrom: row.slot_starts_at,
+      hash: digest(over, contentState),
+    });
   }
   return out;
 }
+
+/** The words every Basu screen uses (`IdeshState.word` in the app). */
+const IDESH_WORD: Record<IdeshState, string> = {
+  DRAFT: 'Төлөгдөөгүй',
+  PAID: 'Төлсөн',
+  PREPARING: 'Бэлтгэж байна',
+  READY: 'Бэлэн',
+  DISPATCHED: 'Замд',
+  HANDED: 'Хүлээлгэн өгсөн',
+  CLOSED: 'Дууслаа',
+  CANCELLED: 'Цуцлагдлаа',
+  REFUNDED: 'Буцаагдлаа',
+};
+
+/** Along the meter of four; nought draws none. */
+const IDESH_STEP: Record<IdeshState, number> = {
+  DRAFT: 0,
+  PAID: 1,
+  PREPARING: 2,
+  READY: 3,
+  DISPATCHED: 4,
+  HANDED: 4,
+  CLOSED: 4,
+  CANCELLED: 0,
+  REFUNDED: 0,
+};
+
+const IDESH_OVER = new Set<IdeshState>(['HANDED', 'CLOSED', 'CANCELLED', 'REFUNDED']);
+
+async function ideshCardStates(orderIds: string[]): Promise<Map<string, CardState>> {
+  const out = new Map<string, CardState>();
+  for (const [id, fact] of await ideshCardFacts(orderIds)) {
+    const over = IDESH_OVER.has(fact.state);
+    const contentState = {
+      state: fact.state,
+      word: IDESH_WORD[fact.state],
+      step: IDESH_STEP[fact.state],
+      receiveOn: fact.receiveOn,
+    };
+    out.set(id, {
+      over,
+      contentState,
+      // The end of the day it was for, in Ulaanbaatar.
+      staleAt: new Date(`${fact.receiveOn}T23:59:59+08:00`),
+      hash: digest(over, contentState),
+    });
+  }
+  return out;
+}
+
+/** The kinds of card, by the subject their tokens are stored under. */
+const KINDS: { subject: string; states: (ids: string[]) => Promise<Map<string, CardState>> }[] = [
+  { subject: 'order', states: cardStates },
+  { subject: 'idesh', states: ideshCardStates },
+];
 
 export interface ActivityRelayReport {
   updated: number;
@@ -95,59 +166,62 @@ export interface ActivityRelayReport {
 /** One pass over every card. Called from the scheduler's tick. */
 export async function relayActivities(ctx: Ctx): Promise<ActivityRelayReport> {
   const report: ActivityRelayReport = { updated: 0, ended: 0, forgotten: 0, failed: 0 };
-  const cards = await activityCards('order');
-  if (cards.length === 0) return report;
-
-  const states = await cardStates([...new Set(cards.map((c) => c.subjectId))]);
   const now = ctx.clock.now();
 
-  for (const card of cards) {
-    const state = states.get(card.subjectId);
-    if (!state) {
-      // The order is gone (a reseed, in practice). Nothing to say to the card.
-      await forgetActivityToken(card.pushToken, card.subjectId);
-      report.forgotten++;
-      continue;
-    }
-    if (state.hash === card.pushedHash) continue;
+  for (const kind of KINDS) {
+    const cards = await activityCards(kind.subject);
+    if (cards.length === 0) continue;
+    const states = await kind.states([...new Set(cards.map((c) => c.subjectId))]);
 
-    // A card that was never told anything and is already over: the phone
-    // ended it itself when it learned. No push, just forget the token.
-    if (state.over && card.pushedHash === null) {
-      await forgetActivityToken(card.pushToken, card.subjectId);
-      report.forgotten++;
-      continue;
-    }
-
-    const push: ActivityPush = {
-      token: card.pushToken,
-      event: state.over ? 'end' : 'update',
-      contentState: state.contentState,
-      staleAt: new Date(state.seatingAt.getTime() + 30 * 60_000),
-    };
-    const alert = ALERT[state.stage];
-    if (state.over) {
-      push.dismissAt = new Date(Math.max(now.getTime(), state.seatingAt.getTime()) + 15 * 60_000);
-    } else if (alert) {
-      push.alert = alert;
-    }
-
-    try {
-      await ctx.notifier.pushActivity(push);
-      if (state.over) {
-        await forgetActivityToken(card.pushToken, card.subjectId);
-        report.ended++;
-      } else {
-        await markActivityPushed(card.pushToken, card.subjectId, state.hash, now);
-        report.updated++;
-      }
-    } catch (error) {
-      if (error instanceof PushTokenGone) {
+    for (const card of cards) {
+      const state = states.get(card.subjectId);
+      if (!state) {
+        // The order is gone (a reseed, in practice). Nothing to say to the card.
         await forgetActivityToken(card.pushToken, card.subjectId);
         report.forgotten++;
-      } else {
-        // Left as it was: the hash still differs, so the next tick retries.
-        report.failed++;
+        continue;
+      }
+      if (state.hash === card.pushedHash) continue;
+
+      // A card that was never told anything and is already over: the phone
+      // ended it itself when it learned. No push, just forget the token.
+      if (state.over && card.pushedHash === null) {
+        await forgetActivityToken(card.pushToken, card.subjectId);
+        report.forgotten++;
+        continue;
+      }
+
+      const push: ActivityPush = {
+        token: card.pushToken,
+        event: state.over ? 'end' : 'update',
+        contentState: state.contentState,
+        staleAt: state.staleAt,
+      };
+      if (state.over) {
+        // The last word stays up a quarter of an hour, then goes.
+        const from = Math.max(now.getTime(), state.lingerFrom?.getTime() ?? 0);
+        push.dismissAt = new Date(from + 15 * 60_000);
+      } else if (state.alert) {
+        push.alert = state.alert;
+      }
+
+      try {
+        await ctx.notifier.pushActivity(push);
+        if (state.over) {
+          await forgetActivityToken(card.pushToken, card.subjectId);
+          report.ended++;
+        } else {
+          await markActivityPushed(card.pushToken, card.subjectId, state.hash, now);
+          report.updated++;
+        }
+      } catch (error) {
+        if (error instanceof PushTokenGone) {
+          await forgetActivityToken(card.pushToken, card.subjectId);
+          report.forgotten++;
+        } else {
+          // Left as it was: the hash still differs, so the next tick retries.
+          report.failed++;
+        }
       }
     }
   }

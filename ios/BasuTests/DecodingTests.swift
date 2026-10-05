@@ -80,6 +80,38 @@ struct DecodingTests {
     #expect(order.asLiveItem().detail == "Хонь, залуу ирэг · 1 толгой · Төлсөн")
   }
 
+  @Test func anIdeshIsOnTheLockScreenOnlyOnItsDay() throws {
+    func idesh(_ state: String, on day: String, receive: String = "pickup") throws -> LiveIdesh {
+      try decode(LiveIdesh.self, """
+        {
+          "id": "i", "code": "7042", "state": "\(state)",
+          "supplier": { "id": "s", "name": "Архангай · Дорж" },
+          "kind": "sheep", "unit": "whole", "title": "Хонь, залуу ирэг", "qty": 1, "total_mnt": 460000,
+          "receive": "\(receive)", "receive_on": "\(day)", "paid_at": null,
+          "pickup_address": "Нарантуул, хойд хаалга"
+        }
+        """)
+    }
+    let today = "2026-09-12"
+    // Next week's sheep is not a thing to watch from the island.
+    #expect(try !idesh("READY", on: "2026-09-19").wantsCard(today: today))
+    #expect(try idesh("PAID", on: today).wantsCard(today: today))
+    #expect(try idesh("READY", on: "2026-09-11").wantsCard(today: today))
+    // On the road is today, whatever day was booked.
+    #expect(try idesh("DISPATCHED", on: "2026-09-19", receive: "delivery").wantsCard(today: today))
+    // In hand, or cancelled: the card says its last word and goes.
+    #expect(try !idesh("HANDED", on: today).wantsCard(today: today))
+    #expect(try idesh("HANDED", on: today).cardOver)
+
+    let ready = try idesh("READY", on: today)
+    #expect(ready.activityState == .init(state: "READY", word: "Бэлэн", step: 3, receiveOn: today))
+    #expect(ready.cardAttributes.what == "Хонь, залуу ирэг · 1 толгой")
+    #expect(ready.cardAttributes.code == "7042")
+    #expect(ready.cardAttributes.pickupAddress == "Нарантуул, хойд хаалга")
+    // A delivery's card never carries an address: a lock screen is public.
+    #expect(try idesh("DISPATCHED", on: today, receive: "delivery").cardAttributes.pickupAddress == nil)
+  }
+
   @Test func meatByTheKiloIsSaidInKilosNotTimes() throws {
     let order = try decode(LiveIdesh.self, """
       {
