@@ -306,6 +306,18 @@ for _ in $(seq 1 30); do
         # closed for want of a key it could not read.
         printf '%s\n' "$recent" | grep -oE '\[scheduler\] [a-z -]*failed' | sort | uniq -c | sed 's/^/    /' || true
         printf '%s\n' "$recent" | grep -E '^\[scheduler\] payments: ' | tail -n 1 | sed 's/^/  /' || true
+        # What each process was handed by systemd rather than read from .env —
+        # a unit's own setting beats .env. Names only, and for the database
+        # its name alone: the URL carries a password and this log is public.
+        for unit in basu-api basu-scheduler; do
+          pid=$(systemctl show -p MainPID --value "$unit" 2>/dev/null || echo 0)
+          given=""; db=""
+          if [ -n "$pid" ] && [ "$pid" != 0 ] && [ -r "/proc/$pid/environ" ]; then
+            given=$(tr '\0' '\n' < "/proc/$pid/environ" | cut -d= -f1 | grep -E '^[A-Z][A-Z0-9_]*$' | grep -vE '^(PATH|HOME|LANG|USER|LOGNAME|SHELL|INVOCATION_ID|JOURNAL_STREAM|SYSTEMD_EXEC_PID|MEMORY_PRESSURE_WATCH|MEMORY_PRESSURE_WRITE|PWD|TERM)$' | sort | paste -sd' ' - || true)
+            db=$(tr '\0' '\n' < "/proc/$pid/environ" | sed -n 's/^DATABASE_URL=//p' | sed -E 's#^.*/([^/?]+)([?].*)?$#\1#' || true)
+          fi
+          echo "  $unit: cwd $(systemctl show -p WorkingDirectory --value "$unit" 2>/dev/null || true); from systemd: ${given:-nothing}${db:+; DATABASE_URL names $db}"
+        done
       fi
     fi
     flipped=0
