@@ -26,6 +26,10 @@ final class Platform {
 
   /// Set while a top-up is in flight, so the button can say so.
   private(set) var toppingUp = false
+  /// The top-up whose QPay page is open in the bank app, and whether it is
+  /// being looked at now that the person is back (`checkTopup`).
+  private var awaitingTopup: String?
+  private(set) var checkingTopup = false
   private(set) var trouble: String?
 
   /**
@@ -286,10 +290,12 @@ final class Platform {
    Money in.
 
    Two steps, because they are two different things: asking the provider for
-   the money, and the money arriving. In production QPay's callback settles it
-   and this poll is a courtesy to a guest who came back faster than the webhook;
-   against the demo provider there is nothing to open, so it settles at once.
-   Both paths are safe — settling twice credits once.
+   the money, and the money arriving. QPay opens outside the app and the
+   person pays there; `open` returns as the bank app comes up, not after the
+   PIN, so asking then only ever heard «not paid yet». The question waits for
+   their return (`checkTopup`), and the server's scheduler credits a paid one
+   within the minute anyway. Against the demo provider there is nothing to
+   open, so it settles at once. Settling twice credits once.
    */
   func topUp(amountMnt: Int) async -> Bool {
     guard let token = session.token else { return false }
@@ -299,12 +305,14 @@ final class Platform {
 
     do {
       let started = try await api.startTopup(amountMnt: amountMnt, token: token)
+      noteTopups(open: true)
       if let raw = started.actionUrl, let url = URL(string: raw),
          UIApplication.shared.canOpenURL(url) {
+        awaitingTopup = started.topupId
         await UIApplication.shared.open(url)
+        return true
       }
       _ = try await api.settleTopup(started.topupId, token: token)
-      noteTopups(open: true)
       await loadWallet()
       await refresh()
       return true
@@ -317,6 +325,36 @@ final class Platform {
       note(error)
       return false
     }
+  }
+
+  /**
+   Back from QPay: the top-up looked at until it lands — the bank's word can
+   be a few seconds behind the person — then the wallet read afresh. Still
+   unpaid after about a minute, it is left to the server, which keeps asking
+   for the rest of the day and tells the person when it lands.
+   */
+  func checkTopup() async {
+    guard let id = awaitingTopup, !checkingTopup, let token = session.token else { return }
+    checkingTopup = true
+    defer { checkingTopup = false }
+    for wait in [0, 2, 3, 5, 10, 20] {
+      if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+      do {
+        _ = try await api.settleTopup(id, token: token)
+        awaitingTopup = nil
+        await loadWallet()
+        await refresh()
+        return
+      } catch let error as APIError where error.code == "NOT_PAID_YET" || error.code == "PROVIDER_UNREACHABLE" {
+        continue
+      } catch {
+        awaitingTopup = nil
+        note(error)
+        return
+      }
+    }
+    awaitingTopup = nil
+    await loadWallet()
   }
 
   /// The swipe. Gone from the list at once; the server is told after, and a

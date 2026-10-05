@@ -137,7 +137,10 @@ struct RootView: View {
     .onChange(of: phase) { _, now in
       switch now {
       case .background: lock.left(at: .now)
-      case .active: lock.returned(at: .now)
+      case .active:
+        lock.returned(at: .now)
+        // Back from the bank app, perhaps: a top-up paid there shows now.
+        Task { await platform.checkTopup() }
       default: break
       }
     }
