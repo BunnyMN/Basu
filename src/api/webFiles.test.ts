@@ -207,7 +207,7 @@ describe('how long a browser keeps a file', () => {
   });
 
   it('a photo or a tile’s art a month, refreshed in the background a week past it', async () => {
-    for (const url of ['/brand/meat/hero.webp', '/brand/food-tile.webp', '/brand/og.jpg', '/brand/apple-touch-icon.png', '/idesh/beef.jpg', '/favicon.ico']) {
+    for (const url of ['/brand/meat/hero.webp', '/brand/food-tile.webp', '/brand/og-dark.jpg', '/brand/apple-touch-icon.png', '/idesh/beef.jpg', '/favicon.ico']) {
       const res = await get(built, url, BROWSER);
       expect(res.statusCode, url).toBe(200);
       expect(res.headers['cache-control'], url).toBe(A_MONTH);
