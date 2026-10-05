@@ -2143,7 +2143,7 @@ export function ideshStage(state) {
  * `/idesh/sheep.jpg`, `/idesh/sheep-2.jpg`… (square) and
  * `/brand/meat/sheep.webp`, `sheep-2.webp`… with `-480` and `-720` copies.
  */
-export const MEAT_PHOTOS = { sheep: 6, goat: 4, beef: 5, horse: 4 };
+export const MEAT_PHOTOS = { sheep: 7, goat: 4, beef: 5, horse: 4 };
 
 /**
  * Which photograph a listing or an order wears, as a file's name without its

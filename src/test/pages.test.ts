@@ -2156,7 +2156,7 @@ describe('өвлийн идэш', () => {
     const worn = new Map<string, string[]>();
     for (const row of dom.window.document.querySelectorAll('.listing')) {
       const src = row.querySelector('.art img')?.getAttribute('src') ?? '';
-      expect(src).toMatch(/^\/idesh\/(sheep|goat|beef|horse)(-[2-6])?\.jpg$/);
+      expect(src).toMatch(/^\/idesh\/(sheep|goat|beef|horse)(-[2-7])?\.jpg$/);
       await expect(readFile(join(WEB, src))).resolves.toBeTruthy();
       const stall = `${row.querySelector('.from')?.textContent} ${src.replace(/(-\d)?\.jpg$/, '')}`;
       worn.set(stall, [...(worn.get(stall) ?? []), src]);
