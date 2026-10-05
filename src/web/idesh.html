@@ -976,15 +976,16 @@ function showScreen(name, title, sub, { replace = false } = {}) {
 /**
  * The screen's bar over a stall's photograph: clear, the way back and the
  * share a glass circle each, while the photograph is in view; glass with the
- * stall's name once it has scrolled under the bar. Every other face has the
- * glass bar from the start.
+ * stall's name once all but a strip of it has scrolled under the bar — a
+ * sliver of meat behind two circles read as a mistake. Every other face has
+ * the glass bar from the start.
  */
 let screenBarFrame = 0;
 function settleScreenBar() {
   screenBarFrame = 0;
   const bar = $('screen').querySelector('.topbar');
   const hero = state.screen === 'detail' ? $('screen-body').querySelector('.hero') : null;
-  const clear = Boolean(hero) && hero.getBoundingClientRect().bottom > bar.getBoundingClientRect().bottom + 24;
+  const clear = Boolean(hero) && hero.getBoundingClientRect().bottom > bar.getBoundingClientRect().bottom + 96;
   bar.toggleAttribute('data-flat', clear);
 }
 $('screen-body').addEventListener('scroll', () => {
