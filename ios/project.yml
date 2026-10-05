@@ -46,15 +46,17 @@ packages:
   BasuKit:
     path: BasuKit
 
-# Golos Text and JetBrains Mono, static 400 / 500 / 600. Every target that
-# draws text bundles them and lists them under UIAppFonts.
+# Manrope (static 400 / 500 / 600 / 700) for words and Noto Sans Display
+# Condensed (700 / 800) for headings, money, times and codes — the web's own
+# two faces since «Тансаг хар». Every target that draws text bundles them and
+# lists them under UIAppFonts; the names match BasuFont.files.
 fonts: &fonts
-  - GolosText-Regular.ttf
-  - GolosText-Medium.ttf
-  - GolosText-SemiBold.ttf
-  - JetBrainsMono-Regular.ttf
-  - JetBrainsMono-Medium.ttf
-  - JetBrainsMono-SemiBold.ttf
+  - Manrope-Regular.ttf
+  - Manrope-Medium.ttf
+  - Manrope-SemiBold.ttf
+  - Manrope-Bold.ttf
+  - NotoSansDisplay-CondensedBold.ttf
+  - NotoSansDisplay-CondensedExtraBold.ttf
 
 targets:
   Basu:
@@ -85,6 +87,9 @@ targets:
         CFBundleShortVersionString: "1.0.4"
         CFBundleVersion: "8"
         UIAppFonts: *fonts
+        # Dark whatever the phone's own setting: «Тансаг хар» has no light
+        # palette, so sheets, alerts and the keyboard are dark too.
+        UIUserInterfaceStyle: Dark
         # The order's progress on the lock screen and in the Dynamic Island.
         NSSupportsLiveActivities: true
         # Profile → Тохиргоо: the app lock (AppLock.swift).

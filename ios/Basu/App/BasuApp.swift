@@ -29,6 +29,9 @@ struct BasuApp: App {
     let model = AppModel()
     _model = State(initialValue: model)
     _platform = State(initialValue: Platform(api: model.api, session: model.session))
+    // Light, dark or the phone's own was a choice until «Тансаг хар»: Basu is
+    // dark now whatever the phone says, and the old answer is let go of.
+    UserDefaults.standard.removeObject(forKey: "appearance")
   }
 
   var body: some Scene {
@@ -38,18 +41,24 @@ struct BasuApp: App {
         .environment(model.session)
         .environment(platform)
         .environment(lock)
-        .tint(.accent)
+        // Dark on every screen, sheets and alerts included, whatever the
+        // phone's own setting (Info.plist says the same to UIKit).
+        .preferredColorScheme(.dark)
+        // System controls — a sheet's «Болих», an alert's button, a cursor —
+        // in the ink. Crimson is kept for the one primary action.
+        .tint(.ink)
     }
   }
 }
 
-/// The three the tab bar carries. Apps are never tabs — they stay in the grid.
+/// The four the tab bar carries. Apps are never tabs — they are tiles.
 enum ShellTab: String, CaseIterable, Hashable {
-  case home, wallet, profile
+  case home, orders, wallet, profile
 
   var title: String {
     switch self {
     case .home: "Нүүр"
+    case .orders: "Захиалга"
     case .wallet: "Түрийвч"
     case .profile: "Профайл"
     }
@@ -58,6 +67,7 @@ enum ShellTab: String, CaseIterable, Hashable {
   var mark: ShellMark {
     switch self {
     case .home: .home
+    case .orders: .orders
     case .wallet: .wallet
     case .profile: .profile
     }
@@ -78,11 +88,11 @@ struct RootView: View {
   @Environment(Platform.self) private var platform
   @Environment(AppLock.self) private var lock
   @Environment(\.scenePhase) private var phase
-  @AppStorage(Appearance.key) private var appearance: Appearance = .system
 
   @State private var tab: ShellTab = .home
   @State private var path: [Destination] = []
   @State private var splash = true
+  @State private var debugPush = false
 
   var body: some View {
     ZStack {
@@ -131,7 +141,6 @@ struct RootView: View {
       default: break
       }
     }
-    .onChange(of: appearance, initial: true) { _, chosen in chosen.apply() }
     // Offline anywhere — the launcher, the way in — clears by itself once
     // the server answers again.
     .task(id: model.offline) { await model.watchWhileOffline() }
@@ -147,6 +156,12 @@ struct RootView: View {
       Text(model.notice ?? "")
     }
     .onOpenURL { url in open(url) }
+    .sheet(isPresented: $debugPush) {
+      PushAsk(audience: .guest) { debugPush = false }
+    }
+    .onChange(of: splash) { _, showing in
+      if !showing, Self.debugAsksPush { debugPush = true }
+    }
     .task {
       // APNs answers whenever it answers — before a sign-in or long after it —
       // so the token is handed over on arrival rather than asked for at a moment.
@@ -160,6 +175,11 @@ struct RootView: View {
       // that has not been asked is asked after its first order, not here.
       await PushRegistrar.shared.registerIfAllowed()
       Self.jumpForDebug(tab: &tab, path: &path)
+      #if DEBUG
+        if ProcessInfo.processInfo.environment["BASU_SCREEN"] == "activity" {
+          await OrderActivity.shared.showSample()
+        }
+      #endif
       await Self.signInForDebug(model)
       // The splash lasts as long as the launch does, within limits: the floor
       // is so a fast launch does not flash, and the cap is so a stalled
@@ -190,7 +210,7 @@ struct RootView: View {
     // fixed distance above the home indicator, and this is how far that is.
     GeometryReader { outer in
       ZStack(alignment: .bottom) {
-        LinearGradient.ground.ignoresSafeArea()
+        Color.bg.ignoresSafeArea()
 
         NavigationStack(path: $path) {
           surface
@@ -219,14 +239,14 @@ struct RootView: View {
           // is still the page's.
           LinearGradient(
             stops: [
-              .init(color: Color.groundBottom.opacity(0), location: 0),
-              .init(color: Color.groundBottom.opacity(0.92), location: 0.62),
-              .init(color: Color.groundBottom, location: 1),
+              .init(color: Color.bg.opacity(0), location: 0),
+              .init(color: Color.bg.opacity(0.9), location: 0.55),
+              .init(color: Color.bg, location: 1),
             ],
             startPoint: .top,
             endPoint: .bottom,
           )
-          .frame(height: outer.safeAreaInsets.bottom + 72)
+          .frame(height: outer.safeAreaInsets.bottom + 84)
           .allowsHitTesting(false)
           .accessibilityHidden(true)
 
@@ -254,7 +274,9 @@ struct RootView: View {
   @ViewBuilder private var surface: some View {
     switch tab {
     case .home:
-      HomeView(open: { path.append($0) })
+      HomeView(open: { path.append($0) }, showOrders: { tab = .orders })
+    case .orders:
+      OrdersView(open: { path.append($0) })
     case .wallet:
       WalletView()
     case .profile:
@@ -291,13 +313,14 @@ struct RootView: View {
 
   // MARK: - the design pass
 
-  /// `BASU_SCREEN=wallet|profile|inbox|splash|food|idesh|signin` lands the app
+  /// `BASU_SCREEN=orders|wallet|profile|inbox|splash|food|idesh|signin|push|activity` lands the app
   /// on a screen so the pass — and the store's pictures — can photograph it.
   /// `BASU_BROWSE=1` with `signin` looks around signed out instead of stopping
   /// at the way in. Debug only; production has no such door.
   private static func jumpForDebug(tab: inout ShellTab, path: inout [Destination]) {
     #if DEBUG
       switch ProcessInfo.processInfo.environment["BASU_SCREEN"] {
+      case "orders": tab = .orders
       case "wallet": tab = .wallet
       case "profile": tab = .profile
       case "inbox": path = [.inbox]
@@ -336,31 +359,40 @@ struct RootView: View {
       false
     #endif
   }
+
+  /// `BASU_SCREEN=push`: the push pre-prompt over the launcher, so the pass
+  /// can photograph a screen that otherwise waits for a first order.
+  fileprivate static var debugAsksPush: Bool {
+    #if DEBUG
+      ProcessInfo.processInfo.environment["BASU_SCREEN"] == "push"
+    #else
+      false
+    #endif
+  }
 }
 
 /**
- The splash. The wordmark, a rule, and the city — no logo file, no spinner,
- no progress text. It sits over the launcher and fades to reveal it, so there
- is no jump between the two.
+ The splash. The wordmark in the display face, a gold rule, and the city — no
+ logo file, no spinner, no progress text. It sits over the launcher and fades
+ to reveal it, on the same charcoal, so there is no jump between the two.
  */
 struct SplashView: View {
   var body: some View {
     ZStack {
-      LinearGradient.ground.ignoresSafeArea()
-      VStack(spacing: 14) {
+      Color.bg.ignoresSafeArea()
+      VStack(spacing: 16) {
         Text("Basu")
-          .font(.sans(44, .semibold))
-          .tracking(-0.03 * 44)
+          .font(.display(64))
           .foregroundStyle(Color.ink)
         RoundedRectangle(cornerRadius: 1, style: .continuous)
-          .fill(Color.accent)
+          .fill(Color.gold)
           .frame(width: 34, height: 2)
       }
       VStack {
         Spacer()
         Text("УЛААНБААТАР")
-          .font(.mono(10.5))
-          .tracking(0.16 * 10.5)
+          .font(.sans(12, .bold))
+          .tracking(12 * 0.18)
           .foregroundStyle(Color.ink3)
           .padding(.bottom, 44)
       }
@@ -374,19 +406,15 @@ struct SplashView: View {
 }
 
 /**
- The bar. A pine capsule floating just above the home indicator; the chosen tab
- is a pale pill that says its name, the other two are marks alone.
+ The bar: a dark glass capsule floating just above the home indicator, four
+ tabs of equal width, each its mark over its name; the chosen one is an
+ off-white pill with dark words on it.
 
- It carries the shell and nothing else. The launcher used to hold a wallet strip
- as well; at nine icons there was no room for both, and the strip and this tab
- were the same tap twice — so the balance is one tap away rather than visible on
- arrival. That is a real trade against the brief, made once, on purpose.
-
- The pill slides between tabs and the phone ticks as it lands — or, with
- Reduce Motion on, fades from one tab to the next without travelling. Only
- the chosen tab shows its name, so the accessibility labels below are what
- VoiceOver has for the other two, and the bar is one tab bar to it, «1 of 3»
- and so on, rather than three loose buttons.
+ It carries the shell and nothing else — the apps are tiles on the launcher,
+ never tabs. The pill slides between tabs and the phone ticks as it lands —
+ or, with Reduce Motion on, fades from one tab to the next without
+ travelling. To VoiceOver the bar is one tab bar, «1 of 4» and so on, rather
+ than four loose buttons.
  */
 struct TabBar: View {
   let tab: ShellTab
@@ -397,7 +425,7 @@ struct TabBar: View {
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
-    HStack(spacing: 4) {
+    HStack(spacing: 0) {
       ForEach(ShellTab.allCases, id: \.self) { item in
         let active = item == tab
         Button {
@@ -405,26 +433,23 @@ struct TabBar: View {
             select(item)
           }
         } label: {
-          HStack(spacing: 8) {
-            ShellGlyph(mark: item.mark, size: 22, lineWidth: active ? 2 : 1.7)
-            if active {
-              Text(item.title)
-                .font(.sans(14, .semibold))
-                .fixedSize()
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.8, anchor: .leading)))
-            }
+          VStack(spacing: 4) {
+            ShellGlyph(mark: item.mark, size: 22, lineWidth: active ? 1.9 : 1.75)
+            Text(item.title)
+              .font(.sans(11, .bold))
+              .lineLimit(1)
+              .minimumScaleFactor(0.8)
           }
-          .foregroundStyle(active ? Color.onDeepPill : Color.onDeep)
-          .padding(.horizontal, active ? 18 : 0)
-          .frame(maxWidth: active ? nil : .infinity)
-          .frame(height: 50)
+          .foregroundStyle(active ? Color.onLight : Color.ink3)
+          .frame(maxWidth: .infinity)
+          .frame(height: 56)
           .background {
             if active {
               if reduceMotion {
-                Capsule().fill(Color.deepPill)
+                Capsule().fill(Color.ink)
                   .transition(.opacity)
               } else {
-                Capsule().fill(Color.deepPill)
+                Capsule().fill(Color.ink)
                   .matchedGeometryEffect(id: "lit", in: lit)
               }
             }
@@ -438,15 +463,20 @@ struct TabBar: View {
       }
     }
     .padding(6)
-    .background(Color.deep, in: Capsule())
-    .overlay(Capsule().strokeBorder(Color.deepEdge, lineWidth: BasuMetric.hairline))
-    .shadow(color: .barShadow, radius: 18, y: 8)
-    // The pill is 50 tall; past this the name would not fit inside it.
-    .dynamicTypeSize(...DynamicTypeSize.xxLarge)
+    .background {
+      ZStack {
+        Capsule().fill(.ultraThinMaterial)
+        Capsule().fill(BasuColor.bar)
+      }
+      .shadow(color: .barShadow, radius: 24, y: 16)
+    }
+    .overlay(Capsule().strokeBorder(BasuColor.barEdge, lineWidth: BasuMetric.hairline))
+    // The pill is 56 tall; past this the names no longer fit inside it.
+    .dynamicTypeSize(...DynamicTypeSize.xLarge)
     .accessibilityElement(children: .contain)
     .accessibilityAddTraits(.isTabBar)
-    .padding(.horizontal, 36)
-    .padding(.bottom, max(bottom - 10, 14))
+    .padding(.horizontal, 16)
+    .padding(.bottom, max(bottom - 4, 14))
     .sensoryFeedback(.selection, trigger: tab)
   }
 }

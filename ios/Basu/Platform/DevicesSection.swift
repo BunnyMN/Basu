@@ -35,7 +35,8 @@ struct DevicesSection: View {
           SectionLabel("Нэвтэрсэн төхөөрөмж")
           Spacer()
           Text("\(platform.sessions.count)")
-            .font(.mono(11, .medium))
+            .font(.sans(12, .bold))
+            .monospacedDigit()
             .foregroundStyle(Color.ink3)
         }
 
@@ -50,11 +51,12 @@ struct DevicesSection: View {
             Button { showingAll = true } label: {
               HStack(spacing: 12) {
                 Text("Бүгдийг харах")
-                  .font(.sans(15, .medium))
+                  .font(.sans(16, .semibold))
                   .foregroundStyle(Color.ink)
                 Spacer(minLength: 8)
                 Text("\(others.count)")
-                  .font(.mono(13, .medium))
+                  .font(.sans(14, .bold))
+                  .monospacedDigit()
                   .foregroundStyle(Color.ink3)
                 Chevron(size: 12).foregroundStyle(Color.ink3)
               }
@@ -66,13 +68,13 @@ struct DevicesSection: View {
             .accessibilityIdentifier("profile.devices.all")
           }
         }
-        .glassCard()
+        .card()
 
         if !others.isEmpty {
           OthersOutButton(count: others.count) { confirmingOthers = true }
             .accessibilityIdentifier("profile.revokeothers")
           Text("Танихгүй төхөөрөмж харагдвал тэр даруй гаргаарай.")
-            .font(.sans(12))
+            .font(.sans(13, .medium))
             .foregroundStyle(Color.ink3)
             .fixedSize(horizontal: false, vertical: true)
         }
@@ -99,7 +101,7 @@ private struct AllDevicesSheet: View {
               DeviceRow(device: device) { await platform.signOutDevice(device) }
             }
           }
-          .glassCard()
+          .card()
           if !others.isEmpty {
             OthersOutButton(count: others.count) { confirming = true }
           } else {
@@ -110,7 +112,7 @@ private struct AllDevicesSheet: View {
         }
         .padding(BasuMetric.screenPadding)
       }
-      .background(LinearGradient.ground.ignoresSafeArea())
+      .containerBackground(for: .navigation) { Color.surface2.ignoresSafeArea() }
       .navigationTitle("Бусад төхөөрөмж")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
@@ -140,28 +142,30 @@ private struct DeviceRow: View {
   @State private var revoking = false
 
   var body: some View {
-    HStack(spacing: 12) {
+    HStack(spacing: 14) {
       Image(systemName: device.symbol)
-        .font(.sans(17))
+        .font(.sans(17, .medium))
         .foregroundStyle(Color.ink2)
-        .frame(width: 38, height: 38)
-        .background(Color.accentSoft, in: RoundedRectangle(cornerRadius: BasuMetric.card, style: .continuous))
+        .frame(width: 40, height: 40)
+        .background(Color.surface3, in: RoundedRectangle(cornerRadius: BasuMetric.row, style: .continuous))
         .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: 3) {
+      VStack(alignment: .leading, spacing: 4) {
         Text(device.shownName)
-          .font(.sans(15, device.current ? .semibold : .regular))
+          .font(.sans(16, device.current ? .bold : .semibold))
           .foregroundStyle(Color.ink)
           .lineLimit(1)
         if device.current {
-          HStack(spacing: 6) {
-            Circle().fill(Color.ready).frame(width: 6, height: 6)
+          // Good, so the ink and a check — never a green dot.
+          HStack(spacing: 5) {
+            Image(systemName: "checkmark")
+              .font(.sans(11, .bold))
             Text("Энэ утас · одоо идэвхтэй")
           }
-          .font(.sans(12))
-          .foregroundStyle(Color.ready)
+          .font(.sans(13, .semibold))
+          .foregroundStyle(Color.ink2)
         } else {
           Text("Сүүлд \(Format.seen(device.lastSeenAt ?? device.createdAt))")
-            .font(.sans(12))
+            .font(.sans(13, .medium))
             .foregroundStyle(Color.ink3)
         }
       }
@@ -176,17 +180,15 @@ private struct DeviceRow: View {
         } label: {
           ZStack {
             if revoking {
-              ProgressView().controlSize(.small)
+              ProgressView().controlSize(.small).tint(Color.accentInk)
             } else {
-              Text("Гаргах").font(.sans(13, .medium))
+              Text("Гаргах").font(.sans(14, .bold))
             }
           }
-          .foregroundStyle(Color.stop)
-          .padding(.horizontal, 12)
-          .frame(minWidth: 72, minHeight: 32)
-          .overlay(Capsule().strokeBorder(Color.stopLine, lineWidth: BasuMetric.hairline))
-          // Drawn at 32, taken at a thumb's 44.
-          .frame(minHeight: BasuMetric.minTarget)
+          // Crimson words, the way every Basu screen says «take this away».
+          .foregroundStyle(Color.accentInk)
+          .padding(.horizontal, 8)
+          .frame(minWidth: 64, minHeight: BasuMetric.minTarget)
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -194,14 +196,15 @@ private struct DeviceRow: View {
         .accessibilityLabel("\(device.shownName)-ийг гаргах")
       }
     }
-    .padding(.horizontal, 14)
+    .padding(.horizontal, 16)
     .padding(.vertical, 12)
     .accessibilityElement(children: .combine)
     .accessibilityIdentifier("profile.device")
   }
 }
 
-/// «Бусад N төхөөрөмжөөс гаргах»: the panic button, in the colour for it.
+/// «Бусад N төхөөрөмжөөс гаргах»: the panic button — crimson words, and an
+/// alert that asks before anybody is signed out.
 private struct OthersOutButton: View {
   let count: Int
   let action: () -> Void
@@ -212,17 +215,14 @@ private struct OthersOutButton: View {
         count == 1 ? "Нөгөө төхөөрөмжөөс гаргах" : "Бусад \(count) төхөөрөмжөөс гаргах",
         systemImage: "rectangle.portrait.and.arrow.right",
       )
-      .font(.sans(14, .medium))
-      .foregroundStyle(Color.stop)
+      .font(.sans(15, .bold))
+      .foregroundStyle(Color.accentInk)
       .frame(maxWidth: .infinity)
-      .padding(.vertical, 13)
-      .background(Color.stopSoft.opacity(0.6), in: RoundedRectangle(cornerRadius: BasuMetric.card, style: .continuous))
-      .overlay(
-        RoundedRectangle(cornerRadius: BasuMetric.card, style: .continuous)
-          .strokeBorder(Color.stopLine, lineWidth: BasuMetric.hairline),
-      )
+      .frame(minHeight: BasuMetric.buttonHeight)
+      .overlay(Capsule().strokeBorder(Color.stopLine, lineWidth: BasuMetric.hairline))
+      .contentShape(Capsule())
     }
-    .buttonStyle(.plain)
+    .buttonStyle(Pressable())
   }
 }
 

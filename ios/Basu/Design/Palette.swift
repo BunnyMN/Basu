@@ -2,89 +2,69 @@ import BasuKit
 import SwiftUI
 
 /**
- The design's tokens, in the names the app has always used.
+ The design's tokens, in the names the app uses.
 
  Every value here comes from `BasuKit/DesignTokens.swift` — nothing is picked by
  eye and nothing is invented. The shell only uses what is there. The apps
  inside it are web pages and bring their own CSS; none of their colours are
  here.
+
+ «Тансаг хар»: the app is dark whatever the phone says, so a token is one
+ colour. Crimson is the customer's one primary action on a screen; gold is a
+ hairline, a step number or a tiny label; there is no green, no yellow and no
+ orange anywhere.
  */
 extension Color {
-  static let bg = BasuColor.ground
-  static let onAccent = BasuColor.onAccent
+  // ── the ground and what stands on it ─────────────────────────────────
+  static let bg = BasuColor.bg
   static let surface = BasuColor.surface
   static let surface2 = BasuColor.surface2
-  static let sunk = dynamic(light: 0xECEBE4, dark: 0x0A0C0B)
-  /// The ground's first stop. A fixed title sits on this so the seam with the
-  /// gradient underneath is invisible where they meet.
-  static let groundTop = dynamic(light: 0xF8F7F3, dark: 0x141815)
-  /// The ground's last stop: what content fades into above the tab bar.
-  static let groundBottom = dynamic(light: 0xECEBE4, dark: 0x0A0C0B)
+  static let surface3 = BasuColor.surface3
+  /// The deepest band: a well inside a card, the plate under an avatar.
+  static let sunk = BasuColor.deep
 
-  static let ink = BasuColor.ink
-  static let ink2 = BasuColor.ink2
-  static let ink3 = BasuColor.ink3
-
+  // ── lines ─────────────────────────────────────────────────────────────
   static let line = BasuColor.line
   static let line2 = BasuColor.line2
 
+  // ── ink ───────────────────────────────────────────────────────────────
+  static let ink = BasuColor.ink
+  static let ink2 = BasuColor.ink2
+  static let ink3 = BasuColor.ink3
+  static let onLight = BasuColor.onLight
+
+  // ── crimson and gold ─────────────────────────────────────────────────
+  /// The fill of the one primary action, a dot that something is unread.
   static let accent = BasuColor.accent
+  static let accentPress = BasuColor.accentPress
+  /// Crimson as text: errors, late, cancel and delete.
   static let accentInk = BasuColor.accentInk
-  static let accentSoft = BasuColor.accentSoft
-  static let deep = BasuColor.deep
-  static let deepEdge = BasuColor.deepEdge
-  static let onDeep = BasuColor.onDeep
-  static let deepPill = BasuColor.deepPill
-  static let onDeepPill = BasuColor.onDeepPill
-  static let hi = BasuColor.hi
-  static let hiInk = BasuColor.hiInk
-  static let hiSoft = BasuColor.hiSoft
-  static let unread = BasuColor.unread
-  /// `--ground2` in the prototype: the flat ground a read row takes while its
-  /// Устгах is showing, so it has something to slide over.
-  static let swipeGround = dynamic(light: 0xF4F3EE, dark: 0x0F1110)
+  static let onAccent = BasuColor.onAccent
+  static let gold = BasuColor.gold
+  static let goldLine = BasuColor.goldLine
+  /// The 2pt ring around whatever is being typed in.
+  static let focus = BasuColor.focus
 
-  static let route = BasuColor.route
-  static let ready = BasuColor.ready
-  static let hold = BasuColor.hold
-  static let stop = BasuColor.stop
-  static let onStop = BasuColor.onStop
+  // ── what a state means (DARK.md: no green, no orange, no yellow) ──────
+  /// Done or good: the ink, with a check beside it.
+  static let ready = BasuColor.ink
+  /// Waiting on the person: gold.
+  static let hold = BasuColor.gold
+  /// Stop, error, delete: crimson text.
+  static let stop = BasuColor.accentInk
+  /// Words on a crimson fill.
+  static let onStop = BasuColor.onAccent
 
-  // ── washes ─────────────────────────────────────────────────────────
-  // Behind a banner or a destructive button. The food app's own state
-  // colours are not here: that app is a web page and carries its own CSS.
-  static let holdSoft = dynamic(light: 0xF1E9D2, dark: 0x2A2312)
-  static let holdLine = dynamic(light: 0xD9C48A, dark: 0x4E4222)
-  static let stopSoft = dynamic(light: 0xF7DEDE, dark: 0x2E1416)
-  static let stopLine = dynamic(light: 0xE0A9A9, dark: 0x5A2A2C)
+  // ── washes, behind a banner or a refusal ─────────────────────────────
+  static let holdSoft = BasuColor.surface
+  static let holdLine = BasuColor.line2
+  static let stopSoft = BasuColor.surface
+  static let stopLine = BasuColor.accentInk.opacity(0.45)
 
-  /// The shadow under an icon tile. Barely there by design: one point down,
-  /// two of blur. The floating tab bar's is the only other one in the shell.
-  static var tileShadow: Color {
-    Color(uiColor: UIColor { traits in
-      traits.userInterfaceStyle == .dark
-        ? UIColor(white: 0, alpha: 0.4)
-        : UIColor(red: 24 / 255, green: 25 / 255, blue: 22 / 255, alpha: 0.05)
-    })
-  }
-
-  /// Under the floating tab bar: pine-tinted in light so it reads as lifted
-  /// off the ground rather than smudged; plain black in dark.
-  static var barShadow: Color {
-    Color(uiColor: UIColor { traits in
-      traits.userInterfaceStyle == .dark
-        ? UIColor(white: 0, alpha: 0.28)
-        : UIColor(red: 18 / 255, green: 58 / 255, blue: 44 / 255, alpha: 0.28)
-    })
-  }
-
-  static func dynamic(light: UInt32, dark: UInt32) -> Color {
-    Color(uiColor: UIColor { traits in
-      UIColor(rgb: traits.userInterfaceStyle == .dark ? dark : light)
-    })
-  }
-
-  init(rgb: UInt32) { self.init(uiColor: UIColor(rgb: rgb)) }
+  /// The shadow under a card or a tile: deep, low and soft.
+  static let tileShadow = Color.black.opacity(0.55)
+  /// Under the floating tab bar.
+  static let barShadow = Color.black.opacity(0.8)
 }
 
 extension UIColor {
@@ -108,59 +88,83 @@ extension UIColor {
 }
 
 /**
- Golos Text for prose, JetBrains Mono for every number and every label.
+ Manrope for words, Noto Sans Display Condensed for what is big or counted.
 
- Two faces, three weights, and no `.system` anywhere in the shell. Numbers are
- always mono with tabular figures; the ₮ is set in the sans face because the
- mono one has no glyph for it and collides with the last digit.
+ Two families and no `.system` anywhere in the shell. Money, times, days and
+ order codes are the display face with tabular figures — it has the ₮ and the
+ №, so an amount is one run of type rather than two faces stitched together.
  */
 extension Font {
   static func sans(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
     BasuFont.sans(size, weight)
   }
 
-  /// Numbers, codes and labels — the parts that must line up in a column.
-  static func mono(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-    BasuFont.mono(size, weight)
+  /// Headings, money, times, days and codes: 800 by default, 700 for the
+  /// smaller headings.
+  static func display(_ size: CGFloat, _ weight: Font.Weight = .heavy) -> Font {
+    BasuFont.display(size, weight)
   }
 }
 
-/**
- The ground, and the glass that sits on it.
-
- Surfaces in the shell are translucent — `.ultraThinMaterial` over a background
- that is not flat. The wash is 176°, three stops, and it exists for exactly one
- reason: translucency needs something to be translucent against. On a single
- flat colour the material has nothing to pick up and reads as dirty grey.
- */
 extension ShapeStyle where Self == LinearGradient {
+  /// The ground, where a shape style is wanted.
   static var ground: LinearGradient { BasuColor.ground }
 }
 
 extension View {
   /**
-   A card: glass, a hairline, twelve points of radius.
-
-   The hairline sits *on top* of the blur rather than under it. That is what
-   keeps an edge legible when the thing behind the card is the same tone as the
-   card — without it a translucent surface dissolves at exactly the moment it
-   needs to be a surface.
+   A card: the surface, a hairline, twenty-two points of radius, and the
+   shadow that lifts it off the ground — with a breath of light along its top
+   edge, the way a lacquered thing catches the room.
    */
-  func glassCard(radius: CGFloat = BasuMetric.card, stroke: Color = .line) -> some View {
-    background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
-      .overlay(
-        RoundedRectangle(cornerRadius: radius, style: .continuous)
-          .strokeBorder(stroke, lineWidth: BasuMetric.hairline),
-      )
+  func card<Fill: ShapeStyle>(
+    radius: CGFloat = BasuMetric.card,
+    fill: Fill = Color.surface,
+    stroke: Color = .line,
+  ) -> some View {
+    let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+    return background {
+      shape
+        .fill(fill)
+        .shadow(color: .tileShadow, radius: 20, y: 16)
+    }
+    .overlay(shape.strokeBorder(stroke, lineWidth: BasuMetric.hairline))
+    .overlay(alignment: .top) {
+      // `inset 0 1px 0 rgba(255,244,236,.05)`
+      shape
+        .strokeBorder(Color(hex: 0xFFF4EC, opacity: 0.05), lineWidth: BasuMetric.hairline)
+        .mask(LinearGradient(colors: [.white, .clear], startPoint: .top, endPoint: .init(x: 0.5, y: 0.12)))
+        .allowsHitTesting(false)
+    }
   }
 
-  /// The sunken variant: the search field and the avatar plate.
-  func glassWell(radius: CGFloat = BasuMetric.card) -> some View {
-    background(.thinMaterial, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
+  /// The sunken variant: a well inside a card.
+  func well(radius: CGFloat = BasuMetric.inner) -> some View {
+    background(Color.sunk, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
       .overlay(
         RoundedRectangle(cornerRadius: radius, style: .continuous)
           .strokeBorder(Color.line, lineWidth: BasuMetric.hairline),
       )
+  }
+
+  /**
+   Glass: a chip on a photograph, the way back over a page. Charcoal over a
+   blur, with a white hairline at twelve per cent so the edge holds on
+   anything.
+   */
+  func glass<S: InsettableShape>(in shape: S) -> some View {
+    background {
+      ZStack {
+        shape.fill(.ultraThinMaterial)
+        shape.fill(BasuColor.glass)
+      }
+    }
+    .overlay(shape.strokeBorder(BasuColor.glassEdge, lineWidth: BasuMetric.hairline))
+  }
+
+  /// `--glow`: the crimson button's own light, and nothing else's.
+  func glow(_ on: Bool = true) -> some View {
+    shadow(color: Color.accent.opacity(on ? 0.55 : 0), radius: 16, y: 12)
   }
 }
 

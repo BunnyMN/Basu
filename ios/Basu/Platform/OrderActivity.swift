@@ -92,6 +92,24 @@ final class OrderActivity {
     }
   }
 
+  #if DEBUG
+    /// `BASU_SCREEN=activity`: a lunch on the lock screen, in the island and
+    /// on the widget without one being bought — so the pass can photograph
+    /// them after the demo day's last sitting. Debug only. Against a server
+    /// that is not answering, nothing syncs it away again.
+    func showSample() async {
+      let seating = Date.now.addingTimeInterval(40 * 60)
+      let snap = OrderSnapshot(
+        orderID: "sample", venueName: "Алтан Тавган", orderNumber: "№0971", partySize: 2,
+        stage: .cooking, stageLabel: OrderStage.cooking.label,
+        seatingTime: seating, fireTime: seating.addingTimeInterval(-15 * 60), takenAt: .now,
+      )
+      OrderSnapshotStore.write(snap)
+      WidgetCenter.shared.reloadTimelines(ofKind: OrderSnapshotStore.widgetKind)
+      await show(snap)
+    }
+  #endif
+
   private func end(_ orderId: String) async {
     for activity in Activity<BasuActivityAttributes>.activities where activity.attributes.orderID == orderId {
       await activity.end(nil, dismissalPolicy: .immediate)

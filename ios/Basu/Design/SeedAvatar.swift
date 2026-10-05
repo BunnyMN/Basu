@@ -53,7 +53,7 @@ struct SeedAvatar: View {
     }
     .padding(inset)
     .frame(width: size, height: size)
-    .glassWell(radius: size * 0.28)
+    .well(radius: size * 0.28)
     .accessibilityHidden(true)
   }
 

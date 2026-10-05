@@ -157,6 +157,9 @@ struct LiveIdesh: Decodable, Sendable, Identifiable, Hashable {
   let code: String
   let state: IdeshState
   let supplier: VenueRef
+  /// `sheep`, `beef`, `goat`, `horse` — which animal, for the card's
+  /// photograph. Nil from a server that does not say.
+  let kind: String?
   let title: String
   let qty: Int
   /// `kg` or `whole` — what `qty` counts. Nil from a server that predates it.
@@ -166,7 +169,7 @@ struct LiveIdesh: Decodable, Sendable, Identifiable, Hashable {
   let receiveOnDay: String
 
   enum CodingKeys: String, CodingKey {
-    case id, code, state, supplier, title, qty, unit, receive
+    case id, code, state, supplier, kind, title, qty, unit, receive
     case totalMnt = "total_mnt"
     case receiveOnDay = "receive_on"
   }

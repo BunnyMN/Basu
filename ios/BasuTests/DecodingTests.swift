@@ -101,12 +101,45 @@ struct DecodingTests {
     // «Хонины мах, кг-аар ×10» read as a multiplication.
     #expect(row.detail == "Хонины мах · 10 кг · Бэлтгэж байна")
     #expect(row.timeLabel == "ИРЭХ")
-    // Being prepared is on the fire, so honey — not the blue of on the way.
+    // Being prepared is on the fire — the second step of four, not on the way.
     #expect(row.status == .cooking)
+    #expect(row.step == 2)
+    #expect(row.word == "Бэлтгэж байна")
+    #expect(row.headline == "Хонины мах · 10 кг")
     #expect(row.spoken.contains("10-р сарын 3-нд ирэх"))
   }
 
-  @Test func whatIsCookingIsHoneyAndWhatIsOnTheWayIsBlue() throws {
+  @Test func anIdeshOrderWalksTheMeterAndEndsInAWord() throws {
+    func idesh(_ state: String, kind: String? = "sheep") throws -> LiveItem {
+      try decode(LiveIdesh.self, """
+        {
+          "id": "i", "code": "7001", "state": "\(state)",
+          "supplier": { "id": "s", "name": "Улаанбаатар махны төв" },
+          \(kind.map { "\"kind\": \"\($0)\"," } ?? "")
+          "unit": "kg", "title": "Хонины мах, кг-аар", "qty": 10, "total_mnt": 128000,
+          "receive": "pickup", "receive_on": "2026-10-07", "paid_at": null
+        }
+        """).asLiveItem()
+    }
+    // Төлсөн, Бэлтгэж байна, Бэлэн, then Замд or Хүлээлгэн өгсөн.
+    #expect(try idesh("PAID").step == 1)
+    #expect(try idesh("PREPARING").step == 2)
+    #expect(try idesh("READY").step == 3)
+    #expect(try idesh("DISPATCHED").step == 4)
+    #expect(try idesh("HANDED").step == 4)
+    // Over without happening: the word alone, crimson or gold, no meter.
+    #expect(try idesh("CANCELLED").step == 0)
+    #expect(try idesh("CANCELLED").tone == .stop)
+    #expect(try idesh("REFUNDED").tone == .hold)
+    #expect(try idesh("HANDED").finished)
+    #expect(try !idesh("READY").finished)
+    // The animal's own photograph, when the order says which; none otherwise.
+    #expect(try idesh("PAID").photo?.path().hasSuffix("/idesh/sheep.jpg") == true)
+    #expect(try idesh("PAID", kind: nil).photo == nil)
+    #expect(try idesh("PAID", kind: "camel").photo == nil)
+  }
+
+  @Test func eachLunchStateSitsOnItsStepOfTheMeter() throws {
     func lunch(_ state: String) throws -> LiveItem {
       try decode(LiveOrder.self, """
         {
@@ -121,6 +154,14 @@ struct DecodingTests {
     #expect(try lunch("FIRED").status == .cooking)
     #expect(try lunch("PLACED").status == .waiting)
     #expect(try lunch("READY").status == .ready)
+    #expect(try lunch("PLACED").step == 1)
+    #expect(try lunch("FIRED").step == 2)
+    #expect(try lunch("READY").step == 3)
+    #expect(try lunch("SERVED").step == 4)
+    #expect(try lunch("CANCELLED").step == 0)
+    #expect(try lunch("CANCELLED").tone == .stop)
+    #expect(try lunch("SERVED").finished)
+    #expect(try lunch("PLACED").headline == "Бөмбөгөр Ресторан")
     #expect(try lunch("PLACED").timeLabel == "ИРЭХ")
     #expect(try lunch("PLACED").spoken.hasPrefix("Хоол, Бөмбөгөр Ресторан, 12:00 цагт ирэх, захиалга 0970"))
   }

@@ -1,22 +1,34 @@
 import BasuKit
 import SwiftUI
 
-/// The uppercase mono label the web pages use above every section — at 11,
-/// the web's floor for anything that has to be read.
+/// The small uppercase label above a section: 12, bold, tracked wide, in
+/// `ink3` — the web's own eyebrow, in the sans now that there is no mono.
 struct SectionLabel: View {
   let text: String
-  init(_ text: String) { self.text = text }
+  var colour: Color = .ink3
+  init(_ text: String, colour: Color = .ink3) {
+    self.text = text
+    self.colour = colour
+  }
 
   var body: some View {
     Text(text.uppercased())
-      .font(.mono(11, .medium))
-      .tracking(11 * 0.14)
-      .foregroundStyle(Color.ink3)
+      .font(.sans(12, .bold))
+      .tracking(12 * 0.14)
+      .foregroundStyle(colour)
+      .accessibilityAddTraits(.isHeader)
   }
 }
 
-/// The big button at the bottom of a sheet — pay, cancel, send — at the
-/// button corner the web's buttons have.
+/**
+ The buttons of a sheet's foot.
+
+ - `primary`: the crimson capsule, white words, its own glow — the one thing
+   the screen is for.
+ - `quiet`: an outlined capsule — the way past, the second choice.
+ - `danger`: crimson words and nothing else; what it does is asked again in
+   an alert before it happens.
+ */
 struct WideButton: View {
   enum Kind { case primary, quiet, danger }
 
@@ -25,18 +37,23 @@ struct WideButton: View {
   var enabled: Bool = true
   let action: () -> Void
 
-  private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: BasuMetric.button, style: .continuous) }
-
   var body: some View {
     Button(action: action) {
       Text(title)
-        .font(.sans(15, kind == .primary ? .semibold : .regular))
+        .font(.sans(16, .bold))
+        .multilineTextAlignment(.center)
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 15)
+        .padding(.horizontal, 16)
+        .frame(minHeight: kind == .danger ? BasuMetric.minTarget : BasuMetric.buttonHeight)
         .foregroundStyle(foreground)
-        .background(background, in: shape)
-        .overlay(shape.strokeBorder(border, lineWidth: 1))
-        .contentShape(shape)
+        .background {
+          switch kind {
+          case .primary: Capsule().fill(Color.accent).glow(enabled)
+          case .quiet: Capsule().strokeBorder(Color.line2, lineWidth: BasuMetric.hairline)
+          case .danger: EmptyView()
+          }
+        }
+        .contentShape(Capsule())
     }
     .buttonStyle(Pressable())
     .disabled(!enabled)
@@ -46,17 +63,29 @@ struct WideButton: View {
   private var foreground: Color {
     switch kind {
     case .primary: .onAccent
-    case .quiet: .ink2
-    case .danger: .stop
+    case .quiet: .ink
+    case .danger: .accentInk
     }
   }
-  private var background: Color { kind == .primary ? .accent : .surface }
-  private var border: Color {
-    switch kind {
-    case .primary: .accent
-    case .quiet: .line2
-    case .danger: .stopLine
-    }
+}
+
+/**
+ A tile's picture in its porcelain square: the supplied render, untouched,
+ clipped to the square's corner, with a white hairline at six per cent and a
+ deep shadow so it sits on the charcoal rather than being pasted on it.
+ */
+struct Porcelain: View {
+  let name: String
+  var size: CGFloat = 72
+  var radius: CGFloat = BasuMetric.iconTile
+
+  var body: some View {
+    RasterTile(name: name, size: size, radius: radius)
+      .overlay(
+        RoundedRectangle(cornerRadius: radius, style: .continuous)
+          .strokeBorder(Color.white.opacity(0.06), lineWidth: BasuMetric.hairline),
+      )
+      .shadow(color: .black.opacity(0.8), radius: 14, y: 14)
   }
 }
 
@@ -78,22 +107,20 @@ struct OfflineBanner: View {
   @State private var trying = false
   @Environment(\.dynamicTypeSize) private var typeSize
 
-  private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: BasuMetric.button, style: .continuous) }
-
   var body: some View {
     // At the largest text sizes the words take the whole width and «Дахин»
     // goes under them: beside them, both broke mid-word («Холбол/т», «Дах/ин»).
     Group {
       if typeSize.isAccessibilitySize {
         VStack(alignment: .leading, spacing: 10) {
-          HStack(alignment: .firstTextBaseline, spacing: 10) {
+          HStack(alignment: .firstTextBaseline, spacing: 12) {
             mark
             words
           }
           again
         }
       } else {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: 12) {
           mark
           words
           Spacer(minLength: 6)
@@ -102,10 +129,10 @@ struct OfflineBanner: View {
         }
       }
     }
-    .padding(12)
+    .padding(.horizontal, 16)
+    .padding(.vertical, 14)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(Color.holdSoft, in: shape)
-    .overlay(shape.strokeBorder(Color.holdLine, lineWidth: 1))
+    .card(radius: BasuMetric.card)
     // Without this the row is a handful of loose labels rather than one thing
     // anybody — VoiceOver or a test — can point at.
     .accessibilityElement(children: .contain)
@@ -119,27 +146,26 @@ struct OfflineBanner: View {
 
   private var mark: some View {
     Image(systemName: "wifi.slash")
-      .font(.sans(15))
-      .foregroundStyle(Color.hold)
+      .font(.sans(16, .semibold))
+      .foregroundStyle(Color.gold)
       .accessibilityHidden(true)
   }
 
   private var words: some View {
-    VStack(alignment: .leading, spacing: 2) {
+    VStack(alignment: .leading, spacing: 3) {
       Text("Холболт тасарлаа")
-        .font(.sans(13.5, .semibold))
+        .font(.sans(15, .bold))
         .foregroundStyle(Color.ink)
         .fixedSize(horizontal: false, vertical: true)
       Text("Интернэтээ шалгаад дахин оролдоно уу.")
-        .font(.sans(12))
+        .font(.sans(13, .medium))
         .foregroundStyle(Color.ink2)
         .fixedSize(horizontal: false, vertical: true)
     }
   }
 
-  /// The only thing to do here, so a thumb's worth of it: a capsule in a
-  /// 44-point target, not eleven points of mono — and never narrower than
-  /// the word on it.
+  /// The only thing to do here, so a thumb's worth of it: an outlined
+  /// capsule in a 44-point target — and never narrower than the word on it.
   private var again: some View {
     Button {
       Task {
@@ -150,18 +176,17 @@ struct OfflineBanner: View {
     } label: {
       ZStack {
         if trying {
-          ProgressView().controlSize(.small)
+          ProgressView().controlSize(.small).tint(Color.ink)
         } else {
           Text("Дахин")
-            .font(.sans(14, .semibold))
-            .foregroundStyle(Color.accentInk)
+            .font(.sans(14, .bold))
+            .foregroundStyle(Color.ink)
             .fixedSize()
         }
       }
-      .padding(.horizontal, 14)
-      .frame(minWidth: 64, minHeight: 34)
-      .background(Color.surface, in: Capsule())
-      .overlay(Capsule().strokeBorder(Color.holdLine, lineWidth: BasuMetric.hairline))
+      .padding(.horizontal, 16)
+      .frame(minWidth: 72, minHeight: 36)
+      .overlay(Capsule().strokeBorder(Color.line2, lineWidth: BasuMetric.hairline))
       .frame(minHeight: BasuMetric.minTarget)
       .contentShape(Rectangle())
     }
@@ -175,17 +200,23 @@ struct OfflineBanner: View {
 struct Banner: View {
   let message: String
 
-  private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: BasuMetric.button, style: .continuous) }
+  private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: BasuMetric.inner, style: .continuous) }
 
   var body: some View {
-    Text(message)
-      .font(.sans(13))
-      .foregroundStyle(Color.stop)
-      .frame(maxWidth: .infinity, alignment: .leading)
-      .fixedSize(horizontal: false, vertical: true)
-      .padding(12)
-      .background(Color.stopSoft, in: shape)
-      .overlay(shape.strokeBorder(Color.stopLine, lineWidth: 1))
+    HStack(alignment: .top, spacing: 10) {
+      Image(systemName: "exclamationmark.circle")
+        .font(.sans(15, .semibold))
+        .foregroundStyle(Color.accentInk)
+        .accessibilityHidden(true)
+      Text(message)
+        .font(.sans(14, .medium))
+        .foregroundStyle(Color.accentInk)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+    .padding(14)
+    .background(Color.stopSoft, in: shape)
+    .overlay(shape.strokeBorder(Color.stopLine, lineWidth: BasuMetric.hairline))
   }
 }
 
@@ -256,31 +287,16 @@ struct FlowLayout: Layout {
   }
 }
 
-/// The count on the bell. A pill rather than a circle, so it grows rightward
-/// from its own left edge and the bell underneath never shifts.
-struct UnreadBadge: View {
-  let count: Int
-
-  var body: some View {
-    Text(count > 99 ? "99+" : "\(count)")
-      .font(.mono(9.5, .semibold))
-      .monospacedDigit()
-      .foregroundStyle(Color.onAccent)
-      .padding(.horizontal, 4)
-      .frame(minWidth: 15, minHeight: 15)
-      .background(Color.accent, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-  }
-}
-
-/// The tracked mono label that names which app a row came from.
+/// The tracked label that names which app a row came from: «ИДЭШ», «ХООЛ».
 struct SourceLabel: View {
   let text: String
-  var size: CGFloat = 11
+  var size: CGFloat = 12
+  var colour: Color = .ink3
 
   var body: some View {
     Text(text)
-      .font(.mono(size, .medium))
-      .tracking(size * 0.12)
-      .foregroundStyle(Color.ink3)
+      .font(.sans(size, .bold))
+      .tracking(size * 0.14)
+      .foregroundStyle(colour)
   }
 }

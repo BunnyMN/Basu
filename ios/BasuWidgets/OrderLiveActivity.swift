@@ -7,7 +7,9 @@ import WidgetKit
  The order on the lock screen and in the Dynamic Island.
 
  The seating time is the largest thing on the card because it is the only
- number the user acts on. The expanded island shows nothing the card does not.
+ number the user acts on: the display face, with «ИРЭХ» under it in gold. The
+ card is the app's own charcoal, and the stage is the meter of four — no
+ green. The expanded island shows nothing the card does not.
  */
 struct OrderLiveActivity: Widget {
   var body: some WidgetConfiguration {
@@ -29,7 +31,7 @@ struct OrderLiveActivity: Widget {
           .padding(.leading, 2)
       } compactTrailing: {
         Text(BasuFormat.hhmm(context.state.seatingTime))
-          .font(BasuFont.mono(15, .semibold))
+          .font(BasuFont.display(18))
           .monospacedDigit()
           .foregroundStyle(BasuColor.onLock)
           .padding(.trailing, 2)
@@ -37,18 +39,16 @@ struct OrderLiveActivity: Widget {
         FoodTile(size: 22, radius: 6)
       }
       .widgetURL(URL(string: "basu://order/\(context.attributes.orderID)"))
-      .keylineTint(BasuColor.onLock)
+      .keylineTint(BasuColor.gold)
     }
   }
 }
 
-/// The expanded island: 34pt icon, venue over the stage, the seating time
-/// over ИРЭХ, and the bar. Nothing the lock screen card does not show.
+/// The expanded island: the tile, venue over the stage, the seating time
+/// over ИРЭХ, and the meter. Nothing the lock screen card does not show.
 struct ExpandedIsland: View {
   let attributes: BasuActivityAttributes
   let state: BasuActivityAttributes.ContentState
-
-  private let dim = Color(red: 0x8E / 255, green: 0x9A / 255, blue: 0xA0 / 255)
 
   var body: some View {
     VStack(alignment: .leading, spacing: 15) {
@@ -56,27 +56,27 @@ struct ExpandedIsland: View {
         FoodTile(size: 34, radius: 9)
         VStack(alignment: .leading, spacing: 4) {
           Text(attributes.venueName)
-            .font(BasuFont.sans(15, .semibold))
+            .font(BasuFont.sans(15, .bold))
             .foregroundStyle(BasuColor.onLock)
             .lineLimit(1)
           // Words, so the sans, as on the lock screen card.
           Text(state.stageLabel)
-            .font(BasuFont.sans(11.5))
-            .foregroundStyle(dim)
+            .font(BasuFont.sans(12, .semibold))
+            .foregroundStyle(BasuColor.onLock2)
             .lineLimit(1)
         }
         .layoutPriority(1)
         Spacer(minLength: 8)
-        VStack(alignment: .trailing, spacing: 3) {
+        VStack(alignment: .trailing, spacing: 4) {
           Text(BasuFormat.hhmm(state.seatingTime))
-            .font(BasuFont.mono(28, .semibold))
+            .font(BasuFont.display(36))
             .monospacedDigit()
             .foregroundStyle(BasuColor.onLock)
-          UnitLabel("ИРЭХ", colour: dim)
+          UnitLabel("ИРЭХ", colour: BasuColor.gold)
         }
         .fixedSize()
       }
-      StageBar(stage: state.stage, track: Color(red: 0x2B / 255, green: 0x32 / 255, blue: 0x36 / 255), fill: BasuColor.onLock)
+      StageBar(stage: state.stage, track: BasuColor.lockTrack)
     }
     .padding(.top, 6)
     .padding(.horizontal, 4)
@@ -85,8 +85,8 @@ struct ExpandedIsland: View {
   }
 }
 
-/// Padding 16 × 18, gap 14. The system draws the card's material and radius;
-/// this is what sits on it.
+/// Padding 16 × 18, gap 14. The system draws the card's radius; this is what
+/// sits on it, over the app's charcoal (`lockCard`).
 struct LockScreenCard: View {
   let attributes: BasuActivityAttributes
   let state: BasuActivityAttributes.ContentState
@@ -94,39 +94,42 @@ struct LockScreenCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
       HStack(alignment: .top, spacing: 12) {
-        FoodTile(size: 30, radius: 8)
+        FoodTile(size: 32, radius: 9)
         VStack(alignment: .leading, spacing: 4) {
           Text(attributes.venueName)
-            .font(BasuFont.sans(15, .semibold))
+            .font(BasuFont.sans(15, .bold))
             .foregroundStyle(BasuColor.onLock)
             .lineLimit(1)
           Text("\(attributes.orderNumber) · \(attributes.partySize) хүн")
-            .font(BasuFont.mono(11.5))
+            .font(BasuFont.sans(12, .semibold))
             .monospacedDigit()
             .foregroundStyle(BasuColor.onLock2)
         }
         Spacer(minLength: 8)
-        VStack(alignment: .trailing, spacing: 3) {
+        VStack(alignment: .trailing, spacing: 4) {
           Text(BasuFormat.hhmm(state.seatingTime))
-            .font(BasuFont.mono(26, .semibold))
+            .font(BasuFont.display(36))
             .monospacedDigit()
             .foregroundStyle(BasuColor.onLock)
-          UnitLabel("ИРЭХ", colour: BasuColor.onLock2)
+          UnitLabel("ИРЭХ", colour: BasuColor.gold)
         }
       }
 
-      VStack(alignment: .leading, spacing: 7) {
-        StageBar(stage: state.stage, track: BasuColor.lockTrack, fill: BasuColor.onLock)
+      VStack(alignment: .leading, spacing: 8) {
+        StageBar(stage: state.stage, track: BasuColor.lockTrack)
         HStack(alignment: .firstTextBaseline) {
           Text(state.stageLabel)
-            .font(BasuFont.sans(12.5, .medium))
+            .font(BasuFont.sans(13, .bold))
             .foregroundStyle(BasuColor.onLock)
           Spacer(minLength: 8)
           if let fire = state.fireTime {
-            Text(BasuFormat.hhmm(fire))
-              .font(BasuFont.mono(12.5, .semibold))
-              .monospacedDigit()
-              .foregroundStyle(BasuColor.onLock)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+              UnitLabel("ГАЛ", colour: BasuColor.onLock2)
+              Text(BasuFormat.hhmm(fire))
+                .font(BasuFont.display(18))
+                .monospacedDigit()
+                .foregroundStyle(BasuColor.ink2)
+            }
           }
         }
       }
@@ -137,10 +140,8 @@ struct LockScreenCard: View {
   }
 }
 
-/// The time label — what the time over it is the time of (`ИРЭХ`): sans
-/// 11/500, uppercase, tracked 0.06em, as on the launcher's live row. A word,
-/// so the sans; and nothing anybody has to read is set under 11 — at mono 9
-/// it was a smudge under the time.
+/// The time label — what the time over it is the time of (`ИРЭХ`): 11, the
+/// heaviest Manrope, uppercase, tracked wide — the web's «АВАХ» under a day.
 struct UnitLabel: View {
   let text: String
   let colour: Color
@@ -152,8 +153,8 @@ struct UnitLabel: View {
 
   var body: some View {
     Text(text.uppercased())
-      .font(BasuFont.sans(11, .medium))
-      .tracking(11 * 0.06)
+      .font(BasuFont.sans(11, .heavy))
+      .tracking(11 * 0.16)
       .foregroundStyle(colour)
   }
 }

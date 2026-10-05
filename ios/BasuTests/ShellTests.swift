@@ -195,9 +195,11 @@ struct ShellTests {
   // MARK: - the shell's furniture
 
   @Test func theBarCarriesTheShellAndNothingElse() {
-    // Home, wallet, profile. Apps are never tabs — they stay in the grid.
-    #expect(ShellTab.allCases.map(\.rawValue) == ["home", "wallet", "profile"])
-    // Icon-only, so the label is all VoiceOver has; every one has one.
+    // Home, the orders, wallet, profile — the prototype's four. Apps are
+    // never tabs — they are tiles on the launcher.
+    #expect(ShellTab.allCases.map(\.rawValue) == ["home", "orders", "wallet", "profile"])
+    #expect(ShellTab.allCases.map(\.title) == ["Нүүр", "Захиалга", "Түрийвч", "Профайл"])
+    // Every tab names itself, for the eye and for VoiceOver.
     #expect(ShellTab.allCases.allSatisfy { !$0.title.isEmpty })
   }
 

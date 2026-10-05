@@ -1,16 +1,15 @@
 {
   "brand": {
-    "accent": "#1F5A43",
-    "glow": "rgba(31,90,67,.15)",
-    "lightGround": "linear-gradient(176deg,#F8F7F3 0%,#F1F2EC 55%,#E6EBE3 100%)",
-    "darkGround": "linear-gradient(176deg,#16201A 0%,#0F1411 55%,#0A0C0B 100%)",
-    "accentDark": "#7CCBA2"
+    "ground": "linear-gradient(176deg,#1D1817 0%,#100D0C 55%,#0C0A09 100%)",
+    "glow": "rgba(210,31,60,.10)",
+    "ink": "#F6F0E8",
+    "ink2": "#C4BAB0",
+    "gold": "#C9A96E"
   },
   "shots": [
     {
       "name": "signin",
       "screen": "signin.png",
-      "theme": "light",
       "eyebrow": "Basu",
       "headline": "Хоол, өвлийн идэш — нэг апп-д",
       "sub": "Apple, Google эсвэл имэйлээр нэг алхамд нэвтэр."
@@ -18,7 +17,6 @@
     {
       "name": "idesh",
       "screen": "idesh.png",
-      "theme": "light",
       "eyebrow": "Идэш",
       "headline": "Өвлийн идшээ гэрээт нийлүүлэгчээс",
       "sub": "Basu шалгаж, гэрээ байгуулсан. Үнэ нь зар дээрээ."
@@ -26,7 +24,6 @@
     {
       "name": "home",
       "screen": "home.png",
-      "theme": "light",
       "eyebrow": "Нүүр",
       "headline": "Апп бүр нэг товшилтод",
       "sub": "Хоол, Идэш — нэг бүртгэлээр, нэг апп дотор."
@@ -34,7 +31,6 @@
     {
       "name": "wallet",
       "screen": "wallet.png",
-      "theme": "light",
       "eyebrow": "Түрийвч",
       "headline": "Гүйлгээ бүр нэг дор",
       "sub": "Үлдэгдэл, буцаалт, баримт — тодорхой."
@@ -42,9 +38,8 @@
     {
       "name": "settings",
       "screen": "settings.png",
-      "theme": "dark",
       "eyebrow": "Тохиргоо",
-      "headline": "Цайвар ч, бараан ч",
+      "headline": "Зөвхөн таны гарт",
       "sub": "Face ID түгжээ, мэдэгдэл — өөрийнхөөрөө."
     }
   ]

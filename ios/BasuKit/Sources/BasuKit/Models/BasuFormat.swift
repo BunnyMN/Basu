@@ -22,8 +22,8 @@ public enum BasuFormat {
     count > 99 ? "99+" : "\(count)"
   }
 
-  /// Grouped by thousands with a comma. The ₮ is set separately, in the sans
-  /// face — the mono face has no glyph for it.
+  /// Grouped by thousands with a comma: «15,000». The ₮ follows in the same
+  /// run — both faces have the glyph.
   public static func grouped(_ value: Int) -> String {
     let f = NumberFormatter()
     f.numberStyle = .decimal

@@ -49,7 +49,7 @@ final class ServiceFlowTests: XCTestCase {
     let food = app.buttons["app.Хоол"]
     XCTAssertTrue(food.waitForExistence(timeout: 10), "the home screen should offer the food app")
     XCTAssertTrue(
-      app.staticTexts["ИДЭВХТЭЙ"].waitForExistence(timeout: 15),
+      app.descendants(matching: .any)["live.card"].waitForExistence(timeout: 15),
       "the order should be on the launcher",
     )
     shot("1-home")

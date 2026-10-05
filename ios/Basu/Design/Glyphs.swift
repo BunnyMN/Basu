@@ -39,7 +39,7 @@ enum GlyphKind: String, CaseIterable, Sendable {
 struct Glyph: View {
   let kind: GlyphKind
   var size: CGFloat = 34
-  var colour: Color = .accent
+  var colour: Color = .ink
   var lineWidth: CGFloat = 1.6
 
   var body: some View {
@@ -229,15 +229,17 @@ private struct GlyphBody: Shape {
 
 // MARK: - the shell's own marks
 
-/// Home, wallet, profile — the three in the tab bar, at SF Symbols' metrics.
+/// The tab bar's four, the bell, the arrow on a tile and the magnifier — the
+/// web's own icon set (`--i` in the prototype): stroke 1.75, round caps and
+/// joins, a 24-unit box.
 enum ShellMark: String, Sendable {
-  case home, wallet, profile, bell, magnifier
+  case home, orders, wallet, profile, bell, arrow, magnifier
 }
 
 struct ShellGlyph: View {
   let mark: ShellMark
-  var size: CGFloat = 23
-  var lineWidth: CGFloat = 1.6
+  var size: CGFloat = 24
+  var lineWidth: CGFloat = 1.75
 
   var body: some View {
     ShellShape(mark: mark)
@@ -258,50 +260,74 @@ private struct ShellShape: Shape {
       path.move(to: b.p(first.0, first.1))
       for point in points.dropFirst() { path.addLine(to: b.p(point.0, point.1)) }
     }
+    func circle(_ x: CGFloat, _ y: CGFloat, _ r: CGFloat) {
+      path.addEllipse(in: CGRect(origin: b.p(x - r, y - r), size: CGSize(width: b.r(r * 2), height: b.r(r * 2))))
+    }
 
     switch mark {
     case .home:
-      run([(4, 10.6), (12, 4.4), (20, 10.6)])
-      run([(6.2, 12.2), (6.2, 19.6), (17.8, 19.6), (17.8, 12.2)])
+      // A house with its door: the roof's ridge, the walls, a doorway cut in.
+      path.move(to: b.p(4, 10.5))
+      path.addLine(to: b.p(12, 4))
+      path.addLine(to: b.p(20, 10.5))
+      path.addLine(to: b.p(20, 19))
+      path.addQuadCurve(to: b.p(19, 20), control: b.p(20, 20))
+      path.addLine(to: b.p(14.5, 20))
+      path.addLine(to: b.p(14.5, 14.5))
+      path.addLine(to: b.p(9.5, 14.5))
+      path.addLine(to: b.p(9.5, 20))
+      path.addLine(to: b.p(5, 20))
+      path.addQuadCurve(to: b.p(4, 19), control: b.p(4, 20))
+      path.closeSubpath()
+
+    case .orders:
+      // A receipt, torn along its foot, with two lines on it.
+      run([(6, 3.5), (18, 3.5), (18, 21), (15, 19), (12, 21), (9, 19), (6, 21), (6, 3.5)])
+      path.closeSubpath()
+      run([(9, 8.5), (15, 8.5)])
+      run([(9, 12.5), (15, 12.5)])
 
     case .wallet:
-      path.addRoundedRect(
-        in: CGRect(origin: b.p(3.4, 6.6), size: CGSize(width: b.r(17.2), height: b.r(10.8))),
-        cornerSize: CGSize(width: b.r(1.6), height: b.r(1.6)),
-        style: .continuous,
-      )
-      run([(15.2, 12), (18.6, 12)])
+      path.move(to: b.p(4, 7.5))
+      path.addQuadCurve(to: b.p(6.5, 5), control: b.p(4, 5))
+      path.addLine(to: b.p(18, 5))
+      path.addLine(to: b.p(18, 8))
+      path.move(to: b.p(4, 7.5))
+      path.addLine(to: b.p(4, 18))
+      path.addQuadCurve(to: b.p(6, 20), control: b.p(4, 20))
+      path.addLine(to: b.p(20, 20))
+      path.addLine(to: b.p(20, 9))
+      path.addLine(to: b.p(6.5, 9))
+      path.addQuadCurve(to: b.p(4, 7.5), control: b.p(4, 9))
+      circle(16.5, 14.5, 1.2)
 
     case .profile:
-      path.addEllipse(in: CGRect(
-        origin: b.p(12 - 3.4, 9 - 3.4),
-        size: CGSize(width: b.r(6.8), height: b.r(6.8)),
-      ))
-      path.move(to: b.p(5.8, 19.4))
-      path.addCurve(to: b.p(12, 14.6), control1: b.p(7, 16.2), control2: b.p(9.4, 14.6))
-      path.addCurve(to: b.p(18.2, 19.4), control1: b.p(14.6, 14.6), control2: b.p(17, 16.2))
+      circle(12, 8.5, 4)
+      path.move(to: b.p(4.5, 20.5))
+      path.addCurve(to: b.p(12, 15), control1: b.p(5.8, 16.9), control2: b.p(8.6, 15))
+      path.addCurve(to: b.p(19.5, 20.5), control1: b.p(15.4, 15), control2: b.p(18.2, 16.9))
 
     case .bell:
-      path.move(to: b.p(7, 16.4))
-      path.addLine(to: b.p(7, 11))
+      path.move(to: b.p(6, 16))
+      path.addLine(to: b.p(6, 11))
       path.addArc(
-        center: b.p(12, 11), radius: b.r(5),
+        center: b.p(12, 11), radius: b.r(6),
         startAngle: .degrees(180), endAngle: .degrees(0), clockwise: false,
       )
-      path.addLine(to: b.p(17, 16.4))
-      run([(5.4, 16.4), (18.6, 16.4)])
-      path.move(to: b.p(10.2, 19))
-      path.addArc(
-        center: b.p(12, 19), radius: b.r(1.8),
-        startAngle: .degrees(180), endAngle: .degrees(0), clockwise: true,
-      )
+      path.addLine(to: b.p(18, 16))
+      path.addLine(to: b.p(19.5, 18))
+      path.addLine(to: b.p(4.5, 18))
+      path.closeSubpath()
+      path.move(to: b.p(10, 20.5))
+      path.addQuadCurve(to: b.p(14, 20.5), control: b.p(12, 22.6))
+
+    case .arrow:
+      run([(5, 12), (19, 12)])
+      run([(13, 6), (19, 12), (13, 18)])
 
     case .magnifier:
-      path.addEllipse(in: CGRect(
-        origin: b.p(10.5 - 6.5, 10.5 - 6.5),
-        size: CGSize(width: b.r(13), height: b.r(13)),
-      ))
-      run([(15.4, 15.4), (20, 20)])
+      circle(11, 11, 6.5)
+      run([(16, 16), (20.5, 20.5)])
     }
 
     return path

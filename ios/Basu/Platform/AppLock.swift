@@ -168,30 +168,31 @@ struct LockView: View {
 
   var body: some View {
     ZStack {
-      LinearGradient.ground.ignoresSafeArea()
-      VStack(spacing: 14) {
+      Color.bg.ignoresSafeArea()
+      VStack(spacing: 16) {
         Text("Basu")
-          .font(.sans(44, .semibold))
-          .tracking(-0.03 * 44)
+          .font(.display(64))
           .foregroundStyle(Color.ink)
         RoundedRectangle(cornerRadius: 1, style: .continuous)
-          .fill(Color.accent)
+          .fill(Color.gold)
           .frame(width: 34, height: 2)
       }
       if lock.locked {
         VStack {
           Spacer()
+          // The screen's one thing to do: the crimson capsule.
           Button {
             Task { await lock.unlock() }
           } label: {
             Label("\(lock.kind.by) нээх", systemImage: lock.kind.symbol)
-              .font(.sans(16, .medium))
-              .foregroundStyle(Color.accent)
-              .frame(minHeight: BasuMetric.minTarget)
-              .padding(.horizontal, 20)
-              .glassCard(radius: 22)
+              .font(.sans(16, .bold))
+              .foregroundStyle(Color.onAccent)
+              .padding(.horizontal, 28)
+              .frame(minHeight: BasuMetric.buttonHeight)
+              .background(Capsule().fill(Color.accent).glow())
+              .contentShape(Capsule())
           }
-          .buttonStyle(.plain)
+          .buttonStyle(Pressable())
           .accessibilityIdentifier("lock.open")
           .padding(.bottom, 60)
         }
