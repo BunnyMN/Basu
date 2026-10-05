@@ -301,6 +301,11 @@ for _ in $(seq 1 30); do
         recent=$( { journalctl -u basu-scheduler --since '20 min ago' --no-pager -o cat 2>/dev/null || true; tail -n 400 /var/log/basu-scheduler.log 2>/dev/null || true; } )
         echo "  scheduler, recent log: $(printf '%s\n' "$recent" | grep -c 'failed' || true) failures, $(printf '%s\n' "$recent" | grep -c 'running, tick' || true) starts"
         printf '%s\n' "$recent" | grep -A3 'failed' | grep -oE '[A-Z][A-Za-z]*Error|code: .[0-9A-Z]{5}.' | sort | uniq -c | sort -rn | head -3 | sed 's/^/    /' || true
+        # Which step failed (the words before «failed», never what it said), and
+        # which payment provider the scheduler itself started with — Wire, or
+        # closed for want of a key it could not read.
+        printf '%s\n' "$recent" | grep -oE '\[scheduler\] [a-z -]*failed' | sort | uniq -c | sed 's/^/    /' || true
+        printf '%s\n' "$recent" | grep -E '^\[scheduler\] payments: ' | tail -n 1 | sed 's/^/  /' || true
       fi
     fi
     flipped=0
