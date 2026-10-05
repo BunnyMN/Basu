@@ -454,17 +454,24 @@ async function orderFromMap(
   (row.querySelector('button[data-d="1"]') as HTMLElement).click();
   await until(dom, 'the pay button', (d) => Boolean(d.querySelector('.sheet footer button')));
   clickText(dom, '.slot', slot);
-  await until(dom, 'a price', (d) =>
-    (d.querySelector('.sheet footer button')?.textContent ?? '').includes('төлөх'),
-  );
+  await until(dom, 'a time chosen', (d) => orderable(d));
   (dom.window.document.querySelector('.sheet footer button') as HTMLElement).click();
   await until(dom, 'the status screen', (d) => Boolean(d.querySelector('.status')));
 }
 
-/** The Pay button, ready for a tap: a price on it and no spinner. */
+/**
+ * The basket's «Захиалах», ready to take the money: a time is chosen (until
+ * then it says «Цагаа сонгоно уу» and is off). It pays as it orders.
+ */
+function orderable(d: Document): boolean {
+  const button = d.querySelector('.sheet footer button') as HTMLButtonElement | null;
+  return Boolean(button && !button.disabled && button.textContent?.trim() === 'Захиалах');
+}
+
+/** The Pay button, ready for a tap: a time chosen and no spinner. */
 function payable(d: Document): boolean {
   const button = d.querySelector('.sheet footer button');
-  return Boolean(button && !button.hasAttribute('data-busy') && button.textContent?.includes('төлөх'));
+  return Boolean(button && !button.hasAttribute('data-busy') && orderable(d));
 }
 
 /** A tsuivan at the paired kitchen for `slot`, chosen as far as its Pay button. */
@@ -761,12 +768,10 @@ describe('the guest app', () => {
     );
 
     clickText(dom, '.slot', '12:30');
-    await until(dom, 'a price', (d) =>
-      (d.querySelector('.sheet footer button')?.textContent ?? '').includes('төлөх'),
-    );
-    expect(dom.window.document.querySelector('.sheet footer button')?.textContent).toContain(
-      '28,000₮',
-    );
+    await until(dom, 'a time chosen', orderable);
+    // The basket says what the one button is about to charge, and for when.
+    expect(dom.window.document.querySelector('#sheet-foot .basket')?.textContent).toContain('28,000₮');
+    expect(dom.window.document.querySelector('#sheet-foot .basket')?.textContent).toContain('12:30');
 
     (dom.window.document.querySelector('.sheet footer button') as HTMLElement).click();
 
@@ -951,9 +956,7 @@ describe('the guest app', () => {
     (salad.querySelector('button[data-d="1"]') as HTMLElement).click();
     await until(dom, 'the pay button', (d) => Boolean(d.querySelector('.sheet footer button')));
     clickText(dom, '.slot', '13:15');
-    await until(dom, 'a price', (d) =>
-      (d.querySelector('.sheet footer button')?.textContent ?? '').includes('төлөх'),
-    );
+    await until(dom, 'a time chosen', orderable);
     (dom.window.document.querySelector('.sheet footer button') as HTMLElement).click();
 
     // Signed in again behind the scenes; the order goes through.
@@ -1074,6 +1077,22 @@ describe('the map', () => {
       // …and still on this origin, which is the whole reason for the proxy.
       expect(new URL(url).origin).toBe(new URL(base).origin);
     }
+  });
+
+  it('draws the city at night whatever the phone is set to', async () => {
+    // Every Basu page is dark. The map used to follow the phone's own setting,
+    // and a phone set to light drew a daylight city under the dark sheet — most
+    // of the lunch page went light. One palette now: the charcoal ground, and
+    // no colour on it but the pins.
+    const dom = await openPage('dine.html');
+    await until(dom, 'the style', () => Boolean((dom.window as unknown as Record<string, unknown>)['__style']));
+    const style = (dom.window as unknown as Record<string, unknown>)['__style'] as {
+      layers: Array<{ id: string; paint?: Record<string, unknown> }>;
+    };
+    const paint = (id: string, key: string) => style.layers.find((l) => l.id === id)?.paint?.[key];
+    expect(paint('bg', 'background-color')).toBe('#141110');
+    expect(paint('road-primary', 'line-color')).toBe('#3E3431');
+    expect(paint('water', 'fill-color')).toBe('#111518');
   });
 });
 
