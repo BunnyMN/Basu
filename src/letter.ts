@@ -3,13 +3,20 @@
  *
  * A code to sign in, an order that is ready, a business that was approved:
  * each arrives on the same paper, so that a person learns what Basu's mail
- * looks like and trusts it — pine at the head with the name, the meat under
- * it, one thing said plainly in the middle, and who we are at the foot.
+ * looks like and trusts it — the name over the meat on charcoal at the head,
+ * one thing said plainly in the middle, and who we are at the foot.
+ *
+ * Basu is dark everywhere but here. Mail clients recolour a dark letter in
+ * their own dark modes, and badly, so the paper stays light: the charcoal and
+ * the meat are a picture no client repaints, and the one button is crimson,
+ * as on every screen. The head says the name and no slogan, because the same
+ * head opens the letter that says an order was cancelled.
  *
  * Built the way mail clients still need it: tables for layout, every style
- * inline, no web fonts, images that say what they were when they are not
- * shown, and nothing that needs script. The plain-text twin is always sent
- * beside it; this is the nicety on top.
+ * inline, no web fonts (each face names the system faces that stand in for
+ * it), images that say what they were when they are not shown, and nothing
+ * that needs script. The plain-text twin is always sent beside it; this is
+ * the nicety on top.
  */
 
 /** Where the site lives, for links and the pictures in a letter. */
@@ -26,32 +33,50 @@ export interface Letter {
   code?: string;
   /** The one thing to do next, as a button. `url` may be a path on the site. */
   action?: { label: string; url: string } | undefined;
-  /** Something to heed, on honey. */
+  /** Something to heed, set apart by a gold rule. */
   note?: string;
   /** The small print under it all. */
   small?: string;
 }
 
+/**
+ * The banner: «Basu» over the landing page's chops on the charcoal ground,
+ * 1200×400 for a 600×200 slot. A new picture takes a new name — the site
+ * keeps brand pictures in a browser for a month, and a letter already sent
+ * still points at the name it was sent with.
+ */
+const BANNER = '/brand/email/banner-dark.jpg';
+
 const esc = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 const C = {
-  ground: '#F4F3EE',
+  /** Around the paper: warm, a shade off white. */
+  ground: '#F4F1EC',
   paper: '#FFFFFF',
-  deep: '#123A2C',
-  pine: '#1F5A43',
-  pineInk: '#1C5440',
-  pineSoft: '#E3EFE8',
-  honey: '#D9A441',
-  honeyInk: '#7A5A12',
-  honeySoft: '#FBF1DC',
-  ink: '#181916',
-  ink2: '#575A53',
-  ink3: '#696C64',
-  line: '#E2E0D8',
+  /** The site's ground, under the banner. */
+  charcoal: '#100D0C',
+  /** The site's ink on charcoal: the banner's alt text. */
+  bone: '#F6F0E8',
+  ink: '#140F0E',
+  ink2: '#4A423E',
+  ink3: '#6A605A',
+  line: '#E8E1D8',
+  /** The code's box and the note's. */
+  soft: '#F6F2EC',
+  crimson: '#D21F3C',
+  gold: '#C9A96E',
 };
-const SANS = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
-const MONO = "'SF Mono',Menlo,Consolas,'Liberation Mono',monospace";
+const SANS = "Manrope,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+/**
+ * Basu's condensed display face where a reader has it, else the narrow cut
+ * their system has: Avenir Next Condensed on Apple's, Arial Narrow on
+ * Windows, Roboto Condensed on Android. For the code and the name only —
+ * not every narrow cut has Ө and Ү — and the code bold, not the site's 800,
+ * which Avenir draws as a blot.
+ */
+const CONDENSED =
+  "'Noto Sans Display Condensed','Avenir Next Condensed','Arial Narrow','Roboto Condensed',sans-serif-condensed,'Helvetica Neue',Arial,sans-serif";
 
 export function renderLetter(letter: Letter): string {
   const origin = publicOrigin();
@@ -61,23 +86,28 @@ export function renderLetter(letter: Letter): string {
     .map((p) => `<p style="margin:0 0 16px;font-family:${SANS};font-size:16px;line-height:1.6;color:${C.ink2}">${esc(p)}</p>`)
     .join('');
 
+  // Set apart by its letter-spacing; the same again on the left keeps the
+  // digits centred, and the six of them fit a 320px phone.
   const code = letter.code
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 20px"><tr>
-        <td align="center" bgcolor="${C.pineSoft}" style="background:${C.pineSoft};border-radius:14px;padding:22px 12px">
-          <div style="font-family:${MONO};font-size:36px;line-height:1;font-weight:700;letter-spacing:8px;color:${C.pineInk};padding-left:8px">${esc(letter.code)}</div>
+        <td align="center" bgcolor="${C.soft}" style="background:${C.soft};border:1px solid ${C.line};border-radius:16px;padding:20px 8px">
+          <div style="font-family:${CONDENSED};font-size:44px;line-height:1;font-weight:700;font-stretch:condensed;font-variant-numeric:tabular-nums;letter-spacing:8px;color:${C.ink};padding-left:8px">${esc(letter.code)}</div>
         </td></tr></table>`
     : '';
 
+  // A button every client draws: the cell is the crimson, so Outlook — which
+  // pads no link — still shows a pill-sized block (mso-padding-alt), and
+  // everywhere else the whole of it is the link.
   const action = letter.action
-    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 20px"><tr>
-        <td align="center" bgcolor="${C.pine}" style="background:${C.pine};border-radius:999px">
-          <a href="${esc(link(letter.action.url))}" style="display:inline-block;padding:15px 30px;font-family:${SANS};font-size:16px;font-weight:600;line-height:1;color:#FFFFFF;text-decoration:none;border-radius:999px">${esc(letter.action.label)} →</a>
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:8px 0 22px"><tr>
+        <td align="center" bgcolor="${C.crimson}" style="background:${C.crimson};border-radius:999px;mso-padding-alt:15px 30px">
+          <a href="${esc(link(letter.action.url))}" style="display:inline-block;padding:15px 30px;font-family:${SANS};font-size:16px;font-weight:700;line-height:20px;color:#FFFFFF;text-decoration:none;border-radius:999px;mso-padding-alt:0">${esc(letter.action.label)}&nbsp;→</a>
         </td></tr></table>`
     : '';
 
   const note = letter.note
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 20px"><tr>
-        <td bgcolor="${C.honeySoft}" style="background:${C.honeySoft};border-radius:12px;padding:14px 16px;font-family:${SANS};font-size:14px;line-height:1.55;color:${C.honeyInk}">${esc(letter.note)}</td>
+        <td bgcolor="${C.soft}" style="background:${C.soft};border-left:3px solid ${C.gold};border-radius:4px 12px 12px 4px;padding:14px 16px;font-family:${SANS};font-size:14px;line-height:1.55;color:${C.ink2}">${esc(letter.note)}</td>
       </tr></table>`
     : '';
 
@@ -87,10 +117,11 @@ export function renderLetter(letter: Letter): string {
 
   // Each promise holds together; the line breaks between them. Joined by
   // spaces that do not break, the three were one 420px word, and every letter
-  // was wider than a phone: the whole card scrolled sideways.
+  // was wider than a phone: the whole card scrolled sideways. The checks part
+  // them, so no dot is left hanging at the end of a wrapped line.
   const promise = ['Гэрээт нийлүүлэгч', 'Эцсийн үнэ', 'Таны захиалгаар нядална']
-    .map((w) => `<span style="white-space:nowrap"><span style="color:${C.pine}">✓</span>&nbsp;${w}</span>`)
-    .join(' · ');
+    .map((w) => `<span style="display:inline-block;white-space:nowrap;padding:2px 8px"><span style="color:${C.ink};font-weight:700">✓</span>&nbsp;${w}</span>`)
+    .join(' ');
 
   return `<!doctype html>
 <html lang="mn">
@@ -106,22 +137,16 @@ export function renderLetter(letter: Letter): string {
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${C.ground}" style="background:${C.ground}">
 <tr><td align="center" style="padding:24px 12px 32px">
   <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px">
-    <tr><td bgcolor="${C.deep}" style="background:${C.deep};border-radius:18px 18px 0 0;padding:22px 28px">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-        <td style="font-family:${SANS};font-size:26px;font-weight:700;letter-spacing:-0.5px;color:#FFFFFF">Basu</td>
-        <td align="right" style="font-family:${SANS};font-size:13px;color:#FFFFFF;opacity:0.85"><span style="color:${C.honey}">●</span>&nbsp;Өвлийн идэш</td>
-      </tr></table>
+    <tr><td bgcolor="${C.charcoal}" style="background:${C.charcoal};border-radius:22px 22px 0 0;line-height:0;font-size:0">
+      <img src="${origin}${BANNER}" width="600" height="200" alt="Basu" style="display:block;width:100%;max-width:600px;height:auto;border:0;outline:none;border-radius:22px 22px 0 0;font-family:${CONDENSED};font-size:32px;font-weight:800;line-height:1.2;color:${C.bone}">
     </td></tr>
-    <tr><td bgcolor="${C.deep}" style="background:${C.deep};line-height:0;font-size:0">
-      <img src="${origin}/brand/email/banner.jpg" width="600" alt="Шинэ мах. Эцсийн үнэ." style="display:block;width:100%;max-width:600px;height:auto;border:0;outline:none;font-family:${SANS};font-size:16px;color:#FFFFFF">
-    </td></tr>
-    <tr><td bgcolor="${C.paper}" style="background:${C.paper};padding:34px 32px 28px">
-      <h1 style="margin:0 0 14px;font-family:${SANS};font-size:26px;line-height:1.2;font-weight:700;letter-spacing:-0.4px;color:${C.ink}">${esc(letter.title)}</h1>
+    <tr><td bgcolor="${C.paper}" style="background:${C.paper};padding:32px 28px 26px">
+      <h1 style="margin:0 0 14px;font-family:${SANS};font-size:28px;line-height:1.2;font-weight:700;letter-spacing:-0.4px;color:${C.ink}">${esc(letter.title)}</h1>
       ${paragraphs}${code}${action}${note}${small}
     </td></tr>
-    <tr><td bgcolor="${C.paper}" style="background:${C.paper};border-top:1px solid ${C.line};border-radius:0 0 18px 18px;padding:16px 32px 20px;font-family:${SANS};font-size:13px;line-height:1.6;color:${C.ink2}" align="center">${promise}</td></tr>
+    <tr><td bgcolor="${C.paper}" style="background:${C.paper};border-top:1px solid ${C.line};border-radius:0 0 22px 22px;padding:16px 28px 20px;font-family:${SANS};font-size:13px;line-height:1.6;color:${C.ink2}" align="center">${promise}</td></tr>
     <tr><td align="center" style="padding:22px 24px 0;font-family:${SANS};font-size:12px;line-height:1.7;color:${C.ink3}">
-      <a href="${origin}/" style="color:${C.pineInk};font-weight:600;text-decoration:none">Basu</a> · Улаанбаатар · <a href="mailto:basuappmn@gmail.com" style="color:${C.ink3}">basuappmn@gmail.com</a><br>
+      <a href="${origin}/" style="color:${C.ink};font-weight:700;text-decoration:none">Basu</a> · Улаанбаатар · <a href="mailto:basuappmn@gmail.com" style="color:${C.ink3}">basuappmn@gmail.com</a><br>
       <a href="${origin}/shop" style="color:${C.ink3}">Өвлийн идэш</a> &nbsp;·&nbsp; <a href="${origin}/orders" style="color:${C.ink3}">Миний захиалга</a> &nbsp;·&nbsp; <a href="${origin}/terms" style="color:${C.ink3}">Үйлчилгээний нөхцөл</a> &nbsp;·&nbsp; <a href="${origin}/privacy" style="color:${C.ink3}">Нууцлалын бодлого</a><br>
       Энэ захидлыг Basu танд илгээв. Асуух зүйл байвал дээрх хаягаар бичээрэй.
     </td></tr>
