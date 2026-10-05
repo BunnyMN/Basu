@@ -266,7 +266,12 @@ export type PayOutcome = { state: 'PAID' } | { state: 'AWAITING_PAYMENT'; invoic
  * to be two: a draft the scheduler gave back in between was left with its
  * money taken, unpaid, and no refund.
  */
-export async function payIdesh(ctx: Ctx, orderId: string, opts: { returnUrl?: string; raise?: boolean } = {}): Promise<PayOutcome> {
+export async function payIdesh(
+  ctx: Ctx,
+  orderId: string,
+  /** `native`: the app draws the invoice itself (the QR and bank apps) instead of opening the provider's page. */
+  opts: { returnUrl?: string; raise?: boolean; native?: boolean } = {},
+): Promise<PayOutcome> {
   const facts = await billingFacts(orderId);
   if (!facts) throw new IdeshError('NOT_FOUND', 'no such order');
   if (facts.state !== 'DRAFT') throw new IdeshError('WRONG_STATE', `cannot pay in ${facts.state}`);
@@ -294,6 +299,7 @@ export async function payIdesh(ctx: Ctx, orderId: string, opts: { returnUrl?: st
       forSubjectId: orderId,
       returnUrl: opts.returnUrl,
       description: `Basu · Идэш №${facts.code}`,
+      native: opts.native,
       within: markPaid,
       raise: opts.raise,
     });

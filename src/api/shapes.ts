@@ -1,3 +1,4 @@
+import type { QPayInvoice } from '../ports.js';
 import type { CertificateFacts, IdeshSummary, Settlement, SupplierOrder } from '../idesh/index.js';
 
 /** The JSON shapes the idesh and ops routes share. Snake case on the wire, as everywhere. */
@@ -67,3 +68,16 @@ export const shapeSettlement = (t: Settlement) => ({
   paid_at: t.paidAt?.toISOString() ?? null,
   created_at: t.createdAt.toISOString(),
 });
+
+/**
+ * A QPay invoice the app draws itself: the QR's text (the app makes the
+ * picture), every bank app with its logo and the link that opens it on this
+ * invoice, and when it lapses unpaid.
+ */
+export function shapeQpay(qpay: QPayInvoice) {
+  return {
+    qr: qpay.qr,
+    banks: qpay.banks.map((bank) => ({ name: bank.name, description: bank.description, logo: bank.logo, link: bank.link })),
+    expires_at: qpay.expiresAt?.toISOString() ?? null,
+  };
+}

@@ -16,6 +16,7 @@ import {
   FakeMailer,
   FakeNotifier,
   FakePaymentProvider,
+  HostedFakePaymentProvider,
   FakeTaxProvider,
   type Ctx,
 } from '../ports.js';
@@ -129,6 +130,8 @@ async function openPage(
   browser: ReturnType<typeof memoryStorage> = storage,
   userAgent?: string,
   now?: string,
+  /** What the page finds before it runs — the app's bridge, for one inside the app. */
+  before?: (window: JSDOM['window']) => void,
 ): Promise<JSDOM> {
   const html = await readFile(join(WEB, file), 'utf8');
   const dom = new JSDOM(html, {
@@ -197,6 +200,7 @@ async function openPage(
       };
     })();`);
   }
+  before?.(window);
   window.eval(
     `(async () => { ${shared}\n${site}\n${mapLib}\n${sideNav}\n${tables}\n${page} })().catch(e => { window.__err = e; });`,
   );
@@ -2217,6 +2221,38 @@ describe('өвлийн идэш', () => {
     const back = await openPage('idesh.html', card.getAttribute('href')!.slice('/idesh'.length));
     await until(back, 'the status', (d) => Boolean(d.querySelector('.status')));
     expect(back.window.document.querySelector('#screen-title')?.textContent).toMatch(/^№\d{4}$/);
+  });
+
+  it('pays in the app’s own sheet where the app can, and tells it once the animal is bought', async () => {
+    await ownGuest('+97699004011');
+    const open = ctx.payments;
+    const hosted = new HostedFakePaymentProvider();
+    ctx.payments = hosted;
+    try {
+      const posted: Array<{ type: string; invoice?: { amount_mnt: number; qpay: { qr: string; banks: Array<{ link: string }> } } }> = [];
+      const dom = await openPage('idesh.html', '', undefined, storage, undefined, undefined, (window) => {
+        Object.assign(window, { webkit: { messageHandlers: { basu: { postMessage: (m: never) => posted.push(m) } } }, __basuPays: true });
+      });
+      await chooseOne(dom);
+      (dom.window.document.querySelector('#pay') as HTMLElement).click();
+      await until(dom, 'the invoice handed to the app', () => posted.some((m) => m.type === 'pay'));
+      const handed = posted.find((m) => m.type === 'pay')!.invoice!;
+      // QPay's QR and bank apps for the app to draw — no page was raised, none opened.
+      expect(handed.qpay.qr).toMatch(/^BASU-DEMO:/);
+      expect(handed.qpay.banks[0]!.link).toMatch(/^basu-demo:\/\/pay\//);
+      expect(handed.amount_mnt).toBeGreaterThan(0);
+      expect(dom.window.location.pathname).toBe('/idesh');
+      // The page's own way back to it opens the sheet again, rather than a page.
+      expect(dom.window.document.querySelector('#qpay-open')?.tagName).toBe('BUTTON');
+
+      hosted.pay(hosted.authorized.at(-1)!, clock.now());
+      // «Төлсөн, шалгах» in the app's sheet asks through the page.
+      (dom.window as unknown as { __basuCheckPay: () => void }).__basuCheckPay();
+      await until(dom, 'the order bought', (d) => Boolean(d.querySelector('.status')));
+      expect(posted.at(-1)?.type === 'paid' || posted.some((m) => m.type === 'paid')).toBe(true);
+    } finally {
+      ctx.payments = open;
+    }
   });
 
   it('says payments are closed on the stall, before any sign-in, and greys «Захиалах» with the reason', async () => {

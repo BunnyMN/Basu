@@ -1,12 +1,15 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import type { AuthorizeInput, PaymentIntent, PaymentProvider } from '../../ports.js';
+import type { AuthorizeInput, PaymentIntent, PaymentProvider, QPayInvoice } from '../../ports.js';
 
 /**
  * Real money, through Wire (wire.mn) onto QPay.
  *
  * Wire fronts QPay: we create a payment intent and a checkout session, the
  * phone opens the hosted page, the person pays from their bank app, and Wire
- * tells us. Two things matter to the rest of Basu and nothing else does.
+ * tells us. The app pays without the page (`native`): the intent is confirmed
+ * with QPay straight away, and Wire hands back QPay's own QR and the bank
+ * apps' links, which the app draws itself. Two things matter to the rest of
+ * Basu and nothing else does.
  *
  * First, `authorize` is idempotent on the top-up id. A phone on a Mongolian
  * mobile network retries; without the idempotency key each retry would be a
@@ -71,6 +74,32 @@ interface WireIntent {
   amount: number;
   expires_at?: number | null;
   metadata?: Record<string, string>;
+  /** After `confirm` with QPay: `{ type: 'qr', qr: { text, image_url, deeplinks } }`. */
+  next_action?: {
+    type?: string;
+    qr?: { text?: string; deeplinks?: Array<{ name?: string; description?: string; logo?: string; link?: string }> };
+  } | null;
+}
+
+/**
+ * The QR and the bank apps of a confirmed intent, as the app draws them. A
+ * link is kept only as an app's own scheme (`khanbank://…`) and a logo only
+ * from https: whatever comes back is opened by the phone.
+ */
+function qpayOf(intent: WireIntent): QPayInvoice | null {
+  const qr = intent.next_action?.type === 'qr' ? intent.next_action.qr : undefined;
+  if (!qr?.text) return null;
+  const banks = (qr.deeplinks ?? []).flatMap((bank) =>
+    typeof bank.link === 'string' && /^[a-z][a-z0-9+.-]*:\/\/\S+$/i.test(bank.link) && !/^(https?|javascript|data|file):/i.test(bank.link)
+      ? [{
+          name: bank.name ?? '',
+          description: bank.description ?? bank.name ?? '',
+          logo: typeof bank.logo === 'string' && bank.logo.startsWith('https://') ? bank.logo : '',
+          link: bank.link,
+        }]
+      : [],
+  );
+  return { qr: qr.text, banks, expiresAt: intent.expires_at ? new Date(intent.expires_at * 1000) : null };
 }
 
 export class WirePayments implements PaymentProvider {
@@ -126,6 +155,17 @@ export class WirePayments implements PaymentProvider {
         metadata: { topup_id: input.reference },
       },
     });
+    if (input.native) {
+      // The app draws it: confirmed with QPay now, and QPay's own QR and bank links come back. No
+      // checkout session — Wire makes none for an intent already confirmed.
+      const confirmed = await this.#call<WireIntent>('POST', `/payment_intents/${encodeURIComponent(intent.id)}/confirm`, {
+        idempotencyKey: `confirm-${input.reference}`,
+        body: { operator: this.#operators[0] },
+      });
+      const qpay = qpayOf(confirmed);
+      if (!qpay) throw new WireError(502, 'no_qr', undefined, 'Wire confirmed the invoice without a QR');
+      return { providerRef: intent.id, qpay };
+    }
     // The intent cancels itself after about ten minutes, so the session is
     // made in the same breath rather than when the phone gets round to it.
     // Back to the purchase's own page when it has one; the server's fallback otherwise.
@@ -138,6 +178,12 @@ export class WirePayments implements PaymentProvider {
       },
     });
     return { providerRef: intent.id, actionUrl: session.url };
+  }
+
+  /** A native invoice's QR and bank links again; null once it is paid, let go or past its time. */
+  async qpayOf(providerRef: string): Promise<QPayInvoice | null> {
+    const intent = await this.#call<WireIntent>('GET', `/payment_intents/${encodeURIComponent(providerRef)}`);
+    return intent.status === 'requires_action' ? qpayOf(intent) : null;
   }
 
   /** The ledger asks this before crediting; "no" leaves the top-up pending. */

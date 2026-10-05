@@ -27,7 +27,10 @@ const SECRET = 'whsec_for_the_test';
 let wire: Server;
 let wireBase: string;
 /** Wire's side: intents by id, the idempotency keys it has seen, and where each page sends people back. */
-const intents = new Map<string, { id: string; status: string; amount: number; metadata: Record<string, string> }>();
+const intents = new Map<
+  string,
+  { id: string; status: string; amount: number; metadata: Record<string, string>; next_action?: unknown; expires_at?: number }
+>();
 const byKey = new Map<string, string>();
 const returns = new Map<string, string>();
 /** Wire answering the next status lookups with a 503, as a busy day does. */
@@ -82,6 +85,7 @@ const paidAtWire = (providerRef: string) => {
   const intent = intents.get(providerRef);
   if (!intent) throw new Error(`no intent ${providerRef}`);
   intent.status = 'succeeded';
+  intent.next_action = null;
 };
 
 beforeAll(async () => {
@@ -104,8 +108,29 @@ beforeAll(async () => {
           if (key) byKey.set(key, id);
         }
         send(200, intents.get(id));
+      } else if (path.endsWith('/confirm')) {
+        // The app's own sheet: confirmed with QPay, and QPay's QR and bank links come back.
+        const intent = intents.get(decodeURIComponent(path.split('/')[2] ?? ''));
+        if (!intent) return send(404, { error: { code: 'not_found' } });
+        if (intent.status !== 'requires_payment_method') return send(400, { error: { code: 'payment_intent_unexpected_state' } });
+        intent.status = 'requires_action';
+        intent.expires_at = Math.floor(clock.now().getTime() / 1000) + 15 * 60;
+        intent.next_action = {
+          type: 'qr',
+          qr: {
+            text: `000201QR${intent.id}`,
+            image_url: 'data:image/png;base64,AAAA',
+            deeplinks: [
+              { name: 'Khan bank', description: 'Хаан банк', logo: 'https://s3.qpay.mn/p/khan.png', link: `khanbank://q?qPay_QRcode=000201QR${intent.id}` },
+              { name: 'Not a bank', description: 'x', logo: 'http://elsewhere.test/x.png', link: 'javascript:alert(1)' },
+            ],
+          },
+        };
+        send(200, intent);
       } else if (path === '/checkout/sessions') {
         const pi = String(body['payment_intent']);
+        // Wire makes no page for an intent already confirmed for the app.
+        if (intents.get(pi)?.status !== 'requires_payment_method') return send(400, { error: { code: 'payment_intent_unexpected_state' } });
         if (typeof body['success_url'] === 'string') returns.set(pi, body['success_url']);
         send(200, { url: `https://pay.wire.test/c/${pi}` });
       } else if (path.endsWith('/cancel')) {
@@ -489,5 +514,73 @@ describe('a wallet top-up paid on Wire’s page', () => {
     paidAtWire('pi_test_3');
     expect((await tick(ctx, { spacingMs: 0 })).topups).toBe(0);
     expect(await balanceOf(guest)).toBe(2_000);
+  });
+});
+
+describe('paid in the app’s own sheet, with no provider page', () => {
+  it('tops a wallet up from QPay’s own QR and bank links, and lands once paid', async () => {
+    const guest = await signIn();
+    const started = await app.inject({ method: 'POST', url: '/v1/wallet/topup', headers: auth(guest), payload: { amount_mnt: 1_000, native: true } });
+    expect(started.statusCode, started.body).toBe(200);
+    const body = started.json();
+    expect(body.action_url).toBeNull();
+    expect(body.qpay.qr).toBe('000201QRpi_test_1');
+    // Only an app's own link, with an https logo: what comes back is opened by the phone.
+    expect(body.qpay.banks).toEqual([
+      { name: 'Khan bank', description: 'Хаан банк', logo: 'https://s3.qpay.mn/p/khan.png', link: 'khanbank://q?qPay_QRcode=000201QRpi_test_1' },
+    ]);
+    expect(Date.parse(body.qpay.expires_at)).toBeGreaterThan(clock.now().getTime());
+    expect(returns.size).toBe(0); // no checkout page was made
+
+    paidAtWire('pi_test_1');
+    expect(await balanceOf(guest)).toBe(1_000);
+  });
+
+  it('buys an идэш from the sheet: the same invoice however often the app asks, bought once paid', async () => {
+    const guest = await signIn();
+    const id = await anOrder(guest);
+    const first = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/pay?native=1`, headers: { ...auth(guest), 'idempotency-key': `pay-${id}` } });
+    expect(first.statusCode, first.body).toBe(202);
+    expect(first.json().invoice.action_url).toBeNull();
+    expect(first.json().invoice.qpay.banks[0].link).toMatch(/^khanbank:\/\//);
+
+    // Reopened: the same invoice, its QR asked of Wire again.
+    const again = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/pay?native=1`, headers: { ...auth(guest), 'idempotency-key': `pay-${id}-2` } });
+    expect(again.statusCode).toBe(202);
+    expect(again.json().invoice.topup_id).toBe(first.json().invoice.topup_id);
+    expect(again.json().invoice.qpay.qr).toBe(first.json().invoice.qpay.qr);
+    expect(intents.size).toBe(1);
+
+    // Asked from a page that only checks: waited on, never let go for being the app's kind.
+    const checked = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/pay?check=1`, headers: auth(guest) });
+    expect(checked.statusCode).toBe(202);
+    expect(intents.get('pi_test_1')!.status).toBe('requires_action');
+
+    paidAtWire('pi_test_1');
+    const paid = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/pay?native=1&check=1`, headers: auth(guest) });
+    expect(paid.statusCode, paid.body).toBe(200);
+    expect(await stateOf(guest, id)).toBe('PAID');
+  });
+
+  it('lets the app’s invoice go when the website pays the same order, and the website’s when the app does', async () => {
+    const guest = await signIn();
+    const id = await anOrder(guest);
+    expect((await app.inject({ method: 'POST', url: `/v1/idesh/${id}/pay?native=1`, headers: { ...auth(guest), 'idempotency-key': 'a1' } })).statusCode).toBe(202);
+
+    // The website cannot show a QR it did not raise: the app's is let go, a page is raised.
+    const web = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/pay`, headers: { ...auth(guest), 'idempotency-key': 'w1' } });
+    expect(web.statusCode, web.body).toBe(202);
+    expect(web.json().invoice.action_url).toMatch(/^https:\/\/pay\.wire\.test\//);
+    expect(intents.get('pi_test_1')!.status).toBe('canceled');
+
+    // And back in the app: the page's invoice is let go, a QR raised.
+    const inApp = await app.inject({ method: 'POST', url: `/v1/idesh/${id}/pay?native=1`, headers: { ...auth(guest), 'idempotency-key': 'a2' } });
+    expect(inApp.statusCode, inApp.body).toBe(202);
+    expect(inApp.json().invoice.qpay.qr).toBe('000201QRpi_test_3');
+    expect(intents.get('pi_test_2')!.status).toBe('canceled');
+
+    paidAtWire('pi_test_3');
+    expect((await app.inject({ method: 'POST', url: `/v1/idesh/${id}/pay?check=1`, headers: auth(guest) })).statusCode).toBe(200);
+    expect(await stateOf(guest, id)).toBe('PAID');
   });
 });

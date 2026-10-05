@@ -1,6 +1,6 @@
 import { getPool, tx } from '../../db/pool.js';
 import { receiptsFor, type IssuedReceipt } from './ebarimt.js';
-import { topupsOpen, type Ctx } from '../../ports.js';
+import { topupsOpen, type Ctx, type QPayInvoice } from '../../ports.js';
 import type { Db } from '../../db/pool.js';
 
 /**
@@ -134,6 +134,8 @@ export interface TopupStarted {
   amountMnt: number;
   /** QPay hands back a deeplink the phone opens; a card flow, a 3DS redirect. */
   actionUrl?: string | undefined;
+  /** Raised natively: the QR and bank apps the app draws itself. */
+  qpay?: QPayInvoice | undefined;
   state: 'pending' | 'settled';
 }
 
@@ -154,6 +156,8 @@ export async function startTopup(
     forSubjectId?: string;
     returnUrl?: string | undefined;
     description?: string | undefined;
+    /** The app draws the invoice itself (`AuthorizeInput.native`). */
+    native?: boolean | undefined;
   },
 ): Promise<TopupStarted> {
   if (!Number.isInteger(input.amountMnt) || input.amountMnt <= 0) {
@@ -184,6 +188,7 @@ export async function startTopup(
       amountMnt: input.amountMnt,
       returnUrl: input.returnUrl,
       description: input.description,
+      native: input.native,
     });
   } catch (error) {
     await getPool().query(`UPDATE ledger.topup SET state = 'failed' WHERE id = $1`, [topupId]);
@@ -196,7 +201,7 @@ export async function startTopup(
     `UPDATE ledger.topup SET provider_ref = $2, action_url = $3 WHERE id = $1`,
     [topupId, intent.providerRef, intent.actionUrl ?? null],
   );
-  return { topupId, amountMnt: input.amountMnt, actionUrl: intent.actionUrl, state: 'pending' };
+  return { topupId, amountMnt: input.amountMnt, actionUrl: intent.actionUrl, qpay: intent.qpay, state: 'pending' };
 }
 
 /** The top-up a provider's callback names, by the reference it gave us. */
@@ -313,21 +318,46 @@ export const INVOICE_LIFETIME_MINUTES = 12;
 
 export interface Invoice {
   topupId: string;
-  /** The provider's page; null for a moment while a second press waits on the first. */
+  /**
+   * The provider's page; null for one the app draws itself, and for a moment
+   * while a second press waits on the first.
+   */
   actionUrl: string | null;
   amountMnt: number;
   createdAt: Date;
+  /** The provider's id for it; null while it is still being raised. */
+  providerRef?: string | null;
+  /** Raised natively: its QR and bank apps, when they are at hand (asked again with `invoiceQpay`). */
+  qpay?: QPayInvoice | null;
 }
 
 /** The open invoice for this purchase, if one is out. */
 export async function pendingInvoice(subject: string, subjectId: string): Promise<Invoice | null> {
-  const { rows } = await getPool().query<{ id: string; action_url: string | null; amount_mnt: string; created_at: Date }>(
-    `SELECT id, action_url, amount_mnt, created_at FROM ledger.topup
+  const { rows } = await getPool().query<{
+    id: string;
+    action_url: string | null;
+    amount_mnt: string;
+    created_at: Date;
+    provider_ref: string | null;
+  }>(
+    `SELECT id, action_url, amount_mnt, created_at, provider_ref FROM ledger.topup
       WHERE for_subject = $1 AND for_subject_id = $2 AND state = 'pending'`,
     [subject, subjectId],
   );
   const r = rows[0];
-  return r ? { topupId: r.id, actionUrl: r.action_url, amountMnt: Number(r.amount_mnt), createdAt: r.created_at } : null;
+  return r
+    ? { topupId: r.id, actionUrl: r.action_url, amountMnt: Number(r.amount_mnt), createdAt: r.created_at, providerRef: r.provider_ref }
+    : null;
+}
+
+/**
+ * An open invoice's QR and bank apps, asked of the provider again: the app reopening a purchase whose
+ * invoice it raised natively. Null when it has none to give (paid, let go, or one with a page instead).
+ */
+export async function invoiceQpay(ctx: Ctx, invoice: Invoice): Promise<QPayInvoice | null> {
+  if (invoice.qpay) return invoice.qpay;
+  if (invoice.actionUrl || !invoice.providerRef || !ctx.payments.qpayOf) return null;
+  return ctx.payments.qpayOf(invoice.providerRef).catch(() => null);
 }
 
 /** Every open invoice for this kind of purchase: what the scheduler finishes or lets go. */
@@ -592,6 +622,12 @@ export async function collectOrInvoice(
     forSubjectId: string;
     returnUrl?: string | undefined;
     description?: string | undefined;
+    /**
+     * The app draws the invoice itself. An open invoice of the other kind — a page raised on the
+     * website, or a native one when the website asks — is let go and the right one raised: neither can
+     * be shown where the other is asked for.
+     */
+    native?: boolean | undefined;
     within?: (db: Db, transferId: string, split: { fromWalletMnt: number; toppedUpMnt: number }) => Promise<void>;
     /**
      * False for a caller that only finishes what the person started (the
@@ -636,7 +672,12 @@ export async function collectOrInvoice(
         // Covered by the wallet by now (a payment that came in late, a top-up): this invoice is not
         // needed — let go at the provider, so it is not paid as well — and the purchase is taken below.
         const covered = (await balance(input.guestId)) >= input.amountMnt;
-        if (!covered && ageMinutes < INVOICE_LIFETIME_MINUTES) return { state: 'awaiting', invoice: open };
+        // Of the kind this caller can show — a page for the website, the QR and bank apps for the app —
+        // or waited on whatever its kind: still being raised (no provider id yet), or asked about by
+        // somebody who only finishes what was started (`raise: false`) and must never let it go.
+        const shown =
+          !open.providerRef || input.raise === false || (input.native === true) === (open.actionUrl === null);
+        if (!covered && shown && ageMinutes < INVOICE_LIFETIME_MINUTES) return { state: 'awaiting', invoice: open };
         // Lapsed unpaid, or not needed: let go, and (if still short) a fresh one below.
         await dropInvoice(ctx, open.topupId);
       } else if (error.code !== 'TOPUP_FAILED') {
@@ -670,10 +711,17 @@ export async function collectOrInvoice(
         forSubjectId: input.forSubjectId,
         returnUrl: input.returnUrl,
         description: input.description,
+        native: input.native,
       });
       return {
         state: 'awaiting',
-        invoice: { topupId: topup.topupId, actionUrl: topup.actionUrl ?? null, amountMnt: topup.amountMnt, createdAt: ctx.clock.now() },
+        invoice: {
+          topupId: topup.topupId,
+          actionUrl: topup.actionUrl ?? null,
+          amountMnt: topup.amountMnt,
+          createdAt: ctx.clock.now(),
+          qpay: topup.qpay ?? null,
+        },
       };
     }
   }

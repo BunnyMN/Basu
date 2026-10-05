@@ -41,6 +41,7 @@ import { addEmailFirst, badRequest, leaveTheDeskFirst, noSuchSession, notFound, 
 import { limits } from './hardening.js';
 import { deskSeatFor, seatedAtTheDesk } from './ops.js';
 import { topupsOpen, type Ctx } from '../ports.js';
+import { shapeQpay } from './shapes.js';
 
 /**
  * The platform's own HTTP surface: who you are, what you have, what you were
@@ -412,7 +413,7 @@ export async function registerPlatformRoutes(
    * decision about this app — a ledger that refused a two million tugrik
    * movement would be a ledger with an opinion about lunch.
    */
-  app.post<{ Body: { amount_mnt?: number } }>(
+  app.post<{ Body: { amount_mnt?: number; native?: boolean } }>(
     '/v1/wallet/topup',
     guarded,
     async (request, reply) => {
@@ -425,11 +426,13 @@ export async function registerPlatformRoutes(
         );
       }
       try {
-        const started = await startTopup(ctx, { guestId: request.guestId!, amountMnt: amount });
+        // `native`: the app pays in its own sheet — QPay's QR and the bank apps, no provider page.
+        const started = await startTopup(ctx, { guestId: request.guestId!, amountMnt: amount, native: request.body?.native === true });
         return {
           topup_id: started.topupId,
           amount_mnt: started.amountMnt,
           action_url: started.actionUrl ?? null,
+          qpay: started.qpay ? shapeQpay(started.qpay) : null,
           state: started.state,
         };
       } catch (error) {

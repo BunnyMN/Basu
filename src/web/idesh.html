@@ -1614,7 +1614,8 @@ async function buyOnce(body) {
     // Paying can lose its answer too. Under the attempt's own key the retry
     // is handed the payment already made, rather than told the order is paid
     // for and left in front of a Pay button for it.
-    const answer = await guestApi(`/v1/idesh/${id}/pay`, { method: 'POST', idempotencyKey: `pay-${current.nonce}` });
+    // In an app that pays natively, QPay's QR and bank apps for its own sheet rather than a page to open.
+    const answer = await guestApi(`/v1/idesh/${id}/pay${shell.pays ? '?native=1' : ''}`, { method: 'POST', idempotencyKey: `pay-${current.nonce}` });
     // Not covered by the wallet: QPay's invoice for it, paid on QPay's own page (202). The order waits as it is.
     if (answer?.state === 'AWAITING_PAYMENT') return { id, what: current.what, invoice: answer.invoice };
   } catch (error) {
@@ -1639,13 +1640,15 @@ async function placeOrder() {
   let paid = false;
   try {
     let bought = await purchase(body);
-    // QPay's invoice, still being raised by a tap a moment earlier: asked again, once it has its page.
-    for (let tries = 0; bought.invoice && !bought.invoice.action_url && tries < 4; tries++) {
+    // QPay's invoice, still being raised by a tap a moment earlier: asked again, once it has its page
+    // (or, in an app that pays natively, its QR).
+    const ready = (invoice) => Boolean(invoice.action_url || invoice.qpay);
+    for (let tries = 0; bought.invoice && !ready(bought.invoice) && tries < 4; tries++) {
       await new Promise((done) => setTimeout(done, 1500));
       bought = await purchase(body);
     }
     if (bought.invoice) {
-      if (!bought.invoice.action_url) throw new Error('QPay-ийн нэхэмжлэл үүсгэж чадсангүй. Дахин оролдоно уу.');
+      if (!ready(bought.invoice)) throw new Error('QPay-ийн нэхэмжлэл үүсгэж чадсангүй. Дахин оролдоно уу.');
       if (!gone) awaitQpay(bought.invoice, body);
       return;
     }
@@ -1678,6 +1681,8 @@ async function placeOrder() {
 /** Bought: the order's own screen in the review's place, as for any purchase. */
 async function boughtNow(bought, body) {
   stopQpay();
+  // The shell's payment sheet, if it is up, has nothing left to pay.
+  shell.paid();
   attempt = null;
   keepAttempt();
   // The card outside the page, on a phone, should say so now.
@@ -1711,6 +1716,9 @@ function awaitQpay(invoice, body) {
   const id = attempt?.order;
   const what = JSON.stringify(body);
   const foot = $('screen-foot');
+  // In an app that pays natively: QPay's QR and bank apps in the shell's own sheet, opened again from
+  // here. Anywhere else: QPay's page.
+  const native = shell.pays && invoice.qpay ? { amount_mnt: invoice.amount_mnt, qpay: invoice.qpay } : null;
   // The amount big, a gold word that it waits, one sentence, and the one crimson way back to QPay.
   foot.replaceChildren(
     el(`<div class="qpay-wait">
@@ -1718,7 +1726,9 @@ function awaitQpay(invoice, body) {
           <b class="amount">${money(invoice.amount_mnt)}</b>
           <p class="why" data-calm role="status">${MARK.info}<span>QPay-ээр <b>${money(invoice.amount_mnt)}</b> төлөөд энд буцаж ирнэ үү — төлбөр орж ирмэгц захиалга тань баталгаажна.</span></p>
           <div class="foot-row">
-            <a class="btn" data-v="primary" id="qpay-open" href="${escapeHtml(invoice.action_url)}">QPay нээх</a>
+            ${native
+              ? '<button class="btn" data-v="primary" type="button" id="qpay-open">QPay нээх</button>'
+              : `<a class="btn" data-v="primary" id="qpay-open" href="${escapeHtml(invoice.action_url)}">QPay нээх</a>`}
             <button class="btn" type="button" id="qpay-check">Төлсөн, шалгах</button>
           </div>
         </div>`),
@@ -1737,13 +1747,14 @@ function awaitQpay(invoice, body) {
       if (answer?.state === 'PAID') return void (await boughtNow({ id, what }, body));
       if (answer?.invoice === null) return void qpayLapsed(body);
       const url = answer?.invoice?.action_url;
-      if (url) $('qpay-open')?.setAttribute('href', url);
+      if (url && !native) $('qpay-open')?.setAttribute('href', url);
     } catch (error) {
       if (qpay && error.code === 'WRONG_STATE') {
         // Not a draft any more: bought another way (QPay's own word to Basu), or given back.
         const order = await guestApi(`/v1/idesh/${id}`).catch(() => null);
         if (order?.paid_at) return void (await boughtNow({ id, what }, body));
         stopQpay();
+        shell.paid();
         attempt = null;
         keepAttempt();
         renderFoot();
@@ -1760,6 +1771,14 @@ function awaitQpay(invoice, body) {
   qpay = { asking: false, timer: setInterval(onShown, 4000), onShown };
   document.addEventListener('visibilitychange', onShown);
   $('qpay-check').addEventListener('click', () => void check());
+  // The shell's sheet asks through the page: «Төлсөн, шалгах» there is this one.
+  globalThis.__basuCheckPay = () => void check();
+  if (native) {
+    $('qpay-open').addEventListener('click', () => shell.pay(native));
+    // The first time without a second tap: the shell's sheet, now.
+    shell.pay(native);
+    return;
+  }
   // The first time without a second tap: QPay's page, now.
   location.href = invoice.action_url;
 }
@@ -1767,6 +1786,7 @@ function awaitQpay(invoice, body) {
 /** QPay's invoice let go unpaid (its page left past its time): the same order, paid with a fresh one on a tap. */
 function qpayLapsed(body) {
   stopQpay();
+  shell.paid();
   const foot = $('screen-foot');
   foot.replaceChildren(
     el(`<div class="qpay-wait">
@@ -1781,6 +1801,7 @@ function stopQpay() {
   if (!qpay) return;
   clearInterval(qpay.timer);
   document.removeEventListener('visibilitychange', qpay.onShown);
+  delete globalThis.__basuCheckPay;
   qpay = null;
 }
 

@@ -71,7 +71,8 @@ import { enqueue } from '../platform/notify/index.js';
 import { LONE_OWNER_PERMISSIONS, grants, headRoles, type Grants } from '../platform/access/index.js';
 import { accessIn, membersOf } from '../platform/org/index.js';
 import { topupsOpen, type Ctx } from '../ports.js';
-import { shapeCertificateFacts, shapeOrder, shapeSettlement, shapeSummary } from './shapes.js';
+import { shapeCertificateFacts, shapeOrder, shapeQpay, shapeSettlement, shapeSummary } from './shapes.js';
+import { invoiceQpay } from '../platform/ledger/index.js';
 import { holds, knownId, need, needAny, UUID } from './guards.js';
 
 /**
@@ -396,7 +397,7 @@ export async function registerIdeshRoutes(
     return reply.send(shapeDetail(detail));
   });
 
-  app.post<{ Params: { id: string }; Querystring: { check?: string } }>('/v1/idesh/:id/pay', guarded, async (request, reply) => {
+  app.post<{ Params: { id: string }; Querystring: { check?: string; native?: string } }>('/v1/idesh/:id/pay', guarded, async (request, reply) => {
     if (!(await ownedByGuest(request.params.id, request.guestId!))) {
       return forbidden(reply, 'not your order');
     }
@@ -407,7 +408,9 @@ export async function registerIdeshRoutes(
       // `?check=1`: a page waiting on QPay asking whether it went through — answered, never a new invoice
       // (its invoice let go is `invoice: null`, and the page offers to pay again).
       const checking = request.query.check === '1';
-      const outcome = await payIdesh(ctx, request.params.id, { returnUrl: back, raise: !checking });
+      // `?native=1`: the app pays in its own sheet — QPay's QR and the bank apps, no provider page.
+      const native = request.query.native === '1';
+      const outcome = await payIdesh(ctx, request.params.id, { returnUrl: back, raise: !checking, native });
       if (outcome.state === 'PAID') return reply.send({ state: 'PAID' });
       if (!outcome.invoice) {
         if (checking) return reply.status(202).send({ state: 'AWAITING_PAYMENT', invoice: null });
@@ -415,12 +418,14 @@ export async function registerIdeshRoutes(
       }
       // Not yet: the guest pays this invoice on the provider's page, and asks again (202: under way, not done —
       // never kept as the answer to the key, so the next ask is answered afresh).
+      const qpay = native ? await invoiceQpay(ctx, outcome.invoice) : null;
       return reply.status(202).send({
         state: 'AWAITING_PAYMENT',
         invoice: {
           topup_id: outcome.invoice.topupId,
           action_url: outcome.invoice.actionUrl,
           amount_mnt: outcome.invoice.amountMnt,
+          qpay: qpay ? shapeQpay(qpay) : null,
         },
       });
     } catch (error) {

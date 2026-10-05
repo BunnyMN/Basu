@@ -15,6 +15,21 @@ export interface PaymentIntent {
   providerRef: string;
   /** QPay hands back a deeplink; a card flow hands back a 3DS redirect. */
   actionUrl?: string;
+  /** Raised for the app to draw itself (`AuthorizeInput.native`): no page to open. */
+  qpay?: QPayInvoice;
+}
+
+/**
+ * A QPay invoice the app draws itself, natively: its QR for paying from
+ * another phone, and the bank apps that pay it with one tap on this one.
+ */
+export interface QPayInvoice {
+  /** The QR's own text: the app draws it, and a bank app reads it. */
+  qr: string;
+  /** Each bank app that pays it — its name, its logo, and the link that opens it on this invoice. */
+  banks: Array<{ name: string; description: string; logo: string; link: string }>;
+  /** When the provider lets it go unpaid; null when it does not say. */
+  expiresAt: Date | null;
 }
 
 export interface PaymentProvider {
@@ -45,6 +60,11 @@ export interface PaymentProvider {
    * is only being told sooner.
    */
   cancel?(providerRef: string): Promise<void>;
+  /**
+   * The QR and bank apps of an invoice raised natively, asked again — the app
+   * reopening the same purchase. Null once it can no longer be paid.
+   */
+  qpayOf?(providerRef: string): Promise<QPayInvoice | null>;
   refund(input: { providerRef: string; amountMnt: number }): Promise<void>;
 }
 
@@ -59,6 +79,11 @@ export interface AuthorizeInput {
   returnUrl?: string | undefined;
   /** What the person sees they are paying for on the provider's page. */
   description?: string | undefined;
+  /**
+   * The app draws the invoice itself — the QR and the bank apps — instead of
+   * opening the provider's page: the payment stays in the app.
+   */
+  native?: boolean | undefined;
 }
 
 /* ── tax ───────────────────────────────────────────────────────────── */
@@ -214,6 +239,15 @@ export class FakePaymentProvider implements PaymentProvider {
  * walked through on a developer's machine. Chosen with FAKE_PAYMENTS=hosted;
  * without it the demo's fake pays on the spot, as it always has.
  */
+/** The demo's natively drawn invoice: a QR that says what it is, and one «bank» that is the demo's own. */
+function demoQpay(providerRef: string): QPayInvoice {
+  return {
+    qr: `BASU-DEMO:${providerRef}`,
+    banks: [{ name: 'Demo', description: 'Туршилтын банк', logo: '', link: `basu-demo://pay/${encodeURIComponent(providerRef)}` }],
+    expiresAt: null,
+  };
+}
+
 export class HostedFakePaymentProvider extends FakePaymentProvider {
   /** Paid on the demo's page: providerRef → when. */
   readonly paidAt = new Map<string, Date>();
@@ -224,7 +258,13 @@ export class HostedFakePaymentProvider extends FakePaymentProvider {
   override async authorize(input: AuthorizeInput): Promise<PaymentIntent> {
     const intent = await super.authorize(input);
     if (input.returnUrl) this.returns.set(intent.providerRef, input.returnUrl);
+    // The app's own sheet: the demo's QR, and its one «bank», paid on /dev/pay/<ref>/paid.
+    if (input.native) return { providerRef: intent.providerRef, qpay: demoQpay(intent.providerRef) };
     return { providerRef: intent.providerRef, actionUrl: `/dev/pay/${encodeURIComponent(intent.providerRef)}` };
+  }
+
+  async qpayOf(providerRef: string): Promise<QPayInvoice | null> {
+    return this.paidAt.has(providerRef) || this.cancelled.has(providerRef) ? null : demoQpay(providerRef);
   }
 
   async paid(providerRef: string): Promise<boolean> {

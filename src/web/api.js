@@ -153,6 +153,26 @@ export const shell = {
   ordersChanged() {
     shell.post({ type: 'orders' });
   },
+
+  /**
+   * Whether the shell pays in a sheet of its own — QPay's QR and the bank
+   * apps, natively, with no provider page. A build that can says so before
+   * the page runs (`__basuPays`); the builds already on phones cannot, and
+   * keep opening QPay's page.
+   */
+  get pays() {
+    return shell.present && globalThis.__basuPays === true;
+  },
+
+  /** QPay's invoice (`{ amount_mnt, qpay }`), paid in the shell's sheet. */
+  pay(invoice) {
+    shell.post({ type: 'pay', invoice });
+  },
+
+  /** What the sheet was paying is settled — bought, let go or given back: the sheet closes. */
+  paid() {
+    shell.post({ type: 'paid' });
+  },
 };
 
 // Pages style the seam with one class: inside the shell the way back sits
