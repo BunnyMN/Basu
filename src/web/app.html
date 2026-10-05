@@ -10,8 +10,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 }
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#F4F3EE" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0F1110" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#100D0C">
 <title>Basu · Миний апп</title>
 <link rel="icon" href="/brand/favicon.png">
 <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
@@ -19,104 +18,150 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 <style>
 /* The home screen. Basu is one app with several things inside it, and this is
    the page that says which ones exist. It owns no domain logic: everything
-   here is a name, an icon and a link — plus whatever of the guest's is
+   here is a name, its art and a link — plus whatever of the guest's is
    currently running, because a launcher that cannot tell you your lunch is on
    the fire is just a menu of links.
 
-   Layout only. Faces, colours, radii, rows, chips and the section label all
-   come from app.css; the one component drawn here is the launcher tile,
-   which no other page has. */
+   «Тансаг хар»: a greeting in the display face, Идэш as the one big tile
+   (the season is winter meat), the other apps as smaller tiles under it, and
+   each order that is running as one card: what it is, its state in one word
+   with the four-bar meter under it, and its day big in the corner with a
+   gold word under that. Colours, faces, the meter and the state words come
+   from app.css; the tiles and the order card are drawn here, as no other page
+   has them. */
 
 /* ── the column ───────────────────────────────────────────────────── */
-/* One 560 column on the ground. The page is a flex column so the footer
-   rests at the foot of the screen when the content is shorter than it. */
+/* One phone column on the charcoal. A flex column, so the foot rests at the
+   bottom of a short screen. The shell runs the page edge to edge: the top
+   inset is the status bar's. */
 main.wrap{
   display:flex;flex-direction:column;min-height:100dvh;
-  padding-top:calc(var(--s-5) + var(--safe-t));
+  padding:calc(var(--safe-t) + 20px) 16px calc(16px + var(--safe-b));
 }
 
-/* ── the brand line ───────────────────────────────────────────────── */
-/* The city is the wordmark's own small: app.css sets its face and its 10px offset. */
-.wordmark{margin:0 0 var(--s-2)}
-.hello{margin:0;font-size:var(--t-body-lg);line-height:var(--lh-body);color:var(--ink-2)}
-/* The greeting is for a stranger; a guest with something running sees that
-   instead — and does not see it flash while their rows are on the way. */
-main:has(.live[data-any]) .hello,main:has(.live[data-loading]) .hello{display:none}
+/* ── the greeting ─────────────────────────────────────────────────── */
+.hello-head{padding:0 4px}
+.today{margin:0 0 10px;font-size:.875rem;font-weight:600;line-height:1.2;color:var(--ink-3)}
+.today:empty{display:none}
+.hello{margin:0;font-family:var(--display);font-size:2.75rem;font-weight:800;line-height:.9;letter-spacing:-.004em;color:var(--ink)}
+
+/* ── the apps ─────────────────────────────────────────────────────── */
+/* Each app is a tile of warm charcoal with its own art in a porcelain square
+   — the same renders the iPhone launcher shows, never redrawn. Идэш is the
+   big one; the rest stand two to a row, and one left alone takes the row as
+   a wide tile with its art beside its name. */
+.apps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:26px 0 0;padding:0;list-style:none}
+.apps > li{display:block;min-width:0;margin:0}
+.apps > li[data-big]{grid-column:1 / -1}
+.app{
+  position:relative;display:block;height:190px;padding:18px;overflow:hidden;
+  border-radius:var(--r-lg);border:1px solid rgba(255,244,236,.06);
+  background:linear-gradient(160deg,#2A2321 0%,#1D1817 60%);box-shadow:var(--shadow-1);
+  color:var(--ink);text-decoration:none;
+  transition:transform 120ms var(--ease),border-color var(--dur) var(--ease);
+}
+.app:active{transform:scale(.985)}
+@media (hover:hover){.app:hover{border-color:rgba(255,244,236,.14)}}
+.app .tile{
+  display:block;width:72px;height:72px;overflow:hidden;border-radius:18px;background:var(--surface-2);
+  box-shadow:0 14px 28px -12px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.06);
+}
+.app .tile > img{display:block;width:100%;height:100%;object-fit:cover}
+.app .name{position:absolute;left:16px;right:16px;bottom:42px;font-family:var(--display);font-size:1.75rem;font-weight:800;line-height:.9;letter-spacing:-.004em}
+.app .tag{position:absolute;left:16px;right:12px;bottom:18px;font-size:.8125rem;font-weight:600;line-height:1.1;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.app .go{position:absolute;right:16px;top:16px;width:20px;height:20px;fill:none;stroke:var(--ink-3);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.app .over{display:none}
+
+/* the big one: the season's eyebrow in gold, its name huge, its art large on the right */
+.app[data-size="lg"]{height:204px;padding:26px 24px}
+.app[data-size="lg"] .over{display:block;margin:0;font-size:.75rem;font-weight:700;line-height:1;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
+.app[data-size="lg"] .name{position:static;display:block;margin-top:8px;font-size:4rem;line-height:.86}
+.app[data-size="lg"] .tag{position:static;display:block;max-width:170px;margin-top:12px;font-size:.9375rem;line-height:1.35;white-space:normal}
+.app[data-size="lg"] .tile{position:absolute;right:22px;top:50%;width:132px;height:132px;margin-top:-66px;border-radius:30px}
+.app[data-size="lg"] .go{display:none}
+
+/* one small app alone in its row: wide and short, its art beside its name */
+.apps > li[data-big] + li:last-child{grid-column:1 / -1}
+.apps > li[data-big] + li:last-child .app{display:grid;grid-template-columns:72px minmax(0,1fr);column-gap:16px;align-content:center;height:auto;min-height:108px}
+.apps > li[data-big] + li:last-child .tile{grid-row:1 / span 2}
+.apps > li[data-big] + li:last-child .name{position:static;align-self:end;padding-right:28px}
+.apps > li[data-big] + li:last-child .tag{position:static;align-self:start;margin-top:8px}
+.apps > li[data-big] + li:last-child .go{top:50%;margin-top:-10px}
 
 /* ── what of the guest's is running ───────────────────────────────── */
-.live{margin-top:var(--s-6)}
+.live{margin-top:30px}
 .live:not([data-any]){display:none}
-/* A token means rows are coming: hold their place instead of letting the grid jump. */
+/* A token means cards are coming: hold their place instead of letting the page jump. */
 .live[data-loading]{display:block}
-/* Rows are hairline-separated (5.3). app.css's row reset outranks its own
-   separator rule for now, so the page draws the line until app.css does. */
-#live-list > .row + .row{border-top:1px solid var(--line)}
-/* The tone dot belongs to the name, not to the middle of a three-line row:
-   it sits on the title's first line, centred in that line box. */
-#live-list{--dot-top:calc((var(--t-row) * var(--lh-snug) - 6px) / 2)}
-#live-list > .row > .lead{align-self:flex-start;margin-top:var(--dot-top)}
-/* The skeleton copies the row it stands in for: dot at the head, three lines
-   (name, what, meta), a corner block the height of the mono value + label. */
-#live-list .skel-row{min-height:85px;padding:12px 16px}
-#live-list .skel-row::before{content:"";flex:none;width:6px;height:6px;border-radius:50%;background:var(--line-2);align-self:flex-start;margin-top:var(--dot-top)}
-#live-list .skel-row > .skel-lines{gap:8px}
-#live-list .skel-row .skel-lines .skel{min-height:0;height:14px;width:60%}
-#live-list .skel-row .skel-lines .skel:nth-child(2){height:12px;width:80%}
-#live-list .skel-row .skel-lines .skel:nth-child(3){height:10px;width:35%}
-#live-list .skel-row > .skel:last-child{width:56px;height:38px}
-
-/* ── the grid of apps ─────────────────────────────────────────────── */
-.apps{
-  display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));
-  gap:10px 14px;margin:0 0 var(--s-7);padding:0;list-style:none;
+.live .section-label{margin:0 4px 12px}
+#live-list{display:flex;flex-direction:column;gap:10px}
+/* One card per order: the picture, what it is, its word and its meter, and
+   its day big in the corner with a gold word under it. */
+.oc{
+  display:flex;align-items:stretch;gap:14px;min-height:94px;padding:14px;
+  border-radius:var(--r-md);color:inherit;text-decoration:none;
+  transition:background-color 120ms var(--ease),transform 120ms var(--ease);
 }
-.app{display:block;color:inherit;text-decoration:none;text-align:center;border-radius:var(--r-lg)}
-.app .tile{
-  width:92px;height:92px;margin:0 auto;display:grid;place-items:center;
-  border-radius:var(--r-lg);background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);
-  transition:transform 120ms var(--ease),border-color var(--dur),background var(--dur);
-}
-.app .tile svg{width:34px;height:34px;fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-/* A tile with art is the art, edge to edge — the render the iPhone launcher shows. */
-.app .tile:has(> img){padding:0;overflow:hidden;background:none}
-.app .tile > img{width:100%;height:100%;display:block;object-fit:cover}
-@media (hover:hover){.app:hover .tile{border-color:var(--line-2);background:var(--surface-2)}}
-.app:active .tile{transform:scale(.97)}
-.app .name{display:block;margin-top:var(--s-2);font-size:var(--t-cap);font-weight:600;line-height:1.3;color:var(--ink)}
-/* the tag is two words of sans, never mono Cyrillic (2.2) */
-.app .tag{display:block;margin-top:2px;font-size:var(--t-pill);line-height:1.35;color:var(--ink-3)}
-/* On the fire is honey, as its chip is (app.css has route, hold, accent, ready, stop). */
-.dot[data-tone="hi"]{background:var(--hi)}
+.oc:active{background:var(--surface-2)}
+@media (hover:hover){a.oc:hover{background:var(--surface-2)}}
+.oc .ph{flex:none;align-self:center;width:64px;height:64px;overflow:hidden;border-radius:14px;background:var(--surface-2)}
+.oc .ph img{display:block;width:100%;height:100%;object-fit:cover;filter:sepia(.1) saturate(1.12) contrast(1.08)}
+.oc .main{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+/* the name on one line, or two when it is long — its count is never cut off */
+.oc .title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:1.0625rem;font-weight:700;line-height:1.2;color:var(--ink);overflow-wrap:anywhere}
+/* the state is one word, no dot: the meter under it says how far */
+.oc .st{display:block;margin-top:6px;line-height:1.2}
+#live-list .chip{min-height:0;font-size:.875rem;font-weight:600;color:var(--ink-2)}
+#live-list .chip::before{display:none}
+/* a word that waits on the guest (an account for a refund) or a refund sent says it in its colour */
+#live-list .chip[data-strong]{color:var(--tone-ink)}
+#live-list .chip[data-tone="hold"]:not([data-strong]){color:var(--gold)}
+.oc .meter{margin-top:10px;min-width:0}
+/* the corner is one width on every card, so the dividing hairlines stand in one column; a sum takes what it needs */
+.oc .end{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;width:84px;padding-left:12px;border-left:1px solid var(--line)}
+.oc .end:has(> [data-money]){width:auto;min-width:84px}
+.oc .end:empty{display:none}
+.oc .when{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.oc .when b{display:block;font-family:var(--display);font-size:2rem;font-weight:800;line-height:.9;letter-spacing:-.004em;font-variant-numeric:tabular-nums lining-nums;color:var(--ink);white-space:nowrap}
+.oc .when[data-money] b{font-size:1.375rem;line-height:1}
+.oc .when b .money{font-weight:inherit;letter-spacing:inherit}
+.oc .when small{display:block;font-size:.6875rem;font-weight:800;line-height:1;letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+/* the shape of a card while the orders are on their way */
+.oc[data-skel]{border:1px solid var(--line);background:var(--surface)}
+.oc[data-skel] .ph{background:var(--surface-2)}
+.oc[data-skel] .main{gap:10px}
+.oc[data-skel] .main .skel{height:14px;min-height:0;width:62%}
+.oc[data-skel] .main .skel + .skel{height:12px;width:40%}
+.oc[data-skel] .main .skel + .skel + .skel{height:4px;width:100%;border-radius:2px}
+.oc[data-skel] .end .skel{width:44px;height:30px}
 
 /* ── the quiet bottom of the page ─────────────────────────────────── */
 .foot{
-  margin-top:auto;display:flex;flex-wrap:wrap;align-items:center;gap:0 var(--s-5);
-  border-top:1px solid var(--line);
+  margin-top:auto;padding-top:36px;display:flex;flex-wrap:wrap;align-items:center;gap:0 var(--s-6);
 }
-.foot a{display:inline-flex;align-items:center;min-height:var(--target);font-size:var(--t-cap);font-weight:500;color:var(--ink-2)}
+.foot a{display:inline-flex;align-items:center;min-height:var(--target);padding:0 4px;font-size:var(--t-cap);font-weight:600;color:var(--ink-3)}
 @media (hover:hover){.foot a:hover{color:var(--ink)}}
 /* The kitchen display is a staff door: it shows only where the demo strip does. */
-.foot .staff{display:none;color:var(--ink-3)}
+.foot .staff{display:none}
 .clockbar ~ .wrap .staff{display:inline-flex}
 </style>
 </head>
 <body>
 
 <main class="wrap">
-  <h1 class="wordmark">Basu<small>Улаанбаатар</small></h1>
-  <p class="hello" id="hello">Өнөөдөр юу хийх вэ?</p>
+  <header class="hello-head">
+    <p class="today" id="today"></p>
+    <h1 class="hello" id="hello">Сайн байна уу</h1>
+  </header>
 
-  <section class="live" id="live">
-    <div id="live-list" data-rows aria-busy="true">
-      <h2 class="section-label">Идэвхтэй</h2>
-      <div class="skel-row" aria-hidden="true"><span class="skel-lines"><span class="skel"></span><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></div>
-      <div class="skel-row" aria-hidden="true"><span class="skel-lines"><span class="skel"></span><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></div>
-      <div class="skel-row" aria-hidden="true"><span class="skel-lines"><span class="skel"></span><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></div>
+  <ul class="apps" id="apps" aria-label="Аппууд"></ul>
+
+  <section class="live" id="live" aria-labelledby="live-title">
+    <h2 class="section-label" id="live-title">Идэвхтэй захиалга</h2>
+    <div id="live-list" aria-busy="true">
+      <div class="oc" data-skel aria-hidden="true"><span class="ph skel"></span><span class="main"><span class="skel"></span><span class="skel"></span><span class="skel"></span></span><span class="end"><span class="skel"></span></span></div>
     </div>
   </section>
-
-  <h2 class="section-label">Аппууд</h2>
-  <ul class="apps" id="apps"></ul>
 
   <footer class="foot">
     <a href="/terms">Үйлчилгээний нөхцөл</a>
@@ -126,7 +171,7 @@ main:has(.live[data-any]) .hello,main:has(.live[data-loading]) .hello{display:no
 </main>
 
 <script type="module">
-import { api, store, hhmm, mountClock, money, HEADLINE, IDESH_HEADLINE, IDESH_STATE, headlineWord, dayShort, ubParts } from '/api.js';
+import { api, store, hhmm, mountClock, money, meter, IDESH_STATE, IDESH_STEP, headlineWord, dayLabel, dayShort, ubParts } from '/api.js';
 
 /** Text into markup, never the other way: a supplier's name is a name. Quotes too, so nothing inside an attribute can end it. */
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -138,29 +183,54 @@ const el = (html) => {
   return t.content.firstElementChild;
 };
 
+/* ── the greeting ─────────────────────────────────────────────────── */
+
+/** The days of the week as a calendar says them, Sunday first (getUTCDay). */
+const WEEKDAY = ['Ням', 'Даваа', 'Мягмар', 'Лхагва', 'Пүрэв', 'Баасан', 'Бямба'];
+
+/**
+ * «Мягмар, 10-р сарын 13» over «Өглөөний мэнд» — today and the time of day
+ * as Ulaanbaatar has them, whatever zone the phone is set to.
+ */
+function greet() {
+  const { day, clock } = ubParts();
+  const hour = Number(clock.slice(0, 2));
+  $('today').textContent = `${WEEKDAY[new Date(`${day}T12:00:00Z`).getUTCDay()]}, ${dayLabel(day)}`;
+  $('hello').textContent = hour >= 5 && hour < 12 ? 'Өглөөний мэнд' : hour >= 12 && hour < 18 ? 'Өдрийн мэнд' : 'Оройн мэнд';
+}
+greet();
+
+/* ── the apps ─────────────────────────────────────────────────────── */
+
+/** The arrow in a small tile's corner: the tile is a way in. */
+const GO = '<svg class="go" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+
 /**
  * Everything inside Basu, in the order it appears on the home screen.
  *
  * A list rather than markup because this is the file that will grow: the
- * second app is a new entry here and nothing else. Icons are inline so a
- * launcher never waits on a network round trip to draw itself.
+ * next app is a new entry here and nothing else. Every tile is the app's own
+ * art — the render the iPhone launcher shows — sized in the markup, so the
+ * grid never jumps while it loads. Идэш is the big one: it is the season.
  */
 const APPS = [
   {
-    id: 'dine',
-    name: 'Хоол',
-    tag: 'урьдчилсан',
-    href: '/dine',
-    // The cloche on a waiter's hand: the same render the iPhone launcher shows.
-    icon: '<img src="/brand/food-tile.webp" alt="" width="92" height="92">',
-  },
-  {
     id: 'idesh',
     name: 'Идэш',
-    tag: 'өвлийн',
+    over: 'Энэ улирал',
+    tag: 'Бүтэн мал, кг-аар мах',
     href: '/idesh',
-    // A box of cuts beside a phone: the iPhone launcher's render too.
-    icon: '<img src="/brand/idesh-tile.webp" alt="" width="92" height="92">',
+    size: 'lg',
+    // A box of cuts beside a phone.
+    art: '/brand/idesh-tile.webp',
+  },
+  {
+    id: 'dine',
+    name: 'Хоол',
+    tag: 'Урьдчилан захиалах',
+    href: '/dine',
+    // The cloche on a waiter's hand.
+    art: '/brand/food-tile.webp',
   },
 ];
 
@@ -168,19 +238,22 @@ const APPS = [
 const SUPPLIER_APP = {
   id: 'supplier',
   name: 'Нийлүүлэгч',
-  tag: 'миний зар',
+  tag: 'Зараа удирдах',
   href: '/supplier',
   // A ger with a sheep by its door: where the meat comes from.
-  icon: '<img src="/brand/supplier-tile.svg" alt="" width="92" height="92">',
+  art: '/brand/supplier-tile.svg',
 };
 
 function tileOf(app) {
+  const big = app.size === 'lg';
   return el(`
-    <li>
-      <a class="app" href="${app.href}" data-app="${app.id}">
-        <span class="tile">${app.icon}</span>
+    <li${big ? ' data-big' : ''}>
+      <a class="app" href="${app.href}" data-app="${app.id}"${big ? ' data-size="lg"' : ''}>
+        <span class="tile"><img src="${app.art}" alt="" width="${big ? 132 : 72}" height="${big ? 132 : 72}"></span>
+        ${app.over ? `<span class="over">${app.over}</span>` : ''}
         <span class="name">${app.name}</span>
         <span class="tag">${app.tag}</span>
+        ${big ? '' : GO}
       </a>
     </li>`);
 }
@@ -226,54 +299,43 @@ function moment(order) {
   return [hhmm(order.slot_starts_at), 'ирэх'];
 }
 
-const SUB = {
-  SCHEDULED: 'Энэ цагт гал дээр гарна',
-  ARMED: 'Та замд гарсан уу?',
-  COOKING: 'Хоол хийгдэж байна',
-};
+/**
+ * How far a lunch has come, on the same four bars as an идэш: paid, taken by
+ * the kitchen, on the fire, ready. A lunch that ended badly has no meter: its
+ * word says it.
+ */
+const LUNCH_STEP = { PLACED: 1, ACCEPTED: 2, SCHEDULED: 2, ARMED: 2, RESLOTTED: 2, HELD: 2, FIRED: 3, COOKING: 3, READY: 4, SERVED: 4, CLOSED: 4 };
+
+/** The picture on a card: the animal's own photo for an идэш, a steamer of buuz for a lunch. */
+const PHOTO = (kind) => `/idesh/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}.jpg`;
+const LUNCH_PHOTO = '/brand/meat/buuz-828.webp';
 
 /*
- * The chip's word is the state's one word, the same as on every other page:
+ * The card's word is the state's one word, the same as on every other page:
  * a lunch's from headlineWord() (LUNCH_WORD — «Хүлээн авсан», never
- * «SCHEDULED»), an идэш's from IDESH_STATE («Цуцлагдсан», where the line
- * under the name keeps the sentence: «Мөнгө буцаагдана»).
+ * «SCHEDULED»), an идэш's from IDESH_STATE («Бэлтгэж байна»); the meter under
+ * it says how far along that is.
  */
 
 /**
- * The colour of the dot at the head of a row: what the order is waiting on.
- * route — the system or the other side; hold — the guest; honey — on the
- * fire, as its chip is; ready — done; stop — needs a person now. A finished
- * negative outcome (cancelled, refunded) is neutral, not an alarm.
- */
-const TONE = {
-  PLACED: 'route', ACCEPTED: 'route', SCHEDULED: 'route', PAID: 'route', DISPATCHED: 'route',
-  ARMED: 'hold', DRAFT: 'hold', RESLOTTED: 'hold',
-  FIRED: 'hi', COOKING: 'hi', PREPARING: 'hi',
-  READY: 'ready', SERVED: 'ready', CLOSED: 'ready', HANDED: 'ready',
-  HELD: 'stop',
-};
-
-/**
- * One row of ИДЭВХТЭЙ, whichever app it came from.
+ * One card of «Идэвхтэй захиалга», whichever app it came from.
  *
- * The section is deliberately not "your lunches": rows are ordered by the
+ * The section is deliberately not "your lunches": cards are ordered by the
  * moment that matters, so a sheep arriving Tuesday sits under today's lunch
  * and above nothing else. Each vertical maps into this shape and the section
  * does not know the difference.
  */
 function dineRow(order) {
-  const word = headlineWord(order.state);
-  const cap = HEADLINE[order.state]?.[1] ?? '';
   const [time, label] = moment(order);
   return {
     at: new Date(order.ready_at ?? order.fire_at ?? order.slot_starts_at),
     href: `/dine?order=${order.id}`,
     source: 'Хоол',
+    photo: LUNCH_PHOTO,
     title: order.restaurant.name,
-    what: SUB[order.state] ?? cap ?? '',
-    code: order.code,
     state: order.state,
-    word,
+    word: headlineWord(order.state),
+    step: LUNCH_STEP[order.state],
     time,
     label,
   };
@@ -290,45 +352,41 @@ const IDESH_PAST = ['HANDED', 'CLOSED', 'CANCELLED', 'REFUNDED'];
 const REFUND_WORD = {
   needs_account: ['Данс оруулна уу', ' data-tone="hold" data-strong'],
   due: ['Буцаалт хүлээгдэж байна', ' data-tone="route"'],
-  paid: [IDESH_STATE.REFUNDED, ''],
+  paid: [IDESH_STATE.REFUNDED, ' data-tone="hold"'],
 };
 
 /**
- * `seen` is the order itself, for one past its day (loadLive): its row says
+ * `seen` is the order itself, for one past its day (loadLive): its card says
  * what became of it — a cancelled one what its money waits for and how much
  * comes back, a handed-over one the day it was received — never the day it
  * was coming.
  */
 function ideshRow(order, seen) {
-  const word = IDESH_STATE[order.state] ?? '';
-  const cap = IDESH_HEADLINE[order.state]?.[1] ?? '';
   const delivery = order.receive === 'delivery';
   const row = {
     // Noon on the day, in the restaurant's zone: a day, not an instant.
     at: new Date(`${order.receive_on}T12:00:00+08:00`),
     href: `/idesh?order=${order.id}`,
     source: 'Идэш',
-    title: order.supplier.name,
-    what: `${esc(order.title)} ×${order.qty} · ${cap}`,
-    code: order.code,
+    photo: PHOTO(order.kind),
+    title: `${order.title} ×${order.qty}`,
     state: order.state,
-    word,
+    word: IDESH_STATE[order.state] ?? '',
+    step: IDESH_STEP[order.state],
     time: dayShort(order.receive_on),
     label: delivery ? 'ирэх' : 'авах',
   };
   if (order.state === 'CANCELLED' || order.state === 'REFUNDED') {
-    // Still here for its refund, not for a day: the chip says what the money waits for, the corner how much it is.
+    // Still here for its refund, not for a day: the word says what the money waits for, the corner how much it is.
     const refund = seen?.refund?.state ?? (order.state === 'REFUNDED' ? 'paid' : 'due');
     const amount = seen?.refund?.amount_mnt ?? seen?.refund_mnt ?? null;
     [row.word, row.tone] = REFUND_WORD[refund] ?? REFUND_WORD.due;
-    // The dot says whom it waits on, as for every row: the guest's account, or Basu's transfer.
-    row.dot = { needs_account: 'hold', due: 'route' }[refund];
-    if (order.state === 'CANCELLED') row.what = `${esc(order.title)} ×${order.qty} · ${IDESH_STATE.CANCELLED}`;
-    row.corner = `<span class="when val">${amount === null ? '—' : money(amount)}<small>${refund === 'paid' ? 'буцаасан' : 'буцаалт'}</small></span>`;
+    row.step = 0;
+    row.corner = `<span class="when" data-money><b>${amount === null ? '—' : money(amount)}</b><small>${refund === 'paid' ? 'буцаасан' : 'буцаалт'}</small></span>`;
   } else if (IDESH_PAST.includes(order.state)) {
     // Received: the day it was, or no day rather than a wrong one.
     const at = seen?.handed_at;
-    row.corner = at ? `<span class="when val" data-size="lg">${dayShort(ubParts(at).day)}<small>${delivery ? 'ирсэн' : 'авсан'}</small></span>` : '';
+    row.corner = at ? `<span class="when"><b>${dayShort(ubParts(at).day)}</b><small>${delivery ? 'ирсэн' : 'авсан'}</small></span>` : '';
   }
   return row;
 }
@@ -377,6 +435,7 @@ async function lookAfter(o, token) {
 addEventListener('pageshow', (e) => {
   if (!e.persisted) return;
   afterLooks.clear();
+  greet();
   void loadLive();
 });
 
@@ -406,29 +465,27 @@ async function loadLive() {
   paint(rows);
 }
 
-/** One row of ИДЭВХТЭЙ as markup: all it says is in here, so the same markup is the same row. */
+/** One card as markup: all it says is in here, so the same markup is the same card. */
 function liveRow(row) {
   return `
-      <a class="card row" href="${row.href}" data-source="${row.source}" data-chev>
-        <span class="lead"><span class="dot" data-tone="${row.dot ?? TONE[row.state] ?? 'neutral'}"></span></span>
-        <span class="who main">
-          <span class="venue title">${esc(row.title)}</span>
-          <span class="what sub">${row.what}</span>
-          <span class="code meta">${row.source} · №${esc(row.code)}${row.word ? `<span class="chip"${row.tone ?? ` data-s="${esc(row.state)}"`} data-inline>${esc(row.word)}</span>` : ''}</span>
+      <a class="card oc" href="${row.href}" data-source="${row.source}">
+        <span class="ph"><img src="${row.photo}" alt="" width="64" height="64" loading="lazy"></span>
+        <span class="main">
+          <span class="title">${esc(row.title)}</span>
+          ${row.word ? `<span class="st"><span class="chip"${row.tone ?? ` data-s="${esc(row.state)}"`}>${esc(row.word)}</span></span>` : ''}
+          ${row.step ? meter(row.step) : ''}
         </span>
-        <span class="end">${row.corner ?? `<span class="when val" data-size="lg">${esc(row.time)}<small>${row.label}</small></span>`}</span>
+        <span class="end">${row.corner ?? `<span class="when"><b>${esc(row.time)}</b><small>${row.label}</small></span>`}</span>
       </a>`;
 }
 
-/** ИДЭВХТЭЙ as it stands on the screen: the order's link → { node, html }, the row and the markup it was drawn from. */
+/** «Идэвхтэй захиалга» as it stands on the screen: the order's link → { node, html }, the card and the markup it was drawn from. */
 const liveDrawn = new Map();
 
 function paint(rows) {
   const list = $('live-list');
-  // The section label is the list's own first row: it survives every repaint,
-  // and the skeleton under it does not. Each order is its link: one per order, and a lunch's never an идэш's.
-  const label = list.querySelector('.section-label');
-  drawRows(list, liveDrawn, rows.map((row) => [row.href, liveRow(row)]), null, label);
+  // Each order is its link: one card per order, and a lunch's never an идэш's.
+  drawRows(list, liveDrawn, rows.map((row) => [row.href, liveRow(row)]));
   list.removeAttribute('aria-busy');
   delete $('live').dataset.loading;
   if (!rows.length) $('live').removeAttribute('data-any');
@@ -436,16 +493,16 @@ function paint(rows) {
 }
 
 /**
- * Rows drawn over the rows already on the screen, matched by key — the list
+ * Cards drawn over the cards already on the screen, matched by key — the list
  * is asked for every 4 seconds, and the answer is nearly always the one
- * already drawn. A row whose markup is the same is not touched; a row whose
- * words moved on keeps its element and gets new insides; only a row that
+ * already drawn. A card whose markup is the same is not touched; a card whose
+ * words moved on keeps its element and gets new insides; only a card that
  * came or went is added or taken out. Drawn afresh every tick, the focus fell
  * to the page and VoiceOver went back to the top every 4 seconds. Now it
- * stays on its row; and if that row had to move, it is given the focus again,
- * without a scroll — or, with its order gone, the row now in its place.
- * `wire` readies a row that is new to the list; `drawn` is the list's memory;
- * the rows go after `after` (the section label) and anything below them goes.
+ * stays on its card; and if that card had to move, it is given the focus
+ * again, without a scroll — or, with its order gone, the card now in its place.
+ * `wire` readies a card that is new to the list; `drawn` is the list's memory;
+ * the cards go after `after` when there is one, and anything below them goes.
  */
 function drawRows(list, drawn, rows, wire, after = null) {
   const keys = [...drawn.keys()];
@@ -466,15 +523,15 @@ function drawRows(list, drawn, rows, wire, after = null) {
       next.set(key, { node: fresh, html });
     }
   }
-  // Rows that went, out first: a row that stays is then never moved past them.
+  // Cards that went, out first: a card that stays is then never moved past them.
   for (const [key, { node }] of drawn) if (next.get(key)?.node !== node) node.remove();
-  // In order; a row already in its place stays where it is.
+  // In order; a card already in its place stays where it is.
   let at = after ? after.nextElementSibling : list.firstElementChild;
   for (const { node } of next.values()) {
     if (node === at) at = at.nextElementSibling;
     else list.insertBefore(node, at);
   }
-  // Anything else under the rows (the skeleton) has had its turn.
+  // Anything else under the cards (the skeleton) has had its turn.
   while (at) {
     const extra = at;
     at = at.nextElementSibling;
@@ -489,14 +546,14 @@ function drawRows(list, drawn, rows, wire, after = null) {
 
 /* ── boot ─────────────────────────────────────────────────────────── */
 
-// A guest with a token has rows on the way: show the skeleton, not a jump.
+// A guest with a token has cards on the way: show the skeleton, not a jump.
 if (store.guestToken) $('live').dataset.loading = '';
 mountClock(() => void loadLive());
 void loadLive();
 
 /**
  * The kitchen accepts and fires without anybody touching this page, so the
- * strip has to keep asking. It stops when the page is hidden and when it goes
+ * list has to keep asking. It stops when the page is hidden and when it goes
  * away — a launcher left open in a background tab should cost nothing.
  */
 const poll = setInterval(() => {

@@ -10,14 +10,19 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 }
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F3EE">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0F1110">
+<meta name="theme-color" content="#100D0C">
 <title>Basu — үдийн хоол</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.css" integrity="sha512-KIMsMWIdnoG9OwZa+oaIafmbDonqck1UCmq+/zcUi2aaZ97N9QE6TqpTM+n36EO40HGh64hU/375zxtjx7WTyQ==" crossorigin="anonymous">
 <link rel="stylesheet" href="/app.css">
 <style>
 /* Layout only. Colour, type, radius, buttons, chips, rows, the sheet and the
-   stepper come from /app.css; what is left here is where things sit. */
+   stepper come from /app.css; what is left here is where things sit.
+
+   «Тансаг хар»: the city at night under a glass bar, the restaurants as
+   crimson pins; a restaurant's sheet on the raised charcoal — its name in
+   the display face, today's times as pills, every dish with its picture in a
+   porcelain square and its price in the display face — and what is in the
+   basket as one floating bar with the crimson «Захиалах». */
 html,body{height:100%;overflow:hidden}
 body{display:flex;flex-direction:column}
 
@@ -30,45 +35,40 @@ body{display:flex;flex-direction:column}
 /* The bar floats over the map. Absolute in the map's box rather than fixed
    in the viewport, so the demo clock strip above the map keeps its own row;
    the map fills the rest of the screen, so the two read the same. It owns
-   the top inset: the day the shell draws this page edge to edge, the bar
-   reaches under the status bar and the map runs beneath both. */
+   the top inset: the bar reaches under the status bar and the map runs
+   beneath both. */
 #map > .topbar[data-fixed]{position:absolute;top:0;left:0;right:0}
 #badge span:empty{display:none}
 
 /* Nobody is cooking: said under the bar, over the map. The page's notes are
    a bold line over a sentence with no icon, so they stack. */
-#map > .note{position:absolute;top:calc(var(--bar-h) + var(--safe-t) + 12px);left:12px;right:12px;z-index:5;box-shadow:var(--shadow-float)}
+#map > .note{position:absolute;top:calc(var(--bar-h) + var(--safe-t) + 12px);left:12px;right:12px;z-index:5;box-shadow:var(--shadow-2)}
 .note[data-k]{flex-direction:column;gap:2px}
 
 /* The server could not be reached on a later look: one line under the bar,
    while the map and the order stay as they were. */
 #map > .stale-strip{position:absolute;top:calc(var(--bar-h) + var(--safe-t));left:0;right:0;z-index:6}
 
-/* MapLibre's controls in the system's material, clear of the home indicator. */
+/* MapLibre's controls in the charcoal, clear of the home indicator and of
+   the order's floating bar. */
 #map .maplibregl-ctrl-bottom-right,#map .maplibregl-ctrl-bottom-left{bottom:var(--safe-b)}
 body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-right,
-body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var(--tabbar-h) + var(--safe-b))}
-#map .maplibregl-ctrl-group{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-ctl)}
-#map .maplibregl-ctrl-group:not(:empty){box-shadow:var(--shadow)}
+body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(88px + var(--safe-b))}
+#map .maplibregl-ctrl-group{background:var(--surface-2);border:1px solid var(--line-2);border-radius:var(--r-pill);overflow:hidden}
+#map .maplibregl-ctrl-group:not(:empty){box-shadow:var(--shadow-2)}
 /* every control the thumb's 44 (4.5) */
 #map .maplibregl-ctrl-group button{width:44px;height:44px}
 /* the attribution's «i» keeps its 24px look; the box around it is the 44 a thumb needs */
 #map .maplibregl-ctrl-attrib-button{width:44px;height:44px;top:-10px;right:-10px;background-color:transparent;background-position:center;background-repeat:no-repeat}
-#map .maplibregl-ctrl-group button+button{border-top:1px solid var(--line)}
-#map .maplibregl-ctrl-group button:focus:first-child{border-radius:var(--r-ctl) var(--r-ctl) 0 0}
-#map .maplibregl-ctrl-group button:focus:last-child{border-radius:0 0 var(--r-ctl) var(--r-ctl)}
-#map .maplibregl-ctrl button:not(:disabled):hover,#map .maplibregl-ctrl button:not(:disabled):active{background-color:var(--surface-2)}
+#map .maplibregl-ctrl-group button+button{border-top:1px solid var(--line-2)}
+#map .maplibregl-ctrl-group button:focus{border-radius:var(--r-pill)}
+#map .maplibregl-ctrl button:not(:disabled):hover,#map .maplibregl-ctrl button:not(:disabled):active{background-color:var(--surface-3)}
 #map .maplibregl-ctrl-attrib{background:var(--glass);color:var(--ink-2);font-size:var(--t-eyebrow);border-radius:var(--r-sm)}
-#map .maplibregl-ctrl-attrib.maplibregl-compact{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-pill)}
+#map .maplibregl-ctrl-attrib.maplibregl-compact{background:var(--surface-2);border:1px solid var(--line-2);border-radius:var(--r-pill)}
 #map .maplibregl-ctrl-attrib.maplibregl-compact-show{border-radius:var(--r-sm)}
-#map .maplibregl-ctrl-attrib a{color:var(--accent-ink)}
-/* The map has a night palette of its own now (mapStyle.js), so nothing
-   veils it; only MapLibre's control glyphs, drawn dark, are lifted. Both
-   dark blocks, like app.css, so an explicit theme wins either way. */
-@media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]) #map :is(.maplibregl-ctrl-icon,.maplibregl-ctrl-attrib-button){filter:invert(.88)}
-}
-:root[data-theme="dark"] #map :is(.maplibregl-ctrl-icon,.maplibregl-ctrl-attrib-button){filter:invert(.88)}
+#map .maplibregl-ctrl-attrib a{color:var(--ink-2)}
+/* MapLibre draws its control glyphs dark; on the charcoal they are lifted to the ink. */
+#map :is(.maplibregl-ctrl-icon,.maplibregl-ctrl-attrib-button){filter:invert(.9)}
 /* On a desk the sheet docks on the right; the controls step out from under
    it, and the dock starts below the demo clock strip when there is one. */
 @media (min-width:900px){
@@ -78,130 +78,158 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var
 
 /* ── nothing to show, or no way to ask ───────────────────────────── */
 /* No restaurant, or the server out of reach: one calm block in place of
-   the map — a mark, what happened, the way on. Never a map with nothing
-   of ours on it, and never a dead end. */
+   the map — what happened in a few words, the way on. With no restaurant
+   yet, a steamer of buuz over it, fading into the charcoal. Never a map
+   with nothing of ours on it, and never a dead end. */
 .blank{
-  position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:calc(var(--bar-h) + var(--safe-t) + 24px) var(--gutter) calc(40px + var(--safe-b));
-  text-align:center;background:var(--bg);background-image:var(--ground);background-repeat:no-repeat;background-size:100% 100%;
+  position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;
+  padding:calc(var(--bar-h) + var(--safe-t) + 24px) 24px calc(40px + var(--safe-b));
+  text-align:center;background:var(--bg);
 }
-.blank .plate{width:64px;height:64px;margin:0 0 20px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent-ink)}
+.blank > *{position:relative;z-index:1}
+.blank[data-kind="none"]{justify-content:flex-end}
+.blank[data-kind="none"]::before{
+  content:"";position:absolute;z-index:0;top:0;left:0;right:0;height:62%;
+  background:url("/brand/meat/buuz-828.webp") 50% 40% / cover no-repeat;filter:saturate(1.05) contrast(1.05) brightness(.92);
+  -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.55) 0%,#000 24%,#000 52%,transparent 100%);mask-image:linear-gradient(180deg,rgba(0,0,0,.55) 0%,#000 24%,#000 52%,transparent 100%);
+}
+.blank .plate{width:72px;height:72px;margin:0 0 22px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);border:1px solid var(--line-2);color:var(--ink-2);box-shadow:var(--shadow-1)}
+.blank[data-kind="none"] .plate{display:none}
 .blank .plate svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.blank[data-kind="offline"] .plate{background:var(--surface-2);color:var(--ink-3);border:1px solid var(--line)}
-.blank h2{font-size:var(--t-title-2);line-height:1.2;letter-spacing:-.015em;max-width:20ch}
-.blank p{margin:10px 0 0;font-size:var(--t-body-lg);line-height:var(--lh-body);color:var(--ink-2);max-width:34ch}
+.blank h2{font-size:var(--t-title);line-height:.92;max-width:14ch}
+.blank[data-kind="none"] h2{font-size:3rem;line-height:.88}
+.blank p{margin:12px 0 0;font-size:var(--t-body-lg);line-height:var(--lh-body);color:var(--ink-2);max-width:32ch}
 .blank .acts{display:flex;flex-direction:column;gap:8px;width:100%;max-width:340px;margin-top:28px}
 .blank .acts .btn{width:100%}
 
 /* The walk, when a venue is open and we know where the guest is. */
-.walk{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}
+.walk{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:var(--t-cap);font-weight:600;line-height:1.4;color:var(--ink-2)}
 .walk:empty{display:none}
 .walk svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-3)}
-.walk b{font-weight:500;color:var(--ink)}
+.walk b{font-family:var(--sans);font-weight:700;color:var(--ink)}
 .walk .guess{color:var(--ink-3)}
 
 /* ── inside the sheet ─────────────────────────────────────────────── */
-/* A menu is read, so the sheet is paper, not glass: the map under a
-   frosted menu showed through behind every dish as a grey smudge. */
-#sheet{background:var(--surface)}
 /* The sheet's name takes the focus as the sheet opens, so a screen reader starts there; it is not a control, and draws no ring. */
 #sheet-name:focus{outline:none}
+#sheet > header h2{font-size:var(--t-title);line-height:.92}
+#sheet > header .sub{margin-top:10px;font-size:var(--t-cap);font-weight:600;color:var(--ink-2)}
 /* Never over the bar: with the status bar's inset the bar is 111pt tall,
    and 88% of the screen reached into it. */
 @media (max-width:899px){#sheet{max-height:min(88dvh,calc(100dvh - var(--bar-h) - var(--safe-t) - 12px))}}
 /* Closed, the sheet waits below the screen — and its upward shadow did not:
    it lay along the bottom edge of every page as a dark band. */
 #sheet:not([data-open]){box-shadow:none}
-.sheet > .body > .empty{border-top:0;padding:20px}
+.sheet > .body > .empty{border-top:0;padding:20px 24px}
 .sheet > .body > .empty .btn{margin-top:12px}
 .sheet .note{margin:16px 20px}
 /* the menu on its way: rows in the shape of a dish */
-.menu-skel .skel-row{min-height:84px;padding:14px 16px}
-.menu-skel .skel-row > .skel:first-child{width:56px;height:56px}
-.menu-skel .skel-row > .skel:last-child{width:84px;height:40px;border-radius:var(--r-ctl)}
+.menu-skel .skel-row{min-height:100px;padding:14px 20px}
+.menu-skel .skel-row > .skel:first-child{width:72px;height:72px;border-radius:16px}
+.menu-skel .skel-row > .skel:last-child{width:44px;height:44px;border-radius:50%}
 
 /* When, first and always in view: the strip sticks under the header while
    the menu scrolls beneath it. One row of pills, scrolling sideways. Opaque,
    not glass: a backdrop filter nested inside the sheet's own is not painted
    everywhere, and rows showing through the strip read as a mistake. */
-.when-strip{position:sticky;top:0;z-index:2;padding:4px 20px 12px;background:var(--surface);border-bottom:1px solid var(--line)}
-.when-strip .section-title{margin:8px 0 10px}
+.when-strip{position:sticky;top:0;z-index:2;padding:6px 20px 14px;background:var(--surface-2);border-bottom:1px solid var(--line)}
+.when-strip .section-title{margin:10px 0 12px;font-size:var(--t-body);font-weight:600;color:var(--ink-2)}
 .when-strip .none-left{margin:0;font-size:var(--t-body);line-height:1.45;color:var(--ink-2)}
 .slots{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -20px;padding:1px 20px 3px}
 .slots::-webkit-scrollbar{display:none}
 .slot{
-  flex:none;min-height:44px;padding:0 16px;border-radius:var(--r-pill);
+  flex:none;min-height:44px;padding:0 18px;border-radius:var(--r-pill);
   border:1px solid var(--line-2);background:var(--surface);color:var(--ink);
-  font-size:var(--t-body-lg);font-weight:500;font-variant-numeric:tabular-nums;
+  font-family:var(--display);font-size:1.25rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums lining-nums;letter-spacing:.01em;
   transition:background var(--dur),border-color var(--dur),color var(--dur),transform 120ms var(--ease);
 }
-.slot[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink);font-weight:600}
-.slot[disabled]{background:var(--surface-2);border-color:var(--line);color:var(--ink-3);text-decoration:line-through;cursor:not-allowed}
+.slot[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--on-light)}
+.slot[disabled]{background:transparent;border-color:var(--line);color:var(--ink-3);text-decoration:line-through;cursor:not-allowed}
 .slot:not([disabled]):active{transform:scale(.985)}
 @media (hover:hover){.slot:not([disabled]):not([aria-pressed="true"]):hover{border-color:var(--ink-3)}}
 
-/* The menu: full-bleed rows in the sheet, so the sheet is the card. */
-.sheet .menu{border-left:0;border-right:0;border-radius:0;box-shadow:none;background:none}
-.item .lead img{width:56px;height:56px}
-.item .name{font-size:var(--t-row);font-weight:500;line-height:var(--lh-snug);color:var(--ink)}
-.item .meta{font-variant-numeric:tabular-nums}
-.item .meta svg{width:12px;height:12px;vertical-align:-1px;fill:var(--star);stroke:none}
-.item > .end{gap:8px}
+/* The menu: full-bleed rows in the sheet, so the sheet is the card. Each
+   dish's picture sits in a porcelain square; its price is the display face. */
+.sheet .menu{border-left:0;border-right:0;border-radius:0;box-shadow:none;background:none;border-color:var(--line)}
+.sheet .menu > .item.row{align-items:center;gap:16px;min-height:100px;padding:14px 20px}
+.item .lead img{width:72px;height:72px;border-radius:16px;background:var(--surface);box-shadow:0 12px 24px -12px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.06)}
+.item .name{font-size:var(--t-row);font-weight:700;line-height:var(--lh-snug);color:var(--ink)}
+.item .desc{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--ink-3)}
+.item .line{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 10px;margin-top:8px}
+.item .price .money{font-family:var(--display);font-size:1.375rem;font-weight:800;line-height:1;letter-spacing:-.004em}
+.item .meta{margin:0;font-variant-numeric:tabular-nums}
+.item .meta svg{width:12px;height:12px;vertical-align:-1px;fill:var(--gold);stroke:none}
+.item > .end{gap:8px;align-self:center}
 .item[data-off] .money{color:var(--ink-3)}
-.item[data-off] .lead img{opacity:.6}
-/* 44 × 44 per press, the target the thumb needs (the stepper was 40 tall).
-   The edge is an outline drawn inside the box, over the buttons' own press
-   wash, so the hairline takes nothing from the 44. */
-.qty{display:inline-flex;align-items:stretch;height:44px;border:0;outline:1px solid var(--line-2);outline-offset:-1px;border-radius:var(--r-ctl);background:var(--surface);overflow:hidden}
-.qty button{width:44px;height:44px;padding:0;border:0;background:none;color:var(--ink-2);display:grid;place-items:center}
-.qty button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
-.qty button:active{background:var(--surface-2);color:var(--ink)}
-@media (hover:hover){.qty button:hover{background:var(--surface-2);color:var(--ink)}}
-.qty span{min-width:28px;display:grid;place-items:center;font-weight:600;color:var(--ink)}
+.item[data-off] .lead img{opacity:.55;filter:grayscale(1)}
+.item .chip{color:var(--ink-3)}
+/* The stepper: a pill of the surface with two round buttons, the count in
+   the display between them. 44 × 44 per press, the target the thumb needs. */
+.qty{display:inline-flex;align-items:center;gap:2px;height:48px;padding:1px;border-radius:var(--r-pill);background:var(--surface);border:1px solid var(--line)}
+.qty button{width:44px;height:44px;padding:0;border:0;border-radius:50%;background:var(--surface-3);color:var(--ink);display:grid;place-items:center}
+.qty button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.qty button:active{background:var(--line-2)}
+@media (hover:hover){.qty button:hover{background:var(--line-2)}}
+.qty span{min-width:30px;display:grid;place-items:center;font-family:var(--display);font-size:1.375rem;font-weight:800;line-height:1;color:var(--ink)}
 /* Nothing of this dish in the basket yet: one «+», not «− 0 +» on every row. */
+.qty[data-zero]{background:none;border-color:transparent;padding:0;height:44px}
 .qty[data-zero] [data-d="-1"],.qty[data-zero] span{display:none}
-.qty[data-zero] button{width:44px;color:var(--accent-ink)}
 
-/* The footer: what is in the basket, the time, the total, then one button. */
-.sheet > footer .terms{margin:0;text-align:center;font-size:var(--t-cap);line-height:1.45;color:var(--ink-2)}
-.sheet > footer .terms b{color:var(--ink)}
+/* The foot of the sheet. A basket floats there as one bar: how many dishes
+   and at what time over the total in the display, and the one crimson
+   «Захиалах». The cancellation terms sit over it, the reason a press did not
+   go through over that. */
+#sheet > footer{padding:10px 12px calc(12px + var(--safe-b));background:var(--surface-2);border-top:0}
+#sheet > footer:has(.basket){background:linear-gradient(180deg,rgba(37,31,29,0) 0%,var(--surface-2) 32%)}
+.sheet > footer .terms{margin:0 8px 2px;text-align:center;font-size:var(--t-cap);line-height:1.45;color:var(--ink-3)}
+.sheet > footer .terms b{color:var(--ink-2);font-weight:700}
+.basket{
+  display:flex;align-items:center;gap:12px;min-height:72px;padding:8px 8px 8px 22px;
+  border-radius:var(--r-pill);background:var(--surface-3);border:1px solid rgba(255,244,236,.08);box-shadow:var(--shadow-2);
+}
+.basket .sum{flex:1;min-width:0}
+.basket .sum > span{display:block;font-size:var(--t-cap);font-weight:600;line-height:1.2;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.basket .sum b{display:block;margin-top:6px;font-family:var(--display);font-size:1.625rem;font-weight:800;line-height:1;letter-spacing:-.004em;white-space:nowrap}
+.basket .sum .money{font-weight:800}
+.basket .btn{flex:none;width:auto;min-height:56px;padding:0 26px;font-size:1.0625rem}
 /* why the last press did not go through, next to the button it is about */
-.sheet > footer .trouble{display:flex;align-items:flex-start;gap:6px;margin:0;font-size:var(--t-cap);font-weight:500;line-height:1.4;color:var(--stop)}
+.sheet > footer .trouble{display:flex;align-items:flex-start;gap:6px;margin:0 8px 4px;font-size:var(--t-cap);font-weight:600;line-height:1.4;color:var(--stop)}
 .sheet > footer .trouble svg{width:16px;height:16px;flex:none;margin-top:1px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 
 /* ── status, once an order exists ────────────────────────────────── */
 /* A guest walking to the restaurant wants the progress and the route at the
-   same time, so this is a sheet over the map rather than a page instead of it.
-   Dismissing it leaves a bar at the bottom to bring it back. */
-.status{padding:20px 20px 8px;text-align:center}
-.status .lab{display:inline-flex;align-items:center;gap:6px}
-.status .lab .dot{margin:0}
-.status .big{margin-top:10px;font-size:var(--t-headline);font-weight:600;line-height:1.15;letter-spacing:-.015em;color:var(--ink);text-wrap:balance}
-.status .big.mono{font-size:var(--t-display);line-height:1.1;letter-spacing:-.01em}
-.status .cap{margin-top:6px}
+   same time, so this is a sheet over the map rather than a page instead of
+   it. The state is one word (or the time it fires) in the display face with
+   the four-bar meter under it; the steps follow. Dismissing it leaves a
+   floating bar at the bottom to bring it back. */
+.status{padding:22px 24px 8px;text-align:left}
+.status .big{font-family:var(--display);font-size:var(--t-display);font-weight:800;line-height:.9;letter-spacing:-.004em;color:var(--ink);text-wrap:balance}
+.status .big.mono{font-variant-numeric:tabular-nums lining-nums}
+.status:is([data-s="CANCELLED"],[data-s="REJECTED"]) .big{color:var(--accent-ink)}
+.status[data-s="REFUNDED"] .big{color:var(--gold)}
+.status > .meter{margin-top:16px}
+.status > .meter > i{height:5px;border-radius:3px}
+.status .cap{margin-top:12px;font-size:var(--t-body);line-height:1.45;color:var(--ink-2)}
 .status .cap:empty{display:none}
-.status .timeline{margin-top:16px;padding-top:8px;border-top:1px solid var(--line)}
-/* On the fire is honey, like its chip — the dot ahead of the eyebrow, and on the launcher. */
-.dot[data-tone="hi"]{background:var(--hi)}
+.status .timeline{margin-top:18px;padding-top:8px;border-top:1px solid var(--line)}
 
 .orderbar{
-  position:fixed;left:0;right:0;bottom:0;z-index:var(--z-bar);
-  display:none;align-items:center;gap:12px;width:100%;
-  min-height:calc(var(--tabbar-h) + var(--safe-b));padding:10px 20px calc(10px + var(--safe-b));
+  position:fixed;left:12px;right:12px;bottom:calc(12px + var(--safe-b));z-index:var(--z-bar);
+  display:none;align-items:center;gap:14px;min-height:64px;padding:10px 20px 10px 22px;
   background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
-  border:0;border-top:1px solid var(--line);border-radius:var(--r-md) var(--r-md) 0 0;box-shadow:var(--shadow-sheet);
+  border:1px solid var(--glass-line);border-radius:var(--r-pill);box-shadow:var(--shadow-2);
   color:inherit;text-align:left;
 }
 .orderbar[data-open]{display:flex}
 .orderbar > span{display:flex;flex-direction:column;flex:1;min-width:0}
-.orderbar .code{font-weight:600;line-height:1.3;color:var(--ink)}
-.orderbar .what{font-size:var(--t-cap);line-height:1.3;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.orderbar .code{font-family:var(--display);font-size:1.375rem;font-weight:800;line-height:1;color:var(--ink)}
+.orderbar .what{margin-top:4px;font-size:var(--t-cap);font-weight:600;line-height:1.3;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .orderbar .what:empty{display:none}
-.orderbar .when{margin-left:auto;flex:none;font-size:1.25rem;font-weight:600;line-height:1;color:var(--ink)}
-.orderbar .when:not(.mono){font-size:var(--t-body-lg)}
+.orderbar .when{margin-left:auto;flex:none;font-family:var(--display);font-size:1.5rem;font-weight:800;line-height:1;color:var(--ink)}
+.orderbar .when:not(.mono){font-family:var(--sans);font-size:var(--t-body);font-weight:700}
 .orderbar::after{content:"";flex:none;width:16px;height:16px;background:var(--ink-3);-webkit-mask:var(--mask-chev) center/contain no-repeat;mask:var(--mask-chev) center/contain no-repeat;transform:rotate(-90deg)}
 @media (min-width:640px){
-  .orderbar{left:50%;right:auto;width:520px;max-width:calc(100% - 40px);transform:translateX(-50%);border:1px solid var(--line);border-bottom:0}
+  .orderbar{left:50%;right:auto;width:520px;max-width:calc(100% - 40px);transform:translateX(-50%)}
 }
 
 /* ── the review ───────────────────────────────────────────────────── */
@@ -209,53 +237,55 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var
    is one tap, and the answer is visible without opening anything. */
 .stars{display:flex}
 .stars button{width:44px;height:44px;padding:0;border:0;background:none;color:var(--ink-3);display:grid;place-items:center}
-.stars button svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
-.stars button[data-on]{color:var(--star)}
+.stars button svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+.stars button[data-on]{color:var(--gold)}
 .stars button[data-on] svg{fill:currentColor}
 /* the small stars are small to look at, not to hit: each is the thumb's 44 (4.5), as the big ones are */
 .stars[data-size="sm"] button{width:44px;height:44px}
 .stars[data-size="sm"] button svg{width:18px;height:18px}
 .rating{display:inline-flex;align-items:center;gap:3px;color:var(--ink-2)}
-.rating i{display:inline-flex;color:var(--star)}
+.rating i{display:inline-flex;color:var(--gold)}
 .rating i svg{width:13px;height:13px;fill:currentColor;stroke:none}
 .rating em{font-style:normal;color:var(--ink-3)}
 
-.review{padding:16px 20px 20px;border-top:1px solid var(--line)}
-.review p.lead{margin:2px 0 10px;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}
+.review{padding:20px 24px 24px;border-top:1px solid var(--line)}
+.review h3{font-family:var(--display);font-size:var(--t-title-2);font-weight:800;line-height:.95;letter-spacing:-.004em}
+.review p.lead{margin:8px 0 12px;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}
 .review > .stars{margin:0 -10px}
 /* A dish keeps room to say its name (7em) beside its picture; where the line has no room for its five
    stars as well (a phone), they go under the name, to the right — still a thumb's 44 each, never over the
    words — and every row of the review the same way. */
-.review .row{display:flex;align-items:center;flex-wrap:wrap;gap:0 12px;min-height:52px;padding:6px 0;border-top:1px solid var(--line)}
-.review > .stars + .row{margin-top:8px}
-.review .row img{width:40px;height:40px;border-radius:var(--r-sm);background:var(--surface-2);object-fit:cover;flex:none}
-.review .row .n{flex:1 1 7em;min-width:0;font-size:var(--t-body-lg);color:var(--ink)}
+.review .row{display:flex;align-items:center;flex-wrap:wrap;gap:0 12px;min-height:56px;padding:6px 0;border-top:1px solid var(--line)}
+.review > .stars + .row{margin-top:10px}
+.review .row img{width:40px;height:40px;border-radius:var(--r-sm);background:var(--surface);object-fit:cover;flex:none}
+.review .row .n{flex:1 1 7em;min-width:0;font-size:var(--t-body-lg);font-weight:600;color:var(--ink)}
 .review .row .stars{margin-left:auto;margin-right:-13px}
-.review textarea{margin-top:12px}
+.review textarea{margin-top:14px}
 /* The timing question is the product's own metric and is asked separately:
    a four-star lunch that came late is a success by one measure and a failure
    by the other, and one score would hide exactly that. */
-.ontime{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;min-height:44px;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
-.ontime > span{flex:1;min-width:140px;font-size:var(--t-body-lg);color:var(--ink)}
+.ontime{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;min-height:44px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.ontime > span{flex:1;min-width:140px;font-size:var(--t-body-lg);font-weight:600;color:var(--ink)}
 
-.said{padding:8px 20px 20px;border-top:1px solid var(--line)}
-.said .section-title{margin:16px 0 10px}
+.said{padding:8px 24px 24px;border-top:1px solid var(--line)}
+.said .section-title{margin:18px 0 12px}
 /* The average and the timing share sit together, because they answer
    different questions and a guest weighs both. */
 .said .summary{
   display:flex;align-items:baseline;justify-content:flex-start;gap:12px;flex-wrap:wrap;
-  padding-bottom:12px;border-bottom:1px solid var(--line);font-size:var(--t-cap);color:var(--ink-2);
+  padding-bottom:14px;border-bottom:1px solid var(--line);font-size:var(--t-cap);font-weight:600;color:var(--ink-2);
 }
-.said .summary .big{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-title-2);font-weight:600;line-height:1;letter-spacing:-.015em;color:var(--ink)}
-.said .summary .big i{display:inline-flex;color:var(--star)}
-.said .summary .big i svg{width:18px;height:18px;fill:currentColor;stroke:none}
-.said .summary .pct{color:var(--hold)}
-.said .summary .pct[data-good="true"]{color:var(--ready)}
+.said .summary .big{display:inline-flex;align-items:center;gap:8px;font-family:var(--display);font-size:var(--t-title);font-weight:800;line-height:1;color:var(--ink)}
+.said .summary .big .mono{font-weight:800}
+.said .summary .big i{display:inline-flex;color:var(--gold)}
+.said .summary .big i svg{width:22px;height:22px;fill:currentColor;stroke:none}
+.said .summary .pct{color:var(--gold)}
+.said .summary .pct[data-good="true"]{color:var(--ink)}
 .said .none{padding:12px 0 0;font-size:var(--t-body);color:var(--ink-2)}
-.said .one{padding:12px 0;border-top:1px solid var(--line)}
+.said .one{padding:14px 0;border-top:1px solid var(--line)}
 .said .summary + .one{border-top:0}
-.said .who{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;font-size:var(--t-cap);color:var(--ink-2)}
-.said .who b{font-weight:500;color:var(--ink)}
+.said .who{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;font-size:var(--t-cap);color:var(--ink-2)}
+.said .who b{font-weight:700;color:var(--ink)}
 .said .txt{font-size:var(--t-body-lg);line-height:1.5;color:var(--ink);overflow-wrap:anywhere}
 </style>
 </head>
@@ -298,8 +328,8 @@ body:has(#orderbar[data-open]) #map .maplibregl-ctrl-bottom-left{bottom:calc(var
 <!-- MapLibre from cdnjs, held to cdnjs's own hash of the file: bytes that ever differ do not run. A new version takes its new hash, here and on the stylesheet. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js" integrity="sha512-hoXlvOdSmh58mppUyZHZsscHkR/yXl6zLpTMTNwA6IZ61DpeaCNjosRu1WJ2DeIpkfW5MsJJ9H89zjV4IBGqRw==" crossorigin="anonymous"></script>
 <script type="module">
-import { api, store, shell, toast, mountClock, mnt, money, hhmm, HEADLINE, signInSheet, confirmPopup, whatWentWrong } from '/api.js';
-import { mapStyle, mapTheme, onMapTheme, repaintMap, pinImage, ULAANBAATAR, isCovered, metresBetween, walkMinutes, MAP_LOCALE } from '/mapStyle.js';
+import { api, store, shell, toast, mountClock, mnt, money, meter, hhmm, HEADLINE, signInSheet, confirmPopup, whatWentWrong } from '/api.js';
+import { mapStyle, pinImage, ULAANBAATAR, isCovered, metresBetween, walkMinutes, MAP_LOCALE } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (html) => {
@@ -460,7 +490,7 @@ const CAMERA = { zoom: 15.4, pitch: 55, bearing: -17 };
 
 // Named for the same reason as __map below: the tile URLs are a thing worth
 // asserting about from outside, and a relative one silently blanks the map.
-window.__style = mapStyle(mapTheme());
+window.__style = mapStyle();
 
 /**
  * The map, once there is something of ours to put on it. It is not drawn
@@ -474,7 +504,8 @@ let ready = false;
 
 function mountMap() {
   if (map) return map;
-  const style = mapStyle(mapTheme());
+  // The night palette, whatever the phone's own appearance: every Basu page is dark.
+  const style = mapStyle();
   window.__style = style;
   map = new maplibregl.Map({
     container: 'map',
@@ -534,8 +565,8 @@ function mountMap() {
 
   map.on('load', () => {
     // The map draws in the page's own tokens, read when it is ready: an open
-    // pin is the accent, a shut one the third ink, both ringed with the
-    // surface; the walk is the route blue cased in surface.
+    // pin is the crimson, a shut one the third ink, both ringed with the
+    // surface; the walk is the second ink cased in the surface.
     const palette = tokens();
     map.addImage('pin-open', pinImage(palette.accent, false, palette.surface, palette.onAccent), { pixelRatio: 2 });
     map.addImage('pin-shut', pinImage(palette.ink3, true, palette.surface, palette.onAccent), { pixelRatio: 2 });
@@ -625,23 +656,6 @@ function tokens() {
     route: token('--route'),
   };
 }
-
-/**
- * The phone turned dark (or light) with the page open: the tiles take the
- * other palette and the pins and the walk are redrawn in the new tokens.
- */
-onMapTheme((theme) => {
-  if (!map || !ready) return;
-  repaintMap(map, theme);
-  const palette = tokens();
-  map.updateImage('pin-open', pinImage(palette.accent, false, palette.surface, palette.onAccent));
-  map.updateImage('pin-shut', pinImage(palette.ink3, true, palette.surface, palette.onAccent));
-  map.setPaintProperty('route-casing', 'line-color', palette.surface);
-  map.setPaintProperty('route-line', 'line-color', palette.route);
-  map.setPaintProperty('route-guess', 'line-color', palette.route);
-  map.setPaintProperty(LAYER, 'text-color', ['case', ['get', 'open'], palette.ink, palette.ink3]);
-  map.setPaintProperty(LAYER, 'text-halo-color', palette.surface);
-});
 
 /** Put the tilt back if something flattened it. */
 function keepTilt() {
@@ -785,13 +799,13 @@ const BLANK = {
   none: {
     plate: ICON.bowl,
     title: 'Одоогоор ресторан алга',
-    text: 'Энд ойролцоох ресторанаас үдийн хоолоо урьдчилж захиалаад, очих цагтаа бэлэн авна. Ресторан нэгдмэгц газрын зураг дээр гарна.',
+    text: 'Ресторан нэгдмэгц газрын зураг дээр гарна.',
     act: '<a class="btn" data-v="primary" data-size="lg" href="/idesh">Өвлийн идэш үзэх</a>',
   },
   offline: {
     plate: ICON.offline,
     title: 'Холболт тасарлаа',
-    text: 'Интернэтээ шалгаад дахин оролдоно уу. Холбогдмогц энэ хуудас өөрөө шинэчлэгдэнэ.',
+    text: 'Интернэтээ шалгаад дахин оролдоно уу.',
     act: '<button class="btn" data-v="primary" data-size="lg" type="button" data-retry>Дахин оролдох</button>',
   },
 };
@@ -887,7 +901,7 @@ async function loadVenues() {
     $('map').append(
       el(`<div class="note" data-k="warn" role="status">
             <b>Одоогоор нэг ч гал тогоо нээлттэй биш</b>
-            <span>Саарал тэмдэгтэй ресторанууд одоо захиалга авахгүй байна. Гал тогоо нь нээгдмэгц тэмдэг нь ногоон болж, захиалга авна.</span>
+            <span>Саарал тэмдэгтэй ресторанууд одоо захиалга авахгүй байна.</span>
           </div>`),
     );
   } else if (open > 0 && existing) {
@@ -999,7 +1013,7 @@ async function openVenue(venue) {
   if (!venue.accepting_orders) {
     $('sheet-body').replaceChildren(
       el(`<div class="note" data-k="warn"><b>Одоогоор захиалга авахгүй байна</b>
-            <span>Гал тогоо нь одоо хаалттай тул хоол хийх хүн алга. Нээгдмэгц газрын зураг дээрх тэмдэг нь ногоон болно.</span></div>`),
+            <span>Гал тогоо нь нээгдмэгц захиалга авна.</span></div>`),
     );
     return;
   }
@@ -1079,17 +1093,19 @@ function renderSheet() {
   const menu = el('<div class="menu" data-rows></div>');
   for (const item of state.menu) {
     const qty = state.cart.get(item.id) ?? 0;
+    // The dish's picture in a porcelain square; its name, a line of what is in
+    // it, and its price in the display face beside how long it takes.
     const row = el(`
       <div class="item row"${item.sold_out ? ' data-sold data-off' : ''}>
-        <span class="lead"><img class="thumb" src="${escapeHtml(dishPicture(item.image_url))}" alt="" loading="lazy" width="56" height="56"></span>
+        <span class="lead"><img class="thumb" src="${escapeHtml(dishPicture(item.image_url))}" alt="" loading="lazy" width="72" height="72"></span>
         <span class="main">
           <span class="name title">${escapeHtml(item.name)}</span>
           ${item.description ? `<span class="sub desc">${escapeHtml(item.description)}</span>` : ''}
-          <span class="meta" data-sans>${item.prep_minutes} мин${
+          <span class="line"><span class="price">${money(item.price_mnt)}</span><span class="meta" data-sans>${item.prep_minutes} мин${
             item.rating?.count ? ` · ${ICON.star} ${item.rating.stars.toFixed(1)}` : ''
-          }</span>
+          }</span></span>
         </span>
-        <span class="end"><span class="price">${money(item.price_mnt)}</span></span>
+        <span class="end"></span>
       </div>`);
     const end = row.querySelector('.end');
 
@@ -1205,33 +1221,24 @@ function renderFoot() {
   const chosen = Boolean(state.slot);
   const slot = state.slots.find((s) => s.starts_at === state.slot);
   const noneLeft = !chosen && !openSlots().length;
-  // What the button is about to charge for, line by line, above it.
-  for (const { item, qty } of lines) {
-    foot.append(
-      el(
-        `<div class="summary"><span>${escapeHtml(item.name)} ×${qty}</span>${money(item.price_mnt * qty)}</div>`,
-      ),
-    );
-  }
-  if (slot) {
-    foot.append(
-      el(`<div class="summary"><span>Ирэх цаг</span><span class="mono">${escapeHtml(slot.label)}</span></div>`),
-    );
-  }
-  foot.append(el(`<div class="summary" data-total><span>Нийт</span>${money(total)}</div>`));
+  // The basket floats at the foot as one bar: how many dishes and at what
+  // time over the total, and the one crimson «Захиалах» — which pays from
+  // the wallet as it orders. The terms sit over it; why the last press did
+  // not go through, over that.
+  const count = lines.reduce((sum, { qty }) => sum + qty, 0);
   foot.append(el('<p class="terms">Хоол <b>гал дээр гарахаас өмнө</b> үнэгүй цуцална.</p>'));
   if (state.trouble) {
     const trouble = el(`<p class="trouble" role="alert">${ICON.alert}<span></span></p>`);
     trouble.querySelector('span').textContent = state.trouble;
     foot.append(trouble);
   }
-  const button = el(
-    `<button class="btn" data-v="primary" data-size="lg" type="button"${chosen ? '' : ' disabled'}>
-       ${chosen ? `${mnt(total)} төлөх` : noneLeft ? 'Өнөөдөр захиалах цаг алга' : 'Цагаа сонгоно уу'}
-     </button>`,
-  );
-  button.addEventListener('click', placeOrder);
-  foot.append(button);
+  const basket = el(`
+    <div class="basket">
+      <div class="sum"><span>${count} хоол${slot ? ` · ${escapeHtml(slot.label)}-д ирнэ` : ''}</span><b>${money(total)}</b></div>
+      <button class="btn" data-v="primary" type="button"${chosen ? '' : ' disabled'}>${chosen ? 'Захиалах' : noneLeft ? 'Өнөөдөр цаг алга' : 'Цагаа сонгоно уу'}</button>
+    </div>`);
+  basket.querySelector('button').addEventListener('click', placeOrder);
+  foot.append(basket);
 }
 
 /**
@@ -1343,23 +1350,11 @@ const WALKING = ['ACCEPTED', 'SCHEDULED', 'ARMED', 'HELD', 'FIRED', 'COOKING', '
 let rendered = null;
 
 /**
- * The dot beside the eyebrow: route is waiting on the system, hold on the
- * guest, stop needs attention, honey is on the fire, ready is done. A
- * finished negative outcome has no tone — it is not an alarm.
+ * How far a lunch has come, on the four bars every order has (api.js
+ * meter): paid, taken by the kitchen, on the fire, ready — the launcher's
+ * card says the same. A lunch that ended badly has no meter: its word says it.
  */
-const TONE = {
-  PLACED: 'route',
-  ACCEPTED: 'route',
-  SCHEDULED: 'route',
-  ARMED: 'hold',
-  RESLOTTED: 'hold',
-  HELD: 'stop',
-  FIRED: 'hi',
-  COOKING: 'hi',
-  READY: 'ready',
-  SERVED: 'ready',
-  CLOSED: 'ready',
-};
+const LUNCH_STEP = { PLACED: 1, ACCEPTED: 2, SCHEDULED: 2, ARMED: 2, RESLOTTED: 2, HELD: 2, FIRED: 3, COOKING: 3, READY: 4, SERVED: 4, CLOSED: 4 };
 const NEGATIVE = ['CANCELLED', 'REFUNDED', 'NO_SHOW', 'REJECTED'];
 const OVER = ['SERVED', 'CLOSED', ...NEGATIVE];
 
@@ -1446,17 +1441,18 @@ async function showStatus(force) {
   // the order was confirmed.
   const when = { fired: order.fire_at, ready: order.ready_at };
 
-  // The eyebrow says where the order stands, in the timeline's own words. A
-  // finished negative outcome names itself, and the big line is then what
-  // happens to the money — the thing the guest wants to know.
+  // The state in one word — or the time it goes on the fire — big in the
+  // display face, the four-bar meter under it and one sentence under that.
+  // A finished negative outcome is its word alone, and the sentence is then
+  // what happens to the money — the thing the guest wants to know.
   const negative = NEGATIVE.includes(order.state);
   const lastStep = STEPS.filter(([key]) => done[key]).at(-1)?.[1] ?? '';
-  const tone = TONE[order.state];
+  const step = negative ? 0 : LUNCH_STEP[order.state];
   const card = el(`
     <div class="status" data-s="${escapeHtml(order.state)}">
-      <div class="lab"><span class="dot"${tone ? ` data-tone="${tone}"` : ''}></span>${negative ? word : lastStep}</div>
-      <div class="big${word ? '' : ' mono'}">${negative ? cap : big}</div>
-      <div class="cap">${negative ? '' : sub}</div>
+      <div class="big${word ? '' : ' mono'}">${escapeHtml(big)}</div>
+      ${step ? meter(step) : ''}
+      <div class="cap">${escapeHtml(sub)}</div>
     </div>`);
 
   const next = negative ? null : STEPS.find(([key]) => !done[key])?.[0];

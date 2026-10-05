@@ -2,11 +2,14 @@
  * The map this app draws.
  *
  * MapLibre GL over vector tiles we serve ourselves. The layer order and zoom
- * breakpoints are a style already proven on a phone in daylight; the palette
- * is Basu's own and quiet on purpose — warm greys, white roads, water and
- * parks only just tinted — so that the one thing with contrast on the map is
- * the pin a guest came to find. At night it is the app's own dark: a
- * pine-black ground, roads a step lighter, labels in the second ink.
+ * breakpoints are a style already proven on a phone; the palette is Basu's
+ * own «Тансаг хар» and quiet on purpose — a warm charcoal ground, roads a
+ * step or two lighter, water a cooler near-black, parks a breath warmer,
+ * street names in the third ink and landmarks in gold — so that the one
+ * thing with colour on the map is the crimson pin a guest came to find. It
+ * is dark whatever the phone's own setting is, as every Basu page is: a
+ * daylight map under a dark sheet was a seam, and a light phone made the
+ * whole lunch page half light.
  *
  * What it does not draw is as deliberate. The tiles carry every café, bar,
  * bank and shop in the city; on a map that sells lunch at the restaurants
@@ -53,31 +56,22 @@ export function isCovered(lat, lon) {
 }
 
 /**
- * The two palettes, one key per thing on the map. Light is the daylight
- * style as it was proven; dark is drawn from the app's dark tokens (ground
- * #0F1110, surface #171A18, lines #29302B, ink-2 #AEB5AD) so the map and the
- * sheet over it are one material, with water in the same blue-black as the
- * unread wash and parks a breath of pine.
+ * The palette, one key per thing on the map, drawn from app.css's tokens so
+ * the map and the sheet over it are one material: the ground a hair above
+ * the page's charcoal (#100D0C), buildings and roads climbing the surfaces
+ * (#1C1716 → #3E3532), labels in the inks — the third for streets, the
+ * near-white for places — and the gold, a shade under app.css's #C9A96E, for
+ * the landmarks somebody steers by: present, and still quieter than a pin.
+ * No green, no blue: water is a cooler charcoal, a park a warmer one.
  */
-const MAP_PALETTES = {
-  light: {
-    ground: '#F4F3EE', water: '#CFDCE4', park: '#DCE3D3', residential: '#ECEAE6',
-    khashaa: '#F1EFEB', khashaaLine: '#CFCBC4',
-    building: '#E4E1DC', buildingTall: '#E1DED8', buildingLine: '#D3CFC8',
-    minorCase: '#E2DFDA', minor: '#FFFFFF', tertiaryCase: '#DAD6CF', tertiary: '#FFFFFF',
-    secondaryCase: '#D6D2CB', secondary: '#FFFFFF', primaryCase: '#CCC7BF', primary: '#FFFFFF',
-    trunkCase: '#BDB7AE', trunk: '#FDFCFA', rail: '#BDBAB5',
-    roadLabel: '#6B665F', houseNumber: '#8C8780', landmark: '#4E6B80', place: '#2B2926', halo: '#FFFFFF',
-  },
-  dark: {
-    ground: '#111412', water: '#16232E', park: '#13231B', residential: '#151917',
-    khashaa: '#161A18', khashaaLine: '#2B322D',
-    building: '#1B201D', buildingTall: '#1E2420', buildingLine: '#262C28',
-    minorCase: '#171B19', minor: '#262C28', tertiaryCase: '#1A1F1C', tertiary: '#2D342F',
-    secondaryCase: '#1C221E', secondary: '#343C36', primaryCase: '#1E2420', primary: '#3C453F',
-    trunkCase: '#202722', trunk: '#475049', rail: '#353D37',
-    roadLabel: '#8D958C', houseNumber: '#6F776F', landmark: '#8FA7B8', place: '#DDE2DC', halo: '#111412',
-  },
+const MAP_PALETTE = {
+  ground: '#141110', water: '#111518', park: '#191512', residential: '#161210',
+  khashaa: '#171312', khashaaLine: '#2E2725',
+  building: '#1F1A18', buildingTall: '#241E1C', buildingLine: '#2E2725',
+  minorCase: '#181412', minor: '#2A2321', tertiaryCase: '#1B1614', tertiary: '#302826',
+  secondaryCase: '#1D1816', secondary: '#372E2B', primaryCase: '#201A18', primary: '#3E3431',
+  trunkCase: '#231C1A', trunk: '#4A3E3A', rail: '#3A302D',
+  roadLabel: '#998E85', houseNumber: '#7E736B', landmark: '#A8915F', place: '#E8DFD5', halo: '#141110',
 };
 
 /**
@@ -106,37 +100,9 @@ export const MAP_LOCALE = {
   'CooperativeGesturesHandler.MobileHelpText': 'Газрын зургийг хоёр хуруугаар хөдөлгөнө',
 };
 
-/** `'dark'` or `'light'`: the page's theme — pinned by `data-theme`, else the phone's. */
-export function mapTheme() {
-  if (typeof document === 'undefined') return 'light';
-  const pinned = document.documentElement.getAttribute('data-theme');
-  if (pinned === 'dark' || pinned === 'light') return pinned;
-  return typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
-/**
- * Call `paint(theme)` when the phone changes appearance while the page is
- * open — iOS turns dark at sunset by itself, and a map left in daylight
- * under a dark sheet is the seam this is here to remove.
- */
-export function onMapTheme(paint) {
-  if (typeof matchMedia !== 'function') return;
-  const query = matchMedia('(prefers-color-scheme: dark)');
-  const changed = () => paint(mapTheme());
-  if (query.addEventListener) query.addEventListener('change', changed);
-  else query.addListener?.(changed);
-}
-
-/** Put a map already drawn into `theme`'s palette, layer by layer, without reloading anything. */
-export function repaintMap(map, theme) {
-  for (const layer of mapStyle(theme).layers) {
-    if (!map.getLayer?.(layer.id)) continue;
-    for (const [key, value] of Object.entries(layer.paint ?? {})) map.setPaintProperty(layer.id, key, value);
-  }
-}
-
-export function mapStyle(theme = 'light') {
-  const c = MAP_PALETTES[theme === 'dark' ? 'dark' : 'light'];
+/** The map's style: one palette, the dark one, whatever the phone's appearance. */
+export function mapStyle() {
+  const c = MAP_PALETTE;
   return {
     version: 8,
     name: 'Basu',

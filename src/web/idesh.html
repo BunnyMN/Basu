@@ -11,8 +11,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 }
 </script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F4F3EE">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0F1110">
+<meta name="theme-color" content="#100D0C">
 <title>Өвлийн идэш — Basu</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.css" integrity="sha512-KIMsMWIdnoG9OwZa+oaIafmbDonqck1UCmq+/zcUi2aaZ97N9QE6TqpTM+n36EO40HGh64hU/375zxtjx7WTyQ==" crossorigin="anonymous">
 <link rel="stylesheet" href="/app.css">
@@ -23,127 +22,183 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
    way a phone does it — one question per step, a bar on top that says where
    back goes, and the price pinned to the bottom.
 
-   Layout only. Colour, type, radius, buttons, chips, rows, fields and cards
-   all come from app.css; this sheet says where things sit. */
+   «Тансаг хар»: a dark photograph of cuts under the title, fading into the
+   charcoal; each stall a photograph first, then who sells it, its name and
+   its price in the display face; a stall's own screen the photograph again,
+   full bleed under glass chips, its questions as one stepper, one segmented
+   choice and a row of days, and the total with the one crimson «Захиалах»
+   pinned under them. Colour, faces, buttons, fields, the meter and the state
+   words come from app.css; this sheet says where things sit. */
 
 /* ── the bar ─────────────────────────────────────────────────────── */
 /* One bar, the one the stall screens and the lunch map have: «‹ Basu» on
-   the leading edge, the title in the middle. On the list it behaves the
-   way a phone's own large title does — clear over the ground while the
-   big «Өвлийн идэш» is in view, glass with the small title once that has
-   scrolled under it. The bar owns the top inset, so nothing below adds it
-   again the day the shell draws the page edge to edge. */
-#bar{transition:background-color var(--dur) var(--ease),border-color var(--dur) var(--ease)}
-#bar .title{opacity:1;transition:opacity var(--dur) var(--ease)}
-#bar[data-flat]{background:transparent;border-bottom-color:transparent;-webkit-backdrop-filter:none;backdrop-filter:none}
-#bar[data-flat] .title{opacity:0}
+   the leading edge, the title in the middle. On the list it floats over the
+   photograph the way a phone's own large title does — clear, «‹ Basu» a
+   glass pill, while the big «Өвлийн идэш» is in view; glass with the small
+   title once that has scrolled under it. The bar owns the top inset. */
+#bar{position:fixed;left:0;right:0}
+#bar .home{transition:background-color var(--dur) var(--ease),border-color var(--dur) var(--ease)}
+#bar[data-flat] .home{background:var(--glass);border:1px solid var(--glass-line);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);padding-right:14px}
 /* a later look that failed: one line under the bar, over the list and over a stall's screen alike */
 #stale{position:fixed;left:0;right:0;top:calc(var(--bar-h) + var(--safe-t));z-index:calc(var(--z-sheet) + 1)}
 
-/* ── the list ────────────────────────────────────────────────────── */
-#list.wrap{padding-top:0}
-.top.page-head[data-large]{padding-top:4px;margin-bottom:20px}
-.top .sub{margin-bottom:0}
+/* ── the photograph under the title ──────────────────────────────── */
+.band{position:absolute;top:0;left:0;right:0;z-index:0;height:calc(var(--safe-t) + 312px);overflow:hidden;pointer-events:none;background:var(--bg)}
+.band img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 38%;filter:saturate(1.08) contrast(1.06)}
+.band::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(16,13,12,.62) 0%,rgba(16,13,12,.12) 26%,rgba(16,13,12,.28) 56%,var(--bg) 100%)}
 
-/* the three promises: one card, hairline rows; three columns on a wide screen */
-/* The three promises, as one line of small marks: said, and out of the way
-   of the stalls, which are what somebody opened this page for. */
-.trust{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 20px;padding:0;list-style:none}
-.trust li{display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 8px;border-radius:var(--r-pill);background:var(--accent-soft);color:var(--accent-ink);font-size:var(--t-cap);font-weight:500;line-height:1.3;white-space:nowrap}
-.trust svg{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+/* ── the list ────────────────────────────────────────────────────── */
+#list.wrap{position:relative;z-index:1;padding:0 16px calc(40px + var(--safe-b))}
+.top.page-head[data-large]{margin:0;padding:calc(var(--safe-t) + var(--bar-h) + 118px) 4px 0}
+.top h1{font-size:3.5rem;line-height:.86;letter-spacing:-.006em}
+.top .sub{margin:14px 0 0;font-size:var(--t-body-lg);font-weight:500;color:var(--ink-2)}
+
+/* The three things a buyer is trusting, as one band between gold hairlines:
+   a gold mark over two words each. Said once here, out of the stalls' way. */
+.trust{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:28px 0 0;padding:14px 0;list-style:none;border-top:1px solid var(--gold-line);border-bottom:1px solid var(--gold-line)}
+.trust li{display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 6px;text-align:center;font-size:var(--t-cap);font-weight:600;line-height:1.3;color:var(--ink-2)}
+.trust li + li{border-left:1px solid var(--line)}
+.trust svg{width:20px;height:20px;flex:none;fill:none;stroke:var(--gold);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 
 /* ── what of mine is running ─────────────────────────────────────── */
-.mine{margin:0 0 24px}
+/* The launcher's card: the animal's photo, what it is, its one word with
+   the meter under it, and its day big in the corner with a gold word. */
+.mine{margin:36px 0 0}
 .mine:not([data-any]){display:none}
-.mine .sec{margin:0 0 8px}
+.mine .sec{margin:0 4px 12px}
+#mine-list{display:flex;flex-direction:column;gap:10px}
+.oc{
+  display:flex;align-items:stretch;gap:14px;width:100%;min-height:94px;margin:0;padding:14px;
+  color:inherit;text-align:left;font:inherit;cursor:pointer;
+  transition:background-color 120ms var(--ease);
+}
+.oc:active{background:var(--surface-2)}
+@media (hover:hover){.oc:hover{background:var(--surface-2)}}
+.oc .ph{flex:none;align-self:center;width:64px;height:64px;overflow:hidden;border-radius:14px;background:var(--surface-2)}
+.oc .ph img{display:block;width:100%;height:100%;object-fit:cover;filter:sepia(.1) saturate(1.12) contrast(1.08)}
+.oc .main{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center}
+/* the name on one line, or two when it is long — its count is never cut off */
+.oc .title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:1.0625rem;font-weight:700;line-height:1.2;color:var(--ink);overflow-wrap:anywhere}
+.oc .st{display:block;margin-top:6px;line-height:1.2}
+#mine-list .chip{min-height:0;font-size:.875rem;font-weight:600;color:var(--ink-2)}
+#mine-list .chip::before{display:none}
+#mine-list .chip[data-strong]{color:var(--tone-ink)}
+#mine-list .chip[data-tone="hold"]:not([data-strong]){color:var(--gold)}
+.oc .meter{margin-top:10px;min-width:0}
+/* the corner is one width on every card, so the dividing hairlines stand in one column; a sum takes what it needs */
+.oc .end{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;width:84px;padding-left:12px;border-left:1px solid var(--line)}
+.oc .end:has(> [data-money]){width:auto;min-width:84px}
+.oc .when{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.oc .when b{display:block;font-family:var(--display);font-size:2rem;font-weight:800;line-height:.9;letter-spacing:-.004em;font-variant-numeric:tabular-nums lining-nums;color:var(--ink);white-space:nowrap}
+.oc .when[data-money] b{font-size:1.375rem;line-height:1}
+.oc .when b .money{font-weight:inherit;letter-spacing:inherit}
+.oc .when small{display:block;font-size:.6875rem;font-weight:800;line-height:1;letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+.oc .end:empty{display:none}
 
 /* ── the filter and the stalls ───────────────────────────────────── */
-/* «14 зар · 4 гэрээт нийлүүлэгч» is a sentence, not a section eyebrow: sans, 13, ink-2 */
-.market > .section-label{min-height:0;margin:0 0 10px}
-.market .tally{font-family:var(--sans);font-size:var(--t-cap);line-height:1.4;letter-spacing:0;text-transform:none;color:var(--ink-2)}
+.market{margin-top:40px}
+.market > .section-label{min-height:0;margin:0 4px 14px}
 /* On a phone the pill itself is the thumb's 44 (app.css, `.filter > button`
-   under pointer:coarse): no invisible area around a smaller face (Appendix B). */
-.kinds{margin:0 0 12px}
-.listings{margin:0}
-/* three rows of the shape that is coming, until the stalls arrive */
-.listings .skel-row{align-items:flex-start;padding:14px 16px}
-.listings .skel-row > .skel:first-child{width:64px;height:64px}
-.listings .skel-row .skel-lines{gap:8px;padding-top:4px}
-.listings .skel-row .skel-lines .skel:nth-child(3){width:30%;height:10px}
-.listings[aria-busy="true"] .skel-row > .skel:last-child{align-self:flex-end}
-.listing .art{
-  width:64px;height:64px;flex:none;display:grid;place-items:center;overflow:hidden;
-  border-radius:var(--r-sm);background:var(--surface-2);color:var(--ink-3);
+   under pointer:coarse): no invisible area around a smaller face (Appendix B).
+   One row that scrolls sideways, never a second row of one pill. */
+.kinds{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px 22px;padding:2px 16px}
+.kinds::-webkit-scrollbar{display:none}
+.kinds > button{flex:none}
+/* One stall to a row on a phone, two on a wider screen: the photograph
+   first, then who sells it, its name and its price. */
+.listings{display:grid;grid-template-columns:minmax(0,1fr);gap:36px;margin:0;padding:0;list-style:none}
+@media (min-width:640px){.listings{grid-template-columns:repeat(2,minmax(0,1fr));gap:44px 20px}}
+.listings > li{display:block;min-width:0;margin:0}
+.listing{
+  position:relative;display:block;width:100%;margin:0;padding:0;border:0;border-radius:var(--r-md);
+  background:none;color:inherit;text-align:left;font:inherit;cursor:pointer;
 }
-.listing .art img{width:100%;height:100%;object-fit:cover;display:block}
-.listing .art svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.listing .who{display:flex;flex-direction:column;gap:3px;min-width:0}
-.listing .from{display:block;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.listing .art{
+  position:relative;display:grid;place-items:center;width:100%;aspect-ratio:16 / 10;overflow:hidden;
+  border-radius:var(--r-md);background:var(--surface);color:var(--ink-3);box-shadow:var(--shadow-1);
+}
+/* one warm correction on every photograph, as the website's; the sheep's leg sits low in its square */
+.listing .art img{display:block;width:100%;height:100%;object-fit:cover;filter:sepia(.1) saturate(1.12) contrast(1.08);transition:transform 420ms var(--ease)}
+.listing[data-kind="sheep"] .art img{object-position:50% 66%}
+.listing .art svg{width:44px;height:44px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+.listing:active .art img{transform:scale(1.02)}
+@media (hover:hover){.listing:hover .art img{transform:scale(1.02)}}
+/* glass chips on the photograph: how many are left at the right, a paid tier at the left */
+.listing .left,.listing .tier{
+  position:absolute;top:12px;z-index:1;display:inline-flex;align-items:center;gap:6px;height:30px;min-height:0;padding:0 12px;
+  border-radius:var(--r-pill);background:var(--glass);border:1px solid var(--glass-line);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  font-size:var(--t-cap);font-weight:700;line-height:1;color:var(--ink);white-space:nowrap;
+}
+.listing .left{right:12px}
+.listing .left::before{display:none}
+.listing .left[data-low]{color:var(--gold)}
+.listing .left[data-low]::before{display:block;width:6px;height:6px;border-radius:50%;background:var(--gold)}
+.listing .tier{left:12px;font-style:normal;letter-spacing:.06em;color:var(--gold);border-color:var(--gold-line)}
+.listing .tier::before{display:none}
+/* a tier the supplier paid for: a gold hairline round its photograph */
+.listing[data-tier] .art{box-shadow:var(--shadow-1),0 0 0 1px var(--gold-line)}
+.listing .who{display:block;margin-top:16px;padding:0 4px}
+.listing .from{display:block;font-size:.875rem;font-weight:600;line-height:1.3;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .verified{font-style:normal}
-/* Every stall here is under contract — the tally above the list says so once
-   (5.5); the row keeps its mark in the DOM and not on the screen. */
+/* Every stall here is under contract — the band above says so once; the
+   card keeps its mark in the DOM and not on the screen. */
 .listing .from .verified{display:none}
-/* one meta line: day · place · delivery — the day first, because it is
-   what a buyer plans around and the end of a cut line is where it used to
-   be. It may wrap to a second line; the dot trails each item, so a
-   wrapped run never starts a line with a lone «·». */
-.bits{display:flex;flex-wrap:wrap;font-size:var(--t-pill);line-height:1.4;color:var(--ink-3)}
+.listing .name{display:block;margin-top:8px;font-family:var(--display);font-size:2.25rem;font-weight:800;line-height:.95;letter-spacing:-.004em;color:var(--ink)}
+.listing .price{display:flex;align-items:baseline;flex-wrap:wrap;gap:0 8px;margin-top:12px;padding:0 4px}
+.listing .price b{font-family:var(--display);font-size:2rem;font-weight:800;line-height:1;color:var(--ink)}
+.listing .price .money{font-weight:800;letter-spacing:0}
+.listing .price small{font-size:.9375rem;font-weight:600;line-height:1.3;color:var(--ink-2)}
+.listing .per{display:block;margin-top:6px;padding:0 4px;font-size:.875rem;font-weight:600;line-height:1.3;color:var(--ink-3)}
+/* one meta line under a hairline: day · place · delivery — the day first,
+   because it is what a buyer plans around. It may wrap to a second line;
+   the dot trails each item, so a wrapped run never starts with a lone «·». */
+.bits{display:flex;flex-wrap:wrap;font-size:.875rem;font-weight:600;line-height:1.4;color:var(--ink-2)}
 .bits span{white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
-.bits span:not(:last-child)::after{content:"·";margin:0 6px;color:var(--ink-3)}
+.bits span:not(:last-child)::after{content:"·";margin:0 8px;color:var(--ink-3)}
 .bits svg{display:none}
-/* A stall's row is two lines: the picture and the words, then stock and
-   price under both. On a phone the words' column is 220px and the price's
-   caption alone is 150 of it, so the second line takes the whole width;
-   from 640 up it sits under the words, in line with them. The chevron is
-   centred on the whole row, not on its first line. */
-[data-rows] > li > .listing{flex-wrap:wrap;row-gap:8px;position:relative;padding-right:44px}
-.listing[data-chev]::after{position:absolute;right:16px;top:50%;margin-top:-8px}
-.listing .row{flex:0 0 100%;display:flex;align-items:flex-end;justify-content:space-between;gap:10px;margin:0}
-.listing .left{flex:none}
-.listing .price{flex:1 1 auto;min-width:0;margin-left:auto;text-align:right}
-@media (min-width:640px){.listing .row{flex-basis:calc(100% - 76px);margin-left:76px}}
-.listing .price b{display:block;font-weight:600;line-height:1.2}
-.listing .price .money{font-size:var(--t-title-3)}
-.listing .price small{display:block;font-size:var(--t-cap);color:var(--ink-2);margin-top:2px;white-space:normal}
-.listing .price small .per{display:block}
-.listing[data-gone] .title{color:var(--ink-2)}
-/* a tier the supplier paid for: a warm or a pine wash on the row, and its mark before the name */
-.listing[data-tier="vip"]{background:color-mix(in srgb,var(--hi-soft) 70%,var(--surface))}
-.listing[data-tier="featured"]{background:color-mix(in srgb,var(--accent-soft) 55%,var(--surface))}
-.listing .tier{font-style:normal;margin-right:4px;vertical-align:1px}
+.listing .bits{margin:14px 4px 0;padding-top:12px;border-top:1px solid var(--line)}
+.listing[data-gone] .name{color:var(--ink-2)}
 .listing[data-gone] .money{color:var(--ink-3)}
-.listing[data-gone] .art img{filter:grayscale(1)}
+.listing[data-gone] .art img{filter:grayscale(1) brightness(.72)}
+.listings > li.empty{padding:20px 4px;border-top:1px solid var(--line);font-size:var(--t-body);color:var(--ink-2)}
+/* the shape of the stalls until they arrive */
+.listings .skel-listing{display:flex;flex-direction:column;gap:12px}
+.listings .skel-listing > .skel:first-child{aspect-ratio:16 / 10;height:auto;border-radius:var(--r-md)}
+.listings .skel-listing > .skel:nth-child(2){height:12px;width:46%;margin:6px 4px 0}
+.listings .skel-listing > .skel:nth-child(3){height:28px;width:68%;margin:0 4px}
+.listings .skel-listing > .skel:nth-child(4){height:24px;width:40%;margin:0 4px}
 
 /* ── nothing to show, or no way to ask ───────────────────────────── */
-/* In the list's place, in the flow of the page: a mark, what happened, the
-   way on. Never a lone «Бүгд» over two grey lines, never a skeleton that
-   waits for ever. */
-.blank{display:flex;flex-direction:column;align-items:center;text-align:center;padding:28px 8px 12px}
-.blank .plate{width:64px;height:64px;margin:0 0 18px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent-ink)}
+/* In the list's place: a mark, what happened in a few words, the way on.
+   Never a lone «Бүгд» over two grey lines, never a skeleton that waits for
+   ever. */
+.blank{display:flex;flex-direction:column;align-items:center;text-align:center;padding:36px 8px 12px}
+.blank .plate{width:72px;height:72px;margin:0 0 22px;border-radius:50%;display:grid;place-items:center;background:var(--surface-2);border:1px solid var(--gold-line);color:var(--gold);box-shadow:var(--shadow-1)}
 .blank .plate svg{width:30px;height:30px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.blank[data-kind="offline"] .plate{background:var(--surface-2);color:var(--ink-3);border:1px solid var(--line)}
-.blank h2{font-size:var(--t-title-3);line-height:var(--lh-snug);letter-spacing:0}
-.blank p{margin:8px 0 0;font-size:var(--t-body);line-height:var(--lh-body);color:var(--ink-2);max-width:34ch}
-.blank .acts{display:flex;flex-direction:column;gap:8px;width:100%;max-width:320px;margin-top:22px}
+.blank[data-kind="offline"] .plate{border-color:var(--line-2);color:var(--ink-2)}
+.blank h2{font-size:var(--t-title);line-height:.92;max-width:16ch}
+.blank p{margin:12px 0 0;font-size:var(--t-body-lg);line-height:var(--lh-body);color:var(--ink-2);max-width:32ch}
+.blank .acts{display:flex;flex-direction:column;gap:8px;width:100%;max-width:340px;margin-top:28px}
 .blank .acts .btn{width:100%}
 
 /* ── how it goes ─────────────────────────────────────────────────── */
-/* Three lines under the stalls for somebody buying a winter's meat for the
-   first time: what happens after the tap, in order. True for every stall. */
-.how{margin:32px 0 0}
-.how .section-title{margin:0 0 12px}
-.how ol{list-style:none;margin:0;padding:0;counter-reset:how}
-.how ol > li{display:grid;grid-template-columns:28px minmax(0,1fr);column-gap:12px;align-items:start;padding:12px 16px;counter-increment:how}
-.how ol > li::before{content:counter(how);grid-column:1;grid-row:1 / span 2;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--surface-2);border:1px solid var(--line);font-family:var(--mono);font-size:var(--t-cap);font-weight:600;color:var(--ink-2)}
-.how li b{grid-column:2;font-size:var(--t-body-lg);font-weight:600;line-height:1.35;color:var(--ink)}
-.how li span{grid-column:2;font-size:var(--t-cap);line-height:1.45;color:var(--ink-2);margin-top:2px}
+/* Three steps under the stalls for somebody buying a winter's meat for the
+   first time, each numbered in a gold outline. */
+.how{margin:56px 0 0;padding-top:28px;border-top:1px solid var(--gold-line)}
+.how .section-title{margin:0 0 6px;font-family:var(--display);font-size:2.25rem;font-weight:800;line-height:.92;letter-spacing:-.004em}
+.how ol{list-style:none;margin:0;padding:0;counter-reset:how;background:none;border:0;border-radius:0;box-shadow:none}
+.how ol > li{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:16px;align-items:center;padding:14px 0;border-top:1px solid var(--line);counter-increment:how}
+.how ol > li:first-child{border-top:0}
+.how ol > li::before{content:counter(how);grid-column:1;grid-row:1 / span 2;font-family:var(--display);font-size:2.75rem;font-weight:800;line-height:1;color:transparent;-webkit-text-stroke:1px var(--gold)}
+.how li b{grid-column:2;font-size:1.0625rem;font-weight:700;line-height:1.25;color:var(--ink)}
+.how li span{grid-column:2;margin-top:3px;font-size:var(--t-body);line-height:1.4;color:var(--ink-2)}
 
-/* two columns on a desk: the promises and my orders stay put, the stalls scroll */
+/* two columns on a wider screen: the promises and my orders stay put, the stalls scroll */
 @media (min-width:900px){
-  .wrap{max-width:960px;display:grid;grid-template-columns:minmax(280px,5fr) minmax(0,7fr);column-gap:32px;align-items:start}
-  /* pinned only while it is short: a column of thirteen orders scrolls with the page instead */
+  #list.wrap{max-width:1040px;display:grid;grid-template-columns:minmax(300px,5fr) minmax(0,7fr);column-gap:40px;align-items:start}
   .intro:has(.mine:not([data-any])){position:sticky;top:calc(var(--bar-h) + var(--safe-t) + 12px)}
-  .market{padding-top:12px}
+  .market{margin-top:calc(var(--bar-h) + 118px)}
+  .listings{grid-template-columns:minmax(0,1fr)}
 }
 
 /* ── the screen ──────────────────────────────────────────────────── */
@@ -153,7 +208,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
    where back goes, which is what the phone taught them. */
 .screen{
   position:fixed;inset:0;z-index:var(--z-sheet);display:flex;flex-direction:column;
-  background:var(--bg);background-image:var(--ground);background-repeat:no-repeat;background-size:100% 100%;
+  background:var(--bg);
   transform:translateX(100%);visibility:hidden;
   transition:transform var(--dur-sheet) var(--ease),visibility 0s linear var(--dur-sheet);
 }
@@ -173,143 +228,199 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 /* The screen's title takes the focus as the screen opens, so a screen reader
    starts there; it is not a control, and draws no ring. */
 #screen-title:focus{outline:none}
-.screen-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:24px}
+.screen-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:28px}
+/* A stall's own face: the bar lies over the photograph — the way back and
+   the share a glass circle each — and turns glass with the name once the
+   photograph has scrolled under it. */
+.screen .share{display:none}
+.screen[data-face="detail"] .topbar{position:absolute;top:0;left:0;right:0}
+.screen[data-face="detail"] .share:not([hidden]){display:inline-grid}
+.screen .topbar .share{place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:none;color:var(--ink)}
+.screen .topbar .share svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.screen .topbar[data-flat] :is(.back,.share){
+  width:44px;min-width:44px;padding:0;justify-content:center;border-radius:50%;
+  background:rgba(16,13,12,.55);border:1px solid rgba(255,255,255,.14);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+}
+.screen .topbar[data-flat] .back > span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.screen .topbar[data-flat] .back svg{width:22px;height:22px}
 .screen-foot{
-  flex:none;padding:12px var(--s-5) calc(12px + var(--safe-b));border-top:1px solid var(--line);
-  background:var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);
+  flex:none;padding:14px 20px calc(14px + var(--safe-b));border-top:1px solid var(--line);
+  background:rgba(16,13,12,.94);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
 }
 .screen-foot:empty{display:none}
 .screen-foot .btn + .btn{margin-top:8px}
-.foot-row{display:flex;align-items:center;gap:14px}
+.foot-row{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .foot-row .sum{flex:1;min-width:0}
-.foot-row .sum b{display:block;line-height:1.1}
-.foot-row .sum .money{font-size:var(--t-title-2)}
-.foot-row .sum > span{display:block;font-size:var(--t-cap);color:var(--ink-2);margin-bottom:2px}
-.foot-row .btn{flex:none;min-width:46%;min-height:var(--h-lg)}
-.why{display:flex;align-items:center;gap:6px;margin:0 0 10px;font-size:var(--t-cap);line-height:1.4;color:var(--ink-3)}
+.foot-row .sum > span{display:block;margin:2px 0 8px;font-size:var(--t-cap);font-weight:600;line-height:1.2;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.foot-row .sum b{display:block;font-family:var(--display);font-size:2.125rem;font-weight:800;line-height:1;letter-spacing:-.004em;white-space:nowrap}
+.foot-row .sum .money{font-weight:800}
+.foot-row .btn{flex:none;min-height:58px;padding:0 30px;font-size:1.125rem}
+.why{display:flex;align-items:center;gap:6px;margin:0 0 12px;font-size:var(--t-cap);font-weight:500;line-height:1.4;color:var(--ink-3)}
 .why svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 /* a refused payment, said above the button it is about, until the next tap */
-.why[data-tone="stop"]{align-items:flex-start;color:var(--stop);font-weight:500}
+.why[data-tone="stop"]{align-items:flex-start;color:var(--stop);font-weight:600}
 .why[data-tone="stop"] svg{margin-top:1px}
 /* payments closed: said on the stall and on the review, before any sign-in — calm, not the stop colour */
-#closed{margin:16px var(--s-5) 0}
-#closed a{font-weight:500;overflow-wrap:anywhere}
+#closed{margin:20px 20px 0}
+#closed a{font-weight:600;overflow-wrap:anywhere}
 
-/* the stall */
-.hero{position:relative;height:220px;background:var(--surface-2);overflow:hidden}
-.hero img{width:100%;height:100%;object-fit:cover;display:block}
+/* the stall: its photograph, full bleed, under a sheet of the charcoal */
+.hero{position:relative;height:calc(var(--safe-t) + 312px);overflow:hidden;background:var(--surface)}
+.hero img{display:block;width:100%;height:100%;object-fit:cover;filter:sepia(.1) saturate(1.12) contrast(1.08)}
+.hero[data-kind="sheep"] img{object-position:50% 62%}
+.hero::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(10,8,7,.7) 0%,rgba(10,8,7,0) 26%,rgba(10,8,7,0) 66%,rgba(16,13,12,.6) 100%)}
 /* the photos are Basu's, not this supplier's meat: said on the picture, quietly, as on the website */
-.hero .sample{position:absolute;left:12px;bottom:12px;padding:4px 10px;border-radius:var(--r-pill);background:rgba(18,26,21,.55);color:#fff;font-size:var(--t-cap);font-weight:500;line-height:1.3;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-.head{padding:20px var(--s-5) 0}
-.head .from{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:var(--t-body-lg);color:var(--ink-2)}
-.head .bits{margin-top:6px;font-size:var(--t-cap)}
-.about{margin:12px var(--s-5) 0;font-size:var(--t-body-lg);line-height:var(--lh-body);color:var(--ink-2)}
-.facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;margin:16px var(--s-5) 0;padding:0;overflow:hidden;background:var(--line)}
-.facts div{background:var(--surface);padding:12px 16px}
-.facts .lab{display:block;margin-bottom:6px}
-.facts b{display:block;font-size:var(--t-body-lg);font-weight:600;line-height:1.3;font-variant-numeric:tabular-nums}
-.facts b small{font-size:var(--t-cap);font-weight:400;color:var(--ink-2)}
-/* the number in the mono, the unit beside it in the sans (2.2) */
-.facts b .mn{font-weight:600}
-.note{margin:16px var(--s-5) 0}
+.hero .sample{position:absolute;left:16px;bottom:44px;z-index:1;display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:var(--r-pill);background:rgba(16,13,12,.55);border:1px solid rgba(255,255,255,.14);color:var(--ink);font-size:var(--t-cap);font-weight:600;line-height:1;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.head{position:relative;z-index:1;margin-top:-28px;padding:26px 20px 0;border-radius:28px 28px 0 0;background:var(--bg)}
+.screen-body > .head:first-child{margin-top:0;padding-top:calc(var(--bar-h) + var(--safe-t) + 16px);border-radius:0}
+.head .from{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;font-size:.875rem;font-weight:600;line-height:1.3;color:var(--ink-2)}
+.head h2{margin-top:12px;font-size:3.25rem;line-height:.88}
+.head .pr{display:flex;align-items:baseline;flex-wrap:wrap;gap:0 6px;margin-top:12px}
+.head .pr b{font-family:var(--display);font-size:2.125rem;font-weight:800;line-height:1;letter-spacing:-.004em}
+.head .pr b .money{font-weight:800}
+.head .pr > span{font-size:var(--t-body-lg);font-weight:600;color:var(--ink-2)}
+.head .per{margin-top:8px;font-size:var(--t-body);font-weight:600;line-height:1.3;color:var(--ink-2)}
+.head .bits{margin-top:10px;color:var(--ink-3)}
+.about{margin:14px 20px 0;font-size:var(--t-body);line-height:var(--lh-body);color:var(--ink-2)}
+.note{margin:18px 20px 0}
 
-/* one question per step, numbered, hairline between them */
-.step{margin:24px var(--s-5) 0;padding-top:20px;border-top:1px solid var(--line)}
-.step .q{margin:0 0 12px}
-.step .help{font-size:var(--t-cap);line-height:1.4;color:var(--ink-3);margin-top:10px}
-.step .help b{color:var(--ink-2);font-weight:500}
-.step > .input{margin-top:4px}
+/* the questions, hairline between them */
+.step{margin:18px 20px 0;padding-top:16px;border-top:1px solid var(--line)}
+.step .q{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 0 12px;font-size:var(--t-body);font-weight:600;line-height:1.3;color:var(--ink-2)}
+.step .q em{font-style:normal;font-size:.875rem;font-weight:600;color:var(--ink-3);text-align:right}
+.step .help{margin-top:10px;font-size:var(--t-cap);font-weight:500;line-height:1.45;color:var(--ink-3)}
+.step .help b{color:var(--ink-2);font-weight:700}
 .step .field:last-child{margin-bottom:0}
-.field .opt{font-weight:400;color:var(--ink-3)}
+.field .opt{font-weight:500;color:var(--ink-3)}
 
-.qty{display:flex;align-items:center;gap:12px}
-.qty output{flex:1;text-align:center;font-size:var(--t-title-2);font-weight:600;line-height:1.1;color:var(--ink)}
-.qty output small{display:block;font-size:var(--t-cap);font-weight:400;color:var(--ink-3);margin-top:3px}
-.sumline{margin-top:10px;text-align:center;font-size:var(--t-cap);color:var(--ink-2)}
+/* how much: the label at the left, a pill stepper at the right */
+#step-qty{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;column-gap:12px}
+#step-qty .q{margin:0}
+#step-qty .help{flex:0 0 100%}
+.qty{display:flex;align-items:center;gap:4px;height:52px;padding:3px;border-radius:26px;background:var(--surface);border:1px solid var(--line)}
+.qty .btn[data-icon]{width:44px;height:44px;min-height:44px;border:0;border-radius:50%;background:var(--surface-3);color:var(--ink);box-shadow:none}
+.qty .btn[data-icon] svg{width:20px;height:20px}
+.qty .btn[data-icon]:disabled{background:var(--surface-2);color:var(--ink-3)}
+.qty output{min-width:76px;text-align:center;font-family:var(--display);font-size:1.75rem;font-weight:800;line-height:1;color:var(--ink);white-space:nowrap}
+.qty output .mn{font-weight:800}
+.qty output small{margin-left:3px;font-family:var(--sans);font-size:var(--t-body);font-weight:600;color:var(--ink-2)}
 
+/* how it arrives: two halves of one pill, the chosen one off-white */
+#step-receive [role="radiogroup"]{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px;padding:4px;border-radius:26px;background:var(--surface);border:1px solid var(--line)}
 .choice{
-  display:flex;align-items:center;gap:12px;width:100%;min-height:56px;padding:12px 0;margin:0;
-  border:0;border-top:1px solid var(--line);background:none;color:var(--ink);text-align:left;
+  display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;min-height:46px;margin:0;padding:0 10px;
+  border:0;border-radius:22px;background:none;color:var(--ink-2);font-family:var(--sans);font-size:var(--t-body);font-weight:700;line-height:1.1;
+  transition:background var(--dur),color var(--dur);
 }
-.choice:first-of-type{border-top:0;padding-top:4px}
-.choice .dot{
-  width:20px;height:20px;margin:0;border-radius:50%;border:1px solid var(--line-2);background:var(--surface);
-  display:grid;place-items:center;transition:background var(--dur),border-color var(--dur);
-}
-.choice .dot svg{display:none}
-.choice .txt{flex:1;min-width:0}
-.choice .txt b{display:block;font-size:var(--t-row);font-weight:600;line-height:var(--lh-snug)}
-.choice .txt small{display:block;font-size:var(--t-cap);color:var(--ink-2);margin-top:2px;line-height:1.4}
-.choice .tag{flex:none;font-size:var(--t-body-lg);font-weight:500;color:var(--ink-2)}
-.choice[aria-checked="true"] .dot{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 0 0 4px var(--surface)}
-.choice[disabled]{cursor:not-allowed}
-.choice[disabled] .txt b,.choice[disabled] .tag{color:var(--ink-3)}
-.choice[disabled] .dot{background:var(--surface-2)}
+.choice svg{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.choice[aria-checked="true"]{background:var(--ink);color:var(--on-light)}
+.choice:focus-visible{outline-offset:-2px}
+.choice[disabled]{color:var(--ink-3);cursor:not-allowed}
+@media (hover:hover){.choice:not([disabled]):not([aria-checked="true"]):hover{color:var(--ink);background:var(--hover)}}
+#receive-note{display:flex;align-items:flex-start;gap:8px}
+#receive-note svg{width:16px;height:16px;flex:none;margin-top:1px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 
-.mapbox{position:relative;height:190px;margin-top:4px;border:1px solid var(--line-2);border-radius:var(--r-ctl);overflow:hidden;background:var(--surface-2)}
-/* mapStyle.js draws the night itself now: no veil over daylight tiles. */
+/* when: four days as chips, and a fifth for any later day */
+.days{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,1fr);gap:8px}
+.days [role="radiogroup"]{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.day{
+  position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:0;height:60px;margin:0;padding:0;
+  border-radius:var(--r-day);background:var(--surface);border:1px solid var(--line);color:var(--ink);font:inherit;cursor:pointer;
+}
+.day b{font-family:var(--display);font-size:1.5rem;font-weight:800;line-height:.9;font-variant-numeric:tabular-nums lining-nums;white-space:nowrap}
+.day span{font-size:.75rem;font-weight:700;line-height:1;color:var(--ink-3);white-space:nowrap}
+.day[aria-checked="true"],.day.other[data-on]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.day[aria-checked="true"] span,.day.other[data-on] span{color:var(--ink-2)}
+.day svg{width:20px;height:20px;fill:none;stroke:var(--ink-2);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.day.other[data-on] svg{display:none}
+.day.other:not([data-on]) b{display:none}
+/* the native date field lies over the fifth chip, unseen: a tap on it opens the phone's own picker */
+.day.other input{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer;-webkit-appearance:none;appearance:none}
+.day.other:focus-within{outline:2px solid var(--focus);outline-offset:2px}
+
+.mapbox{position:relative;height:190px;margin-top:4px;border:1px solid var(--line-2);border-radius:var(--r-day);overflow:hidden;background:var(--surface)}
 .mapbox .tip{
-  position:absolute;left:10px;bottom:10px;z-index:2;padding:5px 10px;border-radius:var(--r-sm);
-  background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);font-size:var(--t-cap);color:var(--ink-2);
+  position:absolute;left:10px;bottom:10px;z-index:2;padding:6px 12px;border-radius:var(--r-pill);
+  background:var(--glass);border:1px solid var(--glass-line);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);font-size:var(--t-cap);font-weight:600;color:var(--ink);
 }
 
 /* ── the review ──────────────────────────────────────────────────── */
-.review{margin:16px var(--s-5) 0;overflow:hidden}
+/* what is being bought, as the stall showed it */
+.review-head{display:flex;align-items:center;gap:16px;margin:20px 20px 0}
+.review-head .ph{flex:none;width:72px;height:72px;overflow:hidden;border-radius:16px;background:var(--surface);box-shadow:var(--shadow-1)}
+.review-head .ph img{display:block;width:100%;height:100%;object-fit:cover;filter:sepia(.1) saturate(1.12) contrast(1.08)}
+.review-head .what{min-width:0}
+.review-head .from{display:block;font-size:.875rem;font-weight:600;line-height:1.3;color:var(--ink-3)}
+.review-head b{display:block;margin-top:6px;font-family:var(--display);font-size:var(--t-title-2);font-weight:800;line-height:.95;letter-spacing:-.004em;color:var(--ink)}
+.review{margin:16px 20px 0;overflow:hidden}
 .review + .review{margin-top:12px}
-.review .r{display:flex;justify-content:space-between;gap:14px;padding:12px 16px;border-top:1px solid var(--line);font-size:var(--t-body-lg);line-height:1.4}
+.review .r{display:flex;justify-content:space-between;gap:16px;padding:14px 18px;border-top:1px solid var(--line);font-size:var(--t-body-lg);line-height:1.4}
 .review .r:first-child{border-top:0}
-.review .r > span{flex:none;color:var(--ink-2)}
-.review .r b{font-weight:500;text-align:right;min-width:0;overflow-wrap:break-word}
-.review .r b small{display:block;font-weight:400;font-size:var(--t-cap);color:var(--ink-2);margin-top:2px}
-.review .r.total{background:var(--surface-2)}
-.review .r.total > span{color:var(--ink);font-weight:500}
-.review .r.total .money{font-size:var(--t-title-2)}
-.promise{margin:20px var(--s-5) 0;display:flex;flex-direction:column;gap:10px}
-.promise div{display:flex;gap:10px;align-items:flex-start;font-size:var(--t-body);line-height:1.5;color:var(--ink-2)}
-.promise svg{width:18px;height:18px;flex:none;fill:none;stroke:var(--ink-3);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;margin-top:2px}
+.review .r > span{flex:none;font-size:var(--t-body);font-weight:600;color:var(--ink-3)}
+.review .r b{font-weight:600;text-align:right;min-width:0;overflow-wrap:break-word}
+.review .r b small{display:block;font-weight:500;font-size:var(--t-cap);color:var(--ink-2);margin-top:2px}
+.review .r .money{font-size:1.125rem}
+.review .r.total{align-items:baseline;background:var(--surface-2)}
+.review .r.total > span{color:var(--ink);font-size:var(--t-body-lg);font-weight:700}
+.review .r.total .money{font-size:2.125rem;font-weight:800;line-height:1}
+.promise{margin:24px 20px 0;display:flex;flex-direction:column;gap:12px}
+.promise div{display:flex;gap:12px;align-items:flex-start;font-size:var(--t-body);line-height:1.5;color:var(--ink-2)}
+.promise svg{width:18px;height:18px;flex:none;fill:none;stroke:var(--gold);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;margin-top:2px}
 .promise b{color:var(--ink)}
-.terms{margin:16px var(--s-5) 0;font-size:var(--t-cap);color:var(--ink-3);text-align:center}
-.terms a{font-weight:500}
+.terms{margin:20px 20px 0;font-size:var(--t-cap);color:var(--ink-3);text-align:center}
+.terms a{font-weight:600;color:var(--ink-2)}
+
+/* QPay's page is open elsewhere: the amount big, a gold word that it waits, the one crimson way back to it */
+.qpay-wait .wait{display:flex;align-items:center;gap:8px;margin:2px 0 10px;font-size:.75rem;font-weight:700;line-height:1;letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+.qpay-wait .wait::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold);animation:qpay-wait 1.6s ease-in-out infinite}
+@keyframes qpay-wait{50%{opacity:.25}}
+.qpay-wait .wait[data-over]{color:var(--ink-3)}
+.qpay-wait .wait[data-over]::before{animation:none;background:var(--ink-3)}
+.qpay-wait .amount{display:block;margin:0 0 8px;font-family:var(--display);font-size:2.75rem;font-weight:800;line-height:.95;letter-spacing:-.004em;color:var(--ink)}
+.qpay-wait .amount .money{font-weight:800}
+.qpay-wait .why{align-items:flex-start;margin-bottom:14px;color:var(--ink-2)}
+.qpay-wait .why svg{margin-top:1px}
+.qpay-wait .foot-row .btn{flex:1 1 0;min-width:0;padding:0 18px}
+.qpay-wait .foot-row .btn[data-v="primary"]{flex:1.25 1 0}
 
 /* ── the order, after paying: one calm page that says what happens next ── */
-.status{margin:16px var(--s-5) 0;padding:24px 20px 20px;text-align:center}
-.status .mark{width:48px;height:48px;border-radius:50%;margin:0 auto 14px;display:grid;place-items:center;background:var(--ready-soft);color:var(--ready)}
-.status .mark svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.status[data-s="PAID"] .mark,.status[data-s="DISPATCHED"] .mark{background:var(--route-soft);color:var(--route)}
-/* the meat being prepared is honey, as its chip is and as the launcher's dot is */
-.status[data-s="PREPARING"] .mark{background:var(--hi-soft);color:var(--hi-ink)}
-/* a finished negative outcome is not an alarm: neutral, not red */
-.status[data-s="CLOSED"] .mark,.status[data-s="CANCELLED"] .mark,.status[data-s="REFUNDED"] .mark{background:var(--surface-2);color:var(--ink-3)}
-.status .big{font-size:var(--t-headline);font-weight:600;line-height:var(--lh-tight);letter-spacing:-.015em;text-wrap:balance}
-.status .cap{font-size:var(--t-body);color:var(--ink-2);margin:8px auto 0;line-height:var(--lh-body);max-width:32ch}
+.status{margin:16px 20px 0;padding:22px 20px 14px;text-align:left}
+.status .stage{display:flex;flex-direction:row;align-items:center;gap:14px;width:100%;max-width:none;margin:0 0 16px}
+.status .stage > b{flex:none;font-size:var(--t-body);font-weight:700}
+.status .stage .meter{flex:1;min-width:0}
+.status .stage .meter > i{height:5px;border-radius:3px}
+.status .big{font-family:var(--display);font-size:var(--t-title);font-weight:800;line-height:.92;letter-spacing:-.004em;color:var(--ink);text-wrap:balance}
+.status[data-s="CANCELLED"] .big{color:var(--accent-ink)}
+.status .cap{margin:12px 0 0;font-size:var(--t-body);line-height:var(--lh-body);color:var(--ink-2);max-width:40ch}
 .status .cap b{color:var(--ink)}
-.timeline{margin:20px 0 0}
-.handcode{margin:12px var(--s-5) 0}
-/* «Хүргэгчид энэ кодыг хэлнэ» is four words: a caption, not an eyebrow (5.8) */
-.handcode .lab{font-family:var(--sans);font-size:var(--t-cap);font-weight:500;letter-spacing:0;text-transform:none;color:var(--ink-2)}
-/* the three fact panels read as one card: joined edges, a hairline between */
-.panel{margin:12px var(--s-5) 0;overflow:hidden}
+.timeline{margin:18px 0 0;padding-top:8px;border-top:1px solid var(--line)}
+.handcode{margin:12px 20px 0}
+.handcode b{font-size:3rem}
+/* the fact panels read as one card: joined edges, a hairline between */
+.panel{margin:12px 20px 0;overflow:hidden}
 .panel + .panel{margin-top:0;border-top:0;border-top-left-radius:0;border-top-right-radius:0}
 .panel:has(+ .panel){border-bottom-left-radius:0;border-bottom-right-radius:0}
 .panel + .panel > .line:first-child{border-top:1px solid var(--line)}
-.panel .line{display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:12px;align-items:start;padding:14px 16px;border-top:1px solid var(--line)}
+.panel .line{display:grid;grid-template-columns:20px minmax(0,1fr);column-gap:14px;align-items:start;padding:16px 18px;border-top:1px solid var(--line)}
 .panel .line:first-child{border-top:0}
 .panel .line > svg{width:20px;height:20px;margin-top:1px;fill:none;stroke:var(--ink-3);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.panel .lab{display:block;margin-bottom:6px}
-.panel .v{font-size:var(--t-body-lg);font-weight:500;line-height:1.4;color:var(--ink);min-width:0;overflow-wrap:break-word}
-.panel .v small{display:block;font-weight:400;font-size:var(--t-cap);color:var(--ink-2);margin-top:4px;line-height:1.4}
-.panel .v .badge{margin-left:6px}
+.panel .lab{display:block;margin-bottom:8px}
+.panel .v{font-size:var(--t-body-lg);font-weight:600;line-height:1.4;color:var(--ink);min-width:0;overflow-wrap:break-word}
+.panel .v > .mono{display:block;font-size:1.75rem;font-weight:800;line-height:1;letter-spacing:-.004em}
+.panel .v > .mono .money{font-weight:800}
+.panel .v small{display:block;font-weight:500;font-size:var(--t-cap);color:var(--ink-2);margin-top:6px;line-height:1.45}
+.panel .v .badge{margin-left:8px}
 /* on a phone the number is the thumb's 44 tall, its line as tall as before (app.css, `.tel` under pointer:coarse) */
-.panel .v a.tel{display:inline-flex;align-items:center;gap:5px;color:var(--ink);font-weight:500;vertical-align:baseline}
-.panel .v a.tel svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-#refund .field{margin:12px 0 0;font-weight:400}
-#refund .why{margin:12px 0 0}
-#refund .btn{margin-top:12px}
+.panel .v a.tel{gap:5px;font-weight:700}
+.panel .v a.tel svg{width:16px;height:16px}
+#refund .field{margin:14px 0 0}
+#refund .why{margin:14px 0 0}
+#refund .btn{margin-top:14px}
 .assure{display:none}
 /* who is signed in, and the way out — in a browser; the app has its own */
-.me{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin:12px 0 0;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}
+.me{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin:14px 0 0;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}
 .me[hidden]{display:none}
-.me b{color:var(--ink);font-weight:600;overflow-wrap:anywhere}
+.me b{color:var(--ink);font-weight:700;overflow-wrap:anywhere}
 .me .link{min-height:32px;font-size:var(--t-cap);text-decoration:underline;text-underline-offset:.2em}
 </style>
 </head>
@@ -321,6 +432,9 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
   <span class="act"></span>
 </header>
 <div class="stale-strip" id="stale" role="status" hidden>Холболт тасарлаа — дахин холбогдож байна…</div>
+
+<!-- A dark photograph of cuts under the title, fading into the charcoal. -->
+<div class="band" aria-hidden="true"><img src="/brand/meat/cuts-828.webp" alt="" width="828" height="424"></div>
 
 <main class="wrap" id="list">
   <div class="intro">
@@ -340,27 +454,26 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 
   <section class="mine" id="mine">
     <h2 class="sec section-label">Миний идэш</h2>
-    <div id="mine-list" data-rows></div>
+    <div id="mine-list"></div>
   </section>
   </div>
 
   <div class="market">
-  <div class="section-label" id="tally-row"><span class="n tally" id="tally"></span></div>
+  <div class="section-label" id="tally-row"><span class="tally" id="tally"></span></div>
   <div class="kinds filter" id="kinds" role="group" aria-label="Малын төрөл"></div>
-  <ul class="listings" id="listings" data-rows aria-busy="true">
-    <li><span class="skel-row" aria-hidden="true"><span class="skel"></span><span class="skel-lines"><span class="skel"></span><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></span></li>
-    <li><span class="skel-row" aria-hidden="true"><span class="skel"></span><span class="skel-lines"><span class="skel"></span><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></span></li>
-    <li><span class="skel-row" aria-hidden="true"><span class="skel"></span><span class="skel-lines"><span class="skel"></span><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></span></li>
+  <ul class="listings" id="listings" aria-busy="true">
+    <li aria-hidden="true"><span class="skel-listing"><span class="skel"></span><span class="skel"></span><span class="skel"></span><span class="skel"></span></span></li>
+    <li aria-hidden="true"><span class="skel-listing"><span class="skel"></span><span class="skel"></span><span class="skel"></span><span class="skel"></span></span></li>
   </ul>
   <section class="blank" id="blank" aria-live="polite" hidden></section>
 
   <!-- What happens after the tap, for somebody doing this for the first time. -->
   <section class="how" id="how" hidden>
     <h2 class="section-title">Хэрхэн авах вэ?</h2>
-    <ol data-rows>
-      <li><b>Зараа сонгоод төлнө</b><span>Үнэ нь зар дээр бичсэнээрээ эцсийнх — нэг удаа, бүтнээр нь төлнө.</span></li>
-      <li><b>Нийлүүлэгч бэлтгэнэ</b><span>Төлбөр орсны дараа малаа нядалж, махыг бэлтгэнэ. Явц нь энд харагдана.</span></li>
-      <li><b>Кодоо хэлээд авна</b><span>Өөрөө очиж, эсвэл гэртээ хүргүүлж авна. Нийлүүлэгч кодыг тань сонсоод махыг өгнө.</span></li>
+    <ol>
+      <li><b>Сонгоод төлнө</b><span>Зар дээрх үнэ эцсийнх.</span></li>
+      <li><b>Нийлүүлэгч бэлтгэнэ</b><span>Төлбөр орсны дараа. Явц энд харагдана.</span></li>
+      <li><b>Кодоо хэлээд авна</b><span>Өөрөө очиж, эсвэл хүргүүлж.</span></li>
     </ol>
   </section>
   </div>
@@ -369,10 +482,10 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 <section class="screen" id="screen" aria-labelledby="screen-title">
   <header class="bar topbar">
     <button class="back" type="button" id="screen-back" aria-label="Буцах">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Буцах
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg><span>Буцах</span>
     </button>
     <div class="bar-title title"><b id="screen-title" role="heading" aria-level="1" tabindex="-1">—</b><span id="screen-sub"></span></div>
-    <span class="act"></span>
+    <span class="act"><button class="share" type="button" id="screen-share" aria-label="Хуваалцах" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/></svg></button></span>
   </header>
   <div class="screen-body" id="screen-body"></div>
   <footer class="screen-foot" id="screen-foot"></footer>
@@ -383,8 +496,8 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 <!-- MapLibre from cdnjs, held to cdnjs's own hash of the file: bytes that ever differ do not run. A new version takes its new hash, here and on the stylesheet. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js" integrity="sha512-hoXlvOdSmh58mppUyZHZsscHkR/yXl6zLpTMTNwA6IZ61DpeaCNjosRu1WJ2DeIpkfW5MsJJ9H89zjV4IBGqRw==" crossorigin="anonymous"></script>
 <script type="module">
-import { api, store, shell, toast, mnt, money, IDESH_HEADLINE, IDESH_STATE, KIND, BANK_NAMES, dayLabel, dayShort, ubParts, signInSheet, passwordPopup, dropSession, whatWentWrong } from '/api.js';
-import { mapStyle, mapTheme, onMapTheme, repaintMap, ULAANBAATAR, MAP_LOCALE } from '/mapStyle.js';
+import { api, store, shell, toast, mnt, money, meter, ideshStage, IDESH_STATE, IDESH_STEP, KIND, BANK_NAMES, dayLabel, dayShort, ubParts, signInSheet, passwordPopup, dropSession, whatWentWrong } from '/api.js';
+import { mapStyle, ULAANBAATAR, MAP_LOCALE } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
 const el = (html) => {
@@ -439,21 +552,17 @@ const MARK = {
   check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
   pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg>',
   day: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/></svg>',
-  truck: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/></svg>',
+  truck: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h11v10H3z"/><path d="M14 10h4l3 3.5v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17.5" cy="17.5" r="1.8"/></svg>',
+  store: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5l1.5-5h13l1.5 5"/><path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0"/><path d="M5.5 12v8h13v-8"/><path d="M10 20v-4.5h4V20"/></svg>',
   shield: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>',
   tag: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12l-8 8-8-8V4h8l8 8z"/><circle cx="8.5" cy="8.5" r="1.3"/></svg>',
   undo: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.3-5.7"/><path d="M4 4v5h5"/></svg>',
   phone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h4l2 5-2.5 1.5a11 11 0 0 0 5 5L16 12l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 4 5a2 2 0 0 1 2-2z"/></svg>',
   warn: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>',
-  work: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 7v5l3 2"/></svg>',
-  box: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l9-4 9 4v9l-9 4-9-4z"/><path d="M3 8l9 4 9-4M12 12v9"/></svg>',
-  hand: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6.5a1.5 1.5 0 0 1 3 0V13M17 13v-2.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.6a6 6 0 0 1-5-2.7L4.4 14a1.5 1.5 0 0 1 2.4-1.8L8 13.5"/></svg>',
-  cross: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg>',
   wallet: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M15.5 14.5h2"/></svg>',
   receipt: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>',
   minus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg>',
   plus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>',
-  next: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>',
   info: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.5h.01"/></svg>',
   offline: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 8.8a14 14 0 0 1 5-2.9M21.5 8.8A14 14 0 0 0 12 5c-.7 0-1.4 0-2 .1M5.5 12.4a9 9 0 0 1 3.4-2M18.5 12.4a9 9 0 0 0-3.2-1.9M9 15.9a4.5 4.5 0 0 1 6 0M12 19.5h.01M3 3l18 18"/></svg>',
 };
@@ -619,13 +728,13 @@ const BLANK = {
   none: {
     plate: () => MARK.day,
     title: 'Одоогоор зар алга',
-    text: 'Нийлүүлэгчид өвлийн идшээ ихэвчлэн 10–11-р сард зарладаг. Шинэ зар гармагц энд харагдана.',
+    text: 'Шинэ зар гармагц энд харагдана.',
     act: '',
   },
   offline: {
     plate: () => MARK.offline,
     title: 'Холболт тасарлаа',
-    text: 'Интернэтээ шалгаад дахин оролдоно уу. Холбогдмогц зарууд өөрөө гарч ирнэ.',
+    text: 'Интернэтээ шалгаад дахин оролдоно уу.',
     act: '<button class="btn" data-v="primary" data-size="lg" type="button" data-retry>Дахин оролдох</button>',
   },
 };
@@ -732,16 +841,18 @@ function phoneShown(raw) {
 }
 
 /**
- * «бүтэн · ≈140 кг» over «≈11,800₮/кг» / «1 кг · доод тал нь 20 кг» — what the
- * price is for. A whole animal also says what its rough weight makes a kilo,
- * rounded to the hundred as the website's market card says it (shop.html),
- * so a whole animal and a stall by the kilo compare on the list.
+ * What the price is for, beside it — «бүтэн · ≈140 кг» for a whole animal,
+ * «/кг» for a stall by the kilo — and the line under it: what that rough
+ * weight makes a kilo («≈11,800₮/кг», rounded to the hundred as the website's
+ * market card says it, shop.html), so a whole animal and a stall by the kilo
+ * compare on the list; or the least a stall by the kilo sells.
  */
 function priceFor(l) {
-  if (l.unit !== 'whole') return `1 кг · доод тал нь ${l.min_qty} кг`;
+  if (l.unit !== 'whole') return { unit: '/кг', per: `доод тал нь ${l.min_qty} кг` };
   const kg = Number(l.approx_kg);
-  // The kilo on a line of its own: the caption is narrower than both, and a run broken after a «·» reads as unfinished.
-  return kg > 0 ? `бүтэн · ≈${kg} кг <span class="per">≈${mnt(Math.round(l.price_mnt / kg / 100) * 100)}/кг</span>` : 'бүтэн';
+  return kg > 0
+    ? { unit: `бүтэн · ≈${kg} кг`, per: `≈${mnt(Math.round(l.price_mnt / kg / 100) * 100)}/кг` }
+    : { unit: 'бүтэн', per: '' };
 }
 
 /**
@@ -794,27 +905,30 @@ function paintListings() {
     const gone_ = l.remaining === 0;
     // Three left of twenty is worth saying louder than seventeen of twenty.
     const low = !gone_ && l.remaining <= Math.max(2, Math.ceil(l.quantity * 0.15));
+    const price = priceFor(l);
+    // The photograph first, a glass chip on it for what is left (and a paid
+    // tier's mark), then who sells it, its name, its price and its day.
     const item = el(`
       <li>
-        <button class="listing row" type="button" data-kind="${escapeHtml(l.kind)}" data-id="${escapeHtml(l.id)}"${l.tier ? ` data-tier="${escapeHtml(l.tier)}"` : ''}${gone_ ? ' data-gone' : ''} data-chev>
-          <span class="art lead"><img src="${PHOTO(l.kind)}" alt="" loading="lazy" width="64" height="64"></span>
-          <span class="who main">
-            <span class="name title">${l.tier ? `<i class="tier chip" data-size="sm" data-tone="${l.tier === 'vip' ? 'hi' : 'accent'}" data-strong>${l.tier === 'vip' ? 'VIP' : 'Онцгой'}</i> ` : ''}${escapeHtml(l.title)}</span>
+        <button class="listing" type="button" data-kind="${escapeHtml(l.kind)}" data-id="${escapeHtml(l.id)}"${l.tier ? ` data-tier="${escapeHtml(l.tier)}"` : ''}${gone_ ? ' data-gone' : ''}>
+          <span class="art"><img src="${PHOTO(l.kind)}" alt="" loading="lazy" width="640" height="400"></span>
+          ${l.tier ? `<i class="tier">${l.tier === 'vip' ? 'VIP' : 'Онцгой'}</i>` : ''}
+          <span class="left chip"${gone_ ? ' data-gone' : low ? ' data-low data-tone="hold" data-strong' : ''}>${
+            gone_ ? 'Дууссан' : `${l.remaining} ${unitWord(l)} үлдсэн`
+          }</span>
+          <span class="who">
             <span class="from">${
               l.supplier.contracted ? `<i class="verified badge">${MARK.check}Гэрээт</i>` : ''
             }${escapeHtml(l.supplier.name)}</span>
-            <span class="bits">${bits(l, `${dayLabel(l.ready_from)}-нөөс`, { where: !placeInName(l) })}</span>
+            <span class="name">${escapeHtml(l.title)}</span>
           </span>
-          <span class="row">
-            <span class="left chip"${gone_ ? ' data-gone' : low ? ' data-low data-tone="hold" data-strong' : ''}>${
-              gone_ ? 'Дууссан' : `${l.remaining} ${unitWord(l)} үлдсэн`
-            }</span>
-            <span class="price"><b>${money(l.price_mnt)}</b><small>${priceFor(l)}</small></span>
-          </span>
+          <span class="price"><b>${money(l.price_mnt)}</b><small>${price.unit}</small></span>
+          ${price.per ? `<span class="per">${price.per}</span>` : ''}
+          <span class="bits">${bits(l, `${dayLabel(l.ready_from)}-нөөс`, { where: !placeInName(l) })}</span>
         </button>
       </li>`);
     item.querySelector('button').addEventListener('click', () => openListing(l));
-    // The picture did not come: the drawn mark stands in, and the row stays whole.
+    // The picture did not come: the drawn mark stands in, and the card stays whole.
     const picture = item.querySelector('.art img');
     picture.addEventListener('error', () => {
       picture.parentElement.innerHTML = ART[l.kind] ?? '';
@@ -841,6 +955,11 @@ function showScreen(name, title, sub, { replace = false } = {}) {
   $('screen-body').scrollTop = 0;
   const first = state.screen === null;
   state.screen = name;
+  // A stall's face lies under its own bar (clear over the photograph until
+  // it scrolls away); the review and the order's face keep a glass bar.
+  $('screen').dataset.face = name;
+  settleScreenBar();
+  $('screen-share').hidden = name !== 'detail' || typeof navigator.share !== 'function';
   $('screen').dataset.open = '1';
   document.body.style.overflow = 'hidden';
   if (replace && !first) history.replaceState({ screen: name }, '');
@@ -853,6 +972,31 @@ function showScreen(name, title, sub, { replace = false } = {}) {
   for (const behind of [$('bar'), $('list')]) behind.toggleAttribute('inert', true);
   $('screen-title').focus({ preventScroll: true });
 }
+
+/**
+ * The screen's bar over a stall's photograph: clear, the way back and the
+ * share a glass circle each, while the photograph is in view; glass with the
+ * stall's name once it has scrolled under the bar. Every other face has the
+ * glass bar from the start.
+ */
+let screenBarFrame = 0;
+function settleScreenBar() {
+  screenBarFrame = 0;
+  const bar = $('screen').querySelector('.topbar');
+  const hero = state.screen === 'detail' ? $('screen-body').querySelector('.hero') : null;
+  const clear = Boolean(hero) && hero.getBoundingClientRect().bottom > bar.getBoundingClientRect().bottom + 24;
+  bar.toggleAttribute('data-flat', clear);
+}
+$('screen-body').addEventListener('scroll', () => {
+  if (!screenBarFrame) screenBarFrame = requestAnimationFrame(settleScreenBar);
+}, { passive: true });
+
+/** The stall, to whoever the guest sends it to — the website's own page for it, where the phone can share. */
+$('screen-share').addEventListener('click', () => {
+  const l = state.listing;
+  if (!l || typeof navigator.share !== 'function') return;
+  navigator.share({ title: l.title, text: `${l.title} — ${l.supplier.name}`, url: `${location.origin}/shop/${encodeURIComponent(l.id)}` }).catch(() => {});
+});
 
 /** What had the focus when the screen opened: it gets it back when the screen closes. */
 let opener = null;
@@ -909,6 +1053,18 @@ addEventListener('popstate', (event) => {
 /** The soonest day the guest may ask for: when the meat exists, and not the past. */
 const earliest = (l) => (l.ready_from > state.today ? l.ready_from : state.today);
 
+/** `2026-10-14` and 2 → `2026-10-16`: a calendar day, counted on a calendar, never a clock. */
+function dayAfter(day, n) {
+  const at = new Date(`${day}T12:00:00Z`);
+  at.setUTCDate(at.getUTCDate() + n);
+  return at.toISOString().slice(0, 10);
+}
+
+/** The days of the week as a calendar says them, Sunday first (getUTCDay). */
+const WEEKDAY = ['Ням', 'Даваа', 'Мягмар', 'Лхагва', 'Пүрэв', 'Баасан', 'Бямба'];
+/** `2026-10-14` → «Лхагва». */
+const weekday = (day) => WEEKDAY[new Date(`${day}T12:00:00Z`).getUTCDay()] ?? '';
+
 function openListing(l) {
   state.listing = l;
   state.orderId = null;
@@ -926,8 +1082,11 @@ function openListing(l) {
 
 /** The same picture, larger, at the top of the screen — Basu's photo of the animal, and said so. */
 function hero(kind) {
-  const box = el(`<div class="hero"><img src="${PHOTO(kind)}" alt="${escapeHtml(KIND[kind] ?? '')} — жишээ зураг" width="560" height="220"><span class="sample" aria-hidden="true">Жишээ зураг</span></div>`);
-  box.querySelector('img').addEventListener('error', () => box.remove());
+  const box = el(`<div class="hero" data-kind="${escapeHtml(kind)}"><img src="${PHOTO(kind)}" alt="${escapeHtml(KIND[kind] ?? '')} — жишээ зураг" width="640" height="640"><span class="sample" aria-hidden="true">Жишээ зураг</span></div>`);
+  box.querySelector('img').addEventListener('error', () => {
+    box.remove();
+    settleScreenBar();
+  });
   return box;
 }
 
@@ -952,53 +1111,45 @@ function renderDetail({ replace = false } = {}) {
   const f = state.form;
   showScreen('detail', l.title, l.supplier.name, { replace });
   const body = $('screen-body');
+  const price = priceFor(l);
 
+  // The photograph, then on the charcoal: who sells it, its name, its price, its day.
   body.append(hero(l.kind));
   body.append(
     el(`<div class="head">
+          <div class="from"><span>${escapeHtml(l.supplier.name)}</span>${l.supplier.contracted ? `<i class="verified badge">${MARK.check}Гэрээт</i>` : ''}</div>
           <h2>${escapeHtml(l.title)}</h2>
-          <div class="from">${l.supplier.contracted ? `<i class="verified badge">${MARK.check}Гэрээт нийлүүлэгч</i>` : ''}${escapeHtml(l.supplier.name)}</div>
+          <div class="pr"><b>${money(l.price_mnt)}</b><span>/${unitWord(l)}</span></div>
+          ${l.unit === 'whole' && price.per ? `<div class="per">≈${escapeHtml(l.approx_kg)} кг · ${price.per}</div>` : ''}
           <div class="bits">${bits(l, `${dayLabel(l.ready_from)}-нөөс бэлэн`)}</div>
         </div>`),
   );
   if (l.note) body.append(el(`<div class="about">${escapeHtml(l.note)}</div>`));
-  body.append(
-    el(`<div class="facts card">
-          <div><span class="lab">Үнэ</span><b>${money(l.price_mnt)}<small> / ${unitWord(l)}</small></b></div>
-          <div><span class="lab">${l.unit === 'whole' ? 'Ойролцоо жин' : 'Доод захиалга'}</span><b><span class="mn">${
-            l.unit === 'whole' ? `≈${l.approx_kg}` : `${l.min_qty}`
-          }</span> кг</b></div>
-          <div><span class="lab">Бэлэн болох</span><b>${dayLabel(l.ready_from)}</b></div>
-          <div><span class="lab">Үлдсэн</span><b><span class="mn">${l.remaining}</span> ${unitWord(l)}</b></div>
-        </div>`),
-  );
 
   if (l.remaining === 0) {
     body.append(el(`<div class="note callout"><b>Энэ зар дууссан</b><span>Нийлүүлэгч дахин нэмбэл энд гарна.</span></div>`));
+    settleScreenBar();
     return;
   }
 
-  /* 1 · how much */
+  /* how much: the label, and the pill stepper */
   const step = l.unit === 'whole' ? 1 : 5;
   const qty = el(`
     <div class="step" id="step-qty">
-      <div class="q section-title"><span class="n">1</span><b>${l.unit === 'whole' ? 'Хэдэн толгой авах вэ?' : 'Хэдэн кг авах вэ?'}</b></div>
+      <div class="q"><b>Хэмжээ</b></div>
       <div class="qty">
         <button class="btn" data-icon type="button" data-d="-1" aria-label="Хасах">${MARK.minus}</button>
-        <output id="qty"><span class="mn">${f.qty}</span><small>${unitWord(l)}</small></output>
+        <output id="qty" aria-live="polite"><span class="mn">${f.qty}</span><small>${unitWord(l)}</small></output>
         <button class="btn" data-icon type="button" data-d="1" aria-label="Нэмэх">${MARK.plus}</button>
       </div>
-      <div class="sumline" id="sumline"></div>
       <div class="help">${
         l.unit === 'whole'
-          ? `Нэг толгой ойролцоогоор <b>${l.approx_kg} кг</b>. Хоёр айл нэг мал хувааж авч болно.`
-          : `Доод тал нь <b>${l.min_qty} кг</b>. ${step} кг-аар нэмэгдэнэ.`
+          ? `<b>${l.remaining} толгой</b> үлдсэн. Хоёр айл нэг мал хувааж авч болно.`
+          : `Доод тал нь <b>${l.min_qty} кг</b>, ${step} кг-аар нэмэгдэнэ. <b>${l.remaining} кг</b> үлдсэн.`
       }</div>
     </div>`);
   const paintQty = () => {
     qty.querySelector('#qty').innerHTML = `<span class="mn">${f.qty}</span><small>${unitWord(l)}</small>`;
-    qty.querySelector('#sumline').innerHTML =
-      `${f.qty} ${unitWord(l)} × ${money(l.price_mnt)} = ${money(l.price_mnt * f.qty)}`;
     qty.querySelector('[data-d="-1"]').disabled = f.qty <= l.min_qty;
     qty.querySelector('[data-d="1"]').disabled = f.qty >= l.remaining;
   };
@@ -1012,36 +1163,57 @@ function renderDetail({ replace = false } = {}) {
   paintQty();
   body.append(qty);
 
-  /* 2 · how to receive it */
+  /* how it arrives: two halves of one pill */
   const pick = el(`
     <div class="step" id="step-receive">
-      <div class="q section-title"><span class="n">2</span><b>Хэрхэн авах вэ?</b></div>
       <div role="radiogroup" aria-label="Хэрхэн авах">
-        <button class="choice" type="button" role="radio" data-r="pickup" aria-checked="${f.receive === 'pickup'}">
-          <span class="dot">${MARK.check}</span>
-          <span class="txt"><b>Өөрөө очиж авна</b><small>${escapeHtml(l.supplier.pickup_address)}</small></span>
-          <span class="tag">үнэгүй</span>
-        </button>
-        <button class="choice" type="button" role="radio" data-r="delivery" aria-checked="${f.receive === 'delivery'}"${l.delivers ? '' : ' disabled'}>
-          <span class="dot">${MARK.check}</span>
-          <span class="txt"><b>Гэрт хүргүүлнэ</b><small>${l.delivers ? 'Нийлүүлэгч таны хаяг руу хүргэнэ' : 'Энэ нийлүүлэгч хүргэлт хийдэггүй'}</small></span>
-          <span class="tag">${l.delivers ? `+${money(l.delivery_fee_mnt)}` : ''}</span>
-        </button>
+        <button class="choice" type="button" role="radio" data-r="pickup" aria-checked="${f.receive === 'pickup'}">${MARK.store}<span>Өөрөө авах</span></button>
+        <button class="choice" type="button" role="radio" data-r="delivery" aria-checked="${f.receive === 'delivery'}"${l.delivers ? '' : ' disabled'}>${MARK.truck}<span>Хүргүүлэх</span></button>
       </div>
+      <div class="help" id="receive-note"></div>
     </div>`);
   body.append(pick);
 
-  /* 3 · when */
+  /* when: four days from the first one the meat exists, and any later day on the fifth chip */
+  const first = earliest(l);
+  const days = [0, 1, 2, 3].map((n) => dayAfter(first, n));
   const when = el(`
     <div class="step" id="step-when">
-      <div class="q section-title"><span class="n">3</span><b></b></div>
-      <input type="date" class="input" id="when" min="${escapeHtml(earliest(l))}" value="${escapeHtml(f.receiveOn)}" aria-label="Өдөр">
-      <div class="help">Хамгийн эрт <b>${dayLabel(earliest(l))}</b> — мах тэр өдрөөс бэлэн. Дараа нь нийлүүлэгч утсаар цагийг тохирно.</div>
+      <div class="q"><b></b><em>${dayLabel(first)}-нөөс</em></div>
+      <div class="days">
+        <div role="radiogroup" aria-label="Өдөр">${days
+          .map((day) => `<button class="day" type="button" role="radio" data-day="${day}" aria-checked="false"><b>${dayShort(day)}</b><span>${weekday(day)}</span></button>`)
+          .join('')}</div>
+        <label class="day other">${MARK.day}<b></b><span>Өөр</span><input type="date" id="when" min="${escapeHtml(first)}" value="${escapeHtml(f.receiveOn)}" aria-label="Өөр өдөр сонгох"></label>
+      </div>
+      <div class="help">Нийлүүлэгч тэр өдөр утсаар цагаа тохирно.</div>
     </div>`);
-  when.querySelector('input').addEventListener('change', (event) => {
-    f.receiveOn = event.target.value;
+  /** The day chosen, on the chips: one of the four, or the fifth saying the later day. */
+  const paintDays = () => {
+    const input = when.querySelector('#when');
+    if (f.receiveOn && input.value !== f.receiveOn) input.value = f.receiveOn;
+    for (const chip of when.querySelectorAll('.day[data-day]')) chip.setAttribute('aria-checked', String(chip.dataset.day === f.receiveOn));
+    const other = when.querySelector('.day.other');
+    const later = Boolean(f.receiveOn) && !days.includes(f.receiveOn);
+    other.toggleAttribute('data-on', later);
+    other.querySelector('b').textContent = later ? dayShort(f.receiveOn) : '';
+    other.querySelector('span').textContent = later ? weekday(f.receiveOn) : 'Өөр';
+  };
+  when.querySelector('[role="radiogroup"]').addEventListener('click', (event) => {
+    const chip = event.target.closest('.day[data-day]');
+    if (!chip) return;
+    f.receiveOn = chip.dataset.day;
+    paintDays();
     renderFoot();
   });
+  when.querySelector('#when').addEventListener('change', (event) => {
+    // A day before the meat exists is not one to ask for: the first day stands in.
+    const value = event.target.value;
+    f.receiveOn = value && value < first ? first : value;
+    paintDays();
+    renderFoot();
+  });
+  paintDays();
   body.append(when);
 
   /**
@@ -1055,7 +1227,13 @@ function renderDetail({ replace = false } = {}) {
     for (const choice of pick.querySelectorAll('.choice')) {
       choice.setAttribute('aria-checked', String(choice.dataset.r === f.receive));
     }
-    when.querySelector('.q b').textContent = f.receive === 'delivery' ? 'Хэзээ хүргүүлэх вэ?' : 'Хэзээ очиж авах вэ?';
+    // Under the pill, what the choice means: where to collect it, or what the delivery costs.
+    pick.querySelector('#receive-note').innerHTML =
+      f.receive === 'delivery'
+        ? `${MARK.truck}<span>Таны хаяг руу хүргэнэ · ${money(l.delivery_fee_mnt)}</span>`
+        : `${MARK.pin}<span>${escapeHtml(l.supplier.pickup_address)}${l.delivers ? '' : ' · хүргэлт хийдэггүй'}</span>`;
+    when.querySelector('.q b').textContent = f.receive === 'delivery' ? 'Хүргүүлэх өдөр' : 'Авах өдөр';
+    when.querySelector('[role="radiogroup"]').setAttribute('aria-label', f.receive === 'delivery' ? 'Хүргүүлэх өдөр' : 'Авах өдөр');
     let where = body.querySelector('#step-where');
     if (f.receive === 'delivery' && !where) {
       where = whereStep(f);
@@ -1074,13 +1252,14 @@ function renderDetail({ replace = false } = {}) {
     settle();
   });
   settle();
+  settleScreenBar();
 }
 
 /** 4 · where, for a delivery. Built only when asked for, dropped when not. */
 function whereStep(f) {
   const where = el(`
     <div class="step" id="step-where">
-      <div class="q section-title"><span class="n">4</span><b>Хаана хүргэх вэ?</b></div>
+      <div class="q"><b>Хүргэх хаяг</b></div>
       <div class="field">
         <label for="address">Хаяг</label>
         <textarea id="address" autocomplete="street-address" aria-describedby="address-help" placeholder="Дүүрэг, хороолол, байр, орц, тоот">${escapeHtml(f.address)}</textarea>
@@ -1135,23 +1314,14 @@ function whereStep(f) {
 /** A token's current value, for the one thing CSS cannot paint: the map. */
 const tone = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-/** The phone changed appearance with the delivery map open: the map, and its pin, follow. */
-onMapTheme((theme) => {
-  const map = state.map;
-  if (!map?.getLayer?.('drop-pin')) return;
-  repaintMap(map, theme);
-  map.setPaintProperty('drop-pin', 'circle-color', tone('--accent'));
-  map.setPaintProperty('drop-pin', 'circle-stroke-color', tone('--surface'));
-});
-
 function mountMap(container) {
   dropMap();
   if (typeof maplibregl === 'undefined') return;
   const f = state.form;
   const map = new maplibregl.Map({
     container,
-    // In the phone's theme: the night palette at night, not daylight under a veil.
-    style: mapStyle(mapTheme()),
+    // The night palette, as every page is dark whatever the phone's setting.
+    style: mapStyle(),
     center: f.lon ? [f.lon, f.lat] : [ULAANBAATAR.lon, ULAANBAATAR.lat],
     zoom: 13.2,
     attributionControl: false,
@@ -1195,15 +1365,15 @@ function renderFoot() {
   if (!l || !f || l.remaining === 0 || state.screen !== 'detail') return;
 
   const able = canPay(total());
-  sayClosed(!able, $('screen-body').querySelector('.facts'));
+  sayClosed(!able, $('screen-body').querySelector('.about') ?? $('screen-body').querySelector('.head'));
   // What stops the order, over its button: payments first — nothing typed fixes that.
   const needs = able ? missing() : null;
   if (!able) foot.append(el(`<p class="why" data-calm id="next-why">${MARK.info}${CLOSED_SHORT}</p>`));
   else if (needs) foot.append(el(`<p class="why" id="next-why">${MARK.warn}${needs}</p>`));
   const row = el(`
     <div class="foot-row">
-      <div class="sum"><span>${f.qty} ${unitWord(l)}${f.receive === 'delivery' ? ' + хүргэлт' : ''} · нийт</span><b>${money(total())}</b></div>
-      <button class="btn" data-v="primary" type="button" id="next"${needs || !able ? ' disabled aria-describedby="next-why"' : ''}>Захиалах${MARK.next}</button>
+      <div class="sum"><span>Нийт · ${f.qty} ${unitWord(l)}${f.receive === 'delivery' ? ' + хүргэлт' : ''}</span><b>${money(total())}</b></div>
+      <button class="btn" data-v="primary" type="button" id="next"${needs || !able ? ' disabled aria-describedby="next-why"' : ''}>Захиалах</button>
     </div>`);
   row.querySelector('#next').addEventListener('click', () => renderReview());
   foot.append(row);
@@ -1235,10 +1405,16 @@ function renderReview({ replace = false } = {}) {
   const body = $('screen-body');
   const delivery = f.receive === 'delivery';
 
+  // What is being bought, as the stall showed it: its photograph, who sells it, its name.
+  body.append(
+    el(`<div class="review-head">
+          <span class="ph"><img src="${PHOTO(l.kind)}" alt="" width="72" height="72"></span>
+          <span class="what"><span class="from">${escapeHtml(l.supplier.name)}</span><b>${escapeHtml(l.title)}</b></span>
+        </div>`),
+  );
   body.append(
     el(`<div class="review card">
-          <div class="r"><span>Зар</span><b>${escapeHtml(l.title)}<small>${escapeHtml(l.supplier.name)}</small></b></div>
-          <div class="r"><span>Хэд</span><b><span class="mn">${f.qty}</span> ${unitWord(l)}</b></div>
+          <div class="r"><span>Хэмжээ</span><b><span class="mn">${f.qty}</span> ${unitWord(l)}</b></div>
           <div class="r"><span>Авах арга</span><b>${delivery ? 'Гэрт хүргүүлнэ' : 'Өөрөө очиж авна'}<small>${
             delivery ? `${escapeHtml(f.address)} · <span class="mn">${escapeHtml(phoneShown(f.phone))}</span>` : escapeHtml(l.supplier.pickup_address)
           }</small></b></div>
@@ -1255,7 +1431,7 @@ function renderReview({ replace = false } = {}) {
   body.append(
     el(`<div class="promise">
           <div>${MARK.tag}<span><b>Үнэ эцсийнх.</b> Бодит жин зөрсөн ч нэмж төлөхгүй.</span></div>
-          <div>${MARK.phone}<span><b>Төлсний дараа</b> нийлүүлэгчийн утас гарна; та ч, тэр ч залгаж чадна.</span></div>
+          <div>${MARK.phone}<span><b>Төлсний дараа</b> нийлүүлэгчийн утас гарна.</span></div>
           <div>${MARK.undo}<span><b>Санал зөрвөл</b> нийлүүлэгчтэй ярина; тэр цуцалбал мөнгө банкны данс руу тань буцна — мал нядалсны дараа таны буруугаас бол ${FORFEIT_PCT}% суутгана.</span></div>
         </div>`),
     el(`<p class="terms">Төлснөөр <a href="/terms" id="terms">үйлчилгээний нөхцөл</a>-ийг зөвшөөрнө.</p>`),
@@ -1514,12 +1690,15 @@ function awaitQpay(invoice, body) {
   const id = attempt?.order;
   const what = JSON.stringify(body);
   const foot = $('screen-foot');
+  // The amount big, a gold word that it waits, one sentence, and the one crimson way back to QPay.
   foot.replaceChildren(
     el(`<div class="qpay-wait">
+          <span class="wait" aria-hidden="true">QPay · төлбөр хүлээж байна</span>
+          <b class="amount">${money(invoice.amount_mnt)}</b>
           <p class="why" data-calm role="status">${MARK.info}<span>QPay-ээр <b>${money(invoice.amount_mnt)}</b> төлөөд энд буцаж ирнэ үү — төлбөр орж ирмэгц захиалга тань баталгаажна.</span></p>
           <div class="foot-row">
             <a class="btn" data-v="primary" id="qpay-open" href="${escapeHtml(invoice.action_url)}">QPay нээх</a>
-            <button class="btn" data-v="quiet" type="button" id="qpay-check">Төлсөн, шалгах</button>
+            <button class="btn" type="button" id="qpay-check">Төлсөн, шалгах</button>
           </div>
         </div>`),
   );
@@ -1570,6 +1749,7 @@ function qpayLapsed(body) {
   const foot = $('screen-foot');
   foot.replaceChildren(
     el(`<div class="qpay-wait">
+          <span class="wait" data-over aria-hidden="true">QPay · хугацаа дууслаа</span>
           <p class="why" data-calm role="status">${MARK.info}<span>QPay-ийн нэхэмжлэлийн хугацаа дууслаа. Төлөөгүй бол дахин нээж төлнө үү.</span></p>
           <div class="foot-row"><button class="btn" data-v="primary" type="button" id="pay">Дахин төлөх</button></div>
         </div>`),
@@ -1643,7 +1823,6 @@ const DONE = ['HANDED', 'CLOSED', 'CANCELLED', 'REFUNDED'];
  */
 const FACE = {
   PAID: {
-    mark: 'check',
     word: 'Захиалга баталгаажлаа',
     cap: (o) =>
       o.receive === 'delivery'
@@ -1651,12 +1830,10 @@ const FACE = {
         : `Төлбөр хүлээн авлаа. Нийлүүлэгч <b>${dayLabel(o.receive_on)}</b>-нд махыг авах цэг дээр бэлэн байлгана.`,
   },
   PREPARING: {
-    mark: 'work',
     word: 'Мах бэлтгэгдэж байна',
     cap: () => 'Нийлүүлэгч малыг нядалж, махыг бэлтгэж байна. Бэлэн болмогц мэдэгдэнэ.',
   },
   READY: {
-    mark: 'box',
     word: 'Мах бэлэн боллоо',
     cap: (o) =>
       o.receive === 'delivery'
@@ -1664,14 +1841,12 @@ const FACE = {
         : `Авах цэг дээр очоод <b>${escapeHtml(o.code)}</b> кодоо хэлээд авна уу.`,
   },
   DISPATCHED: {
-    mark: 'truck',
     word: 'Мах замд гарлаа',
     cap: (o) => `Хүргэгч хаягаар тань очиж, ирэхдээ залгана. <b>${escapeHtml(o.code)}</b> кодоо хэлээд хүлээн авна уу.`,
   },
-  HANDED: { mark: 'hand', word: 'Хүлээлгэн өгсөн', cap: () => 'Мах гарт орлоо. Амтархан хэрэглээрэй.' },
-  CLOSED: { mark: 'check', word: 'Захиалга дууссан', cap: () => 'Энэ захиалга хаагдсан.' },
+  HANDED: { word: 'Хүлээлгэн өгсөн', cap: () => 'Мах гарт орлоо. Амтархан хэрэглээрэй.' },
+  CLOSED: { word: 'Захиалга дууссан', cap: () => 'Энэ захиалга хаагдсан.' },
   CANCELLED: {
-    mark: 'cross',
     word: 'Цуцлагдсан',
     cap: (o) => {
       const why = REASON_WORDS[o.cancel_reason] ?? 'нийлүүлэгч цуцалсан';
@@ -1681,7 +1856,6 @@ const FACE = {
     },
   },
   REFUNDED: {
-    mark: 'undo',
     word: 'Мөнгө буцаасан',
     cap: (o) => `<b>${mnt(o.refund?.amount_mnt ?? o.refund_mnt ?? 0)}</b> ${o.refund?.bank_name ? `${escapeHtml(o.refund.bank_name)} дахь ` : ''}данс руу тань шилжүүлсэн.`,
   },
@@ -1904,7 +2078,7 @@ async function showStatus(force, { replace = false } = {}) {
   if (moved) shell.ordersChanged();
   rendered = signature;
 
-  const face = FACE[order.state] ?? { mark: 'check', word: order.state, cap: () => '' };
+  const face = FACE[order.state] ?? { word: IDESH_STATE[order.state] ?? '', cap: () => '' };
   const live = !DONE.includes(order.state);
   const delivery = order.receive === 'delivery';
   showScreen('status', `№${order.code}`, `${order.supplier.name} · ${order.title} ×${order.qty}`, {
@@ -1912,9 +2086,16 @@ async function showStatus(force, { replace = false } = {}) {
   });
 
   const body = $('screen-body');
+  // The state in one word with the meter beside it (ideshStage), then the
+  // headline and what happens next. A word the headline already says is not
+  // said twice — a handed-over order keeps only its full meter — and a
+  // cancelled one is the headline alone, in the crimson's ink.
+  const step = IDESH_STEP[order.state];
+  const stage =
+    order.state === 'CANCELLED' ? '' : IDESH_STATE[order.state] === face.word ? (step ? `<span class="stage">${meter(step)}</span>` : '') : ideshStage(order.state);
   const card = el(`
     <div class="status card" data-s="${escapeHtml(order.state)}">
-      <div class="mark">${MARK[face.mark]}</div>
+      ${stage}
       <div class="big">${escapeHtml(face.word)}</div>
       <div class="cap">${face.cap(order)}</div>
     </div>`);
@@ -2131,7 +2312,7 @@ async function lookAfter(o, token) {
 const REFUND_WORD = {
   needs_account: ['Данс оруулна уу', ' data-tone="hold" data-strong'],
   due: ['Буцаалт хүлээгдэж байна', ' data-tone="route"'],
-  paid: [IDESH_STATE.REFUNDED, ''],
+  paid: [IDESH_STATE.REFUNDED, ' data-tone="hold"'],
 };
 
 /**
@@ -2154,30 +2335,35 @@ function refundOf(order, seen) {
 function cornerOf(order, seen, refund) {
   const delivery = order.receive === 'delivery';
   if (refund) {
-    return `<span class="when val">${refund.amount === null ? '—' : money(refund.amount)}<small>${refund.state === 'paid' ? 'буцаасан' : 'буцаалт'}</small></span>`;
+    return `<span class="when" data-money><b>${refund.amount === null ? '—' : money(refund.amount)}</b><small>${refund.state === 'paid' ? 'буцаасан' : 'буцаалт'}</small></span>`;
   }
   if (DONE.includes(order.state)) {
     // Handed over: the day it was, from the order itself; not known, no day at all rather than a wrong one.
     const at = seen?.handed_at;
-    return at ? `<span class="when val">${dayShort(ubParts(at).day)}<small>${delivery ? 'ирсэн' : 'авсан'}</small></span>` : '';
+    return at ? `<span class="when"><b>${dayShort(ubParts(at).day)}</b><small>${delivery ? 'ирсэн' : 'авсан'}</small></span>` : '';
   }
-  return `<span class="when val">${dayShort(order.receive_on)}<small>${delivery ? 'ирэх' : 'авах'}</small></span>`;
+  return `<span class="when"><b>${dayShort(order.receive_on)}</b><small>${delivery ? 'ирэх' : 'авах'}</small></span>`;
 }
 
-/** One row of «Миний идэш» as markup: all it says is in here, so the same markup is the same row. */
+/**
+ * One card of «Миний идэш» as markup — the launcher's card: the animal's
+ * photograph, what it is, its state in one word with the meter under it, and
+ * its day big in the corner. All it says is in here, so the same markup is
+ * the same card.
+ */
 function mineRow(order, known) {
   const refund = order.state === 'CANCELLED' || order.state === 'REFUNDED' ? refundOf(order, known) : null;
   // The state's one word, the same on every page (IDESH_STATE) — or, for a
-  // cancelled order, what its money waits for, as the website's row says
-  // it; then the line under the name says it was cancelled.
+  // cancelled order, what its money waits for, as the website's row says it.
   const [word, tone] = refund ? (REFUND_WORD[refund.state] ?? REFUND_WORD.due) : [IDESH_STATE[order.state] ?? '', ` data-s="${escapeHtml(order.state)}"`];
-  const cap = order.state === 'CANCELLED' ? IDESH_STATE.CANCELLED : (IDESH_HEADLINE[order.state]?.[1] ?? '');
+  const step = refund ? 0 : IDESH_STEP[order.state];
   return `
-      <button class="card row" type="button" data-order="${order.id}" data-chev>
-        <span class="who main">
-          <span class="venue title">${escapeHtml(order.supplier.name)}</span>
-          <span class="what sub">${escapeHtml(order.title)} ×${escapeHtml(order.qty)}${cap ? ` · ${escapeHtml(cap)}` : ''}</span>
-          <span class="code meta">№${escapeHtml(order.code)}${word ? `<span class="chip"${tone} data-inline>${escapeHtml(word)}</span>` : ''}</span>
+      <button class="card oc" type="button" data-order="${order.id}">
+        <span class="ph"><img src="${PHOTO(order.kind)}" alt="" width="64" height="64" loading="lazy"></span>
+        <span class="main">
+          <span class="title">${escapeHtml(order.title)} ×${escapeHtml(order.qty)}</span>
+          ${word ? `<span class="st"><span class="chip"${tone}>${escapeHtml(word)}</span></span>` : ''}
+          ${step ? meter(step) : ''}
         </span>
         <span class="end">${cornerOf(order, known, refund)}</span>
       </button>`;

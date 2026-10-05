@@ -80,7 +80,7 @@ await page.evaluate(() => {
   slot.click();
 });
 await page.waitForFunction(
-  () => document.querySelector('.sheet footer button')?.textContent.includes('төлөх'),
+  () => document.querySelector('.sheet footer button')?.textContent.trim() === 'Захиалах',
   { timeout: 10_000 },
 );
 await page.evaluate(() => document.querySelector('.sheet footer button').click());
