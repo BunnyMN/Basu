@@ -2138,6 +2138,25 @@ export function ideshStage(state) {
 }
 
 /** What each kind of animal is called, and the word for one of it. */
+/**
+ * The example photographs: how many each animal has. They sit as
+ * `/idesh/sheep.jpg`, `/idesh/sheep-2.jpg`… (square) and
+ * `/brand/meat/sheep.webp`, `sheep-2.webp`… with `-480` and `-720` copies.
+ */
+export const MEAT_PHOTOS = { sheep: 6, goat: 4, beef: 5, horse: 4 };
+
+/**
+ * Which photograph a listing or an order wears, as a file's name without its
+ * ending: «sheep», «sheep-3». The server says the listing's place among its
+ * supplier's listings of that animal (`photo`); the place picks the picture,
+ * so one stall's sheep do not all look alike and each keeps its own.
+ */
+export function photoOf(of) {
+  const kind = Object.hasOwn(MEAT_PHOTOS, of?.kind) ? of.kind : 'sheep';
+  const place = Math.abs(Math.trunc(Number(of?.photo) || 0)) % MEAT_PHOTOS[kind];
+  return place ? `${kind}-${place + 1}` : kind;
+}
+
 export const KIND = {
   sheep: 'Хонь',
   goat: 'Ямаа',

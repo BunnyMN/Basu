@@ -496,7 +496,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 <!-- MapLibre from cdnjs, held to cdnjs's own hash of the file: bytes that ever differ do not run. A new version takes its new hash, here and on the stylesheet. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js" integrity="sha512-hoXlvOdSmh58mppUyZHZsscHkR/yXl6zLpTMTNwA6IZ61DpeaCNjosRu1WJ2DeIpkfW5MsJJ9H89zjV4IBGqRw==" crossorigin="anonymous"></script>
 <script type="module">
-import { api, store, shell, toast, mnt, money, meter, ideshStage, IDESH_STATE, IDESH_STEP, KIND, BANK_NAMES, dayLabel, dayShort, ubParts, signInSheet, passwordPopup, dropSession, whatWentWrong } from '/api.js';
+import { api, photoOf, store, shell, toast, mnt, money, meter, ideshStage, IDESH_STATE, IDESH_STEP, KIND, BANK_NAMES, dayLabel, dayShort, ubParts, signInSheet, passwordPopup, dropSession, whatWentWrong } from '/api.js';
 import { mapStyle, ULAANBAATAR, MAP_LOCALE } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -523,7 +523,7 @@ function escapeHtml(value) {
  * launcher's stroke, which is what shows if a picture fails to arrive — a
  * list with holes in it sells nothing.
  */
-const PHOTO = (kind) => `/idesh/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}.jpg`;
+const PHOTO = (of) => `/idesh/${photoOf(of)}.jpg`;
 
 const ART = {
   sheep: `<svg viewBox="0 0 24 24" aria-hidden="true">
@@ -928,7 +928,7 @@ function paintListings() {
     const item = el(`
       <li>
         <button class="listing" type="button" data-kind="${escapeHtml(l.kind)}" data-id="${escapeHtml(l.id)}"${l.tier ? ` data-tier="${escapeHtml(l.tier)}"` : ''}${gone_ ? ' data-gone' : ''}>
-          <span class="art"><img src="${PHOTO(l.kind)}" alt="" loading="lazy" width="640" height="400"></span>
+          <span class="art"><img src="${PHOTO(l)}" alt="" loading="lazy" width="640" height="400"></span>
           ${l.tier ? `<i class="tier">${l.tier === 'vip' ? 'VIP' : 'Онцгой'}</i>` : ''}
           <span class="left chip"${gone_ ? ' data-gone' : low ? ' data-low data-tone="hold" data-strong' : ''}>${
             gone_ ? 'Дууссан' : `${l.remaining} ${unitWord(l)} үлдсэн`
@@ -1099,8 +1099,9 @@ function openListing(l) {
 }
 
 /** The same picture, larger, at the top of the screen — Basu's photo of the animal, and said so. */
-function hero(kind) {
-  const box = el(`<div class="hero" data-kind="${escapeHtml(kind)}"><img src="${PHOTO(kind)}" alt="${escapeHtml(KIND[kind] ?? '')} — жишээ зураг" width="640" height="640"><span class="sample" aria-hidden="true">Жишээ зураг</span></div>`);
+function hero(l) {
+  const kind = l.kind;
+  const box = el(`<div class="hero" data-kind="${escapeHtml(kind)}"><img src="${PHOTO(l)}" alt="${escapeHtml(KIND[kind] ?? '')} — жишээ зураг" width="640" height="640"><span class="sample" aria-hidden="true">Жишээ зураг</span></div>`);
   box.querySelector('img').addEventListener('error', () => {
     box.remove();
     settleScreenBar();
@@ -1132,7 +1133,7 @@ function renderDetail({ replace = false } = {}) {
   const price = priceFor(l);
 
   // The photograph, then on the charcoal: who sells it, its name, its price, its day.
-  body.append(hero(l.kind));
+  body.append(hero(l));
   body.append(
     el(`<div class="head">
           <div class="from"><span>${escapeHtml(l.supplier.name)}</span>${l.supplier.contracted ? `<i class="verified badge">${MARK.check}Гэрээт</i>` : ''}</div>
@@ -1428,7 +1429,7 @@ function renderReview({ replace = false } = {}) {
   // What is being bought, as the stall showed it: its photograph, who sells it, its name.
   body.append(
     el(`<div class="review-head">
-          <span class="ph"><img src="${PHOTO(l.kind)}" alt="" width="72" height="72"></span>
+          <span class="ph"><img src="${PHOTO(l)}" alt="" width="72" height="72"></span>
           <span class="what"><span class="from">${escapeHtml(l.supplier.name)}</span><b>${escapeHtml(l.title)}</b></span>
         </div>`),
   );
@@ -2382,7 +2383,7 @@ function mineRow(order, known) {
   const step = refund ? 0 : IDESH_STEP[order.state];
   return `
       <button class="card oc" type="button" data-order="${order.id}">
-        <span class="ph"><img src="${PHOTO(order.kind)}" alt="" width="64" height="64" loading="lazy"></span>
+        <span class="ph"><img src="${PHOTO(order)}" alt="" width="64" height="64" loading="lazy"></span>
         <span class="main">
           <span class="title">${escapeHtml(order.title)} ×${escapeHtml(order.qty)}</span>
           ${word ? `<span class="st"><span class="chip"${tone}>${escapeHtml(word)}</span></span>` : ''}

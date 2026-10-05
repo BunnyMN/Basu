@@ -19,7 +19,7 @@ import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
 import { CERT_COLUMNS, factsOf, usableCertificate, type CertificateFacts, type CertificateState } from './certificates.js';
 import { IdeshError } from './errors.js';
-import type { Kind } from './listings.js';
+import { PHOTO_PLACE, type Kind } from './listings.js';
 import {
   REASON_LABEL,
   FORFEIT_PCT,
@@ -932,6 +932,8 @@ export interface IdeshSummary {
   pickupAddress?: string;
   /** The veterinary certificate this meat is under, once it has one. */
   certificate: CertificateFacts | null;
+  /** Which example photograph the listing it was bought from wears — see `Listing.photo`. */
+  photo: number;
 }
 
 export interface IdeshDetail extends IdeshSummary {
@@ -998,6 +1000,7 @@ interface OrderRow {
   cert_issuer: string | null;
   cert_issued_on: string | null;
   cert_state: CertificateState | null;
+  photo: number | null;
 }
 
 const ORDER_SELECT = `
@@ -1008,7 +1011,8 @@ const ORDER_SELECT = `
          o.address, o.address_phone, o.address_lat, o.address_lon, o.ledger_transfer_id,
          o.paid_at, o.preparing_at, o.ready_at, o.dispatched_at, o.handed_at,
          o.cancel_reason, o.refund_mnt, o.forfeit_mnt, s.commission_pct,
-         ${CERT_COLUMNS}
+         ${CERT_COLUMNS},
+         (SELECT ${PHOTO_PLACE.replace(/ AS photo$/, '')} FROM idesh.listing l WHERE l.id = o.listing_id) AS photo
     FROM idesh.idesh_order o
     JOIN idesh.supplier s ON s.id = o.supplier_id
     LEFT JOIN idesh.certificate c ON c.id = o.certificate_id`;
@@ -1029,6 +1033,7 @@ function summary(r: OrderRow): IdeshSummary {
     paidAt: r.paid_at,
     pickupAddress: r.pickup_address,
     certificate: factsOf(r),
+    photo: r.photo ?? 0,
   };
 }
 

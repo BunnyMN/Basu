@@ -147,6 +147,7 @@ const shapeListing = (l: Listing) => ({
   tier: l.tier,
   tier_until: l.tierUntil?.toISOString() ?? null,
   certificate: shapeCertificateFacts(l.certificate),
+  photo: l.photo,
 });
 
 /** A certificate as the supplier's own screen reads it. */

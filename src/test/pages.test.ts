@@ -2151,8 +2151,18 @@ describe('өвлийн идэш', () => {
     const dom = await openPage('idesh.html');
     await until(dom, 'the stalls', (d) => d.querySelectorAll('.listing').length >= seeded.listings);
 
+    // One stall's listings of the same animal do not all wear one picture: each has its own of the
+    // example photographs — a file that is there — and no two of them the same, while there are enough.
+    const worn = new Map<string, string[]>();
     for (const row of dom.window.document.querySelectorAll('.listing')) {
-      expect(row.querySelector('.art img')?.getAttribute('src')).toMatch(/^\/idesh\/(sheep|goat|beef|horse)\.jpg$/);
+      const src = row.querySelector('.art img')?.getAttribute('src') ?? '';
+      expect(src).toMatch(/^\/idesh\/(sheep|goat|beef|horse)(-[2-6])?\.jpg$/);
+      await expect(readFile(join(WEB, src))).resolves.toBeTruthy();
+      const stall = `${row.querySelector('.from')?.textContent} ${src.replace(/(-\d)?\.jpg$/, '')}`;
+      worn.set(stall, [...(worn.get(stall) ?? []), src]);
+    }
+    for (const [stall, photos] of worn) expect(new Set(photos).size, stall).toBe(Math.min(photos.length, 4));
+    for (const row of dom.window.document.querySelectorAll('.listing')) {
       // The contract is the trust mark, on every row, before the name.
       expect(row.querySelector('.from .verified')?.textContent).toContain('Гэрээт');
       expect(row.querySelector('.price b')?.textContent).toMatch(/₮$/);

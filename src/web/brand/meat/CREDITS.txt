@@ -12,3 +12,22 @@ board.webp                   Sergey Kotenev         https://unsplash.com/photos/
 cuts.webp                    Sergey Kotenev         https://unsplash.com/photos/a-group-of-raw-meats-laid-out-on-a-table-qXrrbHUzmkE
 butcher.webp                 Madie Hamilton         https://unsplash.com/photos/person-holding-red-plastic-shovel-l9vXx8aEYJ8
 buuz.webp                    Tuguldur Baatar        https://unsplash.com/photos/a-pan-filled-with-dumplings-sitting-on-top-of-a-table-FWFHxrn5OGA
+
+More of each animal, so one stall's listings do not all wear the same picture
+(the same crop as <kind>-N.webp here and idesh/<kind>-N.jpg):
+
+sheep-2   Wesual Click          https://unsplash.com/photos/raw-meat-DxJvLtab4ak
+sheep-3   Kyle Mackie           https://unsplash.com/photos/raw-meat-on-brown-wooden-table-lvmFFcLvHl8
+sheep-4   Bruno van der Kraan   https://unsplash.com/photos/raw-meat-on-brown-wooden-chopping-board-QHe6BYKLyOg
+sheep-5   Jez Timms             https://unsplash.com/photos/raw-meat-and-green-leaf-plant-on-brown-surface-DVRXFIH42d0
+sheep-6   James Kern            https://unsplash.com/photos/sliced-meat-on-black-wooden-table-bnLqotJKxn4
+beef-2    Sergey Kotenev        https://unsplash.com/photos/two-steaks-on-a-cutting-board-next-to-garlic-garlic-and-a-knife-sV8Cl0_3UcY
+beef-3    Sergey Kotenev        https://unsplash.com/photos/a-slab-of-raw-meat-on-a-cutting-board-with-vegetables-and-a-bowl-of-sauce-ZKv9WGWMOLk
+beef-4    Madie Hamilton        https://unsplash.com/photos/sliced-meat-on-brown-paper-GXehL5_crJ4
+beef-5    Kelsey Todd           https://unsplash.com/photos/a-wooden-cutting-board-topped-with-sliced-up-meat-J1ceMAyEtfo
+goat-2    chaewon you           https://unsplash.com/photos/a-piece-of-raw-meat-on-a-cutting-board-pDTr0g_LrCQ
+goat-3    Usman Yousaf          https://unsplash.com/photos/raw-meat-on-blue-ceramic-bowl-eOktYr3tAMo
+goat-4    Kyle Mackie           https://unsplash.com/photos/sliced-meat-beside-silver-knife-Xedxbjx7MFg
+horse-2   Cristi Caval          https://unsplash.com/photos/a-couple-of-steaks-sitting-on-top-of-a-wooden-cutting-board-3pCrvi2JH-M
+horse-3   Egor Myznik           https://unsplash.com/photos/a-close-up-of-some-food-ScxlvmNpv4s
+horse-4   Edson Saldaña         https://unsplash.com/photos/raw-meat-on-brown-wooden-table-J88no2vCrTs

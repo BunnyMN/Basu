@@ -171,7 +171,7 @@ main.wrap{
 </main>
 
 <script type="module">
-import { api, store, hhmm, mountClock, money, meter, IDESH_STATE, IDESH_STEP, headlineWord, dayLabel, dayShort, ubParts } from '/api.js';
+import { api, photoOf, store, hhmm, mountClock, money, meter, IDESH_STATE, IDESH_STEP, headlineWord, dayLabel, dayShort, ubParts } from '/api.js';
 
 /** Text into markup, never the other way: a supplier's name is a name. Quotes too, so nothing inside an attribute can end it. */
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -307,7 +307,7 @@ function moment(order) {
 const LUNCH_STEP = { PLACED: 1, ACCEPTED: 2, SCHEDULED: 2, ARMED: 2, RESLOTTED: 2, HELD: 2, FIRED: 3, COOKING: 3, READY: 4, SERVED: 4, CLOSED: 4 };
 
 /** The picture on a card: the animal's own photo for an идэш, a steamer of buuz for a lunch. */
-const PHOTO = (kind) => `/idesh/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}.jpg`;
+const PHOTO = (of) => `/idesh/${photoOf(of)}.jpg`;
 const LUNCH_PHOTO = '/brand/meat/buuz-828.webp';
 
 /*
@@ -368,7 +368,7 @@ function ideshRow(order, seen) {
     at: new Date(`${order.receive_on}T12:00:00+08:00`),
     href: `/idesh?order=${order.id}`,
     source: 'Идэш',
-    photo: PHOTO(order.kind),
+    photo: PHOTO(order),
     title: `${order.title} ×${order.qty}`,
     state: order.state,
     word: IDESH_STATE[order.state] ?? '',

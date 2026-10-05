@@ -262,21 +262,21 @@
 </main>
 
 <script type="module">
-import { api, store, mnt, KIND, dayLabel, dayShort, whatWentWrong, phoneText, phoneInput } from '/api.js';
+import { api, photoOf, store, mnt, KIND, dayLabel, dayShort, whatWentWrong, phoneText, phoneInput } from '/api.js';
 import { mountFrame, authed, loginUrl, esc, el, siteEmpty, howToBuy, tugrik } from '/site.js';
 
 // Open to anybody: the stalls are shown to all, and only paying asks who you are.
 void mountFrame('shop');
 const page = document.getElementById('page');
 
-const PHOTO = (kind) => `/brand/meat/${['sheep', 'goat', 'beef', 'horse'].includes(kind) ? kind : 'sheep'}.webp`;
+const PHOTO = (of) => `/brand/meat/${photoOf(of)}.webp`;
 /**
  * The same photo at the widths it is shown at, so a phone's card does not
  * fetch the 960 a desk's stall needs: the copies sit beside it as
  * `sheep-480.webp` and `sheep-720.webp`.
  */
-const SRCSET = (kind) => {
-  const at = PHOTO(kind).slice(0, -'.webp'.length);
+const SRCSET = (of) => {
+  const at = PHOTO(of).slice(0, -'.webp'.length);
   return `${at}-480.webp 480w, ${at}-720.webp 720w, ${at}.webp 960w`;
 };
 /** A card's width: one column up to 600px, two up to 1100, then three of the page's 1280. */
@@ -561,7 +561,7 @@ function paintGrid(announce = false) {
     const tier = l.tier ? `<span class="sh-tag" data-tier="${esc(l.tier)}">${l.tier === 'vip' ? '★ VIP' : `${MARK.check}Онцгой`}</span>` : '';
     grid.append(
       el(`<a class="sh-card" href="/shop/${esc(l.id)}" data-id="${esc(l.id)}" data-kind="${esc(l.kind)}"${l.tier ? ` data-tier="${esc(l.tier)}"` : ''}${gone ? ' data-gone' : ''}>
-            <span class="ph"><img src="${PHOTO(l.kind)}" srcset="${SRCSET(l.kind)}" sizes="${l.tier === 'vip' ? VIP_SIZES : CARD_SIZES}" alt="" loading="${i < 3 ? 'eager' : 'lazy'}"${i === 0 ? ' fetchpriority="high"' : ''} decoding="async" width="960" height="720">
+            <span class="ph"><img src="${PHOTO(l)}" srcset="${SRCSET(l)}" sizes="${l.tier === 'vip' ? VIP_SIZES : CARD_SIZES}" alt="" loading="${i < 3 ? 'eager' : 'lazy'}"${i === 0 ? ' fetchpriority="high"' : ''} decoding="async" width="960" height="720">
               <span class="tags">${tier}<span class="sh-tag">${whole ? 'Бүтэн' : 'кг-аар'}</span>${l.delivers ? `<span class="sh-tag">${MARK.truckSm}Хүргэлттэй</span>` : ''}</span>
               ${gone ? '' : `<span class="go" aria-hidden="true">${MARK.arrow}</span>`}</span>
             <span class="bd">
@@ -757,7 +757,7 @@ function drawStall(l) {
     crumb(),
     el(`<div class="sd">
           <div class="sd-media">
-            <figure class="sd-photo"><img src="${PHOTO(l.kind)}" srcset="${SRCSET(l.kind)}" sizes="${STALL_SIZES}" fetchpriority="high" decoding="async" alt="${esc(KIND[l.kind] ?? '')} — жишээ зураг" width="960" height="720">
+            <figure class="sd-photo"><img src="${PHOTO(l)}" srcset="${SRCSET(l)}" sizes="${STALL_SIZES}" fetchpriority="high" decoding="async" alt="${esc(KIND[l.kind] ?? '')} — жишээ зураг" width="960" height="720">
               <span class="tags">${l.tier ? `<span class="sh-tag" data-tier="${esc(l.tier)}">${l.tier === 'vip' ? '★ VIP' : 'Онцгой'}</span>` : ''}<span class="sh-tag">${whole ? 'Бүтэн' : 'кг-аар'}</span>${l.delivers ? `<span class="sh-tag">${MARK.truckSm}Хүргэлттэй</span>` : ''}</span>
               <figcaption>Жишээ зураг</figcaption></figure>
             <div class="sd-title">

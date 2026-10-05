@@ -348,7 +348,7 @@
 <div id="root"></div>
 
 <script type="module">
-import { api, store, shell, toast, mnt, money, KIND, IDESH_STATE, ideshStage, dayLabel, dayShort, ubParts, signInDoors, accountWays, authReturn, popup, confirmPopup, passwordPopup, BANK_NAMES, phoneText, dropSession, whatWentWrong } from '/api.js';
+import { api, photoOf, store, shell, toast, mnt, money, KIND, IDESH_STATE, ideshStage, dayLabel, dayShort, ubParts, signInDoors, accountWays, authReturn, popup, confirmPopup, passwordPopup, BANK_NAMES, phoneText, dropSession, whatWentWrong } from '/api.js';
 import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -505,9 +505,8 @@ function blank({ icon = ICON.orders, title, text = '', action = null, size, tone
  * kind of animal — the one the website shows for it — never a supplier's
  * upload. A picture of the words beside it, so a reader skips it.
  */
-const MEAT = ['sheep', 'goat', 'beef', 'horse'];
-const thumb = (kind, size = '') =>
-  `<img class="ph" src="/brand/meat/${MEAT.includes(kind) ? kind : 'sheep'}-480.webp" alt="" width="48" height="48" loading="lazy" decoding="async"${size ? ` data-size="${size}"` : ''}>`;
+const thumb = (of, size = '') =>
+  `<img class="ph" src="/brand/meat/${photoOf(of)}-480.webp" alt="" width="48" height="48" loading="lazy" decoding="async"${size ? ` data-size="${size}"` : ''}>`;
 
 /** How an order reaches its guest, as a mark and a word: «Хүргэлт» or «Өөрөө авна». */
 const howCell = (o) => `<span class="how-cell">${o.receive === 'delivery' ? `${ICON.truck}Хүргэлт` : `${ICON.store}Өөрөө авна`}</span>`;
@@ -1010,7 +1009,7 @@ function deskWork(data) {
         label: 'Захиалга',
         sort: false,
         value: (t) => `${t.title} ${t.code}`,
-        render: (t) => `<span class="it-cell">${thumb(t.kind)}<span class="dt-two"><b>${what(t)}</b><small class="code">№${esc(t.code)}</small></span></span>`,
+        render: (t) => `<span class="it-cell">${thumb(t)}<span class="dt-two"><b>${what(t)}</b><small class="code">№${esc(t.code)}</small></span></span>`,
       },
       { key: 'state', label: 'Төлөв', sort: false, render: (t) => ideshStage(t.state ?? LANE_STATE[t.lane]) },
       { key: 'receive', label: 'Авах', sort: false, render: howCell },
@@ -1133,7 +1132,7 @@ function renderTicket(ticket, lane, { page = false } = {}) {
   const node = el(`
     <article class="card ticket" data-lane="${lane}" data-ticket="${esc(ticket.id)}"${due ? ` data-due="${due}"` : ''}>
       <div class="top">
-        ${thumb(ticket.kind, 'lg')}
+        ${thumb(ticket, 'lg')}
         <div class="it"><span class="what">${what(ticket)}</span>${page ? '' : `<span class="id">№${esc(ticket.code)}</span>`}</div>
         ${page ? '' : ideshStage(state)}
       </div>
@@ -1750,7 +1749,7 @@ function renderRow(l) {
   const kg = l.unit === 'kg';
   const row = el(`
     <div class="card row" data-listing="${esc(l.id)}"${l.active ? '' : ' data-off'}>
-      <span class="lead">${thumb(l.kind, 'lg')}</span>
+      <span class="lead">${thumb(l, 'lg')}</span>
       <span class="main">
         <span class="name title">${esc(l.title)}${listingMarks(l)}</span>
         <span class="sub">${listingWhat(l)} · ${deliveryWord(l)}</span>
@@ -1805,7 +1804,7 @@ function stallTable(listings) {
       {
         key: 'title',
         label: 'Зар',
-        render: (l) => `<span class="it-cell">${thumb(l.kind)}<span class="dt-two"><b>${esc(l.title)}${listingMarks(l)}</b><small>${listingWhat(l)}</small></span></span>`,
+        render: (l) => `<span class="it-cell">${thumb(l)}<span class="dt-two"><b>${esc(l.title)}${listingMarks(l)}</b><small>${listingWhat(l)}</small></span></span>`,
       },
       { key: 'price_mnt', label: 'Үнэ', align: 'end', numeric: true, render: (l) => `${money(l.price_mnt)}<span class="dt-sub">${l.unit === 'kg' ? '1 кг' : 'толгой бүр'}</span>` },
       {
@@ -2359,7 +2358,7 @@ async function renderMoney(bank = false) {
               key: 'title',
               label: 'Захиалга',
               value: (o) => `${o.title} ${o.qty} ${o.code}`,
-              render: (o) => `<span class="it-cell">${thumb(o.kind)}<span class="dt-two"><b>${what(o)}</b><small class="code">№${esc(o.code)}</small></span></span>`,
+              render: (o) => `<span class="it-cell">${thumb(o)}<span class="dt-two"><b>${what(o)}</b><small class="code">№${esc(o.code)}</small></span></span>`,
             },
             { key: 'handed_at', label: 'Хүлээлгэн өгсөн', render: (o) => esc(dayOfStamp(o.handed_at)) },
             { key: 'opens', label: 'Олголт гарах', sortValue: (o) => o.handed_at, render: (o) => `${esc(payoutDay(o))}-нөөс` },
@@ -2377,7 +2376,7 @@ async function renderMoney(bank = false) {
       for (const o of coming) {
         list.append(
           el(`<div class="card line row" data-coming="${esc(o.id)}">
-                <span class="lead">${thumb(o.kind)}</span>
+                <span class="lead">${thumb(o)}</span>
                 <span class="main">
                   <span class="name title"><span class="mn">№${esc(o.code)}</span> · ${what(o)}</span>
                   <span class="sub">${comingAt(o)}</span>
@@ -2843,7 +2842,7 @@ function renderOrders(view) {
           key: 'title',
           label: 'Захиалга',
           value: (o) => `${o.title} ${o.qty} ${o.code}`,
-          render: (o) => `<span class="it-cell">${thumb(o.kind)}<span class="dt-two"><b>${what(o)}</b><small class="code">№${esc(o.code)}</small></span></span>`,
+          render: (o) => `<span class="it-cell">${thumb(o)}<span class="dt-two"><b>${what(o)}</b><small class="code">№${esc(o.code)}</small></span></span>`,
         },
         {
           key: 'guest',
@@ -2956,7 +2955,7 @@ async function loadOrders() {
   for (const o of data.orders) {
     const row = el(`
       <button class="order row" type="button" data-order="${esc(o.id)}" data-chev>
-        <span class="lead">${thumb(o.kind)}</span>
+        <span class="lead">${thumb(o)}</span>
         <span class="main">
           <span class="title t">${what(o)}</span>
           <span class="sub s">${guestLine(o)}</span>

@@ -222,7 +222,7 @@ async function drawList() {
     for (const o of rows) {
       box.append(
         el(`<a class="so-row" href="/orders/${o.id}" data-order="${o.id}">
-              <img src="${meatPhoto(o.kind)}" alt="" loading="lazy" width="72" height="72">
+              <img src="${meatPhoto(o)}" alt="" loading="lazy" width="72" height="72">
               <span><b>${esc(o.title)} × ${o.qty} ${unitWord(o)}</b><small>${esc(o.supplier.name)} · ${o.receive === 'delivery' ? 'хүргэлт' : 'очиж авна'} ${dayLabel(o.receive_on)}</small><small><span class="code">№${esc(o.code)}</span></small></span>
               <span class="end"><span class="s-money">${tugrik(o.total_mnt)}</span>${going.get(o.id) ? refundPill(going.get(o.id)) : pill(o.state)}</span>
             </a>`),

@@ -176,7 +176,7 @@ if (!token || !person) {
     $('live-list').replaceChildren(
       ...going.map((o) =>
         el(`<a class="h-row" href="/orders/${o.id}" data-order="${o.id}">
-              <img src="${meatPhoto(o.kind)}" alt="" loading="lazy" width="72" height="72">
+              <img src="${meatPhoto(o)}" alt="" loading="lazy" width="72" height="72">
               <span class="mid"><b>${esc(o.title)} × ${o.qty}</b><small><span class="code">№${esc(o.code)}</span> · ${esc(o.supplier.name)}</small>${o.refund ? refundPill(o.refund) : statePill(o.state)}</span>
               <span class="h-when">${dayShort(o.receive_on)}<small>${dayWord(o)}</small></span>
             </a>`),

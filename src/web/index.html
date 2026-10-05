@@ -578,7 +578,7 @@ img{display:block;max-width:none}
 </footer>
 
 <script type="module">
-import { api, mnt, dayLabel } from '/api.js';
+import { api, mnt, dayLabel, photoOf } from '/api.js';
 import { accountSlot, esc, tugrik, PAY_STEP } from '/site.js';
 
 const $ = (id) => document.getElementById(id);
@@ -649,12 +649,7 @@ drawer.addEventListener('focusout', (event) => {
  * person who taps one. Shown to anybody: the stalls are open to browse, and
  * only ordering asks who you are.
  */
-const STALL_PHOTO = {
-  sheep: '/idesh/sheep.jpg',
-  goat: '/idesh/goat.jpg',
-  beef: '/idesh/beef.jpg',
-  horse: '/idesh/horse.jpg',
-};
+const STALL_PHOTO = (l) => `/idesh/${photoOf(l)}.jpg`;
 /** A listing put first by its supplier (VIP, then Онцгой) leads, then whatever still has some left. */
 const leading = (a, b) => {
   const rank = (l) => (l.tier === 'vip' ? 0 : l.tier === 'featured' ? 1 : 2);
@@ -748,7 +743,7 @@ try {
       const tier = l.tier ? `<span class="tag" data-tier="${esc(l.tier)}">${l.tier === 'vip' ? 'VIP' : 'Онцгой'}</span>` : '';
       const left = whole ? perKilo(l) : l.delivers ? 'Хүргэлттэй' : 'Очиж авна';
       const when = l.remaining > 0 ? `${dayLabel(l.ready_from)}-нөөс` : 'Дууссан';
-      a.innerHTML = `<span class="ph"><img src="${STALL_PHOTO[l.kind] ?? STALL_PHOTO.sheep}" alt="" loading="lazy" width="640" height="640"><span class="tags">${tier}<span class="tag">${whole ? 'Бүтэн' : 'кг-аар'}</span></span></span>
+      a.innerHTML = `<span class="ph"><img src="${STALL_PHOTO(l)}" alt="" loading="lazy" width="640" height="640"><span class="tags">${tier}<span class="tag">${whole ? 'Бүтэн' : 'кг-аар'}</span></span></span>
         <span class="sup">${esc(l.supplier?.name ?? '')}</span>
         <h3>${esc(l.title)}</h3>
         <span class="pr"><b class="money">${tugrik(l.price_mnt)}</b><small>${whole ? (Number(l.approx_kg) > 0 ? `≈${esc(l.approx_kg)} кг` : '') : '/кг'}</small></span>

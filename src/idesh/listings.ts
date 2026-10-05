@@ -43,6 +43,12 @@ export interface Listing {
   /** The veterinary certificate the meat came with, once the supplier has put one on. */
   certificateId: string | null;
   certificate: CertificateFacts | null;
+  /**
+   * Its place among its supplier's listings of the same animal, oldest first.
+   * The pages turn it into one of the example photographs, so two listings on
+   * one stall do not wear the same picture — and one listing always wears its own.
+   */
+  photo: number;
 }
 
 /** What a supplier can pay for, highest last. */
@@ -72,6 +78,7 @@ interface ListingRow {
   tier: Tier | null;
   tier_until: Date | null;
   certificate_id: string | null;
+  photo: number;
   cert_number: string | null;
   cert_issuer: string | null;
   cert_issued_on: string | null;
@@ -83,12 +90,16 @@ interface ListingRow {
  * time covers that moment, and the latest it runs to. Every query below puts
  * the moment first, so the clock is the caller's — the demo's, or a test's.
  */
+/** A listing `l`'s place among its supplier's listings of the same animal — see `Listing.photo`. */
+export const PHOTO_PLACE = `(SELECT count(*)::int FROM idesh.listing x WHERE x.supplier_id = l.supplier_id AND x.kind = l.kind AND (x.created_at, x.id) < (l.created_at, l.id)) AS photo`;
+
 const SELECT = `
   SELECT l.id, l.supplier_id, s.name AS supplier, s.state = 'contracted' AS contracted,
          s.pickup_address, l.kind, l.unit, l.title, l.note, l.price_mnt, l.approx_kg,
          l.min_qty, l.quantity, l.sold, l.origin, to_char(l.ready_from, 'YYYY-MM-DD') AS ready_from,
          l.delivers, l.delivery_fee_mnt, l.active, p.tier, p.ends_at AS tier_until,
-         l.certificate_id, ${CERT_COLUMNS}
+         l.certificate_id, ${CERT_COLUMNS},
+         ${PHOTO_PLACE}
     FROM idesh.listing l
     JOIN idesh.supplier s ON s.id = l.supplier_id
     LEFT JOIN idesh.certificate c ON c.id = l.certificate_id
@@ -130,6 +141,7 @@ function shape(r: ListingRow): Listing {
     tierUntil: r.tier ? r.tier_until : null,
     certificateId: r.certificate_id,
     certificate: factsOf(r),
+    photo: r.photo,
   };
 }
 
