@@ -24,53 +24,60 @@ interface Dish {
   fill: string;
   /** Garnish, grill marks, filling — whatever the form uses for detail. */
   detail: string;
-  /** The cloth the plate sits on. */
-  ground: string;
 }
+
+/**
+ * The table every plate sits on: the app's raised surface, so a drawing reads
+ * as a porcelain plate on a dark table rather than a light tile in a dark page.
+ */
+const TABLE = '#251F1D';
+
+/** Porcelain, warm rather than paper white, which glares on the dark table. */
+const PORCELAIN = '#F6F0E8';
 
 const DISHES: Record<string, Dish> = {
   // ── soups ────────────────────────────────────────────────────────
-  guriltai_shol: { form: 'soup', fill: '#C98A3E', detail: '#F1E4CB', ground: '#EFE7DA' },
-  banshtai_shol: { form: 'soup', fill: '#C07C3A', detail: '#F6EFE0', ground: '#EFE7DA' },
-  bantan: { form: 'soup', fill: '#D9BE86', detail: '#FBF4E6', ground: '#F0EADF' },
-  huurga_shol: { form: 'soup', fill: '#A65A2E', detail: '#E8D9BC', ground: '#EDE4D6' },
+  guriltai_shol: { form: 'soup', fill: '#C98A3E', detail: '#F1E4CB' },
+  banshtai_shol: { form: 'soup', fill: '#C07C3A', detail: '#F6EFE0' },
+  bantan: { form: 'soup', fill: '#D9BE86', detail: '#FBF4E6' },
+  huurga_shol: { form: 'soup', fill: '#A65A2E', detail: '#E8D9BC' },
 
   // ── steamed & fried parcels ──────────────────────────────────────
-  buuz: { form: 'dumpling', fill: '#F2E3C8', detail: '#D9C39C', ground: '#E9E2D6' },
-  bansh: { form: 'dumpling', fill: '#F6EDDA', detail: '#E0CFAE', ground: '#ECE5DA' },
-  khuushuur: { form: 'fried', fill: '#D9A03F', detail: '#B87A28', ground: '#EDE3D2' },
-  gambir: { form: 'fried', fill: '#E0B458', detail: '#C08C33', ground: '#EFE6D6' },
+  buuz: { form: 'dumpling', fill: '#F2E3C8', detail: '#D9C39C' },
+  bansh: { form: 'dumpling', fill: '#F6EDDA', detail: '#E0CFAE' },
+  khuushuur: { form: 'fried', fill: '#D9A03F', detail: '#B87A28' },
+  gambir: { form: 'fried', fill: '#E0B458', detail: '#C08C33' },
 
   // ── the wok ──────────────────────────────────────────────────────
-  tsuivan: { form: 'noodle', fill: '#C98F4B', detail: '#7E9B4E', ground: '#EBE3D5' },
-  goimon: { form: 'noodle', fill: '#DCB367', detail: '#8AA55A', ground: '#EDE6D8' },
-  tsagaan_budaa: { form: 'rice', fill: '#F3EDDF', detail: '#B4562F', ground: '#E9E3D6' },
-  nogootoi_huurga: { form: 'noodle', fill: '#B87840', detail: '#6E9247', ground: '#EBE4D6' },
+  tsuivan: { form: 'noodle', fill: '#C98F4B', detail: '#7E9B4E' },
+  goimon: { form: 'noodle', fill: '#DCB367', detail: '#8AA55A' },
+  tsagaan_budaa: { form: 'rice', fill: '#F3EDDF', detail: '#B4562F' },
+  nogootoi_huurga: { form: 'noodle', fill: '#B87840', detail: '#6E9247' },
 
   // ── the grill ────────────────────────────────────────────────────
-  steak: { form: 'grill', fill: '#8C4A2C', detail: '#5A2E1B', ground: '#E8E1D4' },
-  shorlog: { form: 'skewer', fill: '#9E5230', detail: '#63321D', ground: '#EAE2D5' },
-  takhia: { form: 'grill', fill: '#C68B45', detail: '#8A5A25', ground: '#ECE5D7' },
-  fries: { form: 'fried', fill: '#E8BC5C', detail: '#C79338', ground: '#EFE7D7' },
+  steak: { form: 'grill', fill: '#8C4A2C', detail: '#5A2E1B' },
+  shorlog: { form: 'skewer', fill: '#9E5230', detail: '#63321D' },
+  takhia: { form: 'grill', fill: '#C68B45', detail: '#8A5A25' },
+  fries: { form: 'fried', fill: '#E8BC5C', detail: '#C79338' },
 
   // ── cold ─────────────────────────────────────────────────────────
-  salad: { form: 'salad', fill: '#6E9B45', detail: '#C0442F', ground: '#EAE6DA' },
-  nogoon_salad: { form: 'salad', fill: '#7BA84E', detail: '#E0B23F', ground: '#EBE7DB' },
+  salad: { form: 'salad', fill: '#6E9B45', detail: '#C0442F' },
+  nogoon_salad: { form: 'salad', fill: '#7BA84E', detail: '#E0B23F' },
 
   // ── drinks ───────────────────────────────────────────────────────
-  suutei_tsai: { form: 'drink', fill: '#E3D7BE', detail: '#C6B394', ground: '#EDE8DC' },
-  kompot: { form: 'drink', fill: '#C4553C', detail: '#9C3B27', ground: '#EEE6DA' },
+  suutei_tsai: { form: 'drink', fill: '#E3D7BE', detail: '#C6B394' },
+  kompot: { form: 'drink', fill: '#C4553C', detail: '#9C3B27' },
 };
 
 /** The one every unknown slug falls back to, so a menu never shows a hole. */
-const FALLBACK: Dish = { form: 'soup', fill: '#B98A52', detail: '#EFE3CC', ground: '#EBE5D9' };
+const FALLBACK: Dish = { form: 'soup', fill: '#B98A52', detail: '#EFE3CC' };
 
 const SIZE = 160;
 
 export function dishSvg(slug: string): string {
   const dish = DISHES[slug] ?? FALLBACK;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}" role="img">
-  <rect width="${SIZE}" height="${SIZE}" fill="${dish.ground}"/>
+  <rect width="${SIZE}" height="${SIZE}" fill="${TABLE}"/>
   ${draw(dish)}
 </svg>`;
 }
@@ -99,17 +106,24 @@ function draw(dish: Dish): string {
 }
 
 /**
- * Steam, drawn on the cloth above the plate rather than on the plate itself.
- * The first version was white-on-white and simply did not exist.
+ * Steam, over the bowl's rim and the table behind it. The first version was
+ * white-on-white and simply did not exist; a mid-tone shows on porcelain and
+ * on the dark table alike.
  */
 function steam(x: number, y: number): string {
-  return `<path d="M${x} ${y + 16}q6-6 0-11t0-9" fill="none" stroke="rgba(20,24,27,.22)" stroke-width="2.4" stroke-linecap="round"/>`;
+  return `<path d="M${x} ${y + 16}q6-6 0-11t0-9" fill="none" stroke="rgba(153,142,133,.7)" stroke-width="2.4" stroke-linecap="round"/>`;
 }
 
-/** The white ring every plated form sits in. */
+/** The plate's shadow on the table: what lifts it off the dark. */
+function shadow(cy: number, radius: number): string {
+  return `<circle cx="80" cy="${cy + 3}" r="${radius + 1.5}" fill="rgba(0,0,0,.5)"/>`;
+}
+
+/** The porcelain ring every plated form sits in. */
 function plate(radius = 58): string {
-  return `<circle cx="80" cy="80" r="${radius}" fill="#ffffff"/>
-  <circle cx="80" cy="80" r="${radius}" fill="none" stroke="rgba(0,0,0,.07)" stroke-width="1.5"/>`;
+  return `${shadow(80, radius)}
+  <circle cx="80" cy="80" r="${radius}" fill="${PORCELAIN}"/>
+  <circle cx="80" cy="80" r="${radius - 6}" fill="none" stroke="rgba(20,15,14,.07)" stroke-width="1.5"/>`;
 }
 
 function soup(d: Dish): string {
@@ -267,8 +281,9 @@ function rice(d: Dish): string {
 }
 
 function drink(d: Dish): string {
-  return `<circle cx="80" cy="82" r="52" fill="#ffffff"/>
-  <circle cx="80" cy="82" r="52" fill="none" stroke="rgba(0,0,0,.07)" stroke-width="1.5"/>
+  return `${shadow(82, 52)}
+  <circle cx="80" cy="82" r="52" fill="${PORCELAIN}"/>
+  <circle cx="80" cy="82" r="46" fill="none" stroke="rgba(20,15,14,.07)" stroke-width="1.5"/>
   <circle cx="80" cy="82" r="38" fill="${d.fill}"/>
   <circle cx="80" cy="82" r="38" fill="none" stroke="rgba(0,0,0,.07)" stroke-width="1.2"/>
   <ellipse cx="80" cy="82" rx="27" ry="27" fill="none" stroke="${d.detail}" stroke-width="2" opacity=".55"/>

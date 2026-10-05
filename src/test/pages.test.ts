@@ -733,7 +733,7 @@ describe('the guest app', () => {
     // A menu is chosen with the eyes: every row carries a picture, and the two
     // numbers the kitchen runs on are on the row rather than hidden.
     for (const row of dom.window.document.querySelectorAll('.item')) {
-      expect(row.querySelector('img')?.getAttribute('src')).toMatch(/^\/dishes\/\w+\.svg$/);
+      expect(row.querySelector('img')?.getAttribute('src')).toMatch(/^\/dishes\/\w+\.svg\?look=dark$/);
       expect(row.querySelector('.meta')?.textContent).toMatch(/\d+ мин/);
       expect(row.querySelector('.price')?.textContent).toMatch(/₮/);
     }

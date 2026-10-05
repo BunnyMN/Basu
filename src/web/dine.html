@@ -1196,13 +1196,19 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
+/** Bumped whenever the drawings in src/api/dishes.ts change how they look. */
+const DRAWINGS = 'dark';
+
 /**
  * A dish's picture: a file of ours or an https address, else the drawing that
  * stands in for a missing one. Whatever writes `image_url` one day — a
  * restaurant's own menu page — writes into every guest's page.
  */
 function dishPicture(url) {
-  return typeof url === 'string' && /^(\/(?![/\\])|https:\/\/)[^\s"'<>\\`]*$/.test(url) ? url : '/dishes/unknown.svg';
+  const picture = typeof url === 'string' && /^(\/(?![/\\])|https:\/\/)[^\s"'<>\\`]*$/.test(url) ? url : '/dishes/unknown.svg';
+  // Our drawings are cached for a week as immutable: a new look needs a new
+  // address, or a phone keeps showing last week's.
+  return /^\/dishes\/\w+\.svg$/.test(picture) ? `${picture}?look=${DRAWINGS}` : picture;
 }
 
 function renderFoot() {
