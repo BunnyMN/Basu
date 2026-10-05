@@ -252,7 +252,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 .foot-row{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .foot-row .sum{flex:1;min-width:0}
 .foot-row .sum > span{display:block;margin:2px 0 8px;font-size:var(--t-cap);font-weight:600;line-height:1.2;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.foot-row .sum b{display:block;font-family:var(--display);font-size:2.125rem;font-weight:800;line-height:1;letter-spacing:-.004em;white-space:nowrap}
+.foot-row .sum b{display:block;font-family:var(--display);font-size:clamp(1.625rem,8.6vw,2.125rem);font-weight:800;line-height:1;letter-spacing:-.004em;white-space:nowrap}
 .foot-row .sum .money{font-weight:800}
 .foot-row .btn{flex:none;min-height:58px;padding:0 30px;font-size:1.125rem}
 .why{display:flex;align-items:center;gap:6px;margin:0 0 12px;font-size:var(--t-cap);font-weight:500;line-height:1.4;color:var(--ink-3)}
@@ -421,7 +421,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 .me{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin:14px 0 0;font-size:var(--t-cap);line-height:1.4;color:var(--ink-2)}
 .me[hidden]{display:none}
 .me b{color:var(--ink);font-weight:700;overflow-wrap:anywhere}
-.me .link{min-height:32px;font-size:var(--t-cap);text-decoration:underline;text-underline-offset:.2em}
+.me .link{min-height:var(--target);font-size:var(--t-cap);text-decoration:underline;text-underline-offset:.2em}
 </style>
 </head>
 <body>
@@ -1144,7 +1144,7 @@ function renderDetail({ replace = false } = {}) {
       </div>
       <div class="help">${
         l.unit === 'whole'
-          ? `<b>${l.remaining} толгой</b> үлдсэн. Хоёр айл нэг мал хувааж авч болно.`
+          ? `<b>${l.remaining} толгой</b> үлдсэн. Хоёр айл хувааж авч болно.`
           : `Доод тал нь <b>${l.min_qty} кг</b>, ${step} кг-аар нэмэгдэнэ. <b>${l.remaining} кг</b> үлдсэн.`
       }</div>
     </div>`);
@@ -1394,7 +1394,7 @@ function sayClosed(on, after) {
   after.after(closedCard());
 }
 const closedCard = () =>
-  el(`<div class="note callout" id="closed" role="note">${MARK.info}<span><b>${CLOSED}</b>Одоохондоо зарыг үзэж, харьцуулж болно. Асуух зүйл байвал <a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a> хаягаар бичээрэй.</span></div>`);
+  el(`<div class="note callout" id="closed" role="note">${MARK.info}<span><b>${CLOSED}</b>Асуулт байвал <a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a> хаягаар бичээрэй.</span></div>`);
 
 /* ── the review, before any money moves ──────────────────────────── */
 

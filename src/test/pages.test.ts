@@ -1078,6 +1078,22 @@ describe('the map', () => {
       expect(new URL(url).origin).toBe(new URL(base).origin);
     }
   });
+
+  it('draws the city at night whatever the phone is set to', async () => {
+    // Every Basu page is dark. The map used to follow the phone's own setting,
+    // and a phone set to light drew a daylight city under the dark sheet — most
+    // of the lunch page went light. One palette now: the charcoal ground, and
+    // no colour on it but the pins.
+    const dom = await openPage('dine.html');
+    await until(dom, 'the style', () => Boolean((dom.window as unknown as Record<string, unknown>)['__style']));
+    const style = (dom.window as unknown as Record<string, unknown>)['__style'] as {
+      layers: Array<{ id: string; paint?: Record<string, unknown> }>;
+    };
+    const paint = (id: string, key: string) => style.layers.find((l) => l.id === id)?.paint?.[key];
+    expect(paint('bg', 'background-color')).toBe('#141110');
+    expect(paint('road-primary', 'line-color')).toBe('#3E3431');
+    expect(paint('water', 'fill-color')).toBe('#111518');
+  });
 });
 
 describe('the Basu home screen', () => {
