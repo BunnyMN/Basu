@@ -25,6 +25,7 @@ export {
   payOut,
   reconcileLedger,
   refund,
+  settleOwnTopups,
   settleTopup,
   startTopup,
   topupByProviderRef,

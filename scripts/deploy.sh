@@ -292,6 +292,16 @@ for _ in $(seq 1 30); do
       echo "✓ production: no /dev on :$PORT"
       # Which ways in are open — Google and email wait on keys in .env.
       echo "  sign-in: $(curl -s "http://127.0.0.1:$PORT/v1/auth/methods")"
+      # Whether the scheduler runs, and how its recent log reads:
+      # money paid while nobody was looking lands through it. Counts and
+      # kinds of error only — this log is public.
+      if systemctl cat basu-scheduler >/dev/null 2>&1; then
+        sleep 3
+        echo "  scheduler: $(systemctl is-enabled basu-scheduler 2>/dev/null || true), $(systemctl is-active basu-scheduler 2>/dev/null || true), restarts $(systemctl show -p NRestarts --value basu-scheduler 2>/dev/null || true)"
+        recent=$( { journalctl -u basu-scheduler --since '20 min ago' --no-pager -o cat 2>/dev/null || true; tail -n 400 /var/log/basu-scheduler.log 2>/dev/null || true; } )
+        echo "  scheduler, recent log: $(printf '%s\n' "$recent" | grep -c 'failed' || true) failures, $(printf '%s\n' "$recent" | grep -c 'running, tick' || true) starts"
+        printf '%s\n' "$recent" | grep -A3 'failed' | grep -oE '[A-Z][A-Za-z]*Error|code: .[0-9A-Z]{5}.' | sort | uniq -c | sort -rn | head -3 | sed 's/^/    /' || true
+      fi
     fi
     flipped=0
     exit 0

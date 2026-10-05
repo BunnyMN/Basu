@@ -19,6 +19,7 @@ import {
   LedgerError,
   balance,
   movement,
+  settleOwnTopups,
   settleTopup,
   startTopup,
   wallet,
@@ -348,6 +349,9 @@ export async function registerPlatformRoutes(
   /* ── wallet ───────────────────────────────────────────────────────── */
 
   app.get<{ Querystring: { before?: string } }>('/v1/wallet', guarded, async (request) => {
+    // A top-up paid on QPay while the app was not looking lands before the
+    // balance is read — the first page only; a later page is the past.
+    if (!request.query.before) await settleOwnTopups(ctx, request.guestId!).catch(() => 0);
     const statement = await wallet(request.guestId!, 25, request.query.before);
     return {
       balance_mnt: statement.balanceMnt,

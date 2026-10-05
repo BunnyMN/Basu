@@ -97,6 +97,15 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
   const startedMs = Date.now();
   const db = getPool();
 
+  /* 0. Money first: wallet top-ups paid while the phone was not looking —
+   *    it asks once, often before the person has paid — credited, and the
+   *    person told. Before anything that could fail, and failing alone. */
+  try {
+    report.topups = await finishTopups(ctx, { young: opts.invoices ?? true, old: opts.lapsed ?? true });
+  } catch (error) {
+    console.error('[scheduler] wallet top-ups failed', error);
+  }
+
   /* 1. Arm everything inside its last fifteen minutes. */
   const { rows: armable } = await db.query<{ id: string }>(
     `SELECT id FROM dine.dining_order
@@ -142,15 +151,17 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
   }
 
   /* 6. The other vertical's housekeeping. Before the outbox, for the same
-   *    reason everything else is: a refund it posts wants relaying now. */
-  const idesh = await ideshHousekeeping(ctx, { invoices: opts.invoices ?? true, lapsed: opts.lapsed ?? true });
-  report.ideshExpired = idesh.expired;
-  report.ideshClosed = idesh.closed;
-  report.ideshBought = idesh.bought;
-
-  /* 6b. Wallet top-ups paid while the phone was not looking — it asks once,
-   *     often before the person has paid — credited, and the person told. */
-  report.topups = await finishTopups(ctx, { young: opts.invoices ?? true, old: opts.lapsed ?? true });
+   *    reason everything else is: a refund it posts wants relaying now. Its
+   *    failure is logged and the tick goes on: the outbox after it carries
+   *    every other message, and one stuck идэш must not silence them all. */
+  try {
+    const idesh = await ideshHousekeeping(ctx, { invoices: opts.invoices ?? true, lapsed: opts.lapsed ?? true });
+    report.ideshExpired = idesh.expired;
+    report.ideshClosed = idesh.closed;
+    report.ideshBought = idesh.bought;
+  } catch (error) {
+    console.error('[scheduler] idesh housekeeping failed', error);
+  }
 
   /* 7. Anything the state changes promised the outside world. */
   report.relayed = await relayOutbox(ctx);

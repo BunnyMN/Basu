@@ -442,6 +442,17 @@ describe('a wallet top-up paid on Wire’s page', () => {
     expect(await toldOf(guest)).toHaveLength(1);
   });
 
+  it('lands the moment its owner opens the wallet, whether or not the scheduler has looked', async () => {
+    const guest = await signIn();
+    await topUp(guest, 20_000);
+    const other = await signIn('+97699002233');
+    paidAtWire('pi_test_1');
+    // Somebody else's wallet does not ask about it.
+    expect(await balanceOf(other)).toBe(0);
+    expect(await balanceOf(guest)).toBe(20_000);
+    expect(await balanceOf(guest)).toBe(20_000);
+  });
+
   it('still lands when the person took an hour in their bank app — asked now and then for a week', async () => {
     const guest = await signIn();
     await topUp(guest, 50_000);
@@ -459,7 +470,8 @@ describe('a wallet top-up paid on Wire’s page', () => {
     expect((await tick(ctx, { spacingMs: 0 })).topups).toBe(0);
 
     paidAtWire('pi_test_1');
-    failGets = 1;
+    // Wire busy for the tick's look and for the wallet's own.
+    failGets = 2;
     expect((await tick(ctx, { spacingMs: 0 })).topups).toBe(0);
     expect(await balanceOf(guest)).toBe(0);
     // Wire answers again: the same top-up, still pending, lands.

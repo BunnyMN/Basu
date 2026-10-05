@@ -378,6 +378,33 @@ export async function openTopups(
   return rows.map((r) => ({ topupId: r.id, guestId: r.guest_id, amountMnt: Number(r.amount_mnt) }));
 }
 
+/** When each top-up was last asked about from its owner's wallet (`settleOwnTopups`), by wall clock. */
+const ownLooks = new Map<string, number>();
+
+/**
+ * A person's own wallet top-ups still pending at the provider, from the last week: asked about when they
+ * open their wallet, so one they paid is in the balance they are about to read — whatever became of the
+ * phone that raised it, and before the scheduler's next look. A few at most, each at most every ten
+ * seconds; unpaid, or the provider silent, they stay pending. Returns how many landed.
+ */
+export async function settleOwnTopups(ctx: Ctx, guestId: string): Promise<number> {
+  // Only a provider that can be asked: one taken at its word (the demo's) would credit unasked.
+  if (!ctx.payments.paid) return 0;
+  const { rows } = await getPool().query<{ id: string }>(
+    `SELECT id FROM ledger.topup
+      WHERE guest_id = $1 AND for_subject IS NULL AND state = 'pending' AND provider_ref IS NOT NULL
+        AND created_at > $2::timestamptz - interval '7 days'
+      ORDER BY created_at DESC LIMIT 3`,
+    [guestId, ctx.clock.now()],
+  );
+  const wall = Date.now();
+  if (ownLooks.size > 500) for (const [id, at] of ownLooks) if (wall - at > 60_000) ownLooks.delete(id);
+  const due = rows.filter((row) => wall - (ownLooks.get(row.id) ?? 0) >= 10_000);
+  for (const row of due) ownLooks.set(row.id, wall);
+  const landed = await Promise.all(due.map((row) => settleTopup(ctx, row.id).then(() => true, () => false)));
+  return landed.filter(Boolean).length;
+}
+
 /** The purchase a top-up was raised for — what the provider's callback goes on to. */
 export async function purchaseOfTopup(topupId: string): Promise<{ subject: string; subjectId: string } | null> {
   const { rows } = await getPool().query<{ for_subject: string | null; for_subject_id: string | null }>(
