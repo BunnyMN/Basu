@@ -66,7 +66,7 @@ final class GuestBrowsingTests: XCTestCase {
     shot("4-wallet")
     app.buttons["tab.profile"].tap()
     XCTAssertTrue(app.buttons["profile.signin"].waitForExistence(timeout: 5), "so is the profile")
-    XCTAssertTrue(app.buttons["settings.appearance.dark"].exists, "but how this phone looks is not")
+    XCTAssertTrue(app.buttons["settings.cache"].exists, "but this phone's own help is not")
     XCTAssertFalse(app.buttons["settings.lock"].exists, "and a lock guards an account, so none yet")
     app.buttons["profile.signin"].tap()
     XCTAssertTrue(app.buttons["signin.apple"].waitForExistence(timeout: 5), "the doors, as a sheet")

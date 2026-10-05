@@ -4,8 +4,11 @@ import UserNotifications
 import WebKit
 
 /**
- The profile: who you are, how this phone shows Basu, and what Basu is
+ The profile: who you are, who may open Basu on this phone, and what Basu is
  allowed to send you.
+
+ There is no light-or-dark choice any more: Basu is dark on every screen
+ whatever the phone's own setting («Тансаг хар», 2026-10-05).
 
  Short on purpose. A profile that grows a field per product stops being one
  person and becomes four apps sharing a form — table preference here, drop-off
@@ -27,7 +30,6 @@ struct ProfileView: View {
   @Environment(AppModel.self) private var model
   @Environment(AppLock.self) private var lock
   @Environment(\.scenePhase) private var phase
-  @AppStorage(Appearance.key) private var appearance: Appearance = .system
 
   @State private var editing: Field?
   @State private var closing = false
@@ -52,9 +54,9 @@ struct ProfileView: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 26) {
+      VStack(alignment: .leading, spacing: 32) {
         if session.isSignedIn {
-          VStack(alignment: .leading, spacing: 14) {
+          VStack(alignment: .leading, spacing: 16) {
             identity
             // Said where it is seen on arrival, not at the foot of the page
             // under the tab bar.
@@ -72,24 +74,24 @@ struct ProfileView: View {
           closeAccount
         } else {
           // Looking around (see `RootView`): the way in, and what is this
-          // phone's rather than the account's — how it looks, and the help.
+          // phone's rather than the account's — the help.
           SignInPrompt(
             symbol: "person.crop.circle",
-            title: "Нэвтэрч, захиалгаа хийгээрэй",
-            detail: "Захиалга, түрийвч, мэдэгдэл таны бүртгэлд хадгалагдана. Apple, Google эсвэл имэйлээр нэг алхамд.",
+            title: "Нэвтэрч захиалаарай",
+            detail: "Apple, Google эсвэл имэйлээр нэг алхамд.",
             id: "profile.signin",
           )
           .padding(.top, 8)
-          settings
           help
         }
       }
       .padding(.horizontal, BasuMetric.screenPadding)
+      .padding(.top, 4)
       .padding(.bottom, BasuMetric.tabBarInset)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .scrollIndicators(.hidden)
-    .background(LinearGradient.ground)
+    .background(Color.bg)
     .safeAreaInset(edge: .top, spacing: 0) { ShellTitle("Профайл") }
     .toolbarVisibility(.hidden, for: .navigationBar)
     .sheet(item: $editing) { field in
@@ -135,25 +137,25 @@ struct ProfileView: View {
 
   private var identity: some View {
     HStack(spacing: 16) {
-      SeedAvatar(seed: platform.me?.avatarSeed ?? "00000000", size: 54)
-      VStack(alignment: .leading, spacing: 5) {
+      SeedAvatar(seed: platform.me?.avatarSeed ?? "00000000", size: BasuMetric.avatarProfile)
+      VStack(alignment: .leading, spacing: 6) {
         headline
-        // The number in the mono, the way every number is; an address is words.
+        // Figures tabular, so a number reads in its groups.
         if let phone = platform.me?.phone ?? (platform.me == nil ? session.phone : nil) {
           Text(spaced(phone))
-            .font(.mono(14))
+            .font(.sans(15, .semibold))
             .monospacedDigit()
             .foregroundStyle(Color.ink2)
         } else if let email = platform.me?.email ?? session.email {
           Text(email)
-            .font(.sans(14))
+            .font(.sans(15, .semibold))
             .foregroundStyle(Color.ink2)
             .lineLimit(1)
             .truncationMode(.middle)
         }
         if let me = platform.me {
           Text("Basu-д \(Format.since(me.memberSince)) хойш")
-            .font(.sans(12))
+            .font(.sans(13, .medium))
             .foregroundStyle(Color.ink3)
             .fixedSize(horizontal: false, vertical: true)
         }
@@ -169,19 +171,18 @@ struct ProfileView: View {
   @ViewBuilder private var headline: some View {
     if let name = platform.me?.displayName?.trimmingCharacters(in: .whitespaces), !name.isEmpty {
       Text(name)
-        .font(.sans(24, .semibold))
-        .tracking(-0.02 * 24)
+        .font(.display(29))
         .foregroundStyle(Color.ink)
         .fixedSize(horizontal: false, vertical: true)
     } else if platform.me != nil {
       Button { editing = .name } label: {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
           Text("Нэрээ оруулах")
-            .font(.sans(22, .semibold))
-            .tracking(-0.02 * 22)
+            .font(.display(29))
           Chevron(size: 14, lineWidth: 2.2)
+            .foregroundStyle(Color.ink3)
         }
-        .foregroundStyle(Color.accentInk)
+        .foregroundStyle(Color.ink)
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
@@ -189,7 +190,7 @@ struct ProfileView: View {
     } else {
       // Still on its way: the shape of a name, not a word that is wrong.
       Text("Батаа Болд")
-        .font(.sans(24, .semibold))
+        .font(.display(29))
         .redacted(reason: .placeholder)
         .accessibilityHidden(true)
     }
@@ -238,7 +239,7 @@ struct ProfileView: View {
           passwordRow(hasPassword: hasPassword, hasEmail: me.email != nil)
         }
       }
-      .glassCard()
+      .card()
 
       if let passwordNote {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -337,26 +338,16 @@ struct ProfileView: View {
 
   /// How Basu looks and who may open it — both about this phone, not the
   /// account, and kept on it.
+  /// Who may open Basu on this phone — about this phone, not the account,
+  /// and kept on it. (How Basu looks is no longer a choice: it is dark.)
   private var settings: some View {
-    VStack(alignment: .leading, spacing: 11) {
+    VStack(alignment: .leading, spacing: 12) {
       SectionLabel("Тохиргоо")
-      VStack(alignment: .leading, spacing: 0) {
-        VStack(alignment: .leading, spacing: 14) {
-          RowLabel(title: "Харагдах байдал", symbol: "circle.lefthalf.filled")
-          AppearancePicker(selection: $appearance)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        if session.isSignedIn {
-          Hairline()
-          lockRow
-        }
-      }
-      .glassCard()
+      lockRow
+        .card()
 
-      Text(session.isSignedIn ? lockFooter : "Харагдах байдал зөвхөн энэ утсанд хадгалагдана.")
-        .font(.sans(12))
-        .lineSpacing(12 * 0.55 - 3)
+      Text(lockFooter)
+        .font(.sans(13, .medium))
         .foregroundStyle(Color.ink3)
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -384,7 +375,7 @@ struct ProfileView: View {
 
   private var lockFooter: String {
     let minutes = Int(AppLock.grace / 60)
-    return "Харагдах байдал зөвхөн энэ утсанд хадгалагдана. Түгжээ асаалттай үед апп-аас \(minutes) минутаас удаан гарвал дахин нээхэд \(lock.kind.by) баталгаажуулна."
+    return "Түгжээтэй үед \(minutes) минутаас удаан гарвал \(lock.kind.by) нээнэ."
   }
 
   // MARK: - what we may send
@@ -425,13 +416,12 @@ struct ProfileView: View {
           id: "profile.pref.marketing",
         ) { await platform.setPreference(marketing: $0) }
       }
-      .glassCard()
+      .card()
 
       // Being honest about what cannot be switched off is the difference
       // between a setting and a lie.
-      Text("Захиалгын явцын мэдэгдлийг унтраах боломжгүй — хоол бэлэн болох, мах гарах цагийг мэдэх хэрэгтэй.")
-        .font(.sans(12))
-        .lineSpacing(12 * 0.55 - 3)
+      Text("Захиалгын явцын мэдэгдэл үргэлж ирнэ.")
+        .font(.sans(13, .medium))
         .foregroundStyle(Color.ink3)
         .fixedSize(horizontal: false, vertical: true)
     }
@@ -463,14 +453,17 @@ struct ProfileView: View {
           }
         }
       }
-      .font(.sans(14, .semibold))
-      .foregroundStyle(Color.accent)
+      .font(.sans(14, .bold))
+      .foregroundStyle(Color.onLight)
+      .padding(.horizontal, 16)
+      .frame(minHeight: 36)
+      .background(Color.ink, in: Capsule())
       .frame(minHeight: BasuMetric.minTarget)
       .accessibilityIdentifier("profile.permission")
     }
     .padding(.horizontal, 16)
     .padding(.vertical, 13)
-    .background(Color.holdSoft.opacity(0.5))
+    .background(Color.surface2)
   }
 
   private func switchRow(
@@ -520,12 +513,13 @@ struct ProfileView: View {
         Hairline()
         clearCache
       }
-      .glassCard()
+      .card()
 
       // The version, because the first thing anybody is asked when they report
       // something is which build they are on, and nobody knows.
       Text("Basu \(Self.version)")
-        .font(.mono(11))
+        .font(.sans(12, .semibold))
+        .monospacedDigit()
         .foregroundStyle(Color.ink3)
         .textSelection(.enabled)
     }
@@ -603,14 +597,16 @@ struct ProfileView: View {
         await platform.refresh()
       }
     } label: {
+      // Reversible, so not crimson: an outlined capsule, the way out.
       Text("Гарах")
-        .font(.sans(15, .medium))
-        .foregroundStyle(Color.stop)
+        .font(.sans(16, .bold))
+        .foregroundStyle(Color.ink)
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 15)
-        .glassCard()
+        .frame(minHeight: BasuMetric.buttonHeight)
+        .overlay(Capsule().strokeBorder(Color.line2, lineWidth: BasuMetric.hairline))
+        .contentShape(Capsule())
     }
-    .buttonStyle(.plain)
+    .buttonStyle(Pressable())
     .accessibilityIdentifier("profile.signout")
   }
 
@@ -629,9 +625,10 @@ struct ProfileView: View {
    */
   private var closeAccount: some View {
     Button { closing = true } label: {
+      // Crimson words and nothing else: the alert asks before anything goes.
       Text("Бүртгэл хаах")
-        .font(.sans(13))
-        .foregroundStyle(Color.ink3)
+        .font(.sans(14, .semibold))
+        .foregroundStyle(Color.accentInk)
         .padding(.horizontal, 12)
         .frame(minHeight: BasuMetric.minTarget)
         .contentShape(Rectangle())
@@ -659,21 +656,21 @@ struct RowLabel: View {
   var tint: Color = .ink2
 
   var body: some View {
-    HStack(spacing: 12) {
+    HStack(spacing: 14) {
       Image(systemName: symbol)
-        .font(.sans(16))
+        .font(.sans(17, .medium))
         .foregroundStyle(tint)
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .frame(minWidth: 24)
         .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: 2) {
+      VStack(alignment: .leading, spacing: 3) {
         Text(title)
-          .font(.sans(15))
+          .font(.sans(16, .semibold))
           .foregroundStyle(Color.ink)
           .fixedSize(horizontal: false, vertical: true)
         if let detail {
           Text(detail)
-            .font(.sans(12))
+            .font(.sans(13, .medium))
             .foregroundStyle(Color.ink3)
             .fixedSize(horizontal: false, vertical: true)
         }
@@ -683,12 +680,13 @@ struct RowLabel: View {
 }
 
 /**
- The switch, to the design's metrics: a 51 × 31 track at radius 16, `accent`
- on and `line2` off, a 27pt white knob inset 2 with a soft shadow.
+ The switch, to the design's metrics: a 51 × 31 track at radius 16 — the ink
+ when on, with a charcoal knob; `surface3` when off, with a knob in `ink3`.
+ No green: on is the brightest thing on the row, which is all on has to be.
 
- Drawn rather than borrowed because the system toggle's off state is a grey
- that is in nobody's token file. The row it sits in is the control — the
- whole row toggles, and is the switch to VoiceOver.
+ Drawn rather than borrowed because the system toggle is green. The row it
+ sits in is the control — the whole row toggles, and is the switch to
+ VoiceOver.
  */
 struct Switch: View {
   let isOn: Bool
@@ -696,13 +694,15 @@ struct Switch: View {
   var body: some View {
     ZStack(alignment: isOn ? .trailing : .leading) {
       RoundedRectangle(cornerRadius: BasuMetric.switchTrack, style: .continuous)
-        .fill(isOn ? Color.accent : Color.line2)
-      // White on the off track; on the accent track, whatever reads on the
-      // accent — white on black, black on white in the dark.
+        .fill(isOn ? Color.ink : Color.surface3)
+        .overlay(
+          RoundedRectangle(cornerRadius: BasuMetric.switchTrack, style: .continuous)
+            .strokeBorder(isOn ? Color.clear : Color.line2, lineWidth: BasuMetric.hairline),
+        )
       Circle()
-        .fill(isOn ? Color.onAccent : .white)
+        .fill(isOn ? Color.onLight : Color.ink3)
         .frame(width: 27, height: 27)
-        .shadow(color: .black.opacity(0.2), radius: 1, y: 1)
+        .shadow(color: .black.opacity(0.3), radius: 1.5, y: 1)
         .padding(2)
     }
     .frame(width: BasuMetric.switchSize.width, height: BasuMetric.switchSize.height)
@@ -735,7 +735,7 @@ struct ProfileSheet<Content: View>: View {
       }
       .scrollIndicators(.hidden)
       .scrollDismissesKeyboard(.interactively)
-      .containerBackground(for: .navigation) { LinearGradient.ground.ignoresSafeArea() }
+      .containerBackground(for: .navigation) { Color.surface2.ignoresSafeArea() }
       .navigationTitle(title)
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
@@ -768,7 +768,7 @@ struct ProfileEditSheet: View {
     ProfileSheet(title: "Нэр") {
       VStack(spacing: 12) {
         AuthField(symbol: "person", active: typing) { typing = true } content: {
-          TextField("Таныг юу гэж дуудах вэ?", text: $name)
+          TextField("Таныг юу гэж дуудах вэ?", text: $name, prompt: placeholder("Таныг юу гэж дуудах вэ?"))
             .textContentType(.name)
             .focused($typing)
             .submitLabel(.done)
@@ -782,8 +782,6 @@ struct ProfileEditSheet: View {
         PrimaryButton(title: "Хадгалах", enabled: ready, busy: busy) { save() }
           .accessibilityIdentifier("profile.name.save")
       }
-      .padding(18)
-      .authCard()
     }
     .presentationDetents([.medium, .large])
     .sensoryFeedback(.error, trigger: trouble) { _, said in said != nil }
@@ -846,7 +844,7 @@ struct EmailAttachSheet: View {
           HStack(alignment: .top, spacing: 10) {
             Image(systemName: "key")
               .font(.sans(15, .medium))
-              .foregroundStyle(Color.accent)
+              .foregroundStyle(Color.gold)
               .accessibilityHidden(true)
             Text("Нууц үг тохируулахын өмнө имэйлээ холбоно уу — тохируулах код тэр хаяг руу очно.")
               .font(.sans(14))
@@ -855,14 +853,14 @@ struct EmailAttachSheet: View {
           }
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(14)
-          .background(Color.accentSoft, in: RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous))
+          .background(Color.surface, in: RoundedRectangle(cornerRadius: BasuMetric.inner, style: .continuous))
           .accessibilityElement(children: .combine)
           .accessibilityIdentifier("profile.email.why")
         }
 
         VStack(spacing: 12) {
           AuthField(symbol: "envelope", active: focus == .email) { focus = .email } content: {
-            TextField("Имэйл хаяг", text: $email)
+            TextField("Имэйл хаяг", text: $email, prompt: placeholder("Имэйл хаяг"))
               .keyboardType(.emailAddress)
               .textContentType(.emailAddress)
               .textInputAutocapitalization(.never)
@@ -935,8 +933,6 @@ struct EmailAttachSheet: View {
               .padding(.vertical, -8)
           }
         }
-        .padding(18)
-        .authCard()
       }
       .animation(.snappy(duration: 0.28), value: sentTo)
       .animation(.easeOut(duration: 0.2), value: trouble)
@@ -1086,8 +1082,6 @@ struct PasswordChangeSheet: View {
             .padding(.vertical, -8)
         }
       }
-      .padding(18)
-      .authCard()
       .animation(.snappy(duration: 0.28), value: sentTo)
       .animation(.easeOut(duration: 0.2), value: trouble)
     }

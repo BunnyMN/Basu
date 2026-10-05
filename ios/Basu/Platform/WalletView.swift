@@ -26,7 +26,7 @@ struct WalletView: View {
 
   var body: some View {
     ScrollView {
-      VStack(alignment: .leading, spacing: 26) {
+      VStack(alignment: .leading, spacing: 36) {
         if session.isSignedIn {
           balance
           topUp
@@ -35,19 +35,20 @@ struct WalletView: View {
           // Somebody looking around has no wallet yet: it is the account's.
           SignInPrompt(
             symbol: "creditcard",
-            title: "Нэвтэрмэгц түрийвч тань энд гарна",
-            detail: "Үлдэгдэл, буцаалт, баримт — бүгд нэг дор.",
+            title: "Түрийвч тань энд",
+            detail: "Үлдэгдэл, буцаалт, баримт нэг дор.",
             id: "wallet.signin",
           )
           .padding(.top, 8)
         }
       }
       .padding(.horizontal, BasuMetric.screenPadding)
+      .padding(.top, 4)
       .padding(.bottom, BasuMetric.tabBarInset)
       .frame(maxWidth: .infinity, alignment: .leading)
     }
     .scrollIndicators(.hidden)
-    .background(LinearGradient.ground)
+    .background(Color.bg)
     .safeAreaInset(edge: .top, spacing: 0) { ShellTitle("Түрийвч") }
     .toolbarVisibility(.hidden, for: .navigationBar)
     // An alert rather than a confirmation dialog: on iOS 26 the dialog is a
@@ -82,10 +83,10 @@ struct WalletView: View {
   /// rather than showing a zero — a wallet that says 0₮ when it means «I do not
   /// know» is the one thing here that could make somebody top up twice.
   private var balance: some View {
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: 10) {
+      SectionLabel("Үлдэгдэл", colour: .gold)
       if platform.balanceKnown {
-        Format.mntText(platform.wallet.balanceMnt, size: 48)
-          .kerning(-0.02 * 48)
+        Format.mntText(platform.wallet.balanceMnt, size: 72)
           .foregroundStyle(Color.ink)
           .lineLimit(1)
           .minimumScaleFactor(0.5)
@@ -95,28 +96,32 @@ struct WalletView: View {
         Button {
           Task { await platform.loadWallet() }
         } label: {
-          Text("Үлдэгдэл уншигдсангүй — дахин")
-            .font(.sans(15, .medium))
-            .foregroundStyle(Color.accent)
-            .frame(minHeight: 48)
+          HStack(spacing: 10) {
+            Text("Үлдэгдэл уншигдсангүй")
+              .foregroundStyle(Color.ink2)
+            Text("Дахин")
+              .foregroundStyle(Color.ink)
+              .underline()
+          }
+          .font(.sans(16, .semibold))
+          .frame(minHeight: 72, alignment: .leading)
+          .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("wallet.retry")
       }
-      // The second sentence is a promise only while money can come in.
+      // The second line is a promise only while money can come in.
       Text(platform.topupsOpen
-        ? "Захиалгын төлбөр эндээс хасагдана. Дутвал зөрүүг QPay-ээр төлнө."
+        ? "Захиалгын төлбөр эндээс хасагдана. Дутвал QPay-ээр."
         : "Захиалгын төлбөр эндээс хасагдана.")
-        .font(.sans(13.5))
-        .lineSpacing(13.5 * 0.5 - 3)
+        .font(.sans(15, .medium))
         .foregroundStyle(Color.ink2)
-        .frame(maxWidth: 300, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
     }
   }
 
   @ViewBuilder private var topUp: some View {
-    VStack(alignment: .leading, spacing: 11) {
+    VStack(alignment: .leading, spacing: 12) {
       SectionLabel("Цэнэглэх")
       if platform.topupsOpen {
         // A grid rather than a row so the largest text sizes get two to a
@@ -129,13 +134,13 @@ struct WalletView: View {
             Button {
               confirming = amount
             } label: {
-              Format.mntText(amount, size: 14)
+              Format.mntText(amount, size: 19)
                 .foregroundStyle(Color.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .chip()
             }
-            .buttonStyle(.plain)
+            .buttonStyle(Pressable())
             // Holding an amount still opens the fourth way; «Өөр дүн» says it out loud.
             .simultaneousGesture(LongPressGesture(minimumDuration: 0.5).onEnded { _ in customAmount = true })
             .disabled(platform.toppingUp)
@@ -148,13 +153,13 @@ struct WalletView: View {
             customAmount = true
           } label: {
             Text("Өөр дүн")
-              .font(.sans(14, .medium))
-              .foregroundStyle(Color.accentInk)
+              .font(.sans(14, .bold))
+              .foregroundStyle(Color.ink)
               .lineLimit(1)
               .minimumScaleFactor(0.7)
               .chip()
           }
-          .buttonStyle(.plain)
+          .buttonStyle(Pressable())
           .disabled(platform.toppingUp)
           .accessibilityIdentifier("wallet.topup.other")
         }
@@ -164,74 +169,80 @@ struct WalletView: View {
       } else {
         // Said once, plainly, with nothing promised: no buttons that all
         // end in the same refusal, and no «soon».
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .center, spacing: 12) {
           Image(systemName: "lock")
-            .font(.sans(15))
+            .font(.sans(16, .medium))
             .foregroundStyle(Color.ink3)
             .accessibilityHidden(true)
-          Text("Цэнэглэлт одоогоор хаалттай байна.")
-            .font(.sans(14))
+          Text("Цэнэглэлт одоогоор хаалттай.")
+            .font(.sans(15, .semibold))
             .foregroundStyle(Color.ink2)
             .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(14)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard(radius: BasuMetric.button)
+        .card()
         .accessibilityElement(children: .combine)
         .accessibilityIdentifier("wallet.topup.closed")
       }
     }
   }
 
+  /// The movements as a table's rows on one card: who or what, which app and
+  /// order, and the money in the display face on the right.
   @ViewBuilder private var statement: some View {
-    VStack(alignment: .leading, spacing: 4) {
+    VStack(alignment: .leading, spacing: 12) {
       SectionLabel("Гүйлгээ")
-        .padding(.bottom, 8)
 
       if platform.wallet.lines.isEmpty {
-        Hairline()
-        Text("Гүйлгээ алга. Захиалгын төлбөр, буцаалт энд харагдана.")
-          .font(.sans(14))
-          .lineSpacing(14 * 0.6 - 4)
+        Text("Гүйлгээ алга.")
+          .font(.sans(15, .medium))
           .foregroundStyle(Color.ink2)
-          .padding(.top, 26)
-          .frame(maxWidth: 300, alignment: .leading)
-          .fixedSize(horizontal: false, vertical: true)
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .padding(.horizontal, 18)
+          .padding(.vertical, 22)
+          .card()
       } else {
-        ForEach(platform.wallet.lines) { line in
-          Button { showing = line } label: { StatementRow(line: line) }
-            .buttonStyle(.plain)
-        }
-
-        if platform.wallet.next != nil {
-          Hairline()
-          Button {
-            Task { await platform.loadMoreWallet() }
-          } label: {
-            Text(platform.loadingMore ? "Уншиж байна…" : "Цааш үзэх")
-              .font(.sans(13, .medium))
-              .foregroundStyle(Color.accent)
-              .frame(maxWidth: .infinity)
-              .padding(.vertical, 16)
-              .contentShape(Rectangle())
+        VStack(spacing: 0) {
+          ForEach(Array(platform.wallet.lines.enumerated()), id: \.element.id) { index, line in
+            if index > 0 { Hairline() }
+            Button { showing = line } label: { StatementRow(line: line) }
+              .buttonStyle(.plain)
           }
-          .buttonStyle(.plain)
-          .disabled(platform.loadingMore)
-          .accessibilityIdentifier("wallet.more")
+
+          if platform.wallet.next != nil {
+            Hairline()
+            Button {
+              Task { await platform.loadMoreWallet() }
+            } label: {
+              Text(platform.loadingMore ? "Уншиж байна…" : "Цааш үзэх")
+                .font(.sans(14, .bold))
+                .foregroundStyle(Color.ink)
+                .frame(maxWidth: .infinity)
+                .frame(minHeight: 56)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(platform.loadingMore)
+            .accessibilityIdentifier("wallet.more")
+          }
         }
+        .card()
       }
     }
   }
 }
 
 private extension View {
-  /// An amount to tap: glass, a hairline, the button corner.
+  /// An amount to tap: an outlined capsule.
   func chip() -> some View {
     frame(maxWidth: .infinity)
-      .padding(.vertical, 15)
+      .frame(minHeight: 52)
       .padding(.horizontal, 6)
-      .glassCard(radius: BasuMetric.button, stroke: .line2)
-      .contentShape(Rectangle())
+      .background(Color.surface, in: Capsule())
+      .overlay(Capsule().strokeBorder(Color.line2, lineWidth: BasuMetric.hairline))
+      .contentShape(Capsule())
   }
 }
 
@@ -253,13 +264,14 @@ struct TopUpAmountSheet: View {
       VStack(spacing: 12) {
         AuthField(symbol: "creditcard", active: typing) { typing = true } content: {
           HStack(spacing: 4) {
-            TextField("Дүн", text: $text)
+            TextField("Дүн", text: $text, prompt: placeholder("Дүн"))
               .keyboardType(.numberPad)
-              .font(.mono(18, .semibold))
+              .font(.display(26))
+              .monospacedDigit()
               .focused($typing)
               .accessibilityIdentifier("wallet.amount.field")
             Text("₮")
-              .font(.sans(18, .semibold))
+              .font(.display(26))
               .foregroundStyle(Color.ink3)
               .accessibilityHidden(true)
           }
@@ -270,8 +282,6 @@ struct TopUpAmountSheet: View {
         }
         .accessibilityIdentifier("wallet.amount.go")
       }
-      .padding(18)
-      .authCard()
     }
     .presentationDetents([.medium, .large])
     .onAppear { typing = true }
@@ -298,15 +308,15 @@ struct MovementSheet: View {
     let shown = line.shown
     NavigationStack {
       ScrollView {
-        VStack(alignment: .leading, spacing: 24) {
-          VStack(alignment: .leading, spacing: 8) {
-            SectionLabel(line.title)
-            Format.signedText(signed, size: 34)
-              .foregroundStyle(line.amountMnt > 0 ? Color.ready : Color.ink)
+        VStack(alignment: .leading, spacing: 28) {
+          VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(line.title, colour: .gold)
+            Format.signedText(signed, size: 56)
+              .foregroundStyle(Color.ink)
               .lineLimit(1)
               .minimumScaleFactor(0.5)
             Text(shown.title == line.title ? shown.detail : "\(shown.title) · \(shown.detail)")
-              .font(.sans(14))
+              .font(.sans(15, .medium))
               .foregroundStyle(Color.ink2)
               .fixedSize(horizontal: false, vertical: true)
           }
@@ -314,13 +324,13 @@ struct MovementSheet: View {
           VStack(spacing: 0) {
             detail("Огноо", Format.date(line.at))
             Hairline()
-            detail("Цаг", Format.hhmm(line.at), mono: true)
+            detail("Цаг", Format.hhmm(line.at), figures: true)
             if let number = shown.number {
               Hairline()
-              detail("Захиалгын дугаар", "№\(number)", mono: true)
+              detail("Захиалгын дугаар", "№\(number)", figures: true)
             }
           }
-          .glassCard()
+          .card()
 
           receipt
         }
@@ -328,7 +338,7 @@ struct MovementSheet: View {
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
       }
-      .background(LinearGradient.ground)
+      .containerBackground(for: .navigation) { Color.surface2.ignoresSafeArea() }
       .navigationTitle("Гүйлгээ")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
@@ -342,31 +352,33 @@ struct MovementSheet: View {
   }
 
   @ViewBuilder private var receipt: some View {
-    VStack(alignment: .leading, spacing: 11) {
+    VStack(alignment: .leading, spacing: 12) {
       SectionLabel("Е-баримт")
       if let receipt = movement?.receipt {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
           if let lottery = receipt.lottery {
-            HStack {
+            HStack(alignment: .firstTextBaseline) {
               Text("Сугалааны дугаар")
-                .font(.sans(14))
+                .font(.sans(15, .medium))
                 .foregroundStyle(Color.ink2)
               Spacer(minLength: 8)
               Text(lottery)
-                .font(.mono(15, .semibold))
+                .font(.display(22))
+                .monospacedDigit()
                 .foregroundStyle(Color.ink)
                 .textSelection(.enabled)
             }
           }
           Text(receipt.qr)
-            .font(.mono(11))
+            .font(.sans(12, .medium))
+            .monospacedDigit()
             .foregroundStyle(Color.ink3)
             .textSelection(.enabled)
             .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(16)
+        .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .glassCard()
+        .card()
         .accessibilityIdentifier("movement.receipt")
       } else {
         // Said out loud. A blank space where a receipt should be is the same
@@ -376,27 +388,27 @@ struct MovementSheet: View {
           : line.kind == "topup"
             ? "Цэнэглэлтэд баримт гардаггүй — баримтыг худалдсан ресторан, нийлүүлэгч гаргана."
             : "Баримт хараахан гараагүй байна. Захиалга хаагдмагц энд гарч ирнэ.")
-          .font(.sans(13))
-          .lineSpacing(3.5)
+          .font(.sans(14, .medium))
+          .lineSpacing(3)
           .foregroundStyle(Color.ink2)
           .fixedSize(horizontal: false, vertical: true)
       }
     }
   }
 
-  private func detail(_ label: String, _ value: String, mono: Bool = false) -> some View {
+  private func detail(_ label: String, _ value: String, figures: Bool = false) -> some View {
     HStack(spacing: 12) {
       Text(label)
-        .font(.sans(15))
+        .font(.sans(15, .medium))
         .foregroundStyle(Color.ink2)
       Spacer(minLength: 8)
       Text(value)
-        .font(mono ? .mono(14) : .sans(15, .medium))
+        .font(figures ? .display(20) : .sans(15, .semibold))
         .monospacedDigit()
         .foregroundStyle(Color.ink)
     }
-    .padding(.horizontal, 16)
-    .padding(.vertical, 14)
+    .padding(.horizontal, 18)
+    .frame(minHeight: 56)
     .accessibilityElement(children: .combine)
   }
 
@@ -405,42 +417,44 @@ struct MovementSheet: View {
   }
 }
 
-/// One movement: who or what it was, which app and order, and what it did.
+/// One movement, as a table's row: who or what it was with, which app and
+/// order, and the money in the display face with the day under it.
 struct StatementRow: View {
   let line: WalletLine
 
   var body: some View {
     let shown = line.shown
-    VStack(spacing: 0) {
-      Hairline()
-      HStack(alignment: .top, spacing: 16) {
-        VStack(alignment: .leading, spacing: 4) {
-          // Who it was with leads — «Улаанбаатар махны төв» says more than
-          // «Захиалга», which every other line also says.
-          Text(shown.title)
-            .font(.sans(15, .medium))
-            .foregroundStyle(Color.ink)
-            .fixedSize(horizontal: false, vertical: true)
-          shown.subline
-            .foregroundStyle(Color.ink3)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        Spacer(minLength: 0)
-        VStack(alignment: .trailing, spacing: 5) {
-          Format.signedText(signed, size: 15)
-            // Money arriving is the only thing on this screen worth colour.
-            .foregroundStyle(line.amountMnt > 0 ? Color.ready : Color.ink)
-            .lineLimit(1)
-            .minimumScaleFactor(0.7)
-          Text(Format.when(line.at))
-            .font(.mono(11))
-            .monospacedDigit()
-            .foregroundStyle(Color.ink3)
-        }
-        .fixedSize(horizontal: true, vertical: false)
+    HStack(alignment: .center, spacing: 16) {
+      VStack(alignment: .leading, spacing: 4) {
+        // Who it was with leads — «Улаанбаатар махны төв» says more than
+        // «Захиалга», which every other line also says.
+        Text(shown.title)
+          .font(.sans(16, .bold))
+          .foregroundStyle(Color.ink)
+          .fixedSize(horizontal: false, vertical: true)
+        shown.subline
+          .foregroundStyle(Color.ink3)
+          .fixedSize(horizontal: false, vertical: true)
       }
-      .padding(.vertical, 14)
+      Spacer(minLength: 0)
+      VStack(alignment: .trailing, spacing: 6) {
+        // Money in and money out are told apart by the sign, not by a
+        // colour: there is no green here.
+        Format.signedText(signed, size: 22)
+          .foregroundStyle(Color.ink)
+          .lineLimit(1)
+          .minimumScaleFactor(0.7)
+        Text(Format.when(line.at))
+          .font(.sans(12, .semibold))
+          .monospacedDigit()
+          .foregroundStyle(Color.ink3)
+      }
+      .fixedSize(horizontal: true, vertical: false)
     }
+    .padding(.horizontal, 18)
+    .padding(.vertical, 14)
+    .frame(minHeight: 72)
+    .contentShape(Rectangle())
     // Said in words: the row combined read out «№», «·» and «₮» one by one.
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(spoken(shown))
@@ -482,11 +496,11 @@ extension WalletLine {
     let detail: String
     let number: String?
 
-    /// «Идэш · №7001» — words in the sans, the number in the mono.
+    /// «Идэш · №7001» — the words, then the number in tabular figures.
     var subline: Text {
-      let words = Text(detail).font(.sans(13))
+      let words = Text(detail).font(.sans(13, .semibold))
       guard let number else { return words }
-      return words + Text(detail.isEmpty ? "" : " · ").font(.sans(13)) + Text("№\(number)").font(.mono(12))
+      return words + Text(detail.isEmpty ? "" : " · ").font(.sans(13, .semibold)) + Text("№\(number)").font(.sans(13, .semibold)).monospacedDigit()
     }
   }
 
@@ -519,11 +533,12 @@ extension WalletLine {
 }
 
 /**
- The title a tab root carries: 28/600, tracked −0.02em, padding 2 × 20 × 16.
+ The title a tab root carries: the display face at 44, on the ground.
 
- Wallet and Profile are roots, not pushed screens — there is nothing to go back
- to, so there is no back link. The glass under it is the same the tab bar has,
- so content scrolling up runs under a surface rather than a gap.
+ The orders, the wallet and the profile are roots, not pushed screens — there
+ is nothing to go back to, so there is no back link. The ground under the
+ title is the screen's own, so content scrolling up runs under it rather than
+ into the clock.
  */
 struct ShellTitle: View {
   let text: String
@@ -531,24 +546,24 @@ struct ShellTitle: View {
 
   var body: some View {
     Text(text)
-      .font(.sans(28, .semibold))
-      .tracking(-0.02 * 28)
+      .font(.display(44))
       .foregroundStyle(Color.ink)
+      .lineLimit(1)
+      .minimumScaleFactor(0.7)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .padding(.top, 2)
+      .padding(.top, 12)
       .padding(.horizontal, BasuMetric.screenPadding)
-      .padding(.bottom, 16)
-      .background(Color.groundTop.ignoresSafeArea(edges: .top))
+      .padding(.bottom, 20)
+      .background(Color.bg.ignoresSafeArea(edges: .top))
       .accessibilityAddTraits(.isHeader)
   }
 }
 
 /**
- The nav bar of a pushed shell screen: «‹ Basu» on the left in `accentInk`,
- the title centred at 17/600, and an empty right cell. Three columns, so the
- title is centred on the screen and not on what is left of it. The back says
- where it goes in the words every app page uses for the launcher — «‹ Basu» —
- so there is one way back in the whole app, not three.
+ The bar of a pushed shell screen: the way back as a round glass button on
+ the left, the title centred, and an empty right cell — so the title is
+ centred on the screen and not on what is left of it. Back goes to the
+ launcher, and VoiceOver says so («Basu нүүр»).
  */
 struct ShellNav: View {
   let title: String
@@ -557,22 +572,18 @@ struct ShellNav: View {
   var body: some View {
     ZStack {
       Text(title)
-        .font(.sans(17, .semibold))
-        .tracking(-0.01 * 17)
+        .font(.sans(17, .bold))
         .foregroundStyle(Color.ink)
         .accessibilityAddTraits(.isHeader)
       HStack {
         Button(action: back) {
-          HStack(spacing: 4) {
-            Chevron(direction: .back, size: 18)
-            Text("Basu")
-              .font(.sans(15, .medium))
-          }
-          .foregroundStyle(Color.accentInk)
-          .frame(minWidth: BasuMetric.minTarget, minHeight: BasuMetric.minTarget, alignment: .leading)
-          .contentShape(Rectangle())
+          Chevron(direction: .back, size: 18, lineWidth: 2)
+            .foregroundStyle(Color.ink)
+            .frame(width: BasuMetric.minTarget, height: BasuMetric.minTarget)
+            .glass(in: Circle())
+            .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(Pressable())
         .accessibilityIdentifier("shell.back")
         .accessibilityLabel("Basu нүүр")
         Spacer()
@@ -581,10 +592,10 @@ struct ShellNav: View {
     // A bar, like the system's: it grows with the text up to where the back
     // and the title still sit side by side, and no further.
     .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-    .frame(height: 44)
-    .padding(.top, 4 - (44 - 20) / 2)
-    .padding(.horizontal, BasuMetric.screenPadding - 4)
-    .padding(.bottom, 18 - (44 - 20) / 2)
-    .background(Color.groundTop.ignoresSafeArea(edges: .top))
+    .frame(minHeight: BasuMetric.minTarget)
+    .padding(.top, 4)
+    .padding(.horizontal, 16)
+    .padding(.bottom, 12)
+    .background(Color.bg.ignoresSafeArea(edges: .top))
   }
 }

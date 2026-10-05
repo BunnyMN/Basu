@@ -1,12 +1,13 @@
 import XCTest
 
 /**
- The profile's settings, doing what they say.
+ The profile's settings, doing what they say — and the app dark on every
+ screen, whatever the phone's own appearance.
 
- Appearance is checked by the colour of the ground itself — a pixel near the
- top of the screen — because the only thing «Бараан» promises is that the
- screen goes dark, the launcher behind the profile included. Each run puts it
- back on «Систем», so the next suite sees the phone's own setting.
+ «Тансаг хар» (2026-10-05) took away the light-or-dark choice: Basu is dark
+ everywhere. That is checked by the colour of the ground itself — a pixel near
+ the top of the screen — on the profile and on the launcher, because the only
+ thing the promise means is that the screen is dark.
 
  The lock needs a face, which a test cannot give; `AppLockTests` covers when
  it asks, and a run with an enrolled simulator face can go further by hand.
@@ -29,7 +30,7 @@ final class SettingsFlowTests: XCTestCase {
     add(attachment)
   }
 
-  func testAppearanceTurnsTheWholeAppAndTheCacheClears() async throws {
+  func testTheAppIsDarkAndTheCacheClears() async throws {
     try await DemoAPI(base: base).requireServer()
 
     let app = XCUIApplication()
@@ -39,29 +40,18 @@ final class SettingsFlowTests: XCTestCase {
     app.signInIfSignedOut()
     XCTAssertEqual(app.landing(), .shell)
 
+    // ── dark, here and on the launcher, with no choice to make ─────────
     app.buttons["tab.profile"].tap()
-    let dark = app.buttons["settings.appearance.dark"]
-    XCTAssertTrue(dark.waitForExistence(timeout: 10), "the profile offers light and dark")
-
-    // ── dark, here and on the launcher ────────────────────────────────
-    dark.tap()
-    XCTAssertTrue(waitForGround(darker: true), "«Бараан» turns the profile dark")
+    XCTAssertTrue(app.buttons["profile.signout"].waitForExistence(timeout: 10))
+    XCTAssertFalse(app.buttons["settings.appearance.light"].exists, "there is no light to choose")
+    XCTAssertTrue(waitForDarkGround(), "the profile is dark")
     shot("1-dark-profile")
     app.buttons["tab.home"].tap()
-    XCTAssertTrue(waitForGround(darker: true), "…and the launcher with it")
+    XCTAssertTrue(waitForDarkGround(), "…and the launcher with it")
     shot("2-dark-home")
 
-    // ── light, whatever the phone says ────────────────────────────────
-    app.buttons["tab.profile"].tap()
-    app.buttons["settings.appearance.light"].tap()
-    XCTAssertTrue(waitForGround(darker: false), "«Цайвар» turns it light")
-    shot("3-light-profile")
-
-    // ── back to the phone's own ───────────────────────────────────────
-    app.buttons["settings.appearance.system"].tap()
-    XCTAssertTrue(app.buttons["settings.appearance.system"].isSelected, "«Систем» is the one chosen")
-
     // ── the kept pages ────────────────────────────────────────────────
+    app.buttons["tab.profile"].tap()
     // Clear of the tab bar, which lies over the bottom of the scroll: a
     // row under it is «hittable» and the tap lands on the bar.
     let cache = app.buttons["settings.cache"]
@@ -73,15 +63,15 @@ final class SettingsFlowTests: XCTestCase {
       "clearing the cache says it did",
     )
     XCTAssertTrue(app.buttons["profile.signout"].exists, "and nobody was signed out by it")
-    shot("4-cache-cleared")
+    shot("3-cache-cleared")
   }
 
-  /// The ground just under the status bar, dark or light — asked until it
-  /// settles, since the change is animated.
-  private func waitForGround(darker: Bool, timeout: TimeInterval = 5) -> Bool {
+  /// The ground just under the status bar is dark — asked until it settles,
+  /// since the first frame may still be the splash fading.
+  private func waitForDarkGround(timeout: TimeInterval = 5) -> Bool {
     let deadline = Date.now.addingTimeInterval(timeout)
     repeat {
-      if let luma = groundLuma(), darker ? luma < 0.25 : luma > 0.75 { return true }
+      if let luma = groundLuma(), luma < 0.15 { return true }
       _ = XCTWaiter.wait(for: [XCTestExpectation(description: "settle")], timeout: 0.3)
     } while Date.now < deadline
     return false

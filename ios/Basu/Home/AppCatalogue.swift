@@ -17,9 +17,10 @@ import Foundation
 struct LauncherApp: Identifiable, Hashable, Sendable {
   let id: String
   let name: String
-  /// A few lower-case words — «урьдчилж захиал», «өвлийн мах». They carry
-  /// the specificity the glyph must not, so they are a phrase rather than a
-  /// fragment («урьдчилсан» on its own said nothing).
+  /// A few lower-case words — «урьдчилан захиалах», «зараа удирдах». They
+  /// carry the specificity the picture must not, so they are a phrase rather
+  /// than a fragment («урьдчилсан» on its own said nothing). The tile sets
+  /// them as a line, capital first (`line`).
   let tag: String
   let icon: ServiceIcon
   /// Where the page lives on the server — `/dine`. `nil` is an icon that is
@@ -45,6 +46,9 @@ struct LauncherApp: Identifiable, Hashable, Sendable {
   }
 
   var isLive: Bool { destination != nil }
+
+  /// The tag as the tile prints it: a line under the name, capital first.
+  var line: String { tag.prefix(1).uppercased() + tag.dropFirst() }
 }
 
 /// A supplied render, or a mark drawn to the icon system's rules.
@@ -61,7 +65,7 @@ struct AppBand: Identifiable, Hashable, Sendable {
 
 enum AppCatalogue {
   static let food = LauncherApp(
-    id: "food", name: "Хоол", tag: "урьдчилж захиал", icon: .raster("food-tile"), path: "/dine",
+    id: "food", name: "Хоол", tag: "урьдчилан захиалах", icon: .raster("food-tile"), path: "/dine",
   )
 
   /// The second app: the page at `/idesh`, opened like the first. One entry
@@ -69,14 +73,16 @@ enum AppCatalogue {
   /// is a supplied render, like the food one; the drawn rib mark stays in the
   /// icon system for the sheet.
   static let idesh = LauncherApp(
-    id: "idesh", name: "Идэш", tag: "өвлийн мах", icon: .raster("idesh-tile"), path: "/idesh",
+    id: "idesh", name: "Идэш", tag: "бүтэн мал, кг-аар мах", icon: .raster("idesh-tile"), path: "/idesh",
   )
 
   /// The supplier's own side of the second app, for the few guests who are
   /// one: the same page the counter's tablet shows, opened with the phone's
   /// own sign-in — every screen there is a person signed in as themselves. Not in `shipped` — it is on the launcher only for them.
+  /// Its tile is the web's own ger (`brand/supplier-tile.svg`), drawn once
+  /// to a picture so the phone shows the same three as the website.
   static let supplier = LauncherApp(
-    id: "supplier", name: "Нийлүүлэгч", tag: "миний зарууд", icon: .glyph(.supplier), path: "/supplier",
+    id: "supplier", name: "Нийлүүлэгч", tag: "зараа удирдах", icon: .raster("supplier-tile"), path: "/supplier",
   )
 
   /// What is actually built. Everything in `planned` is drawn and named only.

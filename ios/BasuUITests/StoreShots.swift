@@ -94,7 +94,7 @@ final class StoreShots: XCTestCase {
         // fresh launch lands there, which is also how a guest next sees it.
         app.terminate()
         app.launch()
-        if app.staticTexts["ИДЭВХТЭЙ"].waitForExistence(timeout: 20) {
+        if app.descendants(matching: .any)["live.card"].waitForExistence(timeout: 20) {
           try await Task.sleep(for: .seconds(2))
           try save("7-home-live", to: dir)
         }

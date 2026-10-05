@@ -71,7 +71,6 @@ struct SignInSheet: View {
   @Environment(AppModel.self) private var model
   @Environment(Platform.self) private var platform
   @Environment(\.dismiss) private var dismiss
-  @Environment(\.colorScheme) private var colorScheme
   @Environment(\.webAuthenticationSession) private var webAuthenticationSession
 
   @State private var way: Way = .doors
@@ -266,20 +265,20 @@ struct SignInSheet: View {
   private var hero: some View {
     let first = way == .doors
     let small = !first || focus != nil
-    let shape = RoundedRectangle(cornerRadius: BasuMetric.authCard, style: .continuous)
-    return VStack(alignment: .leading, spacing: 4) {
+    let shape = RoundedRectangle(cornerRadius: BasuMetric.card, style: .continuous)
+    return VStack(alignment: .leading, spacing: 8) {
       Text("Basu")
-        .font(.sans(small ? 28 : 36, .semibold))
-        .tracking(-0.03 * (small ? 28 : 36))
+        .font(.display(small ? 36 : 56))
       Text(first ? Self.tagline : title)
-        .font(.sans(first ? 14 : 16, first ? .regular : .medium))
-        .opacity(0.86)
+        .font(.sans(first ? 15 : 17, first ? .semibold : .bold))
+        .foregroundStyle(Color.ink2)
         .fixedSize(horizontal: false, vertical: true)
         .contentTransition(.opacity)
     }
-    .foregroundStyle(.white)
+    .foregroundStyle(Color.ink)
     .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-    .padding(18)
+    .padding(.horizontal, 20)
+    .padding(.vertical, 20)
     .frame(
       maxWidth: .infinity,
       minHeight: small ? BasuMetric.authPhoto * 0.55 : BasuMetric.authPhoto,
@@ -290,11 +289,19 @@ struct SignInSheet: View {
         Image("SignInPhoto")
           .resizable()
           .scaledToFill()
-        // A shade for the words, from nothing at the middle to most of black
-        // at the foot: white type on a photograph needs somewhere to stand.
+          // The web's warm grade for a pale photograph: a touch of sepia's
+          // warmth, more colour, more contrast — the meat lit, the rest dark.
+          .saturation(1.2)
+          .contrast(1.12)
+        // The photograph settles into the charcoal at its foot, so the words
+        // stand on the ground rather than on a grey smudge.
         LinearGradient(
-          colors: [Color.black.opacity(0), Color.black.opacity(0.72)],
-          startPoint: UnitPoint(x: 0.5, y: 0.3),
+          stops: [
+            .init(color: Color.bg.opacity(0.0), location: 0.2),
+            .init(color: Color.bg.opacity(0.7), location: 0.62),
+            .init(color: Color.bg.opacity(0.96), location: 1),
+          ],
+          startPoint: .top,
           endPoint: .bottom,
         )
       }
@@ -330,14 +337,12 @@ struct SignInSheet: View {
         }
         // One line at every size: grown past this it broke mid-word.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-        .font(.sans(14, .semibold))
+        .font(.sans(14, .bold))
         .foregroundStyle(Color.ink)
-        .padding(.horizontal, 14)
-        .frame(minHeight: 36)
-        .background(Color.surface, in: Capsule())
-        .overlay(Capsule().strokeBorder(Color.line2, lineWidth: BasuMetric.hairline))
+        .padding(.horizontal, 16)
         .frame(minHeight: BasuMetric.minTarget)
-        .contentShape(Rectangle())
+        .glass(in: Capsule())
+        .contentShape(Capsule())
       }
       .buttonStyle(Pressable())
       .accessibilityIdentifier("signin.browse")
@@ -347,15 +352,14 @@ struct SignInSheet: View {
   /// A sheet over a page: no photograph, the title large and on the ground —
   /// and, when a page asked, why.
   private var sheetHead: some View {
-    VStack(alignment: .leading, spacing: 6) {
+    VStack(alignment: .leading, spacing: 8) {
       Text(title)
-        .font(.sans(28, .semibold))
-        .tracking(-0.02 * 28)
+        .font(.display(44))
         .foregroundStyle(Color.ink)
         .accessibilityAddTraits(.isHeader)
       if let reason, !codeStep {
         Text(reason)
-          .font(.sans(14))
+          .font(.sans(15, .medium))
           .foregroundStyle(Color.ink2)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityIdentifier("signin.reason")
@@ -374,8 +378,8 @@ struct SignInSheet: View {
       Link("Нууцлалын бодлого", destination: Endpoint.base.appending(path: "privacy"))
         .frame(minHeight: BasuMetric.minTarget)
     }
-    .font(.sans(12.5))
-    .tint(Color.ink2)
+    .font(.sans(13, .semibold))
+    .tint(Color.ink3)
     .padding(.top, 16)
   }
 
@@ -388,13 +392,13 @@ struct SignInSheet: View {
       VStack(alignment: .leading, spacing: 4) {
         if let phone = platform.me?.phone ?? session.phone {
           Text("Утас").font(.sans(13)).foregroundStyle(Color.ink3)
-          Text(phone).font(.mono(16)).foregroundStyle(Color.ink)
+          Text(phone).font(.sans(16, .semibold)).monospacedDigit().foregroundStyle(Color.ink)
         } else if let email = platform.me?.email ?? session.email {
           Text("Имэйл").font(.sans(13)).foregroundStyle(Color.ink3)
           Text(email).font(.sans(16)).foregroundStyle(Color.ink)
         }
       }
-      WideButton(title: "Гарах", kind: .danger) {
+      WideButton(title: "Гарах", kind: .quiet) {
         platform.signOut()
         Task { await model.refreshLive() }
         dismiss()
@@ -467,16 +471,14 @@ struct SignInSheet: View {
   }
 
   /**
-   Apple's own button, white. On the dark ground that is the guidelines' own
-   choice; on the light one it wears a hairline, the outline the guidelines
-   ask for there — drawn at the card's corner rather than Apple's, whose
-   outline the corner clipped. Either way it is the twin of Google's button
-   under it, so the pine button is the one strong colour on the card rather
-   than a black slab above it.
+   Apple's own button, in its white style: on a dark ground that is the
+   guidelines' own choice, and it needs no outline there. A capsule, as every
+   button in Basu is — the guidelines let its corner follow the app's — and
+   the twin of Google's under it, so the crimson button is the one strong
+   colour on the card.
    */
   private var appleButton: some View {
-    let shape = RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous)
-    return SignInWithAppleButton(.signIn) { request in
+    SignInWithAppleButton(.signIn) { request in
       let nonce = Nonce.make()
       appleNonce = nonce
       request.requestedScopes = [.fullName, .email]
@@ -487,19 +489,12 @@ struct SignInSheet: View {
     .signInWithAppleButtonStyle(.white)
     // Never smaller than the other doors (Apple's rule), however large the text.
     .frame(height: doorHeight)
-    .clipShape(shape)
-    .overlay {
-      if colorScheme == .light {
-        shape.strokeBorder(Color.line2, lineWidth: BasuMetric.hairline)
-          .allowsHitTesting(false)
-      }
-    }
+    .clipShape(Capsule())
     .overlay {
       if busy == .apple {
         ZStack {
-          RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous)
-            .fill(Color.surface)
-          ProgressView()
+          Capsule().fill(Color.surface)
+          ProgressView().tint(Color.ink)
         }
         .transition(.opacity)
       }
@@ -509,7 +504,7 @@ struct SignInSheet: View {
 
   @ViewBuilder private var emailDoor: some View {
     AuthField(symbol: "envelope", active: focus == .email) { focus = .email } content: {
-      TextField("Имэйл хаяг", text: $email)
+      TextField("Имэйл хаяг", text: $email, prompt: placeholder("Имэйл хаяг"))
         .keyboardType(.emailAddress)
         .textContentType(.emailAddress)
         .textInputAutocapitalization(.never)
@@ -647,7 +642,7 @@ struct SignInSheet: View {
 
   private var nameField: some View {
     AuthField(symbol: "person", active: focus == .name) { focus = .name } content: {
-      TextField("Нэр", text: $name)
+      TextField("Нэр", text: $name, prompt: placeholder("Нэр"))
         .textContentType(.name)
         .focused($focus, equals: .name)
         .submitLabel(.next)
@@ -668,7 +663,7 @@ struct SignInSheet: View {
    */
   private var loginField: some View {
     AuthField(symbol: door == .signUp ? "envelope" : "at", active: focus == .login) { focus = .login } content: {
-      TextField(door == .signUp ? "Имэйл хаяг" : "Имэйл эсвэл утас", text: $login)
+      TextField(door == .signUp ? "Имэйл хаяг" : "Имэйл эсвэл утас", text: $login, prompt: placeholder(door == .signUp ? "Имэйл хаяг" : "Имэйл эсвэл утас"))
         .keyboardType(.emailAddress)
         .textContentType(.username)
         .textInputAutocapitalization(.never)
@@ -694,10 +689,11 @@ struct SignInSheet: View {
 
   private var phoneField: some View {
     AuthField(symbol: "phone", active: focus == .phone) { focus = .phone } content: {
-      TextField("Утасны дугаар · 8811 2233", text: $phone)
+      TextField("Утасны дугаар · 8811 2233", text: $phone, prompt: placeholder("Утасны дугаар · 8811 2233"))
         .keyboardType(.phonePad)
         .textContentType(.telephoneNumber)
-        .font(.mono(16))
+        .font(.sans(16, .medium))
+        .monospacedDigit()
         .focused($focus, equals: .phone)
         .accessibilityIdentifier("signin.phone")
     }
@@ -812,7 +808,7 @@ struct SignInSheet: View {
         if offerSignUp && spot == .password {
           Button("Шинэ хэрэглэгч бол бүртгүүлэх") { open(.signUp) }
             .font(.sans(14, .semibold))
-            .tint(Color.accent)
+            .tint(Color.ink)
             .frame(minHeight: 32)
             .accessibilityIdentifier("signin.offerSignUp")
         }
@@ -846,7 +842,7 @@ struct SignInSheet: View {
             }
           }
           .font(.sans(13, .medium))
-          .tint(Color.accent)
+          .tint(Color.ink)
           .accessibilityIdentifier("signin.demo")
           Text("Зөвхөн debug build, зөвхөн хөгжүүлэгчийн өөрийн сервер дээр.")
             .font(.sans(11.5))
@@ -1136,9 +1132,9 @@ struct SignInSheet: View {
   }
 }
 
-/// Google's button as its guidelines draw it: the four-colour mark on white
-/// (on the dark ground, on the dark surface), a hairline, the words — the
-/// same height and corner as Apple's above it, and its own wait.
+/// Google's button as its guidelines draw it for a dark ground: the
+/// four-colour mark on the surface, a hairline, the words — the same height
+/// and capsule as Apple's above it, and its own wait.
 private struct GoogleButton: View {
   var busy = false
   let action: () -> Void
@@ -1147,7 +1143,7 @@ private struct GoogleButton: View {
     Button(action: action) {
       ZStack {
         if busy {
-          ProgressView()
+          ProgressView().tint(Color.ink)
         } else {
           HStack(spacing: 10) {
             Image("GoogleG")
@@ -1155,7 +1151,7 @@ private struct GoogleButton: View {
               .frame(width: 18, height: 18)
               .accessibilityHidden(true)
             Text("Google-ээр нэвтрэх")
-              .font(.sans(17, .medium))
+              .font(.sans(17, .semibold))
               .foregroundStyle(Color.ink)
               .multilineTextAlignment(.center)
           }
@@ -1164,15 +1160,13 @@ private struct GoogleButton: View {
           .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         }
       }
-      .padding(.horizontal, 14)
+      .padding(.horizontal, 16)
       .padding(.vertical, 8)
       .frame(maxWidth: .infinity)
       .frame(minHeight: BasuMetric.controlHeight)
-      .background(Color.surface, in: RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous))
-      .overlay(
-        RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous)
-          .strokeBorder(Color.line2, lineWidth: BasuMetric.hairline),
-      )
+      .background(Color.surface, in: Capsule())
+      .overlay(Capsule().strokeBorder(Color.line2, lineWidth: BasuMetric.hairline))
+      .contentShape(Capsule())
     }
     .buttonStyle(Pressable())
   }
@@ -1180,24 +1174,24 @@ private struct GoogleButton: View {
 
 // MARK: - the way in's parts
 
-/// The ground: warm white, or near black. The photograph is the colour.
+/// The ground: the charcoal. The photograph is the colour.
 private struct Backdrop: View {
   var body: some View {
-    LinearGradient.ground
+    Color.bg
   }
 }
 
 /**
- The strip under the clock, in the ground's top colour. With no navigation
- bar over the gate, whatever scrolls up — the photograph, the fields — ran
- into the time; with it the time stays on the ground, the way it does under
- a bar. Nothing under it is ever reachable, so it takes no touches.
+ The strip under the clock, in the ground's colour. With no navigation bar
+ over the gate, whatever scrolls up — the photograph, the fields — ran into
+ the time; with it the time stays on the ground, the way it does under a
+ bar. Nothing under it is ever reachable, so it takes no touches.
  */
 private struct StatusBarBackdrop: View {
   var body: some View {
     Color.clear
       .frame(height: 0)
-      .background(Color.groundTop.ignoresSafeArea(edges: .top))
+      .background(Color.bg.ignoresSafeArea(edges: .top))
       .allowsHitTesting(false)
       .accessibilityHidden(true)
   }
@@ -1210,12 +1204,12 @@ private struct StatusBarBackdrop: View {
  */
 private struct DoorsPlaceholder: View {
   var body: some View {
-    let shape = RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous)
     VStack(spacing: 12) {
-      shape.fill(Color.sunk.opacity(0.8)).frame(height: BasuMetric.controlHeight)
+      Capsule().fill(Color.surface3).frame(height: BasuMetric.controlHeight)
       Rectangle().fill(Color.line).frame(height: BasuMetric.hairline).padding(.vertical, 12)
-      shape.fill(Color.sunk.opacity(0.8)).frame(height: BasuMetric.controlHeight)
-      shape.fill(Color.sunk.opacity(0.5)).frame(height: BasuMetric.controlHeight)
+      RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous)
+        .fill(Color.surface3).frame(height: BasuMetric.controlHeight)
+      Capsule().fill(Color.surface3.opacity(0.6)).frame(height: BasuMetric.buttonHeight)
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Уншиж байна")
@@ -1228,10 +1222,10 @@ private struct OrLine: View {
   let words: String
 
   var body: some View {
-    HStack(spacing: 10) {
+    HStack(spacing: 12) {
       Rectangle().fill(Color.line).frame(height: BasuMetric.hairline)
       Text(words)
-        .font(.sans(12.5))
+        .font(.sans(13, .semibold))
         .foregroundStyle(Color.ink3)
         .fixedSize()
       Rectangle().fill(Color.line).frame(height: BasuMetric.hairline)
@@ -1248,21 +1242,21 @@ private struct WayButton: View {
 
   var body: some View {
     Button(action: action) {
-      HStack(spacing: 12) {
+      HStack(spacing: 14) {
         Image(systemName: symbol)
-          .font(.sans(15, .medium))
-          .foregroundStyle(Color.accent)
+          .font(.sans(16, .medium))
+          .foregroundStyle(Color.ink2)
           .dynamicTypeSize(...DynamicTypeSize.accessibility1)
           .frame(minWidth: 22)
           .accessibilityHidden(true)
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 3) {
           Text(title)
-            .font(.sans(15, .medium))
+            .font(.sans(15, .bold))
             .foregroundStyle(Color.ink)
             .fixedSize(horizontal: false, vertical: true)
           if let detail {
             Text(detail)
-              .font(.sans(12.5))
+              .font(.sans(13, .medium))
               .foregroundStyle(Color.ink3)
               .fixedSize(horizontal: false, vertical: true)
           }
@@ -1271,17 +1265,18 @@ private struct WayButton: View {
         Spacer(minLength: 8)
         Chevron(size: 12).foregroundStyle(Color.ink3)
       }
-      .padding(.horizontal, 16)
-      .padding(.vertical, 14)
+      .padding(.horizontal, 18)
+      .padding(.vertical, 16)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .glassCard(radius: BasuMetric.control)
+      .card(radius: BasuMetric.card)
       .contentShape(Rectangle())
     }
     .buttonStyle(Pressable())
   }
 }
 
-/// «Нэвтрэх | Бүртгүүлэх»: two halves of one pill, the chosen one lifted.
+/// «Нэвтрэх | Бүртгүүлэх»: two halves of one capsule; the chosen one is the
+/// off-white pill with dark words on it.
 private struct DoorSwitch: View {
   @Binding var door: SignInSheet.Door
   @Namespace private var pill
@@ -1292,7 +1287,7 @@ private struct DoorSwitch: View {
       half(.signUp, "Бүртгүүлэх", id: "signin.door.signUp")
     }
     .padding(4)
-    .background(Color.sunk.opacity(0.7), in: Capsule())
+    .background(Color.surface, in: Capsule())
     .overlay(Capsule().strokeBorder(Color.line, lineWidth: BasuMetric.hairline))
     .sensoryFeedback(.selection, trigger: door)
   }
@@ -1303,16 +1298,14 @@ private struct DoorSwitch: View {
       withAnimation(.snappy(duration: 0.25)) { door = which }
     } label: {
       Text(title)
-        .font(.sans(15, chosen ? .semibold : .medium))
-        .foregroundStyle(chosen ? Color.ink : Color.ink2)
+        .font(.sans(15, .bold))
+        .foregroundStyle(chosen ? Color.onLight : Color.ink2)
         .frame(maxWidth: .infinity)
-        .frame(minHeight: 40)
+        .frame(minHeight: 46)
         .background {
           if chosen {
             Capsule()
-              .fill(Color.surface)
-              .overlay(Capsule().strokeBorder(Color.line, lineWidth: BasuMetric.hairline))
-              .shadow(color: Color.tileShadow, radius: 2, y: 1)
+              .fill(Color.ink)
               .matchedGeometryEffect(id: "pill", in: pill)
           }
         }

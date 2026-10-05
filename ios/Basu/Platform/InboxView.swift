@@ -8,8 +8,8 @@ import SwiftUI
  thing it was about — your table is held, your money came back — is not. This is
  that record, and the push is only one way of pointing at it.
 
- Unread is a pine dot before the source, a heavier title and a muted blue
- wash; the wash alone was too faint to see. There is no mark-all-read:
+ Unread is a crimson dot before the source, a heavier title and a raised
+ wash on the row; the wash alone was too faint. There is no mark-all-read:
  opening a message reads it, and swiping one away deletes it.
 
  Nothing is asked here. Notifications are asked for after the first order
@@ -45,32 +45,36 @@ struct InboxView: View {
             empty
           }
         } else {
-          ForEach(platform.inbox.messages) { message in
-            SwipeToDelete(
-              open: Binding(get: { swiped == message.id }, set: { swiped = $0 ? message.id : nil }),
-              delete: { Task { await platform.delete(message) } },
-            ) {
-              Button {
-                Task { await platform.markRead(message) }
-                if let destination = message.destination { open(destination) }
-              } label: {
-                MessageRow(message: message)
+          // One card, the rows on it divided by hairlines; the card clips, so
+          // the wash and the swipe never bleed past its corners.
+          VStack(spacing: 0) {
+            ForEach(Array(platform.inbox.messages.enumerated()), id: \.element.id) { index, message in
+              if index > 0 { Hairline() }
+              SwipeToDelete(
+                open: Binding(get: { swiped == message.id }, set: { swiped = $0 ? message.id : nil }),
+                delete: { Task { await platform.delete(message) } },
+              ) {
+                Button {
+                  Task { await platform.markRead(message) }
+                  if let destination = message.destination { open(destination) }
+                } label: {
+                  MessageRow(message: message)
+                }
+                .buttonStyle(.plain)
               }
-              .buttonStyle(.plain)
             }
           }
-          // The wrapper reaches 12 past the content on both sides, is rounded
-          // at 12, and clips — so the wash and the swipe never bleed square.
-          .padding(.horizontal, -12)
+          .clipShape(RoundedRectangle(cornerRadius: BasuMetric.card, style: .continuous))
+          .card()
         }
       }
-      .padding(.horizontal, BasuMetric.screenPadding)
+      .padding(.horizontal, 16)
+      .padding(.top, 4)
       .padding(.bottom, BasuMetric.tabBarInset)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .clipShape(RoundedRectangle(cornerRadius: BasuMetric.card, style: .continuous))
     }
     .scrollIndicators(.hidden)
-    .background(LinearGradient.ground)
+    .background(Color.bg)
     .safeAreaInset(edge: .top, spacing: 0) { ShellNav(title: "Мэдэгдэл", back: back) }
     .toolbarVisibility(.hidden, for: .navigationBar)
     // The bar is hidden, and with it went the edge swipe back; it is the
@@ -83,32 +87,33 @@ struct InboxView: View {
     }
   }
 
-  /// A paragraph on the ground, under the same hairline the rows use. No
-  /// illustration, no card, no button — there is nothing here to act on.
+  /// Two lines on the ground. No illustration, no card, no button — there is
+  /// nothing here to act on.
   private var empty: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      Hairline()
-      Text("Мэдэгдэл алга. Захиалга өгвөл явц нь энд, утсанд тань ирнэ.")
-        .font(.sans(14))
-        .lineSpacing(14 * 0.6 - 4)
-        .foregroundStyle(Color.ink2)
-        .padding(.top, 26)
-        .frame(maxWidth: 300, alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true)
+    VStack(alignment: .leading, spacing: 10) {
+      Text("Мэдэгдэл алга")
+        .font(.display(36))
+        .foregroundStyle(Color.ink)
         .accessibilityIdentifier("inbox.empty")
+      Text("Захиалгын явц энд, утсанд тань ирнэ.")
+        .font(.sans(15, .medium))
+        .foregroundStyle(Color.ink2)
+        .fixedSize(horizontal: false, vertical: true)
     }
+    .padding(.top, 12)
   }
 
   /// Three rows in the shape of what is coming, so the list does not arrive
   /// as a jump — and so «Мэдэгдэл алга» is never said before it is known.
   private var skeleton: some View {
     VStack(alignment: .leading, spacing: 0) {
-      ForEach(0..<3, id: \.self) { _ in
+      ForEach(0..<3, id: \.self) { index in
+        if index > 0 { Hairline() }
         MessageRow(message: .placeholder)
       }
     }
     .redacted(reason: .placeholder)
-    .padding(.horizontal, -12)
+    .card()
     .accessibilityElement(children: .ignore)
     .accessibilityLabel("Уншиж байна")
     .accessibilityIdentifier("inbox.loading")
@@ -121,7 +126,7 @@ struct MessageRow: View {
   let message: InboxMessage
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 7) {
+    VStack(alignment: .leading, spacing: 8) {
       HStack(spacing: 10) {
         HStack(spacing: 8) {
           if !message.read {
@@ -130,33 +135,31 @@ struct MessageRow: View {
               .frame(width: 8, height: 8)
               .accessibilityHidden(true)
           }
-          SourceLabel(text: message.source)
+          SourceLabel(text: message.source, colour: message.read ? .ink3 : .gold)
           if message.channel == "sms" { ChannelChip(channel: message.channel) }
         }
         Spacer(minLength: 4)
         Text(Format.when(message.at))
-          .font(.mono(11))
+          .font(.sans(12, .semibold))
           .monospacedDigit()
           .foregroundStyle(Color.ink3)
       }
       Text(message.title ?? "Basu")
-        .font(.sans(15.5, message.read ? .regular : .semibold))
-        .lineSpacing(15.5 * 0.35 - 4)
+        .font(.sans(16, message.read ? .semibold : .bold))
         .foregroundStyle(message.read ? Color.ink2 : Color.ink)
         .fixedSize(horizontal: false, vertical: true)
         .multilineTextAlignment(.leading)
       Text(message.body)
-        .font(.sans(13))
-        .lineSpacing(13 * 0.5 - 3)
-        .foregroundStyle(Color.ink2)
+        .font(.sans(14, .medium))
+        .lineSpacing(2)
+        .foregroundStyle(message.read ? Color.ink3 : Color.ink2)
         .fixedSize(horizontal: false, vertical: true)
         .multilineTextAlignment(.leading)
     }
-    .padding(.horizontal, 12)
+    .padding(.horizontal, 18)
     .padding(.vertical, 16)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(message.read ? Color.clear : Color.unread)
-    .overlay(alignment: .top) { Hairline() }
+    .background(message.read ? Color.clear : Color.surface2)
     .contentShape(Rectangle())
     // Said in words: combined, the row read out «№» and «·» one by one, and
     // a day as a fraction.
@@ -186,10 +189,10 @@ struct ChannelChip: View {
 
   var body: some View {
     Text(channel == "sms" ? "SMS" : "АПП")
-      .font(.mono(11, .medium))
-      .tracking(11 * 0.08)
+      .font(.sans(11, .bold))
+      .tracking(11 * 0.1)
       .foregroundStyle(Color.ink2)
-      .padding(.horizontal, 5)
+      .padding(.horizontal, 6)
       .padding(.vertical, 2)
       .overlay(
         RoundedRectangle(cornerRadius: BasuMetric.chip, style: .continuous)
@@ -199,7 +202,7 @@ struct ChannelChip: View {
 }
 
 /**
- Swipe left to reveal Устгах: an 88pt `stop`-filled button pinned to the row's
+ Swipe left to reveal Устгах: an 88pt crimson button pinned to the row's
  right edge. The row slides over it and stays open until it is tapped, swiped
  back, or another row opens.
 
@@ -227,10 +230,10 @@ struct SwipeToDelete<Content: View>: View {
         Button(action: delete) {
           Text("Устгах")
             .font(.sans(14, .medium))
-            .foregroundStyle(Color.onStop)
+            .foregroundStyle(Color.onAccent)
             .frame(width: width)
             .frame(maxHeight: .infinity)
-            .background(Color.stop)
+            .background(Color.accent)
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("inbox.delete")
@@ -238,7 +241,7 @@ struct SwipeToDelete<Content: View>: View {
       }
 
       content()
-        .background(open || drag != 0 ? Color.swipeGround : Color.clear)
+        .background(open || drag != 0 ? Color.surface : Color.clear)
         .offset(x: offset)
         .animation(.easeOut(duration: 0.2), value: open)
     }

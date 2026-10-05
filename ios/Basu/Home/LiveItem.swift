@@ -3,19 +3,22 @@ import SwiftUI
 /**
  Something of the guest's that is running right now, whichever app it belongs to.
 
- The launcher's ИДЭВХТЭЙ section is deliberately not "your orders": rows are
- ordered by the moment that matters, not by which app produced them, so a taxi
- four minutes away sits above a lunch that fires at half past. The food app
- maps into this; the second app will map into it too, and the section will
- not know the difference.
+ The launcher's «Идэвхтэй захиалга» is deliberately not one app's orders:
+ rows are ordered by the moment that matters, not by which app produced them,
+ so a sheep due Tuesday sits under today's lunch. The food app maps into this;
+ the second app maps into it too, and the section does not know the difference.
+
+ On the screen an order is a card: what it is, the state in one word, a meter
+ of four under the word, and the day or the time in the corner with what it
+ is the time of — «АВАХ», «ИРЭХ» — in gold.
  */
 struct LiveItem: Identifiable, Hashable {
-  /// The dot at the head of the row: what the order is waiting on, in the
-  /// web's tones — honey for what is on the fire, blue for what is on the way.
+  /// What the order is waiting on — kept for VoiceOver and the tests; the
+  /// screen says it with `word` and the meter, never with a coloured dot.
   enum Status: Hashable {
     /// Waiting on something — the kitchen, the restaurant, the supplier.
     case waiting
-    /// On the fire, or being prepared: honey, the small warm mark.
+    /// On the fire, or being prepared.
     case cooking
     /// On its way. The one status that means *do not go anywhere*.
     case moving
@@ -23,20 +26,15 @@ struct LiveItem: Identifiable, Hashable {
     case ready
     /// Over without happening — cancelled, refunded. Not an alarm.
     case over
-
-    var tint: Color {
-      switch self {
-      case .waiting: .hold
-      case .cooking: .hi
-      case .moving: .route
-      case .ready: .ready
-      case .over: .ink3
-      }
-    }
   }
 
+  /// How the state's word is set: as it is, or — for an order that ended
+  /// without happening — in crimson (cancelled) or gold (money on its way
+  /// back, a payment still owed), with no meter under it.
+  enum Tone: Hashable { case plain, stop, hold }
+
   let id: String
-  /// The app it came from, set in the row as a tracked mono label.
+  /// The app it came from, as a tracked label.
   let source: String
   let title: String
   /// The order's number, without its №.
@@ -60,6 +58,24 @@ struct LiveItem: Identifiable, Hashable {
   /// thing can afford to say more; three cannot, and a list where some rows
   /// are taller than others is a list you have to read rather than scan.
   let extra: (label: String, time: Date)?
+
+  // ── the card: a title, one word, a meter of four ───────────────────────
+
+  /// The card's title: the restaurant, or the meat and how much of it.
+  let headline: String
+  /// The state in one word — the web's own: «Бэлтгэж байна».
+  let word: String
+  /// 1…4 along Төлсөн → Бэлтгэж байна → Бэлэн → Замд / Хүлээлгэн өгсөн;
+  /// nought for an order that ended without happening, which has no meter.
+  let step: Int
+  let tone: Tone
+  /// The tile's picture, for the thumbnail when there is no photograph.
+  let art: String
+  /// A photograph of what was bought, when the order says what animal.
+  let photo: URL?
+  /// Over: handed over, served, or ended without happening. The Захиалга
+  /// tab keeps these apart from what is still on its way.
+  let finished: Bool
 
   static func == (a: LiveItem, b: LiveItem) -> Bool { a.id == b.id }
   func hash(into hasher: inout Hasher) { hasher.combine(id) }
@@ -90,6 +106,13 @@ extension LiveOrder {
       extra: expanded && fireAt != nil && state != .fired && state != .cooking
         ? ("Гал тавих цаг", fireAt!)
         : nil,
+      headline: restaurant.name,
+      word: detail,
+      step: step,
+      tone: [.cancelled, .rejected, .noShow].contains(state) ? .stop : state == .refunded ? .hold : .plain,
+      art: "food-tile",
+      photo: nil,
+      finished: [.served, .closed, .cancelled, .refunded, .rejected, .noShow].contains(state),
     )
   }
 
@@ -99,6 +122,18 @@ extension LiveOrder {
     case .ready, .served, .closed: .ready
     case .cancelled, .refunded, .rejected, .noShow: .over
     default: .waiting
+    }
+  }
+
+  /// Along the meter: in and waiting on the kitchen, on the fire, ready,
+  /// served. An order that ended without a meal has none.
+  var step: Int {
+    switch state {
+    case .fired, .cooking: 2
+    case .ready: 3
+    case .served, .closed: 4
+    case .cancelled, .refunded, .rejected, .noShow: 0
+    default: 1
     }
   }
 }
@@ -126,6 +161,13 @@ extension LiveIdesh {
         ? "Идэш, \(supplier.name), \(meat), \(amount), захиалга \(code), \(state.word.lowercased())"
         : "Идэш, \(supplier.name), \(Format.dayWords(receiveOn))-нд \(label), \(meat), \(amount), захиалга \(code), \(state.word.lowercased())",
       extra: nil,
+      headline: what,
+      word: state.word,
+      step: step,
+      tone: state == .cancelled ? .stop : state == .refunded || state == .draft ? .hold : .plain,
+      art: "idesh-tile",
+      photo: photo,
+      finished: [.handed, .closed, .cancelled, .refunded].contains(state),
     )
   }
 
@@ -152,5 +194,23 @@ extension LiveIdesh {
     case .cancelled, .refunded: .over
     default: .waiting
     }
+  }
+
+  /// Along the meter: paid, being prepared, ready, on its way or handed over.
+  /// Unpaid, cancelled or refunded, there is no meter — the word says it.
+  var step: Int {
+    switch state {
+    case .paid: 1
+    case .preparing: 2
+    case .ready: 3
+    case .dispatched, .handed, .closed: 4
+    case .draft, .cancelled, .refunded: 0
+    }
+  }
+
+  /// The animal's photograph, from the server — the one its stall shows.
+  var photo: URL? {
+    guard let kind, ["sheep", "beef", "goat", "horse"].contains(kind) else { return nil }
+    return Endpoint.base.appending(path: "idesh/\(kind).jpg")
   }
 }

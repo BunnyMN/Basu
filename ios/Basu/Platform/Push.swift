@@ -110,41 +110,46 @@ struct PushAsk: View {
   @State private var height: CGFloat = 320
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 16) {
+    VStack(alignment: .leading, spacing: 20) {
       Image(systemName: "bell.badge")
         .font(.sans(22, .medium))
-        .foregroundStyle(Color.accent)
-        .frame(width: 48, height: 48)
-        .background(Color.accentSoft, in: RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous))
+        .foregroundStyle(Color.ink)
+        .frame(width: 52, height: 52)
+        .background(Color.surface3, in: RoundedRectangle(cornerRadius: BasuMetric.inner, style: .continuous))
         .accessibilityHidden(true)
-      VStack(alignment: .leading, spacing: 6) {
+      VStack(alignment: .leading, spacing: 10) {
         Text(audience == .supplier ? "Шинэ захиалгыг утсандаа аваарай" : "Захиалгын явцыг утсандаа аваарай")
-          .font(.sans(20, .semibold))
+          .font(.display(36))
           .foregroundStyle(Color.ink)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityAddTraits(.isHeader)
         Text(
-          (audience == .supplier
-            ? "Захиалга орж ирмэгц утсанд тань шууд мэдэгдэнэ."
-            : "Бэлэн болох, замд гарах үед нь шууд мэдэгдэнэ.")
-            + " Үргэлжлүүлбэл утас тань зөвшөөрөл асууна — дараа нь Профайл дээрээс өөрчилж болно.",
+          audience == .supplier
+            ? "Захиалга орж ирмэгц утсанд тань мэдэгдэнэ."
+            : "Бэлэн болох, замд гарахад нь мэдэгдэнэ.",
         )
-        .font(.sans(14))
+        .font(.sans(16, .medium))
         .foregroundStyle(Color.ink2)
         .fixedSize(horizontal: false, vertical: true)
+        // What happens next, said before it does: the phone's own question.
+        Text("Дараа нь утас тань зөвшөөрөл асууна.")
+          .font(.sans(13, .medium))
+          .foregroundStyle(Color.ink3)
+          .fixedSize(horizontal: false, vertical: true)
       }
       PrimaryButton(title: "Үргэлжлүүлэх", enabled: true, busy: false, action: proceed)
         .accessibilityIdentifier("push.continue")
     }
     .padding(.horizontal, BasuMetric.screenPadding)
-    .padding(.top, 28)
+    .padding(.top, 32)
     .padding(.bottom, 16)
     .frame(maxWidth: .infinity, alignment: .leading)
     .fixedSize(horizontal: false, vertical: true)
     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
     .frame(maxHeight: .infinity, alignment: .top)
     .presentationDetents([.height(height)])
-    .presentationBackground { LinearGradient.ground }
+    .presentationBackground { Color.surface2 }
+    .presentationCornerRadius(BasuMetric.tile)
     .interactiveDismissDisabled()
   }
 }

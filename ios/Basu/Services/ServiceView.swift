@@ -57,7 +57,7 @@ struct ServiceView: View {
 
   var body: some View {
     ZStack(alignment: .topLeading) {
-      LinearGradient.ground.ignoresSafeArea()
+      Color.bg.ignoresSafeArea()
 
       ServiceWeb(page: page)
         .ignoresSafeArea()
@@ -174,19 +174,17 @@ private struct HomeChip: View {
 
   var body: some View {
     Button(action: action) {
-      HStack(spacing: 4) {
-        Chevron(direction: .back, size: 17)
+      HStack(spacing: 6) {
+        Chevron(direction: .back, size: 17, lineWidth: 2)
         Text("Basu")
-          .font(.sans(15, .medium))
+          .font(.sans(15, .bold))
       }
-      .foregroundStyle(Color.accentInk)
-      .padding(.leading, 8)
-      .padding(.trailing, 14)
-      .frame(minHeight: 36)
-      .background(.ultraThinMaterial, in: Capsule())
-      .overlay(Capsule().strokeBorder(Color.line, lineWidth: BasuMetric.hairline))
+      .foregroundStyle(Color.ink)
+      .padding(.leading, 12)
+      .padding(.trailing, 16)
       .frame(minHeight: BasuMetric.minTarget)
-      .contentShape(Rectangle())
+      .glass(in: Capsule())
+      .contentShape(Capsule())
     }
     .buttonStyle(Pressable())
     .dynamicTypeSize(...DynamicTypeSize.accessibility1)
@@ -260,6 +258,8 @@ final class ServicePage: NSObject {
     webView = WKWebView(frame: .zero, configuration: configuration)
     webView.isOpaque = false
     webView.backgroundColor = .clear
+    // What a rubber-band pull shows past the page's edge: the charcoal, not white.
+    webView.underPageBackgroundColor = UIColor(rgb: 0x100D0C)
     webView.scrollView.contentInsetAdjustmentBehavior = .never
     // WebKit's own swipe skips history a page added after waiting on the
     // network — idesh opens a stall that way — so on idesh it never went

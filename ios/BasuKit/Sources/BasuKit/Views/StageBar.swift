@@ -1,34 +1,68 @@
 import SwiftUI
 
 /**
- Three equal 3pt bars, gap 4, radius 2 — filled up to the current stage.
+ Status, said the way every Basu screen says it: one word, and four segments
+ under it — Төлсөн, Бэлтгэж байна, Бэлэн, then Замд or Хүлээлгэн өгсөн.
 
- Three segments because the order has three states, and no more. The bar can
- never show 37% because there is no such thing as 37% of a lunch.
+ Filled up to the step the order is on: the step being lived now in crimson,
+ the ones behind it in the ink, the ones ahead empty. There is never a 37%:
+ an order is on a step, not part of the way along one. A cancelled order has
+ no meter at all — the word alone says it.
  */
-public struct StageBar: View {
-  public let stage: OrderStage
+public struct Meter: View {
+  /// 1…total. Nought draws an empty meter.
+  public let step: Int
+  public var total: Int
+  public var current: Color
+  public var filled: Color
   public var track: Color
-  public var fill: Color
+  public var height: CGFloat
 
-  /// `fill` is the accent in the app and a widget; on the lock screen, whose
-  /// glass is dark whatever the phone's appearance, it is `onLock`.
-  public init(stage: OrderStage, track: Color, fill: Color = BasuColor.accent) {
-    self.stage = stage
+  public init(
+    step: Int,
+    total: Int = 4,
+    current: Color = BasuColor.accent,
+    filled: Color = BasuColor.ink,
+    track: Color = BasuColor.surface3,
+    height: CGFloat = 4,
+  ) {
+    self.step = step
+    self.total = total
+    self.current = current
+    self.filled = filled
     self.track = track
-    self.fill = fill
+    self.height = height
   }
 
   public var body: some View {
     HStack(spacing: 4) {
-      ForEach(0..<3, id: \.self) { i in
-        RoundedRectangle(cornerRadius: 2, style: .continuous)
-          .fill(i <= stage.index ? fill : track)
-          .frame(height: 3)
+      ForEach(0..<total, id: \.self) { index in
+        RoundedRectangle(cornerRadius: height / 2, style: .continuous)
+          .fill(index < step - 1 ? filled : index == step - 1 ? current : track)
+          .frame(height: height)
       }
     }
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel(stage.label)
+    .accessibilityHidden(true)
+  }
+}
+
+/**
+ A lunch's three stages on the meter of four: in (waiting on the kitchen),
+ on the fire, ready — the fourth, served, is when the activity ends.
+ */
+public struct StageBar: View {
+  public let stage: OrderStage
+  public var track: Color
+
+  public init(stage: OrderStage, track: Color = BasuColor.surface3) {
+    self.stage = stage
+    self.track = track
+  }
+
+  public var body: some View {
+    Meter(step: stage.index + 1, track: track)
+      .accessibilityElement(children: .ignore)
+      .accessibilityLabel(stage.label)
   }
 }
 
@@ -50,8 +84,9 @@ public struct FoodTile: View {
 
 /**
  A supplied render as an app tile, full-bleed at the tile's radius with no
- inner margin. The food tile was the first; the идэш tile is the second, and
- any app whose mark is a render rather than a drawn glyph is one of these.
+ inner margin. The food tile was the first; the идэш tile is the second, the
+ supplier's ger the third — and any app whose mark is a render rather than a
+ drawn glyph is one of these. The pictures themselves are never redrawn.
  */
 public struct RasterTile: View {
   public let name: String

@@ -2,231 +2,213 @@
 //  BasuKit
 //
 //  Every colour, font and metric the design uses. Nothing outside this file
-//  is a legal value. Two themes, authored independently — dark is not an
-//  inversion of light.
+//  is a legal value.
+//
+//  «Тансаг хар» (2026-10-05): one theme, and it is dark. Basu is dark on
+//  every surface whatever the phone's own setting, so each token is one
+//  value rather than a light and a dark — the same tokens as the web's
+//  app.css (`--bg`, `--surface`, `--ink`, `--accent`, `--gold`…), with the
+//  same hex.
 
 import SwiftUI
 
 // MARK: - Colour
 
 public extension Color {
-    init(light: UInt32, dark: UInt32, opacity: Double = 1) {
-        self.init(UIColor { $0.userInterfaceStyle == .dark
-            ? UIColor(rgb: dark, alpha: opacity)
-            : UIColor(rgb: light, alpha: opacity) })
-    }
-}
-
-private extension UIColor {
-    convenience init(rgb: UInt32, alpha: CGFloat) {
-        self.init(red:   CGFloat((rgb >> 16) & 0xFF) / 255,
-                  green: CGFloat((rgb >>  8) & 0xFF) / 255,
-                  blue:  CGFloat( rgb        & 0xFF) / 255,
-                  alpha: alpha)
-    }
+  /// `0xRRGGBB` in sRGB, at an opacity.
+  init(hex: UInt32, opacity: Double = 1) {
+    self.init(
+      .sRGB,
+      red: Double((hex >> 16) & 0xFF) / 255,
+      green: Double((hex >> 8) & 0xFF) / 255,
+      blue: Double(hex & 0xFF) / 255,
+      opacity: opacity,
+    )
+  }
 }
 
 public enum BasuColor {
-    // Surfaces. Cards are translucent over an 8pt backdrop blur
-    // (.ultraThinMaterial); the 1pt hairline sits on top of the blur and is
-    // what keeps edges legible.
-    public static let surface      = Color(light: 0xFFFFFF, dark: 0x171A18, opacity: 0.60)
-    public static let surface2     = Color(light: 0xF7F6F2, dark: 0x1D211E, opacity: 0.52)
+  // ── the ground and what stands on it: warm charcoal, never #000 ──────
+  /// `--bg`: the ground of every screen.
+  public static let bg = Color(hex: 0x100D0C)
+  /// `--surface`: cards, rows, inputs.
+  public static let surface = Color(hex: 0x1C1716)
+  /// `--surface-2`: sheets, the chosen row, raised panels.
+  public static let surface2 = Color(hex: 0x251F1D)
+  /// `--surface-3`: stepper buttons, the meter's empty segment, a pressed row.
+  public static let surface3 = Color(hex: 0x2F2826)
+  /// `--deep`: the deepest band — under a well, behind the lock.
+  public static let deep = Color(hex: 0x0C0A09)
 
-    // Ink: warm neutrals with a breath of green.
-    public static let ink          = Color(light: 0x181916, dark: 0xEEF1EC)
-    public static let ink2         = Color(light: 0x575A53, dark: 0xAEB5AD)
-    public static let ink3         = Color(light: 0x696C64, dark: 0x8D958C)
+  // ── lines ─────────────────────────────────────────────────────────────
+  /// `--line`: row and card lines.
+  public static let line = Color(hex: 0x2E2725)
+  /// `--line-2`: outlined buttons and inputs.
+  public static let line2 = Color(hex: 0x3E3532)
 
-    // Lines
-    public static let line         = Color(light: 0xE2E0D8, dark: 0x29302B)
-    public static let line2        = Color(light: 0xCDCBC2, dark: 0x39423C)
+  // ── ink ───────────────────────────────────────────────────────────────
+  public static let ink = Color(hex: 0xF6F0E8)
+  public static let ink2 = Color(hex: 0xC4BAB0)
+  /// Labels and dates: 6.0:1 on the ground, 5.5:1 on a card.
+  public static let ink3 = Color(hex: 0x998E85)
+  /// Text on an off-white button or pill.
+  public static let onLight = Color(hex: 0x140F0E)
 
-    // The one brand colour: pine, a deep green — as on the web (app.css,
-    // §3 of docs/design-system.md) since ba03238. Orange went in 11143bb and
-    // the black that replaced it was too plain.
-    public static let accent       = Color(light: 0x1F5A43, dark: 0x7CCBA2)
-    /// The accent as text, a shade deeper so it reads at body size.
-    public static let accentInk    = Color(light: 0x1C5440, dark: 0x8FD4AE)
-    public static let onAccent     = Color(light: 0xFFFFFF, dark: 0x0D1F16)
-    /// The wash behind a chosen tab or chip.
-    public static let accentSoft   = Color(light: 0xE3EFE8, dark: 0x16271F)
-    public static let accentLine   = Color(light: 0xB9D4C6, dark: 0x2A4A3B)
+  // ── crimson: the customer's one primary action per screen ────────────
+  public static let accent = Color(hex: 0xD21F3C)
+  public static let accentPress = Color(hex: 0xB5172F)
+  /// Crimson as text on the dark: an error, something late, a cancel or a
+  /// delete. Never a link that only goes somewhere.
+  public static let accentInk = Color(hex: 0xF2566B)
+  /// White on crimson, 5.3:1.
+  public static let onAccent = Color(hex: 0xFFFFFF)
 
-    // Honey: small marks only — «on the fire», never a button or money — so
-    // what is cooking never looks like the green of done.
-    public static let hi           = Color(light: 0xD9A441, dark: 0xE3B458)
-    public static let hiInk        = Color(light: 0x7A5A12, dark: 0xE8C27A)
-    public static let hiSoft       = Color(light: 0xFBF1DC, dark: 0x2B2312)
+  // ── gold: hairlines, step numbers, tiny labels like «АВАХ» ───────────
+  /// Also what is waiting on the person.
+  public static let gold = Color(hex: 0xC9A96E)
+  public static let goldLine = Color(hex: 0xC9A96E, opacity: 0.5)
 
-    // The deep pine of the web's dark bands (--deep): the tab bar's ground,
-    // and the pale pill on it that marks the chosen tab.
-    public static let deep         = Color(light: 0x123A2C, dark: 0x17241D)
-    public static let deepEdge     = Color(light: 0x123A2C, dark: 0x2A4A3B)
-    public static let onDeep       = Color(light: 0xFFFFFF, dark: 0xEEF1EC, opacity: 0.62)
-    public static let deepPill     = Color(light: 0xF4F3EE, dark: 0x7CCBA2)
-    public static let onDeepPill   = Color(light: 0x1F5A43, dark: 0x0D1F16)
+  /// The 2pt focus ring.
+  public static let focus = ink
 
-    // Semantic
-    public static let ready        = Color(light: 0x136A4B, dark: 0x57C295)   // credits
-    public static let hold         = Color(light: 0x7E6113, dark: 0xDAB65A)   // waiting
-    public static let stop         = Color(light: 0x9B2226, dark: 0xF08A8D)   // sign out, delete
-    public static let onStop       = Color(light: 0xFFFFFF, dark: 0x2A0B0C)
-    public static let route        = Color(light: 0x1B5B8F, dark: 0x78B0E0)   // in transit
+  // ── glass: the tab bar, a chip on a photo, the way back ─────────────
+  /// Over a blur; a 1pt `glassEdge` keeps its edge.
+  public static let glass = Color(hex: 0x100D0C, opacity: 0.62)
+  public static let glassEdge = Color(white: 1, opacity: 0.12)
+  /// The tab bar's own glass: nearly solid, so the pill on it reads.
+  public static let bar = Color(hex: 0x201A19, opacity: 0.92)
+  public static let barEdge = Color(hex: 0xFFF4EC, opacity: 0.08)
 
-    // Unread wash — a muted blue, deliberately not the accent
-    public static let unread       = Color(light: 0xE4EDF5, dark: 0x16232E)
+  // ── the lock screen, the island and the widgets ──────────────────────
+  public static let onLock = ink
+  public static let onLock2 = ink3
+  /// The Live Activity's ground on the lock screen: the app's own charcoal.
+  public static let lockCard = Color(hex: 0x100D0C, opacity: 0.9)
+  public static let lockLine = line
+  /// The meter's empty segment, on the lock screen and in the island.
+  public static let lockTrack = surface3
 
-    // Lock screen / Live Activity
-    public static let onLock       = Color(white: 1)
-    public static let onLock2      = Color(light: 0x9AA6AC, dark: 0x8E9AA0)
-    public static let lockCard     = Color(white: 1, opacity: 0.12)
-    public static let lockLine     = Color(white: 1, opacity: 0.14)
-    public static let lockTrack    = Color(white: 1, opacity: 0.18)
-
-    /// Screen background: a 176° wash, top to bottom. The gradient exists so
-    /// translucent surfaces have something to be translucent against.
-    public static var ground: LinearGradient {
-        LinearGradient(
-            stops: [
-                .init(color: Color(light: 0xF8F7F3, dark: 0x141815), location: 0.00),
-                .init(color: Color(light: 0xF4F3EE, dark: 0x0F1110), location: 0.46),
-                .init(color: Color(light: 0xECEBE4, dark: 0x0A0C0B), location: 1.00)
-            ],
-            startPoint: .init(x: 0.03, y: 0), endPoint: .init(x: -0.03, y: 1))
-    }
+  /// The app's ground as a gradient, for the places that take a shape
+  /// style. Flat: the old wash existed for translucent cards, and the cards
+  /// are solid now.
+  public static var ground: LinearGradient {
+    LinearGradient(colors: [bg, bg], startPoint: .top, endPoint: .bottom)
+  }
 }
 
 // MARK: - Type
 //
-// Golos Text for prose, JetBrains Mono for every number and every label.
-// Numbers always use tabular figures. The ₮ sign is set in the SANS face —
-// the mono face has no glyph for it and collides with the last digit.
+// Manrope for every word; Noto Sans Display Condensed for what is big or
+// counted — headings, money, times, days, order codes. Both carry Ө ө Ү ү,
+// ₮ and №, so nothing falls back mid-word, and both have tabular figures.
 
 public enum BasuFont {
-    // The bundled faces are the static 400 / 500 / 600 cuts, so a weight is a
-    // PostScript name rather than an axis. `.weight()` on a custom font only
-    // works with a variable font and otherwise falls back to the system face
-    // without saying so — which is exactly the failure nobody notices.
-    private static func face(_ weight: Font.Weight) -> String {
-        switch weight {
-        case .medium: "Medium"
-        case .semibold, .bold, .heavy, .black: "SemiBold"
-        default: "Regular"
-        }
+  // The bundled faces are static cuts, so a weight is a PostScript name
+  // rather than an axis. `.weight()` on a custom font only works with a
+  // variable font and otherwise falls back to the system face without
+  // saying so — which is exactly the failure nobody notices.
+  private static func sansFace(_ weight: Font.Weight) -> String {
+    switch weight {
+    case .medium: "Manrope-Medium"
+    case .semibold: "Manrope-SemiBold"
+    case .bold, .heavy, .black: "Manrope-Bold"
+    default: "Manrope-Regular"
     }
-    // Relative to the body style, so every size grows with Dynamic Type and
-    // the design's 15 is still 15 at the default setting.
-    public static func sans(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        .custom("GolosText-\(face(weight))", size: size, relativeTo: .body)
+  }
+
+  private static func displayFace(_ weight: Font.Weight) -> String {
+    switch weight {
+    case .heavy, .black: "NotoSansDisplay-CondensedExtraBold"
+    default: "NotoSansDisplay-CondensedBold"
     }
-    public static func mono(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
-        .custom("JetBrainsMono-\(face(weight))", size: size, relativeTo: .body)
-    }
-    /// The file names `UIAppFonts` has to list, in every target that draws text.
-    public static let files = [
-        "GolosText-Regular.ttf", "GolosText-Medium.ttf", "GolosText-SemiBold.ttf",
-        "JetBrainsMono-Regular.ttf", "JetBrainsMono-Medium.ttf", "JetBrainsMono-SemiBold.ttf",
-    ]
+  }
 
-    // Titles
-    public static let navTitleLarge  = sans(28, .semibold)   // Түрийвч, Профайл, tracking -0.02em
-    public static let navTitle       = sans(17, .semibold)   // centred Мэдэгдэл
-    public static let splashMark     = sans(44, .semibold)   // Basu, tracking -0.03em
-    public static let brand          = sans(27, .semibold)   // launcher Basu, -0.025em
-    public static let profileName    = sans(24, .semibold)
+  /// Words. Relative to the body style, so every size grows with Dynamic
+  /// Type and the design's 15 is still 15 at the default setting.
+  public static func sans(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+    .custom(sansFace(weight), size: size, relativeTo: .body)
+  }
 
-    // Numbers
-    public static let balance        = mono(48, .semibold)   // -0.02em
-    public static let liveTime       = mono(23, .semibold)
-    public static let widgetTimeS    = mono(34, .semibold)
-    public static let widgetTimeM    = mono(30, .semibold)
-    public static let activityTime   = mono(26, .semibold)
-    public static let clock          = mono(15, .semibold)
-    public static let amount         = mono(15, .semibold)
-    public static let badge          = mono(9.5, .semibold)
+  /// The condensed display face: 800 (`.heavy`, the default) for headings,
+  /// money, times and codes; 700 (`.bold`) for the smaller headings.
+  public static func display(_ size: CGFloat, _ weight: Font.Weight = .heavy) -> Font {
+    .custom(displayFace(weight), size: size, relativeTo: .body)
+  }
 
-    // Text
-    public static let rowTitle       = sans(15.5, .semibold) // live row, unread notification
-    public static let rowTitleRead   = sans(15.5, .regular)
-    public static let row            = sans(15, .regular)
-    public static let rowValue       = sans(15, .medium)
-    public static let navLink        = sans(15, .medium)
-    public static let appName        = sans(13, .semibold)
-    public static let body           = sans(13, .regular)
-    public static let bodyLarge      = sans(14, .regular)
-    public static let inlineAction   = sans(13, .medium)
-    public static let stage          = sans(12.5, .medium)
-    public static let caption        = sans(12, .regular)
-
-    // Labels. Nothing anybody has to read is set under 11 — the web's floor
-    // (docs/design-system.md §2.2) — and words are sans; mono is for the
-    // digits and the short uppercase eyebrows.
-    public static let meta           = mono(11.5, .regular)
-    public static let timestamp      = mono(11, .regular)
-    public static let sectionLabel   = mono(11, .medium)     // ТҮРИЙВЧ — tracking 0.14em, uppercase
-    public static let sourceLabel    = mono(11, .medium)     // ХООЛ — tracking 0.12em
-    public static let appTag         = sans(12, .regular)    // урьдчилж захиал
-    public static let unitLabel      = sans(11, .medium)     // ИРЭХ, АВАХ — uppercase, beside a time
-    public static let channelChip    = mono(11, .medium)     // SMS — tracking 0.12em
+  /// The file names `UIAppFonts` has to list, in every target that draws text.
+  public static let files = [
+    "Manrope-Regular.ttf", "Manrope-Medium.ttf", "Manrope-SemiBold.ttf", "Manrope-Bold.ttf",
+    "NotoSansDisplay-CondensedBold.ttf", "NotoSansDisplay-CondensedExtraBold.ttf",
+  ]
 }
 
 public extension Text {
-    /// Numbers never jitter as they change.
-    func tabular() -> Text { self.monospacedDigit() }
+  /// Numbers never jitter as they change.
+  func tabular() -> Text { self.monospacedDigit() }
 }
 
 public extension View {
-    /// Tracking in ems, the way the design specifies it.
-    func tracking(em: CGFloat, size: CGFloat) -> some View { self.tracking(em * size) }
+  /// Tracking in ems, the way the design specifies it.
+  func tracking(em: CGFloat, size: CGFloat) -> some View { self.tracking(em * size) }
 }
 
 // MARK: - Metrics
 
 public enum BasuMetric {
-    // Radii
-    public static let card: CGFloat        = 12
-    public static let iconTile: CGFloat    = 18
-    public static let widget: CGFloat      = 24
-    public static let activityCard: CGFloat = 22
-    public static let islandCompact: CGFloat = 19
-    public static let islandExpanded: CGFloat = 40
-    public static let badge: CGFloat       = 8
-    public static let switchTrack: CGFloat = 16
-    /// A button, a banner, a chip of money: the web's `--r-ctl`.
-    public static let button: CGFloat      = 10
-    public static let chip: CGFloat        = 2
-    public static let avatarPlate: CGFloat = 0.28   // 28% of the plate's side
+  // Radii: 8 · 12 menu rows · 16 chips and inner boxes · 22 cards and
+  // photos · 28 tiles and sheets · a capsule for buttons, filters and the bar.
+  public static let small: CGFloat       = 8
+  public static let row: CGFloat         = 12
+  public static let inner: CGFloat       = 16
+  public static let card: CGFloat        = 22
+  public static let tile: CGFloat        = 28
+  /// A small tile's art in its porcelain square.
+  public static let iconTile: CGFloat    = 18
+  /// The big tile's art.
+  public static let iconTileLarge: CGFloat = 30
+  public static let widget: CGFloat      = 24
+  public static let activityCard: CGFloat = 22
+  public static let islandCompact: CGFloat = 19
+  public static let islandExpanded: CGFloat = 40
+  public static let badge: CGFloat       = 8
+  public static let switchTrack: CGFloat = 16
+  /// A banner or a box of money: the card's corner.
+  public static let button: CGFloat      = 22
+  public static let chip: CGFloat        = 8
+  public static let avatarPlate: CGFloat = 0.28   // 28% of the plate's side
 
-    // Layout
-    public static let screenPadding: CGFloat = 20
-    public static let statusBar: CGFloat     = 54
-        public static let tabBarInset: CGFloat   = 104  // bottom content inset, clear of the floating bar
-    public static let hairline: CGFloat      = 1
-    public static let minTarget: CGFloat     = 44
+  // Layout
+  public static let screenPadding: CGFloat = 20
+  public static let statusBar: CGFloat     = 54
+  /// Bottom content inset, clear of the floating bar (68 tall, 30 up).
+  public static let tabBarInset: CGFloat   = 124
+  public static let hairline: CGFloat      = 1
+  public static let minTarget: CGFloat     = 44
 
-    // Grid
-    public static let tileMin: CGFloat       = 92
-    public static let gridGapX: CGFloat      = 14
-    public static let gridGapY: CGFloat      = 10
-    public static let glyph: CGFloat         = 34
+  // Grid
+  public static let tileMin: CGFloat       = 92
+  public static let gridGapX: CGFloat      = 12
+  public static let gridGapY: CGFloat      = 12
+  public static let glyph: CGFloat         = 34
 
-    // Components
-    public static let bell: CGFloat          = 26
-    public static let badgeHeight: CGFloat   = 15
-    public static let avatarLauncher: CGFloat = 30
-    public static let avatarProfile: CGFloat  = 54
-    public static let switchSize            = CGSize(width: 51, height: 31)
-    // The way in: fields and buttons one height and one corner, on one card.
-    public static let control: CGFloat       = 14
-    public static let controlHeight: CGFloat = 52
-    public static let authCard: CGFloat      = 24
-    public static let authPhoto: CGFloat     = 210
-    public static let swipeAction: CGFloat   = 88
-    public static let searchThreshold        = 7   // services before the filter field appears
+  // Components
+  public static let bell: CGFloat          = 22
+  public static let badgeHeight: CGFloat   = 15
+  public static let avatarLauncher: CGFloat = 30
+  public static let avatarProfile: CGFloat  = 56
+  public static let switchSize            = CGSize(width: 51, height: 31)
+  /// A field: one height and one corner everywhere a thing is typed.
+  public static let control: CGFloat       = 16
+  public static let controlHeight: CGFloat = 52
+  /// The one primary button of a screen: a crimson capsule this tall.
+  public static let buttonHeight: CGFloat  = 56
+  public static let authCard: CGFloat      = 28
+  public static let authPhoto: CGFloat     = 240
+  public static let swipeAction: CGFloat   = 88
+  public static let searchThreshold        = 7   // services before the filter field appears
 
-    // Material
-    public static let blur: CGFloat          = 8
-    public static let lockBlur: CGFloat      = 18
-    public static let shadow                 = (y: CGFloat(1), radius: CGFloat(2))
+  // Material
+  public static let blur: CGFloat          = 16
+  public static let lockBlur: CGFloat      = 18
+  public static let shadow                 = (y: CGFloat(18), radius: CGFloat(20))
 }

@@ -7,22 +7,28 @@ import SwiftUI
 
  One field, one code input, one button and one way of saying no, so that
  adding an address from the profile looks like the same app as signing in
- did. The profile's sheets were stock grouped forms once: a cool grey that is
- in nobody's token file, a code typed into `······`, and a 4pt button
- stretched edge to edge.
+ did. «Тансаг хар»: fields are the surface with a `line2` edge that turns to
+ the ink when typed in; the one button is a crimson capsule; a refusal is
+ crimson words under the field it is about.
  */
 
 extension View {
-  /// The one card the way in sits on: glass, a hairline, a wide corner.
+  /// The one card the way in sits on.
   func authCard() -> some View {
-    glassCard(radius: BasuMetric.authCard)
+    card(radius: BasuMetric.card)
   }
 }
 
+/// What a field shows while it is empty, in `ink3` — the system's own
+/// placeholder grey is too faint to read on the charcoal.
+func placeholder(_ words: String) -> Text {
+  Text(words).foregroundStyle(Color.ink3)
+}
+
 /**
- A field: its mark, what is typed, and a ring that lights when it is the one
- being typed in. The whole of it takes the tap, not only the text — the mark
- is part of the target.
+ A field: its mark, what is typed, and an edge that lights in the ink when it
+ is the one being typed in. The whole of it takes the tap, not only the text —
+ the mark is part of the target.
 
  At least the control height, never exactly it: at the largest text sizes
  the words need more room than 52 points, and a field that clips what is
@@ -39,22 +45,22 @@ struct AuthField<Content: View>: View {
   var body: some View {
     HStack(spacing: 12) {
       Image(systemName: symbol)
-        .font(.sans(16))
-        .foregroundStyle(active ? Color.accent : Color.ink3)
+        .font(.sans(16, .medium))
+        .foregroundStyle(active ? Color.ink : Color.ink3)
         // Its own width, at least 22: fixed at 22, the largest text sizes drew
         // the mark over the words beside it.
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .frame(minWidth: 22)
         .accessibilityHidden(true)
       content
-        .font(.sans(16))
+        .font(.sans(16, .medium))
         .foregroundStyle(Color.ink)
     }
-    .padding(.horizontal, 14)
+    .padding(.horizontal, 16)
     .padding(.vertical, 6)
     .frame(minHeight: BasuMetric.controlHeight)
     .background(Color.surface, in: shape)
-    .overlay(shape.strokeBorder(active ? Color.accent : Color.line2, lineWidth: active ? 1.5 : BasuMetric.hairline))
+    .overlay(shape.strokeBorder(active ? Color.focus : Color.line2, lineWidth: active ? 2 : BasuMetric.hairline))
     .contentShape(shape)
     .onTapGesture(perform: tap)
     .animation(.easeOut(duration: 0.15), value: active)
@@ -81,12 +87,12 @@ struct CodeInput<Field: Hashable>: View {
           let shape = RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous)
           let next = typing && index == min(digits.count, 5)
           Text(index < digits.count ? String(digits[index]) : "")
-            .font(.mono(22, .semibold))
+            .font(.display(28))
             .foregroundStyle(Color.ink)
             .frame(maxWidth: .infinity)
-            .frame(height: BasuMetric.controlHeight + 4)
+            .frame(height: BasuMetric.controlHeight + 6)
             .background(Color.surface, in: shape)
-            .overlay(shape.strokeBorder(next ? Color.accent : Color.line2, lineWidth: next ? 1.5 : BasuMetric.hairline))
+            .overlay(shape.strokeBorder(next ? Color.focus : Color.line2, lineWidth: next ? 2 : BasuMetric.hairline))
         }
       }
       // Six boxes are a row of digits at any text size; grown, they would
@@ -101,7 +107,7 @@ struct CodeInput<Field: Hashable>: View {
         .focused(focus, equals: field)
         .foregroundStyle(.clear)
         .tint(.clear)
-        .frame(height: BasuMetric.controlHeight + 4)
+        .frame(height: BasuMetric.controlHeight + 6)
         .accessibilityLabel("Имэйлд ирсэн код")
         .accessibilityIdentifier(id)
     }
@@ -109,7 +115,8 @@ struct CodeInput<Field: Hashable>: View {
   }
 }
 
-/// The one thing the card is for, in the accent, with the wait shown in place.
+/// The one thing the card is for: a crimson capsule with its own glow, and
+/// the wait shown in place of the words.
 struct PrimaryButton: View {
   let title: String
   let enabled: Bool
@@ -123,16 +130,17 @@ struct PrimaryButton: View {
           ProgressView().tint(Color.onAccent)
         } else {
           Text(title)
-            .font(.sans(16, .semibold))
+            .font(.sans(16, .bold))
             .multilineTextAlignment(.center)
         }
       }
       .foregroundStyle(Color.onAccent)
-      .padding(.horizontal, 16)
+      .padding(.horizontal, 20)
       .padding(.vertical, 8)
       .frame(maxWidth: .infinity)
-      .frame(minHeight: BasuMetric.controlHeight)
-      .background(Color.accent, in: RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous))
+      .frame(minHeight: BasuMetric.buttonHeight)
+      .background(Capsule().fill(Color.accent).glow(enabled || busy))
+      .contentShape(Capsule())
     }
     .buttonStyle(Pressable())
     .disabled(!enabled || busy)
@@ -146,7 +154,7 @@ struct Pressable: ButtonStyle {
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
       .scaleEffect(configuration.isPressed ? 0.98 : 1)
-      .opacity(configuration.isPressed ? 0.9 : 1)
+      .opacity(configuration.isPressed ? 0.88 : 1)
       .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
   }
 }
@@ -157,7 +165,7 @@ struct Note: View {
 
   var body: some View {
     Text(text)
-      .font(.sans(12.5))
+      .font(.sans(13, .medium))
       .lineSpacing(2)
       .foregroundStyle(Color.ink3)
       .fixedSize(horizontal: false, vertical: true)
@@ -179,21 +187,25 @@ struct TroubleNote<Extra: View>: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       HStack(alignment: .top, spacing: 8) {
-        Image(systemName: "exclamationmark.circle.fill")
-          .font(.sans(14))
-          .foregroundStyle(Color.stop)
+        Image(systemName: "exclamationmark.circle")
+          .font(.sans(15, .semibold))
+          .foregroundStyle(Color.accentInk)
           .accessibilityHidden(true)
         Text(text)
-          .font(.sans(13.5))
-          .foregroundStyle(Color.stop)
+          .font(.sans(14, .semibold))
+          .foregroundStyle(Color.accentInk)
           .fixedSize(horizontal: false, vertical: true)
           .accessibilityIdentifier(id)
       }
       extra
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(12)
+    .padding(14)
     .background(Color.stopSoft, in: RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous))
+    .overlay(
+      RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous)
+        .strokeBorder(Color.stopLine, lineWidth: BasuMetric.hairline),
+    )
     .transition(.opacity.combined(with: .scale(scale: 0.98)))
   }
 }
@@ -227,12 +239,12 @@ struct PasswordField<Field: Hashable>: View {
 
   var body: some View {
     ZStack {
-      SecureField(title, text: $text)
+      SecureField(title, text: $text, prompt: placeholder(title))
         .focused(focus, equals: hidden)
         .opacity(reveal ? 0 : 1)
         .allowsHitTesting(!reveal)
         .accessibilityHidden(reveal)
-      TextField(title, text: $text)
+      TextField(title, text: $text, prompt: placeholder(title))
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
         .focused(focus, equals: shown)
@@ -268,7 +280,7 @@ struct RevealButton<Field: Hashable>: View {
       }
     } label: {
       Image(systemName: reveal ? "eye.slash" : "eye")
-        .font(.sans(15))
+        .font(.sans(15, .medium))
         .foregroundStyle(Color.ink3)
         .frame(width: BasuMetric.minTarget, height: BasuMetric.minTarget)
         .contentShape(Rectangle())
@@ -291,27 +303,31 @@ struct AuthValue: View {
   var body: some View {
     HStack(spacing: 12) {
       Image(systemName: symbol)
-        .font(.sans(16))
+        .font(.sans(16, .medium))
         .foregroundStyle(Color.ink3)
         .dynamicTypeSize(...DynamicTypeSize.accessibility1)
         .frame(minWidth: 22)
         .accessibilityHidden(true)
       VStack(alignment: .leading, spacing: 2) {
         Text(label)
-          .font(.sans(12))
+          .font(.sans(12, .semibold))
           .foregroundStyle(Color.ink3)
         Text(value)
-          .font(.sans(16))
+          .font(.sans(16, .semibold))
           .foregroundStyle(Color.ink)
           .lineLimit(1)
           .truncationMode(.middle)
       }
       Spacer(minLength: 0)
     }
-    .padding(.horizontal, 14)
+    .padding(.horizontal, 16)
     .padding(.vertical, 8)
     .frame(minHeight: BasuMetric.controlHeight)
-    .background(Color.sunk.opacity(0.6), in: RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous))
+    .background(Color.surface, in: RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous))
+    .overlay(
+      RoundedRectangle(cornerRadius: BasuMetric.control, style: .continuous)
+        .strokeBorder(Color.line, lineWidth: BasuMetric.hairline),
+    )
     .accessibilityElement(children: .combine)
   }
 }
@@ -329,8 +345,8 @@ struct QuietLink: View {
   var body: some View {
     Button(action: action) {
       Text(title)
-        .font(.sans(14, .medium))
-        .foregroundStyle(Color.accentInk)
+        .font(.sans(14, .bold))
+        .foregroundStyle(Color.ink)
         .frame(minHeight: BasuMetric.minTarget)
         .contentShape(Rectangle())
     }

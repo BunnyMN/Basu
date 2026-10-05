@@ -39,20 +39,34 @@ enum Format {
   }
 
   /**
-   Money, set the way the design asks: mono digits, sans tugrik.
-
-   SF Mono has no ₮, so a monospaced amount falls back mid-string and the sign
-   collides with the last digit. Setting it in the sans face fixes both, and the
-   hair spaces put back the sliver of air the fallback used to provide.
+   Money, set the way the design asks: the display face, tabular, the ₮ in
+   the same run — «15,000₮». Noto Sans Display has the sign, so nothing
+   falls back to another face and nothing collides with the last digit.
    */
-  static func mntText(_ value: Int, size: CGFloat, weight: Font.Weight = .semibold) -> Text {
+  static func mntText(_ value: Int, size: CGFloat, weight: Font.Weight = .heavy) -> Text {
     signedText(grouped(value), size: size, weight: weight)
   }
 
   /// The same, for an already-signed string such as `+50,000` or `−18,500`.
-  static func signedText(_ digits: String, size: CGFloat, weight: Font.Weight = .semibold) -> Text {
-    Text(digits).font(.mono(size, weight)).monospacedDigit()
-      + Text("\u{200A}\u{200A}₮").font(.sans(size, weight))
+  static func signedText(_ digits: String, size: CGFloat, weight: Font.Weight = .heavy) -> Text {
+    Text("\(digits)₮").font(.display(size, weight)).monospacedDigit()
+  }
+
+  /// «Мягмар»: the day of the week, in Ulaanbaatar.
+  static func weekday(_ date: Date) -> String {
+    let names = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"]
+    let index = calendar.component(.weekday, from: date) - 1
+    return names[max(0, min(names.count - 1, index))]
+  }
+
+  /// The launcher's hello, by Ulaanbaatar's clock: «Өглөөний мэнд» until
+  /// eleven, «Өдрийн мэнд» until five, «Оройн мэнд» after.
+  static func greeting(at date: Date) -> String {
+    switch calendar.component(.hour, from: date) {
+    case 4..<11: "Өглөөний мэнд"
+    case 11..<17: "Өдрийн мэнд"
+    default: "Оройн мэнд"
+    }
   }
 
   /// Signed money as a plain string: `+50 000₮` / `−18 500₮`.
