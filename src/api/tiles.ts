@@ -30,7 +30,8 @@ const DEFAULT_UPSTREAM = 'https://monzasvar.mn';
 /** A day in the browser, a week at any CDN in front of us. Tiles rarely move. */
 const CACHE_CONTROL = 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400';
 
-function upstream(): string {
+/** Where tiles and glyphs come from. Exported so a test can ask the host itself whether it is up. */
+export function upstream(): string {
   return (process.env['MAP_TILES_UPSTREAM'] ?? DEFAULT_UPSTREAM).replace(/\/$/, '');
 }
 

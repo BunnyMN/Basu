@@ -1,9 +1,10 @@
 import type { FastifyInstance } from 'fastify';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { closePool, getPool } from '../db/pool.js';
 import { at, PILOT_MENU } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
+import { upstream } from './tiles.js';
 import { addMember, removeMember } from '../platform/org/index.js';
 import { accountByContact } from '../platform/identity/index.js';
 import { tick } from '../scheduler/runner.js';
@@ -940,7 +941,23 @@ describe('the map', () => {
   /** The vector-tile layers the style asks for by name. */
   const NEEDED = ['water', 'landuse', 'transportation', 'building', 'place', 'poi'];
 
-  it('serves a tile the browser can actually read', async () => {
+  /**
+   * Whether the tile host answers at all, asked directly rather than through
+   * us. The two tests that read a real tile and glyph need it. When it is
+   * down — its outage, not ours, and the live map is down with it — they say
+   * so and step aside instead of holding every deploy until it is back; a
+   * proxy of ours that breaks while the host is up still fails them.
+   */
+  let hostUp = false;
+  beforeAll(async () => {
+    hostUp = await fetch(`${upstream()}/tiles/14/13057/5700`, { signal: AbortSignal.timeout(10_000) }).then(
+      (response) => response.status < 500,
+      () => false,
+    );
+  }, 15_000);
+
+  it('serves a tile the browser can actually read', async (test) => {
+    if (!hostUp) test.skip(`the tile host ${upstream()} is not answering`);
     const response = await app.inject({ method: 'GET', url: '/tiles/14/13057/5700' });
     expect(response.statusCode).toBe(200);
     expect(response.headers['content-type']).toContain('protobuf');
@@ -960,7 +977,8 @@ describe('the map', () => {
     for (const name of NEEDED) expect(layers, name).toContain(name);
   });
 
-  it('serves label glyphs', async () => {
+  it('serves label glyphs', async (test) => {
+    if (!hostUp) test.skip(`the tile host ${upstream()} is not answering`);
     const response = await app.inject({
       method: 'GET',
       url: '/fonts/Noto%20Sans%20Regular/0-255.pbf',
