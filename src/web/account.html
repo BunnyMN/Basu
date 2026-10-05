@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="mn" data-theme="light" data-site>
+<html lang="mn" data-site>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#FFFFFF">
+<meta name="theme-color" content="#100D0C">
 <title>Бүртгэл — Basu</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="/brand/favicon.png">
@@ -11,57 +11,55 @@
 <link rel="stylesheet" href="/app.css">
 <link rel="stylesheet" href="/site.css">
 <style>
-/* The account, on the website: the name others see, how the person gets
-   back in, where they are signed in, and the way out. The page shows; a
-   change is made in a popup. */
+/* The account, on the website, «Тансаг хар»: the name others see, how the
+   person gets back in, where they are signed in, and the way out — raised
+   cards on the charcoal, labels in the quiet ink, values in the bright one.
+   The page shows; a change is made in a popup. */
 
 .sa{display:grid;grid-template-columns:minmax(0,1fr);max-width:760px}
 .sa .s-sec:first-child{margin-top:0}
-.sa-card{padding:4px 24px}
+.sa-card{padding:6px 24px}
 .sa-facts{margin:0}
-.sa-facts div{display:grid;grid-template-columns:160px 1fr;gap:12px;align-items:baseline;padding:14px 0;font-size:.9375rem}
+.sa-facts div{display:grid;grid-template-columns:160px 1fr;gap:12px;align-items:baseline;padding:16px 0;font-size:.9375rem}
 .sa-facts div + div{border-top:1px solid var(--line)}
-.sa-facts dt{color:var(--ink-3)}
-.sa-facts dd{margin:0;font-weight:500;overflow-wrap:anywhere}
-.sa-facts dd.none{color:var(--ink-3);font-weight:400}
-.sa-facts dd .mono{font-size:.875rem}
+.sa-facts dt{color:var(--ink-3);font-weight:600}
+.sa-facts dd{margin:0;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+.sa-facts dd.none{color:var(--ink-3);font-weight:500}
+.sa-facts dd .digits{font-variant-numeric:tabular-nums}
 /* accountWays (api.js) draws its own rows in a card: that card is the card here */
 .sa-ways .section{margin:0}
 .sa-ways .section-label{display:none}
-.sa-ways [data-rows]{border-radius:18px}
+.sa-ways [data-rows]{border-radius:22px}
 .sa-ways [data-rows] > .row{padding:16px 24px}
 /* app.css's `[data-rows] > .row{border:0}` outweighs its own hairline between rows; said again here until it is fixed there */
 .sa-ways [data-rows] > .row + .row{border-top:1px solid var(--line)}
-/* its buttons are the website's pills, as «Нэр засах» over them is, not the app's rounded rectangles */
-.sa-ways .btn{border-radius:999px;padding-inline:16px}
-.sa-ways .btn[data-size="sm"]{min-height:40px}
-@media (pointer:coarse){.sa-ways .btn[data-size="sm"]{min-height:44px}}
+.sa-ways .btn[data-size="sm"]{min-height:44px}
 .sa-sessions{margin:0;padding:0;list-style:none}
-.sa-sessions li{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:68px;padding:12px 0}
+.sa-sessions li{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:72px;padding:14px 0}
 .sa-sessions li + li{border-top:1px solid var(--line)}
-.sa-sessions b{display:block;font-weight:600}
-.sa-sessions small{display:block;margin-top:2px;font-size:.8125rem;color:var(--ink-3)}
-.sa-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:14px 0 18px;border-top:1px solid var(--line)}
+.sa-sessions b{display:block;font-weight:700}
+.sa-sessions small{display:block;margin-top:3px;font-size:.8125rem;font-weight:500;font-variant-numeric:tabular-nums;color:var(--ink-3)}
+.sa-foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:16px 0 20px;border-top:1px solid var(--line)}
 .sa-foot p{margin:0;font-size:.875rem;color:var(--ink-3)}
 .sa-foot p:focus{outline:none}
-.sa-out{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px;margin-top:40px;padding:20px 24px}
+.sa-out{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 20px;margin-top:48px;padding:22px 24px}
 .sa-out p{margin:0;font-size:.9375rem;color:var(--ink-2)}
-.sa-out p b{display:block;color:var(--ink)}
+.sa-out p b{display:block;margin-bottom:2px;color:var(--ink)}
 @media (max-width:560px){
-  .sa-card{padding:4px 18px}
-  .sa-facts div{grid-template-columns:1fr;gap:2px}
+  .sa-card{padding:6px 18px}
+  .sa-facts div{grid-template-columns:1fr;gap:4px}
   .sa-ways [data-rows] > .row{padding:14px 18px}
-  .sa-out{padding:18px}
+  .sa-out{padding:20px 18px}
   .sa-out .s-btn{width:100%}
 }
 </style>
 </head>
 <body>
-<header class="s-bar" data-static><div class="s-wrap"><a class="s-word" href="/">Basu</a><nav class="s-nav" aria-label="Цэс"><a href="/home">Нүүр</a><a href="/shop">Зах</a><a href="/orders">Миний захиалга</a><a href="/dashboard">Бизнест</a></nav><div class="s-right"></div></div></header>
+<header class="s-bar" data-static><div class="s-wrap"><a class="s-word" href="/">Basu</a><nav class="s-nav" aria-label="Цэс"><a href="/home">Нүүр</a><a href="/shop">Идэш</a><a href="/orders">Миний захиалга</a><a href="/dashboard">Бизнес</a></nav><div class="s-right"></div></div></header>
 <main class="s-main">
   <div class="s-wrap">
-    <section class="s-head"><h1>Бүртгэл</h1><p>Таны нэр, нэвтрэх арга, нэвтэрсэн төхөөрөмжүүд.</p></section>
-    <div class="sa" id="sa" role="status" aria-busy="true"><span class="s-skel" style="height:220px;border-radius:18px"></span></div>
+    <section class="s-head"><h1>Бүртгэл</h1><p>Нэр, нэвтрэх арга, төхөөрөмж.</p></section>
+    <div class="sa" id="sa" role="status" aria-busy="true"><span class="s-skel" style="height:220px;border-radius:22px"></span></div>
   </div>
 </main>
 
@@ -99,8 +97,8 @@ async function draw() {
   // rest of the page down under the eye.
   const waysBlock = accountWays({ token: store.guestToken });
   const [me, { sessions }] = await Promise.all([authed('/v1/me'), authed('/v1/me/sessions')]);
-  const fact = (label, value, mono = false) =>
-    `<div><dt>${label}</dt>${value ? `<dd>${mono ? `<span class="mono">${esc(value)}</span>` : esc(value)}</dd>` : '<dd class="none">—</dd>'}</div>`;
+  const fact = (label, value, digits = false) =>
+    `<div><dt>${label}</dt>${value ? `<dd>${digits ? `<span class="digits">${esc(value)}</span>` : esc(value)}</dd>` : '<dd class="none">—</dd>'}</div>`;
 
   // The address is not among the facts: it is said once, under «Нэвтрэх арга», where it is a way in
   // and where the button to add one is — not a second time here as «—».

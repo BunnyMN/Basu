@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="mn" data-theme="light" data-site>
+<html lang="mn" data-site>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#FFFFFF">
+<meta name="theme-color" content="#100D0C">
 <title>Миний Basu</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="/brand/favicon.png">
@@ -11,55 +11,76 @@
 <link rel="stylesheet" href="/app.css">
 <link rel="stylesheet" href="/site.css">
 <style>
-/* Home, on the website: the apps inside Basu as the tiles the phone shows —
-   the same art, larger — and, for somebody signed in, what of theirs is
-   going on right now. With nothing going on, it says what to do next. The
-   phone's launcher is /app; this is the browser's. */
+/* Home, on the website, «Тансаг хар»: the apps inside Basu as the phone's
+   launcher has them — the same art, unchanged, set in dark porcelain squares
+   on raised tiles, Идэш the big one — and, for somebody signed in, what of
+   theirs is going on right now: a row each, its state in one word with the
+   four bars under it, the day in the display with a gold word for what the
+   day is. With nothing going on, one line and one button. The phone's
+   launcher is /app; this is the browser's. */
 
-.h-apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:20px;margin:0;padding:0;list-style:none}
-.h-apps li{display:flex}
+/* a row of tiles whatever their number: Идэш twice as wide as the others */
+.h-apps{display:flex;gap:16px;margin:0;padding:0;list-style:none}
+.h-apps li{display:flex;flex:1 1 0;min-width:0}
+.h-apps li:first-child{flex-grow:2}
 .h-apps .h-app{flex:1}
-.h-app{display:flex;flex-direction:column;align-items:center;gap:14px;padding:28px 16px 22px;border:1px solid var(--line);border-radius:22px;background:var(--surface);box-shadow:var(--shadow);color:inherit;text-decoration:none;text-align:center;-webkit-tap-highlight-color:transparent;transition:border-color var(--dur),transform 140ms var(--ease),box-shadow var(--dur)}
-@media (hover:hover){.h-app:hover{border-color:var(--line-2);box-shadow:0 18px 36px -24px rgba(18,58,44,.28)}}
+.h-app{position:relative;display:flex;flex-direction:column;justify-content:flex-end;min-height:220px;padding:24px;border:1px solid rgba(255,244,236,.06);border-radius:28px;background:linear-gradient(160deg,#2A2321 0%,#1D1817 60%);box-shadow:var(--shadow-1);color:var(--ink);text-decoration:none;overflow:hidden;-webkit-tap-highlight-color:transparent;transition:border-color var(--dur),transform 140ms var(--ease)}
+@media (hover:hover){.h-app:hover{border-color:var(--line-2)}}
 .h-app:active{transform:scale(.985)}
-.h-app .tile{width:120px;height:120px;border-radius:28px;overflow:hidden;box-shadow:0 10px 24px -14px rgba(22,21,20,.45),0 0 0 1px rgba(22,21,20,.06)}
+.h-app .tile{position:absolute;left:24px;top:24px;width:72px;height:72px;border-radius:18px;overflow:hidden;box-shadow:0 14px 28px -12px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.06)}
 .h-app .tile img{width:100%;height:100%;object-fit:cover;display:block}
-.h-app b{display:block;font-size:1.0625rem;font-weight:600}
-.h-app small{display:block;margin-top:2px;font-size:.875rem;color:var(--ink-3)}
-.h-app .s-pill{margin-top:2px}
-@media (max-width:520px){.h-apps{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.h-app .tile{width:92px;height:92px;border-radius:22px}.h-app{padding:22px 10px 18px}}
+.h-app b{display:block;font-family:var(--display);font-size:2.25rem;font-weight:800;line-height:.9}
+.h-app small{display:block;margin-top:10px;font-size:.9375rem;font-weight:600;color:var(--ink-2)}
+.h-app .arrow{position:absolute;right:20px;top:20px;width:20px;height:20px;color:var(--ink-3)}
+/* Идэш, the season's, is the big tile: its art large on the right, its name in the display */
+.h-app[data-app="idesh"] .tile{left:auto;right:28px;top:50%;width:132px;height:132px;margin-top:-66px;border-radius:30px}
+.h-app[data-app="idesh"] b{font-size:4rem;line-height:.86}
+.h-app[data-app="idesh"] .over{position:absolute;left:24px;top:26px;font-size:.6875rem;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
+.h-app[data-app="idesh"] .arrow{display:none}
+@media (max-width:900px){.h-apps{flex-wrap:wrap;gap:12px}.h-apps li{flex-basis:calc(50% - 6px)}.h-apps li:first-child{flex-basis:100%}}
+@media (max-width:520px){
+  .h-app{min-height:190px;padding:18px}
+  .h-app .tile{left:18px;top:18px}
+  .h-app b{font-size:1.75rem}
+  .h-app small{margin-top:8px;font-size:.8125rem}
+  .h-app[data-app="idesh"]{min-height:204px}
+  .h-app[data-app="idesh"] .tile{width:112px;height:112px;margin-top:-56px;right:20px;border-radius:26px}
+  .h-app[data-app="idesh"] b{font-size:3.5rem}
+  .h-app[data-app="idesh"] small{max-width:150px}
+}
 
-.h-live{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow)}
-.h-row{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:16px;align-items:center;min-height:76px;padding:14px 18px;color:inherit;text-decoration:none}
-.h-row + .h-row{border-top:1px solid var(--line)}
-/* the list clips what is outside it (its round corners): the focus ring goes inside the row */
-.h-row:focus-visible{outline-offset:-3px}
-@media (hover:hover){a.h-row:hover{background:var(--surface-2)}}
+/* what is going on: a row each, as the app's own order card */
+.h-live{display:grid;gap:12px}
+.h-row{display:grid;grid-template-columns:72px minmax(0,1fr) auto;gap:18px;align-items:stretch;padding:14px;border:1px solid var(--line);border-radius:22px;background:var(--surface);color:var(--ink);text-decoration:none;transition:border-color var(--dur)}
+.h-row:focus-visible{outline-offset:2px}
+@media (hover:hover){a.h-row:hover{border-color:var(--line-2)}}
 a.h-row:active{background:var(--surface-2)}
-.h-row img{width:64px;height:48px;border-radius:10px;object-fit:cover;background:var(--surface-2)}
-.h-row b{display:block;font-weight:600;line-height:1.35}
-.h-row small{display:block;margin-top:2px;font-size:.875rem;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.h-row small .mono{font-size:.8125rem;color:var(--ink-3)}
-.h-row .end{display:flex;flex-direction:column;align-items:flex-end;gap:6px;text-align:right}
-.h-when{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1;color:var(--ink)}
-.h-when small{display:inline;margin:0 0 0 6px;font-family:var(--sans);font-size:.75rem;font-weight:500;color:var(--ink-3)}
+.h-row img{width:72px;height:72px;border-radius:14px;object-fit:cover;background:var(--surface-2);align-self:center}
+.h-row .mid{display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:0}
+.h-row b{display:block;font-size:1.0625rem;font-weight:700;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.h-row .mid > small{display:block;font-size:.875rem;font-weight:500;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.h-row .code{font-variant-numeric:tabular-nums;color:var(--ink-3);font-weight:600}
+.h-row .stage{margin-top:6px;max-width:220px}
+/* the day, large, and what it is the day of in a gold word: as the app's card says it */
+.h-when{flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-width:88px;padding-left:16px;border-left:1px solid var(--line);font-family:var(--display);font-size:2rem;font-weight:800;line-height:.9;font-variant-numeric:tabular-nums;color:var(--ink)}
+.h-when small{display:block;font-family:var(--sans);font-size:.75rem;font-weight:800;line-height:1;letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
 @media (max-width:560px){
-  .h-row{grid-template-columns:56px minmax(0,1fr);align-items:start}
-  .h-row img{width:56px;height:44px}
-  .h-row .end{grid-column:2;flex-direction:row-reverse;flex-wrap:wrap-reverse;justify-content:flex-end;align-items:center;gap:6px 10px}
+  .h-row{grid-template-columns:56px minmax(0,1fr) auto;gap:12px;padding:12px}
+  .h-row img{width:56px;height:56px;border-radius:12px}
+  .h-when{min-width:64px;padding-left:12px;font-size:1.625rem}
 }
 /* While the orders come: two rows in the shape of the live list's, so the page has its shape at once. */
-.h-wait .h-row{grid-template-columns:64px minmax(0,1fr) 96px}
-.h-wait .s-skel:nth-child(1){height:48px;border-radius:10px}
-.h-wait .s-skel:nth-child(2){height:38px;width:min(320px,90%)}
-.h-wait .s-skel:nth-child(3){height:38px}
-@media (max-width:560px){.h-wait .h-row{grid-template-columns:56px minmax(0,1fr)}.h-wait .s-skel:nth-child(1){height:44px}.h-wait .s-skel:nth-child(3){display:none}}
-.h-next{margin-top:32px}
+.h-wait .h-row{grid-template-columns:72px minmax(0,1fr) 88px}
+.h-wait .s-skel:nth-child(1){height:72px;border-radius:14px}
+.h-wait .s-skel:nth-child(2){height:44px;align-self:center;width:min(320px,90%)}
+.h-wait .s-skel:nth-child(3){height:56px;align-self:center}
+@media (max-width:560px){.h-wait .h-row{grid-template-columns:56px minmax(0,1fr) 64px}.h-wait .s-skel:nth-child(1){height:56px}}
+.h-next{margin-top:48px}
 .h-hello{margin:0}
 </style>
 </head>
 <body>
-<header class="s-bar" data-static><div class="s-wrap"><a class="s-word" href="/">Basu</a><nav class="s-nav" aria-label="Цэс"><a href="/home" aria-current="page">Нүүр</a><a href="/shop">Зах</a><a href="/orders">Миний захиалга</a><a href="/dashboard">Бизнест</a></nav><div class="s-right"></div></div></header>
+<header class="s-bar" data-static><div class="s-wrap"><a class="s-word" href="/">Basu</a><nav class="s-nav" aria-label="Цэс"><a href="/home" aria-current="page">Нүүр</a><a href="/shop">Идэш</a><a href="/orders">Миний захиалга</a><a href="/dashboard">Бизнес</a></nav><div class="s-right"></div></div></header>
 <main class="s-main">
   <div class="s-wrap">
     <section class="s-head"><h1 id="hi">Миний Basu</h1><p class="h-hello">Өнөөдөр юу хийх вэ?</p></section>
@@ -73,7 +94,7 @@ a.h-row:active{background:var(--surface-2)}
 </main>
 
 <script type="module">
-import { api, store, dayShort, IDESH_STATE } from '/api.js';
+import { api, store, dayShort } from '/api.js';
 import { mountFrame, esc, el, loginUrl, siteEmpty, howToBuy, statePill, refundPill, meatPhoto, stillGoing } from '/site.js';
 
 // The header and the foot are drawn at once; who is signed in comes after — the tiles do not wait for it.
@@ -86,16 +107,18 @@ const $ = (id) => document.getElementById(id);
  * ordering ahead (the phone's for now), the supplier's own side.
  */
 const TILES = [
-  { id: 'idesh', name: 'Идэш', tag: 'өвлийн', href: '/shop', art: '/brand/idesh-tile.webp' },
-  { id: 'dine', name: 'Хоол', tag: 'урьдчилсан', href: '/#dine', art: '/brand/food-tile.webp', soon: true },
+  { id: 'idesh', name: 'Идэш', tag: 'Бүтэн мал, кг-аар мах', href: '/shop', art: '/brand/idesh-tile.webp', over: 'Энэ улирал' },
+  // Lunch is ordered in the iPhone app: its tile goes to the App Store, and says so.
+  { id: 'dine', name: 'Хоол', tag: 'iPhone апп-д', href: 'https://apps.apple.com/app/id6810541939', art: '/brand/food-tile.webp' },
 ];
-const SUPPLIER = { id: 'supplier', name: 'Нийлүүлэгч', tag: 'миний зар', href: '/supplier', art: '/brand/supplier-tile.svg' };
+const SUPPLIER = { id: 'supplier', name: 'Нийлүүлэгч', tag: 'Зараа удирдах', href: '/supplier', art: '/brand/supplier-tile.svg' };
+const ARROW = '<svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 
 const tile = (t) =>
   el(`<li><a class="h-app" href="${t.href}" data-app="${t.id}">
-        <span class="tile"><img src="${t.art}" alt="" width="120" height="120"></span>
+        ${t.over ? `<span class="over">${t.over}</span>` : ''}
+        <span class="tile"><img src="${t.art}" alt="" width="132" height="132"></span>${ARROW}
         <span><b>${t.name}</b><small>${t.tag}</small></span>
-        ${t.soon ? '<span class="s-pill" data-tone="hi">Удахгүй вэбэд</span>' : ''}
       </a></li>`);
 for (const t of TILES) $('apps').append(tile(t));
 
@@ -106,15 +129,15 @@ function nothingGoing(signedIn) {
       ? siteEmpty({
           icon: 'orders',
           title: 'Идэвхтэй захиалга алга',
-          text: 'Өвлийн идшээ захиалахад явц нь энд харагдана: төлсөн, бэлтгэж байна, бэлэн, хүлээлгэн өгсөн. Өмнөх захиалгууд «Миний захиалга»-д бий.',
-          actions: [['Зар үзэх', '/shop', 'dark'], ['Миний захиалга', '/orders']],
+          text: 'Захиалсан идэш тань энд явцтайгаа харагдана.',
+          actions: [['Зар үзэх', '/shop', 'dark']],
           card: true,
         })
       : siteEmpty({
           icon: 'person',
-          title: 'Нэвтэрвэл захиалгаа эндээс хянана',
-          text: 'Зар үзэхэд нэвтрэх шаардлагагүй. Захиалга төлөх үед л нэвтэрнэ.',
-          actions: [['Зар үзэх', '/shop', 'dark'], ['Нэвтрэх', loginUrl('/home')]],
+          title: 'Захиалгаа эндээс хянана',
+          text: 'Зар үзэхэд нэвтрэх шаардлагагүй.',
+          actions: [['Нэвтрэх', loginUrl('/home'), 'dark']],
           card: true,
         }),
     howToBuy(),
@@ -153,9 +176,9 @@ if (!token || !person) {
     $('live-list').replaceChildren(
       ...going.map((o) =>
         el(`<a class="h-row" href="/orders/${o.id}" data-order="${o.id}">
-              <img src="${meatPhoto(o.kind)}" alt="" loading="lazy" width="64" height="48">
-              <span><b>${esc(o.title)} × ${o.qty}</b><small><span class="mono">№${esc(o.code)}</span> · ${esc(o.supplier.name)}</small></span>
-              <span class="end"><span class="h-when">${dayShort(o.receive_on)}<small>${dayWord(o)}</small></span>${o.refund ? refundPill(o.refund) : statePill(o.state, IDESH_STATE[o.state] ?? o.state)}</span>
+              <img src="${meatPhoto(o.kind)}" alt="" loading="lazy" width="72" height="72">
+              <span class="mid"><b>${esc(o.title)} × ${o.qty}</b><small><span class="code">№${esc(o.code)}</span> · ${esc(o.supplier.name)}</small>${o.refund ? refundPill(o.refund) : statePill(o.state)}</span>
+              <span class="h-when">${dayShort(o.receive_on)}<small>${dayWord(o)}</small></span>
             </a>`),
       ),
     );
