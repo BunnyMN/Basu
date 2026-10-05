@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="mn" data-theme="light" data-desk>
+<html lang="mn" data-desk>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#F4F3EE">
+<meta name="theme-color" content="#100D0C">
 <title>Бизнес — Basu</title>
 <link rel="stylesheet" href="/app.css">
 <!-- The page's own module comes last in this long file: what it imports is fetched beside the file, not after it. -->
@@ -60,28 +60,38 @@ p{margin:0}
 :root[data-in-app] .shell-ways .sw-lead{margin-bottom:18px}
 :root[data-in-app] .shell-ways .sw-inapp{display:block}
 @media (max-width:480px){:root[data-in-app] .shell-ways .sw-inapp{margin-bottom:20px}}
-.door-card{width:100%;max-width:440px;padding:32px 32px 28px}
-.door-brand{display:inline-flex;align-items:baseline;gap:10px;margin:0 0 28px;color:var(--ink);text-decoration:none}
-.door-brand .wordmark{font-size:24px}
-.door-place{font-size:var(--t-body);font-weight:500;color:var(--ink-3)}
-.door-card :is(h1,h2){font-size:var(--t-title-2);line-height:var(--lh-tight);letter-spacing:-.015em;margin:0 0 8px}
+/* the door is the business world's front: the raised card of a popup (radius 28, the deep shadow), the
+   wordmark, the title big in the display with one line over its ways in, a gold hairline under the brand */
+.door-card{width:100%;max-width:460px;padding:36px 40px 32px;border-radius:var(--r-sheet);box-shadow:var(--shadow-1),var(--shadow-2)}
+.door-brand{display:flex;align-items:baseline;gap:10px;margin:0 0 32px;padding-bottom:20px;border-bottom:1px solid var(--gold-line);color:var(--ink);text-decoration:none}
+.door-brand .wordmark{font-size:2rem}
+.door-place{font-size:var(--t-body);font-weight:700;color:var(--ink-3)}
+.door-card :is(h1,h2){font-family:var(--display);font-size:var(--t-display);font-weight:800;line-height:.9;letter-spacing:-.004em;margin:0 0 12px}
 .door-card > p{color:var(--ink-2);margin:0 0 20px;line-height:1.5}
-.door-card > .door-for{font-size:var(--t-body);margin-bottom:16px}
-.door-card > #door-lead{font-size:var(--t-cap);color:var(--ink-3);margin-bottom:16px}
+.door-card > .door-for{font-size:var(--t-body);margin-bottom:24px}
+.door-card > #door-lead{font-size:var(--t-cap);font-weight:600;color:var(--ink-3);margin-bottom:16px}
 .door-card > .chip{margin:0 0 12px}
 .door-card > .callout{margin:0 0 16px}
 .door-card > .input{margin-bottom:10px}
 .door-home{display:inline-flex;align-items:center;gap:4px;min-height:var(--target);padding:0 8px;font-size:var(--t-body);font-weight:500;color:var(--ink-2);text-decoration:none;border-radius:var(--r-ctl)}
 .door-home svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 @media (hover:hover){.door-home:hover{color:var(--ink);background:var(--surface-2)}}
-@media (max-width:480px){.door-card{padding:24px 20px}}
+@media (max-width:480px){.door-card{padding:28px 22px 24px}.door-brand{margin-bottom:24px;padding-bottom:16px}}
 
-/* page heads: the line under a title is one sentence; on a desk it may run to the head's buttons */
-.page-head p{max-width:70ch}
+/* A page's head, as the prototype's business screen («Өнөөдөр») sets it: the name big in the display at 800, its
+   one quiet line of context over it (a date, what the page holds, a file's place), the head's own buttons at the
+   right on the title's foot. */
+.page-head{align-items:flex-end;margin-bottom:40px}
+.page-head > div:first-child{display:flex;flex-direction:column;min-width:0}
+.page-head h1{font-size:clamp(2.75rem,5.6vw,5.5rem);line-height:.86}
+.page-head > div:first-child > p{order:-1;max-width:70ch;margin:0 0 14px;font-size:var(--t-body);font-weight:600;line-height:1.4;color:var(--ink-3)}
+.page-head > div:first-child > p a.tel{color:var(--ink-2)}
+.page-head h1 .stage{margin-left:16px;vertical-align:middle;font-family:var(--sans);letter-spacing:0}
+/* a file's title — a person, a business, an order — under the way back: a size down, so a long name keeps to a line or two */
+.page > .back + .page-head h1{font-size:clamp(2.5rem,4.4vw,4rem);line-height:.9}
 .head-acts .seg{flex:none}
 /* a quiet line of help under a list or a section, and the line that says what a section is for */
 .page-note{margin:12px 0 0;font-size:var(--t-cap);line-height:1.5;color:var(--ink-3);max-width:90ch}
-.page-note a{color:var(--accent-ink)}
 .section-note{margin:-2px 0 12px;font-size:var(--t-cap);line-height:1.5;color:var(--ink-2);max-width:90ch}
 .nowrap{white-space:nowrap}
 .dt-unnamed{font-weight:400;color:var(--ink-3)}
@@ -107,10 +117,10 @@ p{margin:0}
 /* the first moment, before anybody has answered: the shape of the frame — the sidebar, a page head, a
    band of numbers, rows — or, for somebody not signed in, of the door's card; never a blank page */
 .boot{display:grid;grid-template-columns:var(--side) minmax(0,1fr);min-height:100dvh}
-.boot-side{display:flex;flex-direction:column;gap:12px;padding:18px 12px 12px;background:var(--surface);border-right:1px solid var(--line)}
+.boot-side{display:flex;flex-direction:column;gap:12px;padding:24px 16px 14px;background:var(--deep);border-right:1px solid var(--line)}   /* the sidebar's own charcoal, so nothing changes colour when it lands */
 .boot-side .skel{height:14px}
 .boot-side .boot-brand{width:96px;height:20px;margin:0 8px 6px}
-.boot-side .boot-ws{height:54px;border-radius:var(--r-ctl)}
+.boot-side .boot-ws{height:62px;border-radius:var(--r-day)}
 .boot-side .boot-nav{width:70%;margin:6px 10px 0}
 .boot-side .boot-nav:nth-child(odd){width:54%}
 .boot-bar{display:none}
@@ -122,12 +132,12 @@ p{margin:0}
 @media (max-width:900px){
   .boot{grid-template-columns:minmax(0,1fr);align-content:start}
   .boot-side{display:none}
-  .boot-bar{display:flex;align-items:center;gap:12px;min-height:calc(var(--bar-h) + var(--safe-t));padding:var(--safe-t) 16px 0;background:var(--surface);border-bottom:1px solid var(--line)}
+  .boot-bar{display:flex;align-items:center;gap:12px;min-height:calc(var(--bar-h) + var(--safe-t));padding:var(--safe-t) 16px 0;background:var(--deep);border-bottom:1px solid var(--line)}
   .boot-bar .skel:first-child{width:24px;height:24px}
   .boot-bar .skel:last-child{width:140px;height:16px}
 }
 .boot-door{min-height:100dvh;display:grid;place-items:center;padding:var(--s-7) var(--gutter)}
-.boot-door .card{display:flex;flex-direction:column;gap:14px;width:100%;max-width:440px;padding:32px}
+.boot-door .card{display:flex;flex-direction:column;gap:14px;width:100%;max-width:460px;padding:36px 40px 32px;border-radius:var(--r-sheet)}
 .boot-door .skel:nth-child(1){width:110px;height:24px;margin-bottom:12px}
 .boot-door .skel:nth-child(2){width:50%;height:26px}
 .boot-door .skel:nth-child(3){width:90%}
@@ -142,17 +152,18 @@ p{margin:0}
 .fr-copy h2{font-size:var(--t-title-2);line-height:var(--lh-tight);letter-spacing:-.015em;margin:0 0 10px}
 .fr-copy > p{font-size:var(--t-body-lg);line-height:1.55;color:var(--ink-2);max-width:56ch;margin:0 0 24px}
 .fr-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;counter-reset:fr}
-.fr-steps li{display:grid;grid-template-columns:28px minmax(0,1fr);column-gap:12px;counter-increment:fr;padding:14px 16px;border-radius:var(--r-ctl);background:var(--surface-2)}
-.fr-steps li::before{content:counter(fr);grid-row:span 2;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--deep);color:var(--on-accent);font-family:var(--mono);font-size:var(--t-meta);font-weight:600}
-.fr-steps b{font-size:var(--t-body-lg);font-weight:600;line-height:1.35;color:var(--ink)}
+/* the steps as the prototype numbers its own: the gold numeral in the display on a gold hairline ring, never a dark disc on the dark */
+.fr-steps li{display:grid;grid-template-columns:32px minmax(0,1fr);column-gap:14px;counter-increment:fr;padding:16px 18px;border-radius:var(--r-day);background:var(--surface-2)}
+.fr-steps li::before{content:counter(fr);grid-row:span 2;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;border:1px solid var(--gold-line);color:var(--gold);font-family:var(--display);font-size:1.125rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums lining-nums}
+.fr-steps b{font-size:var(--t-body-lg);font-weight:700;line-height:1.35;color:var(--ink)}
 .fr-steps span{margin-top:2px;font-size:var(--t-cap);line-height:1.45;color:var(--ink-2)}
 .fr-acts{display:flex;gap:10px;flex-wrap:wrap}
 .fr-copy > .fr-other{margin:16px 0 0;font-size:var(--t-cap);line-height:1.5;color:var(--ink-3);max-width:56ch}
 @media (max-width:1100px){#org-list > .first-run{grid-template-columns:1fr;gap:24px;padding:24px 20px}}
 .org-mark{display:grid;place-items:center;width:40px;height:40px;flex:none;border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2);font-weight:600}
 .org-mark svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.org-mark[data-desk]{background:var(--deep);border-color:var(--deep);color:var(--on-accent)}
-.org-row .org-why{color:var(--stop)}
+.org-mark[data-desk]{background:var(--ink);border-color:var(--ink);color:var(--on-light);font-weight:800}   /* Basu's own desk: the off-white mark, as the switcher draws it */
+.org-row .org-why{color:var(--accent-ink)}
 #front .row .end{display:flex;align-items:center}
 
 /* a record read as label and value, one per line: a profile, a business's details */
@@ -172,7 +183,7 @@ p{margin:0}
 .org-steps{max-width:520px;margin:0}
 /* under the steps: how long it usually takes, and the address to write to meanwhile */
 .org-wait-note{max-width:62ch;margin:18px 0 0;padding-top:16px;border-top:1px solid var(--line);font-size:var(--t-cap);line-height:1.5;color:var(--ink-2)}
-.org-wait-note a{color:var(--accent-ink);text-decoration:underline;text-underline-offset:.15em;overflow-wrap:anywhere}
+.org-wait-note a{overflow-wrap:anywhere}   /* the ink with the gold hairline under it (app.css): a link, not an alarm */
 .nudge{display:flex;align-items:center;gap:16px 24px;flex-wrap:wrap;margin-top:24px;padding:18px 20px}
 /* what a supplier still lacks, one card each, stacked */
 .nudges{display:grid;gap:12px;margin-top:24px}
@@ -188,8 +199,13 @@ p{margin:0}
 
 /* the frame: the grid, the sidebar and the drawer are /app.css's .desk-frame */
 .main{min-width:0}
+/* the drawer on a phone is 304px: the brand's row a little tighter, so «Бизнес» never runs under the «Нүүр» pill */
+@media (max-width:900px){.sidebar .brand{gap:8px;padding-left:4px;padding-right:0}}
 .page{max-width:var(--col-desk);margin:0 auto;padding:var(--s-7) var(--gutter) 64px}
-.page > .back{margin-bottom:4px}
+/* a wide desk breathes as the prototype's business screen does: 44 over the head and more under the last row;
+   the sides keep the desk's gutter, so a seven-column table still fits a 1440 screen whole */
+@media (min-width:1100px){.page{padding:44px var(--gutter) 96px}}
+.page > .back{margin-bottom:12px;border-radius:var(--r-xs)}   /* its ring, when it takes the focus on a file's arrival, a rounded one */
 .page-head + .section{margin-top:0}
 .page-head + .kpi-band{margin-bottom:8px}
 .pair-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:0 16px;align-items:start}   /* never wider than a 320px phone's column */
@@ -206,18 +222,18 @@ p{margin:0}
 .door-link > span{grid-area:label;font-size:var(--t-body-lg);font-weight:500;line-height:1.3}
 .door-link > small{grid-area:say;font-size:var(--t-cap);line-height:1.4;color:var(--ink-3)}
 .door-link::after{content:"";grid-area:go;width:16px;height:16px;background:var(--ink-3);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center/16px no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center/16px no-repeat}
-@media (hover:hover){.door-link:hover{background:var(--surface-2)}.door-link:hover > svg{color:var(--accent-ink)}}
+@media (hover:hover){.door-link:hover{background:var(--surface-2)}.door-link:hover > svg{color:var(--ink)}}
 .door-link:active{background:var(--surface-2)}
 /* the card clips its rows to its corners: the focus ring is drawn inside, so it is never cut */
 .door-link:focus-visible{outline-offset:-3px}
 /* who may do what: permissions down, roles across, the reader's own column marked */
 .table.roles th.role-col,.table.roles td.role-col{width:96px;text-align:center}
 .table.roles th.yours{color:var(--ink)}
-.table.roles th.role-col small{display:block;font-family:var(--mono);font-size:var(--t-meta);font-weight:500;color:var(--accent-ink);text-transform:none;letter-spacing:0}
+.table.roles th.role-col small{display:block;margin-top:4px;font-family:var(--sans);font-size:var(--t-eyebrow);font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:var(--track-eyebrow)}   /* «та»: a tiny gold label, as «АВАХ» */
 .table.roles td.yours{background:var(--surface-2)}
 .table.roles .yes svg{width:18px;height:18px;fill:none;stroke:var(--ready);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
 .table.roles .no{color:var(--ink-3)}
-.table.roles tr.role-sec td{padding-top:18px;font-family:var(--mono);font-size:var(--t-eyebrow);font-weight:500;letter-spacing:var(--track-eyebrow);text-transform:uppercase;color:var(--ink-3);background:none}
+.table.roles tr.role-sec td{padding-top:18px;font-family:var(--sans);font-size:var(--t-eyebrow);font-weight:700;letter-spacing:var(--track-eyebrow);text-transform:uppercase;color:var(--ink-3);background:none}
 /* the roles page: every role in one table; a role is made and changed in a popup, module by module */
 .roles-tools{display:flex;align-items:center;gap:12px;margin:0 0 8px}
 .roles-tools .section-label{flex:1;min-width:0;margin:0}
@@ -225,10 +241,10 @@ p{margin:0}
 .roles-table .who b{font-size:var(--t-row);font-weight:600}
 .roles-table .who .tags{display:inline-flex;gap:6px;margin-left:8px;vertical-align:1px}
 .roles-table .who small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:52ch;margin-top:2px;font-size:var(--t-cap);font-weight:400;line-height:1.4;color:var(--ink-2)}
-.roles-table tr[data-on] td{background:var(--accent-soft)}
+.roles-table tr[data-on] td{background:var(--surface-2)}   /* the role just saved: the raised surface, not a red wash */
 .role-mark{display:grid;place-items:center;width:36px;height:36px;flex:none;border-radius:var(--r-sm);background:var(--surface-2);border:1px solid var(--line);font-size:var(--t-cap);font-weight:600;color:var(--ink-2)}
 .role-mark svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.role-mark[data-locked]{background:var(--deep);border-color:var(--deep);color:var(--on-accent)}
+.role-mark[data-locked]{background:var(--ink);border-color:var(--ink);color:var(--on-light)}
 /* a role's fingerprint: every module in menu order, lit where the role opens it */
 .role-strip{display:flex;align-items:center;gap:8px;color:var(--ink-2)}
 .role-strip span{display:grid}
@@ -245,15 +261,15 @@ p{margin:0}
 .role-id .sub{max-width:62ch}
 .role-id .sub:empty{display:none}
 .role-stats{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px;font-size:var(--t-cap);color:var(--ink-3)}
-.role-stats b{margin-right:4px;font-family:var(--mono);font-weight:600;color:var(--ink)}
+.role-stats b{margin-right:4px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
 .role-sheet > .body{padding-bottom:4px}
 .role-sheet .callout{margin:18px 20px 0}
 .role-sec{padding:18px 20px}
 .role-sec + .role-sec{border-top:1px solid var(--line)}
 .role-sec-head{display:flex;align-items:center;gap:12px;margin:0 0 14px}
 .role-sec-head h3{flex:1;min-width:0;display:flex;align-items:center;font-size:var(--t-title-3);font-weight:600}
-.role-sec-head .meta{font-family:var(--mono);font-size:var(--t-meta);color:var(--ink-3)}
-.role-step{display:inline-grid;place-items:center;width:22px;height:22px;flex:none;margin-right:10px;border-radius:50%;background:var(--deep);color:var(--on-accent);font-family:var(--mono);font-size:var(--t-meta);font-weight:600}
+.role-sec-head .meta{font-size:var(--t-meta);font-weight:600;font-variant-numeric:tabular-nums;color:var(--ink-3)}
+.role-step{display:inline-grid;place-items:center;width:26px;height:26px;flex:none;margin-right:12px;border-radius:50%;border:1px solid var(--gold-line);color:var(--gold);font-family:var(--display);font-size:var(--t-body);font-weight:800;line-height:1;font-variant-numeric:tabular-nums lining-nums}
 @media (min-width:640px){.role-sheet .fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .role-flags{display:flex;flex-direction:column;margin-top:4px;border-top:1px solid var(--line)}
 .role-flag{display:flex;align-items:flex-start;gap:12px;padding:12px 0 0;cursor:pointer}
@@ -277,8 +293,8 @@ p{margin:0}
 .role-fold[aria-expanded="false"] .fold svg{transform:rotate(-90deg)}
 .role-mod[data-level="none"] .role-fold .ic{color:var(--ink-3)}
 .role-mod[data-level="none"] .role-fold .t b{color:var(--ink-2)}
-/* how far a module is open, in the tile: whole in the pine wash, part in the plate, shut in grey */
-.role-mod[data-level="full"] .role-fold .ic{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-ink)}
+/* how far a module is open, in the tile: whole in the off-white, part in the plate, shut in grey */
+.role-mod[data-level="full"] .role-fold .ic{background:var(--ink);border-color:var(--ink);color:var(--on-light)}
 .role-mod[data-level="view"] .role-fold .ic,.role-mod[data-level="some"] .role-fold .ic{background:var(--surface);border-color:var(--line-2);color:var(--ink)}
 .role-level{flex:none}
 .role-level button{min-height:30px;padding:0 12px}
@@ -294,7 +310,7 @@ p{margin:0}
 .role-page:not(:has([data-view]:checked)) .role-acts label{color:var(--ink-3)}
 .role-sheet > footer{flex-direction:row;align-items:center;flex-wrap:wrap;gap:8px}
 .role-sheet > footer .sum{flex:1 1 200px;min-width:0;font-size:var(--t-cap);color:var(--ink-2)}
-.role-sheet > footer .sum b{font-family:var(--mono);font-weight:600;color:var(--ink)}
+.role-sheet > footer .sum b{font-weight:700;font-variant-numeric:tabular-nums;color:var(--ink)}
 .role-sheet > footer[data-dirty] .sum::before{content:"";display:inline-block;width:8px;height:8px;margin-right:8px;border-radius:50%;background:var(--hold);vertical-align:1px}
 @media (max-width:640px){
   .role-sheet > header,.role-sec{padding-left:16px;padding-right:16px}
@@ -351,25 +367,51 @@ p{margin:0}
   .page{padding:var(--s-5) var(--s-5) var(--s-8)}
 }
 
+/* On the desk a `.mono` is data that is read — a code under a row's title, a TIN, an account, a phone, a date,
+   a clock — the sans with its digits lined up, as the prototype's «№7004» under «Эр бярууны мах · 4 кг». What
+   is glanced at — money, counts, a KPI, a file's № as its title — is the display's, by its own class. */
+.mono{font-family:var(--sans);font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums}
+
 /* tables that are not data tables (a few facts), KPI rows */
 .card > .table-wrap{border-radius:inherit}
+/* a numbers column's name is a column name — the sans in small capitals — not a number in the display */
+.table th.num{font-family:var(--sans)}
 /* a table wider than the screen scrolls in its box, which the keyboard can reach: its ring inside the card's edge */
 .table-wrap[tabindex]:focus-visible{outline-offset:-2px}
 .card-foot{padding:12px 20px;border-top:1px solid var(--line)}
 .table:has(tr[data-link]) th:last-child{padding-right:32px}
 .table td.end{text-align:right}
 .run-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}
-/* How many numbers sit in a row is app.css's (.kpi-band): six across from 1400px and three and three
-   below it, four across while the band is wider than 860px and two by two under that — measured on
-   the band, which beside the sidebar is about 320px narrower than the screen. */
-/* a figure wider than its cell — a seven-digit sum in six across at 1440 — (fitBands measures it): the
-   whole band a size down together, so every figure keeps clear of its cell's edges and the row stays even */
-.kpi-band[data-fit="1"] > .kpi:not([data-word]) > b{font-size:var(--t-title-2)}
-.kpi-band[data-fit="2"] > .kpi:not([data-word]) > b{font-size:var(--t-title-3)}
+/* The numbers, as the prototype's business tiles: a label, the figure big in the display at 800 — sized by its
+   tile (container units), up to the prototype's 76px — and one quiet line under it. Six numbers sit three and
+   three on a desk (the prototype's three across), not six thin tiles of small figures; four, five and seven keep
+   app.css's rows. A phone keeps two columns. */
+.kpi-band > .kpi{gap:0;min-height:0;padding:24px 26px}
+.kpi-band .kpi .lab{font-size:.875rem;line-height:1.2;color:var(--ink-2)}
+.kpi-band .kpi b{margin-top:18px;font-size:clamp(2rem,29cqi,4.75rem);line-height:.86}
+.kpi-band .kpi > span{margin-top:14px;font-size:.875rem;line-height:1.35}
+.kpi-band .kpi[data-word] b{min-height:calc(var(--fit,clamp(2rem,29cqi,4.75rem)) * .86)}
+@media (min-width:641px){.kpi-band:has(> :nth-child(6):last-child){grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:640px){
+  .kpi-band > .kpi{padding:18px 18px 16px}
+  .kpi-band .kpi b{margin-top:14px;font-size:clamp(1.75rem,29cqi,3rem)}
+  .kpi-band .kpi > span{margin-top:10px;font-size:var(--t-cap)}
+  .kpi-band .kpi[data-word] b{min-height:calc(var(--fit,clamp(1.75rem,29cqi,3rem)) * .86)}
+}
+/* the money a tile counts, lifted as the prototype's «Танд очих»: a warmer plate, the brighter edge */
+.kpi-band > .kpi[data-money]{background:linear-gradient(150deg,#2A2321,var(--surface) 70%);border-color:var(--line-2)}
+/* a business's own three — the work, the season, the money — the money a step wider, as the prototype's (1 · 1 · 1.25) */
+@media (min-width:900px){#org-kpis:has(> [data-money]:nth-child(3):last-child){grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.25fr)}}
+/* a band's skeleton as tall as the tiles that replace it */
+@media (min-width:641px){.kpi-band > .skel-kpi-cell{min-height:176px;padding:24px 26px}}
+/* a figure wider than its tile — a ten-digit sum — or a tile wider than the rest (fitBands measures them): the
+   whole band at the largest size every figure fits at, so nothing runs to an edge and the row reads even */
+.kpi-band[data-fit] > .kpi:not([data-word]) > b{font-size:var(--fit)}
 /* Until app.css scopes `.kpi-band .kpi span` to `> span`: money() inside a
-   KPI value keeps the value's size, weight and tone instead of the caption's. */
-.kpi-band .kpi b span{display:inline;font-size:inherit;color:inherit;line-height:inherit}
-.kpi-band .kpi b .cur{font-size:.65em;font-weight:500}
+   KPI value keeps the value's size, weight and tone instead of the caption's —
+   the ₮ the figure's own size and weight, as the prototype draws «450,800₮». */
+.kpi-band .kpi b span{display:inline;font-size:inherit;color:inherit;line-height:inherit;margin-top:0}
+.kpi-band .kpi b .cur{font-size:1em;font-weight:inherit}
 
 /* a signed-in device on a guest's file: its name and when it was last seen, the button that signs it out */
 .sess{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:var(--t-body)}
@@ -432,6 +474,22 @@ p{margin:0}
 .section-label:has(.btn){align-items:center}
 .section-label .label-acts{display:flex;gap:6px;margin-left:auto}
 .section-label .label-acts .btn{margin-left:0}
+/* A section's name in the main column, as the prototype's «Бэлтгэх захиалга»: the display at 800 in sentence
+   case, its count a quiet pill beside it, its link or buttons at the right. The rail's, a card's and a popup's
+   own labels stay the small capitals. */
+.page :is(.section,.roles-tools) > h2.section-label{
+  justify-content:flex-start;align-items:center;gap:12px;min-height:0;margin:0 0 18px;
+  font-family:var(--display);font-size:clamp(1.8125rem,2.8vw,2.5rem);font-weight:800;line-height:1;letter-spacing:-.004em;text-transform:none;color:var(--ink);
+}
+.page :is(.section,.roles-tools) > h2.section-label:not(:first-child){margin-top:40px}
+.page :is(.section,.roles-tools) > h2.section-label .n{
+  display:inline-flex;align-items:center;justify-content:center;min-width:28px;height:26px;padding:0 9px;border-radius:var(--r-pill);
+  background:var(--surface-3);font-family:var(--sans);font-size:var(--t-cap);font-weight:700;letter-spacing:0;line-height:1;color:var(--ink-2);font-variant-numeric:tabular-nums;
+}
+.page :is(.section,.roles-tools) > h2.section-label .n:empty{display:none}
+.page :is(.section,.roles-tools) > h2.section-label > .link{margin-left:auto}
+.page .section{margin-top:48px}
+.page .page-head + .section{margin-top:0}
 /* a page's own buttons: at the right of its head, the one that adds a thing inked */
 .head-acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 a.tel{display:inline-flex;align-items:center;gap:4px;color:var(--ink);font-weight:500}
@@ -440,11 +498,10 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 .acts .hint{font-size:var(--t-cap);line-height:1.45;color:var(--ink-3)}
 .acts .sep{height:1px;background:var(--line);margin:4px 0}
 /* a finger's target on a touch screen — app.css grows the shared controls (a number that dials among them);
-   these are the page's own small ones, or own sizes that would undo it: the door's brand, the link in a line
-   whose min-height this page takes away, the role editor's «Бүгдийг дэлгэх» (kept on its line) and its
+   these are the page's own small ones, or own sizes that would undo it (the door's brand is tall enough
+   with the room over its gold line): the link in a line whose min-height this page takes away, the role editor's «Бүгдийг дэлгэх» (kept on its line) and its
    Хаах / Харах / Бүрэн. Each grows around its words, so the line keeps its place. */
 @media (pointer:coarse){
-  .door-brand{padding-block:9px;margin-top:-9px;margin-bottom:19px}
   .org-you .link{min-height:var(--target);margin-block:-12px}
   .role-sec-head [data-unfold]{min-height:var(--target);margin-block:-15px}
   .role-level button{min-height:var(--target)}
@@ -466,7 +523,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
     <div class="card door-card">
       <a class="door-brand" href="/" aria-label="Basu-гийн нүүр хуудас"><span class="wordmark">Basu</span><span class="door-place">Бизнес</span></a>
       <h1><span data-plain>Нэвтрэх</span><span data-joining>Бизнесээ бүртгүүлэх</span></h1>
-      <p class="door-for"><span data-plain>Байгууллагаа Basu дээр удирдах газар. Basu-д нэвтэрдэг бүртгэлээрээ орно.</span><span data-joining>Нэвтэрмэгц бүртгэлийн цонх нээгдэнэ: бизнесийнхээ нэр, утас, хаягийг бөглөөд илгээнэ. Basu шалгаж баталмагц зар, захиалгаа эндээс удирдана.</span></p>
+      <p class="door-for"><span data-plain>Байгууллагаа Basu дээр удирдана.</span><span data-joining>Нэвтэрмэгц бүртгэлийн цонх нээгдэнэ.</span></p>
       <div class="shell-ways" aria-hidden="true"><span class="skel sw-lead"></span><span class="skel sw-btn sw-google"></span><span class="skel sw-or"></span><span class="skel sw-label"></span><span class="skel sw-input"></span><span class="skel sw-hint"></span><span class="skel sw-btn"></span><span class="skel sw-inapp"></span><span class="skel sw-fold"></span></div>
     </div>
     <a class="door-home" href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>Basu-гийн нүүр хуудас</a>
@@ -479,7 +536,7 @@ a.tel svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;
 </div>
 
 <script type="module">
-import { api, ApiError, store, toast, mnt, money, KIND, HEADLINE, LUNCH_WORD, IDESH_STATE, IDESH_LIVE, headlineWord, dayLabel, dayShort, ubParts, signInDoors, authMethods, accountWays, authReturn, takeSession, dropSession, popup, confirmPopup, phoneText, skeleton, emptyState, whatWentWrong, BANK_NAMES } from '/api.js';
+import { api, ApiError, store, toast, mnt, money, KIND, HEADLINE, LUNCH_WORD, IDESH_STATE, IDESH_LIVE, ideshStage, headlineWord, dayLabel, dayShort, ubParts, signInDoors, authMethods, accountWays, authReturn, takeSession, dropSession, popup, confirmPopup, phoneText, skeleton, emptyState, whatWentWrong, BANK_NAMES } from '/api.js';
 import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -502,6 +559,12 @@ const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&
 /* A moment's day and clock are Ulaanbaatar's (api.js ubParts), whatever zone the computer at the desk is set to. */
 const when = (iso) => (iso ? dayLabel(ubParts(iso).day) : '—');
 const clockOf = (iso) => ubParts(iso).clock;
+/** Today over a home's title, as the prototype's business screen says it — «Лхагва, 10-р сарын 14» — Ulaanbaatar's day. */
+const WEEKDAY = ['Ням', 'Даваа', 'Мягмар', 'Лхагва', 'Пүрэв', 'Баасан', 'Бямба'];
+const todayLine = () => {
+  const { day } = ubParts();
+  return `${WEEKDAY[new Date(`${day}T12:00:00Z`).getUTCDay()]}, ${dayLabel(day)}`;
+};
 /** A date and its time in a table cell, as datatable.js draws them («10-р сарын 2 · 07:15»), read in Ulaanbaatar. */
 const whenCell = (iso) => {
   if (!iso) return dtCell.none();
@@ -518,7 +581,7 @@ const contactCell = (value) =>
   !value ? dtCell.none() : /^\+?[\d\s-]{8,}$/.test(String(value)) ? dtCell.phone(value) : String(value).includes('@') ? emailHtml(value) : esc(value);
 /** Three rows of the shape that is coming, while it loads. */
 const busy = () => el(`<div role="status" aria-busy="true">${'<div class="skel-row"><span class="skel"></span><span class="skel-lines"><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></div>'.repeat(3)}</div>`);
-/** The dot's tone on the story: red for a cancellation, blue for on the road, green for handed over. */
+/** The dot's tone on the story: the crimson's ink for a cancellation, the quiet ink on the road, the ink for handed over. */
 const STORY_K = {
   CANCELLED: 'stop', REFUNDED: 'stop', REFUND_DUE: 'stop', HELD: 'stop', HELD_BY_KITCHEN: 'stop', REJECTED: 'stop', NO_SHOW: 'stop',
   DISPATCHED: 'route', RESLOTTED: 'route', RESENT: 'route', PAID: 'route',
@@ -533,9 +596,10 @@ const step = (type, title, sub, at) =>
   `<li data-done${STORY_K[type] ? ` data-k="${STORY_K[type]}"` : ''}><span class="w">${esc(title)}<span class="s">${esc(sub)}</span></span><span class="t">${when(at)} ${clockOf(at)}</span></li>`;
 const STATE = { applied: 'хүлээгдэж байна', contracted: 'гэрээт', declined: 'татгалзсан' };
 /**
- * An идэш's state in a chip: the one word the guest, the supplier and the website say for it —
- * api.js's IDESH_STATE, «Төлсөн» … «Хүлээлгэн өгсөн», and where an order that ended stands:
- * «Дууссан», «Цуцлагдсан», not the guest's news «Цуцлагдлаа».
+ * An идэш's state in one word — the guest, the supplier and the website say the same — api.js's
+ * IDESH_STATE, «Төлсөн» … «Хүлээлгэн өгсөн», and where an order that ended stands: «Дууссан»,
+ * «Цуцлагдсан», not the guest's news «Цуцлагдлаа». A list or a file's title draws it as the word and
+ * its four-bar meter (api.js ideshStage); this is the word alone, for a sentence, a sort or a search.
  */
 const STATE_WORD = IDESH_STATE;
 const EVENT_WORD = {
@@ -653,7 +717,7 @@ function joined() {
   if (new URLSearchParams(location.search).has('join')) history.replaceState(null, '', `${location.pathname}${location.hash}`);
 }
 /** What the door says to somebody who came to register: what happens next, in one line. */
-const JOIN_LINE = 'Нэвтэрмэгц бүртгэлийн цонх нээгдэнэ: бизнесийнхээ нэр, утас, хаягийг бөглөөд илгээнэ. Basu шалгаж баталмагц зар, захиалгаа эндээс удирдана.';
+const JOIN_LINE = 'Нэвтэрмэгц бүртгэлийн цонх нээгдэнэ.';
 
 async function showToken() {
   const drawing = ++doorDrawn;
@@ -708,7 +772,7 @@ async function showToken() {
     <div class="card door-card"${join ? ' data-join' : ''}>
       ${mark}
       <h1>${join ? 'Бизнесээ бүртгүүлэх' : 'Нэвтрэх'}</h1>
-      <p class="door-for">${join ? JOIN_LINE : 'Байгууллагаа Basu дээр удирдах газар. Basu-д нэвтэрдэг бүртгэлээрээ орно.'}</p>
+      <p class="door-for">${join ? JOIN_LINE : 'Байгууллагаа Basu дээр удирдана.'}</p>
       ${why}
       <p id="door-lead">Нэвтэрнэ үү.</p>
       <div data-doors></div>
@@ -785,7 +849,7 @@ function renderMeHome(view) {
   const seat = deskSeat();
   const h = head(
     named ? `Сайн байна уу, ${esc(named)}` : 'Тавтай морил',
-    orgs.length ? 'Таны ажилладаг байгууллагууд. Аль нэгийг нь сонгоод ажлаа үргэлжлүүлнэ.' : seat ? 'Basu-гийн ширээ болон таны байгууллагууд.' : 'Байгууллагаа Basu дээр ажиллуулах эхний алхам энд.',
+    todayLine(),
   );
   view.append(h);
   // Somebody with a business already: one more is the head's button. Somebody with none: the welcome below carries it.
@@ -808,14 +872,14 @@ function renderMeHome(view) {
       <div class="first-run">
         <div class="fr-copy">
           <h2>Бизнесээ Basu дээр ажиллуулаарай</h2>
-          <p>Махны нийлүүлэгч эсвэл ресторан бол бүртгүүлээд Basu-гийн зочдод зар, хоолоо санал болгоно. Захиалга, мөнгө, ажилтнаа эндээс удирдана.</p>
+          <p>Зар, хоолоо Basu-гийн зочдод санал болгоно.</p>
           <div class="fr-acts"></div>
-          <p class="fr-other">Өөр байгууллагад ажилладаг бол эзэн, менежер тань таныг Basu-д нэвтэрдэг утас, имэйлээр тань нэмнэ. Нэмэгдмэгц тэр байгууллага энд гарна.</p>
+          <p class="fr-other">Эзэн тань таныг нэмбэл байгууллага тань энд гарна.</p>
         </div>
         <ol class="fr-steps">
-          <li><b>Бүртгүүлэх</b><span>Нэр, утас, хаягаа өгнө. Бүртгүүлсэн хүн эзэн нь болно.</span></li>
-          <li><b>Basu шалгана</b><span>Basu-гийн баг шалгаж батална. Батлагдмагц танд мэдэгдэнэ.</span></li>
-          <li><b>Ажилтнаа нэмнэ</b><span>Менежер, ажилтан, нягтландаа үүрэг өгч ажиллуулна.</span></li>
+          <li><b>Бүртгүүлэх</b><span>Нэр, утас, хаягаа өгнө</span></li>
+          <li><b>Basu шалгана</b><span>Баталмагц танд мэдэгдэнэ</span></li>
+          <li><b>Ажилтнаа нэмнэ</b><span>Менежер, ажилтандаа үүрэг өгнө</span></li>
         </ol>
       </div>`);
     welcome.querySelector('.fr-acts').append(button(`${NAV_ICON.plus}Байгууллага бүртгүүлэх`, () => orgPopup(), 'data-v="primary" id="org-new"'));
@@ -866,7 +930,7 @@ function deskSection() {
 /** The person: their name, how they sign in, and every device that is signed in as them. */
 async function renderMeProfile(view) {
   const account = access.account ?? {};
-  view.append(head('Профайл', 'Таны нэр, нэвтрэх арга, нэвтэрсэн төхөөрөмжүүд.'));
+  view.append(head('Профайл', 'Нэр, нэвтрэх арга, төхөөрөмж'));
   // What is not there yet reads as the website's /account says it: a dash.
   const unset = '<span class="kv-none">—</span>';
   const card = el(`
@@ -883,7 +947,7 @@ async function renderMeProfile(view) {
       () =>
         popup({
           title: account.name ? 'Нэр засах' : 'Нэр оруулах',
-          sub: 'Байгууллага, Basu-гийн ажилтнууд таныг энэ нэрээр харна.',
+          sub: 'Таныг энэ нэрээр харна.',
           width: 440,
           fields: [{ name: 'display_name', label: 'Нэр', autocomplete: 'name', value: account.name ?? '', required: true, wide: true }],
           onSubmit: async (v) => {
@@ -964,7 +1028,7 @@ function seenAt(iso) {
 function orgPopup({ supplier = false } = {}) {
   return popup({
     title: 'Байгууллага бүртгүүлэх',
-    sub: 'Та энэ байгууллагын эзэн болно. Basu шалгаж баталсны дараа ажилтнуудаа нэмж, ажлаа эхэлнэ.',
+    sub: 'Та эзэн нь болно. Basu шалгаж батална.',
     width: 600,
     id: 'org-form',
     fields: [
@@ -1064,7 +1128,8 @@ const steps = (list) =>
 
 async function renderOrgHome(view) {
   const w = ws;
-  view.append(head(esc(w.name), esc(w.sub)));
+  // A running business opens on its day, as the prototype's «Өнөөдөр» does; one not running yet on what it is.
+  view.append(head(esc(w.name), w.state === 'active' ? `${todayLine()} · ${esc(w.sub)}` : esc(w.sub)));
   if (w.state !== 'active') {
     // A business Basu has not opened: where it stands, and what comes next — nothing else to press.
     const card = el('<section class="section org-wait"><div class="card"><div class="card-body"></div></div></section>');
@@ -1072,11 +1137,11 @@ async function renderOrgHome(view) {
     if (w.state === 'applied') {
       body.innerHTML = `
         <div class="org-wait-head"><span class="pill" data-s="applied">Basu шалгаж байна</span></div>
-        <p class="org-wait-lead">Бүртгэлийг тань Basu-гийн баг шалгаж байна. Батлагдмагц энд таны хэсгүүд нээгдэж, танд мэдэгдэл очно.</p>
+        <p class="org-wait-lead">Батлагдмагц энд таны хэсгүүд нээгдэнэ.</p>
         ${steps([
           ['done', 'Бүртгэл илгээсэн', 'Та эзэн нь болно'],
-          ['next', 'Basu шалгаж байна', 'Утсаар холбогдож нэр, утас, хаягийг тулгана'],
-          ['', w.kinds?.supplier ? 'Зар, дансаа нэмэх' : 'Ажилтнаа нэмэх', w.kinds?.supplier ? 'Эхний зараа тавьж, олголт очих дансаа оруулна' : 'Менежер, ажилтан, нягтландаа үүрэг өгнө'],
+          ['next', 'Basu шалгаж байна', 'Утсаар холбогдож тулгана'],
+          ['', w.kinds?.supplier ? 'Зар, дансаа нэмэх' : 'Ажилтнаа нэмэх', w.kinds?.supplier ? 'Эхний зар, олголтын данс' : 'Менежер, ажилтандаа үүрэг өгнө'],
         ])}
         <p class="org-wait-note" id="wait-note">${WAIT_WORDS}</p>`;
     } else if (w.state === 'declined') {
@@ -1117,13 +1182,17 @@ async function renderOrgHome(view) {
         const todo = h.lanes.paid + h.lanes.preparing + h.lanes.ready + h.lanes.dispatched;
         // A business that has sold nothing yet: four zeros say less than the steps under them (the supplier's Today keeps the same rule).
         if (!todo && !h.season.handed && !h.season.payout_mnt) return band.remove();
-        const due = [h.due_today ? `${h.due_today} нь өнөөдөр авна` : '', h.overdue ? `${h.overdue} нь хоцорсон` : ''].filter(Boolean).join(' · ');
+        // The prototype's three: the work, the season, the money. The new orders are said under the work, not a tile of their own.
+        const due = [
+          h.lanes.paid ? `${h.lanes.paid} нь шинэ` : '',
+          h.due_today ? `${h.due_today} нь өнөөдөр авна` : '',
+          h.overdue ? `${h.overdue} нь хоцорсон` : '',
+        ].filter(Boolean).join(' · ');
         const cells = [
           `<div class="card kpi"${h.overdue ? ' data-tone="warn"' : ''}><div class="lab">Хийх ажил</div><b>${todo}</b><span>${todo ? due || 'хүлээлгэн өгөөгүй захиалга' : 'одоогоор хийх захиалга алга'}</span></div>`,
-          `<div class="card kpi"><div class="lab">Шинэ захиалга</div><b>${h.lanes.paid}</b><span>${h.lanes.paid ? 'төлсөн, бэлтгэж эхлээгүй' : 'шинэ захиалга алга'}</span></div>`,
           `<div class="card kpi"><div class="lab">Энэ улиралд</div><b>${h.season.handed}</b><span>зочинд хүлээлгэн өгсөн</span></div>`,
         ];
-        if (h.season.payout_mnt !== null) cells.push(`<div class="card kpi"><div class="lab">Танд очих</div><b>${money(h.season.payout_mnt)}</b><span>энэ улирлын орлого, шимтгэл хассан</span></div>`);
+        if (h.season.payout_mnt !== null) cells.push(`<div class="card kpi" data-money><div class="lab">Танд очих</div><b>${money(h.season.payout_mnt)}</b><span>энэ улирлын орлого, шимтгэл хассан</span></div>`);
         band.innerHTML = cells.join('');
         band.hidden = false;
       })
@@ -1154,7 +1223,7 @@ async function renderOrgHome(view) {
   view.append(grid);
   // What a supplier still lacks before it can sell and be paid — no listing guests can see, no account for its
   // payouts — said before the doors, each with the button that opens its popup on the supplier's page at once
-  // (`#stall/new`, `#profile/bank`), never a page where the person has to press again. One pine button: the first.
+  // (`#stall/new`, `#profile/bank`), never a page where the person has to press again. One primary button, the off-white pill: the first.
   const nudges = el('<div class="nudges" id="nudges"></div>');
   grid.before(nudges);
   const stall = w.kinds?.supplier && can('org.idesh.stall:edit') ? navHref(orgLink('idesh.stall')?.href) : null;
@@ -1170,7 +1239,7 @@ async function renderOrgHome(view) {
       say.push({
         id: 'nudge-listing',
         title: 'Зочдод харагдах зар алга',
-        text: 'Эхний зараа нэмбэл зочид таныг Basu дээр олж захиална: мал, үнэ, хэдийд бэлэн болохыг бичнэ.',
+        text: 'Эхний зараа нэмбэл зочид таныг олж захиална.',
         href: `${stall}/new`,
         label: 'Зар нэмэх',
       });
@@ -1181,8 +1250,8 @@ async function renderOrgHome(view) {
         id: 'nudge-bank',
         title: 'Олголт очих данс алга',
         text: canAdd
-          ? 'Данс нэмэхгүй бол хүлээлгэн өгсөн захиалгын мөнгийг тань шилжүүлж чадахгүй.'
-          : 'Данс нэмэхгүй бол хүлээлгэн өгсөн захиалгын мөнгийг шилжүүлж чадахгүй. Дансыг эзэн нь нэмнэ.',
+          ? 'Дансгүй бол мөнгийг тань шилжүүлж чадахгүй.'
+          : 'Дансгүй бол мөнгийг шилжүүлж чадахгүй. Дансыг эзэн нэмнэ.',
         href: canAdd ? `${bankAt}/bank` : null,
         label: 'Данс нэмэх',
       });
@@ -1209,7 +1278,7 @@ async function renderOrgHome(view) {
  * taking somebody out. Anybody may leave. Each of those is a popup.
  */
 async function renderOrgTeam(view) {
-  const h = head('Ажилтнууд', 'Энд ажилладаг хүмүүс, тэдний үүрэг.');
+  const h = head('Ажилтнууд', 'Энд ажилладаг хүмүүс, тэдний үүрэг');
   view.append(h);
   let data;
   try {
@@ -1236,7 +1305,7 @@ async function renderOrgTeam(view) {
     let who = null;
     return popup({
       title: 'Хүн нэмэх',
-      sub: 'Тэр хүний Basu-д нэвтэрдэг утас эсвэл имэйлээр хайна. Тэр урьд нь Basu-д нэг удаа ч гэсэн нэвтэрсэн байх ёстой.',
+      sub: 'Basu-д нэвтэрдэг утас, имэйлээр нь хайна.',
       width: 480,
       id: 'member-add',
       fields: [{ name: 'contact', label: 'Утас эсвэл имэйл', inputmode: 'email', placeholder: '9911 2233 эсвэл нэр@gmail.com', required: true, wide: true, hint: 'Утсыг +976-гүйгээр бичиж болно.' }],
@@ -1301,7 +1370,7 @@ async function renderOrgTeam(view) {
               });
               roleHint(document.getElementById('team-role'), giving);
             },
-            'data-v="quiet" data-size="sm" data-a="role"',
+            'data-size="sm" data-a="role"',
           ),
         );
       }
@@ -1324,7 +1393,7 @@ async function renderOrgTeam(view) {
                   show('team');
                 },
               }),
-            'data-v="quiet" data-size="sm" data-a="remove"',
+            'data-v="danger" data-size="sm" data-a="remove"',
           ),
         );
       }
@@ -1338,13 +1407,13 @@ async function renderOrgTeam(view) {
   team.el.setAttribute('data-members', '');
   view.append(team.el);
   view.append(el(`<p class="page-note">${giving.length
-    ? 'Нэмэх хүн Basu-д нэг удаа ч гэсэн нэвтэрсэн байх ёстой. Үүрэг бүр юу хийж болохыг «Эрхүүд» хуудаснаас харна.'
+    ? 'Нэмэх хүн Basu-д нэг удаа нэвтэрсэн байх ёстой.'
     : 'Хүн нэмэх, үүрэг өөрчлөх нь эзэн, менежерийн ажил.'}</p>`));
 }
 
 /** The business's own details — what Basu knows it by — read here, changed in a popup by its owner or a manager. */
 async function renderOrgProfile(view) {
-  const h = head('Мэдээлэл', 'Basu-д бүртгэлтэй байгууллагын мэдээлэл.');
+  const h = head('Мэдээлэл', 'Basu-д бүртгэлтэй мэдээлэл');
   view.append(h);
   let data;
   try {
@@ -1417,7 +1486,7 @@ async function renderOrgProfile(view) {
  * the person's own column is marked.
  */
 async function renderOrgRoles(view) {
-  view.append(head('Эрхүүд', 'Үүрэг бүр энэ байгууллагад юу хийж болох вэ. Таны багана тодорсон.'));
+  view.append(head('Эрхүүд', 'Үүрэг бүр юу хийж болох вэ'));
   let table;
   try {
     table = await ops(`/v1/access/roles?org=${encodeURIComponent(ws.id)}`);
@@ -1442,7 +1511,7 @@ const LOG_WORD = {
 
 /** Who gave whom which role, newest first: the owner's and the managers' record. */
 async function renderOrgLog(view) {
-  view.append(head('Түүх', 'Хэн хэнийг нэмж, үүргийг нь өөрчилж, хассан бүртгэл.'));
+  view.append(head('Түүх', 'Хэн хэнийг нэмж, хассан, үүрэг өөрчилсөн'));
   let log;
   try {
     ({ log } = await ops(`/v1/orgs/${ws.id}/log`));
@@ -1515,7 +1584,7 @@ function declineOrg(o, done) {
 let orgsOpenOn = null;
 
 async function renderOrgsDesk(view) {
-  view.append(head('Байгууллагууд', 'Ресторан, нийлүүлэгчийн бүртгэл. Батлахад бүртгүүлсэн хүн эзэн нь болно.'));
+  view.append(head('Байгууллагууд', 'Ресторан, нийлүүлэгчийн бүртгэл'));
   const decides = can('desk.orgs:decide');
   const table = dataTable({
     // Narrow enough for «Батлах» and «Татгалзах» to stand in view at 1280: what a business is rides under its
@@ -1569,11 +1638,11 @@ async function renderOrgsDesk(view) {
       if (o.state === 'applied' && decides) {
         return [
           button('Батлах', () => approveOrg(o, () => show('orgs')), 'data-v="primary" data-size="sm" data-a="approve"'),
-          button('Татгалзах', () => declineOrg(o, () => show('orgs')), 'data-v="quiet" data-size="sm" data-a="decline"'),
+          button('Татгалзах', () => declineOrg(o, () => show('orgs')), 'data-v="danger" data-size="sm" data-a="decline"'),
         ];
       }
       if (o.state === 'active') {
-        const access = el('<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="access">Үүрэг, эрх</button>');
+        const access = el('<button class="btn" data-size="sm" type="button" data-a="access">Үүрэг, эрх</button>');
         access.addEventListener('click', () => openOrgAccess(o.id));
         return access;
       }
@@ -1772,7 +1841,7 @@ async function renderRoles(view) {
   roleBack = null;
   const manage = can('desk.roles:manage');
   // The switch between the desk's roles and businesses' roles, and the one way to add a role: together, at the head's right.
-  const h = head('Үүрэг, эрх', 'Үүрэг бүр ямар хуудас, үйлдэл нээхийг тохируулна. Хүний цэс үүнээс гарна.');
+  const h = head('Үүрэг, эрх', 'Үүрэг бүр ямар хуудас, үйлдэл нээх');
   const acts = el('<div class="head-acts"></div>');
   acts.append(scopeSeg(() => show('roles')));
   h.append(acts);
@@ -2216,7 +2285,7 @@ function roleEditor(data, mods, role, { manage, from, back = {}, close, copy }) 
  */
 async function renderMenus(view) {
   const manage = can('desk.menus:manage');
-  const h = head('Цэс', 'Зүүн цэсний модуль, хуудсыг нэрлэж, эрэмбэлж, нууна.');
+  const h = head('Цэс', 'Зүүн цэсний модуль, хуудас');
   // The desk-or-business switch and the buttons that add: together, at the head's right.
   const headBox = el('<div class="head-acts"></div>');
   headBox.append(scopeSeg(() => show('menus')));
@@ -2309,7 +2378,7 @@ async function renderMenus(view) {
   const addModule = () =>
     popup({
       title: 'Модуль нэмэх',
-      sub: 'Шинэ модуль цэсний доод талд гарна. Дараа нь хуудсуудаа түүн рүү зөөнө.',
+      sub: 'Цэсний доод талд гарна.',
       width: 520,
       fields: [{ name: 'name', label: 'Нэр', placeholder: 'Тайлан', required: true, wide: true }, iconField('layers')],
       submit: 'Нэмэх',
@@ -2322,7 +2391,7 @@ async function renderMenus(view) {
   const addLink = () =>
     popup({
       title: 'Холбоос нэмэх',
-      sub: 'Basu-гийн өөр хуудас, эсвэл гадны https хаяг. Хэн харахыг «Үүрэг, эрх»-ээс сонгоно.',
+      sub: 'Basu-гийн хуудас эсвэл https хаяг.',
       width: 560,
       fields: [
         { name: 'name', label: 'Цэсэнд харагдах нэр', placeholder: 'Гарын авлага', required: true, wide: true },
@@ -2368,8 +2437,8 @@ async function renderMenus(view) {
     const acts = card.querySelector('.menu-acts');
     if (manage && !top) {
       acts.append(arrows(custom, custom.indexOf(m), 'modules'));
-      acts.append(button('Засах', () => editModule(m), 'data-size="sm" data-v="quiet" data-edit-mod'));
-      if (m.key.startsWith('m-')) acts.append(button('Устгах', () => dropModule(m), 'data-size="sm" data-v="quiet" data-drop-mod'));
+      acts.append(button('Засах', () => editModule(m), 'data-size="sm" data-edit-mod'));
+      if (m.key.startsWith('m-')) acts.append(button('Устгах', () => dropModule(m), 'data-size="sm" data-v="danger" data-drop-mod'));
     }
     const list = card.querySelector('.menu-pages');
     if (!pages.length) list.append(el('<div class="empty">Хоосон — хуудсыг «Засах»-аар энэ модуль руу зөөнө.</div>'));
@@ -2384,8 +2453,8 @@ async function renderMenus(view) {
       const acts = row.querySelector('.menu-acts');
       if (manage) {
         acts.append(arrows(pages, i, 'pages'));
-        acts.append(button('Засах', () => editPage(p), 'data-size="sm" data-v="quiet" data-edit-page'));
-        if (p.link) acts.append(button('Устгах', () => dropLink(p), 'data-size="sm" data-v="quiet" data-drop-link'));
+        acts.append(button('Засах', () => editPage(p), 'data-size="sm" data-edit-page'));
+        if (p.link) acts.append(button('Устгах', () => dropLink(p), 'data-size="sm" data-v="danger" data-drop-link'));
       }
       list.append(row);
     });
@@ -2462,7 +2531,7 @@ async function openOrgAccess(orgId, from = { label: 'Байгууллагууд'
     railActs(
       [
         decides && { label: 'Батлах', attrs: 'data-v="primary" data-a="approve"', onClick: () => approveOrg({ ...listed, ...org }, again), hint: 'Бүртгүүлсэн хүн эзэн нь болж, ажилтнуудаа өөрөө нэмнэ.' },
-        decides && { label: 'Татгалзах', attrs: 'data-a="decline"', onClick: () => declineOrg({ ...listed, ...org }, again), hint: 'Шалтгааныг нь бүртгүүлсэн хүн харж, засаад дахин бүртгүүлж болно.' },
+        decides && { label: 'Татгалзах', attrs: 'data-v="danger" data-a="decline"', onClick: () => declineOrg({ ...listed, ...org }, again), hint: 'Шалтгааныг нь бүртгүүлсэн хүн харж, засаад дахин бүртгүүлж болно.' },
       ],
       org.state === 'applied'
         ? 'Бүртгэл батлах, татгалзах нь таны үүрэгт нээлттэй биш.'
@@ -2516,7 +2585,7 @@ async function openOrgAccess(orgId, from = { label: 'Байгууллагууд'
               });
               roleHint(document.getElementById('org-member-role'), open);
             },
-            'data-v="quiet" data-size="sm" data-a="role"',
+            'data-size="sm" data-a="role"',
           )
       : null,
     rowAttrs: (m) => ({ 'data-member': m.guest_id }),
@@ -2540,7 +2609,7 @@ async function openOrgAccess(orgId, from = { label: 'Байгууллагууд'
         </div>`,
         )
         .join('')}</div>
-      <p class="page-note">«Бүх байгууллагад» үүргийг ямар ч байгууллага өгнө; бусдыг Basu сонгосон байгууллагад л нээнэ. Үүрэг бүр юу нээхийг «Үүрэг, эрх» хуудсанд засна.</p>
+      <p class="page-note">Бусад үүргийг Basu сонгосон байгууллагад л нээнэ.</p>
     </section>`);
   if (deciding && choosable.length) {
     roles.querySelector('.section-label').append(
@@ -2697,22 +2766,33 @@ function frame() {
 }
 
 /**
- * A figure wider than its cell — a seven-digit sum in one of six cells across at
- * 1440 — sets its whole band a size down, and a second if that is not enough,
- * rather than run to the cell's edge or under the next one; measured, so it
- * holds at any width and for any figure. The band's own size stays wherever
- * every figure fits. Attributes only: the observer below watches children.
+ * The figures of a band at one size: each tile sizes its own figure (app.css,
+ * container units), and a figure wider than its tile — a seven-digit sum — or
+ * a tile wider than the others (the money's) sets the whole band to the
+ * largest size every figure fits at (`data-fit`, `--fit`), rather than run to
+ * a tile's edge or read uneven; measured, so it holds at any width and for any
+ * figure. Attributes and a style property only: the observer below watches
+ * children.
  */
 function fitBands(scope) {
   for (const band of scope.querySelectorAll('.kpi-band')) {
     if (!band.clientWidth) continue; // not laid out — hidden for now — so nothing to measure yet
     const figures = [...band.querySelectorAll(':scope > .kpi:not([data-word]) > b')];
     band.removeAttribute('data-fit');
-    let level = 0;
-    while (level < 2 && figures.some((b) => b.scrollWidth > b.clientWidth + 1)) {
-      level += 1;
-      band.setAttribute('data-fit', String(level));
+    band.style.removeProperty('--fit');
+    // Each figure at its tile's size, or — wider than its tile — the size at which it fits; the band takes the
+    // smallest of them, so the row reads even and nothing runs to an edge.
+    let size = Infinity;
+    let largest = 0;
+    for (const b of figures) {
+      const px = parseFloat(getComputedStyle(b).fontSize);
+      if (!px || !b.clientWidth) continue;
+      largest = Math.max(largest, px);
+      size = Math.min(size, b.scrollWidth > b.clientWidth + 1 ? (px * b.clientWidth) / b.scrollWidth : px);
     }
+    if (!Number.isFinite(size) || size >= largest) continue;
+    band.style.setProperty('--fit', `${Math.max(16, Math.floor(size * 0.98))}px`);
+    band.setAttribute('data-fit', '');
   }
 }
 let fitting = 0;
@@ -2837,7 +2917,7 @@ function show(key) {
   if (draw) draw(view);
   else {
     // A page this person's role does not open — an old link, a role changed since: say so, and the way back.
-    view.append(head('Энэ хуудас нээлттэй биш', 'Таны үүрэг энэ хуудсыг нээдэггүй, эсвэл хуудас цэснээс хасагдсан.'));
+    view.append(head('Энэ хуудас нээлттэй биш', 'Таны үүрэг энэ хуудсыг нээдэггүй'));
     const home = firstPage(ws);
     if (home && home !== key && hasPage(home)) view.append(button('Эхний хуудас руу', () => show(home), 'data-size="sm"'));
   }
@@ -2920,7 +3000,7 @@ const ALERT_TAB = [
 const LEVEL_RANK = { bad: 0, warn: 1, info: 2 };
 
 async function renderOverview(view) {
-  view.append(head('Самбар', 'Хийх ажил эхэндээ, дараа нь Basu-гийн өнөөдрийн байдал.'));
+  view.append(head('Самбар', todayLine()));
   // The page's own shape while its numbers come: the things to do, then a band of six.
   const waiting = busyBox('<div class="overview-skel"></div>');
   waiting.append(quiet(skeleton('rows', 2)), quiet(skeleton('kpis', 6)));
@@ -2949,7 +3029,7 @@ async function renderOverview(view) {
     const go = a.tab && hasPage(a.tab) ? `<button type="button" class="btn" data-size="sm" data-go="${esc(a.tab)}">${esc(GO_WORD[a.tab] ?? 'Очих')}</button>` : '';
     list.append(el(`<div class="alert" data-level="${esc(a.level)}"><span class="alert-text">${esc(a.text)}</span>${go}</div>`));
   }
-  if (!todo.length) list.append(el('<div class="alert" data-level="ok"><span class="alert-text">Одоогоор хийх ажил алга. Шинэ хүсэлт, олголт ирвэл энд гарна.</span></div>'));
+  if (!todo.length) list.append(el('<div class="alert" data-level="ok"><span class="alert-text">Одоогоор хийх ажил алга.</span></div>'));
   list.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-go]');
     if (!b) return;
@@ -2981,7 +3061,7 @@ async function renderOverview(view) {
     ),
     cell('Зочид', v.guests.total, `өнөөдөр шинээр ${v.guests.joined.today} · ${v.guests.sessions_open} нэвтэрсэн`),
     cell('Зочдын түрийвч', money(w.liability_mnt), `зочдод өгөх өр${w.payable_mnt ? ` · гадагш өгөх ${mnt(w.payable_mnt)}` : ''}`),
-    cell('Basu-гийн данс', money(w.revenue_mnt), w.drift === 0 ? 'дэвтэр тэнцсэн' : `дэвтэр зөрүү ${mnt(w.drift)}`, w.drift === 0 ? '' : ' data-tone="bad"'),
+    cell('Basu-гийн данс', money(w.revenue_mnt), w.drift === 0 ? 'дэвтэр тэнцсэн' : `дэвтэр зөрүү ${mnt(w.drift)}`, w.drift === 0 ? ' data-money' : ' data-money data-tone="bad"'),
   );
 
   // What a period brought: the switch at the top of the page picks it.
@@ -3006,7 +3086,7 @@ async function renderOverview(view) {
       cell('Идэшний захиалга', t(v.idesh.paid), sold(t(v.idesh.paid), t(v.idesh.sales_mnt), t(v.idesh.cancelled), 'төлсөн захиалга алга')),
       cell('Хоолны захиалга', t(v.dine.placed), sold(t(v.dine.placed), t(v.dine.sales_mnt), t(v.dine.cancelled), 'захиалга алга')),
       cell('Цэнэглэлт', money(t(w.topups.settled_mnt)), t(w.topups.settled) ? `${t(w.topups.settled)} удаа${t(w.topups.failed) ? ` · ${t(w.topups.failed)} амжилтгүй` : ''}` : 'цэнэглэлт алга'),
-      cell('Орлого (Basu)', money(t(w.revenue)), `идэшний шимтгэл ${mnt(t(v.idesh.commission_mnt))}`),
+      cell('Орлого (Basu)', money(t(w.revenue)), `идэшний шимтгэл ${mnt(t(v.idesh.commission_mnt))}`, ' data-money'),
       cell('Буцаалт', money(refunds), refunds ? `түрийвчид ${t(w.refunds.count)} удаа · данс руу ${mnt(t(v.idesh.refund_mnt))}` : 'буцаалт алга'),
     );
     cross.replaceChildren(el(`<table class="table"><thead><tr><th><span class="sr-only">Үзүүлэлт</span></th><th class="num">Идэш</th><th class="num">Хоол</th></tr></thead><tbody>
@@ -3044,7 +3124,7 @@ const PLATFORM_WORD = { ios: 'iPhone', android: 'Android', web: 'Вэб' };
 let guestQ = '';
 
 function renderGuests(view) {
-  view.append(head('Зочид', 'Утас, имэйл, нэрээр хайна — хүргэлтэд өгсөн утсаар ч олдоно.'));
+  view.append(head('Зочид', 'Утас, имэйл, нэрээр хайна'));
   const table = dataTable({
     columns: [
       {
@@ -3201,7 +3281,7 @@ async function openGuest(id, from = { label: 'Зочид', go: () => show('guest
           <div class="card-body acts">
             ${f.sessions.length ? f.sessions.map((s) => `
               <div class="sess"><span>${esc(s.label ?? 'Утас')}<small>сүүлд ${when(s.last_seen_at ?? s.created_at)} ${clockOf(s.last_seen_at ?? s.created_at)}</small></span>
-              ${can('desk.guests:sessions') ? `<button class="btn" data-v="quiet" data-size="sm" type="button" data-a="revoke" data-sid="${s.id}">Гаргах</button>` : ''}</div>`).join('') : '<div class="hint">Одоо нэвтэрсэн төхөөрөмж алга.</div>'}
+              ${can('desk.guests:sessions') ? `<button class="btn" data-v="danger" data-size="sm" type="button" data-a="revoke" data-sid="${s.id}">Гаргах</button>` : ''}</div>`).join('') : '<div class="hint">Одоо нэвтэрсэн төхөөрөмж алга.</div>'}
             ${f.devices.length ? `<div class="hint">Push мэдэгдэл авдаг: ${f.devices.map((d) => esc(`${PLATFORM_WORD[d.platform] ?? d.platform}${d.label ? ` · ${d.label}` : ''}`)).join(', ')}</div>` : ''}
             ${closed ? `<div class="sep"></div><div class="hint">Бүртгэл ${when(g.closed_at)}-нд хаагдсан. Захиалга, гүйлгээ нь бүртгэлд үлдсэн.</div>` : `
             <div class="sep"></div>
@@ -3249,10 +3329,10 @@ async function openGuest(id, from = { label: 'Зочид', go: () => show('guest
   }));
   const idesh = dataTable({
     columns: [
-      { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(`<span class="mono">№${esc(o.code)}</span>`, esc(`${o.title} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}`)) },
+      { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(esc(`${o.title} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}`), `<span class="mono">№${esc(o.code)}</span>`) },
       { key: 'supplier', label: 'Нийлүүлэгч', value: (o) => o.supplier.name },
       { key: 'receive_on', label: 'Өдөр', render: (o) => `<span class="mono nowrap">${dayLabel(o.receive_on)}</span>` },
-      { key: 'state', label: 'Төлөв', value: (o) => STATE_WORD[o.state] ?? o.state, render: (o) => dtCell.pill(o.state, STATE_WORD[o.state] ?? o.state) },
+      { key: 'state', label: 'Төлөв', value: (o) => STATE_WORD[o.state] ?? o.state, render: (o) => ideshStage(o.state) },
       { key: 'total_mnt', label: 'Дүн', align: 'end', numeric: true, render: (o) => dtCell.money(o.total_mnt) },
     ],
     search: false,
@@ -3355,7 +3435,7 @@ function toggleVenue(r, done) {
 }
 
 async function renderVenues(view) {
-  view.append(head('Ресторан', 'Гал тогоо нээлттэй эсэх, өнөөдрийн захиалга, цэс, үнэлгээ.'));
+  view.append(head('Ресторан', 'Гал тогоо, өнөөдрийн захиалга, цэс'));
   const manage = can('desk.venues:manage');
   const table = dataTable({
     columns: [
@@ -3421,7 +3501,7 @@ async function renderVenues(view) {
     actions: manage
       ? (r) => {
           // Quiet in the row; the red is the popup's, where the stop is said and confirmed.
-          const b = el(`<button class="btn" data-size="sm" data-v="quiet" type="button" data-a="active">${r.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>`);
+          const b = el(`<button class="btn" data-size="sm" type="button" data-a="active">${r.active ? 'Зогсоох' : 'Идэвхжүүлэх'}</button>`);
           b.addEventListener('click', () => toggleVenue(r, () => loadVenues(table)));
           return b;
         }
@@ -3526,7 +3606,7 @@ async function openVenue(r, from = { label: 'Ресторан', go: () => show('
     search: { placeholder: 'Хоолны нэр, цех…' },
     actions: manage
       ? (m) => {
-          const b = el(`<button class="btn" data-size="sm" data-v="quiet" type="button" data-item="${m.id}">${m.active ? 'Нуух' : 'Харуулах'}</button>`);
+          const b = el(`<button class="btn" data-size="sm" type="button" data-item="${m.id}">${m.active ? 'Нуух' : 'Харуулах'}</button>`);
           b.addEventListener('click', () =>
             confirmPopup({
               title: m.active ? 'Хоолыг цэснээс нуух' : 'Хоолыг цэсэнд буцаах',
@@ -3566,7 +3646,7 @@ async function openVenue(r, from = { label: 'Ресторан', go: () => show('
 let lunchFilter = { scope: 'live', restaurant: '', day: '', q: '' };
 
 async function renderLunches(view) {
-  view.append(head('Хоолны захиалга', 'Ресторанд урьдчилж өгсөн хоолны захиалгууд.'));
+  view.append(head('Хоолны захиалга', 'Ресторанд урьдчилж өгсөн захиалга'));
   if (!venueCache.length) {
     try {
       ({ restaurants: venueCache } = await ops('/v1/ops/dine/restaurants'));
@@ -3784,7 +3864,7 @@ async function openLunch(id, from = { label: 'Хоолны захиалга', go
 let reviewVenue = '';
 
 async function renderReviews(view) {
-  view.append(head('Үнэлгээ', 'Хооллосон зочдын одоор өгсөн үнэлгээ, сэтгэгдэл.'));
+  view.append(head('Үнэлгээ', 'Зочдын од, сэтгэгдэл'));
   if (!venueCache.length) {
     try {
       ({ restaurants: venueCache } = await ops('/v1/ops/dine/restaurants'));
@@ -3880,7 +3960,7 @@ async function download(path, name) {
 }
 
 function renderMoney(view) {
-  view.append(head('Мөнгө', 'Дэвтрийн данс, гүйлгээ, цэнэглэлт, е-баримт. Нягтланд CSV.'));
+  view.append(head('Мөнгө', 'Дэвтэр, гүйлгээ, цэнэглэлт, е-баримт'));
   const seg = el(`<div class="seg">${[['checks', 'Нэгтгэл'], ['transfers', 'Гүйлгээ'], ['topups', 'Цэнэглэлт'], ['receipts', 'Е-баримт']].map(([k, l]) => `<button type="button" data-m="${k}" aria-pressed="${moneyView === k}"${moneyView === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
   seg.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-m]');
@@ -3923,7 +4003,7 @@ async function moneyChecks() {
       <div class="card kpi"><div class="lab">Гадагш өгөх</div><b>${money(c.wallets.payable_mnt)}</b><span>нийлүүлэгч, буцаалт · банкаар гарсан ${mnt(c.bank.out_mnt)}</span></div>
       <div class="card kpi" data-word${ok(c.receipts.failed === 0) || (c.receipts.gap === 0 ? ' data-tone="good"' : ' data-tone="warn"')}><div class="lab">Е-баримт</div><b>${c.receipts.gap === 0 ? 'бүрэн' : `${c.receipts.gap} дутуу`}</b><span>гарсан ${c.receipts.issued} · дараалалд ${c.receipts.queued} · амжилтгүй ${c.receipts.failed}</span></div>
     </div>
-    ${canMoney() ? '<div class="run-row"><button class="btn" type="button" id="run">Шалгалт одоо ажиллуулах</button><span class="cap">Дэвтэр, е-баримтын тулгалт ба дараалал. Өдөр бүр 23:30-д өөрөө ажилладаг.</span></div>' : ''}
+    ${canMoney() ? '<div class="run-row"><button class="btn" type="button" id="run">Шалгалт одоо ажиллуулах</button><span class="cap">Өдөр бүр 23:30-д өөрөө ажилладаг.</span></div>' : ''}
     <section class="section"><h2 class="section-label">Данс бүрээр</h2><div data-accounts></div></section>
   </div>`);
   /** A ledger account's kind, in the words of the books. */
@@ -4083,7 +4163,7 @@ async function moneyReceipts() {
     },
     actions: (r) => {
       if (r.state !== 'failed' || !canMoney()) return null;
-      const retry = el(`<button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${r.id}">Дахин илгээх</button>`);
+      const retry = el(`<button class="btn" data-size="sm" type="button" data-retry="${r.id}">Дахин илгээх</button>`);
       retry.addEventListener('click', async () => {
         try {
           await ops(`/v1/ops/money/receipts/${r.id}/retry`, { method: 'POST', body: {} });
@@ -4117,7 +4197,7 @@ let notifyView = localStorage.getItem('basu.ops.notify') ?? 'log';
 let msgFilter = { q: '', state: '', channel: '' };
 
 function renderNotify(view) {
-  view.append(head('Мэдэгдэл', 'Зочдод илгээсэн SMS, push. Амжилтгүйг дахин илгээнэ.'));
+  view.append(head('Мэдэгдэл', 'Зочдод илгээсэн SMS, push'));
   const seg = el(`<div class="seg">${[['log', 'Бүх мэдэгдэл'], ['volume', 'Сараар']].map(([k, l]) => `<button type="button" data-n="${k}" aria-pressed="${notifyView === k}"${notifyView === k ? ' data-on' : ''}>${l}</button>`).join('')}</div>`);
   seg.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-n]');
@@ -4189,7 +4269,7 @@ async function notifyLog() {
     },
     actions: (m) => {
       if (m.state !== 'failed' || !can('desk.notify:retry')) return null;
-      const retry = el(`<button class="btn" data-size="sm" data-v="quiet" type="button" data-retry="${m.id}">Дахин илгээх</button>`);
+      const retry = el(`<button class="btn" data-size="sm" type="button" data-retry="${m.id}">Дахин илгээх</button>`);
       retry.addEventListener('click', async () => {
         try {
           await ops(`/v1/ops/notify/messages/${m.id}/retry`, { method: 'POST', body: {} });
@@ -4267,7 +4347,7 @@ function settingValue(k) {
 }
 
 async function renderSystem(view) {
-  view.append(head('Систем', 'Холболт, хуваарьлагч, өгөгдлийн сан, тохиргоо.'));
+  view.append(head('Систем', 'Холболт, хуваарьлагч, тохиргоо'));
   view.append(el('<div id="system"></div>'));
   view.querySelector('#system').append(busy());
   await drawSystem();
@@ -4300,9 +4380,9 @@ async function drawSystem() {
         <tr><td>Е-баримт гаргасан</td><td class="num">${sch.day.receipts}</td></tr>
       </tbody></table></div></div>
       <h2 class="section-label">Сервер</h2><div class="card"><div class="table-wrap"><table class="table"><tbody>
-        <tr><td>Орчин</td><td class="num"><span class="pill" data-s="${s.mode === 'production' ? 'contracted' : 'PAID'}">${s.mode === 'production' ? 'Бодит' : 'Туршилтын'}</span></td></tr>
-        <tr><td>Хувилбар</td><td class="num">${esc(s.version)} · Node.js ${esc(String(s.node ?? '').replace(/^v/, ''))}</td></tr>
-        <tr><td>Асаасан</td><td class="num">${when(s.started_at)} ${clockOf(s.started_at)}</td></tr>
+        <tr><td>Орчин</td><td class="end"><span class="pill" data-s="${s.mode === 'production' ? 'contracted' : 'PAID'}">${s.mode === 'production' ? 'Бодит' : 'Туршилтын'}</span></td></tr>
+        <tr><td>Хувилбар</td><td class="end">${esc(s.version)} · Node.js ${esc(String(s.node ?? '').replace(/^v/, ''))}</td></tr>
+        <tr><td>Асаасан</td><td class="end">${when(s.started_at)} ${clockOf(s.started_at)}</td></tr>
       </tbody></table></div></div>
       <h2 class="section-label">Идэшний дүрэм</h2><div class="card"><div class="table-wrap"><table class="table"><tbody>
         <tr><td>Шимтгэл<span class="sub">хүлээлгэн өгсөн захиалгын махны үнээс</span></td><td class="num">${s.rules.commission_pct}%</td></tr>
@@ -4327,7 +4407,7 @@ async function drawSystem() {
         () =>
           popup({
             title: 'Тохиргоо',
-            sub: 'Өөрчилсөн утга шууд үйлчилнэ; хэн, хэзээ өөрчилсөн нь үлдэнэ.',
+            sub: 'Шууд үйлчилнэ; өөрчилсөн хүн нь үлдэнэ.',
             width: 600,
             id: 'settings-edit',
             fields: s.settings.map((k) => ({
@@ -4359,7 +4439,7 @@ async function drawSystem() {
 /* ── the numbers ── */
 
 async function renderStats(view) {
-  view.append(head('Тоон үзүүлэлт', 'Идэшний захиалга, борлуулалт, шимтгэл, буцаалт.'));
+  view.append(head('Тоон үзүүлэлт', 'Захиалга, борлуулалт, шимтгэл, буцаалт'));
   view.append(busy());
   let st;
   try {
@@ -4376,7 +4456,7 @@ async function renderStats(view) {
     kpis.replaceChildren(
       el(`<div class="card kpi"><div class="lab">Төлсөн захиалга</div><b>${t.paid}</b><span>${t.handed} хүлээлгэн өгсөн</span></div>`),
       el(`<div class="card kpi"><div class="lab">Борлуулалт</div><b>${money(t.sales_mnt)}</b><span>төлөгдсөн захиалгын дүн</span></div>`),
-      el(`<div class="card kpi"><div class="lab">Шимтгэл (Basu)</div><b>${money(t.commission_mnt)}</b><span>хүлээлгэн өгсөн захиалгаас</span></div>`),
+      el(`<div class="card kpi" data-money><div class="lab">Шимтгэл (Basu)</div><b>${money(t.commission_mnt)}</b><span>хүлээлгэн өгсөн захиалгаас</span></div>`),
       el(`<div class="card kpi"><div class="lab">Цуцлагдсан</div><b>${t.cancelled}</b><span>${t.cancelled ? `нийлүүлэгчийн буруу ${t.supplier_fault} · зочны ${t.guest_fault}` : 'цуцлалт алга'}</span></div>`),
       el(`<div class="card kpi"><div class="lab">Буцаалт</div><b>${money(t.refund_mnt)}</b><span>зочдод буцах дүн</span></div>`),
       el(`<div class="card kpi"><div class="lab">Суутгал</div><b>${money(t.forfeit_mnt)}</b><span>нийлүүлэгчид үлдсэн</span></div>`),
@@ -4438,11 +4518,11 @@ let movingScope = false;
 
 function renderOrders(view) {
   const suppliers = cache.suppliers.filter((s) => s.state === 'contracted');
-  view.append(head('Захиалгууд', 'Бүх нийлүүлэгчийн идэшний захиалга нэг дор.'));
+  view.append(head('Захиалгууд', 'Бүх нийлүүлэгчийн идэшний захиалга'));
   const day = el(`<input class="input dt-date" type="date" id="day" value="${esc(orderFilter.day)}" title="Авах, хүргэх өдөр" aria-label="Авах, хүргэх өдөр">`);
   const table = dataTable({
     columns: [
-      { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(`<span class="mono">№${esc(o.code)}</span>`, esc(`${o.title} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}`)) },
+      { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(esc(`${o.title} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}`), `<span class="mono">№${esc(o.code)}</span>`) },
       { key: 'supplier', label: 'Нийлүүлэгч', value: (o) => o.supplier.name },
       {
         key: 'guest',
@@ -4459,7 +4539,7 @@ function renderOrders(view) {
         label: 'Өдөр',
         render: (o) => dtCell.twoHtml(`<span class="mono">${dayLabel(o.receive_on)}</span>`, o.receive === 'delivery' ? 'хүргэлт' : 'өөрөө авна'),
       },
-      { key: 'state', label: 'Төлөв', value: (o) => STATE_WORD[o.state] ?? o.state, render: (o) => dtCell.pill(o.state, STATE_WORD[o.state] ?? o.state) },
+      { key: 'state', label: 'Төлөв', value: (o) => STATE_WORD[o.state] ?? o.state, render: (o) => ideshStage(o.state) },
       { key: 'total_mnt', label: 'Дүн', align: 'end', numeric: true, render: (o) => dtCell.money(o.total_mnt) },
     ],
     search: { placeholder: 'Код, утас, зочин, нийлүүлэгч, мах…' },
@@ -4550,7 +4630,7 @@ async function openOrder(id, from = { label: 'Захиалгууд', go: () => s
   const manage = can('desk.orders:manage');
   view.replaceChildren();
   backTo(view, from);
-  view.append(head(`№${esc(o.code)} <span class="pill" data-s="${esc(o.state)}">${esc(STATE_WORD[o.state] ?? o.state)}</span>`, `${esc(o.title)} ×${esc(o.qty)}${o.unit === 'kg' ? ' кг' : ''} · ${esc(o.supplier.name)}`));
+  view.append(head(`№${esc(o.code)} ${ideshStage(o.state)}`, `${esc(o.title)} ×${esc(o.qty)}${o.unit === 'kg' ? ' кг' : ''} · ${esc(o.supplier.name)}`));
   const here = { label: `№${o.code}`, go: () => openOrder(id, from) };
   // Who bought it: the order says (the story's first line is the guest's own, by their account, as before).
   const guestId = o.guest_id ?? d.events.map((e) => /^guest:([0-9a-f-]{36})$/.exec(e.actor ?? '')?.[1]).find(Boolean) ?? null;
@@ -4716,7 +4796,7 @@ const bankOf = (v) => (v.bank_name === OTHER_BANK ? String(v.bank_other ?? '').t
 const registerSupplier = () =>
   popup({
     title: 'Нийлүүлэгч бүртгэх',
-    sub: 'Гэрээ байгуулсан нийлүүлэгчийг шууд бүртгэнэ. Эзэмшигч нь Basu-д өмнө нь нэвтэрсэн байх ёстой — бүртгэмэгц өөрийн бүртгэлээр /supplier-д орно.',
+    sub: 'Эзэмшигч нь Basu-д өмнө нэвтэрсэн байх ёстой.',
     width: 640,
     id: 'new-supplier',
     fields: [
@@ -4762,7 +4842,7 @@ function renderSuppliers(view) {
   const runs = can('desk.suppliers:manage');
   view.append(
     headActs(
-      head('Нийлүүлэгчид', 'Гэрээт нийлүүлэгчид, ирсэн хүсэлтүүд.'),
+      head('Нийлүүлэгчид', 'Гэрээт нийлүүлэгч, ирсэн хүсэлт'),
       runs && button(`${NAV_ICON.plus}Нийлүүлэгч бүртгэх`, registerSupplier, 'data-v="primary" id="add-supplier"'),
     ),
   );
@@ -4780,7 +4860,7 @@ function renderSuppliers(view) {
       actions: runs
         ? (s) => [
             button('Батлах', () => approveSupplier(s, refresh), 'data-v="primary" data-size="sm" data-a="approve"'),
-            button('Татгалзах', () => declineSupplier(s, refresh), 'data-v="quiet" data-size="sm" data-a="decline"'),
+            button('Татгалзах', () => declineSupplier(s, refresh), 'data-v="danger" data-size="sm" data-a="decline"'),
           ]
         : null,
       sort: { key: 'applied_at', desc: true },
@@ -4791,7 +4871,7 @@ function renderSuppliers(view) {
       rows: applied,
     });
     asked.el.id = 'applied';
-    const section = el(`<section class="section"><h2 class="section-label">Хариу хүлээж буй хүсэлт<span class="n">${applied.length}</span></h2><p class="section-note">Батлахад хүсэлт гаргасан хүн эзэн нь болж, зараа тавьж эхэлнэ. Татгалзвал шалтгааныг нь хүсэлт гаргагч харж, засаад дахин хүсэж болно.</p></section>`);
+    const section = el(`<section class="section"><h2 class="section-label">Хариу хүлээж буй хүсэлт<span class="n">${applied.length}</span></h2><p class="section-note">Батлахад хүсэлт гаргасан хүн эзэн нь болно.</p></section>`);
     section.append(asked.el);
     view.append(section);
   }
@@ -4944,7 +5024,7 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
     railActs(
       [
         asked && runs && { label: 'Батлах', attrs: 'data-v="primary" data-a="approve"', onClick: () => approveSupplier(s, again), hint: 'Хүсэлт гаргасан хүн эзэн нь болж, өөрийн бүртгэлээр зараа тавьж эхэлнэ.' },
-        asked && runs && { label: 'Татгалзах', attrs: 'data-a="decline"', onClick: () => declineSupplier(s, again), hint: 'Шалтгааныг нь хүсэлт гаргагч харж, засаад дахин хүсэж болно.' },
+        asked && runs && { label: 'Татгалзах', attrs: 'data-v="danger" data-a="decline"', onClick: () => declineSupplier(s, again), hint: 'Шалтгааныг нь хүсэлт гаргагч харж, засаад дахин хүсэж болно.' },
         unverified && { label: 'Данс баталгаажуулах', attrs: 'data-v="primary" data-a="bank-verify"', onClick: verifyBank, hint: 'Гэрээний данстай тулгасны дараа олголт энэ данс руу явна.' },
         s.state !== 'declined' && signs && { label: 'Гэрээ, данс засах', attrs: 'data-a="terms"', onClick: editTerms, hint: 'Шимтгэл, ТТД, олголт очих данс.' },
         'sep',
@@ -4991,7 +5071,7 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
                         await again();
                       },
                     }),
-                  'data-v="quiet" data-size="sm" data-a="hide"',
+                  'data-size="sm" data-a="hide"',
                 )
               : null
         : null,
@@ -5009,10 +5089,10 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
     if (hasPage('orders')) {
       orders = dataTable({
         columns: [
-          { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(`<span class="mono">№${esc(o.code)}</span>`, esc(`${o.title} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}`)) },
+          { key: 'code', label: 'Захиалга', render: (o) => dtCell.twoHtml(esc(`${o.title} ×${o.qty}${o.unit === 'kg' ? ' кг' : ''}`), `<span class="mono">№${esc(o.code)}</span>`) },
           { key: 'guest', label: 'Зочин', value: (o) => `${o.guest ?? ''} ${o.guest_email ?? ''} ${o.guest_phone ?? ''}`, render: (o) => dtCell.twoHtml(guestWho(o.guest, o.guest_email), o.guest_phone ? dtCell.phone(o.guest_phone) : '') },
           { key: 'receive_on', label: 'Өдөр', render: (o) => dtCell.twoHtml(`<span class="mono nowrap">${dayLabel(o.receive_on)}</span>`, o.receive === 'delivery' ? 'хүргэлт' : 'өөрөө авна'), phone: false },
-          { key: 'state', label: 'Төлөв', value: (o) => STATE_WORD[o.state] ?? o.state, render: (o) => dtCell.pill(o.state, STATE_WORD[o.state] ?? o.state) },
+          { key: 'state', label: 'Төлөв', value: (o) => STATE_WORD[o.state] ?? o.state, render: (o) => ideshStage(o.state) },
           { key: 'total_mnt', label: 'Дүн', align: 'end', numeric: true, render: (o) => dtCell.money(o.total_mnt) },
         ],
         search: false,
@@ -5198,7 +5278,7 @@ const PROMO_STANDING = {
 async function renderPromotions(view) {
   const manages = can('desk.promotions:manage');
   view.append(
-    head('Онцлох зар', 'Нийлүүлэгчийн төлж онцолсон зарууд. Үнэ, хоногийг «Систем»-ээс тохируулна.'),
+    head('Онцлох зар', 'Нийлүүлэгчийн төлж онцолсон зарууд'),
   );
   const band = el('<div class="kpis kpi-band band-gap" id="promo-kpis"></div>');
   view.append(band);
@@ -5210,7 +5290,7 @@ async function renderPromotions(view) {
         key: 'tier',
         label: 'Зэрэглэл',
         value: (p) => p.name,
-        render: (p) => dtCell.twoHtml(`<span class="pill" data-tone="${p.tier === 'vip' ? 'hi' : 'accent'}" data-strong>${p.tier === 'vip' ? 'VIP' : 'Онцгой'}</span>`, `${p.days} хоног`),
+        render: (p) => dtCell.twoHtml(`<span class="pill" data-tone="${p.tier === 'vip' ? 'hi' : 'ready'}" data-strong>${p.tier === 'vip' ? 'VIP' : 'Онцгой'}</span>`, `${p.days} хоног`),
       },
       { key: 'price_mnt', label: 'Үнэ', render: (p) => dtCell.money(p.price_mnt) },
       { key: 'buyer', label: 'Төлсөн', value: (p) => `${p.buyer ?? ''} ${p.buyer_contact ?? ''}`, render: (p) => dtCell.two(p.buyer ?? 'Нэргүй', p.buyer_contact ?? '') },
@@ -5293,10 +5373,10 @@ function renderPay(view) {
     waiting.length ? `${waiting.length} буцаалт — зочин дансаа оруулаагүй` : '',
     unchecked.length ? `${unchecked.length} олголт — данс баталгаажаагүй` : '',
   ].filter(Boolean);
-  view.append(head('Олголт, буцаалт', 'Нийлүүлэгчийн олголт, зочны буцаалт. Нэг хүн батлаж, өөр хүн шилжүүлнэ.'));
+  view.append(head('Олголт, буцаалт', 'Нэг хүн батлаж, өөр хүн шилжүүлнэ'));
   // Money is never coloured: the figures stay ink, whatever waits behind them.
   view.append(el(`<div class="kpis kpi-band" id="pay-sum">
-    <div class="card kpi"><div class="lab">Шилжүүлэх</div><b>${money(sum(ready))}</b><span>${ready.length ? `${ready.length} олголт, буцаалт — данс бэлэн` : 'одоо шилжүүлэх зүйл алга'}</span></div>
+    <div class="card kpi" data-money><div class="lab">Шилжүүлэх</div><b>${money(sum(ready))}</b><span>${ready.length ? `${ready.length} олголт, буцаалт — данс бэлэн` : 'одоо шилжүүлэх зүйл алга'}</span></div>
     <div class="card kpi"><div class="lab">Данс хүлээж буй</div><b>${money(sum(waiting) + sum(unchecked))}</b><span>${held.length ? held.join(' · ') : 'данс хүлээж буй мөр алга'}</span></div>
     <div class="card kpi"><div class="lab">Шилжүүлсэн, 30 хоног</div><b>${money(sum(paid))}</b><span>${paid.length ? `${paid.length} удаа` : 'сүүлийн 30 хоногт шилжүүлээгүй'}</span></div>
   </div>`));
@@ -5371,7 +5451,7 @@ function auditWho(a) {
 }
 
 async function renderAudit(view) {
-  view.append(head('Үйлдлийн түүх', 'Ширээнд хийсэн үйлдэл бүр: хэн, хэзээ, юуг, ямар тэмдэглэлтэй.'));
+  view.append(head('Үйлдлийн түүх', 'Ширээнд хийсэн үйлдэл бүр'));
   const areas = [...new Set(Object.values(TARGET_WORD))];
   const table = dataTable({
     columns: [
@@ -5421,13 +5501,13 @@ async function renderMembers(view) {
   const roleOptions = roleList.map((r) => [r.key, r.name]);
   view.append(
     headActs(
-      head('Гишүүд', 'Basu-гийн ширээнд ажилладаг хүмүүс, тэдний үүрэг.'),
+      head('Гишүүд', 'Basu-гийн ширээнд ажилладаг хүмүүс'),
       button(
         `${NAV_ICON.plus}Гишүүн нэмэх`,
         () => {
           void popup({
             title: 'Гишүүн нэмэх',
-            sub: 'Basu-д нэвтэрсэн хэрэглэгчдээс хүнээ сонгоод үүрэг өгнө. Тэр дараагийн удаа нэвтрэхэд Basu-гийн ширээ нь нээгдэнэ.',
+            sub: 'Basu-гийн хэрэглэгчээс сонгоод үүрэг өгнө.',
             width: 600,
             id: 'member-new',
             fields: [
@@ -5515,7 +5595,7 @@ async function renderMembers(view) {
             });
             roleHint(document.getElementById('member-role'), roleList);
           },
-          'data-v="quiet" data-size="sm" data-a="role"',
+          'data-size="sm" data-a="role"',
         ),
         // Said as what it does — the desk closes to them — not «Хаах», which every popup's corner says too.
         button(
@@ -5536,7 +5616,7 @@ async function renderMembers(view) {
                 show('members');
               },
             }),
-          'data-v="quiet" data-size="sm" data-a="active"',
+          `${m.active ? 'data-v="danger" ' : ''}data-size="sm" data-a="active"`,
         ),
       ];
     },

@@ -3139,6 +3139,9 @@ describe('нийлүүлэгч болох', () => {
     // The desk's first page drawn: a tab pressed while it still loads would draw its page twice.
     await until(desk, 'the overview', (d) => Boolean(d.querySelector('#now')));
     const said = (list: string) => [...doc.querySelectorAll(`#${list} tbody .pill`)].map((p) => [(p as HTMLElement).dataset['s'], p.textContent]);
+    // An идэш's state is a word and its meter (api.js ideshStage): the word is the stage's <b>, the meter says nothing.
+    const staged = (list: string) =>
+      [...doc.querySelectorAll(`#${list} tbody .stage`)].map((p) => [(p as HTMLElement).dataset['s'], p.querySelector(':scope > b')?.textContent]);
 
     // Every lunch, going on and over: the demo's history closed some, other tests left some on the fire.
     // A list's first answer lands before another is asked for: the later answer of two in flight is the one drawn.
@@ -3160,8 +3163,12 @@ describe('нийлүүлэгч болох', () => {
     (doc.querySelector('#orders .dt-seg button[data-v="all"]') as HTMLElement).click();
     const ours = () => [...doc.querySelectorAll('#orders tr[data-order]')].find((r) => r.textContent?.includes(`№${code}`));
     await until(desk, 'the идэш that is over', () => Boolean(ours()));
-    for (const [state, word] of said('orders')) expect(word, state).toBe(IDESH[state!]);
-    expect(ours()!.querySelector('.pill')?.textContent).toBe('Дууссан');
+    expect(said('orders')).toEqual([]);
+    expect(staged('orders').length).toBeGreaterThan(0);
+    for (const [state, word] of staged('orders')) expect(word, state).toBe(IDESH[state!]);
+    expect(ours()!.querySelector('.stage > b')?.textContent).toBe('Дууссан');
+    // Over, it has gone the whole way: four bars of four, none of them the crimson's «now».
+    expect(ours()!.querySelectorAll('.stage .meter > i[data-on]').length).toBe(4);
   });
 
   it('says a guest with no name quietly in the lunch, order and message lists, as the guests’ table does', async () => {
@@ -3407,7 +3414,7 @@ describe('who sees what', () => {
     const bank = doc.querySelector('#nudge-bank a.btn')!;
     expect(listing.getAttribute('href')).toBe(`/supplier?org=${orgId}#stall/new`);
     expect(bank.getAttribute('href')).toBe(`/supplier?org=${orgId}#profile/bank`);
-    // One pine button: the first thing to do.
+    // One primary button, the off-white pill: the first thing to do.
     expect(listing.getAttribute('data-v')).toBe('primary');
     expect(bank.hasAttribute('data-v')).toBe(false);
 
