@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import rateLimit from '@fastify/rate-limit';
@@ -932,6 +933,20 @@ async function mountPages(app: FastifyInstance, root: string): Promise<void> {
   app.get('/ops', (_request, reply) => reply.redirect('/dashboard', 301));
   app.get('/terms', (_request, reply) => reply.sendFile('terms.html'));
   app.get('/privacy', (_request, reply) => reply.sendFile('privacy.html'));
+
+  // An address we do not have. A browser that asked for a page gets one, in
+  // the site's own words and colours, rather than the framework's English
+  // JSON on white; the API, the app and a script missing a file still get
+  // the JSON they read, as before.
+  const lost = readFileSync(join(root, '404.html'));
+  app.setNotFoundHandler((request, reply) => {
+    const page =
+      (request.method === 'GET' || request.method === 'HEAD') &&
+      !request.url.startsWith('/v1/') &&
+      (request.headers.accept ?? '').includes('text/html');
+    if (page) return reply.code(404).header('cache-control', 'no-store').type('text/html; charset=utf-8').send(lost);
+    return reply.code(404).send({ message: `Route ${request.method}:${request.url} not found`, error: 'Not Found', statusCode: 404 });
+  });
 }
 
 /**

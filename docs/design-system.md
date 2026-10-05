@@ -460,9 +460,9 @@ Chrome: badge + «‹ Basu» → нэг `.topbar[data-fixed]` (back тэргүү
 3. Idesh зарын зураг: төрөл×нэгж тус бүрийн зураг (бүтэн мал / кг) эсвэл нийлүүлэгчийн бодит зураг, үгүй бол зураггүй мөр — давтагдсан stock render итгэл алдуулна.
 4. Supplier cancel confirm: «Цуцлах» хоёр удаа vs «Захиалгыг цуцлах» (копи өөрчлөлт).
 5. Demo цагийн strip: дээд нам strip (одоогийн) vs доод pill (`api.js`-д 2 мөр toggle).
-6. Нарсан палитр (`--ink*`, `--line*`, `--bg`/`--surface*`, `--accent*`, `--deep`, `--hi*`) — `DesignTokens.swift`-д зөөх (shell ба WebView нэг өнгө).
-7. Ops зөвхөн light, supplier/kds систем дагана — батлах уу; ops утсанд гэрэлтэй гарна.
-8. ~~Фонтыг `/fonts`-оос self-host хийх үү?~~ Хийгдсэн (2026-10-02, design/r3-speed-server): тайрсан `*.v2.woff2`, Google-гүй — §2.1.
+6. ~~Нарсан палитрыг `DesignTokens.swift`-д зөөх үү?~~ Шийдэгдсэн (2026-10-05, «Тансаг хар»): нэг хар палитр `app.css` ба `DesignTokens.swift`-д, shell ба WebView нэг өнгө.
+7. ~~Ops зөвхөн light, supplier/kds систем дагана — батлах уу?~~ Шийдэгдсэн (2026-10-05): бүх гадаргуу зөвхөн хар, гэрэлтэй хувилбар байхгүй.
+8. ~~Фонтыг `/fonts`-оос self-host хийх үү?~~ Хийгдсэн (2026-10-02, design/r3-speed-server): тайрсан woff2, Google-гүй; 2026-10-05-аас `*.v3.woff2` (Manrope, Noto Sans Display Condensed) — §2.1.
 9. `9/20` огноо: хэвээр (тест) эсвэл «Ня 20 · 9-р сар» + тест өөрчлөх?
 10. Ширээний JS ажлын хугацаа (prompt→sheet, хүснэгт+overflow, origin back) — хоёр дахь шат гэж хүлээн зөвшөөрөх үү?
 

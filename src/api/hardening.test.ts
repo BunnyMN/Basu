@@ -278,6 +278,30 @@ describe('a server with no demo in it', () => {
       await real.close();
     }
   });
+
+  it('tells a browser at an address we do not have so, in its own words and colours, and anything else in JSON', async () => {
+    const real = await buildServer(ctx, { dev: false });
+    try {
+      const page = await real.inject({ method: 'GET', url: '/nowhere', headers: { accept: 'text/html,application/xhtml+xml,*/*;q=0.8' } });
+      expect(page.statusCode).toBe(404);
+      expect(page.headers['content-type']).toMatch(/^text\/html/);
+      expect(page.body).toContain('<html lang="mn">');
+      expect(page.body).toMatch(/Хуудас<br>олдсонгүй\./);
+      expect(page.body).toContain('href="/"');
+      // The API, the app and a script missing a file read JSON, as they always have.
+      for (const [url, accept] of [
+        ['/v1/nowhere', 'text/html'],
+        ['/nowhere', 'application/json'],
+        ['/brand/nothing.png', 'image/png,image/*'],
+      ] as const) {
+        const res = await real.inject({ method: 'GET', url, headers: { accept } });
+        expect(res.statusCode, url).toBe(404);
+        expect(res.json(), url).toEqual({ message: `Route GET:${url} not found`, error: 'Not Found', statusCode: 404 });
+      }
+    } finally {
+      await real.close();
+    }
+  });
 });
 
 describe('rate limits', () => {

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#100D0C">
+<meta name="robots" content="noindex">
+<title>Хуудас олдсонгүй · Basu</title>
+<script>
+/* In a browser this is a page of the website, with its bar. In the phone app
+   (the shell's web view) it keeps no bar of its own. Dark in both, like
+   everything. Set before the stylesheets are read, so nothing changes. */
+if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.basu)) {
+  document.documentElement.setAttribute('data-site', '');
+}
+</script>
+<link rel="stylesheet" href="/app.css">
+<link rel="stylesheet" href="/site.css">
+<style>
+/* Layout only. Faces, colours and pills come from app.css and site.css. */
+.lost{position:relative;flex:1 0 auto;display:flex;align-items:center;min-height:min(760px,calc(100dvh - var(--s-bar)));overflow:hidden;isolation:isolate}
+.lost .ph{position:absolute;inset:0;z-index:-2}
+.lost .ph img{width:100%;height:100%;object-fit:cover;object-position:0% 60%;filter:sepia(.14) saturate(1.25) contrast(1.14)}
+.lost .shade{position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(16,13,12,0) 30%,rgba(16,13,12,.55) 55%,rgba(16,13,12,.8) 100%),linear-gradient(180deg,rgba(16,13,12,0) 70%,var(--bg) 100%)}
+.lost .s-wrap{display:flex;justify-content:flex-end;padding-top:88px;padding-bottom:88px}
+.lost .copy{width:min(100%,520px)}
+.lost .lab{display:block;margin:0 0 18px;font-size:.75rem;font-weight:700;line-height:1;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
+.lost h1{margin:0;font-family:var(--display);font-weight:800;font-size:clamp(3.5rem,8vw,7rem);line-height:.88;color:var(--ink)}
+.lost p{margin:22px 0 34px;max-width:30ch;font-size:1.125rem;line-height:1.5;color:var(--ink-2)}
+.lost .go{display:flex;flex-wrap:wrap;gap:12px}
+@media (max-width:760px){
+  .lost{flex-direction:column;align-items:stretch;min-height:0}
+  .lost .ph{position:relative;inset:auto;height:clamp(260px,48vh,420px);flex:none}
+  .lost .ph img{object-position:12% 62%}
+  .lost .shade{background:linear-gradient(180deg,rgba(16,13,12,0) 40%,var(--bg) 100%);height:clamp(260px,48vh,420px);bottom:auto}
+  .lost .s-wrap{justify-content:flex-start;margin-top:-12px;padding-top:0;padding-bottom:56px}
+  .lost .go .s-btn{flex:1 1 100%}
+}
+</style>
+</head>
+<body>
+<header class="s-bar" data-static><div class="s-wrap"><a class="s-word" href="/">Basu</a><nav class="s-nav" aria-label="Цэс"><a href="/home">Нүүр</a><a href="/shop">Идэш</a><a href="/orders">Миний захиалга</a><a href="/dashboard">Бизнес</a></nav><div class="s-right"></div></div></header>
+<main class="lost">
+  <div class="ph"><img src="/brand/meat/board-1600.webp" srcset="/brand/meat/board-828.webp 828w, /brand/meat/board-1600.webp 1600w, /brand/meat/board.webp 2000w" sizes="100vw" alt="" decoding="async"></div>
+  <div class="shade"></div>
+  <div class="s-wrap">
+    <div class="copy">
+      <span class="lab">404</span>
+      <h1>Хуудас<br>олдсонгүй.</h1>
+      <p>Хаяг буруу, эсвэл хуудас нүүсэн байж магадгүй.</p>
+      <div class="go">
+        <a class="s-btn s-btn-dark s-btn-lg" href="/">Нүүр хуудас</a>
+        <a class="s-btn s-btn-line s-btn-lg" href="/shop">Идэш үзэх</a>
+      </div>
+    </div>
+  </div>
+</main>
+</body>
+</html>
