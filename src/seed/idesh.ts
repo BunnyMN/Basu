@@ -1,6 +1,8 @@
 import type { Db } from '../db/pool.js';
 import {
   applySupplier,
+  addCertificate,
+  checkCertificate,
   createListing,
   registerSupplier,
   type Kind,
@@ -103,6 +105,14 @@ export const LISTINGS: SeedListing[] = [
   { supplier: 3, kind: 'sheep', unit: 'whole', title: 'Хонь, бүтэн', note: 'Нядалж бэлдсэн гулууз.', price: 480_000, approxKg: 36, quantity: 10, origin: 'Улаанбаатар, Эмээлт', readyIn: 2, delivers: true, fee: 10_000 },
 ];
 
+/** One certificate per supplier, by its place in SUPPLIERS. Invented numbers, for the demo only. */
+const CERTIFICATES: Array<{ number: string; issuer: string; daysAgo: number; checked: boolean }> = [
+  { number: 'ДЕМО-65110421', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', daysAgo: 4, checked: false },
+  { number: 'ДЕМО-44070318', issuer: 'Хэнтий, Хэрлэн сумын мал эмнэлэг', daysAgo: 6, checked: false },
+  { number: 'ДЕМО-41020977', issuer: 'Төв, Баянчандмань сумын мал эмнэлэг', daysAgo: 3, checked: false },
+  { number: 'ДЕМО-11050263', issuer: 'Сонгинохайрхан дүүргийн мал эмнэлгийн тасаг', daysAgo: 1, checked: true },
+];
+
 /** The would-be supplier in the seed. Sign in as them to see the application. */
 export const APPLICANT_PHONE = '+97688010009';
 
@@ -145,6 +155,18 @@ export async function seedIdesh(
   }
 
   const now = ctx.clock.now();
+
+  // The shipment each supplier's cut meat came with: one certificate apiece,
+  // from the soum the meat is from. One the desk has already looked up, so
+  // the demo shows both what a checked one and an unchecked one read like.
+  const certificates = new Map<number, string>();
+  for (const [i, c] of CERTIFICATES.entries()) {
+    if (!LISTINGS.some((l) => l.supplier === i && l.unit === 'kg')) continue;
+    const added = await addCertificate(ids[i]!, { number: c.number, issuer: c.issuer, issuedOn: plusDays(today, -c.daysAgo) }, now, today, db);
+    if (c.checked) await checkCertificate({ id: added.id, genuine: true, by: 'Демо', at: now }, db);
+    certificates.set(i, added.id);
+  }
+
   for (const l of LISTINGS) {
     await createListing(
       ids[l.supplier]!,
@@ -161,6 +183,7 @@ export async function seedIdesh(
         readyFrom: plusDays(today, l.readyIn),
         delivers: l.delivers,
         deliveryFeeMnt: l.fee ?? 0,
+        certificateId: l.unit === 'kg' ? certificates.get(l.supplier)! : null,
       },
       now,
       db,

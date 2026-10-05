@@ -1,4 +1,5 @@
 import { getPool, type Db } from '../db/pool.js';
+import { CERT_COLUMNS, factsOf, usableCertificate, type CertificateFacts, type CertificateState } from './certificates.js';
 import { IdeshError } from './errors.js';
 import type { Unit } from './pricing.js';
 
@@ -39,6 +40,9 @@ export interface Listing {
   tier: Tier | null;
   /** When that tier stops holding. */
   tierUntil: Date | null;
+  /** The veterinary certificate the meat came with, once the supplier has put one on. */
+  certificateId: string | null;
+  certificate: CertificateFacts | null;
 }
 
 /** What a supplier can pay for, highest last. */
@@ -67,6 +71,11 @@ interface ListingRow {
   active: boolean;
   tier: Tier | null;
   tier_until: Date | null;
+  certificate_id: string | null;
+  cert_number: string | null;
+  cert_issuer: string | null;
+  cert_issued_on: string | null;
+  cert_state: CertificateState | null;
 }
 
 /**
@@ -78,9 +87,11 @@ const SELECT = `
   SELECT l.id, l.supplier_id, s.name AS supplier, s.state = 'contracted' AS contracted,
          s.pickup_address, l.kind, l.unit, l.title, l.note, l.price_mnt, l.approx_kg,
          l.min_qty, l.quantity, l.sold, l.origin, to_char(l.ready_from, 'YYYY-MM-DD') AS ready_from,
-         l.delivers, l.delivery_fee_mnt, l.active, p.tier, p.ends_at AS tier_until
+         l.delivers, l.delivery_fee_mnt, l.active, p.tier, p.ends_at AS tier_until,
+         l.certificate_id, ${CERT_COLUMNS}
     FROM idesh.listing l
     JOIN idesh.supplier s ON s.id = l.supplier_id
+    LEFT JOIN idesh.certificate c ON c.id = l.certificate_id
     LEFT JOIN LATERAL (
       SELECT tier, ends_at FROM idesh.promotion
        WHERE listing_id = l.id AND state = 'active' AND starts_at <= $1 AND ends_at > $1
@@ -117,18 +128,22 @@ function shape(r: ListingRow): Listing {
     active: r.active,
     tier: r.tier,
     tierUntil: r.tier ? r.tier_until : null,
+    certificateId: r.certificate_id,
+    certificate: factsOf(r),
   };
 }
 
 /**
  * What a guest sees: everything still on offer, soonest first. A listing that
  * has sold out stays on the page marked so, rather than vanishing — a page
- * that shrinks as people buy from it looks broken, not popular.
+ * that shrinks as people buy from it looks broken, not popular. Meat under a
+ * certificate the desk found false is not on offer at all.
  */
 export async function openListings(at: Date = new Date(), db: Db = getPool()): Promise<Listing[]> {
   const { rows } = await db.query<ListingRow>(
     `${SELECT}
       WHERE l.active AND s.active AND s.state = 'contracted'
+        AND c.state IS DISTINCT FROM 'false'
       ORDER BY ${TIER_FIRST}, l.ready_from, l.kind, l.price_mnt`,
     [at],
   );
@@ -163,6 +178,8 @@ export interface ListingInput {
   readyFrom: string;
   delivers?: boolean;
   deliveryFeeMnt?: number;
+  /** Required for meat by the kilogram: it is already slaughtered, and came with one. */
+  certificateId?: string | null;
 }
 
 function validate(input: ListingInput): void {
@@ -191,11 +208,15 @@ export async function createListing(
   db: Db = getPool(),
 ): Promise<Listing> {
   validate(input);
+  if (input.unit === 'kg' && !input.certificateId) {
+    throw new IdeshError('NEEDS_CERTIFICATE', 'meat by the kilogram is listed with its veterinary certificate');
+  }
+  if (input.certificateId) await usableCertificate(supplierId, input.certificateId, db);
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO idesh.listing
        (supplier_id, kind, unit, title, note, price_mnt, approx_kg, min_qty, quantity,
-        origin, ready_from, delivers, delivery_fee_mnt, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::date, $12, $13, $14, $14)
+        origin, ready_from, delivers, delivery_fee_mnt, created_at, updated_at, certificate_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::date, $12, $13, $14, $14, $15)
      RETURNING id`,
     [
       supplierId,
@@ -212,6 +233,7 @@ export async function createListing(
       input.delivers ?? true,
       input.deliveryFeeMnt ?? 0,
       at,
+      input.certificateId ?? null,
     ],
   );
   return (await listingById(rows[0]!.id, at, db))!;
@@ -226,6 +248,8 @@ export interface ListingPatch {
   readyFrom?: string;
   note?: string | null;
   title?: string;
+  /** The next shipment's certificate. One is replaced, never taken off. */
+  certificateId?: string;
 }
 
 /**
@@ -257,6 +281,7 @@ export async function updateListing(
   if (patch.readyFrom !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(patch.readyFrom)) {
     throw new IdeshError('BAD_DATE', 'ready_from must be YYYY-MM-DD');
   }
+  if (patch.certificateId !== undefined) await usableCertificate(supplierId, patch.certificateId, db);
 
   let updated;
   try {
@@ -270,6 +295,7 @@ export async function updateListing(
               ready_from       = COALESCE($8::date, ready_from),
               note             = CASE WHEN $9::boolean THEN $10 ELSE note END,
               title            = COALESCE($11, title),
+              certificate_id   = COALESCE($13, certificate_id),
               updated_at       = $12
         WHERE id = $1 AND supplier_id = $2
         RETURNING id`,
@@ -286,6 +312,7 @@ export async function updateListing(
         patch.note ?? null,
         patch.title?.trim() || null,
         at,
+        patch.certificateId ?? null,
       ],
     );
   } catch (error) {

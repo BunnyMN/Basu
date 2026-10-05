@@ -17,6 +17,7 @@ import {
 } from '../platform/ledger/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
+import { CERT_COLUMNS, factsOf, usableCertificate, type CertificateFacts, type CertificateState } from './certificates.js';
 import { IdeshError } from './errors.js';
 import type { Kind } from './listings.js';
 import {
@@ -153,17 +154,21 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
       delivers: boolean;
       delivery_fee_mnt: number;
       ready_from: string;
+      certificate_id: string | null;
+      certificate_false: boolean;
     }>(
       `SELECT l.id, l.supplier_id, (s.active AND s.state = 'contracted') AS supplier_active, l.active, l.kind, l.unit,
               l.title, l.origin, l.price_mnt, l.min_qty, l.quantity, l.sold, l.delivers,
-              l.delivery_fee_mnt, to_char(l.ready_from, 'YYYY-MM-DD') AS ready_from
+              l.delivery_fee_mnt, to_char(l.ready_from, 'YYYY-MM-DD') AS ready_from, l.certificate_id,
+              COALESCE((SELECT c.state = 'false' FROM idesh.certificate c WHERE c.id = l.certificate_id), false) AS certificate_false
          FROM idesh.listing l JOIN idesh.supplier s ON s.id = l.supplier_id
         WHERE l.id = $1
         FOR UPDATE OF l`,
       [input.listingId],
     );
     const listing = rows[0];
-    if (!listing || !listing.active || !listing.supplier_active) {
+    // Meat under a certificate the desk found false is not on offer, whatever page still shows it.
+    if (!listing || !listing.active || !listing.supplier_active || listing.certificate_false) {
       throw new IdeshError('NOT_FOUND', 'that listing is not on offer');
     }
 
@@ -202,9 +207,9 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
       `INSERT INTO idesh.idesh_order
          (code, supplier_id, listing_id, guest_id, state, kind, unit, title, origin, qty,
           unit_price_mnt, delivery_fee_mnt, total_mnt, receive, receive_on,
-          address, address_phone, address_lat, address_lon, created_at, updated_at)
+          address, address_phone, address_lat, address_lon, created_at, updated_at, certificate_id)
        VALUES ($1, $2, $3, $4, 'DRAFT', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::date,
-               $15, $16, $17, $18, $19, $19)
+               $15, $16, $17, $18, $19, $19, $20)
        RETURNING id`,
       [
         code,
@@ -226,6 +231,8 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
         input.addressLat ?? null,
         input.addressLon ?? null,
         now,
+        // The certificate the meat is under today: the listing may carry the next shipment's tomorrow.
+        listing.certificate_id,
       ],
     );
     const orderId = inserted.rows[0]!.id;
@@ -473,13 +480,19 @@ export async function startPreparing(ctx: Ctx, orderId: string, actor: string): 
   });
 }
 
-/** «Бэлэн» — the meat exists. This is the message that matters, so it goes by SMS. */
-export async function markReady(ctx: Ctx, orderId: string, actor: string): Promise<void> {
+/**
+ * «Бэлэн» — the meat exists. This is the message that matters, so it goes by SMS.
+ *
+ * A whole animal has its certificate from this moment, not before: the
+ * supplier names it as they mark the meat ready, when they have it by then.
+ */
+export async function markReady(ctx: Ctx, orderId: string, actor: string, certificateId?: string | null): Promise<void> {
   const now = ctx.clock.now();
   await tx(async (client) => {
+    if (certificateId) await putCertificate(client, orderId, certificateId);
     const ok = await transition(client, orderId, ['PREPARING'], 'READY', { ready_at: now });
     if (!ok) throw new IdeshError('WRONG_STATE', 'this order is not being prepared');
-    await appendEvent(client, orderId, 'READY', actor);
+    await appendEvent(client, orderId, 'READY', actor, certificateId ? { certificateId } : {});
   });
 
   const facts = await billingFacts(orderId);
@@ -495,6 +508,33 @@ export async function markReady(ctx: Ctx, orderId: string, actor: string): Promi
       facts.receive === 'pickup'
         ? `Таны идэш бэлэн боллоо. ${facts.pickupAddress} хаягаас авна уу. Код №${facts.code}.`
         : `Таны идэш бэлэн боллоо. ${dayLabel(facts.receiveOn)}-нд хүргэнэ.`,
+  });
+}
+
+/** Point an order at a certificate of its own supplier's. */
+async function putCertificate(db: Db, orderId: string, certificateId: string): Promise<void> {
+  const { rows } = await db.query<{ supplier_id: string }>('SELECT supplier_id FROM idesh.idesh_order WHERE id = $1 FOR UPDATE', [orderId]);
+  if (!rows[0]) throw new IdeshError('NOT_FOUND', 'no such order');
+  await usableCertificate(rows[0].supplier_id, certificateId, db);
+  await db.query('UPDATE idesh.idesh_order SET certificate_id = $2, updated_at = now() WHERE id = $1', [orderId, certificateId]);
+}
+
+/**
+ * The certificate arrives after the order did — the meat was marked ready
+ * before the paper was written in, or the wrong one was chosen. Allowed
+ * while the order is still the supplier's to work on; once it is closed the
+ * order is a record, and stays as it was handed over.
+ */
+export async function certifyIdesh(orderId: string, actor: string, certificateId: string): Promise<void> {
+  await tx(async (client) => {
+    const { rows } = await client.query<{ state: IdeshState }>('SELECT state FROM idesh.idesh_order WHERE id = $1 FOR UPDATE', [orderId]);
+    const state = rows[0]?.state;
+    if (!state) throw new IdeshError('NOT_FOUND', 'no such order');
+    if (!(['PAID', 'PREPARING', 'READY', 'DISPATCHED', 'HANDED'] as IdeshState[]).includes(state)) {
+      throw new IdeshError('WRONG_STATE', 'this order is no longer being worked on');
+    }
+    await putCertificate(client, orderId, certificateId);
+    await appendEvent(client, orderId, 'CERTIFIED', actor, { certificateId });
   });
 }
 
@@ -890,6 +930,8 @@ export interface IdeshSummary {
   paidAt: Date | null;
   /** Where a pickup is collected: the supplier's own address. The guest's lists carry it for the lock screen. */
   pickupAddress?: string;
+  /** The veterinary certificate this meat is under, once it has one. */
+  certificate: CertificateFacts | null;
 }
 
 export interface IdeshDetail extends IdeshSummary {
@@ -952,6 +994,10 @@ interface OrderRow {
   refund_mnt: number | null;
   forfeit_mnt: number | null;
   commission_pct: string;
+  cert_number: string | null;
+  cert_issuer: string | null;
+  cert_issued_on: string | null;
+  cert_state: CertificateState | null;
 }
 
 const ORDER_SELECT = `
@@ -961,9 +1007,11 @@ const ORDER_SELECT = `
          o.total_mnt, o.receive, to_char(o.receive_on, 'YYYY-MM-DD') AS receive_on,
          o.address, o.address_phone, o.address_lat, o.address_lon, o.ledger_transfer_id,
          o.paid_at, o.preparing_at, o.ready_at, o.dispatched_at, o.handed_at,
-         o.cancel_reason, o.refund_mnt, o.forfeit_mnt, s.commission_pct
+         o.cancel_reason, o.refund_mnt, o.forfeit_mnt, s.commission_pct,
+         ${CERT_COLUMNS}
     FROM idesh.idesh_order o
-    JOIN idesh.supplier s ON s.id = o.supplier_id`;
+    JOIN idesh.supplier s ON s.id = o.supplier_id
+    LEFT JOIN idesh.certificate c ON c.id = o.certificate_id`;
 
 function summary(r: OrderRow): IdeshSummary {
   return {
@@ -980,6 +1028,7 @@ function summary(r: OrderRow): IdeshSummary {
     receiveOn: r.receive_on,
     paidAt: r.paid_at,
     pickupAddress: r.pickup_address,
+    certificate: factsOf(r),
   };
 }
 

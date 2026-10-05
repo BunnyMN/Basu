@@ -1,6 +1,10 @@
-import type { IdeshSummary, Settlement, SupplierOrder } from '../idesh/index.js';
+import type { CertificateFacts, IdeshSummary, Settlement, SupplierOrder } from '../idesh/index.js';
 
 /** The JSON shapes the idesh and ops routes share. Snake case on the wire, as everywhere. */
+
+/** The certificate on a listing or an order, as a guest reads it: which one, from whom, and whether Basu looked it up. */
+export const shapeCertificateFacts = (c: CertificateFacts | null) =>
+  c ? { number: c.number, issuer: c.issuer, issued_on: c.issuedOn, checked: c.checked } : null;
 
 export const shapeSummary = (o: IdeshSummary) => ({
   id: o.id,
@@ -17,6 +21,7 @@ export const shapeSummary = (o: IdeshSummary) => ({
   paid_at: o.paidAt?.toISOString() ?? null,
   // Only a pickup has somewhere to go; a delivery's address is the guest's own.
   pickup_address: o.receive === 'pickup' ? (o.pickupAddress ?? null) : null,
+  certificate: shapeCertificateFacts(o.certificate),
 });
 
 /** An order as the supplier's screens and the ops desk read it. */

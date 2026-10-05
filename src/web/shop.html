@@ -778,6 +778,13 @@ function drawStall(l) {
               <li>${MARK.truck}<div><b>${l.delivers ? 'Хүргэлттэй' : 'Хүргэлтгүй'}</b><span>${
                 l.delivers ? `Нийлүүлэгч таны хаяг руу хүргэнэ · ${mnt(l.delivery_fee_mnt)}` : 'Энэ нийлүүлэгчээс өөрөө очиж авна.'
               }</span></div></li>
+              ${
+                l.certificate
+                  ? `<li>${MARK.check}<div><b>Мал эмнэлгийн гэрчилгээ №${esc(l.certificate.number)}</b><span>${esc(l.certificate.issuer)} · ${dayShort(l.certificate.issued_on)} · ${l.certificate.checked ? 'Basu шалгасан' : 'нийлүүлэгчийн оруулсан'}</span></div></li>`
+                  : whole
+                    ? `<li>${MARK.check}<div><b>Мал эмнэлгийн гэрчилгээ</b><span>Нядалсны дараа гэрчилгээний дугаар захиалга дээр тань гарна.</span></div></li>`
+                    : ''
+              }
               <li>${MARK.tag}<div><b>Үнэ эцсийн</b><span>Жин нь зөрсөн ч нэмж төлөхгүй.</span></div></li>
               <li>${MARK.undo}<div><b>Цуцлах, буцаалт</b><span>Нядлахаас өмнө бол мөнгө бүтнээрээ буцна. Нядалсны дараа таны хүсэлтээр бол 10% суутгана.</span></div></li>
             </ul>

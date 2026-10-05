@@ -4,7 +4,7 @@ import { closePool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
-import { createListing, housekeeping, registerSupplier, supplierById, type Listing } from '../idesh/index.js';
+import { addCertificate, createListing, housekeeping, registerSupplier, supplierById, type Listing } from '../idesh/index.js';
 import { ClosedPaymentProvider, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
 import { setSetting } from '../ops/index.js';
@@ -175,9 +175,10 @@ describe('putting a listing first', () => {
 
   it('raises an invoice at the desk’s price, starts only once paid, and puts the listing first', async () => {
     // Another supplier's listing, ready sooner: on its own it would come first.
+    const paper = await addCertificate(rivalId, { number: '44070318', issuer: 'Хэнтий, Хэрлэн сумын мал эмнэлэг', issuedOn: '2026-09-01' }, clock.now(), '2026-09-01');
     const beef = await createListing(
       rivalId,
-      { kind: 'beef', unit: 'kg', title: 'Үхрийн мах', priceMnt: 14_000, minQty: 10, quantity: 300, origin: 'Хэнтий', readyFrom: '2026-09-05' },
+      { kind: 'beef', unit: 'kg', title: 'Үхрийн мах', priceMnt: 14_000, minQty: 10, quantity: 300, origin: 'Хэнтий', readyFrom: '2026-09-05', certificateId: paper.id },
       clock.now(),
     );
     expect((await stalls()).map((l) => l.id)).toEqual([beef.id, sheep.id]);
@@ -633,12 +634,14 @@ describe('the supplier’s screen', () => {
 
   it('lets the supplier run their own stall', async () => {
     const screen = await atCounter(supplierId);
+    const paper = await addCertificate(supplierId, { number: '65110421', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', issuedOn: '2026-09-01' }, clock.now(), '2026-09-01');
 
     const created = await app.inject({
       method: 'POST',
       url: '/v1/supplier/listings',
       headers: auth(screen),
       payload: {
+        certificate_id: paper.id,
         kind: 'beef',
         unit: 'kg',
         title: 'Үхрийн мах, кг-аар',

@@ -1407,6 +1407,8 @@ export function popup({ title, sub = '', fields = [], submit = 'Хадгалах
     step({ title, sub, fields, submit, danger });
     drawn = true;
     $('[data-cancel]').textContent = cancel;
+    // A popup that only shows something has one way out, not two: `cancel: ''` leaves the button out.
+    $('[data-cancel]').hidden = !cancel;
 
     // A field that was wrong is right again as soon as it is touched.
     const mend = (e) => {

@@ -180,6 +180,13 @@
 .ticket .k{font-size:var(--t-cap);line-height:1.4;padding-top:2px;color:var(--ink-3)}
 .ticket .v{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;color:var(--ink);min-width:0}
 .ticket .where .v > span:first-child{overflow-wrap:anywhere}
+/* The certificates under the listings, and the popup's file field and photograph. */
+.papers{margin-top:28px}
+.papers-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.papers-none{margin:8px 0 0;color:var(--ink-3);font-size:var(--t-body);max-width:56ch}
+.paper-act{margin-top:12px}
+.file-pick{display:flex;align-items:center;gap:12px;min-width:0}
+.file-pick .file-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-3);font-size:var(--t-body)}
 .ticket .rel{font-size:var(--t-cap);font-weight:600;color:var(--ink-2)}
 .ticket .rel[data-tone="hold"]{color:var(--gold);font-weight:700}
 .ticket .rel[data-tone="stop"]{color:var(--stop);font-weight:700}
@@ -341,7 +348,7 @@
 <div id="root"></div>
 
 <script type="module">
-import { api, store, shell, toast, mnt, money, KIND, IDESH_STATE, ideshStage, dayLabel, dayShort, ubParts, signInDoors, accountWays, authReturn, popup, passwordPopup, BANK_NAMES, phoneText, dropSession, whatWentWrong } from '/api.js';
+import { api, store, shell, toast, mnt, money, KIND, IDESH_STATE, ideshStage, dayLabel, dayShort, ubParts, signInDoors, accountWays, authReturn, popup, confirmPopup, passwordPopup, BANK_NAMES, phoneText, dropSession, whatWentWrong } from '/api.js';
 import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -1139,6 +1146,7 @@ function renderTicket(ticket, lane, { page = false } = {}) {
           <div class="where"><span class="k">${delivery ? 'Хүргэлт' : 'Авах'}</span><span class="v">${
             delivery ? `<span>${esc(ticket.address)}</span>${ticket.address_phone && ticket.address_phone !== ring ? tel(ticket.address_phone) : ''}` : 'Өөрөө ирж авна'
           }</span></div>
+          ${ticket.certificate ? `<div class="where paper"><span class="k">Гэрчилгээ</span><span class="v"><span class="mn">№${esc(ticket.certificate.number)}</span></span></div>` : ''}
         </div>
         <div class="sum"><span>Нийт</span>${money(ticket.total_mnt)}</div>
         ${typeof ticket.payout_mnt === 'number' ? `<div class="pay"><span>Танд очих</span>${money(ticket.payout_mnt)}</div>` : ''}
@@ -1190,8 +1198,10 @@ function ticketActions(ticket, lane, box, { size = 'lg' } = {}) {
   const add = (label, action, { confirm = null } = {}) => {
     const button = el(`<button class="btn" type="button" data-a="${action}" data-v="primary"${size ? ` data-size="${size}"` : ''}>${label}</button>`);
     button.addEventListener('click', async () => {
-      if (confirm && !(await confirm())) return;
-      void go(action, button);
+      // What the popup answers with rides along: the certificate chosen at «Бэлэн».
+      const answer = confirm ? await confirm() : true;
+      if (!answer) return;
+      void go(action, button, typeof answer === 'object' ? answer : {});
     });
     box.append(button);
   };
@@ -1205,7 +1215,8 @@ function ticketActions(ticket, lane, box, { size = 'lg' } = {}) {
     add('Бэлтгэж эхлэх', 'prepare', { confirm: () => startPreparing(ticket) });
     cancel(['guest_asked', 'cannot_fulfil', 'vet']);
   } else if (lane === 'preparing') {
-    add('Бэлэн боллоо', 'ready');
+    // Cut meat came with its certificate; a whole animal's is named now, as the meat is.
+    add('Бэлэн боллоо', 'ready', ticket.certificate ? {} : { confirm: () => readyWith(ticket) });
     cancel(['guest_asked', 'vet', 'cannot_fulfil']);
   } else if (lane === 'ready') {
     if (delivery) add('Замд гаргах', 'dispatch');
@@ -1215,6 +1226,54 @@ function ticketActions(ticket, lane, box, { size = 'lg' } = {}) {
     add('Хүлээлгэн өгсөн', 'hand', { confirm: () => handOver(ticket) });
     cancel(['unreachable', 'guest_asked', 'cannot_fulfil']);
   }
+}
+
+/**
+ * «Бэлэн боллоо» for meat that has no certificate yet: the popup asks which
+ * one it came with. The step is not held up for it — a certificate still on
+ * its way is put on afterwards, from the order's own page.
+ */
+async function readyWith(ticket) {
+  await loadPapers().catch(() => {});
+  const answer = popup({
+    id: 'ready-order',
+    title: 'Бэлэн боллоо',
+    sub: `<span class="mn">№${esc(ticket.code)}</span> · ${esc(ticket.title)} ×${esc(ticket.qty)}${ticket.unit === 'kg' ? ' кг' : ''} · ${guestLine(ticket)}`,
+    width: 500,
+    fields: [
+      { name: 'certificate_id', label: 'Мал эмнэлгийн гэрчилгээ', type: 'select', wide: true, options: paperOptions('Одоохондоо алга — дараа оруулна'), value: usablePapers().length === 1 ? usablePapers()[0].id : '', hint: 'Энэ махны гэрчилгээ. Зочин захиалга дээрээ дугаарыг нь харна.' },
+      { type: 'note', text: 'Зочинд «идэш бэлэн боллоо» гэж мессеж очно.' },
+    ],
+    submit: 'Бэлэн боллоо',
+    onSubmit: async (v) => (v.certificate_id ? { certificate_id: v.certificate_id } : {}),
+  });
+  wirePaperSelect(document.getElementById('ready-order'));
+  return answer;
+}
+
+/**
+ * The certificate put on an order after the fact, or the wrong one put
+ * right — from the order's own page, while the order is still being worked on.
+ */
+async function certifyOrder(o, then) {
+  await loadPapers().catch(() => {});
+  const answer = popup({
+    id: 'certify-order',
+    title: o.certificate ? 'Гэрчилгээ солих' : 'Гэрчилгээ оруулах',
+    sub: `<span class="mn">№${esc(o.code)}</span> · ${esc(o.title)}`,
+    width: 500,
+    fields: [{ name: 'certificate_id', label: 'Мал эмнэлгийн гэрчилгээ', type: 'select', wide: true, required: true, options: paperOptions('Сонгоно уу'), value: '' }],
+    submit: 'Хадгалах',
+    onSubmit: async (v) => {
+      if (!v.certificate_id) throw refuse('certificate_id', 'Гэрчилгээгээ сонгоно уу, эсвэл шинээр нэмнэ үү.');
+      await sup(`/v1/supplier/orders/${o.id}/certify`, { method: 'POST', body: { certificate_id: v.certificate_id } });
+      return true;
+    },
+  });
+  wirePaperSelect(document.getElementById('certify-order'));
+  if (!(await answer)) return;
+  toast('Гэрчилгээ хадгалагдлаа.', 'good');
+  await then?.();
 }
 
 /**
@@ -1386,6 +1445,246 @@ async function refreshBoard() {
   }
 }
 
+/* ── the certificates ────────────────────────────────────────────── */
+
+/**
+ * The veterinary certificates the meat came with. One is written in when a
+ * shipment arrives — its number, who gave it, the day, a photograph — and
+ * then chosen: on a listing of meat by the kilogram, and on a whole animal's
+ * order when it is marked ready. Guests read the number; the photograph is
+ * for this business and for Basu.
+ */
+let papers = [];
+async function loadPapers() {
+  papers = (await sup('/v1/supplier/certificates')).certificates;
+  return papers;
+}
+/** One that may still be put on meat: not one Basu found false. */
+const usablePapers = () => papers.filter((c) => c.state !== 'false');
+const PAPER_STATE = { unchecked: ['pending', 'Шалгаагүй'], genuine: ['verified', 'Basu шалгасан'], false: ['bad', 'Хүчингүй'] };
+/** «№65110421 · Архангай, Их тамир сумын мал эмнэлэг · 10/02» */
+const paperLine = (c) => `№${c.number} · ${c.issuer} · ${dayShort(c.issued_on)}`;
+/** A choice of certificates for a popup's select: `none` is the first line, «add one» the last. */
+const paperOptions = (none) => [['', none], ...usablePapers().map((c) => [c.id, paperLine(c)]), ...(may('org.idesh.stall:edit') ? [['new', '+ Шинэ гэрчилгээ нэмэх']] : [])];
+
+/**
+ * A photograph of a sheet of paper, made small enough to send: the long side
+ * at most 1600 px, a JPEG, stepped down until it is under the server's limit.
+ */
+async function shrinkPhoto(file) {
+  if (!/^image\//.test(file.type)) throw refuse('photo', 'Зургийн файл сонгоно уу.');
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(refuse('photo', 'Энэ зургийг уншиж чадсангүй. Өөр зураг сонгоно уу.'));
+      i.src = url;
+    });
+    let side = 1600;
+    let quality = 0.82;
+    for (let tries = 0; tries < 6; tries += 1) {
+      const scale = Math.min(1, side / Math.max(img.naturalWidth, img.naturalHeight));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+      const pen = canvas.getContext('2d');
+      // A PNG's clear parts would turn black in a JPEG: paper is white.
+      pen.fillStyle = '#fff';
+      pen.fillRect(0, 0, canvas.width, canvas.height);
+      pen.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const data = canvas.toDataURL('image/jpeg', quality);
+      if (data.length * 0.75 < 850 * 1024) return data;
+      side = Math.round(side * 0.8);
+      quality = Math.max(0.6, quality - 0.06);
+    }
+    throw refuse('photo', 'Зураг хэт том байна. Жижиг зураг сонгоно уу.');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/**
+ * A file field in the page's own words: the browser's «Choose File · No file
+ * chosen» is put away, and a button and the chosen file's name stand for it.
+ */
+function filePick(input) {
+  if (!input) return;
+  const box = el('<span class="file-pick"><button class="btn" type="button" data-size="sm">Зураг сонгох</button><span class="file-name">Сонгоогүй байна</span></span>');
+  input.hidden = true;
+  input.after(box);
+  box.querySelector('button').addEventListener('click', () => input.click());
+  input.addEventListener('change', () => {
+    box.querySelector('.file-name').textContent = input.files?.[0]?.name ?? 'Сонгоогүй байна';
+  });
+}
+
+/** Write a certificate in. Resolves to it, or to null when the popup was closed. */
+async function addPaper() {
+  const day = await knowToday();
+  const asked = popup({
+    id: 'paper-new',
+    title: 'Гэрчилгээ нэмэх',
+    sub: 'Мах ирсэн ачилтын мал эмнэлгийн гэрчилгээ',
+    width: 520,
+    fields: [
+      { name: 'number', label: 'Гэрчилгээний дугаар', required: true, wide: true, autocomplete: 'off', attrs: { maxlength: 40 }, hint: 'Гэрчилгээн дээр хэвлэгдсэн дугаар. Зочид энэ дугаарыг харна.' },
+      { name: 'issuer', label: 'Олгосон газар', required: true, wide: true, attrs: { maxlength: 120 }, placeholder: 'Архангай, Их тамир сумын мал эмнэлэг' },
+      { name: 'issued_on', label: 'Олгосон өдөр', type: 'date', value: day ?? '', required: true, attrs: { max: day ?? null } },
+      { name: 'photo', label: 'Гэрчилгээний зураг', type: 'file', wide: true, attrs: { accept: 'image/*' }, hint: 'Зургийг зөвхөн та болон Basu харна, зочдод харагдахгүй.' },
+    ],
+    submit: 'Нэмэх',
+    onSubmit: async (v) => {
+      if (v.number.replace(/\s+/g, '').length < 3) throw refuse('number', 'Гэрчилгээний дугаараа бүтнээр нь бичнэ үү.');
+      if (day && v.issued_on > day) throw refuse('issued_on', 'Олгосон өдөр ирээдүйд байж болохгүй.');
+      const file = document.querySelector('#paper-new [name="photo"]')?.files?.[0];
+      if (!file) throw refuse('photo', 'Гэрчилгээнийхээ зургийг сонгоно уу.');
+      const photo = await shrinkPhoto(file);
+      const { certificate } = await sup('/v1/supplier/certificates', { method: 'POST', body: { number: v.number, issuer: v.issuer, issued_on: v.issued_on, photo } });
+      return certificate;
+    },
+  });
+  filePick(document.querySelector('#paper-new [name="photo"]'));
+  const added = await asked;
+  if (!added) return null;
+  papers = [added, ...papers];
+  toast(`№${added.number} гэрчилгээ нэмэгдлээ.`, 'good');
+  return added;
+}
+
+/**
+ * A popup's certificate select: choosing «+ Шинэ гэрчилгээ нэмэх» opens the
+ * popup that writes one in, over this one, and comes back with it chosen —
+ * or with nothing chosen, when that popup was closed.
+ */
+function wirePaperSelect(sheet, name = 'certificate_id') {
+  const select = sheet?.querySelector(`[name="${name}"]`);
+  if (!select) return;
+  let kept = select.value;
+  select.addEventListener('change', async () => {
+    if (select.value !== 'new') {
+      kept = select.value;
+      return;
+    }
+    select.value = kept;
+    const added = await addPaper();
+    if (!added || !select.isConnected) return;
+    const option = document.createElement('option');
+    option.value = added.id;
+    option.textContent = paperLine(added);
+    select.querySelector('option[value="new"]')?.before(option);
+    select.value = added.id;
+    kept = added.id;
+    select.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+/** The photograph, shown to the supplier again: fetched as theirs, never a public address. */
+async function showPaper(c) {
+  let src = null;
+  try {
+    const answer = await fetch(`/v1/supplier/certificates/${c.id}/photo`, { headers: { authorization: `Bearer ${token()}`, ...(ORG ? { 'x-basu-org': ORG } : {}) } });
+    if (!answer.ok) throw new Error('Зургийг ачаалж чадсангүй.');
+    src = URL.createObjectURL(await answer.blob());
+  } catch (error) {
+    toast(error.message, 'bad');
+    return;
+  }
+  await popup({
+    id: 'paper-photo',
+    title: `Гэрчилгээ №${c.number}`,
+    sub: `${esc(c.issuer)} · ${esc(dayLabel(c.issued_on))}`,
+    width: 640,
+    fields: [{ type: 'static', label: 'Зураг', html: `<img class="cert-photo" src="${src}" alt="Гэрчилгээ №${esc(c.number)}">` }],
+    submit: 'Хаах',
+    cancel: '',
+    onSubmit: async () => true,
+  });
+  URL.revokeObjectURL(src);
+}
+
+async function removePaper(c) {
+  const ok = await confirmPopup({
+    title: 'Гэрчилгээг устгах уу?',
+    text: `№${c.number} · ${c.issuer}. Буруу оруулсан бол устгаад дахин нэмнэ.`,
+    ok: 'Устгах',
+    danger: true,
+    onConfirm: async () => {
+      await sup(`/v1/supplier/certificates/${c.id}`, { method: 'DELETE' });
+      return true;
+    },
+  });
+  if (!ok) return;
+  toast('Гэрчилгээ устлаа.', 'good');
+  await reloadStall();
+}
+
+/** What a certificate is on, in words: «2 зар · 5 захиалга», or that nothing uses it yet. */
+const paperUse = (c) => [c.listings ? `${c.listings} зар` : '', c.orders ? `${c.orders} захиалга` : ''].filter(Boolean).join(' · ') || 'Хэрэглээгүй';
+const paperCanGo = (c) => may('org.idesh.stall:edit') && !c.listings && !c.orders && c.state === 'unchecked';
+
+/** The certificates under the listings: a table at a desk, rows on a phone; adding one is a popup. */
+function renderPapers() {
+  const section = el('<section class="papers" id="papers"></section>');
+  const label = el('<div class="section-label papers-head"><span>Мал эмнэлгийн гэрчилгээ</span></div>');
+  if (may('org.idesh.stall:edit')) {
+    const add = el(`<button class="btn" type="button" data-size="sm" id="add-paper">${ICON.plus}Гэрчилгээ нэмэх</button>`);
+    add.addEventListener('click', async () => {
+      if (await addPaper()) await reloadStall();
+    });
+    label.append(add);
+  }
+  section.append(label);
+  if (!papers.length) {
+    section.append(el('<p class="papers-none">Ачилт бүрийн гэрчилгээг нэг удаа нэмээд, зар болон захиалга дээрээ сонгоно. Кг-аар зарах маханд заавал хэрэгтэй.</p>'));
+    return section;
+  }
+  const acts = (c, size = '') => {
+    const box = el(`<span>${c.has_photo ? `<button class="btn" type="button" data-a="photo"${size ? ` data-size="${size}"` : ''}>Зураг</button>` : ''}${
+      paperCanGo(c) ? `<button class="btn" type="button" data-v="danger" data-a="remove"${size ? ` data-size="${size}"` : ''}>Устгах</button>` : ''
+    }</span>`);
+    box.querySelector('[data-a="photo"]')?.addEventListener('click', () => void showPaper(c));
+    box.querySelector('[data-a="remove"]')?.addEventListener('click', () => void removePaper(c));
+    return box;
+  };
+  if (wideDesk()) {
+    section.append(
+      dataTable({
+        columns: [
+          { key: 'number', label: 'Дугаар', render: (c) => `<span class="dt-two"><b class="mn">№${esc(c.number)}</b>${c.state === 'false' && c.check_note ? `<small>${esc(c.check_note)}</small>` : ''}</span>` },
+          { key: 'issuer', label: 'Олгосон газар', render: (c) => esc(c.issuer) },
+          { key: 'issued_on', label: 'Олгосон өдөр', render: (c) => esc(dayLabel(c.issued_on)) },
+          { key: 'use', label: 'Хэрэглэсэн', sortValue: (c) => c.listings + c.orders, render: (c) => esc(paperUse(c)) },
+          { key: 'state', label: 'Төлөв', value: (c) => PAPER_STATE[c.state][1], render: (c) => dtCell.pill(...PAPER_STATE[c.state]) },
+        ],
+        search: false,
+        actions: (c) => [...acts(c, 'sm').children],
+        rowAttrs: (c) => ({ 'data-paper': c.id }),
+        noun: 'гэрчилгээ',
+        rows: papers,
+      }).el,
+    );
+    return section;
+  }
+  const rows = el('<div class="rows"></div>');
+  for (const c of papers) {
+    const [state, word] = PAPER_STATE[c.state];
+    const row = el(`
+      <div class="card row" data-paper="${esc(c.id)}">
+        <span class="main">
+          <span class="name title"><span class="mn">№${esc(c.number)}</span> <span class="chip" data-size="sm" data-s="${state}">${word}</span></span>
+          <span class="sub">${esc(c.issuer)} · ${esc(dayLabel(c.issued_on))}</span>
+          <span class="sub">${esc(c.state === 'false' && c.check_note ? c.check_note : paperUse(c))}</span>
+        </span>
+        <span class="btns"></span>
+      </div>`);
+    row.querySelector('.btns').append(...acts(c).children);
+    rows.append(row);
+  }
+  section.append(rows);
+  return section;
+}
+
 /* ── the stall ───────────────────────────────────────────────────── */
 
 /** A listing's state in a word: what a guest can do with it now. */
@@ -1398,7 +1697,9 @@ const listingWhat = (l) =>
 /** The marks beside a listing's name: its tier while it lasts, and a state other than on sale. */
 function listingMarks(l) {
   const [state, word] = listingState(l);
-  return `${state === 'active' ? '' : ` <span class="chip" data-size="sm" data-s="${state}">${word}</span>`}${
+  // Meat by the kilogram with no certificate is from before certificates were asked for; one is put on in «Засах».
+  const paper = l.unit === 'kg' && !l.certificate ? ' <span class="chip" data-size="sm" data-s="pending">Гэрчилгээгүй</span>' : '';
+  return `${state === 'active' ? '' : ` <span class="chip" data-size="sm" data-s="${state}">${word}</span>`}${paper}${
     l.tier ? ` <span class="chip tier" data-size="sm">${l.tier === 'vip' ? 'VIP' : 'Онцгой'} · ${dayOfStamp(l.tier_until)} хүртэл</span>` : ''
   }`;
 }
@@ -1432,9 +1733,10 @@ function renderStall(listings) {
         action: canEdit ? { label: 'Зар нэмэх', primary: true, id: 'add', onClick: () => void addListing() } : null,
       }),
     );
+    if (papers.length) stall.append(renderPapers());
     return;
   }
-  stall.append(wideDesk() ? stallTable(listings) : stallRows(listings));
+  stall.append(wideDesk() ? stallTable(listings) : stallRows(listings), renderPapers());
 }
 
 /** On a phone: one row per listing, its numbers in words, at most two buttons a thumb can hit. */
@@ -1533,7 +1835,7 @@ function stallTable(listings) {
 
 async function reloadStall() {
   try {
-    const { listings } = await sup('/v1/supplier/listings');
+    const [{ listings }] = await Promise.all([sup('/v1/supplier/listings'), loadPapers()]);
     renderStall(listings);
   } catch {
     // The rows keep what they said until the page is opened again.
@@ -1654,6 +1956,7 @@ function checkListing(v, { unit, sold = 0, day = null, keptDay = null }) {
  */
 async function addListing() {
   const day = await knowToday();
+  await loadPapers().catch(() => {});
   const done = popup({
     id: 'listing-new',
     title: 'Шинэ зар нэмэх',
@@ -1670,6 +1973,8 @@ async function addListing() {
       { name: 'quantity', label: 'Хэдэн толгой байгаа', inputmode: 'numeric', required: true },
       { name: 'ready_from', label: 'Бэлэн болох өдөр', type: 'date', value: weekFrom(day), required: true },
       { name: 'origin', label: 'Гарал', required: true, wide: true, hint: 'Мах хаанаас ирж байгаа: аймаг, сум, эсвэл хотын махны газар.' },
+      // Cut meat already has its certificate; a whole animal gets one when it is marked ready.
+      { name: 'certificate_id', label: 'Мал эмнэлгийн гэрчилгээ', type: 'select', wide: true, options: paperOptions('Сонгоно уу'), value: '', hint: 'Энэ мах ирсэн ачилтын гэрчилгээ. Зочид дугаарыг нь харна.' },
       { type: 'checks', label: 'Хүргэлт', options: [['delivers', 'Хүргэлт хийнэ', false, { hint: 'Хүргэлтийн үйлчилгээгээр зочны хаяг руу хүргүүлнэ — төлбөр нь бүтнээрээ танд.' }]] },
       { name: 'delivery_fee_mnt', label: 'Хүргэлтийн төлбөр', format: 'money', hint: 'Үнэгүй хүргэх бол 0.' },
       { name: 'note', label: 'Тайлбар (заавал биш)', type: 'textarea', placeholder: 'Толгой, дотор мөнтэйгээ…' },
@@ -1678,6 +1983,7 @@ async function addListing() {
     onSubmit: async (v) => {
       const unit = v.unit;
       const { price, qty } = checkListing(v, { unit, day });
+      if (unit === 'kg' && !v.certificate_id) throw refuse('certificate_id', 'Кг-аар зарах махны гэрчилгээг сонгоно уу, эсвэл шинээр нэмнэ үү.');
       const body = {
         kind: v.kind,
         unit,
@@ -1692,6 +1998,7 @@ async function addListing() {
       };
       if (unit === 'whole') body.approx_kg = asNumber(v.approx_kg);
       else body.min_qty = v.min_qty ? asNumber(v.min_qty) : 1;
+      if (unit === 'kg') body.certificate_id = v.certificate_id;
       await sup('/v1/supplier/listings', { method: 'POST', body });
       return true;
     },
@@ -1705,11 +2012,13 @@ async function addListing() {
     const kg = unit.value === 'kg';
     fieldShown(sheet, 'approx_kg', !kg);
     fieldShown(sheet, 'min_qty', kg);
+    fieldShown(sheet, 'certificate_id', kg);
     fieldLabel(sheet, 'price_mnt', kg ? '1 кг-ийн үнэ' : 'Нэг толгойн үнэ');
     fieldLabel(sheet, 'quantity', kg ? 'Нийт хэдэн кг байгаа' : 'Хэдэн толгой байгаа');
   };
   unit?.addEventListener('change', syncUnit);
   if (unit) syncUnit();
+  wirePaperSelect(sheet);
   wireDelivery(sheet);
   if (!(await done)) return;
   toast('Зар нэмэгдлээ — зочдод харагдаж байна.', 'good');
@@ -1725,6 +2034,9 @@ async function editListing(l) {
   if (!may('org.idesh.stall:edit')) return;
   const kg = l.unit === 'kg';
   const day = await knowToday();
+  await loadPapers().catch(() => {});
+  // The certificate the listing is under now, by its number: the list of them is this business's own.
+  const held = l.certificate ? papers.find((c) => c.number === l.certificate.number) : null;
   const done = popup({
     id: 'listing-edit',
     title: 'Зар засах',
@@ -1735,6 +2047,9 @@ async function editListing(l) {
       { name: 'price_mnt', label: kg ? '1 кг-ийн үнэ' : 'Нэг толгойн үнэ', format: 'money', value: String(l.price_mnt), required: true },
       { name: 'quantity', label: kg ? 'Нийт хэдэн кг' : 'Нийт хэдэн толгой', inputmode: 'numeric', value: String(l.quantity), required: true, hint: l.sold ? `${l.sold} нь зарагдсан — үүнээс бага болгохгүй.` : 'Одоогоор зарагдаагүй.' },
       { name: 'ready_from', label: 'Бэлэн болох өдөр', type: 'date', value: l.ready_from, required: true },
+      ...(kg
+        ? [{ name: 'certificate_id', label: 'Мал эмнэлгийн гэрчилгээ', type: 'select', wide: true, options: held ? [[held.id, `${paperLine(held)}${held.state === 'false' ? ' — хүчингүй' : ''}`], ...paperOptions('').slice(1).filter(([id]) => id !== held.id)] : paperOptions('Сонгоно уу'), value: held?.id ?? '', hint: 'Шинэ ачилтын мах зарж эхлэхдээ гэрчилгээг нь солино.' }]
+        : []),
       { type: 'checks', label: 'Хүргэлт', options: [['delivers', 'Хүргэлт хийнэ', Boolean(l.delivers)]] },
       // A listing that did not deliver offers no fee to keep: ticking delivery asks for one, never assumes 0.
       { name: 'delivery_fee_mnt', label: 'Хүргэлтийн төлбөр', format: 'money', value: l.delivers ? String(l.delivery_fee_mnt ?? 0) : '', hint: 'Үнэгүй хүргэх бол 0.' },
@@ -1755,6 +2070,7 @@ async function editListing(l) {
           ...(v.delivers ? { delivery_fee_mnt: asNumber(v.delivery_fee_mnt) } : {}),
           note: v.note ?? '',
           active: Boolean(v.active),
+          ...(v.certificate_id && v.certificate_id !== held?.id ? { certificate_id: v.certificate_id } : {}),
         },
       });
       return true;
@@ -1762,6 +2078,7 @@ async function editListing(l) {
   });
   const sheet = document.getElementById('listing-edit');
   noKeyboard(sheet);
+  wirePaperSelect(sheet);
   wireDelivery(sheet);
   if (!(await done)) return;
   toast('Хадгалагдлаа.', 'good');
@@ -2661,6 +2978,7 @@ const EVENT_WORD = {
   CREATED: 'Захиалга үүссэн', PAID: 'Төлсөн', PREPARING: 'Бэлтгэж эхэлсэн', READY: 'Бэлэн болсон',
   DISPATCHED: 'Замд гарсан', HANDED: 'Хүлээлгэн өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан',
   REFUND_DUE: 'Буцаалт үүссэн', REFUNDED: 'Буцаалт шилжүүлсэн', RESENT: 'Мэдэгдэл дахин илгээсэн',
+  CERTIFIED: 'Гэрчилгээ оруулсан',
 };
 /** The dot each event takes in the story: the crimson's ink for a cancellation, the quiet ink on the road, the ink when handed. */
 const EVENT_TONE = { CANCELLED: 'stop', REFUND_DUE: 'stop', REFUNDED: 'stop', DISPATCHED: 'route', HANDED: 'ready', CLOSED: 'ready' };
@@ -2712,6 +3030,12 @@ async function openOrder(id, from = 'orders') {
   const card = renderTicket(o, lane ?? 'done', { page: true });
   if (!lane) card.querySelector('.btns')?.remove();
   view.querySelector('#act').append(card);
+  // The certificate goes on, or is put right, while the order is still the business's to work on.
+  if (may('org.idesh.orders:act') && ['PAID', 'PREPARING', 'READY', 'DISPATCHED', 'HANDED'].includes(o.state)) {
+    const paper = el(`<button class="btn paper-act" type="button" data-size="sm" id="certify">${o.certificate ? 'Гэрчилгээ солих' : 'Гэрчилгээ оруулах'}</button>`);
+    paper.addEventListener('click', () => void certifyOrder(o, () => openOrder(id, from)));
+    view.querySelector('#act').append(paper);
+  }
   if (lane) onActed = () => openOrder(id, from);
 }
 
@@ -2720,7 +3044,7 @@ async function openOrder(id, from = 'orders') {
 async function renderStallTab(view, add = false) {
   view.append(el(`<div class="stall" id="stall">${pageHead('Миний зар', 'Зочид эндээс захиална.')}<div data-rows aria-busy="true">${'<div class="skel-row"><span class="skel-lines"><span class="skel"></span><span class="skel"></span></span><span class="skel"></span></div>'.repeat(3)}</div></div>`));
   try {
-    const { listings } = await sup('/v1/supplier/listings');
+    const [{ listings }] = await Promise.all([sup('/v1/supplier/listings'), loadPapers()]);
     if (!document.getElementById('stall')) return;
     renderStall(listings);
     if (add && may('org.idesh.stall:edit')) void addListing();

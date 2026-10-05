@@ -44,6 +44,7 @@ import { closeGuest, guestFile, guestSearch } from './guests.js';
 import { registerDineDesk } from './dineDesk.js';
 import { registerMoneyDesk } from './moneyDesk.js';
 import { registerPromotionsDesk } from './promotionsDesk.js';
+import { registerCertificatesDesk } from './certificatesDesk.js';
 import { anIdeshId } from './idesh.js';
 import { registerSystemDesk } from './systemDesk.js';
 import { registerAccessDesk } from './accessDesk.js';
@@ -848,6 +849,7 @@ export async function registerOpsRoutes(
   registerDineDesk(app, ctx, { desk, deskAny, who, audit });
   registerMoneyDesk(app, ctx, { desk, audit });
   registerPromotionsDesk(app, ctx, { desk, who, audit });
+  registerCertificatesDesk(app, ctx, { desk, who, audit });
   registerSystemDesk(app, ctx, { desk, who, audit });
   registerAccessDesk(app, ctx, { desk, deskAny, who, audit });
 

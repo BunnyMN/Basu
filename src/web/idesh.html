@@ -870,6 +870,23 @@ function placeInName(l) {
   return !place || l.supplier.name.includes(place);
 }
 
+/**
+ * The veterinary certificate the meat came with, as a guest reads it: its
+ * number, who gave it and when, and whose word it is — Basu's, when the desk
+ * looked the number up, the supplier's until then. A whole animal has none
+ * before it is slaughtered, and the line says when it will.
+ */
+function paperLine(c, unit) {
+  if (!c) {
+    return unit === 'whole'
+      ? `<div class="line">${MARK.shield}<div><span class="lab">Мал эмнэлгийн гэрчилгээ</span><div class="v">Нядалсны дараа<small>Гэрчилгээний дугаар захиалга дээр тань гарна.</small></div></div></div>`
+      : '';
+  }
+  return `<div class="line">${MARK.shield}<div><span class="lab">Мал эмнэлгийн гэрчилгээ</span><div class="v"><span class="mn">№${escapeHtml(c.number)}</span>${
+    c.checked ? `<span class="badge">${MARK.check}Basu шалгасан</span>` : ''
+  }<small>${escapeHtml(c.issuer)} · ${dayLabel(c.issued_on)}${c.checked ? '' : ' · нийлүүлэгчийн оруулсан'}</small></div></div></div>`;
+}
+
 function bits(l, day, { where = true } = {}) {
   return [
     `<span>${MARK.day}${day}</span>`,
@@ -1126,6 +1143,8 @@ function renderDetail({ replace = false } = {}) {
         </div>`),
   );
   if (l.note) body.append(el(`<div class="about">${escapeHtml(l.note)}</div>`));
+  const paper = paperLine(l.certificate, l.unit);
+  if (paper) body.append(el(`<div class="panel card paper">${paper}</div>`));
 
   if (l.remaining === 0) {
     body.append(el(`<div class="note callout"><b>Энэ зар дууссан</b><span>Нийлүүлэгч дахин нэмбэл энд гарна.</span></div>`));
@@ -2195,6 +2214,9 @@ async function showStatus(force, { replace = false } = {}) {
           </div>
         </div></div>`),
   );
+  // A cancelled order's meat was never handed over: its certificate is nobody's to read.
+  const paper = order.cancel_reason ? '' : paperLine(order.certificate, live ? order.unit : null);
+  if (paper) who.append(el(paper));
   body.append(who);
 
   /* the money */

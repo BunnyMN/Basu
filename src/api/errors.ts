@@ -95,6 +95,12 @@ const IDESH_ERRORS: Record<IdeshErrorCode, Spec> = {
     status: 409,
     mn: 'Энэ зарыг онцлох боломжгүй: зар зогссон, дууссан, эсвэл аль хэдийн VIP байна.',
   },
+  NEEDS_CERTIFICATE: { status: 400, mn: 'Кг-аар зарах махны мал эмнэлгийн гэрчилгээг сонгоно уу.' },
+  NO_CERTIFICATE: { status: 404, mn: 'Ийм гэрчилгээ олдсонгүй.' },
+  BAD_CERTIFICATE: { status: 400, mn: 'Гэрчилгээний мэдээлэл буруу байна. Дугаар, олгосон газар, огноогоо шалгана уу.' },
+  CERTIFICATE_EXISTS: { status: 409, mn: 'Энэ дугаартай гэрчилгээ аль хэдийн бүртгэлтэй байна.' },
+  CERTIFICATE_FALSE: { status: 409, mn: 'Энэ гэрчилгээг Basu шалгаад хүчингүй гэж үзсэн. Өөр гэрчилгээ сонгоно уу.' },
+  CERTIFICATE_IN_USE: { status: 409, mn: 'Зар, захиалгад хэрэглэсэн эсвэл шалгагдсан гэрчилгээг устгах боломжгүй.' },
 };
 
 const PASSWORD_ERRORS: Record<PasswordError['code'], Spec> = {

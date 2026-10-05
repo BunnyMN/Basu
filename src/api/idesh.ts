@@ -54,6 +54,15 @@ import {
   TIER_WORD,
   type Plan,
   type Promotion,
+  addCertificate,
+  certificatesOf,
+  certificatePhoto,
+  certifyIdesh,
+  removeCertificate,
+  photoType,
+  MAX_PHOTO_BYTES,
+  type Certificate,
+  type CertificatePhoto,
 } from '../idesh/index.js';
 import { setting } from '../ops/index.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
@@ -62,7 +71,7 @@ import { enqueue } from '../platform/notify/index.js';
 import { LONE_OWNER_PERMISSIONS, grants, headRoles, type Grants } from '../platform/access/index.js';
 import { accessIn, membersOf } from '../platform/org/index.js';
 import { topupsOpen, type Ctx } from '../ports.js';
-import { shapeOrder, shapeSettlement, shapeSummary } from './shapes.js';
+import { shapeCertificateFacts, shapeOrder, shapeSettlement, shapeSummary } from './shapes.js';
 import { holds, knownId, need, needAny, UUID } from './guards.js';
 
 /**
@@ -137,7 +146,39 @@ const shapeListing = (l: Listing) => ({
   active: l.active,
   tier: l.tier,
   tier_until: l.tierUntil?.toISOString() ?? null,
+  certificate: shapeCertificateFacts(l.certificate),
 });
+
+/** A certificate as the supplier's own screen reads it. */
+const shapeCertificate = (c: Certificate) => ({
+  id: c.id,
+  number: c.number,
+  issuer: c.issuer,
+  issued_on: c.issuedOn,
+  has_photo: c.hasPhoto,
+  state: c.state,
+  check_note: c.state === 'false' ? c.checkNote : null,
+  checked_at: c.checkedAt?.toISOString() ?? null,
+  listings: c.listings,
+  orders: c.orders,
+  created_at: c.createdAt.toISOString(),
+});
+
+/**
+ * The photograph the page sends: a data URL, as a canvas hands one over.
+ * `null` when none was sent; a string when what was sent is no photograph.
+ */
+function readPhoto(sent: unknown): CertificatePhoto | null | string {
+  if (sent === undefined || sent === null || sent === '') return null;
+  if (typeof sent !== 'string') return 'photo must be a data URL';
+  const match = /^data:(image\/(?:jpeg|png));base64,([A-Za-z0-9+/=]+)$/.exec(sent);
+  if (!match) return 'photo must be a JPEG or PNG data URL';
+  const bytes = Buffer.from(match[2]!, 'base64');
+  if (bytes.length > MAX_PHOTO_BYTES) return 'photo is too large';
+  const type = photoType(bytes);
+  if (!type || type !== match[1]) return 'photo is not the image it says it is';
+  return { type, bytes };
+}
 
 
 const shapeDetail = (o: IdeshDetail) => ({
@@ -198,6 +239,10 @@ function readListing(body: Record<string, unknown>): ListingInput | string {
   if (body['min_qty'] !== undefined) input.minQty = Number(body['min_qty']);
   if (typeof body['delivers'] === 'boolean') input.delivers = body['delivers'];
   if (body['delivery_fee_mnt'] !== undefined) input.deliveryFeeMnt = Number(body['delivery_fee_mnt']);
+  if (typeof body['certificate_id'] === 'string' && body['certificate_id']) {
+    if (!UUID.test(body['certificate_id'])) return 'certificate_id must be an id';
+    input.certificateId = body['certificate_id'];
+  }
   return input;
 }
 
@@ -211,6 +256,8 @@ function readPatch(body: Record<string, unknown>): ListingPatch {
   if (typeof body['ready_from'] === 'string') patch.readyFrom = body['ready_from'];
   if (body['note'] !== undefined) patch.note = body['note'] === null ? null : String(body['note']);
   if (typeof body['title'] === 'string') patch.title = body['title'];
+  // One that is not an id finds no certificate, and is told so by the module.
+  if (typeof body['certificate_id'] === 'string' && UUID.test(body['certificate_id'])) patch.certificateId = body['certificate_id'];
   return patch;
 }
 
@@ -742,15 +789,22 @@ export async function registerIdeshRoutes(
     action: string,
     orderId: string,
     actor: string,
-    body: { reason?: string } | undefined,
+    body: { reason?: string; certificate_id?: string } | undefined,
   ) => {
+    const sent = body?.certificate_id;
+    const certificateId = typeof sent === 'string' && UUID.test(sent) ? sent : null;
     switch (action) {
       case 'prepare':
         await startPreparing(ctx, orderId, actor);
         return { state: 'PREPARING' };
       case 'ready':
-        await markReady(ctx, orderId, actor);
+        if (sent && !certificateId) throw new IdeshError('NO_CERTIFICATE', 'certificate_id is not an id');
+        await markReady(ctx, orderId, actor, certificateId);
         return { state: 'READY' };
+      case 'certify':
+        if (!certificateId) throw new IdeshError('NO_CERTIFICATE', 'certificate_id is required');
+        await certifyIdesh(orderId, actor, certificateId);
+        return { certified: true };
       case 'dispatch':
         await markDispatched(ctx, orderId, actor);
         return { state: 'DISPATCHED' };
@@ -771,7 +825,7 @@ export async function registerIdeshRoutes(
     }
   };
 
-  app.post<{ Params: { id: string; action: string }; Body: { reason?: string } }>(
+  app.post<{ Params: { id: string; action: string }; Body: { reason?: string; certificate_id?: string } }>(
     '/v1/supplier/orders/:id/:action',
     asSupplierMay('org.idesh.orders:act'),
     async (request, reply) => {
@@ -797,6 +851,70 @@ export async function registerIdeshRoutes(
   app.get('/v1/supplier/listings', asSupplierMay('org.idesh.stall'), async (request) => ({
     listings: (await listingsOf(request.supplierSeat!.supplierId, ctx.clock.now())).map(shapeListing),
   }));
+
+  /* ── the certificates the meat came with ──────────────────────────────
+   *
+   * Written in once per shipment, then chosen on a listing or an order. The
+   * photograph rides in the JSON as a data URL the page has already made
+   * small, so this one route reads a larger body than the rest. Whoever works
+   * the orders reads the list too: they choose from it at «Бэлэн». */
+
+  app.get('/v1/supplier/certificates', asSupplierMayAny('org.idesh.stall', 'org.idesh.today', 'org.idesh.orders'), async (request) => ({
+    today: dayOf(ctx.clock.now()),
+    may_add: holds(request, 'org.idesh.stall:edit'),
+    certificates: (await certificatesOf(request.supplierSeat!.supplierId)).map(shapeCertificate),
+  }));
+
+  app.post<{ Body: Record<string, unknown> }>(
+    '/v1/supplier/certificates',
+    { ...asSupplierMay('org.idesh.stall:edit'), bodyLimit: Math.ceil(MAX_PHOTO_BYTES * 1.4) + 4096 },
+    async (request, reply) => {
+      const body = request.body ?? {};
+      const photo = readPhoto(body['photo']);
+      if (typeof photo === 'string') return badRequest(reply, 'Зураг JPEG эсвэл PNG байх ёстой, 900 КБ-аас бага.', photo);
+      try {
+        const added = await addCertificate(
+          request.supplierSeat!.supplierId,
+          {
+            number: String(body['number'] ?? ''),
+            issuer: String(body['issuer'] ?? ''),
+            issuedOn: String(body['issued_on'] ?? ''),
+            photo,
+            addedBy: request.supplierSeat!.person,
+          },
+          ctx.clock.now(),
+          dayOf(ctx.clock.now()),
+        );
+        return reply.status(201).send({ certificate: shapeCertificate(added) });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  /** The supplier's own photograph of it: theirs to look at again, nobody else's. */
+  app.get<{ Params: { id: string } }>(
+    '/v1/supplier/certificates/:id/photo',
+    asSupplierMayAny('org.idesh.stall', 'org.idesh.today', 'org.idesh.orders'),
+    async (request, reply) => {
+      const photo = await certificatePhoto(request.params.id, request.supplierSeat!.supplierId);
+      if (!photo) return sendError(reply, new IdeshError('NO_CERTIFICATE', 'no photo of that certificate here'));
+      return reply.header('content-type', photo.type).header('cache-control', 'private, max-age=3600').send(photo.bytes);
+    },
+  );
+
+  app.delete<{ Params: { id: string } }>(
+    '/v1/supplier/certificates/:id',
+    asSupplierMay('org.idesh.stall:edit'),
+    async (request, reply) => {
+      try {
+        await removeCertificate(request.supplierSeat!.supplierId, request.params.id);
+        return reply.status(204).send();
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
 
   /* ── putting a listing first, paid to Basu ─────────────────────────── */
 

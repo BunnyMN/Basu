@@ -2738,8 +2738,24 @@ describe('өвлийн идэш', () => {
     // first — with the code the guest's phone shows, to check against.
     const press = (label: string) =>
       ([...ticket().querySelectorAll('button')].find((b) => b.textContent?.includes(label)) as HTMLElement).click();
+    // A whole animal has no certificate until it is slaughtered: the supplier writes the shipment's in,
+    // and «Бэлэн боллоо» asks which one this meat came with — the guest then reads its number.
+    const owner = { authorization: `Bearer ${screen.window.localStorage.getItem('basu.guest')}`, 'content-type': 'application/json' };
+    const paper = await fetch(`${base}/v1/supplier/certificates`, {
+      method: 'POST',
+      headers: owner,
+      body: JSON.stringify({ number: `ТЕСТ-${code}`, issuer: 'Сонгинохайрхан дүүргийн мал эмнэлгийн тасаг', issued_on: clock.now().toISOString().slice(0, 10) }),
+    });
+    expect(paper.status, await paper.clone().text()).toBe(201);
+    const { certificate } = (await paper.json()) as { certificate: { id: string } };
     press('Бэлэн боллоо');
+    await until(screen, 'the certificate to be asked for', (d) => Boolean(d.querySelector(`#ready-order[data-open] [name="certificate_id"] option[value="${certificate.id}"]`)));
+    expect(ticket().getAttribute('data-lane')).toBe('preparing');
+    await answerPopup(screen, { certificate_id: certificate.id });
     await until(screen, 'the meat to be ready', () => ticket()?.getAttribute('data-lane') === 'ready');
+    expect(ticket().textContent).toContain(`№ТЕСТ-${code}`);
+    await until(guest, 'the guest to read the certificate', (d) => d.querySelector('#screen-body')?.textContent?.includes(`№ТЕСТ-${code}`) ?? false);
+    expect(guest.window.document.querySelector('#screen-body')?.textContent).toContain('нийлүүлэгчийн оруулсан');
     press('Хүлээлгэн өгсөн');
     await until(screen, 'the code to check', (d) => d.querySelector('#hand-order .hand-code b')?.textContent === code);
     expect(ticket()?.getAttribute('data-lane')).toBe('ready');
@@ -5080,6 +5096,9 @@ describe('every page, with a tag in whatever somebody could have typed', () => {
     // The words that ride with the money.
     ['idesh.settlement', ['memo', 'bank_name', 'bank_account', 'bank_holder', 'reference']],
     ['idesh.promotion', ['ended_note']],
+    // The certificate a supplier wrote in, and what the desk found of it.
+    ['idesh.certificate', ['number', 'issuer']],
+    ['idesh.certificate', ['checked_by', 'check_note'], 'checked_by IS NOT NULL'],
     ['ledger.transfer', ['memo']],
     ['ledger.topup', ['provider_ref']],
     ['ledger.ebarimt_receipt', ['last_error', 'lottery', 'bill_id']],
@@ -5216,7 +5235,7 @@ describe('every page, with a tag in whatever somebody could have typed', () => {
     await look(dom, 'the frame around the desk', '.sidebar');
     const tabs = [...dom.window.document.querySelectorAll('.tabs button[data-tab]')].map((b) => (b as HTMLElement).dataset['tab']!);
     expect(tabs).toEqual(
-      expect.arrayContaining(['overview', 'guests', 'money', 'notify', 'system', 'venues', 'lunches', 'reviews', 'stats', 'orders', 'suppliers', 'pay', 'promotions', 'orgs', 'members', 'roles', 'menus', 'audit']),
+      expect.arrayContaining(['overview', 'guests', 'money', 'notify', 'system', 'venues', 'lunches', 'reviews', 'stats', 'orders', 'suppliers', 'pay', 'promotions', 'certificates', 'orgs', 'members', 'roles', 'menus', 'audit']),
     );
     // Two carry nobody's words as they open: the books' own checks, and the payouts when none waits.
     const wordless = new Set(['money', 'pay']);
@@ -5226,6 +5245,11 @@ describe('every page, with a tag in whatever somebody could have typed', () => {
     // Every payout and refund, not only what waits: the names and the bank's words on each.
     await step(dom, 'the payouts', press(dom, '.tabs button[data-tab="pay"]'), { drawn: '#pay' });
     await step(dom, 'every payout and refund', press(dom, '#pay .dt-seg button[data-v="all"]'), { shows: '#pay' });
+    // The certificates suppliers wrote in — a number, who gave it, what the desk found — and the popup that checks one.
+    await step(dom, 'the certificates', press(dom, '.tabs button[data-tab="certificates"]'), { shows: '#certificates', drawn: '#certificates tr[data-certificate]' });
+    await step(dom, 'a certificate, to check', press(dom, '#certificates [data-a="check"]'), { shows: '#cert-check', drawn: '#cert-check[data-open]' });
+    await step(dom, 'the check put away', press(dom, '#cert-check [data-cancel]'));
+    await until(dom, 'the check gone', (d) => !d.querySelector('#cert-check[data-open]'));
     // The books, each of their views, and the messages by month.
     await step(dom, 'the books', press(dom, '.tabs button[data-tab="money"]'), { drawn: '#money .kpi' });
     for (const view of ['transfers', 'topups', 'receipts']) {
@@ -5304,6 +5328,13 @@ describe('every page, with a tag in whatever somebody could have typed', () => {
     for (const tab of ['stall', 'money', 'profile']) {
       await step(screen, `the supplier’s ${tab}`, press(screen, `.tabbar button[data-tab="${tab}"]`), { shows: '#view' });
     }
+    // A supplier with cut meat on sale: the certificates under its listings, written in by somebody there.
+    const cutMeat = await ownerScreen(seeded.suppliers[3]!.phone);
+    await until(cutMeat, 'the module', (d) => Boolean(d.querySelector('.tabbar button[data-tab="stall"]')));
+    press(cutMeat, '.tabbar button[data-tab="stall"]')();
+    await until(cutMeat, 'its certificates', (d) => Boolean(d.querySelector('#papers [data-paper]')));
+    await settled(cutMeat, 'the stall and its certificates');
+    await look(cutMeat, 'a supplier’s certificates', '#papers');
   });
 
   it('draws the kitchen, and the guest’s pages on the website, with it as text', async () => {

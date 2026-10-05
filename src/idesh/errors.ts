@@ -20,7 +20,13 @@ export type IdeshErrorCode =
   | 'NEEDS_PHONE'
   | 'NOT_PENDING'
   | 'OPS_CLOSED'
-  | 'NOT_PROMOTABLE';
+  | 'NOT_PROMOTABLE'
+  | 'NEEDS_CERTIFICATE'
+  | 'NO_CERTIFICATE'
+  | 'BAD_CERTIFICATE'
+  | 'CERTIFICATE_EXISTS'
+  | 'CERTIFICATE_FALSE'
+  | 'CERTIFICATE_IN_USE';
 
 export class IdeshError extends Error {
   constructor(

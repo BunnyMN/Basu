@@ -331,7 +331,11 @@ async function drawOrder(id, fresh) {
         </div>`),
     el(`<div class="s-card od-box">
           <h2>Нийлүүлэгч</h2>
-          <dl><div><dt>Нэр</dt><dd>${esc(o.supplier.name)}<small>Basu шалгаж, гэрээ байгуулсан</small></dd></div></dl>
+          <dl><div><dt>Нэр</dt><dd>${esc(o.supplier.name)}<small>Basu шалгаж, гэрээ байгуулсан</small></dd></div>${
+            o.certificate && !o.cancel_reason
+              ? `<div><dt>Мал эмнэлгийн гэрчилгээ</dt><dd><span class="digits">№${esc(o.certificate.number)}</span><small>${esc(o.certificate.issuer)} · ${dayLabel(o.certificate.issued_on)} · ${o.certificate.checked ? 'Basu шалгасан' : 'нийлүүлэгчийн оруулсан'}</small></dd></div>`
+              : ''
+          }</dl>
           ${o.supplier_phone ? `<a class="s-btn s-btn-line s-btn-block" href="tel:${esc(o.supplier_phone)}" aria-label="Нийлүүлэгч рүү залгах: ${esc(phoneShown(o.supplier_phone))}">${MARK.phone}<span class="digits">${esc(phoneShown(o.supplier_phone))}</span></a>` : ''}
           ${live ? '<p class="od-note">Өөрчлөх, цуцлах бол нийлүүлэгчтэй ярина уу — цуцлахыг тэр хийнэ.</p>' : ''}
         </div>`),

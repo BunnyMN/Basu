@@ -604,7 +604,7 @@ const STATE = { applied: 'хүлээгдэж байна', contracted: 'гэрэ�
 const STATE_WORD = IDESH_STATE;
 const EVENT_WORD = {
   CREATED: 'Үүссэн', PAID: 'Төлсөн', PREPARING: 'Бэлтгэж эхэлсэн', READY: 'Бэлэн болсон', DISPATCHED: 'Замд гарсан',
-  HANDED: 'Хүлээлгэн өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан', REFUND_DUE: 'Буцаалт үүссэн', REFUNDED: 'Буцаалт шилжүүлсэн', RESENT: 'Мэдэгдэл дахин илгээсэн',
+  HANDED: 'Хүлээлгэн өгсөн', CLOSED: 'Хаагдсан', CANCELLED: 'Цуцлагдсан', REFUND_DUE: 'Буцаалт үүссэн', REFUNDED: 'Буцаалт шилжүүлсэн', RESENT: 'Мэдэгдэл дахин илгээсэн', CERTIFIED: 'Гэрчилгээ оруулсан',
 };
 const REASON = {
   guest_asked: 'Зочин хүссэн', vet: 'Мал эмнэлгийн шалгалт', cannot_fulfil: 'Нийлүүлэгч биелүүлж чадахгүй',
@@ -2697,6 +2697,145 @@ const pagesOf = (w) => w.menu.flatMap((g) => g.items);
 /** Whether the place open now has that page — what a link inside a page asks before it is drawn. */
 const hasPage = (key) => Boolean(ws && pagesOf(ws).some((i) => i.key === key && !i.href));
 const lastPageKey = (w) => (w.kind === 'desk' ? 'basu.ops.tab' : `basu.dash.page.${w.id}`);
+/* ── the veterinary certificates suppliers wrote in ── */
+
+const CERT_STATE = { unchecked: ['pending', 'Шалгаагүй'], genuine: ['verified', 'Жинхэнэ'], false: ['bad', 'Хүчингүй'] };
+/** What a certificate is on, in words. */
+const certUse = (c) => [c.listings ? `${c.listings} зар` : '', c.orders ? `${c.orders} захиалга` : ''].filter(Boolean).join(' · ') || 'Хэрэглээгүй';
+
+/**
+ * A certificate's photograph, fetched as the desk's own: an address that
+ * holds while the popup that shows it is open, and is let go with `done()`.
+ */
+async function certPhoto(c) {
+  if (!c.has_photo) return { src: null, done: () => {} };
+  const answer = await fetch(`/v1/ops/certificates/${c.id}/photo`, { headers: { authorization: `Bearer ${token()}` } });
+  if (!answer.ok) return { src: null, done: () => {} };
+  const src = URL.createObjectURL(await answer.blob());
+  return { src, done: () => URL.revokeObjectURL(src) };
+}
+
+/**
+ * Say what looking a certificate's number up in the state's system (МЭНС)
+ * found. Genuine, the guest reads «Basu шалгасан» beside the number; false,
+ * with the reason, takes the meat under it out of the stalls and tells the
+ * supplier — so that one asks first, and is the crimson button.
+ */
+async function checkCertificatePopup(c) {
+  const photo = await certPhoto(c);
+  const done = await popup({
+    id: 'cert-check',
+    title: `Гэрчилгээ №${c.number}`,
+    sub: `${esc(c.supplier_name)} · ${esc(c.issuer)} · ${esc(dayLabel(c.issued_on))}`,
+    width: 640,
+    fields: [
+      { type: 'static', label: 'Зураг', html: photo.src ? `<img class="cert-photo" src="${photo.src}" alt="Гэрчилгээ №${esc(c.number)}">` : '<span class="dt-none">Зураг оруулаагүй</span>' },
+      { type: 'note', text: 'Дугаарыг «Мал эмнэлгийн гэрчилгээ» апп эсвэл МЭНС-ээр шалгаад, олдсон дүнгээ сонгоно.' },
+      {
+        name: 'found',
+        label: 'Шалгалтын дүн',
+        type: 'select',
+        wide: true,
+        required: true,
+        value: '',
+        options: [['', 'Сонгоно уу'], ['genuine', 'Жинхэнэ — бүртгэлтэй, мэдээлэл таарсан'], ['false', 'Хүчингүй — бүртгэлгүй эсвэл таараагүй']],
+        onChange: (value, form) => {
+          form.show('note', value === 'false');
+          form.hint('found', value === 'false' ? 'Энэ гэрчилгээтэй зар зочдод харагдахаа болино, нийлүүлэгчид мэдэгдэнэ.' : value === 'genuine' ? 'Зочид дугаарын хажууд «Basu шалгасан» гэж харна.' : '');
+        },
+      },
+      { name: 'note', label: 'Яагаад хүчингүй вэ', type: 'textarea', required: true, placeholder: 'Жишээ нь: МЭНС-д ийм дугаар бүртгэлгүй', hint: 'Нийлүүлэгч үүнийг уншина.' },
+    ],
+    submit: 'Хадгалах',
+    onSubmit: async (v) => {
+      if (!v.found) throw Object.assign(new Error('Шалгалтын дүнгээ сонгоно уу.'), { field: 'found' });
+      await ops(`/v1/ops/certificates/${c.id}/check`, { method: 'POST', body: { genuine: v.found === 'genuine', note: v.note ?? '' } });
+      return v.found;
+    },
+  });
+  photo.done();
+  if (!done) return;
+  toast(done === 'genuine' ? 'Жинхэнэ гэж тэмдэглэлээ.' : 'Хүчингүй гэж тэмдэглэлээ — зар нуугдлаа.', 'good');
+  show('certificates');
+}
+
+/** The photograph alone, for a seat that reads and does not check. */
+async function showCertificate(c) {
+  const photo = await certPhoto(c);
+  await popup({
+    id: 'cert-view',
+    title: `Гэрчилгээ №${c.number}`,
+    sub: `${esc(c.supplier_name)} · ${esc(c.issuer)} · ${esc(dayLabel(c.issued_on))}`,
+    width: 640,
+    fields: [{ type: 'static', label: 'Зураг', html: photo.src ? `<img class="cert-photo" src="${photo.src}" alt="Гэрчилгээ №${esc(c.number)}">` : '<span class="dt-none">Зураг оруулаагүй</span>' }],
+    submit: 'Хаах',
+    cancel: '',
+    onSubmit: async () => true,
+  });
+  photo.done();
+}
+
+/**
+ * Every certificate a supplier wrote in: whose, its number, who gave it,
+ * what meat is under it, and what the desk found. Not every one is checked —
+ * the desk samples: a new supplier's first few, a guest's complaint, one at
+ * random. The unchecked come first.
+ */
+async function renderCertificates(view) {
+  const checks = can('desk.certificates:check');
+  view.append(head('Гэрчилгээ', 'Нийлүүлэгчдийн оруулсан мал эмнэлгийн гэрчилгээ'));
+  const band = el('<div class="kpis kpi-band band-gap" id="cert-kpis"></div>');
+  view.append(band);
+  const table = dataTable({
+    columns: [
+      { key: 'created_at', label: 'Оруулсан', render: (c) => whenCell(c.created_at) },
+      { key: 'number', label: 'Гэрчилгээ', value: (c) => `${c.number} ${c.issuer}`, render: (c) => dtCell.twoHtml(`<span class="mn">№${esc(c.number)}</span>`, `${esc(c.issuer)} · ${esc(dayLabel(c.issued_on))}`) },
+      { key: 'supplier_name', label: 'Нийлүүлэгч', render: (c) => esc(c.supplier_name) },
+      { key: 'use', label: 'Хэрэглэсэн', value: (c) => c.listings + c.orders, render: (c) => esc(certUse(c)) },
+      {
+        key: 'state',
+        label: 'Төлөв',
+        value: (c) => CERT_STATE[c.state][1],
+        render: (c) => `${dtCell.pill(...CERT_STATE[c.state])}${c.checked_by ? `<small class="dt-text">${esc(c.checked_by)}${c.check_note ? ` · ${esc(c.check_note)}` : ''}</small>` : ''}`,
+      },
+    ],
+    search: { placeholder: 'Дугаар, нийлүүлэгч, олгосон газар…' },
+    filters: [
+      {
+        key: 'state',
+        label: 'Төлөв',
+        kind: 'seg',
+        options: [['', 'Бүгд'], ['unchecked', 'Шалгаагүй'], ['genuine', 'Жинхэнэ'], ['false', 'Хүчингүй']],
+        test: (c, v) => !v || c.state === v,
+      },
+    ],
+    actions: (c) =>
+      checks
+        ? button(c.state === 'unchecked' ? 'Шалгах' : 'Дахин шалгах', () => checkCertificatePopup(c), 'data-size="sm" data-a="check"')
+        : c.has_photo
+          ? button('Зураг', () => showCertificate(c), 'data-size="sm" data-a="photo"')
+          : null,
+    rowAttrs: (c) => ({ 'data-certificate': c.id }),
+    noun: 'гэрчилгээ',
+    empty: { title: 'Гэрчилгээ алга', text: 'Нийлүүлэгч гэрчилгээ оруулахад энд гарна.' },
+    stateKey: 'basu.dt.certificates',
+  });
+  table.el.id = 'certificates';
+  view.append(table.el);
+  try {
+    const { summary, certificates } = await ops('/v1/ops/certificates');
+    band.replaceChildren(
+      el(`<div class="card kpi"><div class="lab">Шалгаагүй</div><b>${summary.unchecked}</b><span>${summary.unchecked ? 'түүвэрлэж шалгана' : 'шалгаагүй гэрчилгээ алга'}</span></div>`),
+      el(`<div class="card kpi"><div class="lab">Жинхэнэ</div><b>${summary.genuine}</b><span>зочид «Basu шалгасан» гэж харна</span></div>`),
+      el(`<div class="card kpi"${summary.false ? ' data-tone="warn"' : ''}><div class="lab">Хүчингүй</div><b>${summary.false}</b><span>${summary.false ? 'зар нь зочдод харагдахгүй' : 'хүчингүй гэрчилгээ алга'}</span></div>`),
+    );
+    table.setRows(certificates);
+  } catch (error) {
+    toast(error.message, 'bad');
+    table.setRows([]);
+  }
+}
+
 const firstPage = (w) => pagesOf(w).find((i) => !i.href)?.key ?? 'home';
 const remembered = (w) => {
   const saved = localStorage.getItem(lastPageKey(w));
@@ -2706,7 +2845,7 @@ const remembered = (w) => {
 const DESK_PAGES = {
   overview: renderOverview, guests: renderGuests, money: renderMoney, notify: renderNotify, system: renderSystem,
   venues: renderVenues, lunches: renderLunches, reviews: renderReviews,
-  stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, promotions: renderPromotions,
+  stats: renderStats, orders: renderOrders, suppliers: renderSuppliers, pay: renderPay, promotions: renderPromotions, certificates: renderCertificates,
   orgs: renderOrgsDesk, members: renderMembers, roles: renderRoles, menus: renderMenus, audit: renderAudit,
 };
 const ORG_PAGES = { home: renderOrgHome, team: renderOrgTeam, profile: renderOrgProfile, roles: renderOrgRoles, log: renderOrgLog };
@@ -5408,13 +5547,14 @@ const ACTION = {
   'menu.save': 'Цэс өөрчилсөн', 'menu.module': 'Модуль нэмсэн', 'menu.module_remove': 'Модуль устгасан', 'menu.link': 'Холбоос нэмсэн', 'menu.link_remove': 'Холбоос устгасан',
   'setting.change': 'Тохиргоо өөрчилсөн',
   'promotion.end': 'Онцлолт зогсоосон',
+  'certificate.genuine': 'Гэрчилгээг жинхэнэ гэж тэмдэглэсэн', 'certificate.false': 'Гэрчилгээг хүчингүй гэж тэмдэглэсэн',
 };
 
 /** What an action was done to, in the words of the desk's own sections. */
 const TARGET_WORD = {
   order: 'Идэш', listing: 'Идэш', supplier: 'Нийлүүлэгч', settlement: 'Мөнгө', ledger: 'Мөнгө', receipt: 'Мөнгө', guest: 'Зочин',
   member: 'Гишүүд', org: 'Байгууллага', role: 'Үүрэг, цэс', menu: 'Үүрэг, цэс', restaurant: 'Хоол', device: 'Хоол', menu_item: 'Хоол',
-  message: 'Мэдэгдэл', setting: 'Систем', promotion: 'Онцлох зар',
+  message: 'Мэдэгдэл', setting: 'Систем', promotion: 'Онцлох зар', certificate: 'Гэрчилгээ',
 };
 
 /**

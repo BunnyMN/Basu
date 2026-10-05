@@ -71,6 +71,24 @@ export {
 } from './listings.js';
 
 export {
+  addCertificate,
+  certificatesOf,
+  certificateById,
+  certificatesForDesk,
+  certificatePhoto,
+  removeCertificate,
+  checkCertificate,
+  photoType,
+  MAX_PHOTO_BYTES,
+  type Certificate,
+  type CertificateFacts,
+  type CertificateInput,
+  type CertificatePhoto,
+  type CertificateState,
+  type DeskCertificate,
+} from './certificates.js';
+
+export {
   startPromotion,
   settlePromotion,
   promotionsOf,
@@ -118,6 +136,7 @@ export {
   cancelIdesh,
   startPreparing,
   markReady,
+  certifyIdesh,
   markDispatched,
   markHanded,
   housekeeping,

@@ -254,6 +254,127 @@ img{display:block;max-width:none}
   .close .go{width:100%}
   .store{margin-inline:auto}
 }
+/* ── the market in numbers: three figures on a hairline ──────────── */
+.tally-band{padding:0 0 24px}
+.tally-band[hidden]{display:none}
+.tally{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px;padding:28px 0 0;border-top:1px solid var(--gold-line)}
+.tally div{min-width:0}
+.tally b{display:block;font-size:clamp(3rem,5vw,4.5rem);line-height:.9;white-space:nowrap}
+.tally span{display:block;margin-top:12px;font:600 .9375rem/1.3 var(--sans);color:var(--ink-2)}
+@media (max-width:760px){
+  .tally-band{padding:8px 0 28px}
+  .tally{gap:12px;padding-top:18px}
+  .tally b{font-size:2.25rem}
+  .tally span{margin-top:8px;font-size:.8125rem}
+}
+
+/* ── where the meat is from: the certificate ─────────────────────── */
+.proof{padding:0 0 136px}
+.proof .L-wrap{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:72px;align-items:center}
+.proof .ph{position:relative;height:640px;border-radius:22px;overflow:hidden;background:#1A1514;box-shadow:var(--shadow-1)}
+.proof .ph img{width:100%;height:100%;object-fit:cover;object-position:50% 40%;filter:sepia(.12) saturate(1.1) contrast(1.06)}
+.proof .ph::after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(12,9,8,.7) 0%,rgba(12,9,8,0) 42%)}
+.proof .eyebrow{display:flex;align-items:center;gap:14px;margin:0 0 22px;font:700 .8125rem/1 var(--sans);letter-spacing:.16em;text-transform:uppercase;color:var(--gold)}
+.proof .eyebrow::before{content:"";width:36px;height:1px;background:var(--gold)}
+.proof h2{margin:0;font-size:clamp(3.5rem,6.1vw,5.5rem);line-height:.88}
+.proof .lead{margin:24px 0 0;max-width:500px;font:500 1.25rem/1.45 var(--sans);color:var(--ink-2)}
+.proof ol{list-style:none;margin:40px 0 0;padding:0;border-top:1px solid var(--gold-line)}
+.proof li{display:grid;grid-template-columns:56px minmax(0,1fr);align-items:baseline;padding:20px 0;border-bottom:1px solid var(--line)}
+.proof li i{font-family:var(--display);font-size:2.5rem;font-style:normal;font-weight:800;line-height:.8;color:transparent;-webkit-text-stroke:1px var(--gold)}
+.proof li b{display:block;font:700 1.1875rem/1.25 var(--sans)}
+.proof li span{display:block;margin-top:6px;font:500 1rem/1.45 var(--sans);color:var(--ink-2)}
+/* a real listing's certificate, as its own page shows it: floating on the photograph */
+.slip{position:absolute;left:24px;right:24px;bottom:24px;z-index:1;display:block;padding:18px 20px;border-radius:18px;background:rgba(16,13,12,.66);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:1px solid rgba(255,244,236,.12);color:var(--ink);text-decoration:none}
+.slip[hidden]{display:none}
+.slip small{display:block;font:700 .75rem/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.slip .no{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:12px}
+.slip .no b{font-size:1.875rem;line-height:1;overflow-wrap:anywhere}
+.slip .ok{display:inline-flex;align-items:center;gap:6px;min-height:26px;padding:0 10px;border-radius:999px;border:1px solid var(--gold-line);font:700 .8125rem/1 var(--sans);color:var(--gold)}
+.slip .ok svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.slip .ok[hidden]{display:none}
+.slip p{margin:10px 0 0;font:500 .9375rem/1.4 var(--sans);color:var(--ink-2)}
+@media (hover:hover){.slip:hover{background:rgba(16,13,12,.8)}}
+@media (max-width:1100px){.proof .L-wrap{gap:40px}.proof .ph{height:520px}}
+@media (max-width:760px){
+  .proof{padding:44px 0 56px}
+  .proof .L-wrap{display:block}
+  .proof .ph{height:360px;margin-bottom:32px}
+  .proof .eyebrow{margin-bottom:16px}
+  .proof h2{font-size:3.5rem}
+  .proof .lead{margin-top:16px;font-size:1.0625rem}
+  .proof ol{margin-top:24px}
+  .proof li{grid-template-columns:44px minmax(0,1fr);padding:16px 0}
+  .proof li i{font-size:2rem}
+  .proof li b{font-size:1.0625rem}
+  .proof li span{font-size:.9375rem}
+  .slip{left:14px;right:14px;bottom:14px;padding:14px 16px}
+  .slip .no b{font-size:1.5rem}
+}
+
+/* ── what the buyer holds on to: four promises ───────────────────── */
+.vows-band{padding:0 0 136px}
+.vows{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+.vow{padding:28px 26px 30px;border-radius:22px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-1)}
+.vow svg{width:30px;height:30px;fill:none;stroke:var(--gold);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.vow h3{margin:26px 0 0;font-family:var(--display);font-size:2.25rem;font-weight:800;line-height:.92}
+.vow p{margin:12px 0 0;font:500 1rem/1.45 var(--sans);color:var(--ink-2)}
+@media (max-width:1100px){.vows{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){
+  .vows-band{padding:0 0 56px}
+  .vows{gap:12px}
+  .vow{padding:18px 16px 20px}
+  .vow svg{width:24px;height:24px}
+  .vow h3{margin-top:16px;font-size:1.625rem}
+  .vow p{margin-top:8px;font-size:.875rem}
+}
+
+/* ── what people ask ─────────────────────────────────────────────── */
+.faq-band{padding:0 0 136px}
+.faq-band .L-wrap{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,7fr);gap:72px;align-items:start}
+.faq-band h2{margin:0;font-size:clamp(3.5rem,6.1vw,5.5rem);line-height:.88}
+.faq-band .ask{margin:24px 0 0;font:500 1.0625rem/1.5 var(--sans);color:var(--ink-2)}
+.faq-band .ask a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--gold-line);text-underline-offset:.26em}
+.faq{border-top:1px solid var(--gold-line)}
+.faq details{border-bottom:1px solid var(--line)}
+.faq summary{display:flex;align-items:center;justify-content:space-between;gap:20px;min-height:76px;padding:14px 0;font:700 1.25rem/1.3 var(--sans);color:var(--ink);cursor:pointer;list-style:none;-webkit-tap-highlight-color:transparent}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"";flex:none;width:12px;height:12px;margin-right:6px;border-right:1.8px solid var(--gold);border-bottom:1.8px solid var(--gold);transform:rotate(45deg) translate(-3px,-3px);transition:transform var(--dur) var(--ease)}
+.faq details[open] summary::after{transform:rotate(-135deg) translate(-3px,-3px)}
+.faq summary:focus-visible{outline:2px solid var(--ink);outline-offset:4px;border-radius:8px}
+.faq details p{margin:0;padding:0 48px 26px 0;max-width:640px;font:500 1.0625rem/1.55 var(--sans);color:var(--ink-2)}
+@media (max-width:1100px){.faq-band .L-wrap{gap:40px}}
+@media (max-width:760px){
+  .faq-band{padding:0 0 56px}
+  .faq-band .L-wrap{display:block}
+  .faq-band h2{font-size:3.5rem}
+  .faq-band .ask{margin:14px 0 24px;font-size:.9375rem}
+  .faq summary{min-height:64px;font-size:1.0625rem}
+  .faq details p{padding:0 8px 20px 0;font-size:.9375rem}
+}
+
+/* ── for whoever sells meat ──────────────────────────────────────── */
+.sell-band{padding:0 0 40px}
+.sell{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:24px 48px;padding:40px 48px;border-radius:22px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow-1)}
+.sell h2{margin:0;font-size:clamp(2.5rem,4.2vw,3.75rem);line-height:.9}
+.sell p{margin:14px 0 0;font:500 1.125rem/1.45 var(--sans);color:var(--ink-2)}
+.sell a{display:inline-flex;align-items:center;gap:10px;min-height:56px;padding:0 28px;border-radius:999px;border:1px solid var(--line-2);font:700 1.0625rem/1 var(--sans);color:var(--ink);text-decoration:none;white-space:nowrap}
+.sell a svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+@media (hover:hover){.sell a:hover{border-color:var(--gold)}}
+@media (max-width:760px){
+  .sell-band{padding:0 0 8px}
+  .sell{padding:24px 20px}
+  .sell h2{font-size:2.5rem}
+  .sell p{font-size:1rem}
+  .sell a{width:100%;justify-content:center}
+}
+
+/* ── the page arrives: each part rises once as it comes into view ── */
+@media (prefers-reduced-motion:no-preference){
+  .rv-on .rv{opacity:0;transform:translateY(28px);transition:opacity 700ms var(--ease),transform 700ms var(--ease);transition-delay:var(--rv-d,0ms)}
+  .rv-on .rv[data-in]{opacity:1;transform:none}
+  .hero .ph img{animation:hero-in 2400ms var(--ease) both}
+  @keyframes hero-in{from{transform:scale(1.07);opacity:.4}to{transform:none;opacity:1}}
+}
 </style>
 </head>
 <body>
@@ -303,6 +424,17 @@ img{display:block;max-width:none}
     </div>
   </section>
 
+  <!-- ── the market in numbers: straight from the stalls, hidden while there is nothing ── -->
+  <section class="tally-band" id="tally" aria-label="Зах тоогоор" hidden>
+    <div class="L-wrap">
+      <div class="tally rv">
+        <div><b class="d num" id="tally-stalls"></b><span>зар зах дээр</span></div>
+        <div><b class="d num" id="tally-sellers"></b><span>гэрээт нийлүүлэгч</span></div>
+        <div><b class="d num" id="tally-from"></b><span id="tally-from-word">кг-ийн доод үнэ</span></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ── the four animals ── -->
   <section class="animals-band" id="meat" aria-labelledby="meat-title">
     <div class="L-wrap">
@@ -310,7 +442,7 @@ img{display:block;max-width:none}
         <h2 class="d" id="meat-title">Малаа сонго</h2>
         <p>Бүтнээр нь, эсвэл кг-аар.</p>
       </div>
-      <div class="animals">
+      <div class="animals rv">
         <a class="animal" href="/shop" data-kind="sheep"><img src="/brand/meat/sheep-720.webp" srcset="/brand/meat/sheep-480.webp 480w, /brand/meat/sheep-720.webp 720w, /brand/meat/sheep.webp 960w" sizes="(max-width: 760px) calc(50vw - 30px), (max-width: 1100px) calc(50vw - 60px), 310px" alt="" loading="lazy" width="960" height="720"><span class="ktag"></span><span class="t"><b class="d">Хонь</b><span class="m"></span></span></a>
         <a class="animal" href="/shop" data-kind="goat"><img src="/brand/meat/goat-720.webp" srcset="/brand/meat/goat-480.webp 480w, /brand/meat/goat-720.webp 720w, /brand/meat/goat.webp 960w" sizes="(max-width: 760px) calc(50vw - 30px), (max-width: 1100px) calc(50vw - 60px), 310px" alt="" loading="lazy" width="960" height="720"><span class="ktag"></span><span class="t"><b class="d">Ямаа</b><span class="m"></span></span></a>
         <a class="animal" href="/shop" data-kind="beef"><img src="/brand/meat/beef-720.webp" srcset="/brand/meat/beef-480.webp 480w, /brand/meat/beef-720.webp 720w, /brand/meat/beef.webp 960w" sizes="(max-width: 760px) calc(50vw - 30px), (max-width: 1100px) calc(50vw - 60px), 310px" alt="" loading="lazy" width="960" height="720"><span class="ktag"></span><span class="t"><b class="d">Үхэр</b><span class="m"></span></span></a>
@@ -324,12 +456,36 @@ img{display:block;max-width:none}
     <div class="cuts"><img src="/brand/meat/cuts.webp" srcset="/brand/meat/cuts-828.webp 828w, /brand/meat/cuts-1200.webp 1200w, /brand/meat/cuts.webp 1800w" sizes="100vw" alt="Хар тавцан дээр эгнүүлэн тавьсан шинэ махны зүсмэлүүд" loading="lazy" width="1800" height="920"></div>
     <div class="L-wrap">
       <div class="steps-in">
-        <div class="steps">
+        <div class="steps rv">
           <h2 class="d" id="how-title">Гурван<br> алхам</h2>
           <div class="step"><i aria-hidden="true">1</i><div><h3>Сонгох</h3><span>Мал, жин, авах өдрөө сонго.</span></div></div>
           <div class="step" data-pay><i aria-hidden="true">2</i><div><h3>Төлөх</h3><span>QPay-ээр шууд төл.</span></div></div>
           <div class="step"><i aria-hidden="true">3</i><div><h3>Авах</h3><span>Өөрөө ав, эсвэл хүргүүл.</span></div></div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── where the meat is from: the veterinary certificate ── -->
+  <section class="proof" id="proof" aria-labelledby="proof-title">
+    <div class="L-wrap">
+      <div class="ph rv">
+        <img src="/brand/meat/butcher.webp" srcset="/brand/meat/butcher-600.webp 600w, /brand/meat/butcher-828.webp 828w, /brand/meat/butcher.webp 1100w" sizes="(max-width: 760px) calc(100vw - 48px), 44vw" alt="Махчин үхрийн хавиргыг хутгаар салгаж байна" loading="lazy" width="1100" height="1375">
+        <a class="slip" id="slip" href="/shop" hidden>
+          <small>Мал эмнэлгийн гэрчилгээ</small>
+          <span class="no"><b class="d num" id="slip-no"></b><span class="ok" id="slip-ok" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Basu шалгасан</span></span>
+          <p id="slip-line"></p>
+        </a>
+      </div>
+      <div class="rv" style="--rv-d:120ms">
+        <p class="eyebrow">Мал эмнэлгийн гэрчилгээ</p>
+        <h2 class="d" id="proof-title">Гарал нь<br>тодорхой.</h2>
+        <p class="lead">Мах ямар гэрчилгээтэй ирснийг захиалахаасаа өмнө харна.</p>
+        <ol>
+          <li><i aria-hidden="true">1</i><div><b>Дугаар нь ил</b><span>Гэрчилгээний дугаар зар, захиалга дээр харагдана.</span></div></li>
+          <li><i aria-hidden="true">2</i><div><b>Basu шалгана</b><span>Дугаарыг улсын бүртгэлээс түүвэрлэн шалгана.</span></div></li>
+          <li><i aria-hidden="true">3</i><div><b>Хуурамч бол хаагдана</b><span>Хүчингүй гэрчилгээтэй зар шууд нуугдана.</span></div></li>
+        </ol>
       </div>
     </div>
   </section>
@@ -345,6 +501,53 @@ img{display:block;max-width:none}
       <div class="board-empty" id="board-empty" hidden>
         <p>Анхны зарууд удахгүй гарна.</p>
         <a href="/dashboard?join=business">Мах нийлүүлдэг бол бүртгүүлэх</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── what the buyer holds on to ── -->
+  <section class="vows-band" id="vows" aria-labelledby="vows-title">
+    <div class="L-wrap">
+      <div class="sec-head">
+        <h2 class="d" id="vows-title">Таны баталгаа</h2>
+        <p>Төлөхөөсөө өмнө мэдэх дөрвөн зүйл.</p>
+      </div>
+      <div class="vows rv">
+        <div class="vow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg><h3>Үнэ эцсийн</h3><p>Жин зөрсөн ч нэмж төлөхгүй.</p></div>
+        <div class="vow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg><h3>Гэрээт нийлүүлэгч</h3><p>Basu шалгаж, гэрээ байгуулсан.</p></div>
+        <div class="vow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 4v5h5"/></svg><h3>Бүтэн буцаалт</h3><p>Нядлахаас өмнө цуцлагдвал мөнгө бүтнээрээ буцна.</p></div>
+        <div class="vow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.8"/><circle cx="17.5" cy="18" r="1.8"/></svg><h3>Хүргэлт, эсвэл өөрөө</h3><p>Хаягаар хүргүүлнэ, эсвэл цэгээс очиж авна.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── what people ask ── -->
+  <section class="faq-band" id="faq" aria-labelledby="faq-title">
+    <div class="L-wrap">
+      <div class="rv">
+        <h2 class="d" id="faq-title">Түгээмэл<br>асуулт</h2>
+        <p class="ask">Өөр асуулт байвал <a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a></p>
+      </div>
+      <div class="faq rv" style="--rv-d:120ms">
+        <details><summary>Яаж төлөх вэ?</summary><p id="faq-pay">QPay-ээр. Банкны аппаараа уншуулаад төлнө.</p></details>
+        <details><summary>Жин зөрвөл яах вэ?</summary><p>Үнэ эцсийн. Бодит жин зөрсөн ч нэмж төлөхгүй.</p></details>
+        <details><summary>Цуцалж болох уу?</summary><p>Нийлүүлэгчтэй утсаар ярьж цуцална. Нядлахаас өмнө бол мөнгө бүтнээрээ буцна. Нядалсны дараа таны хүсэлтээр бол 10% суутгана.</p></details>
+        <details><summary>Махаа хэрхэн авах вэ?</summary><p>Нийлүүлэгчийн цэгээс өөрөө авна, эсвэл хаягаараа хүргүүлнэ. Хүргэлтийн төлбөр зар бүр дээр бичээтэй.</p></details>
+        <details><summary>Мах хаанаас ирдэг вэ?</summary><p>Гарал, нийлүүлэгч нь зар бүр дээр бий. Кг-аар зарах махны мал эмнэлгийн гэрчилгээний дугаар зар дээрээ, бүтэн малынх нядалсны дараа захиалга дээр орно.</p></details>
+        <details><summary>Хоёр айл хувааж авч болох уу?</summary><p>Болно. Бүтэн малыг нэг захиалгаар аваад өөрсдөө хуваана.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── for whoever sells meat ── -->
+  <section class="sell-band" aria-labelledby="sell-title">
+    <div class="L-wrap">
+      <div class="sell rv">
+        <div>
+          <h2 class="d" id="sell-title">Мах нийлүүлдэг үү?</h2>
+          <p>Зар оруулах үнэгүй. Захиалга утсанд тань шууд ирнэ.</p>
+        </div>
+        <a href="/dashboard?join=business">Бизнесээ бүртгүүлэх <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
       </div>
     </div>
   </section>
@@ -387,6 +590,23 @@ $('year').textContent = String(new Date().getFullYear());
 // On Android there is no app yet: what leads to the App Store is left out.
 if (/Android/i.test(navigator.userAgent)) {
   for (const node of document.querySelectorAll('[data-store]')) node.hidden = true;
+}
+
+// Each part rises once as it comes into view. Without the observer — or for somebody who asked for
+// less motion — the page simply stands there, whole.
+if ('IntersectionObserver' in window) {
+  document.documentElement.classList.add('rv-on');
+  const seen = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        entry.target.setAttribute('data-in', '');
+        seen.unobserve(entry.target);
+      }
+    },
+    { rootMargin: '0px 0px -8% 0px', threshold: 0.08 },
+  );
+  for (const node of document.querySelectorAll('.rv')) seen.observe(node);
 }
 
 // The bar is glass once the page moves under it.
@@ -449,7 +669,10 @@ const perKilo = (l) => {
 try {
   const { listings, today, payments_open: paymentsOpen } = await api('/v1/idesh/listings');
   // While online payment is closed, «QPay-ээр шууд төл.» is not offered as something to do now.
-  if (paymentsOpen === false) document.querySelector('#how [data-pay] span').textContent = PAY_STEP.closed;
+  if (paymentsOpen === false) {
+    document.querySelector('#how [data-pay] span').textContent = PAY_STEP.closed;
+    $('faq-pay').textContent = `${PAY_STEP.closed} Нээгдмэгц QPay-ээр төлнө.`;
+  }
   const sorted = [...listings].sort(leading);
   const open = sorted.filter((l) => l.remaining > 0);
 
@@ -460,6 +683,27 @@ try {
     $('fact').textContent = `${ready}${open.some((l) => l.delivers) ? ' · Хүргэлттэй' : ''}`;
     $('fact').hidden = false;
     if (today && first > today) $('close-line').textContent = `Идэшээ одоо захиалаад, ${dayLabel(first)}-нөөс аваарай.`;
+  }
+
+  // The market in numbers: what is on sale, from how many suppliers, and where a kilo starts.
+  if (open.length) {
+    const kilos = open.filter((l) => l.unit === 'kg').map((l) => l.price_mnt);
+    const heads = open.filter((l) => l.unit === 'whole').map((l) => l.price_mnt);
+    $('tally-stalls').textContent = String(open.length);
+    $('tally-sellers').textContent = String(new Set(open.map((l) => l.supplier?.id)).size);
+    $('tally-from').textContent = mnt(Math.min(...(kilos.length ? kilos : heads)));
+    $('tally-from-word').textContent = kilos.length ? 'кг-ийн доод үнэ' : 'бүтэн малын доод үнэ';
+    $('tally').hidden = false;
+  }
+
+  // A real listing's certificate on the photograph — one Basu has looked up, if there is one.
+  const certified = open.find((l) => l.certificate?.checked) ?? open.find((l) => l.certificate);
+  if (certified) {
+    $('slip').href = `/shop/${certified.id}`;
+    $('slip-no').textContent = `№${certified.certificate.number}`;
+    $('slip-ok').hidden = !certified.certificate.checked;
+    $('slip-line').textContent = `${certified.title} · ${certified.certificate.issuer}`;
+    $('slip').hidden = false;
   }
 
   // One listing on the opening's photo.
