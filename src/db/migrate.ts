@@ -32,6 +32,9 @@ export async function migrate(): Promise<string[]> {
     if (applied.has(file)) continue;
     const sql = await readFile(join(MIGRATIONS_DIR, file), 'utf8');
     const client = await pool.connect();
+    // What a migration says as it runs (RAISE NOTICE): a one-off that counts what it changed says so in the deploy's log.
+    const said = (notice: { message?: string | undefined }): void => console.log(`  ${file}: ${notice.message ?? ''}`);
+    client.on('notice', said);
     try {
       await client.query('BEGIN');
       await client.query(sql);
@@ -42,6 +45,7 @@ export async function migrate(): Promise<string[]> {
       await client.query('ROLLBACK').catch(() => {});
       throw new Error(`migration ${file} failed: ${(error as Error).message}`, { cause: error });
     } finally {
+      client.off('notice', said);
       client.release();
     }
   }
