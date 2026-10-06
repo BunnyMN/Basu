@@ -191,3 +191,13 @@ export {
   type OrderScope,
   type OrderEvent,
 } from './orders.js';
+
+export {
+  MAX_LISTING_PHOTOS,
+  MAX_THUMB_BYTES,
+  addListingPhoto,
+  removeListingPhoto,
+  orderListingPhotos,
+  listingPhoto,
+  type Picture,
+} from './photos.js';

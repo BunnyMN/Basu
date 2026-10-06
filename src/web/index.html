@@ -578,7 +578,7 @@ img{display:block;max-width:none}
 </footer>
 
 <script type="module">
-import { api, mnt, dayLabel, photoOf } from '/api.js';
+import { api, mnt, dayLabel, photoOf, ownPhoto } from '/api.js';
 import { accountSlot, esc, tugrik, PAY_STEP } from '/site.js';
 
 const $ = (id) => document.getElementById(id);
@@ -649,7 +649,7 @@ drawer.addEventListener('focusout', (event) => {
  * person who taps one. Shown to anybody: the stalls are open to browse, and
  * only ordering asks who you are.
  */
-const STALL_PHOTO = (l) => `/idesh/${photoOf(l)}.jpg`;
+const STALL_PHOTO = (l) => ownPhoto(l) ?? `/idesh/${photoOf(l)}.jpg`;
 /** A listing put first by its supplier (VIP, then Онцгой) leads, then whatever still has some left. */
 const leading = (a, b) => {
   const rank = (l) => (l.tier === 'vip' ? 0 : l.tier === 'featured' ? 1 : 2);

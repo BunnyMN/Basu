@@ -2177,6 +2177,16 @@ export function photoOf(of) {
   return place ? `${kind}-${place + 1}` : kind;
 }
 
+/**
+ * A listing's or an order's own photograph, where its supplier put one up:
+ * `thumb` for a card in a list, `url` for the stall's own page. Null where
+ * there is none — the page then draws the example `photoOf` names.
+ */
+export function ownPhoto(of, size = 'thumb') {
+  const own = of?.photos?.[0] ?? of?.cover ?? null;
+  return own ? (own[size] ?? own.url ?? null) : null;
+}
+
 export const KIND = {
   sheep: 'Хонь',
   goat: 'Ямаа',

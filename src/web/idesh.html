@@ -271,6 +271,12 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 .hero::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(10,8,7,.7) 0%,rgba(10,8,7,0) 26%,rgba(10,8,7,0) 66%,rgba(16,13,12,.6) 100%)}
 /* the photos are Basu's, not this supplier's meat: said on the picture, quietly, as on the website */
 .hero .sample{position:absolute;left:16px;bottom:44px;z-index:1;display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:var(--r-pill);background:rgba(16,13,12,.55);border:1px solid rgba(255,255,255,.14);color:var(--ink);font-size:var(--t-cap);font-weight:600;line-height:1;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+/* the supplier's own photographs: a row swiped through, each the hero's size; where it is in the row said where the example's label sits */
+.hero .reel{display:flex;height:100%;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.hero .reel::-webkit-scrollbar{display:none}
+.hero .reel img{flex:0 0 100%;width:100%;scroll-snap-align:center;scroll-snap-stop:always}
+.hero .reel:focus-visible{outline-offset:-4px}
+.hero .count{left:auto;right:16px;font-variant-numeric:tabular-nums}
 .head{position:relative;z-index:1;margin-top:-28px;padding:26px 20px 0;border-radius:28px 28px 0 0;background:var(--bg)}
 .screen-body > .head:first-child{margin-top:0;padding-top:calc(var(--bar-h) + var(--safe-t) + 16px);border-radius:0}
 .head .from{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;font-size:.875rem;font-weight:600;line-height:1.3;color:var(--ink-2)}
@@ -496,7 +502,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 <!-- MapLibre from cdnjs, held to cdnjs's own hash of the file: bytes that ever differ do not run. A new version takes its new hash, here and on the stylesheet. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js" integrity="sha512-hoXlvOdSmh58mppUyZHZsscHkR/yXl6zLpTMTNwA6IZ61DpeaCNjosRu1WJ2DeIpkfW5MsJJ9H89zjV4IBGqRw==" crossorigin="anonymous"></script>
 <script type="module">
-import { api, photoOf, store, shell, toast, mnt, money, meter, ideshStage, IDESH_STATE, IDESH_STEP, KIND, BANK_NAMES, dayLabel, dayShort, ubParts, signInSheet, passwordPopup, dropSession, whatWentWrong, breakdownStart, breakdownFee, breakdownBody, breakdownWords, breakdownStep } from '/api.js';
+import { api, photoOf, store, shell, toast, mnt, money, meter, ideshStage, IDESH_STATE, IDESH_STEP, KIND, BANK_NAMES, dayLabel, dayShort, ubParts, signInSheet, passwordPopup, dropSession, whatWentWrong, ownPhoto, breakdownStart, breakdownFee, breakdownBody, breakdownWords, breakdownStep } from '/api.js';
 import { mapStyle, ULAANBAATAR, MAP_LOCALE } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -523,7 +529,8 @@ function escapeHtml(value) {
  * launcher's stroke, which is what shows if a picture fails to arrive — a
  * list with holes in it sells nothing.
  */
-const PHOTO = (of) => `/idesh/${photoOf(of)}.jpg`;
+// The supplier's own photograph where there is one; else Basu's example of that animal.
+const PHOTO = (of) => ownPhoto(of) ?? `/idesh/${photoOf(of)}.jpg`;
 
 const ART = {
   sheep: `<svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1101,8 +1108,48 @@ function openListing(l) {
   renderDetail();
 }
 
+/**
+ * The supplier's own photographs at the top of the screen: one beside the
+ * next, swiped through, with «2/5» where the example's label would be. They
+ * are of this animal, so nothing says «Жишээ зураг».
+ */
+function reel(l) {
+  const n = l.photos.length;
+  const box = el(`<div class="hero" data-own>
+    <div class="reel"${n > 1 ? ' tabindex="0" role="group" aria-label="Зургууд"' : ''}>${l.photos
+      .map((p, i) => `<img src="${escapeHtml(p.url)}" alt="${escapeHtml(l.title)} — ${i + 1}-р зураг" width="640" height="640"${i ? ' loading="lazy"' : ''} decoding="async">`)
+      .join('')}</div>
+    ${n > 1 ? `<span class="sample count" aria-hidden="true">1/${n}</span>` : ''}
+  </div>`);
+  const strip = box.querySelector('.reel');
+  // A photograph that will not load is not left as a hole in the row.
+  for (const img of strip.querySelectorAll('img')) {
+    img.addEventListener('error', () => {
+      img.remove();
+      if (!strip.querySelector('img')) {
+        box.remove();
+        settleScreenBar();
+      }
+    });
+  }
+  const count = box.querySelector('.count');
+  if (count) {
+    strip.addEventListener(
+      'scroll',
+      () => {
+        const shown = strip.querySelectorAll('img').length;
+        const at = Math.min(shown, Math.round(strip.scrollLeft / Math.max(1, strip.clientWidth)) + 1);
+        count.textContent = `${at}/${shown}`;
+      },
+      { passive: true },
+    );
+  }
+  return box;
+}
+
 /** The same picture, larger, at the top of the screen — Basu's photo of the animal, and said so. */
 function hero(l) {
+  if (l.photos?.length) return reel(l);
   const kind = l.kind;
   const box = el(`<div class="hero" data-kind="${escapeHtml(kind)}"><img src="${PHOTO(l)}" alt="${escapeHtml(KIND[kind] ?? '')} — жишээ зураг" width="640" height="640"><span class="sample" aria-hidden="true">Жишээ зураг</span></div>`);
   box.querySelector('img').addEventListener('error', () => {

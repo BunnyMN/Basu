@@ -14,6 +14,12 @@ export const shapeCertificateFacts = (c: CertificateFacts | null) =>
 export const shapeBreakdown = (b: Breakdown | null, feeMnt: number) =>
   b ? { style: b.style, cut: b.cut, note: b.note, fee_mnt: feeMnt, ...describe(b) } : null;
 
+/**
+ * A listing's own photograph as a page asks for it: as it is looked at, and
+ * small for a card. The address never changes what it serves, so it is kept.
+ */
+export const shapePhoto = (id: string) => ({ id, url: `/v1/idesh/photos/${id}`, thumb: `/v1/idesh/photos/${id}?size=thumb` });
+
 export const shapeSummary = (o: IdeshSummary) => ({
   id: o.id,
   code: o.code,
@@ -32,6 +38,8 @@ export const shapeSummary = (o: IdeshSummary) => ({
   certificate: shapeCertificateFacts(o.certificate),
   breakdown: shapeBreakdown(o.breakdown, o.cutFeeMnt),
   photo: o.photo,
+  // The listing's own cover while it has one; null, and the page draws the example `photo` names.
+  cover: o.cover ? shapePhoto(o.cover) : null,
 });
 
 /** An order as the supplier's screens and the ops desk read it. */

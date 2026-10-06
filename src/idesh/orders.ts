@@ -21,6 +21,7 @@ import { CERT_COLUMNS, factsOf, usableCertificate, type CertificateFacts, type C
 import { STYLES, breakdownOf, choose, isCut, type Breakdown, type BreakdownWant } from './breakdown.js';
 import { IdeshError } from './errors.js';
 import { PHOTO_PLACE, type Kind } from './listings.js';
+import { coverId } from './photos.js';
 import {
   REASON_LABEL,
   FORFEIT_PCT,
@@ -973,6 +974,8 @@ export interface IdeshSummary {
   cutFeeMnt: number;
   /** Which example photograph the listing it was bought from wears — see `Listing.photo`. */
   photo: number;
+  /** The listing's own cover photograph, by id, while it has one; else the example stands. */
+  cover: string | null;
 }
 
 export interface IdeshDetail extends IdeshSummary {
@@ -1044,6 +1047,7 @@ interface OrderRow {
   cert_issued_on: string | null;
   cert_state: CertificateState | null;
   photo: number | null;
+  cover: string | null;
 }
 
 const ORDER_SELECT = `
@@ -1056,7 +1060,8 @@ const ORDER_SELECT = `
          o.cancel_reason, o.refund_mnt, o.forfeit_mnt, s.commission_pct,
          o.breakdown, o.cut_parts, o.breakdown_note, o.cut_fee_mnt,
          ${CERT_COLUMNS},
-         (SELECT ${PHOTO_PLACE.replace(/ AS photo$/, '')} FROM idesh.listing l WHERE l.id = o.listing_id) AS photo
+         (SELECT ${PHOTO_PLACE.replace(/ AS photo$/, '')} FROM idesh.listing l WHERE l.id = o.listing_id) AS photo,
+         ${coverId('o.listing_id')} AS cover
     FROM idesh.idesh_order o
     JOIN idesh.supplier s ON s.id = o.supplier_id
     LEFT JOIN idesh.certificate c ON c.id = o.certificate_id`;
@@ -1080,6 +1085,7 @@ function summary(r: OrderRow): IdeshSummary {
     breakdown: breakdownOf(r),
     cutFeeMnt: Number(r.cut_fee_mnt),
     photo: r.photo ?? 0,
+    cover: r.cover,
   };
 }
 

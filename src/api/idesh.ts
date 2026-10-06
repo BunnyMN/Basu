@@ -69,6 +69,11 @@ import {
   STYLE_HINT,
   STYLE_LABEL,
   type BreakdownOffer,
+  MAX_THUMB_BYTES,
+  addListingPhoto,
+  listingPhoto,
+  orderListingPhotos,
+  removeListingPhoto,
 } from '../idesh/index.js';
 import { setting } from '../ops/index.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
@@ -77,7 +82,8 @@ import { enqueue } from '../platform/notify/index.js';
 import { LONE_OWNER_PERMISSIONS, grants, headRoles, type Grants } from '../platform/access/index.js';
 import { accessIn, membersOf } from '../platform/org/index.js';
 import { topupsOpen, type Ctx } from '../ports.js';
-import { shapeCertificateFacts, shapeOrder, shapeQpay, shapeSettlement, shapeSummary } from './shapes.js';
+import { shapeCertificateFacts, shapeOrder, shapePhoto, shapeQpay, shapeSettlement, shapeSummary } from './shapes.js';
+import { FOREVER } from './webFiles.js';
 import { invoiceQpay } from '../platform/ledger/index.js';
 import { holds, knownId, need, needAny, UUID } from './guards.js';
 
@@ -171,6 +177,8 @@ const shapeListing = (l: Listing) => ({
   certificate: shapeCertificateFacts(l.certificate),
   breakdown: shapeBreakdownOffer(l.breakdown),
   photo: l.photo,
+  // The supplier's own photographs, the cover first; none, and the page draws the example `photo` names.
+  photos: l.photos.map(shapePhoto),
 });
 
 /** A certificate as the supplier's own screen reads it. */
@@ -1058,6 +1066,72 @@ export async function registerIdeshRoutes(
           ctx.clock.now(),
         );
         return reply.send({ listing: shapeListing(listing) });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  /* ── the supplier's own photographs of a listing ─────────────────── */
+
+  /**
+   * One photograph, or its small copy (`?size=thumb`), to anybody: a listing
+   * is public and so is what it looks like. It is never changed once kept,
+   * so a browser asks for it once.
+   */
+  app.get<{ Params: { id: string }; Querystring: { size?: string } }>('/v1/idesh/photos/:id', async (request, reply) => {
+    const photo = UUID.test(request.params.id) ? await listingPhoto(request.params.id, request.query.size === 'thumb' ? 'thumb' : 'full') : null;
+    if (!photo) return sendError(reply, new IdeshError('NOT_FOUND', 'no such photograph'));
+    return reply.header('content-type', photo.type).header('cache-control', FOREVER).header('x-content-type-options', 'nosniff').send(photo.bytes);
+  });
+
+  /** One more photograph on a listing: the picture and its small copy, both made by the page. */
+  app.post<{ Params: { id: string }; Body: Record<string, unknown> }>(
+    '/v1/supplier/listings/:id/photos',
+    { ...asSupplierMay('org.idesh.stall:edit'), bodyLimit: Math.ceil((MAX_PHOTO_BYTES + MAX_THUMB_BYTES) * 1.4) + 4096 },
+    async (request, reply) => {
+      const body = request.body ?? {};
+      const photo = readPhoto(body['photo']);
+      const thumb = readPhoto(body['thumb']);
+      if (typeof photo === 'string' || typeof thumb === 'string' || !photo || !thumb) {
+        return badRequest(reply, 'Зураг JPEG эсвэл PNG байх ёстой, 900 КБ-аас бага.', typeof photo === 'string' ? photo : typeof thumb === 'string' ? thumb : 'photo and thumb are required');
+      }
+      try {
+        const id = await addListingPhoto(request.supplierSeat!.supplierId, request.params.id, { photo, thumb, addedBy: request.supplierSeat!.person }, ctx.clock.now());
+        return reply.status(201).send({ photo: shapePhoto(id) });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  /** The order a guest sees them in, the cover first. */
+  app.put<{ Params: { id: string }; Body: { ids?: unknown } }>(
+    '/v1/supplier/listings/:id/photos/order',
+    asSupplierMay('org.idesh.stall:edit'),
+    async (request, reply) => {
+      const ids = request.body?.ids;
+      if (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string' || !UUID.test(id))) {
+        return badRequest(reply, 'Зургийн дараалал буруу байна.', 'ids must be a list of photograph ids');
+      }
+      try {
+        await orderListingPhotos(request.supplierSeat!.supplierId, request.params.id, ids as string[]);
+        const listing = await listingById(request.params.id, ctx.clock.now());
+        return reply.send({ photos: (listing?.photos ?? []).map(shapePhoto) });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  app.delete<{ Params: { id: string; photoId: string } }>(
+    '/v1/supplier/listings/:id/photos/:photoId',
+    asSupplierMay('org.idesh.stall:edit'),
+    async (request, reply) => {
+      try {
+        if (!UUID.test(request.params.photoId)) throw new IdeshError('NOT_FOUND', 'that is not an id');
+        await removeListingPhoto(request.supplierSeat!.supplierId, request.params.id, request.params.photoId);
+        return reply.send({ ok: true });
       } catch (error) {
         return sendError(reply, error);
       }

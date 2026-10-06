@@ -1020,6 +1020,99 @@ describe('задаргаа', () => {
   });
 });
 
+describe('a listing’s own photographs', () => {
+  /** A photograph as a canvas hands one over: a JPEG by its first bytes, `fill` to tell two apart. */
+  const jpeg = (fill: number, size = 64) => `data:image/jpeg;base64,${Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(size, fill)]).toString('base64')}`;
+
+  const put = (screen: string, fill: number, listingId = sheep.id) =>
+    app.inject({
+      method: 'POST',
+      url: `/v1/supplier/listings/${listingId}/photos`,
+      headers: auth(screen),
+      payload: { photo: jpeg(fill, 256), thumb: jpeg(fill) },
+    });
+
+  it('wears an example until its supplier photographs it, then shows theirs to anybody, the cover first', async () => {
+    const before = await app.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}` });
+    expect(before.json().listing.photos).toEqual([]);
+
+    const screen = await atCounter(supplierId);
+    const first = await put(screen, 1);
+    const second = await put(screen, 2);
+    expect(first.statusCode, first.body).toBe(201);
+    expect(second.statusCode, second.body).toBe(201);
+    const a = first.json().photo.id as string;
+    const b = second.json().photo.id as string;
+
+    // Nobody signed in: a listing is public and so is what it looks like.
+    const stall = await app.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}` });
+    expect(stall.json().listing.photos).toEqual([
+      { id: a, url: `/v1/idesh/photos/${a}`, thumb: `/v1/idesh/photos/${a}?size=thumb` },
+      { id: b, url: `/v1/idesh/photos/${b}`, thumb: `/v1/idesh/photos/${b}?size=thumb` },
+    ]);
+    const full = await app.inject({ method: 'GET', url: `/v1/idesh/photos/${a}` });
+    expect(full.statusCode).toBe(200);
+    expect(full.headers['content-type']).toBe('image/jpeg');
+    // Never changed once kept, so asked for once.
+    expect(full.headers['cache-control']).toBe('public, max-age=31536000, immutable');
+    expect(full.rawPayload.length).toBe(4 + 256);
+    const small = await app.inject({ method: 'GET', url: `/v1/idesh/photos/${a}?size=thumb` });
+    expect(small.rawPayload.length).toBe(4 + 64);
+    expect((await app.inject({ method: 'GET', url: '/v1/idesh/photos/00000000-0000-4000-8000-000000000000' })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'GET', url: '/v1/idesh/photos/not-an-id' })).statusCode).toBe(404);
+
+    // The order a guest bought wears the listing's cover, on their list and on the supplier's.
+    const token = await signIn();
+    await topUp(token, 500_000);
+    const { id } = await placeAndPay(token);
+    const mine = await app.inject({ method: 'GET', url: `/v1/idesh/${id}`, headers: auth(token) });
+    expect(mine.json().cover).toMatchObject({ id: a });
+
+    // The second made the cover; then the first taken away.
+    const ordered = await app.inject({ method: 'PUT', url: `/v1/supplier/listings/${sheep.id}/photos/order`, headers: auth(screen), payload: { ids: [b, a] } });
+    expect(ordered.statusCode, ordered.body).toBe(200);
+    expect(ordered.json().photos.map((p: { id: string }) => p.id)).toEqual([b, a]);
+    expect((await app.inject({ method: 'GET', url: `/v1/idesh/${id}`, headers: auth(token) })).json().cover).toMatchObject({ id: b });
+    const gone = await app.inject({ method: 'DELETE', url: `/v1/supplier/listings/${sheep.id}/photos/${b}`, headers: auth(screen) });
+    expect(gone.statusCode, gone.body).toBe(200);
+    expect((await app.inject({ method: 'GET', url: `/v1/idesh/photos/${b}` })).statusCode).toBe(404);
+    const after = await app.inject({ method: 'GET', url: '/v1/supplier/listings', headers: auth(screen) });
+    expect(after.json().listings[0].photos.map((p: { id: string }) => p.id)).toEqual([a]);
+  });
+
+  it('takes a photograph only from the listing’s own supplier, and only a photograph', async () => {
+    const screen = await atCounter(supplierId);
+    const rival = await atCounter(rivalId);
+    const mine = (await put(screen, 1)).json().photo.id as string;
+
+    // Another supplier's counter: not their listing to add to, reorder or strip.
+    expect((await put(rival, 9)).statusCode).toBe(404);
+    expect((await app.inject({ method: 'DELETE', url: `/v1/supplier/listings/${sheep.id}/photos/${mine}`, headers: auth(rival) })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'PUT', url: `/v1/supplier/listings/${sheep.id}/photos/order`, headers: auth(rival), payload: { ids: [mine] } })).statusCode).toBe(404);
+    // Nobody at all.
+    expect((await app.inject({ method: 'POST', url: `/v1/supplier/listings/${sheep.id}/photos`, payload: { photo: jpeg(1), thumb: jpeg(1) } })).statusCode).toBe(401);
+
+    // What says it is a JPEG and is not; a photograph with no small copy; an order that leaves one out.
+    const text = `data:image/jpeg;base64,${Buffer.from('not a photograph').toString('base64')}`;
+    for (const payload of [{ photo: text, thumb: jpeg(1) }, { photo: jpeg(1) }, { photo: jpeg(1), thumb: 'x' }]) {
+      const refusedPhoto = await app.inject({ method: 'POST', url: `/v1/supplier/listings/${sheep.id}/photos`, headers: auth(screen), payload });
+      expect(refusedPhoto.statusCode, JSON.stringify(payload).slice(0, 60)).toBe(400);
+    }
+    const other = (await put(screen, 2)).json().photo.id as string;
+    const partial = await app.inject({ method: 'PUT', url: `/v1/supplier/listings/${sheep.id}/photos/order`, headers: auth(screen), payload: { ids: [other] } });
+    expect(partial.statusCode).toBe(400);
+    expect(partial.json().error.code).toBe('BAD_PHOTO');
+  });
+
+  it('holds eight, and says so in Mongolian at the ninth', async () => {
+    const screen = await atCounter(supplierId);
+    for (let n = 1; n <= 8; n += 1) expect((await put(screen, n)).statusCode, `photo ${n}`).toBe(201);
+    const ninth = await put(screen, 9);
+    expect(ninth.statusCode).toBe(400);
+    expect(ninth.json().error).toMatchObject({ code: 'TOO_MANY_PHOTOS', message_mn: expect.stringContaining('8 зураг') });
+  });
+});
+
 describe('an id that is not one', () => {
   it('is nothing of anybody’s: 404 at every идэш address that takes one, never a 500', async () => {
     const guest = await signIn();

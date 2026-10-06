@@ -2,6 +2,7 @@ import { getPool, type Db } from '../db/pool.js';
 import { CERT_COLUMNS, factsOf, usableCertificate, type CertificateFacts, type CertificateState } from './certificates.js';
 import { STYLES, offerOf, type BreakdownOffer, type Style } from './breakdown.js';
 import { IdeshError } from './errors.js';
+import { photoIds } from './photos.js';
 import type { Unit } from './pricing.js';
 
 /**
@@ -46,6 +47,8 @@ export interface Listing {
   certificate: CertificateFacts | null;
   /** Задаргаа: the ways this supplier will take the animal apart, and what cutting it small costs. Nothing offered asks the guest nothing. */
   breakdown: BreakdownOffer;
+  /** The supplier's own photographs of it, by id, the cover first. None, and it wears an example picture (`photo`). */
+  photos: string[];
   /**
    * Its place among its supplier's listings of the same animal, oldest first.
    * The pages turn it into one of the example photographs, so two listings on
@@ -83,6 +86,7 @@ interface ListingRow {
   certificate_id: string | null;
   breakdown_styles: string[];
   cut_fee_mnt: number;
+  photos: string[];
   photo: number;
   cert_number: string | null;
   cert_issuer: string | null;
@@ -104,6 +108,7 @@ const SELECT = `
          l.min_qty, l.quantity, l.sold, l.origin, to_char(l.ready_from, 'YYYY-MM-DD') AS ready_from,
          l.delivers, l.delivery_fee_mnt, l.active, p.tier, p.ends_at AS tier_until,
          l.certificate_id, l.breakdown_styles, l.cut_fee_mnt, ${CERT_COLUMNS},
+         ${photoIds('l.id')} AS photos,
          ${PHOTO_PLACE}
     FROM idesh.listing l
     JOIN idesh.supplier s ON s.id = l.supplier_id
@@ -150,6 +155,7 @@ function shape(r: ListingRow): Listing {
       styles: STYLES.filter((s: Style) => r.breakdown_styles.includes(s)),
       cutFeeMnt: Number(r.cut_fee_mnt),
     },
+    photos: r.photos,
     photo: r.photo,
   };
 }

@@ -8,7 +8,7 @@ import type { FastifyInstance } from 'fastify';
 import { closePool, getPool } from '../db/pool.js';
 import { DemoClock } from '../demoClock.js';
 import { buildServer } from '../api/server.js';
-import { cancelIdesh } from '../idesh/index.js';
+import { addListingPhoto, cancelIdesh } from '../idesh/index.js';
 import { handOff } from '../platform/identity/index.js';
 import { seedDemo } from '../seed/demo.js';
 import {
@@ -2288,6 +2288,51 @@ describe('өвлийн идэш', () => {
     const screen = await supplierScreenFor(code);
     await until(screen, 'the order with its breakdown', (doc) => Boolean(doc.querySelector('.ticket .cutup')));
     expect(screen.window.document.querySelector('.ticket .cutup')?.textContent).toContain('Хэсгээр');
+  });
+
+  it('shows a supplier’s own photographs of the animal in place of the example, swiped through on its stall', async () => {
+    storage.removeItem('basu.guest');
+    // A stall with two photographs of its own, put up as its supplier would.
+    const { rows } = await getPool().query<{ id: string; supplier_id: string; title: string }>(
+      `SELECT l.id, l.supplier_id, l.title FROM idesh.listing l
+        WHERE l.active AND l.unit = 'whole' AND l.sold < l.quantity
+          AND NOT EXISTS (SELECT 1 FROM idesh.listing_photo p WHERE p.listing_id = l.id)
+        ORDER BY l.created_at DESC LIMIT 1`,
+    );
+    const stall = rows[0]!;
+    const jpeg = (fill: number) => ({ type: 'image/jpeg' as const, bytes: Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(32, fill)]) });
+    const cover = await addListingPhoto(stall.supplier_id, stall.id, { photo: jpeg(1), thumb: jpeg(1) }, new Date());
+    const side = await addListingPhoto(stall.supplier_id, stall.id, { photo: jpeg(2), thumb: jpeg(2) }, new Date());
+
+    const dom = await openPage('idesh.html');
+    const d = dom.window.document;
+    await until(dom, 'the stalls', () => d.querySelectorAll('.listing').length >= seeded.listings);
+    const card = d.querySelector(`.listing[data-id="${stall.id}"]`) as HTMLElement;
+    // On the card, the cover's small copy; every other stall still wears an example.
+    expect(card.querySelector('.art img')?.getAttribute('src')).toBe(`/v1/idesh/photos/${cover}?size=thumb`);
+    expect([...d.querySelectorAll('.listing .art img')].filter((img) => img.getAttribute('src')?.startsWith('/idesh/')).length).toBe(d.querySelectorAll('.listing').length - 1);
+
+    card.click();
+    await until(dom, 'the stall', () => Boolean(d.querySelector('#next')));
+    // Both photographs, as they are looked at, and where in the row the guest is. They are of this animal: nothing says «Жишээ зураг».
+    expect([...d.querySelectorAll('.hero[data-own] .reel img')].map((img) => img.getAttribute('src'))).toEqual([`/v1/idesh/photos/${cover}`, `/v1/idesh/photos/${side}`]);
+    expect(d.querySelector('.hero .count')?.textContent).toBe('1/2');
+    expect(d.querySelector('.hero')?.textContent).not.toContain('Жишээ зураг');
+    expect(d.querySelector('.hero .reel img')?.getAttribute('alt')).toBe(`${stall.title} — 1-р зураг`);
+
+    // The website's stall: the cover large, the two small under it, and the one pressed shown.
+    const shop = await openPage('shop.html', `/${stall.id}`);
+    await until(shop, 'the website’s stall', (doc) => Boolean(doc.querySelector('#sd-shot')));
+    const sd = shop.window.document;
+    expect(sd.querySelector('#sd-shot')?.getAttribute('src')).toBe(`/v1/idesh/photos/${cover}`);
+    expect(sd.querySelector('.sd-photo figcaption')).toBeNull();
+    expect(sd.querySelectorAll('.sd-shots button')).toHaveLength(2);
+    (sd.querySelector('.sd-shots button[data-shot="1"]') as HTMLElement).click();
+    expect(sd.querySelector('#sd-shot')?.getAttribute('src')).toBe(`/v1/idesh/photos/${side}`);
+    expect(sd.querySelector('.sd-shots button[data-shot="1"]')?.getAttribute('aria-pressed')).toBe('true');
+
+    // Left as it was found: later tests count on the seed's stalls.
+    await getPool().query('DELETE FROM idesh.listing_photo WHERE listing_id = $1', [stall.id]);
   });
 
   it('pays in the app’s own sheet where the app can, and tells it once the animal is bought', async () => {

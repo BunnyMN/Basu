@@ -136,6 +136,13 @@
 .sd-buy{grid-area:buy;position:sticky;top:calc(var(--s-bar) + var(--safe-t) + 24px);padding:28px;border-radius:28px}
 .sd-photo{position:relative;margin:0;border-radius:22px;overflow:hidden;background:#1A1514}
 .sd-photo img{display:block;width:100%;height:auto;aspect-ratio:16/10;object-fit:cover}
+/* the supplier's own photographs under the large one: small, in a row, the one shown outlined */
+.sd-shots{display:flex;gap:8px;margin-top:10px;overflow-x:auto;scrollbar-width:none;padding:2px}
+.sd-shots::-webkit-scrollbar{display:none}
+.sd-shots button{flex:none;width:84px;height:63px;margin:0;padding:0;border:0;border-radius:12px;overflow:hidden;background:#1A1514;cursor:pointer;opacity:.6;transition:opacity var(--dur),box-shadow var(--dur)}
+.sd-shots button img{display:block;width:100%;height:100%;object-fit:cover}
+.sd-shots button[aria-pressed="true"]{opacity:1;box-shadow:0 0 0 2px var(--ink)}
+@media (hover:hover){.sd-shots button:hover{opacity:1}}
 .sd-photo::after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(10,8,7,.45) 0%,rgba(10,8,7,0) 26%,rgba(10,8,7,0) 74%,rgba(10,8,7,.45) 100%)}
 .sd-photo .tags{position:absolute;z-index:1;left:16px;top:16px;display:flex;flex-wrap:wrap;gap:6px}
 /* the photos are Basu's, not this supplier's meat: said on the picture, on glass */
@@ -262,21 +269,25 @@
 </main>
 
 <script type="module">
-import { api, photoOf, store, mnt, KIND, dayLabel, dayShort, whatWentWrong, phoneText, phoneInput, breakdownStart, breakdownFee, breakdownBody, breakdownWords, breakdownStep } from '/api.js';
+import { api, photoOf, ownPhoto, store, mnt, KIND, dayLabel, dayShort, whatWentWrong, phoneText, phoneInput, breakdownStart, breakdownFee, breakdownBody, breakdownWords, breakdownStep } from '/api.js';
 import { mountFrame, authed, loginUrl, esc, el, siteEmpty, howToBuy, tugrik } from '/site.js';
 
 // Open to anybody: the stalls are shown to all, and only paying asks who you are.
 void mountFrame('shop');
 const page = document.getElementById('page');
 
-const PHOTO = (of) => `/brand/meat/${photoOf(of)}.webp`;
+// The supplier's own photograph where there is one; else Basu's example of that animal.
+const EXAMPLE = (of) => `/brand/meat/${photoOf(of)}.webp`;
+const PHOTO = (of) => ownPhoto(of, 'url') ?? EXAMPLE(of);
 /**
  * The same photo at the widths it is shown at, so a phone's card does not
  * fetch the 960 a desk's stall needs: the copies sit beside it as
  * `sheep-480.webp` and `sheep-720.webp`.
  */
 const SRCSET = (of) => {
-  const at = PHOTO(of).slice(0, -'.webp'.length);
+  // A supplier's own comes in two sizes: the small copy for a card, the photograph for the stall.
+  if (ownPhoto(of)) return `${ownPhoto(of, 'thumb')} 720w, ${ownPhoto(of, 'url')} 1600w`;
+  const at = EXAMPLE(of).slice(0, -'.webp'.length);
   return `${at}-480.webp 480w, ${at}-720.webp 720w, ${at}.webp 960w`;
 };
 /** A card's width: one column up to 600px, two up to 1100, then three of the page's 1280. */
@@ -757,13 +768,23 @@ function drawStall(l) {
     };
   };
 
+  // The supplier's own photographs of it, the cover first; none, and the example stands, marked so.
+  const own = l.photos ?? [];
+
   page.replaceChildren(
     crumb(),
     el(`<div class="sd">
           <div class="sd-media">
-            <figure class="sd-photo"><img src="${PHOTO(l)}" srcset="${SRCSET(l)}" sizes="${STALL_SIZES}" fetchpriority="high" decoding="async" alt="${esc(KIND[l.kind] ?? '')} — жишээ зураг" width="960" height="720">
+            <figure class="sd-photo"><img id="sd-shot" src="${PHOTO(l)}" srcset="${SRCSET(l)}" sizes="${STALL_SIZES}" fetchpriority="high" decoding="async" alt="${own.length ? `${esc(l.title)} — 1-р зураг` : `${esc(KIND[l.kind] ?? '')} — жишээ зураг`}" width="960" height="720">
               <span class="tags">${l.tier ? `<span class="sh-tag" data-tier="${esc(l.tier)}">${l.tier === 'vip' ? '★ VIP' : 'Онцгой'}</span>` : ''}<span class="sh-tag">${whole ? 'Бүтэн' : 'кг-аар'}</span>${l.delivers ? `<span class="sh-tag">${MARK.truckSm}Хүргэлттэй</span>` : ''}</span>
-              <figcaption>Жишээ зураг</figcaption></figure>
+              ${own.length ? '' : '<figcaption>Жишээ зураг</figcaption>'}</figure>
+            ${
+              own.length > 1
+                ? `<div class="sd-shots" role="group" aria-label="Зургууд">${own
+                    .map((p, i) => `<button type="button" data-shot="${i}" aria-pressed="${i === 0}" aria-label="${i + 1}-р зураг"><img src="${esc(p.thumb)}" alt="" loading="lazy" decoding="async" width="96" height="72"></button>`)
+                    .join('')}</div>`
+                : ''
+            }
             <div class="sd-title">
               <div class="sd-who"><span>${esc(l.supplier.name)} · ${esc(l.origin)}</span>${l.supplier.contracted ? `<span class="gold">${MARK.check}Гэрээт</span>` : ''}</div>
               <h1>${esc(l.title)}</h1>
@@ -797,6 +818,17 @@ function drawStall(l) {
   );
 
   const buy = document.getElementById('buy');
+  // The small ones under the photograph: the one pressed is the one shown.
+  page.querySelector('.sd-shots')?.addEventListener('click', (event) => {
+    const pressed = event.target.closest('button[data-shot]');
+    if (!pressed) return;
+    const at = Number(pressed.dataset.shot);
+    const shot = page.querySelector('#sd-shot');
+    shot.removeAttribute('srcset');
+    shot.src = own[at].url;
+    shot.alt = `${l.title} — ${at + 1}-р зураг`;
+    for (const other of pressed.parentElement.children) other.setAttribute('aria-pressed', String(other === pressed));
+  });
 
   /* On a phone the box sits under the picture; until it is on screen, a bar
      at the foot carries the total and takes the thumb to it. */

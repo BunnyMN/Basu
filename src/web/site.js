@@ -2,7 +2,7 @@
    the foot, the way to /login and back, and calls made as the person
    signed in. Every page of the website imports this; the app's pages do not. */
 
-import { api, store, dropSession, endSession, authReturn, IDESH_LIVE, phoneText, ideshStage, photoOf } from '/api.js';
+import { api, store, dropSession, endSession, authReturn, IDESH_LIVE, phoneText, ideshStage, photoOf, ownPhoto } from '/api.js';
 
 /**
  * Text into markup, for everything a page draws from what people wrote: a
@@ -454,7 +454,7 @@ export async function stillGoing() {
 }
 
 /** An animal's photo at the size a row or a card shows it — not the landing's large one. */
-export const meatPhoto = (of) => `/brand/meat/${photoOf(of)}-480.webp`;
+export const meatPhoto = (of) => ownPhoto(of) ?? `/brand/meat/${photoOf(of)}-480.webp`;
 
 /**
  * An empty place that says what it is for and gives the one next step:

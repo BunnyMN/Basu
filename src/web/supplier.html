@@ -180,6 +180,20 @@
 .ticket .k{font-size:var(--t-cap);line-height:1.4;padding-top:2px;color:var(--ink-3)}
 .ticket .v{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;color:var(--ink);min-width:0}
 .ticket .where .v > span:first-child{overflow-wrap:anywhere}
+/* A listing's own photographs on its popup: small square tiles, the cover marked, one more tile to add. */
+.shots{display:flex;flex-wrap:wrap;gap:10px}
+.shots[aria-busy="true"]{opacity:.6}
+.shot{position:relative;flex:none;width:88px;height:88px;border-radius:var(--r-sm);overflow:hidden;background:var(--surface-2);border:1px solid var(--line-2)}
+.shot img{display:block;width:100%;height:100%;object-fit:cover}
+.shot[data-cover]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.shot i{position:absolute;left:6px;bottom:6px;padding:2px 8px;border-radius:var(--r-pill);background:var(--ink);color:var(--on-light);font-style:normal;font-size:.6875rem;font-weight:700;line-height:1.4}
+.shot button{position:absolute;top:4px;display:grid;place-items:center;width:28px;height:28px;margin:0;padding:0;border:0;border-radius:50%;background:rgba(16,13,12,.72);color:var(--ink);font:inherit;font-size:1rem;font-weight:700;line-height:1;cursor:pointer}
+.shot .drop{right:4px}
+.shot .first{left:4px;font-size:.8125rem}
+.shot.add{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-style:dashed;background:none;color:var(--ink-2);font:inherit;cursor:pointer}
+.shot.add b{font-size:1.5rem;font-weight:500;line-height:1}
+.shot.add span{font-size:.6875rem;font-weight:600;line-height:1.2;text-align:center}
+@media (hover:hover){.shot.add:hover{border-color:var(--ink-2);color:var(--ink)}}
 /* The certificates under the listings, and the popup's file field and photograph. */
 .papers{margin-top:28px}
 .papers-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -348,7 +362,7 @@
 <div id="root"></div>
 
 <script type="module">
-import { api, photoOf, store, shell, toast, mnt, money, KIND, IDESH_STATE, ideshStage, dayLabel, dayShort, ubParts, signInDoors, accountWays, authReturn, popup, confirmPopup, passwordPopup, BANK_NAMES, phoneText, dropSession, whatWentWrong } from '/api.js';
+import { api, photoOf, ownPhoto, store, shell, toast, mnt, money, KIND, IDESH_STATE, ideshStage, dayLabel, dayShort, ubParts, signInDoors, accountWays, authReturn, popup, confirmPopup, passwordPopup, BANK_NAMES, phoneText, dropSession, whatWentWrong } from '/api.js';
 import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -501,12 +515,13 @@ function blank({ icon = ICON.orders, title, text = '', action = null, size, tone
 }
 
 /**
- * The meat's photo beside an order or a listing: Basu's own picture of that
- * kind of animal — the one the website shows for it — never a supplier's
- * upload. A picture of the words beside it, so a reader skips it.
+ * The meat's photo beside an order or a listing: the supplier's own cover
+ * photograph where the listing has one, else Basu's picture of that kind of
+ * animal — the one the website shows for it. A picture of the words beside
+ * it, so a reader skips it.
  */
 const thumb = (of, size = '') =>
-  `<img class="ph" src="/brand/meat/${photoOf(of)}-480.webp" alt="" width="48" height="48" loading="lazy" decoding="async"${size ? ` data-size="${size}"` : ''}>`;
+  `<img class="ph" src="${esc(ownPhoto(of) ?? `/brand/meat/${photoOf(of)}-480.webp`)}" alt="" width="48" height="48" loading="lazy" decoding="async"${size ? ` data-size="${size}"` : ''}>`;
 
 /** How an order reaches its guest, as a mark and a word: «Хүргэлт» or «Өөрөө авна». */
 const howCell = (o) => `<span class="how-cell">${o.receive === 'delivery' ? `${ICON.truck}Хүргэлт` : `${ICON.store}Өөрөө авна`}</span>`;
@@ -1475,7 +1490,7 @@ const paperOptions = (none) => [['', none], ...usablePapers().map((c) => [c.id, 
  * A photograph of a sheet of paper, made small enough to send: the long side
  * at most 1600 px, a JPEG, stepped down until it is under the server's limit.
  */
-async function shrinkPhoto(file) {
+async function shrinkPhoto(file, { longest = 1600, under = 850 * 1024 } = {}) {
   if (!/^image\//.test(file.type)) throw refuse('photo', 'Зургийн файл сонгоно уу.');
   const url = URL.createObjectURL(file);
   try {
@@ -1485,7 +1500,7 @@ async function shrinkPhoto(file) {
       i.onerror = () => reject(refuse('photo', 'Энэ зургийг уншиж чадсангүй. Өөр зураг сонгоно уу.'));
       i.src = url;
     });
-    let side = 1600;
+    let side = longest;
     let quality = 0.82;
     for (let tries = 0; tries < 6; tries += 1) {
       const scale = Math.min(1, side / Math.max(img.naturalWidth, img.naturalHeight));
@@ -1498,7 +1513,7 @@ async function shrinkPhoto(file) {
       pen.fillRect(0, 0, canvas.width, canvas.height);
       pen.drawImage(img, 0, 0, canvas.width, canvas.height);
       const data = canvas.toDataURL('image/jpeg', quality);
-      if (data.length * 0.75 < 850 * 1024) return data;
+      if (data.length * 0.75 < under) return data;
       side = Math.round(side * 0.8);
       quality = Math.max(0.6, quality - 0.06);
     }
@@ -1506,6 +1521,97 @@ async function shrinkPhoto(file) {
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+/**
+ * A listing's own photographs, on its popup: the ones it has and the ones
+ * just chosen as small tiles — the first is the cover a guest sees on the
+ * card — each with «take away» and «make it the cover», and a tile that adds
+ * more, several at a time. Nothing is sent until the popup is saved:
+ * `saveShots` then takes away, sends and orders, in that order.
+ */
+const MAX_SHOTS = 8;
+const SHOTS_FIELD = {
+  type: 'static',
+  label: 'Зураг (заавал биш)',
+  html: `<div class="shots" id="shots"></div><input type="file" id="shots-file" accept="image/*" multiple hidden><small class="help">Малаа олон талаас нь авсан ${MAX_SHOTS} хүртэл зураг. Эхний зураг нь зарын нүүрэнд гарна. Зураггүй бол жишээ зураг харагдана.</small>`,
+};
+function wireShots(sheet, had = []) {
+  const box = sheet?.querySelector('#shots');
+  const input = sheet?.querySelector('#shots-file');
+  // `id` for one the listing has; `photo` and `thumb` (data URLs) for one chosen here.
+  const shots = { list: had.map((p) => ({ id: p.id, show: p.thumb })), gone: [], changed: false };
+  if (!box || !input) return shots;
+  const paint = () => {
+    box.replaceChildren(
+      ...shots.list.map((s, i) => {
+        const tile = el(`<span class="shot"${i === 0 ? ' data-cover' : ''}>
+            <img src="${esc(s.show)}" alt="${i + 1}-р зураг" width="88" height="88">
+            ${i === 0 ? '<i>Нүүр</i>' : `<button type="button" class="first" aria-label="${i + 1}-р зургийг нүүр зураг болгох" title="Нүүр зураг болгох">★</button>`}
+            <button type="button" class="drop" aria-label="${i + 1}-р зургийг хасах" title="Хасах">×</button>
+          </span>`);
+        tile.querySelector('.drop').addEventListener('click', () => {
+          if (s.id) shots.gone.push(s.id);
+          shots.list.splice(i, 1);
+          shots.changed = true;
+          paint();
+        });
+        tile.querySelector('.first')?.addEventListener('click', () => {
+          shots.list.splice(i, 1);
+          shots.list.unshift(s);
+          shots.changed = true;
+          paint();
+        });
+        return tile;
+      }),
+      ...(shots.list.length < MAX_SHOTS
+        ? [(() => {
+            const add = el(`<button type="button" class="shot add" id="shots-add"><b>+</b><span>Зураг нэмэх</span></button>`);
+            add.addEventListener('click', () => input.click());
+            return add;
+          })()]
+        : []),
+    );
+  };
+  input.addEventListener('change', async () => {
+    const files = [...(input.files ?? [])];
+    input.value = '';
+    const room = MAX_SHOTS - shots.list.length;
+    if (files.length > room) toast(`Нэг зарт ${MAX_SHOTS} хүртэл зураг орно — эхний ${room}-г авлаа.`);
+    box.setAttribute('aria-busy', 'true');
+    for (const file of files.slice(0, room)) {
+      try {
+        // The photograph as a guest looks at it, and a small copy for a card in a list.
+        const photo = await shrinkPhoto(file);
+        const thumb = await shrinkPhoto(file, { longest: 720, under: 140 * 1024 });
+        shots.list.push({ photo, thumb, show: thumb });
+        shots.changed = true;
+      } catch (error) {
+        toast(`${file.name}: ${error.message}`, 'bad');
+      }
+      paint();
+    }
+    box.removeAttribute('aria-busy');
+  });
+  paint();
+  return shots;
+}
+/**
+ * Make the listing's photographs what the popup shows: the ones taken away
+ * gone, the new ones sent one at a time (a photograph is most of a megabyte),
+ * and the order said last, once every one of them has an id.
+ */
+async function saveShots(listingId, shots) {
+  if (!shots?.changed) return;
+  for (const id of shots.gone) await sup(`/v1/supplier/listings/${listingId}/photos/${id}`, { method: 'DELETE' });
+  shots.gone = [];
+  for (const s of shots.list) {
+    if (s.id) continue;
+    const { photo } = await sup(`/v1/supplier/listings/${listingId}/photos`, { method: 'POST', body: { photo: s.photo, thumb: s.thumb } });
+    s.id = photo.id;
+  }
+  if (shots.list.length > 1) await sup(`/v1/supplier/listings/${listingId}/photos/order`, { method: 'PUT', body: { ids: shots.list.map((s) => s.id) } });
+  shots.changed = false;
 }
 
 /**
@@ -2017,6 +2123,8 @@ function checkListing(v, { unit, sold = 0, day = null, keptDay = null }) {
 async function addListing() {
   const day = await knowToday();
   await loadPapers().catch(() => {});
+  let made = null;
+  let shots = null;
   const done = popup({
     id: 'listing-new',
     title: 'Шинэ зар нэмэх',
@@ -2038,6 +2146,7 @@ async function addListing() {
       { type: 'checks', label: 'Хүргэлт', options: [['delivers', 'Хүргэлт хийнэ', false, { hint: 'Хүргэлтийн үйлчилгээгээр зочны хаяг руу хүргүүлнэ — төлбөр нь бүтнээрээ танд.' }]] },
       { name: 'delivery_fee_mnt', label: 'Хүргэлтийн төлбөр', format: 'money', hint: 'Үнэгүй хүргэх бол 0.' },
       ...CUT_FIELDS(),
+      SHOTS_FIELD,
       { name: 'note', label: 'Тайлбар (заавал биш)', type: 'textarea', placeholder: 'Толгой, дотор мөнтэйгээ…' },
     ],
     submit: 'Зар нэмэх',
@@ -2060,11 +2169,14 @@ async function addListing() {
       if (unit === 'whole') Object.assign(body, { approx_kg: asNumber(v.approx_kg) }, cutAnswer(v));
       else body.min_qty = v.min_qty ? asNumber(v.min_qty) : 1;
       if (unit === 'kg') body.certificate_id = v.certificate_id;
-      await sup('/v1/supplier/listings', { method: 'POST', body });
+      // Made once: a press again after a photograph failed sends the photographs, not a second listing.
+      made ??= (await sup('/v1/supplier/listings', { method: 'POST', body })).listing.id;
+      await saveShots(made, shots);
       return true;
     },
   });
   const sheet = document.getElementById('listing-new');
+  shots = wireShots(sheet);
   noKeyboard(sheet);
   affix(sheet, 'approx_kg', 'кг');
   affix(sheet, 'min_qty', 'кг');
@@ -2119,6 +2231,7 @@ async function editListing(l) {
       // A listing that did not deliver offers no fee to keep: ticking delivery asks for one, never assumes 0.
       { name: 'delivery_fee_mnt', label: 'Хүргэлтийн төлбөр', format: 'money', value: l.delivers ? String(l.delivery_fee_mnt ?? 0) : '', hint: 'Үнэгүй хүргэх бол 0.' },
       ...(kg ? [] : CUT_FIELDS(l)),
+      SHOTS_FIELD,
       { name: 'note', label: 'Тайлбар (заавал биш)', type: 'textarea', value: l.note ?? '' },
       { type: 'checks', label: 'Зочдод', options: [['active', 'Зочдод харагдана', Boolean(l.active), { hint: 'Арилгавал зар зогсож, шинэ захиалга авахгүй. Авсан захиалга хэвээр.' }]] },
     ],
@@ -2140,10 +2253,12 @@ async function editListing(l) {
           ...(v.certificate_id && v.certificate_id !== held?.id ? { certificate_id: v.certificate_id } : {}),
         },
       });
+      await saveShots(l.id, shots);
       return true;
     },
   });
   const sheet = document.getElementById('listing-edit');
+  const shots = wireShots(sheet, l.photos ?? []);
   noKeyboard(sheet);
   wirePaperSelect(sheet);
   wireDelivery(sheet);
