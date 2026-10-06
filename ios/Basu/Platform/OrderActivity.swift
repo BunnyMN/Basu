@@ -107,6 +107,10 @@ final class OrderActivity {
    Only today's: an activity lives eight hours, and an идэш takes days.
    */
   func sync(idesh orders: [LiveIdesh]) async {
+    // The Home Screen's: the next one still to come, whatever its day.
+    IdeshSnapshotStore.write(LiveIdesh.next(in: orders)?.widgetSnapshot)
+    WidgetCenter.shared.reloadTimelines(ofKind: OrderSnapshotStore.widgetKind)
+
     let today = BasuFormat.today()
     var byID: [String: LiveIdesh] = [:]
     for order in orders { byID[order.id] = order }
@@ -208,12 +212,34 @@ final class OrderActivity {
         what: "Хонины мах · 1 толгой", receive: delivery ? "delivery" : "pickup",
         pickupAddress: delivery ? nil : "БЗД, 26-р хороо, Шархад 3-р гудамж 14",
       )
+      // `BASU_IDESH_IN_DAYS` moves the day, for the widget's «Маргааш».
+      let days = Double(ProcessInfo.processInfo.environment["BASU_IDESH_IN_DAYS"] ?? "") ?? 0
       let content = IdeshActivityAttributes.ContentState(
-        state: state.rawValue, word: state.word, step: state.step, receiveOn: BasuFormat.today(),
+        state: state.rawValue, word: state.word, step: state.step,
+        receiveOn: BasuFormat.today(.now.addingTimeInterval(days * 86_400)),
       )
       _ = try? Activity.request(attributes: attributes, content: ActivityContent(state: content, staleDate: nil), pushType: nil)
+      // And the Home Screen's widget, the same order.
+      IdeshSnapshotStore.write(IdeshSnapshot(
+        orderID: attributes.orderID, code: attributes.code, supplier: attributes.supplier,
+        what: attributes.what, receive: attributes.receive, receiveOn: content.receiveOn,
+        state: content.state, word: content.word, step: content.step, takenAt: .now,
+      ))
+      WidgetCenter.shared.reloadTimelines(ofKind: OrderSnapshotStore.widgetKind)
     }
   #endif
+
+  /// Signed out: nothing of the last person's stays on the lock screen or
+  /// the Home Screen.
+  func clear() async {
+    await endAll()
+    for activity in Activity<IdeshActivityAttributes>.activities {
+      await activity.end(nil, dismissalPolicy: .immediate)
+    }
+    OrderSnapshotStore.write(nil)
+    IdeshSnapshotStore.write(nil)
+    WidgetCenter.shared.reloadTimelines(ofKind: OrderSnapshotStore.widgetKind)
+  }
 
   private func end(_ orderId: String) async {
     for activity in Activity<BasuActivityAttributes>.activities where activity.attributes.orderID == orderId {
@@ -298,5 +324,21 @@ extension LiveIdesh {
   /// Out of date at the end of the day it was for.
   var cardStale: Date? {
     ISODate.parse("\(receiveOnDay)T23:59:59+08:00")
+  }
+
+  /// The one the Home Screen shows: the soonest still to come. Finished,
+  /// cancelled or unpaid ones are not news.
+  static func next(in orders: [LiveIdesh]) -> LiveIdesh? {
+    orders
+      .filter { [.paid, .preparing, .ready, .dispatched].contains($0.state) }
+      .min { ($0.receiveOnDay, $0.code) < ($1.receiveOnDay, $1.code) }
+  }
+
+  var widgetSnapshot: IdeshSnapshot {
+    IdeshSnapshot(
+      orderID: id, code: code, supplier: supplier.name, what: "\(meat) · \(amount)",
+      receive: receive, receiveOn: receiveOnDay, state: state.rawValue, word: state.word,
+      step: state.step, takenAt: .now,
+    )
   }
 }

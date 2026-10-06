@@ -56,6 +56,19 @@ struct BasuKitTests {
     #expect(BasuFormat.dayWord("2026-10-07", now: now) == "10-р сарын 7")
   }
 
+  @Test func aWidgetSaysTheDayInANumbersPlaceAndRedrawsAtMidnight() {
+    // 2026-09-12 10:00 in Ulaanbaatar.
+    let now = Date(timeIntervalSince1970: 1_789_178_400)
+    #expect(BasuFormat.dayShort("2026-09-12", now: now) == "Өнөөдөр")
+    #expect(BasuFormat.dayShort("2026-09-13", now: now) == "Маргааш")
+    #expect(BasuFormat.dayShort("2026-10-07", now: now) == "10/7")
+    // Midnights on the 13th and 14th (the day after the 13th): Маргааш,
+    // then Өнөөдөр, then Өчигдөр — each drawn when it becomes true.
+    let marks = BasuFormat.midnights(after: now, through: "2026-09-13")
+    #expect(marks.map { BasuFormat.today($0) } == ["2026-09-13", "2026-09-14"])
+    #expect(BasuFormat.midnights(after: now, through: "2026-09-10").isEmpty)
+  }
+
   @Test func theServersPushAndTheAppsOwnEncodingBothDecodeAsContentState() throws {
     // What the relay sends (src/services/activities.ts): ISO 8601 text.
     let pushed = try JSONDecoder().decode(

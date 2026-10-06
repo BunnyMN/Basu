@@ -88,7 +88,7 @@ final class WidgetTests: XCTestCase {
     // the gallery landed on, the seating time is labelled.
     let label = springboard.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'ИРЭХ'")).firstMatch
     XCTAssertTrue(label.waitForExistence(timeout: 10), "the widget should show the seating time's label")
-    XCTAssertFalse(springboard.staticTexts["Захиалга алга. Товшиж хоол сонгоно."].exists)
+    XCTAssertFalse(springboard.staticTexts["Захиалга алга. Товшиж идэш, хоолоо сонгоно."].exists)
 
     // ── and take it away again ────────────────────────────────────────
     removeWidget(at: label, on: springboard)

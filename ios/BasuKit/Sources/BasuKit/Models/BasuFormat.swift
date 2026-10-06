@@ -39,6 +39,39 @@ public enum BasuFormat {
     }
   }
 
+  /// The same day, for a number's place: «Өнөөдөр», «Маргааш»,
+  /// «Өчигдөр», or «10/7».
+  public static func dayShort(_ value: String, now: Date = Date()) -> String {
+    guard let date = day.date(from: value) else { return value }
+    let calendar = ulaanbaatar
+    let days = calendar.dateComponents(
+      [.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date),
+    ).day ?? 0
+    switch days {
+    case 0: return "Өнөөдөр"
+    case 1: return "Маргааш"
+    case -1: return "Өчигдөр"
+    default:
+      let parts = calendar.dateComponents([.month, .day], from: date)
+      return "\(parts.month ?? 0)/\(parts.day ?? 0)"
+    }
+  }
+
+  /// The midnights between now and the end of a `YYYY-MM-DD` day, in
+  /// Ulaanbaatar: where a day word on a widget changes.
+  public static func midnights(after now: Date, through value: String) -> [Date] {
+    guard let date = day.date(from: value) else { return [] }
+    let calendar = ulaanbaatar
+    let last = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: date)) ?? date
+    var out: [Date] = []
+    var next = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now
+    while next <= last && out.count < 31 {
+      out.append(next)
+      next = calendar.date(byAdding: .day, value: 1, to: next) ?? last.addingTimeInterval(1)
+    }
+    return out
+  }
+
   private static let ulaanbaatar: Calendar = {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = TimeZone(identifier: "Asia/Ulaanbaatar")!

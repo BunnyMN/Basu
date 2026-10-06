@@ -133,6 +133,8 @@ struct RootView: View {
       } else {
         tab = .home
         path = []
+        // Nothing of the last person's stays on the lock screen or the widget.
+        Task { await OrderActivity.shared.clear() }
       }
     }
     .onChange(of: phase) { _, now in

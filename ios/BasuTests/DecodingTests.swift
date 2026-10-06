@@ -112,6 +112,37 @@ struct DecodingTests {
     #expect(try idesh("DISPATCHED", on: today, receive: "delivery").cardAttributes.pickupAddress == nil)
   }
 
+  @Test func theWidgetShowsTheSoonestIdeshStillToCome() throws {
+    func idesh(_ id: String, _ state: String, on day: String) throws -> LiveIdesh {
+      try decode(LiveIdesh.self, """
+        {
+          "id": "\(id)", "code": "70\(id)", "state": "\(state)",
+          "supplier": { "id": "s", "name": "Архангай · Дорж" },
+          "kind": "sheep", "unit": "kg", "title": "Хонины мах, кг-аар", "qty": 10, "total_mnt": 128000,
+          "receive": "delivery", "receive_on": "\(day)", "paid_at": null
+        }
+        """)
+    }
+    let orders = [
+      try idesh("01", "HANDED", on: "2026-09-10"),
+      try idesh("02", "PREPARING", on: "2026-09-20"),
+      try idesh("03", "PAID", on: "2026-09-15"),
+      try idesh("04", "CANCELLED", on: "2026-09-12"),
+    ]
+    // Handed over and cancelled are not news; the 15th comes before the 20th.
+    let next = try #require(LiveIdesh.next(in: orders))
+    #expect(next.id == "03")
+    let snap = next.widgetSnapshot
+    #expect(snap.code == "7003")
+    #expect(snap.what == "Хонины мах · 10 кг")
+    #expect(snap.receiveOn == "2026-09-15")
+    #expect(snap.word == "Төлсөн")
+    #expect(snap.step == 1)
+    #expect(snap.delivery)
+    #expect(snap.url.absoluteString == "basu://idesh/03")
+    #expect(LiveIdesh.next(in: [try idesh("05", "HANDED", on: "2026-09-10")]) == nil)
+  }
+
   @Test func meatByTheKiloIsSaidInKilosNotTimes() throws {
     let order = try decode(LiveIdesh.self, """
       {
