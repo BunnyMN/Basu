@@ -324,6 +324,17 @@ describe('ordering', () => {
     expect((await housekeeping(ctx)).expired).toBe(1);
     const lapsed = await app.inject({ method: 'GET', url: '/v1/idesh?scope=all', headers: auth(token) });
     expect(lapsed.json().orders.map((o: { id: string }) => o.id)).toEqual([id]);
+    // Nor a sale on the supplier's list or in their season: it closed unpaid, and reads «Дууссан» by its state alone.
+    const screen = await atCounter(supplierId);
+    for (const scope of ['all', 'done', 'live']) {
+      const listed = await app.inject({ method: 'GET', url: `/v1/supplier/orders?scope=${scope}`, headers: auth(screen) });
+      expect(listed.json().orders.map((o: { id: string }) => o.id), scope).toEqual(scope === 'done' ? [] : [id]);
+    }
+    const act = (action: string) => app.inject({ method: 'POST', url: `/v1/supplier/orders/${id}/${action}`, headers: auth(screen), payload: {} });
+    for (const action of ['prepare', 'ready', 'hand']) expect((await act(action)).statusCode, action).toBe(200);
+    const home = await app.inject({ method: 'GET', url: '/v1/supplier/home', headers: auth(screen) });
+    expect(home.json().season).toMatchObject({ handed: 1, revenue_mnt: 460_000 });
+    expect(home.json().season.by_kind).toMatchObject([{ kind: 'sheep', orders: 1 }]);
     // Somebody else's history is theirs.
     const other = await app.inject({ method: 'GET', url: '/v1/idesh?scope=all', headers: auth(await signIn('+97699001144')) });
     expect(other.json().orders).toEqual([]);

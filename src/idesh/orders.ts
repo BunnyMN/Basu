@@ -1352,13 +1352,14 @@ export async function homeOf(supplierId: string, now: Date, db: Db = getPool()):
             COALESCE(sum(total_mnt) FILTER (WHERE state IN ('HANDED','CLOSED')), 0) AS revenue,
             COALESCE(sum(COALESCE(payout_mnt, total_mnt)) FILTER (WHERE state IN ('HANDED','CLOSED')), 0) AS payout,
             COALESCE(sum(forfeit_mnt) FILTER (WHERE state IN ('CANCELLED','REFUNDED')), 0) AS forfeit
-       FROM idesh.idesh_order WHERE supplier_id = $1`,
+       -- Only what was paid for: an unpaid checkout that lapsed is closed too, and is no sale.
+       FROM idesh.idesh_order WHERE supplier_id = $1 AND paid_at IS NOT NULL`,
     [supplierId],
   );
   const { rows: kinds } = await db.query<{ kind: Kind; unit: Unit; qty: string; orders: number }>(
     `SELECT kind, unit, sum(qty) AS qty, count(*)::int AS orders
        FROM idesh.idesh_order
-      WHERE supplier_id = $1 AND state IN ('HANDED','CLOSED')
+      WHERE supplier_id = $1 AND state IN ('HANDED','CLOSED') AND paid_at IS NOT NULL
       GROUP BY kind, unit ORDER BY sum(total_mnt) DESC`,
     [supplierId],
   );
@@ -1440,6 +1441,9 @@ async function listOrders(opts: OrderFilter, db: Db, { fallback = true }: { fall
   const { rows } = await db.query<OrderRow & { handed_at: Date | null; cancelled_at: Date | null; created_at: Date }>(
     `${ORDER_SELECT.replace('o.cancel_reason,', 'o.cancel_reason, o.cancelled_at, o.created_at,')}
       WHERE o.state = ANY($1::text[])
+        -- Paid for, or it was never an order: a checkout nobody finished closes unpaid («Дууссан»
+        -- by its state alone) and would read on a supplier's list as a sale that never was.
+        AND o.paid_at IS NOT NULL
         AND ($2::uuid IS NULL OR o.supplier_id = $2::uuid)
         AND ($3::date IS NULL OR o.receive_on = $3::date)
         AND ($4::uuid IS NULL OR o.guest_id = $4::uuid)
