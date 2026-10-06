@@ -2262,3 +2262,166 @@ export function hhmm(iso) {
     timeZone: 'Asia/Ulaanbaatar',
   }).format(new Date(iso));
 }
+
+/* ── Задаргаа: how a whole animal is taken apart ──────────────────────
+ *
+ * One step on a stall's form, the same in the app and on the website: the
+ * ways the supplier offers (the server sends them with their words —
+ * `listing.breakdown`), and under «Хэсгээр сонгох» the six parts, each kept
+ * whole or cut small. A listing that offers nothing has no step at all.
+ *
+ * The choice is a plain object the page keeps in its form:
+ * `{ style: 'carcass' | 'parts', cut: [part…], custom, note }`. `custom`
+ * is only which way is shown chosen — the server is sent the style, the
+ * parts to cut and the note, and names the result itself.
+ */
+
+/**
+ * The choice a form starts from: `kept` when it still fits what the stall
+ * offers (a form that came back from signing in), else jointed where the
+ * supplier joints, else the one way there is. Null where nothing is asked.
+ */
+export function breakdownStart(listing, kept = null) {
+  const offer = listing.breakdown;
+  if (!offer) return null;
+  const ids = offer.styles.map((s) => s.id);
+  const parts = offer.parts.map((p) => p.id);
+  if (kept && typeof kept === 'object' && Array.isArray(kept.cut)) {
+    const cut = parts.filter((p) => kept.cut.includes(p));
+    const fits =
+      kept.style === 'carcass' ? ids.includes('carcass') : kept.style === 'parts' && (cut.length ? ids.includes('cut') : ids.includes('jointed'));
+    if (fits) {
+      return { style: kept.style, cut: kept.style === 'parts' ? cut : [], custom: Boolean(kept.custom) && ids.includes('cut'), note: String(kept.note ?? '').slice(0, offer.note_max) };
+    }
+  }
+  return { style: ids.includes('jointed') ? 'parts' : 'carcass', cut: [], custom: false, note: '' };
+}
+
+/** Which of the ways on the step is the chosen one. */
+function breakdownWay(choice) {
+  if (choice.style === 'carcass') return 'carcass';
+  if (choice.custom) return 'custom';
+  return choice.cut.length ? 'cut' : 'jointed';
+}
+
+/** What cutting costs this order: the supplier's fee per head, once anything is cut small. */
+export function breakdownFee(listing, choice, qty) {
+  if (!listing.breakdown || !choice || choice.style !== 'parts' || choice.cut.length === 0) return 0;
+  return listing.breakdown.cut_fee_mnt * qty;
+}
+
+/** The choice as the order carries it to the server; nothing where nothing was asked. */
+export function breakdownBody(choice) {
+  if (!choice) return {};
+  const note = choice.note.trim();
+  return { breakdown: { style: choice.style, cut: choice.style === 'parts' ? choice.cut : [], ...(note ? { note } : {}) } };
+}
+
+/** The choice in words, for the review before the order exists — as the server will say it after. */
+export function breakdownWords(listing, choice) {
+  const offer = listing.breakdown;
+  if (!offer || !choice) return null;
+  const style = (id) => offer.styles.find((s) => s.id === id) ?? { label: '', hint: '' };
+  const said = (id) => ({ label: style(id).label, detail: style(id).hint });
+  if (choice.style === 'carcass') return said('carcass');
+  if (choice.cut.length === 0) return said('jointed');
+  if (choice.cut.length === offer.parts.length) return said('cut');
+  const names = (parts) => parts.map((p) => p.label.toLowerCase()).join(', ');
+  return {
+    label: 'Хэсгээр',
+    detail: `Жижиглэнэ: ${names(offer.parts.filter((p) => choice.cut.includes(p.id)))}. Бүхлээр: ${names(offer.parts.filter((p) => !choice.cut.includes(p.id)))}.`,
+  };
+}
+
+/**
+ * The step itself. `choice` is changed in place and `changed()` called after
+ * every change that moves the price or the words; typing the note calls
+ * nothing — it changes neither.
+ */
+export function breakdownStep(listing, choice, changed = () => {}) {
+  const offer = listing.breakdown;
+  const safe = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+  const cuts = offer.styles.some((s) => s.id === 'cut');
+  const fee = offer.cut_fee_mnt;
+  const price = fee > 0 ? `+${mnt(fee)}` : 'Нэмэлт төлбөргүй';
+  const ways = [
+    ...offer.styles.map((s) => ({ id: s.id, label: s.label, hint: s.hint, price: s.id === 'cut' ? price : '' })),
+    ...(cuts ? [{ id: 'custom', label: 'Хэсгээр сонгох', hint: 'Аль хэсгийг бүхлээр, алийг жижиглэхээ өөрөө сонгоно', price: '' }] : []),
+  ];
+  const box = document.createElement('div');
+  box.className = 'bd';
+  box.innerHTML = `
+    <div class="bd-ways" role="radiogroup" aria-label="Задаргаа">${ways
+      .map((w) => `<button class="bd-way" type="button" role="radio" data-way="${w.id}"><i></i><span><b>${safe(w.label)}</b><small>${safe(w.hint)}</small></span><em>${safe(w.price)}</em></button>`)
+      .join('')}</div>
+    ${
+      cuts
+        ? `<div class="bd-parts" hidden>${offer.parts
+            .map(
+              (p) =>
+                `<div class="bd-part" data-part="${p.id}"><span>${safe(p.label)}</span><div class="seg" role="group" aria-label="${safe(p.label)}"><button type="button" data-cut="0">Бүхлээр</button><button type="button" data-cut="1">Жижиглэж</button></div></div>`,
+            )
+            .join('')}</div>`
+        : ''
+    }
+    ${cuts && fee > 0 ? `<p class="bd-fee">Жижиглүүлбэл нэг толгойд <b>${mnt(fee)}</b> нэмэгдэнэ — хэдэн хэсгийг ч адил.</p>` : ''}
+    <label class="bd-note"><span>Тусгай хүсэлт <small>(заавал биш)</small></span><input type="text" maxlength="${offer.note_max}" autocomplete="off" enterkeyhint="done" placeholder="Жишээ нь: ууцыг бүтэн үлдээгээрэй"></label>`;
+
+  const paint = () => {
+    const way = breakdownWay(choice);
+    // A radio group is one stop for Tab — the way chosen; the arrow keys move between them.
+    for (const b of box.querySelectorAll('.bd-way')) {
+      b.setAttribute('aria-checked', String(b.dataset.way === way));
+      b.tabIndex = b.dataset.way === way ? 0 : -1;
+    }
+    const parts = box.querySelector('.bd-parts');
+    if (parts) {
+      parts.hidden = way !== 'custom';
+      for (const row of parts.querySelectorAll('.bd-part')) {
+        const cut = choice.cut.includes(row.dataset.part);
+        for (const b of row.querySelectorAll('button')) b.setAttribute('aria-pressed', String((b.dataset.cut === '1') === cut));
+      }
+    }
+  };
+  const take = (way) => {
+    if (way === 'carcass') Object.assign(choice, { style: 'carcass', cut: [], custom: false });
+    else if (way === 'jointed') Object.assign(choice, { style: 'parts', cut: [], custom: false });
+    else if (way === 'cut') Object.assign(choice, { style: 'parts', cut: offer.parts.map((p) => p.id), custom: false });
+    // «Хэсгээр» starts from what was chosen: all whole after «мөчилсөн», all small after «хоолны хэмжээгээр».
+    else Object.assign(choice, { style: 'parts', cut: choice.style === 'parts' ? choice.cut : [], custom: true });
+    paint();
+    changed();
+  };
+  box.querySelector('.bd-ways').addEventListener('click', (event) => {
+    const b = event.target.closest('.bd-way');
+    if (b && b.dataset.way !== breakdownWay(choice)) take(b.dataset.way);
+  });
+  box.querySelector('.bd-ways').addEventListener('keydown', (event) => {
+    const by = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[event.key];
+    if (!by) return;
+    event.preventDefault();
+    const all = [...box.querySelectorAll('.bd-way')];
+    const next = all[(all.findIndex((b) => b.dataset.way === breakdownWay(choice)) + by + all.length) % all.length];
+    take(next.dataset.way);
+    next.focus();
+  });
+  box.querySelector('.bd-parts')?.addEventListener('click', (event) => {
+    const b = event.target.closest('button[data-cut]');
+    if (!b) return;
+    const part = b.closest('.bd-part').dataset.part;
+    const cut = new Set(choice.cut);
+    if (b.dataset.cut === '1') cut.add(part);
+    else cut.delete(part);
+    // Kept in the parts' own order, as the server keeps them.
+    choice.cut = offer.parts.map((p) => p.id).filter((p) => cut.has(p));
+    paint();
+    changed();
+  });
+  const note = box.querySelector('.bd-note input');
+  note.value = choice.note;
+  note.addEventListener('input', () => {
+    choice.note = note.value;
+  });
+  paint();
+  return box;
+}

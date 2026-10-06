@@ -63,6 +63,12 @@ import {
   MAX_PHOTO_BYTES,
   type Certificate,
   type CertificatePhoto,
+  NOTE_MAX,
+  PARTS,
+  PART_LABEL,
+  STYLE_HINT,
+  STYLE_LABEL,
+  type BreakdownOffer,
 } from '../idesh/index.js';
 import { setting } from '../ops/index.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
@@ -122,6 +128,21 @@ function bearer(request: FastifyRequest): string | undefined {
   return header.slice(7);
 }
 
+/**
+ * Задаргаа as a page draws it: the ways on offer and the six parts, each with
+ * its words — Basu's, sent with the listing so no page keeps its own copy.
+ * Null where the supplier said nothing, and the guest is asked nothing.
+ */
+const shapeBreakdownOffer = (b: BreakdownOffer) =>
+  b.styles.length === 0
+    ? null
+    : {
+        styles: b.styles.map((id) => ({ id, label: STYLE_LABEL[id], hint: STYLE_HINT[id] })),
+        parts: PARTS.map((id) => ({ id, label: PART_LABEL[id] })),
+        cut_fee_mnt: b.cutFeeMnt,
+        note_max: NOTE_MAX,
+      };
+
 const shapeListing = (l: Listing) => ({
   id: l.id,
   supplier: {
@@ -148,6 +169,7 @@ const shapeListing = (l: Listing) => ({
   tier: l.tier,
   tier_until: l.tierUntil?.toISOString() ?? null,
   certificate: shapeCertificateFacts(l.certificate),
+  breakdown: shapeBreakdownOffer(l.breakdown),
   photo: l.photo,
 });
 
@@ -241,6 +263,8 @@ function readListing(body: Record<string, unknown>): ListingInput | string {
   if (body['min_qty'] !== undefined) input.minQty = Number(body['min_qty']);
   if (typeof body['delivers'] === 'boolean') input.delivers = body['delivers'];
   if (body['delivery_fee_mnt'] !== undefined) input.deliveryFeeMnt = Number(body['delivery_fee_mnt']);
+  if (Array.isArray(body['breakdown_styles'])) input.breakdownStyles = body['breakdown_styles'].map(String);
+  if (body['cut_fee_mnt'] !== undefined && body['cut_fee_mnt'] !== null) input.cutFeeMnt = Number(body['cut_fee_mnt']);
   if (typeof body['certificate_id'] === 'string' && body['certificate_id']) {
     if (!UUID.test(body['certificate_id'])) return 'certificate_id must be an id';
     input.certificateId = body['certificate_id'];
@@ -258,6 +282,8 @@ function readPatch(body: Record<string, unknown>): ListingPatch {
   if (typeof body['ready_from'] === 'string') patch.readyFrom = body['ready_from'];
   if (body['note'] !== undefined) patch.note = body['note'] === null ? null : String(body['note']);
   if (typeof body['title'] === 'string') patch.title = body['title'];
+  if (Array.isArray(body['breakdown_styles'])) patch.breakdownStyles = body['breakdown_styles'].map(String);
+  if (body['cut_fee_mnt'] !== undefined && body['cut_fee_mnt'] !== null) patch.cutFeeMnt = Number(body['cut_fee_mnt']);
   // One that is not an id finds no certificate, and is told so by the module.
   if (typeof body['certificate_id'] === 'string' && UUID.test(body['certificate_id'])) patch.certificateId = body['certificate_id'];
   return patch;
@@ -358,6 +384,7 @@ export async function registerIdeshRoutes(
       address_phone?: string;
       address_lat?: number;
       address_lon?: number;
+      breakdown?: { style?: unknown; cut?: unknown; note?: unknown } | null;
     };
   }>('/v1/idesh', guarded, async (request, reply) => {
     const body = request.body ?? {};
@@ -379,6 +406,7 @@ export async function registerIdeshRoutes(
         addressPhone: body.address_phone,
         addressLat: typeof body.address_lat === 'number' ? body.address_lat : undefined,
         addressLon: typeof body.address_lon === 'number' ? body.address_lon : undefined,
+        breakdown: body.breakdown && typeof body.breakdown === 'object' ? body.breakdown : undefined,
       });
       return reply.status(201).send({
         id: created.orderId,

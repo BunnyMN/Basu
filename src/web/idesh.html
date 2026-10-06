@@ -496,7 +496,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 <!-- MapLibre from cdnjs, held to cdnjs's own hash of the file: bytes that ever differ do not run. A new version takes its new hash, here and on the stylesheet. -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js" integrity="sha512-hoXlvOdSmh58mppUyZHZsscHkR/yXl6zLpTMTNwA6IZ61DpeaCNjosRu1WJ2DeIpkfW5MsJJ9H89zjV4IBGqRw==" crossorigin="anonymous"></script>
 <script type="module">
-import { api, photoOf, store, shell, toast, mnt, money, meter, ideshStage, IDESH_STATE, IDESH_STEP, KIND, BANK_NAMES, dayLabel, dayShort, ubParts, signInSheet, passwordPopup, dropSession, whatWentWrong } from '/api.js';
+import { api, photoOf, store, shell, toast, mnt, money, meter, ideshStage, IDESH_STATE, IDESH_STEP, KIND, BANK_NAMES, dayLabel, dayShort, ubParts, signInSheet, passwordPopup, dropSession, whatWentWrong, breakdownStart, breakdownFee, breakdownBody, breakdownWords, breakdownStep } from '/api.js';
 import { mapStyle, ULAANBAATAR, MAP_LOCALE } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -551,6 +551,7 @@ const ART = {
 const MARK = {
   check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
   pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg>',
+  knife: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 3.5l6 6L10 17l-3-3z"/><path d="M8.5 15.5l-5 5"/></svg>',
   day: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/></svg>',
   truck: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5h11v10H3z"/><path d="M14 10h4l3 3.5v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17.5" cy="17.5" r="1.8"/></svg>',
   store: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5l1.5-5h13l1.5 5"/><path d="M4 9.5a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0"/><path d="M5.5 12v8h13v-8"/><path d="M10 20v-4.5h4V20"/></svg>',
@@ -1094,6 +1095,8 @@ function openListing(l) {
     phone: '',
     lat: null,
     lon: null,
+    // Задаргаа: how the animal is taken apart, where the stall offers a choice.
+    breakdown: breakdownStart(l),
   };
   renderDetail();
 }
@@ -1112,7 +1115,7 @@ function hero(l) {
 function total() {
   const l = state.listing;
   const f = state.form;
-  return l.price_mnt * f.qty + (f.receive === 'delivery' ? l.delivery_fee_mnt : 0);
+  return l.price_mnt * f.qty + breakdownFee(l, f.breakdown, f.qty) + (f.receive === 'delivery' ? l.delivery_fee_mnt : 0);
 }
 
 /** What still has to be answered before the order can be looked at. */
@@ -1183,6 +1186,13 @@ function renderDetail({ replace = false } = {}) {
   });
   paintQty();
   body.append(qty);
+
+  /* how it is taken apart: whole, jointed, cut small — or part by part */
+  if (f.breakdown) {
+    const cutUp = el(`<div class="step" id="step-breakdown"><div class="q"><b>Задаргаа</b><em>Махаа яаж авах вэ</em></div></div>`);
+    cutUp.append(breakdownStep(l, f.breakdown, renderFoot));
+    body.append(cutUp);
+  }
 
   /* how it arrives: two halves of one pill */
   const pick = el(`
@@ -1393,7 +1403,7 @@ function renderFoot() {
   else if (needs) foot.append(el(`<p class="why" id="next-why">${MARK.warn}${needs}</p>`));
   const row = el(`
     <div class="foot-row">
-      <div class="sum"><span>Нийт · ${f.qty} ${unitWord(l)}${f.receive === 'delivery' ? ' + хүргэлт' : ''}</span><b>${money(total())}</b></div>
+      <div class="sum"><span>Нийт · ${f.qty} ${unitWord(l)}${breakdownFee(l, f.breakdown, f.qty) ? ' + жижиглэх' : ''}${f.receive === 'delivery' ? ' + хүргэлт' : ''}</span><b>${money(total())}</b></div>
       <button class="btn" data-v="primary" type="button" id="next"${needs || !able ? ' disabled aria-describedby="next-why"' : ''}>Захиалах</button>
     </div>`);
   row.querySelector('#next').addEventListener('click', () => renderReview());
@@ -1425,6 +1435,8 @@ function renderReview({ replace = false } = {}) {
   showScreen('review', 'Захиалгаа шалгана уу', 'Төлөхөөс өмнө нэг харна уу', { replace });
   const body = $('screen-body');
   const delivery = f.receive === 'delivery';
+  const cutUp = breakdownWords(l, f.breakdown);
+  const cutFee = breakdownFee(l, f.breakdown, f.qty);
 
   // What is being bought, as the stall showed it: its photograph, who sells it, its name.
   body.append(
@@ -1436,6 +1448,7 @@ function renderReview({ replace = false } = {}) {
   body.append(
     el(`<div class="review card">
           <div class="r"><span>Хэмжээ</span><b><span class="mn">${f.qty}</span> ${unitWord(l)}</b></div>
+          ${cutUp ? `<div class="r" id="review-breakdown"><span>Задаргаа</span><b>${escapeHtml(cutUp.label)}<small>${escapeHtml(cutUp.detail)}</small>${f.breakdown.note.trim() ? `<small>«${escapeHtml(f.breakdown.note.trim())}»</small>` : ''}</b></div>` : ''}
           <div class="r"><span>Авах арга</span><b>${delivery ? 'Гэрт хүргүүлнэ' : 'Өөрөө очиж авна'}<small>${
             delivery ? `${escapeHtml(f.address)} · <span class="mn">${escapeHtml(phoneShown(f.phone))}</span>` : escapeHtml(l.supplier.pickup_address)
           }</small></b></div>
@@ -1445,6 +1458,7 @@ function renderReview({ replace = false } = {}) {
   body.append(
     el(`<div class="review card">
           <div class="r"><span>${f.qty} ${unitWord(l)} × ${mnt(l.price_mnt)}</span><b>${money(l.price_mnt * f.qty)}</b></div>
+          ${cutFee ? `<div class="r"><span>Жижиглэх</span><b>${money(cutFee)}</b></div>` : ''}
           ${delivery ? `<div class="r"><span>Хүргэлт</span><b>${money(l.delivery_fee_mnt)}</b></div>` : ''}
           <div class="r total"><span>Нийт төлөх</span><b>${money(total())}</b></div>
         </div>`),
@@ -1486,6 +1500,7 @@ function orderBody() {
     qty: f.qty,
     receive: f.receive,
     receive_on: f.receiveOn,
+    ...breakdownBody(f.breakdown),
     ...(f.receive === 'delivery'
       ? {
           address: f.address,
@@ -2219,6 +2234,17 @@ async function showStatus(force, { replace = false } = {}) {
             }</div>
           </div></div>`),
     );
+    // How it was asked to be taken apart: what the supplier is cutting to.
+    if (order.breakdown) {
+      plan.append(
+        el(`<div class="line" id="order-breakdown">${MARK.knife}<div>
+              <span class="lab">Задаргаа</span>
+              <div class="v">${escapeHtml(order.breakdown.label)}<small>${escapeHtml(order.breakdown.detail)}${
+                order.breakdown.note ? ` · «${escapeHtml(order.breakdown.note)}»` : ''
+              }</small></div>
+            </div></div>`),
+      );
+    }
     body.append(plan);
   }
 
@@ -2243,11 +2269,16 @@ async function showStatus(force, { replace = false } = {}) {
 
   /* the money */
   const pay = el('<div class="panel card"></div>');
+  // What the total holds beside the meat: the cutting, the delivery.
+  const extras = [
+    order.breakdown?.fee_mnt ? `жижиглэх ${mnt(order.breakdown.fee_mnt)}` : '',
+    order.delivery_fee_mnt ? `хүргэлт ${mnt(order.delivery_fee_mnt)}` : '',
+  ].filter(Boolean);
   pay.append(
     el(`<div class="line">${MARK.wallet}<div>
           <span class="lab">Төлсөн дүн</span>
           <div class="v"><span class="mono">${money(order.total_mnt)}</span><small>Түрийвчнээс · ${
-            order.delivery_fee_mnt ? `хүргэлт ${mnt(order.delivery_fee_mnt)} орсон` : 'нэмэлт төлбөр гарахгүй'
+            extras.length ? `${extras.join(', ')} орсон` : 'нэмэлт төлбөр гарахгүй'
           }</small></div>
         </div></div>`),
   );

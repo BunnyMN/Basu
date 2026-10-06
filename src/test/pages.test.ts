@@ -2062,8 +2062,8 @@ describe('өвлийн идэш', () => {
     // Collected, on the day it is ready — the form's own defaults.
     expect(dom.window.document.querySelector('.choice[data-r="pickup"]')?.getAttribute('aria-checked')).toBe('true');
     expect((dom.window.document.querySelector('#when') as HTMLInputElement).value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    // The four questions are numbered, and a pickup has three of them.
-    expect(dom.window.document.querySelectorAll('.step').length).toBe(3);
+    // A pickup has three questions — how much, how it arrives, when — and a stall that offers a задаргаа asks one more.
+    expect(dom.window.document.querySelectorAll('.step:not(#step-breakdown)').length).toBe(3);
     const next = dom.window.document.querySelector('#next') as HTMLButtonElement;
     expect(next.disabled).toBe(false);
     // One verb for starting an order, as on the website.
@@ -2221,6 +2221,73 @@ describe('өвлийн идэш', () => {
     const back = await openPage('idesh.html', card.getAttribute('href')!.slice('/idesh'.length));
     await until(back, 'the status', (d) => Boolean(d.querySelector('.status')));
     expect(back.window.document.querySelector('#screen-title')?.textContent).toMatch(/^№\d{4}$/);
+  });
+
+  it('asks how the animal is taken apart where the stall offers it, charges the cutting, and tells the supplier', async () => {
+    await ownGuest('+97699004077');
+    const { listings } = (await (await fetch(`${base}/v1/idesh/listings`)).json()) as {
+      listings: Array<{ id: string; price_mnt: number; remaining: number; breakdown: { cut_fee_mnt: number; styles: Array<{ id: string }> } | null }>;
+    };
+    // A stall that offers every way, and charges for the knife.
+    const stall = listings.find((l) => l.remaining > 0 && l.breakdown?.styles.length === 3 && l.breakdown.cut_fee_mnt > 0)!;
+    const fee = stall.breakdown!.cut_fee_mnt;
+
+    const dom = await openPage('idesh.html');
+    const d = dom.window.document;
+    await until(dom, 'the stalls', () => d.querySelectorAll('.listing').length >= seeded.listings);
+    (d.querySelector(`.listing[data-id="${stall.id}"]`) as HTMLElement).click();
+    await until(dom, 'the breakdown step', () => Boolean(d.querySelector('#step-breakdown .bd-way')));
+
+    // Jointed until the guest says otherwise — the way it was handed over before there was a question — and no fee.
+    const chosen = () => d.querySelector('.bd-way[aria-checked="true"]')?.getAttribute('data-way');
+    const sum = () => d.querySelector('#screen-foot .sum')?.textContent ?? '';
+    expect([...d.querySelectorAll('.bd-way')].map((w) => w.getAttribute('data-way'))).toEqual(['carcass', 'jointed', 'cut', 'custom']);
+    expect(chosen()).toBe('jointed');
+    expect((d.querySelector('.bd-parts') as HTMLElement).hidden).toBe(true);
+    expect(sum()).not.toContain('жижиглэх');
+    expect(sum()).toContain(stall.price_mnt.toLocaleString('mn-MN'));
+
+    // Part by part: the legs stay whole, the ribs are cut small — and the knife has its price.
+    (d.querySelector('.bd-way[data-way="custom"]') as HTMLElement).click();
+    expect((d.querySelector('.bd-parts') as HTMLElement).hidden).toBe(false);
+    expect(d.querySelectorAll('.bd-part')).toHaveLength(6);
+    expect(sum()).not.toContain('жижиглэх');
+    (d.querySelector('.bd-part[data-part="ribs"] [data-cut="1"]') as HTMLElement).click();
+    expect(d.querySelector('.bd-part[data-part="ribs"] [data-cut="1"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(d.querySelector('.bd-part[data-part="fore"] [data-cut="0"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect(sum()).toContain('жижиглэх');
+    expect(sum()).toContain((stall.price_mnt + fee).toLocaleString('mn-MN'));
+    const wish = d.querySelector('.bd-note input') as HTMLInputElement;
+    wish.value = 'Ууцыг бүтэн үлдээгээрэй';
+    wish.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+
+    // The whole order once before any money moves: the choice in words, the fee on its own line.
+    (d.querySelector('#next') as HTMLElement).click();
+    await until(dom, 'the review', () => Boolean(d.querySelector('#pay')));
+    const review = d.querySelector('#review-breakdown')?.textContent ?? '';
+    expect(review).toContain('Хэсгээр');
+    expect(review).toContain('Жижиглэнэ: хавирга, өвчүү.');
+    expect(review).toContain('«Ууцыг бүтэн үлдээгээрэй»');
+    expect([...d.querySelectorAll('.review .r')].some((r) => r.textContent?.startsWith('Жижиглэх'))).toBe(true);
+
+    (d.querySelector('#pay') as HTMLElement).click();
+    await until(dom, 'the status', () => Boolean(d.querySelector('.handcode b')));
+    expect(d.querySelector('#order-breakdown')?.textContent).toContain('Хэсгээр');
+    expect(d.querySelector('#order-breakdown')?.textContent).toContain('«Ууцыг бүтэн үлдээгээрэй»');
+
+    const code = d.querySelector('.handcode b')!.textContent!;
+    const { rows } = await getPool().query<{ breakdown: string; cut_parts: string[]; breakdown_note: string; cut_fee_mnt: string; total_mnt: string }>(
+      'SELECT breakdown, cut_parts, breakdown_note, cut_fee_mnt, total_mnt FROM idesh.idesh_order WHERE code = $1',
+      [code],
+    );
+    expect(rows[0]).toMatchObject({ breakdown: 'parts', cut_parts: ['ribs'], breakdown_note: 'Ууцыг бүтэн үлдээгээрэй' });
+    expect(Number(rows[0]!.cut_fee_mnt)).toBe(fee);
+    expect(Number(rows[0]!.total_mnt)).toBe(stall.price_mnt + fee);
+
+    // The supplier reads it on the order, before the knife.
+    const screen = await supplierScreenFor(code);
+    await until(screen, 'the order with its breakdown', (doc) => Boolean(doc.querySelector('.ticket .cutup')));
+    expect(screen.window.document.querySelector('.ticket .cutup')?.textContent).toContain('Хэсгээр');
   });
 
   it('pays in the app’s own sheet where the app can, and tells it once the animal is bought', async () => {
@@ -2626,7 +2693,7 @@ describe('өвлийн идэш', () => {
 
     (dom.window.document.querySelector('.choice[data-r="delivery"]') as HTMLElement).click();
     await until(dom, 'the address question', (d) => Boolean(d.querySelector('#step-where #address')));
-    expect(dom.window.document.querySelectorAll('.step').length).toBe(4);
+    expect(dom.window.document.querySelectorAll('.step:not(#step-breakdown)').length).toBe(4);
     // No way on until the courier knows where to go — and the bar says why.
     const pay = () => dom.window.document.querySelector('#next') as HTMLButtonElement;
     expect(pay().disabled).toBe(true);

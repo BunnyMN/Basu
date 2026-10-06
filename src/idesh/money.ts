@@ -68,6 +68,16 @@ export function splitRefund(input: {
   return { refundMnt: total - forfeitMnt, forfeitMnt };
 }
 
+/**
+ * The meat price of an order: the animals, and the cutting the guest asked
+ * for. Everything but the delivery — what commission and the forfeit are
+ * worked out on. The cutting fee is in it on purpose: were it not, a supplier
+ * could move the price of the animal into the price of the knife.
+ */
+export function meatOf(order: { unitPriceMnt: number; qty: number; cutFeeMnt: number }): number {
+  return order.unitPriceMnt * order.qty + order.cutFeeMnt;
+}
+
 /** Basu's share of the meat price at this supplier's rate. */
 export function commissionOf(meatMnt: number, pct: number): number {
   return Math.round((meatMnt * pct) / 100);

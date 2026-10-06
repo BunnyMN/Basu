@@ -79,24 +79,27 @@ interface SeedListing {
   readyIn: number;
   delivers: boolean;
   fee?: number;
+  /** Задаргаа: the ways offered, and what cutting small costs a head. */
+  cuts?: string[];
+  cutFee?: number;
 }
 
 export const LISTINGS: SeedListing[] = [
   // ── the herder: whole animals, honest weights, will deliver ─────────
-  { supplier: 0, kind: 'sheep', unit: 'whole', title: 'Хонь, залуу ирэг', note: 'Их тамирын бэлчээрийн хонь. Толгой, дотор мөнтэйгээ.', price: 460_000, approxKg: 38, quantity: 20, origin: 'Архангай, Их тамир', readyIn: 12, delivers: true, fee: 25_000 },
-  { supplier: 0, kind: 'sheep', unit: 'whole', title: 'Хонь, том эм', note: 'Өвөлжилтөнд тохирсон тарган хонь.', price: 520_000, approxKg: 44, quantity: 12, origin: 'Архангай, Их тамир', readyIn: 12, delivers: true, fee: 25_000 },
+  { supplier: 0, kind: 'sheep', unit: 'whole', title: 'Хонь, залуу ирэг', note: 'Их тамирын бэлчээрийн хонь. Толгой, дотор мөнтэйгээ.', price: 460_000, approxKg: 38, quantity: 20, origin: 'Архангай, Их тамир', readyIn: 12, delivers: true, fee: 25_000, cuts: ['carcass', 'jointed', 'cut'], cutFee: 15_000 },
+  { supplier: 0, kind: 'sheep', unit: 'whole', title: 'Хонь, том эм', note: 'Өвөлжилтөнд тохирсон тарган хонь.', price: 520_000, approxKg: 44, quantity: 12, origin: 'Архангай, Их тамир', readyIn: 12, delivers: true, fee: 25_000, cuts: ['carcass', 'jointed'] },
   { supplier: 0, kind: 'goat', unit: 'whole', title: 'Ямаа, серх', note: 'Уулын ямаа. Хониноос бага өөхтэй.', price: 380_000, approxKg: 30, quantity: 15, origin: 'Архангай, Их тамир', readyIn: 12, delivers: true, fee: 25_000 },
   { supplier: 0, kind: 'horse', unit: 'whole', title: 'Адуу, гүү', note: 'Бүтэн гулууз. Хоёр айл хувааж авахад тохиромжтой.', price: 1_950_000, approxKg: 180, quantity: 4, origin: 'Архангай, Их тамир', readyIn: 20, delivers: true, fee: 45_000 },
 
   // ── the co-op: beef by the head, and cut by the kilo, pickup only ───
-  { supplier: 1, kind: 'beef', unit: 'whole', title: 'Үхэр, шар', note: 'Хэрлэнгийн үхэр. Нядалж, дөрөв хуваагаад өгнө.', price: 2_600_000, approxKg: 220, quantity: 6, origin: 'Хэнтий, Хэрлэн', readyIn: 18, delivers: false },
+  { supplier: 1, kind: 'beef', unit: 'whole', title: 'Үхэр, шар', note: 'Хэрлэнгийн үхэр. Нядалж, дөрөв хуваагаад өгнө.', price: 2_600_000, approxKg: 220, quantity: 6, origin: 'Хэнтий, Хэрлэн', readyIn: 18, delivers: false, cuts: ['jointed'] },
   { supplier: 1, kind: 'beef', unit: 'kg', title: 'Үхрийн мах, кг-аар', note: 'Хагас гулуузаас зүсэж өгнө. Доод тал нь 20 кг.', price: 13_500, minQty: 20, quantity: 600, origin: 'Хэнтий, Хэрлэн', readyIn: 18, delivers: false },
   { supplier: 1, kind: 'sheep', unit: 'kg', title: 'Хонины мах, кг-аар', note: 'Ясгүй биш, ястай. Доод тал нь 10 кг.', price: 12_000, minQty: 10, quantity: 300, origin: 'Хэнтий, Хэрлэн', readyIn: 10, delivers: false },
 
   // ── the farm: fat animals, fed on hay, dearer, delivers for a fee ───
   { supplier: 2, kind: 'sheep', unit: 'whole', title: 'Хонь, фермийн тарган', note: 'Өвсөөр бордсон. 45 кг орчим.', price: 590_000, approxKg: 46, quantity: 30, origin: 'Төв аймаг, Баянчандмань', readyIn: 8, delivers: true, fee: 20_000 },
-  { supplier: 2, kind: 'beef', unit: 'whole', title: 'Үхэр, бяруу', note: 'Залуу үхэр, зөөлөн мах. Хоёр айлд тохирно.', price: 1_650_000, approxKg: 140, quantity: 8, origin: 'Төв аймаг, Баянчандмань', readyIn: 14, delivers: true, fee: 35_000 },
-  { supplier: 2, kind: 'goat', unit: 'whole', title: 'Ямаа, ишиг', note: 'Жижиг, нэг айлд.', price: 260_000, approxKg: 20, quantity: 25, origin: 'Төв аймаг, Баянчандмань', readyIn: 8, delivers: true, fee: 20_000 },
+  { supplier: 2, kind: 'beef', unit: 'whole', title: 'Үхэр, бяруу', note: 'Залуу үхэр, зөөлөн мах. Хоёр айлд тохирно.', price: 1_650_000, approxKg: 140, quantity: 8, origin: 'Төв аймаг, Баянчандмань', readyIn: 14, delivers: true, fee: 35_000, cuts: ['jointed', 'cut'], cutFee: 40_000 },
+  { supplier: 2, kind: 'goat', unit: 'whole', title: 'Ямаа, ишиг', note: 'Жижиг, нэг айлд.', price: 260_000, approxKg: 20, quantity: 25, origin: 'Төв аймаг, Баянчандмань', readyIn: 8, delivers: true, fee: 20_000, cuts: ['carcass', 'jointed', 'cut'] },
 
   // ── the abattoir in town: ready soon, by the kilo, delivers cheaply ──
   { supplier: 3, kind: 'beef', unit: 'kg', title: 'Үхрийн мах, кг-аар', note: 'Өнөөдөр нядалсан. Доод тал нь 15 кг.', price: 14_500, minQty: 15, quantity: 900, origin: 'Улаанбаатар, Эмээлт', readyIn: 2, delivers: true, fee: 10_000 },
@@ -183,6 +186,7 @@ export async function seedIdesh(
         readyFrom: plusDays(today, l.readyIn),
         delivers: l.delivers,
         deliveryFeeMnt: l.fee ?? 0,
+        ...(l.cuts ? { breakdownStyles: l.cuts, cutFeeMnt: l.cutFee ?? 0 } : {}),
         certificateId: l.unit === 'kg' ? certificates.get(l.supplier)! : null,
       },
       now,

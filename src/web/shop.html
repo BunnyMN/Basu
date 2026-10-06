@@ -262,7 +262,7 @@
 </main>
 
 <script type="module">
-import { api, photoOf, store, mnt, KIND, dayLabel, dayShort, whatWentWrong, phoneText, phoneInput } from '/api.js';
+import { api, photoOf, store, mnt, KIND, dayLabel, dayShort, whatWentWrong, phoneText, phoneInput, breakdownStart, breakdownFee, breakdownBody, breakdownWords, breakdownStep } from '/api.js';
 import { mountFrame, authed, loginUrl, esc, el, siteEmpty, howToBuy, tugrik } from '/site.js';
 
 // Open to anybody: the stalls are shown to all, and only paying asks who you are.
@@ -728,8 +728,11 @@ function drawStall(l) {
   const resume = Boolean(kept?.review && store.guestToken);
   if (kept) delete kept.review;
   const form = { qty: l.min_qty, receive: 'pickup', receiveOn: earliest(l), address: '', phone: '', ...(kept ?? {}) };
+  // Задаргаа: how the animal is taken apart, where the stall offers a choice — the kept one, if it still fits.
+  form.breakdown = breakdownStart(l, kept?.breakdown);
   const step = l.unit === 'whole' ? 1 : 5;
-  const total = () => l.price_mnt * form.qty + (form.receive === 'delivery' ? l.delivery_fee_mnt : 0);
+  const cutFee = () => breakdownFee(l, form.breakdown, form.qty);
+  const total = () => l.price_mnt * form.qty + cutFee() + (form.receive === 'delivery' ? l.delivery_fee_mnt : 0);
   const gone = l.remaining === 0;
   const whole = l.unit === 'whole';
   const unit = unitWord(l);
@@ -743,7 +746,8 @@ function drawStall(l) {
   const notNow = (closedWords) => {
     if (!pay.wallet || pay.wallet <= 0) return { why: closedWords, short: 'Онлайн төлбөр хаалттай' };
     const fee = form.receive === 'delivery' ? l.delivery_fee_mnt : 0;
-    const steps = Math.floor(((pay.wallet - fee) / l.price_mnt - l.min_qty) / step);
+    // A head costs its price and, cut small, the cutting.
+    const steps = Math.floor(((pay.wallet - fee) / (l.price_mnt + breakdownFee(l, form.breakdown, 1)) - l.min_qty) / step);
     const reach = steps >= 0 ? Math.min(l.min_qty + steps * step, l.remaining) : 0;
     return {
       why: reach
@@ -861,6 +865,7 @@ function drawStall(l) {
                 </div>
                 ${whole ? '' : `<p class="s-help">${step} кг-аар нэмэгдэнэ.</p>`}
               </div>
+              ${form.breakdown ? '<div class="sd-q" id="breakdown-q"><span>Задаргаа</span></div>' : ''}
               <div class="sd-q">
                 <span id="way-label">Хэрхэн авах</span>
                 <div class="sd-ways" role="radiogroup" aria-labelledby="way-label">
@@ -893,6 +898,7 @@ function drawStall(l) {
       buy.querySelector('#when-label').textContent = form.receive === 'delivery' ? 'Хүргүүлэх өдөр' : 'Очиж авах өдөр';
       buy.querySelector('#sum').innerHTML = `
         <div><span>${form.qty} ${unit} × ${mnt(l.price_mnt)}</span><span class="s-money">${tugrik(l.price_mnt * form.qty)}</span></div>
+        ${cutFee() ? `<div><span>Жижиглэх</span><span class="s-money">${tugrik(cutFee())}</span></div>` : ''}
         ${form.receive === 'delivery' ? `<div><span>Хүргэлт</span><span class="s-money">${tugrik(l.delivery_fee_mnt)}</span></div>` : ''}
         <div class="total"><span>Нийт</span><span class="s-money">${tugrik(total())}</span></div>`;
       // Payments closed: said at the top of the box, before anything is filled
@@ -988,12 +994,15 @@ function drawStall(l) {
       // The button pressed is gone with the form: the focus goes to the review's heading, where its reading starts.
       buy.querySelector('.sd-review h2')?.focus({ preventScroll: true });
     });
+    // How it is taken apart: the step the app draws too, repainting the sum when the choice moves the price.
+    if (form.breakdown) buy.querySelector('#breakdown-q').append(breakdownStep(l, form.breakdown, paint));
     paint();
   }
 
   /** Before any money moves, the whole order once. */
   function paintReview() {
     const delivery = form.receive === 'delivery';
+    const cutUp = breakdownWords(l, form.breakdown);
     // Back at the review after signing in while payments are closed, and the
     // wallet short of the total: said here too, and «Төлөх» grey with its reason.
     const able = canPay(total());
@@ -1006,11 +1015,13 @@ function drawStall(l) {
             <dl>
               <div><dt>Зар</dt><dd>${esc(l.title)}<small>${esc(l.supplier.name)}</small></dd></div>
               <div><dt>Хэмжээ</dt><dd>${form.qty} ${unit}</dd></div>
+              ${cutUp ? `<div id="review-breakdown"><dt>Задаргаа</dt><dd>${esc(cutUp.label)}<small>${esc(cutUp.detail)}</small>${form.breakdown.note.trim() ? `<small>«${esc(form.breakdown.note.trim())}»</small>` : ''}</dd></div>` : ''}
               <div><dt>Авах арга</dt><dd>${delivery ? 'Хүргүүлнэ' : 'Өөрөө очиж авна'}<small>${delivery ? `${esc(form.address)} · <span class="sd-tel">${esc(phoneText(form.phone))}</span>` : esc(l.supplier.pickup_address)}</small></dd></div>
               <div><dt>Өдөр</dt><dd>${dayLabel(form.receiveOn)}</dd></div>
             </dl>
             <div class="sd-sum">
               <div><span>${form.qty} ${unit} × ${mnt(l.price_mnt)}</span><span class="s-money">${tugrik(l.price_mnt * form.qty)}</span></div>
+              ${cutFee() ? `<div><span>Жижиглэх</span><span class="s-money">${tugrik(cutFee())}</span></div>` : ''}
               ${delivery ? `<div><span>Хүргэлт</span><span class="s-money">${tugrik(l.delivery_fee_mnt)}</span></div>` : ''}
               <div class="total"><span>Нийт төлөх</span><span class="s-money">${tugrik(total())}</span></div>
             </div>
@@ -1060,6 +1071,7 @@ function drawStall(l) {
         qty: form.qty,
         receive: form.receive,
         receive_on: form.receiveOn,
+        ...breakdownBody(form.breakdown),
         ...(delivery ? { address: form.address.trim(), address_phone: form.phone.replace(/\s+/g, '') } : {}),
       };
       try {

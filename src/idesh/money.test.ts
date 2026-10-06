@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { commissionOf, noShowFrom, reasonProblem, splitRefund } from './money.js';
+import { commissionOf, meatOf, noShowFrom, reasonProblem, splitRefund } from './money.js';
 
 /** The three numbers from CONTEXT.md, exercised as arithmetic. */
 describe('what comes back when an идэш is cancelled', () => {
@@ -68,5 +68,14 @@ describe('when a guest may be called absent', () => {
     expect(reasonProblem({ ...ok, state: 'READY', reason: 'unreachable', receive: 'pickup' })).toMatch(/хүргэлт/);
     expect(reasonProblem({ ...ok, state: 'PAID', reason: 'guest_asked', receive: 'pickup' })).toBeNull();
     expect(reasonProblem({ ...ok, state: 'PAID', reason: 'draft_expired', receive: 'pickup' })).toMatch(/биш/);
+  });
+});
+
+describe('the meat price', () => {
+  it('is the animals and the cutting the guest asked for — what commission is worked out on', () => {
+    expect(meatOf({ unitPriceMnt: 460_000, qty: 2, cutFeeMnt: 30_000 })).toBe(950_000);
+    expect(meatOf({ unitPriceMnt: 460_000, qty: 1, cutFeeMnt: 0 })).toBe(460_000);
+    // A price moved from the animal into the knife earns Basu the same.
+    expect(commissionOf(meatOf({ unitPriceMnt: 300_000, qty: 1, cutFeeMnt: 160_000 }), 2)).toBe(commissionOf(460_000, 2));
   });
 });

@@ -36,6 +36,28 @@ const beefByKg: Offer = {
 
 const TODAY = '2026-10-01';
 
+describe('cutting the animal small', () => {
+  const offered: Offer = { ...sheep, cutFeeMnt: 15_000 };
+
+  it('adds the supplier’s fee for every head, only when the guest asks for it', () => {
+    expect(quote(offered, { qty: 2, receive: 'pickup', receiveOn: '2026-10-14', cut: true }, '2026-10-01')).toEqual({
+      qty: 2,
+      unitPriceMnt: 460_000,
+      cutFeeMnt: 30_000,
+      deliveryFeeMnt: 0,
+      totalMnt: 950_000,
+    });
+    expect(quote(offered, { qty: 2, receive: 'delivery', receiveOn: '2026-10-14' }, '2026-10-01')).toMatchObject({
+      cutFeeMnt: 0,
+      totalMnt: 945_000,
+    });
+  });
+
+  it('charges nothing where the listing names no fee', () => {
+    expect(quote(sheep, { qty: 1, receive: 'pickup', receiveOn: '2026-10-14', cut: true }, '2026-10-01')).toMatchObject({ cutFeeMnt: 0, totalMnt: 460_000 });
+  });
+});
+
 describe('what an идэш costs', () => {
   it('charges the listed price per head, plus the fee only when delivered', () => {
     const delivered = quote(sheep, { qty: 1, receive: 'delivery', receiveOn: '2026-10-15' }, TODAY);

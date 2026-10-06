@@ -18,12 +18,14 @@ import {
 import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
 import { CERT_COLUMNS, factsOf, usableCertificate, type CertificateFacts, type CertificateState } from './certificates.js';
+import { STYLES, breakdownOf, choose, isCut, type Breakdown, type BreakdownWant } from './breakdown.js';
 import { IdeshError } from './errors.js';
 import { PHOTO_PLACE, type Kind } from './listings.js';
 import {
   REASON_LABEL,
   FORFEIT_PCT,
   commissionOf,
+  meatOf,
   noShowFrom,
   reasonProblem,
   splitRefund,
@@ -111,6 +113,8 @@ export interface CreateIdeshInput {
   addressPhone?: string | undefined;
   addressLat?: number | undefined;
   addressLon?: number | undefined;
+  /** Задаргаа: how the animal is to be taken apart, where the listing offers a choice. */
+  breakdown?: BreakdownWant | null | undefined;
 }
 
 export interface CreatedIdesh {
@@ -156,10 +160,13 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
       ready_from: string;
       certificate_id: string | null;
       certificate_false: boolean;
+      breakdown_styles: string[];
+      cut_fee_mnt: number;
     }>(
       `SELECT l.id, l.supplier_id, (s.active AND s.state = 'contracted') AS supplier_active, l.active, l.kind, l.unit,
               l.title, l.origin, l.price_mnt, l.min_qty, l.quantity, l.sold, l.delivers,
               l.delivery_fee_mnt, to_char(l.ready_from, 'YYYY-MM-DD') AS ready_from, l.certificate_id,
+              l.breakdown_styles, l.cut_fee_mnt,
               COALESCE((SELECT c.state = 'false' FROM idesh.certificate c WHERE c.id = l.certificate_id), false) AS certificate_false
          FROM idesh.listing l JOIN idesh.supplier s ON s.id = l.supplier_id
         WHERE l.id = $1
@@ -172,6 +179,13 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
       throw new IdeshError('NOT_FOUND', 'that listing is not on offer');
     }
 
+    // What the guest asked to have done to the animal, held against what this
+    // listing offers today — before the price, because cutting has one.
+    const chosen = choose(
+      { styles: STYLES.filter((s) => listing.breakdown_styles.includes(s)), cutFeeMnt: Number(listing.cut_fee_mnt) },
+      input.breakdown,
+    );
+
     const priced = quote(
       {
         unit: listing.unit,
@@ -181,9 +195,10 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
         sold: listing.sold,
         delivers: listing.delivers,
         deliveryFeeMnt: listing.delivery_fee_mnt,
+        cutFeeMnt: Number(listing.cut_fee_mnt),
         readyFrom: listing.ready_from,
       },
-      { qty: input.qty, receive: input.receive, receiveOn: input.receiveOn },
+      { qty: input.qty, receive: input.receive, receiveOn: input.receiveOn, cut: isCut(chosen) },
       today,
     );
 
@@ -207,9 +222,10 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
       `INSERT INTO idesh.idesh_order
          (code, supplier_id, listing_id, guest_id, state, kind, unit, title, origin, qty,
           unit_price_mnt, delivery_fee_mnt, total_mnt, receive, receive_on,
-          address, address_phone, address_lat, address_lon, created_at, updated_at, certificate_id)
+          address, address_phone, address_lat, address_lon, created_at, updated_at, certificate_id,
+          breakdown, cut_parts, breakdown_note, cut_fee_mnt)
        VALUES ($1, $2, $3, $4, 'DRAFT', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::date,
-               $15, $16, $17, $18, $19, $19, $20)
+               $15, $16, $17, $18, $19, $19, $20, $21, $22::text[], $23, $24)
        RETURNING id`,
       [
         code,
@@ -233,6 +249,10 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
         now,
         // The certificate the meat is under today: the listing may carry the next shipment's tomorrow.
         listing.certificate_id,
+        chosen?.style ?? null,
+        chosen?.cut ?? [],
+        chosen?.note ?? null,
+        priced.cutFeeMnt,
       ],
     );
     const orderId = inserted.rows[0]!.id;
@@ -243,6 +263,8 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
       receive: input.receive,
       receiveOn: input.receiveOn,
       totalMnt: priced.totalMnt,
+      // What was asked of the butcher, in the record nobody can edit.
+      ...(chosen ? { breakdown: chosen, cutFeeMnt: priced.cutFeeMnt } : {}),
     });
 
     return { orderId, code, totalMnt: priced.totalMnt };
@@ -416,7 +438,7 @@ export async function cancelIdesh(
     if (problem) throw new IdeshError('BAD_REASON', problem);
   }
 
-  const meatMnt = facts.unitPriceMnt * facts.qty;
+  const meatMnt = meatOf(facts);
   const split: Split = facts.transferId
     ? splitRefund({ state: facts.state, reason, meatMnt, deliveryFeeMnt: facts.deliveryFeeMnt })
     : { refundMnt: 0, forfeitMnt: 0 };
@@ -577,7 +599,7 @@ export async function markHanded(ctx: Ctx, orderId: string, actor: string): Prom
 
   // The supplier's share is fixed here, at the rate in force today: a
   // contract renegotiated next week does not reach back into this order.
-  const commissionMnt = commissionOf(facts.unitPriceMnt * facts.qty, facts.commissionPct);
+  const commissionMnt = commissionOf(meatOf(facts), facts.commissionPct);
   const payoutMnt = facts.totalMnt - commissionMnt;
 
   await tx(async (client) => {
@@ -734,10 +756,11 @@ export async function housekeeping(
     total_mnt: number;
     unit_price_mnt: number;
     qty: number;
+    cut_fee_mnt: number;
     commission_pct: string;
   }>(
     `SELECT o.id, o.code, o.supplier_id, o.payout_mnt, o.total_mnt, o.unit_price_mnt, o.qty,
-            s.commission_pct
+            o.cut_fee_mnt, s.commission_pct
        FROM idesh.idesh_order o JOIN idesh.supplier s ON s.id = o.supplier_id
       WHERE o.state = 'HANDED' AND o.handed_at < $1::timestamptz - make_interval(hours => $2)`,
     [now, HANDED_TTL_HOURS],
@@ -756,7 +779,10 @@ export async function housekeeping(
     const payoutMnt =
       row.payout_mnt ??
       Number(row.total_mnt) -
-        commissionOf(Number(row.unit_price_mnt) * row.qty, Number(row.commission_pct));
+        commissionOf(
+          meatOf({ unitPriceMnt: Number(row.unit_price_mnt), qty: row.qty, cutFeeMnt: Number(row.cut_fee_mnt) }),
+          Number(row.commission_pct),
+        );
     await openSettlement({
       kind: 'payout',
       orderId: row.id,
@@ -850,6 +876,7 @@ async function billingFacts(orderId: string): Promise<{
   title: string;
   qty: number;
   unitPriceMnt: number;
+  cutFeeMnt: number;
   deliveryFeeMnt: number;
   totalMnt: number;
   receive: Receive;
@@ -871,6 +898,7 @@ async function billingFacts(orderId: string): Promise<{
     title: string;
     qty: number;
     unit_price_mnt: number;
+    cut_fee_mnt: number;
     delivery_fee_mnt: number;
     total_mnt: number;
     receive: Receive;
@@ -884,7 +912,7 @@ async function billingFacts(orderId: string): Promise<{
     ledger_transfer_id: string | null;
   }>(
     `SELECT o.guest_id, o.listing_id, o.supplier_id, o.code, o.state, o.title, o.qty,
-            o.unit_price_mnt, o.delivery_fee_mnt, o.total_mnt, o.receive,
+            o.unit_price_mnt, o.cut_fee_mnt, o.delivery_fee_mnt, o.total_mnt, o.receive,
             to_char(o.receive_on, 'YYYY-MM-DD') AS receive_on, o.ready_at, o.address_phone,
             o.ledger_transfer_id, s.name AS supplier, s.pickup_address,
             s.ebarimt_merchant_tin AS tin, s.commission_pct
@@ -904,6 +932,7 @@ async function billingFacts(orderId: string): Promise<{
     title: row.title,
     qty: row.qty,
     unitPriceMnt: Number(row.unit_price_mnt),
+    cutFeeMnt: Number(row.cut_fee_mnt),
     deliveryFeeMnt: Number(row.delivery_fee_mnt),
     totalMnt: Number(row.total_mnt),
     receive: row.receive,
@@ -938,6 +967,10 @@ export interface IdeshSummary {
   pickupAddress?: string;
   /** The veterinary certificate this meat is under, once it has one. */
   certificate: CertificateFacts | null;
+  /** Задаргаа: how the guest asked for the animal to be taken apart; null where the listing asked nothing. */
+  breakdown: Breakdown | null;
+  /** What cutting it small cost, the whole of it. Part of the meat price. */
+  cutFeeMnt: number;
   /** Which example photograph the listing it was bought from wears — see `Listing.photo`. */
   photo: number;
 }
@@ -1002,6 +1035,10 @@ interface OrderRow {
   refund_mnt: number | null;
   forfeit_mnt: number | null;
   commission_pct: string;
+  breakdown: string | null;
+  cut_parts: string[] | null;
+  breakdown_note: string | null;
+  cut_fee_mnt: number;
   cert_number: string | null;
   cert_issuer: string | null;
   cert_issued_on: string | null;
@@ -1017,6 +1054,7 @@ const ORDER_SELECT = `
          o.address, o.address_phone, o.address_lat, o.address_lon, o.ledger_transfer_id,
          o.paid_at, o.preparing_at, o.ready_at, o.dispatched_at, o.handed_at,
          o.cancel_reason, o.refund_mnt, o.forfeit_mnt, s.commission_pct,
+         o.breakdown, o.cut_parts, o.breakdown_note, o.cut_fee_mnt,
          ${CERT_COLUMNS},
          (SELECT ${PHOTO_PLACE.replace(/ AS photo$/, '')} FROM idesh.listing l WHERE l.id = o.listing_id) AS photo
     FROM idesh.idesh_order o
@@ -1039,6 +1077,8 @@ function summary(r: OrderRow): IdeshSummary {
     paidAt: r.paid_at,
     pickupAddress: r.pickup_address,
     certificate: factsOf(r),
+    breakdown: breakdownOf(r),
+    cutFeeMnt: Number(r.cut_fee_mnt),
     photo: r.photo ?? 0,
   };
 }
@@ -1239,7 +1279,12 @@ function ticketOf(r: OrderRow, names: Map<string, string>, contacts: Map<string,
     readyAt: r.ready_at,
     noShowFrom:
       r.state === 'READY' && r.receive === 'pickup' && r.ready_at ? noShowFrom(r.ready_at, r.receive_on) : null,
-    payoutMnt: Number(r.total_mnt) - commissionOf(Number(r.unit_price_mnt) * r.qty, Number(r.commission_pct)),
+    payoutMnt:
+      Number(r.total_mnt) -
+      commissionOf(
+        meatOf({ unitPriceMnt: Number(r.unit_price_mnt), qty: r.qty, cutFeeMnt: Number(r.cut_fee_mnt) }),
+        Number(r.commission_pct),
+      ),
     addressLat: r.address_lat === null ? null : Number(r.address_lat),
     addressLon: r.address_lon === null ? null : Number(r.address_lon),
   };

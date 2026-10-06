@@ -325,7 +325,8 @@ async function drawOrder(id, fresh) {
           <dl>
             <div><dt>${delivery ? 'Хүргэх өдөр' : 'Очиж авах өдөр'}</dt><dd>${dayLabel(o.receive_on)}</dd></div>
             <div><dt>${delivery ? 'Хүргэх хаяг' : 'Авах цэг'}</dt><dd>${esc(delivery ? o.address : o.pickup_address)}${delivery && o.address_phone ? `<small>Залгах утас: <span class="digits">${esc(phoneShown(o.address_phone))}</span></small>` : ''}</dd></div>
-            <div><dt>Төлсөн</dt><dd><span class="s-money">${tugrik(o.total_mnt)}</span>${o.delivery_fee_mnt ? `<small>Хүргэлт ${mnt(o.delivery_fee_mnt)} орсон</small>` : ''}</dd></div>
+            ${o.breakdown ? `<div id="order-breakdown"><dt>Задаргаа</dt><dd>${esc(o.breakdown.label)}<small>${esc(o.breakdown.detail)}</small>${o.breakdown.note ? `<small>«${esc(o.breakdown.note)}»</small>` : ''}</dd></div>` : ''}
+            <div><dt>Төлсөн</dt><dd><span class="s-money">${tugrik(o.total_mnt)}</span>${o.breakdown?.fee_mnt ? `<small>Жижиглэх ${mnt(o.breakdown.fee_mnt)} орсон</small>` : ''}${o.delivery_fee_mnt ? `<small>Хүргэлт ${mnt(o.delivery_fee_mnt)} орсон</small>` : ''}</dd></div>
             ${o.receipt ? `<div><dt>Е-баримт</dt><dd>Сугалаа <span class="digits">${esc(o.receipt.lottery ?? '')}</span></dd></div>` : ''}
           </dl>
         </div>`),

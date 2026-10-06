@@ -861,6 +861,165 @@ describe('an account on an application', () => {
   });
 });
 
+describe('задаргаа', () => {
+  /** The sheep, offered every way: one carcass, jointed, or cut small for 15 000 ₮ a head. */
+  async function offerEveryWay(): Promise<string> {
+    const screen = await atCounter(supplierId);
+    const patched = await app.inject({
+      method: 'PATCH',
+      url: `/v1/supplier/listings/${sheep.id}`,
+      headers: auth(screen),
+      payload: { breakdown_styles: ['cut', 'jointed', 'carcass'], cut_fee_mnt: 15_000 },
+    });
+    expect(patched.statusCode, patched.body).toBe(200);
+    return screen;
+  }
+
+  it('asks the guest nothing on a listing whose supplier said nothing', async () => {
+    const market = await app.inject({ method: 'GET', url: '/v1/idesh/listings' });
+    expect(market.json().listings[0].breakdown).toBeNull();
+
+    const token = await signIn();
+    await topUp(token, 500_000);
+    const { id } = await placeAndPay(token);
+    const detail = await app.inject({ method: 'GET', url: `/v1/idesh/${id}`, headers: auth(token) });
+    expect(detail.json()).toMatchObject({ breakdown: null, total_mnt: 460_000 });
+
+    // A page showing an offer that is no longer there is told, not obeyed.
+    const stale = await app.inject({
+      method: 'POST',
+      url: '/v1/idesh',
+      headers: auth(token),
+      payload: { listing_id: sheep.id, qty: 1, receive: 'pickup', receive_on: '2026-09-12', breakdown: { style: 'parts', cut: ['ribs'] } },
+    });
+    expect(stale.statusCode).toBe(400);
+    expect(stale.json().error).toMatchObject({ code: 'BAD_BREAKDOWN' });
+  });
+
+  it('shows the guest the ways a supplier offers, with Basu’s words for them and for the six parts', async () => {
+    await offerEveryWay();
+    const one = await app.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}` });
+    expect(one.json().listing.breakdown).toEqual({
+      styles: [
+        { id: 'carcass', label: 'Бүтэн гулууз', hint: expect.any(String) },
+        { id: 'jointed', label: 'Мөчилсөн', hint: expect.any(String) },
+        { id: 'cut', label: 'Хоолны хэмжээгээр', hint: expect.any(String) },
+      ],
+      parts: [
+        { id: 'fore', label: 'Хаа' },
+        { id: 'hind', label: 'Гуя' },
+        { id: 'rump', label: 'Ууц' },
+        { id: 'spine', label: 'Нуруу, сээр' },
+        { id: 'ribs', label: 'Хавирга, өвчүү' },
+        { id: 'neck', label: 'Хүзүү' },
+      ],
+      cut_fee_mnt: 15_000,
+      note_max: 140,
+    });
+  });
+
+  it('keeps the legs whole and cuts the ribs: the fee on every head, the choice on the supplier’s ticket, commission on all of the meat', async () => {
+    const screen = await offerEveryWay();
+    const token = await signIn();
+    await topUp(token, 1_000_000);
+    const { id } = await placeAndPay(token, {
+      qty: 2,
+      breakdown: { style: 'parts', cut: ['neck', 'ribs'], note: ' Ууцыг бүтэн үлдээгээрэй ' },
+    });
+
+    const said = {
+      style: 'parts',
+      cut: ['ribs', 'neck'],
+      note: 'Ууцыг бүтэн үлдээгээрэй',
+      fee_mnt: 30_000,
+      label: 'Хэсгээр',
+      detail: 'Жижиглэнэ: хавирга, өвчүү, хүзүү. Бүхлээр: хаа, гуя, ууц, нуруу, сээр.',
+    };
+    const detail = await app.inject({ method: 'GET', url: `/v1/idesh/${id}`, headers: auth(token) });
+    expect(detail.json()).toMatchObject({ total_mnt: 2 * 460_000 + 30_000, breakdown: said });
+
+    // What the butcher reads while the animal is on the block; 2 % of the meat, the cutting in it.
+    const board = await app.inject({ method: 'GET', url: '/v1/supplier/board', headers: auth(screen) });
+    expect(board.json().lanes.paid[0]).toMatchObject({ breakdown: said, payout_mnt: 950_000 - 19_000 });
+
+    const act = (action: string) =>
+      app.inject({ method: 'POST', url: `/v1/supplier/orders/${id}/${action}`, headers: auth(screen), payload: {} });
+    for (const action of ['prepare', 'ready', 'hand']) expect((await act(action)).statusCode, action).toBe(200);
+    const one = await app.inject({ method: 'GET', url: `/v1/supplier/orders/${id}`, headers: auth(screen) });
+    expect(one.json().order).toMatchObject({ state: 'HANDED', payout_mnt: 931_000, breakdown: said });
+    // The record nobody can edit says what was asked of the butcher.
+    expect(one.json().events[0]).toMatchObject({ type: 'CREATED', payload: { breakdown: { style: 'parts', cut: ['ribs', 'neck'] }, cutFeeMnt: 30_000 } });
+  });
+
+  it('takes an order that says nothing as jointed, at no fee, and one carcass as one carcass', async () => {
+    await offerEveryWay();
+    const token = await signIn();
+    await topUp(token, 1_000_000);
+    const plain = await placeAndPay(token);
+    const whole = await placeAndPay(token, { breakdown: { style: 'carcass' } });
+    const read = async (id: string) => (await app.inject({ method: 'GET', url: `/v1/idesh/${id}`, headers: auth(token) })).json();
+    expect(await read(plain.id)).toMatchObject({ total_mnt: 460_000, breakdown: { style: 'parts', cut: [], label: 'Мөчилсөн', fee_mnt: 0 } });
+    expect(await read(whole.id)).toMatchObject({ total_mnt: 460_000, breakdown: { style: 'carcass', label: 'Бүтэн гулууз', fee_mnt: 0 } });
+  });
+
+  it('refuses a way the supplier does not offer, in Mongolian, and holds no animal for it', async () => {
+    const screen = await atCounter(supplierId);
+    await app.inject({ method: 'PATCH', url: `/v1/supplier/listings/${sheep.id}`, headers: auth(screen), payload: { breakdown_styles: ['jointed'] } });
+    const token = await signIn();
+    await topUp(token, 500_000);
+    const order = (breakdown: unknown) =>
+      app.inject({
+        method: 'POST',
+        url: '/v1/idesh',
+        headers: auth(token),
+        payload: { listing_id: sheep.id, qty: 1, receive: 'pickup', receive_on: '2026-09-12', breakdown },
+      });
+    for (const breakdown of [{ style: 'parts', cut: ['ribs'] }, { style: 'carcass' }, { style: 'parts', cut: ['tail'] }]) {
+      const refusedOrder = await order(breakdown);
+      expect(refusedOrder.statusCode, JSON.stringify(breakdown)).toBe(400);
+      expect(refusedOrder.json().error).toMatchObject({ code: 'BAD_BREAKDOWN', message_mn: expect.stringContaining('Задаргаа') });
+    }
+    const market = await app.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}` });
+    expect(market.json().listing).toMatchObject({ sold: 0, remaining: 5 });
+  });
+
+  it('lets a supplier say what they do on a new listing, and refuses what no butcher does', async () => {
+    const screen = await atCounter(supplierId);
+    const paper = await addCertificate(supplierId, { number: '65110499', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', issuedOn: '2026-09-01' }, clock.now(), '2026-09-01');
+    const add = (more: Record<string, unknown>) =>
+      app.inject({
+        method: 'POST',
+        url: '/v1/supplier/listings',
+        headers: auth(screen),
+        payload: { kind: 'beef', unit: 'whole', title: 'Үхэр, шар', price_mnt: 2_600_000, approx_kg: 220, quantity: 3, origin: 'Хэнтий, Хэрлэн', ready_from: '2026-09-20', ...more },
+      });
+
+    const cow = await add({ breakdown_styles: ['jointed', 'cut'], cut_fee_mnt: 40_000 });
+    expect(cow.statusCode, cow.body).toBe(201);
+    const cowId = cow.json().listing.id as string;
+    expect(cow.json().listing.breakdown).toMatchObject({ styles: [{ id: 'jointed' }, { id: 'cut' }], cut_fee_mnt: 40_000 });
+
+    // Nobody carries a cow home in one piece; whoever cuts small also joints; a fee is for cutting.
+    for (const more of [
+      { breakdown_styles: ['carcass', 'jointed'] },
+      { breakdown_styles: ['cut'] },
+      { breakdown_styles: ['jointed'], cut_fee_mnt: 5_000 },
+      { unit: 'kg', min_qty: 10, certificate_id: paper.id, breakdown_styles: ['jointed'] },
+    ]) {
+      const no = await add(more);
+      expect(no.statusCode, JSON.stringify(more)).toBe(400);
+      expect(no.json().error.code).toBe('BAD_BREAKDOWN');
+    }
+
+    // The fee does not outlive the cutting it was for.
+    const dropped = await app.inject({ method: 'PATCH', url: `/v1/supplier/listings/${cowId}`, headers: auth(screen), payload: { breakdown_styles: ['jointed'] } });
+    expect(dropped.json().listing.breakdown).toMatchObject({ styles: [{ id: 'jointed' }], cut_fee_mnt: 0 });
+    // And saying nothing again asks the guest nothing again.
+    const silent = await app.inject({ method: 'PATCH', url: `/v1/supplier/listings/${cowId}`, headers: auth(screen), payload: { breakdown_styles: [] } });
+    expect(silent.json().listing.breakdown).toBeNull();
+  });
+});
+
 describe('an id that is not one', () => {
   it('is nothing of anybody’s: 404 at every идэш address that takes one, never a 500', async () => {
     const guest = await signIn();

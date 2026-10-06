@@ -1049,6 +1049,41 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
 .seg button[data-tone="ready"][aria-pressed="true"],.seg button[data-on="yes"]{background:var(--ink);border-color:var(--ink);color:var(--on-light)}
 .seg button[data-tone="stop"][aria-pressed="true"],.seg button[data-on="no"]{background:var(--stop-soft);border-color:var(--stop-line);color:var(--accent-ink)}
 
+/* ── Задаргаа: how a whole animal is taken apart ──────────────────── */
+/* The step api.js `breakdownStep` draws on a stall's form, in the app and on
+   the website alike: the ways as cards with a radio's dot, the six parts as
+   rows with a two-way .seg, a line for a wish. */
+.bd-ways{display:grid;gap:10px}
+.bd-way{
+  display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:12px;align-items:start;width:100%;margin:0;padding:14px 16px;
+  border:1px solid var(--line);border-radius:var(--r-day);background:var(--surface);color:var(--ink);
+  font:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:border-color var(--dur),box-shadow var(--dur);
+}
+.bd-way i{width:20px;height:20px;margin-top:1px;border:1.5px solid var(--line-2);border-radius:50%;transition:border-width var(--dur),border-color var(--dur)}
+.bd-way[aria-checked="true"]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.bd-way[aria-checked="true"] i{border:6px solid var(--ink)}
+@media (hover:hover){.bd-way:not([aria-checked="true"]):hover{border-color:var(--line-2)}}
+.bd-way b{display:block;font-size:var(--t-body);font-weight:700;line-height:1.3}
+.bd-way small{display:block;margin-top:3px;font-size:var(--t-cap);font-weight:500;line-height:1.45;color:var(--ink-2)}
+.bd-way em{font-style:normal;font-size:var(--t-cap);font-weight:700;line-height:1.5;white-space:nowrap;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.bd-parts{margin-top:10px;padding:2px 16px;border:1px solid var(--line);border-radius:var(--r-day);background:var(--surface)}
+.bd-parts[hidden]{display:none}
+.bd-part{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.bd-part:first-child{border-top:0}
+.bd-part > span{min-width:0;font-size:var(--t-body);font-weight:600;line-height:1.3;color:var(--ink)}
+.bd-part .seg{flex:none;background:var(--surface-2)}
+.bd-fee{margin:10px 0 0;font-size:var(--t-cap);font-weight:500;line-height:1.45;color:var(--ink-3)}
+.bd-fee b{font-weight:700;color:var(--ink-2)}
+.bd-note{display:block;margin:16px 0 0}
+.bd-note > span{display:block;margin-bottom:8px;font-size:var(--t-cap);font-weight:600;line-height:1.3;color:var(--ink-2)}
+.bd-note > span small{font-size:inherit;font-weight:500;color:var(--ink-3)}
+.bd-note input{
+  width:100%;min-height:48px;margin:0;padding:0 16px;border:1px solid var(--line-2);border-radius:var(--r-ctl);
+  background:var(--surface);color:var(--ink);font:inherit;font-size:1rem;font-weight:500;outline:none;-webkit-appearance:none;appearance:none;
+}
+.bd-note input::placeholder{color:var(--ink-3)}
+.bd-note input:focus{border-color:var(--focus);box-shadow:var(--ring)}
+
 /* ── sheet + scrim ────────────────────────────────────────────────── */
 /* A sheet is a raised panel (--surface-2, radius 28 at its top) over a
    dim of the charcoal; a popup is the same element lifted to the middle of

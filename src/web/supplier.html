@@ -1009,7 +1009,7 @@ function deskWork(data) {
         label: 'Захиалга',
         sort: false,
         value: (t) => `${t.title} ${t.code}`,
-        render: (t) => `<span class="it-cell">${thumb(t)}<span class="dt-two"><b>${what(t)}</b><small class="code">№${esc(t.code)}</small></span></span>`,
+        render: (t) => `<span class="it-cell">${thumb(t)}<span class="dt-two"><b>${what(t)}</b><small class="code">№${esc(t.code)}</small>${t.breakdown ? `<small class="cutup">${esc(t.breakdown.label)}${t.breakdown.note ? ' · хүсэлттэй' : ''}</small>` : ''}</span></span>`,
       },
       { key: 'state', label: 'Төлөв', sort: false, render: (t) => ideshStage(t.state ?? LANE_STATE[t.lane]) },
       { key: 'receive', label: 'Авах', sort: false, render: howCell },
@@ -1145,6 +1145,7 @@ function renderTicket(ticket, lane, { page = false } = {}) {
           <div class="where"><span class="k">${delivery ? 'Хүргэлт' : 'Авах'}</span><span class="v">${
             delivery ? `<span>${esc(ticket.address)}</span>${ticket.address_phone && ticket.address_phone !== ring ? tel(ticket.address_phone) : ''}` : 'Өөрөө ирж авна'
           }</span></div>
+          ${ticket.breakdown ? `<div class="where cutup"><span class="k">Задаргаа</span><span class="v"><span><b>${esc(ticket.breakdown.label)}</b> — ${esc(ticket.breakdown.detail)}</span>${ticket.breakdown.note ? `<span class="rel" data-tone="hold">«${esc(ticket.breakdown.note)}»</span>` : ''}</span></div>` : ''}
           ${ticket.certificate ? `<div class="where paper"><span class="k">Гэрчилгээ</span><span class="v"><span class="mn">№${esc(ticket.certificate.number)}</span></span></div>` : ''}
         </div>
         <div class="sum"><span>Нийт</span>${money(ticket.total_mnt)}</div>
@@ -1319,6 +1320,10 @@ async function startPreparing(ticket) {
     sub: `<span class="mn">№${esc(ticket.code)}</span> · ${esc(ticket.title)} ×${esc(ticket.qty)}${ticket.unit === 'kg' ? ' кг' : ''} · ${guestLine(ticket)}`,
     width: 480,
     fields: [
+      // What the guest asked to have done to it, before the knife: the choice, and the wish in their words.
+      ...(ticket.breakdown
+        ? [{ type: 'note', html: `<b>Задаргаа: ${esc(ticket.breakdown.label)}</b> — ${esc(ticket.breakdown.detail)}${ticket.breakdown.note ? ` Зочны хүсэлт: «${esc(ticket.breakdown.note)}»` : ''}` }]
+        : []),
       { type: 'note', text: 'Бэлтгэж эхэлбэл малыг нядалсанд тооцно: буцаах боломжгүй, мал зар руу буцахгүй. Зочинд «бэлтгэгдэж эхэллээ» гэж мэдэгдэнэ.' },
       {
         type: 'note',
@@ -1692,7 +1697,10 @@ const listingState = (l) => (!l.active ? ['off', 'Зогссон'] : l.remaining
 const deliveryWord = (l) => (l.delivers ? (l.delivery_fee_mnt ? `хүргэлт ${mnt(l.delivery_fee_mnt)}` : 'хүргэлт үнэгүй') : 'хүргэхгүй');
 /** «Хонь · бүтэн, ~38 кг · Архангай, Их тамир» — what the listing is, after its title. */
 const listingWhat = (l) =>
-  `${KIND[l.kind] ?? l.kind} · ${l.unit === 'whole' ? `бүтэн, ~${l.approx_kg} кг` : `кг-аар, доод тал нь ${l.min_qty} кг`} · ${esc(l.origin)}`;
+  `${KIND[l.kind] ?? l.kind} · ${l.unit === 'whole' ? `бүтэн, ~${l.approx_kg} кг` : `кг-аар, доод тал нь ${l.min_qty} кг`} · ${esc(l.origin)}${cutWord(l)}`;
+/** « · задаргаа: мөчилсөн, хоолны хэмжээгээр +15,000₮» — the ways a whole animal's listing offers, after what it is. */
+const cutWord = (l) =>
+  l.breakdown ? ` · задаргаа: ${l.breakdown.styles.map((s) => esc(s.label.toLowerCase())).join(', ')}${l.breakdown.cut_fee_mnt ? ` +${mnt(l.breakdown.cut_fee_mnt)}` : ''}` : '';
 /** The marks beside a listing's name: its tier while it lasts, and a state other than on sale. */
 function listingMarks(l) {
   const [state, word] = listingState(l);
@@ -1904,6 +1912,59 @@ function wireDelivery(sheet) {
 }
 
 /**
+ * Задаргаа on a listing's popup: the ways a whole animal is handed over, as
+ * boxes, and the fee for cutting small. Whoever cuts small also joints, so
+ * that box follows; a cow is never one carcass; meat by the kilogram is asked
+ * nothing. The fee is there only once cutting is ticked.
+ */
+const CUT_BOXES = (on = []) => [
+  ['bd_carcass', 'Бүтэн гулуузаар өгнө', on.includes('carcass'), { hint: 'Задлахгүй, гулуузаар нь. Зөвхөн хонь, ямаа.' }],
+  ['bd_jointed', 'Мөчилж өгнө', on.includes('jointed'), { hint: 'Үе мөчөөр нь салгана: хаа, гуя, ууц, нуруу, хавирга, хүзүү.' }],
+  ['bd_cut', 'Жижиглэж, ууталж өгнө', on.includes('cut'), { hint: 'Зочин бүгдийг нь, эсвэл хэсэг бүрээр сонгож жижиглүүлнэ.' }],
+];
+const CUT_FIELDS = (l = null) => [
+  { type: 'checks', label: 'Задаргаа', options: CUT_BOXES(l?.breakdown?.styles.map((s) => s.id) ?? []), hint: 'Чагталсан сонголтоос зочин захиалахдаа сонгоно. Юу ч чагтлахгүй бол зочноос асуухгүй.' },
+  { name: 'cut_fee_mnt', label: 'Жижиглэх төлбөр, нэг толгойд', format: 'money', value: l?.breakdown?.styles.some((s) => s.id === 'cut') ? String(l.breakdown.cut_fee_mnt) : '', hint: 'Нэмэлт төлбөр авахгүй бол 0. Махны үнэд тооцогдоно.' },
+];
+/** The boxes as the server reads them: the styles ticked, and the fee when cutting is one of them. */
+function cutAnswer(v) {
+  const cut = Boolean(v.bd_cut);
+  const styles = [v.bd_carcass ? 'carcass' : '', v.bd_jointed || cut ? 'jointed' : '', cut ? 'cut' : ''].filter(Boolean);
+  if (!cut) return { breakdown_styles: styles, cut_fee_mnt: 0 };
+  const fee = asNumber(v.cut_fee_mnt);
+  if (!Number.isInteger(fee) || fee < 0) throw refuse('cut_fee_mnt', 'Жижиглэх төлбөрөө бичнэ үү — нэмэлт төлбөргүй бол 0.');
+  return { breakdown_styles: styles, cut_fee_mnt: fee };
+}
+function wireCut(sheet, { whole = () => true, small = () => true } = {}) {
+  const box = (name) => sheet?.querySelector(`[name="${name}"]`);
+  const [carcass, jointed, cut] = ['bd_carcass', 'bd_jointed', 'bd_cut'].map(box);
+  if (!carcass || !jointed || !cut) return () => {};
+  const group = cut.closest('.field');
+  const sync = () => {
+    const on = whole();
+    group.hidden = !on;
+    for (const b of [carcass, jointed, cut]) b.disabled = !on;
+    // One carcass is a sheep's or a goat's.
+    if (on && !small()) {
+      carcass.checked = false;
+      carcass.disabled = true;
+    }
+    // Whoever cuts small also joints.
+    if (on && cut.checked) {
+      jointed.checked = true;
+      jointed.disabled = true;
+    }
+    fieldShown(sheet, 'cut_fee_mnt', on && cut.checked);
+  };
+  cut.addEventListener('change', () => {
+    sync();
+    if (cut.checked) sheet.querySelector('[name="cut_fee_mnt"]')?.focus();
+  });
+  sync();
+  return sync;
+}
+
+/**
  * On a touch screen a form popup opens on the form, not on the keyboard: the
  * popup takes the focus itself (it stays inside the dialog), and the person
  * taps the field they came to change.
@@ -1976,6 +2037,7 @@ async function addListing() {
       { name: 'certificate_id', label: 'Мал эмнэлгийн гэрчилгээ', type: 'select', wide: true, options: paperOptions('Сонгоно уу'), value: '', hint: 'Энэ мах ирсэн ачилтын гэрчилгээ. Зочид дугаарыг нь харна.' },
       { type: 'checks', label: 'Хүргэлт', options: [['delivers', 'Хүргэлт хийнэ', false, { hint: 'Хүргэлтийн үйлчилгээгээр зочны хаяг руу хүргүүлнэ — төлбөр нь бүтнээрээ танд.' }]] },
       { name: 'delivery_fee_mnt', label: 'Хүргэлтийн төлбөр', format: 'money', hint: 'Үнэгүй хүргэх бол 0.' },
+      ...CUT_FIELDS(),
       { name: 'note', label: 'Тайлбар (заавал биш)', type: 'textarea', placeholder: 'Толгой, дотор мөнтэйгээ…' },
     ],
     submit: 'Зар нэмэх',
@@ -1995,7 +2057,7 @@ async function addListing() {
         delivery_fee_mnt: v.delivers ? asNumber(v.delivery_fee_mnt) : 0,
         note: v.note ?? '',
       };
-      if (unit === 'whole') body.approx_kg = asNumber(v.approx_kg);
+      if (unit === 'whole') Object.assign(body, { approx_kg: asNumber(v.approx_kg) }, cutAnswer(v));
       else body.min_qty = v.min_qty ? asNumber(v.min_qty) : 1;
       if (unit === 'kg') body.certificate_id = v.certificate_id;
       await sup('/v1/supplier/listings', { method: 'POST', body });
@@ -2007,8 +2069,12 @@ async function addListing() {
   affix(sheet, 'approx_kg', 'кг');
   affix(sheet, 'min_qty', 'кг');
   const unit = sheet?.querySelector('[name="unit"]');
+  const kind = sheet?.querySelector('[name="kind"]');
+  const syncCut = wireCut(sheet, { whole: () => unit?.value !== 'kg', small: () => ['sheep', 'goat'].includes(kind?.value) });
+  kind?.addEventListener('change', syncCut);
   const syncUnit = () => {
     const kg = unit.value === 'kg';
+    syncCut();
     fieldShown(sheet, 'approx_kg', !kg);
     fieldShown(sheet, 'min_qty', kg);
     fieldShown(sheet, 'certificate_id', kg);
@@ -2052,6 +2118,7 @@ async function editListing(l) {
       { type: 'checks', label: 'Хүргэлт', options: [['delivers', 'Хүргэлт хийнэ', Boolean(l.delivers)]] },
       // A listing that did not deliver offers no fee to keep: ticking delivery asks for one, never assumes 0.
       { name: 'delivery_fee_mnt', label: 'Хүргэлтийн төлбөр', format: 'money', value: l.delivers ? String(l.delivery_fee_mnt ?? 0) : '', hint: 'Үнэгүй хүргэх бол 0.' },
+      ...(kg ? [] : CUT_FIELDS(l)),
       { name: 'note', label: 'Тайлбар (заавал биш)', type: 'textarea', value: l.note ?? '' },
       { type: 'checks', label: 'Зочдод', options: [['active', 'Зочдод харагдана', Boolean(l.active), { hint: 'Арилгавал зар зогсож, шинэ захиалга авахгүй. Авсан захиалга хэвээр.' }]] },
     ],
@@ -2069,6 +2136,7 @@ async function editListing(l) {
           ...(v.delivers ? { delivery_fee_mnt: asNumber(v.delivery_fee_mnt) } : {}),
           note: v.note ?? '',
           active: Boolean(v.active),
+          ...(kg ? {} : cutAnswer(v)),
           ...(v.certificate_id && v.certificate_id !== held?.id ? { certificate_id: v.certificate_id } : {}),
         },
       });
@@ -2079,6 +2147,7 @@ async function editListing(l) {
   noKeyboard(sheet);
   wirePaperSelect(sheet);
   wireDelivery(sheet);
+  wireCut(sheet, { small: () => ['sheep', 'goat'].includes(l.kind) });
   if (!(await done)) return;
   toast('Хадгалагдлаа.', 'good');
   await reloadStall();

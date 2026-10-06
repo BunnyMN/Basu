@@ -1,11 +1,18 @@
 import type { QPayInvoice } from '../ports.js';
-import type { CertificateFacts, IdeshSummary, Settlement, SupplierOrder } from '../idesh/index.js';
+import { describe, type Breakdown, type CertificateFacts, type IdeshSummary, type Settlement, type SupplierOrder } from '../idesh/index.js';
 
 /** The JSON shapes the idesh and ops routes share. Snake case on the wire, as everywhere. */
 
 /** The certificate on a listing or an order, as a guest reads it: which one, from whom, and whether Basu looked it up. */
 export const shapeCertificateFacts = (c: CertificateFacts | null) =>
   c ? { number: c.number, issuer: c.issuer, issued_on: c.issuedOn, checked: c.checked } : null;
+
+/**
+ * Задаргаа on an order: what was chosen, and the same in words — one wording
+ * for the guest's page, the supplier's ticket and the desk.
+ */
+export const shapeBreakdown = (b: Breakdown | null, feeMnt: number) =>
+  b ? { style: b.style, cut: b.cut, note: b.note, fee_mnt: feeMnt, ...describe(b) } : null;
 
 export const shapeSummary = (o: IdeshSummary) => ({
   id: o.id,
@@ -23,6 +30,7 @@ export const shapeSummary = (o: IdeshSummary) => ({
   // Only a pickup has somewhere to go; a delivery's address is the guest's own.
   pickup_address: o.receive === 'pickup' ? (o.pickupAddress ?? null) : null,
   certificate: shapeCertificateFacts(o.certificate),
+  breakdown: shapeBreakdown(o.breakdown, o.cutFeeMnt),
   photo: o.photo,
 });
 

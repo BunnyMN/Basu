@@ -4789,7 +4789,8 @@ async function openOrder(id, from = { label: 'Захиалгууд', go: () => s
       <div class="card detail-facts"><div class="facts">
         <div><span class="lab">Зочин</span><b>${guestWho(o.guest, o.guest_email)}</b><span class="fact-sub">${o.guest_phone ? tel(o.guest_phone) : ''}</span></div>
         <div><span class="lab">${o.receive === 'delivery' ? 'Хүргэлтээр' : 'Өөрөө очиж авна'}</span><b class="nowrap">${dayLabel(o.receive_on)}</b><span class="fact-sub">${o.receive === 'delivery' ? `${esc(o.address)} · <span class="mono nowrap">${esc(phoneText(o.address_phone))}</span>` : 'нийлүүлэгчийн авах цэгээс'}</span></div>
-        <div><span class="lab">Зочин төлсөн</span><b>${money(o.total_mnt)}</b><span class="fact-sub">${o.delivery_fee_mnt ? `хүргэлт ${mnt(o.delivery_fee_mnt)} орсон` : 'хүргэлтгүй'}</span></div>
+        <div><span class="lab">Зочин төлсөн</span><b>${money(o.total_mnt)}</b><span class="fact-sub">${o.breakdown?.fee_mnt ? `жижиглэх ${mnt(o.breakdown.fee_mnt)} · ` : ''}${o.delivery_fee_mnt ? `хүргэлт ${mnt(o.delivery_fee_mnt)} орсон` : 'хүргэлтгүй'}</span></div>
+        ${o.breakdown ? `<div id="order-breakdown"><span class="lab">Задаргаа</span><b>${esc(o.breakdown.label)}</b><span class="fact-sub">${esc(o.breakdown.detail)}${o.breakdown.note ? ` · «${esc(o.breakdown.note)}»` : ''}</span></div>` : ''}
         <div><span class="lab">Нийлүүлэгчид очих</span><b>${money(o.payout_mnt)}</b><span class="fact-sub">шимтгэл хассан</span></div>
         ${o.cancel_reason ? `<div><span class="lab">Цуцлалт</span><b>${esc(REASON[o.cancel_reason] ?? o.cancel_reason)}</b><span class="fact-sub">буцаалт ${mnt(o.refund_mnt ?? 0)}${o.forfeit_mnt ? ` · суутгал ${mnt(o.forfeit_mnt)}` : ''}</span></div>` : ''}
       </div></div>

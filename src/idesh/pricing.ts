@@ -19,6 +19,8 @@ export interface Offer {
   sold: number;
   delivers: boolean;
   deliveryFeeMnt: number;
+  /** Per head, for cutting the animal small; nothing where the listing does not offer it. */
+  cutFeeMnt?: number;
   /** `YYYY-MM-DD`, the restaurant-zone calendar day. */
   readyFrom: string;
 }
@@ -28,11 +30,15 @@ export interface Want {
   receive: Receive;
   /** `YYYY-MM-DD` */
   receiveOn: string;
+  /** The guest has asked for some of it cut small. */
+  cut?: boolean;
 }
 
 export interface Quote {
   qty: number;
   unitPriceMnt: number;
+  /** The whole cutting fee, every head of it. Part of the meat price. */
+  cutFeeMnt: number;
   deliveryFeeMnt: number;
   totalMnt: number;
 }
@@ -70,11 +76,14 @@ export function quote(offer: Offer, want: Want, today: string): Quote {
   }
 
   const deliveryFeeMnt = want.receive === 'delivery' ? offer.deliveryFeeMnt : 0;
+  // Every head is cut the same way, so the fee is per head like the price.
+  const cutFeeMnt = want.cut ? (offer.cutFeeMnt ?? 0) * want.qty : 0;
   return {
     qty: want.qty,
     unitPriceMnt: offer.priceMnt,
+    cutFeeMnt,
     deliveryFeeMnt,
-    totalMnt: offer.priceMnt * want.qty + deliveryFeeMnt,
+    totalMnt: offer.priceMnt * want.qty + cutFeeMnt + deliveryFeeMnt,
   };
 }
 

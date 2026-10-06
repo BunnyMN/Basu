@@ -1,5 +1,6 @@
 import { getPool, type Db } from '../db/pool.js';
 import { CERT_COLUMNS, factsOf, usableCertificate, type CertificateFacts, type CertificateState } from './certificates.js';
+import { STYLES, offerOf, type BreakdownOffer, type Style } from './breakdown.js';
 import { IdeshError } from './errors.js';
 import type { Unit } from './pricing.js';
 
@@ -43,6 +44,8 @@ export interface Listing {
   /** The veterinary certificate the meat came with, once the supplier has put one on. */
   certificateId: string | null;
   certificate: CertificateFacts | null;
+  /** Задаргаа: the ways this supplier will take the animal apart, and what cutting it small costs. Nothing offered asks the guest nothing. */
+  breakdown: BreakdownOffer;
   /**
    * Its place among its supplier's listings of the same animal, oldest first.
    * The pages turn it into one of the example photographs, so two listings on
@@ -78,6 +81,8 @@ interface ListingRow {
   tier: Tier | null;
   tier_until: Date | null;
   certificate_id: string | null;
+  breakdown_styles: string[];
+  cut_fee_mnt: number;
   photo: number;
   cert_number: string | null;
   cert_issuer: string | null;
@@ -98,7 +103,7 @@ const SELECT = `
          s.pickup_address, l.kind, l.unit, l.title, l.note, l.price_mnt, l.approx_kg,
          l.min_qty, l.quantity, l.sold, l.origin, to_char(l.ready_from, 'YYYY-MM-DD') AS ready_from,
          l.delivers, l.delivery_fee_mnt, l.active, p.tier, p.ends_at AS tier_until,
-         l.certificate_id, ${CERT_COLUMNS},
+         l.certificate_id, l.breakdown_styles, l.cut_fee_mnt, ${CERT_COLUMNS},
          ${PHOTO_PLACE}
     FROM idesh.listing l
     JOIN idesh.supplier s ON s.id = l.supplier_id
@@ -141,6 +146,10 @@ function shape(r: ListingRow): Listing {
     tierUntil: r.tier ? r.tier_until : null,
     certificateId: r.certificate_id,
     certificate: factsOf(r),
+    breakdown: {
+      styles: STYLES.filter((s: Style) => r.breakdown_styles.includes(s)),
+      cutFeeMnt: Number(r.cut_fee_mnt),
+    },
     photo: r.photo,
   };
 }
@@ -192,6 +201,10 @@ export interface ListingInput {
   deliveryFeeMnt?: number;
   /** Required for meat by the kilogram: it is already slaughtered, and came with one. */
   certificateId?: string | null;
+  /** Задаргаа: the styles offered — see `breakdown.ts`. A whole animal's only. */
+  breakdownStyles?: string[];
+  /** Per head, for cutting small. */
+  cutFeeMnt?: number;
 }
 
 function validate(input: ListingInput): void {
@@ -224,11 +237,13 @@ export async function createListing(
     throw new IdeshError('NEEDS_CERTIFICATE', 'meat by the kilogram is listed with its veterinary certificate');
   }
   if (input.certificateId) await usableCertificate(supplierId, input.certificateId, db);
+  const offer = offerOf({ kind: input.kind, unit: input.unit, styles: input.breakdownStyles, cutFeeMnt: input.cutFeeMnt });
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO idesh.listing
        (supplier_id, kind, unit, title, note, price_mnt, approx_kg, min_qty, quantity,
-        origin, ready_from, delivers, delivery_fee_mnt, created_at, updated_at, certificate_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::date, $12, $13, $14, $14, $15)
+        origin, ready_from, delivers, delivery_fee_mnt, created_at, updated_at, certificate_id,
+        breakdown_styles, cut_fee_mnt)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::date, $12, $13, $14, $14, $15, $16::text[], $17)
      RETURNING id`,
     [
       supplierId,
@@ -246,6 +261,8 @@ export async function createListing(
       input.deliveryFeeMnt ?? 0,
       at,
       input.certificateId ?? null,
+      offer.styles,
+      offer.cutFeeMnt,
     ],
   );
   return (await listingById(rows[0]!.id, at, db))!;
@@ -262,6 +279,9 @@ export interface ListingPatch {
   title?: string;
   /** The next shipment's certificate. One is replaced, never taken off. */
   certificateId?: string;
+  /** Задаргаа: the whole set of styles offered from now on. Orders already made keep what they chose. */
+  breakdownStyles?: string[];
+  cutFeeMnt?: number;
 }
 
 /**
@@ -295,6 +315,25 @@ export async function updateListing(
   }
   if (patch.certificateId !== undefined) await usableCertificate(supplierId, patch.certificateId, db);
 
+  // The offer is judged whole, against the animal it is for: a fee outlives
+  // neither the cutting it was for nor a change the page did not mention.
+  let offer: BreakdownOffer | null = null;
+  if (patch.breakdownStyles !== undefined || patch.cutFeeMnt !== undefined) {
+    const { rows } = await db.query<{ kind: Kind; unit: Unit; breakdown_styles: string[]; cut_fee_mnt: number }>(
+      'SELECT kind, unit, breakdown_styles, cut_fee_mnt FROM idesh.listing WHERE id = $1 AND supplier_id = $2',
+      [listingId, supplierId],
+    );
+    const now = rows[0];
+    if (!now) throw new IdeshError('NOT_FOUND', 'no such listing here');
+    const styles = patch.breakdownStyles ?? now.breakdown_styles;
+    offer = offerOf({
+      kind: now.kind,
+      unit: now.unit,
+      styles,
+      cutFeeMnt: patch.cutFeeMnt ?? (styles.includes('cut') ? Number(now.cut_fee_mnt) : 0),
+    });
+  }
+
   let updated;
   try {
     updated = await db.query<{ id: string }>(
@@ -308,6 +347,8 @@ export async function updateListing(
               note             = CASE WHEN $9::boolean THEN $10 ELSE note END,
               title            = COALESCE($11, title),
               certificate_id   = COALESCE($13, certificate_id),
+              breakdown_styles = COALESCE($14::text[], breakdown_styles),
+              cut_fee_mnt      = COALESCE($15, cut_fee_mnt),
               updated_at       = $12
         WHERE id = $1 AND supplier_id = $2
         RETURNING id`,
@@ -325,6 +366,8 @@ export async function updateListing(
         patch.title?.trim() || null,
         at,
         patch.certificateId ?? null,
+        offer ? offer.styles : null,
+        offer ? offer.cutFeeMnt : null,
       ],
     );
   } catch (error) {

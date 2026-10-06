@@ -26,7 +26,8 @@ export type IdeshErrorCode =
   | 'BAD_CERTIFICATE'
   | 'CERTIFICATE_EXISTS'
   | 'CERTIFICATE_FALSE'
-  | 'CERTIFICATE_IN_USE';
+  | 'CERTIFICATE_IN_USE'
+  | 'BAD_BREAKDOWN';
 
 export class IdeshError extends Error {
   constructor(

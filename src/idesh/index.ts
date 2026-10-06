@@ -24,6 +24,21 @@ export {
 export { quote, dayOf, type Offer, type Want, type Quote, type Receive, type Unit } from './pricing.js';
 
 export {
+  STYLES,
+  PARTS,
+  STYLE_LABEL,
+  STYLE_HINT,
+  PART_LABEL,
+  NOTE_MAX,
+  describe,
+  type Breakdown,
+  type BreakdownOffer,
+  type BreakdownWant,
+  type Part,
+  type Style,
+} from './breakdown.js';
+
+export {
   CANCEL_REASONS,
   REASON_LABEL,
   FORFEIT_PCT,
@@ -31,6 +46,7 @@ export {
   DEFAULT_COMMISSION_PCT,
   splitRefund,
   commissionOf,
+  meatOf,
   noShowFrom,
   reasonProblem,
   isSupplierFault,
