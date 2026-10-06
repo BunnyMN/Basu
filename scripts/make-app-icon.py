@@ -27,6 +27,12 @@ all three are easy to get wrong by eye:
    figure has neither, and no amount of repeating a row invents it. Feed this
    the tallest version of the art there is.
 
+`--crop x0,y0,x1,y1` takes exactly that square of the source instead — head
+and chest rather than the whole figure, which is what the icon has been since
+2026-10-06: at 60 points a whole wrestler is a small orange shape, and a face
+with its hands at the temples is a face. The square is measured on the source
+as it is, frame and all, so what was previewed is what ships.
+
 `--figure x0,y0,x1,y1` gives the figure's bounding box for when the background
 defeats the built-in guess — a blurred crowd is full of white shirts, and the
 sticker's white outline is not the only pale thing in the frame. Measure it
@@ -112,7 +118,20 @@ def widen(a: np.ndarray, to: int) -> np.ndarray:
     return np.hstack([left, a, right])
 
 
-def build(source: Path, target: Path, figure: tuple[int, int, int, int] | None, size: int) -> None:
+def build(
+    source: Path,
+    target: Path,
+    figure: tuple[int, int, int, int] | None,
+    size: int,
+    crop: tuple[int, int, int, int] | None = None,
+) -> None:
+    if crop:
+        x0, y0, x1, y1 = crop
+        if x1 - x0 != y1 - y0:
+            raise SystemExit("--crop must be a square")
+        Image.open(source).convert("RGB").crop(crop).resize((size, size), Image.LANCZOS).save(target)
+        print(f"{target}  {size}×{size}  the square {crop} of the source")
+        return
     a = np.asarray(Image.open(source).convert("RGB")).astype(np.int16)
     if framed(a):
         a = unframe(a)
@@ -150,7 +169,9 @@ if __name__ == "__main__":
     parser.add_argument("source", type=Path)
     parser.add_argument("target", type=Path)
     parser.add_argument("--figure", help="x0,y0,x1,y1 of the figure, when the guess fails")
+    parser.add_argument("--crop", help="x0,y0,x1,y1: exactly this square of the source, nothing else")
     parser.add_argument("--size", type=int, default=1024)
     args = parser.parse_args()
     box = tuple(int(n) for n in args.figure.split(",")) if args.figure else None
-    build(args.source, args.target, box, args.size)  # type: ignore[arg-type]
+    crop = tuple(int(n) for n in args.crop.split(",")) if args.crop else None
+    build(args.source, args.target, box, args.size, crop)  # type: ignore[arg-type]

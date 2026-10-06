@@ -5,6 +5,21 @@
 `app-icon-source.png` — эх зураг: бөхийн дүр, наалт хэлбэрээр, бүдэгрүүлсэн
 цэнгэлдэхийн дэвсгэр дээр, 1019×1543 босоо.
 
+2026-10-06-наас икон нь бүтэн дүр биш, **толгой ба цээж**: эх зургийн
+`60,20,964,924` дөрвөлжин, өөр юу ч хийхгүй. 60pt дээр бүтэн бөх жижиг улбар
+шар толбо болдог байсан; нүүр нь нүүр хэвээрээ. Дөрвөн газар нэг командаар:
+
+```bash
+C=60,20,964,924
+python3 scripts/make-app-icon.py design/app-icon-source.png ios/Basu/Assets.xcassets/AppIcon.appiconset/AppIcon.png --crop $C
+python3 scripts/make-app-icon.py design/app-icon-source.png android/app/src/main/res/drawable-nodpi/app_icon.png --crop $C --size 432
+python3 scripts/make-app-icon.py design/app-icon-source.png src/web/brand/apple-touch-icon.png --crop $C --size 180
+python3 scripts/make-app-icon.py design/app-icon-source.png src/web/brand/favicon.png --crop $C --size 64
+python3 scripts/make-app-icon.py design/app-icon-source.png src/web/brand/app-icon.webp --crop $C --size 512
+```
+
+Бүтэн дүрээр хийх хуучин арга (`--figure`) хэвээр байна:
+
 ```bash
 python3 scripts/make-app-icon.py design/app-icon-source.png \
     ios/Basu/Assets.xcassets/AppIcon.appiconset/AppIcon.png \
