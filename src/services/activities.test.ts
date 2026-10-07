@@ -243,25 +243,26 @@ describe('an идэш on the lock screen', () => {
     report = await relayActivities(ctx);
     expect(report.started).toBe(0);
 
-    // The supplier starts preparing the next day: a fresh card for the new step.
-    clock.advanceMinutes(20 * 60);
+    // The phone answers with the card's own token. Two hours on the supplier starts preparing: that card is
+    // still up, so it is moved, not put up a second time.
+    await registerActivityToken({ guestId, subject: 'idesh', subjectId: orderId, pushToken: 'card-0', at: clock.now() });
+    clock.advanceMinutes(2 * 60);
     await startPreparing(ctx, orderId, 'supplier');
     report = await relayActivities(ctx);
-    expect(report.started).toBe(1);
-    expect(notifier.activities.filter((a) => a.event === 'start').at(-1)!.contentState).toMatchObject({ state: 'PREPARING', step: 2 });
-
-    // The phone answers with the new card's own token: from now the card is moved, not put up again.
-    await registerActivityToken({ guestId, subject: 'idesh', subjectId: orderId, pushToken: 'card-1', at: clock.now() });
-    clock.advanceMinutes(60);
-    await markIdeshReady(ctx, orderId, 'supplier');
-    report = await relayActivities(ctx);
     expect(report.started).toBe(0);
-    expect(notifier.activities.at(-1)).toMatchObject({ token: 'card-1', event: 'update', contentState: { state: 'READY', step: 3 } });
+    expect(notifier.activities.at(-1)).toMatchObject({ token: 'card-0', event: 'update', contentState: { state: 'PREPARING', step: 2 } });
 
-    // A token the phone stopped answering for is dropped, never pushed to again.
+    // The next day iOS has long ended that card, whatever Apple still takes for its token; the phone handing
+    // the same token over again on a launch does not make the card younger. «Бэлэн» puts a fresh one up.
+    clock.advanceMinutes(20 * 60);
+    await registerActivityToken({ guestId, subject: 'idesh', subjectId: orderId, pushToken: 'card-0', at: clock.now() });
+    await markIdeshReady(ctx, orderId, 'supplier');
     notifier.deadTokens.add('start-b');
-    clock.advanceMinutes(13 * 60);
-    await markHanded(ctx, orderId, 'supplier');
+    report = await relayActivities(ctx);
+    expect(report.started).toBe(1);
+    expect(notifier.activities.filter((a) => a.event === 'start').at(-1)).toMatchObject({ token: 'start-a', contentState: { state: 'READY', step: 3 } });
+    // A start token Apple called dead is dropped; a stranger's is never used.
+    expect(report.forgotten).toBeGreaterThanOrEqual(1);
     expect(notifier.activities.some((a) => a.token === 'start-x')).toBe(false);
   });
 

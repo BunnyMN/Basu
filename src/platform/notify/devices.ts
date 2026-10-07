@@ -101,8 +101,8 @@ export async function registerActivityToken(input: {
   at: Date;
 }): Promise<void> {
   await getPool().query(
-    `INSERT INTO notify.activity_token (guest_id, subject, subject_id, push_token, updated_at)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO notify.activity_token (guest_id, subject, subject_id, push_token, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $5)
      ON CONFLICT (subject, subject_id, push_token) DO UPDATE
         SET guest_id = EXCLUDED.guest_id, updated_at = EXCLUDED.updated_at`,
     [input.guestId, input.subject, input.subjectId, input.pushToken, input.at],
@@ -172,8 +172,11 @@ export interface ActivityCard {
   pushToken: string;
   /** What this token was last told, or null if nothing has landed yet. */
   pushedHash: string | null;
-  /** When the phone last handed this token over: a card lives eight hours from its start. */
-  updatedAt: Date;
+  /**
+   * When the phone first handed this token over — the card's start, near enough. A card lives eight
+   * hours from it; the phone handing the same token over again on a later launch does not move it.
+   */
+  startedAt: Date;
 }
 
 /** Every card out there for one subject kind — `order` — oldest first. */
@@ -183,9 +186,9 @@ export async function activityCards(subject: string): Promise<ActivityCard[]> {
     subject_id: string;
     push_token: string;
     pushed_hash: string | null;
-    updated_at: Date;
+    created_at: Date;
   }>(
-    `SELECT guest_id, subject_id, push_token, pushed_hash, updated_at
+    `SELECT guest_id, subject_id, push_token, pushed_hash, created_at
        FROM notify.activity_token WHERE subject = $1 ORDER BY created_at`,
     [subject],
   );
@@ -194,7 +197,7 @@ export async function activityCards(subject: string): Promise<ActivityCard[]> {
     subjectId: r.subject_id,
     pushToken: r.push_token,
     pushedHash: r.pushed_hash,
-    updatedAt: r.updated_at,
+    startedAt: r.created_at,
   }));
 }
 

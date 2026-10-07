@@ -191,9 +191,9 @@ export async function relayActivities(ctx: Ctx): Promise<ActivityRelayReport> {
     const states = await kind.states([...new Set(cards.map((c) => c.subjectId))]);
 
     for (const card of cards) {
-      // An идэш card the phone has not spoken for in longer than a card lives is gone from the
-      // lock screen: forgotten, so the next step can put a fresh one up.
-      if (kind.subject === 'idesh' && now.getTime() - card.updatedAt.getTime() > CARD_LIFE_MS + 4 * 60 * 60_000) {
+      // An идэш card started longer ago than a card lives is gone from the lock screen, whatever
+      // Apple still accepts for its token: forgotten, so the next step can put a fresh one up.
+      if (kind.subject === 'idesh' && now.getTime() - card.startedAt.getTime() > CARD_LIFE_MS + 4 * 60 * 60_000) {
         await forgetActivityToken(card.pushToken, card.subjectId);
         report.forgotten++;
         continue;
@@ -264,7 +264,8 @@ async function startIdeshCards(ctx: Ctx, report: ActivityRelayReport): Promise<v
   const due = await ideshCardsToStart(new Date(now.getTime() - START_WITHIN_MS));
   if (due.length === 0) return;
   const running = new Set(
-    (await activityCards('idesh')).filter((c) => now.getTime() - c.updatedAt.getTime() < CARD_LIFE_MS).map((c) => c.subjectId),
+    // Up means started under eight hours ago: iOS ends a card then, and its token says nothing about it.
+    (await activityCards('idesh')).filter((c) => now.getTime() - c.startedAt.getTime() < CARD_LIFE_MS).map((c) => c.subjectId),
   );
   const started = await activitiesStarted('idesh', due.map((d) => ({ subjectId: d.id, state: d.state })));
   const tokens = await activityStartTokensFor('idesh', [...new Set(due.map((d) => d.guestId))]);
