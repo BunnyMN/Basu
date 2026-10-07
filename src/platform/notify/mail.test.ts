@@ -6,6 +6,7 @@ import { VirtualClock } from '../../domain/time.js';
 import { FakeMailer, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../../ports.js';
 import { seedPerson, truncateAll } from '../../test/seed.js';
 import { SmtpMailer, smtpConfigFromEnv, smtpHost } from './mail.js';
+import { registerDevice } from './devices.js';
 import { enqueue, relay } from './messages.js';
 
 /**
@@ -114,6 +115,22 @@ describe('the relay', () => {
     expect(mailer.to('bat@example.mn')).toMatchObject({ subject: 'Basu · Захиалга бэлэн', text: 'Таны мах бэлэн боллоо.' });
     const { rows } = await getPool().query('SELECT state, channel FROM notify.message');
     expect(rows).toEqual([{ state: 'sent', channel: 'email' }]);
+  });
+
+  it('pushes a message asked for as SMS while no SMS gateway runs, and sends SMS first once one does', async () => {
+    const id = await seedPerson({ phone: '+97699001133', email: 'dorj@example.mn' });
+    await registerDevice({ guestId: id, platform: 'ios', pushToken: 'phone-1', label: null, at: at('11:40') });
+    await enqueue(ctx, { guestId: id, template: 'idesh.ready', title: '№7042 · Бэлэн', body: 'Хонь бэлэн боллоо.', channel: 'sms', dedupeKey: 'r1' });
+    await relay(ctx);
+    // Without a gateway the stand-in kept every SMS to itself: «бэлэн» reached nobody. Now it is pushed.
+    expect(notifier.sent.at(-1)).toMatchObject({ channel: 'push', to: 'phone-1', body: 'Хонь бэлэн боллоо.' });
+    expect(mailer.sent).toHaveLength(0);
+
+    // With a real gateway the SMS goes first, as the message asked.
+    ctx.smsGateway = true;
+    await enqueue(ctx, { guestId: id, template: 'idesh.dispatched', body: 'Замд гарлаа.', channel: 'sms', dedupeKey: 'r2' });
+    await relay(ctx);
+    expect(notifier.sent.at(-1)).toMatchObject({ channel: 'sms', to: '+97699001133', body: 'Замд гарлаа.' });
   });
 
   it('prefers email to the phone while SMS is not running, and falls back to the phone if the letter fails', async () => {

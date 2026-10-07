@@ -845,7 +845,7 @@ export async function registerIdeshRoutes(
         return { state: 'READY' };
       case 'certify':
         if (!certificateId) throw new IdeshError('NO_CERTIFICATE', 'certificate_id is required');
-        await certifyIdesh(orderId, actor, certificateId);
+        await certifyIdesh(orderId, actor, certificateId, ctx);
         return { certified: true };
       case 'dispatch':
         await markDispatched(ctx, orderId, actor);

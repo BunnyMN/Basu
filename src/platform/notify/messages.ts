@@ -3,6 +3,7 @@ import { contactsFor } from '../identity/index.js';
 import type { Ctx } from '../../ports.js';
 import { pushTokensFor } from './devices.js';
 import { actionFor, renderLetter } from '../../letter.js';
+import { mode } from '../../mode.js';
 
 /**
  * Messages are written to a table first and sent afterwards.
@@ -122,15 +123,21 @@ export async function relay(ctx: Ctx, limit = 100): Promise<number> {
     const pref = prefs.get(row.guest_id) ?? { push: true, sms: true };
     // Push first where the app can be reached; then email, which reaches
     // anybody who signed up with an address; the phone last, and only where
-    // there is one. A message asked for as SMS skips push — it was meant to
-    // arrive even with the app closed — but not email.
-    const wanted: Array<'push' | 'email' | 'sms'> = row.channel === 'push' ? ['push', 'email', 'sms'] : ['email', 'sms'];
+    // there is one. A message asked for as SMS (the ones that matter most:
+    // «бэлэн», «замд», a cancel) goes by SMS first — but only where a real
+    // gateway is behind it. Without one it went to the stand-in, which keeps
+    // the message to itself: in production «бэлэн» was marked sent and reached
+    // nobody, not even by push. So without a gateway it is pushed like the rest,
+    // and production never counts the stand-in as a delivery.
+    const smsIsReal = Boolean(ctx.smsGateway);
+    const wanted: Array<'push' | 'email' | 'sms'> =
+      row.channel === 'sms' && smsIsReal ? ['sms', 'push', 'email'] : ['push', 'email', 'sms'];
     const ladder = wanted.filter((c) =>
       c === 'push'
         ? pref.push && pushable.has(row.guest_id)
         : c === 'email'
           ? Boolean(contact.email && ctx.mailer)
-          : pref.sms && Boolean(contact.phone),
+          : pref.sms && Boolean(contact.phone) && (smsIsReal || mode() !== 'production'),
     );
 
     const body = row.body || row.template;

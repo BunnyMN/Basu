@@ -101,6 +101,100 @@ export function dayLabel(day: string): string {
   return `${Number(month)}-р сарын ${Number(date)}`;
 }
 
+/* ── what the guest is told at each step ───────────────────────────── */
+
+/** The word every Basu screen uses for a state (IDESH_STATE on the web, `IdeshState.word` in the app). */
+export const STEP_WORD: Record<IdeshState, string> = {
+  DRAFT: 'Төлөгдөөгүй',
+  PAID: 'Төлсөн',
+  PREPARING: 'Бэлтгэж байна',
+  READY: 'Бэлэн',
+  DISPATCHED: 'Замд',
+  HANDED: 'Хүлээлгэн өгсөн',
+  CLOSED: 'Дууслаа',
+  CANCELLED: 'Цуцлагдлаа',
+  REFUNDED: 'Буцаагдлаа',
+};
+
+type StepFacts = { code: string; title: string; unit: Unit; qty: number; supplier: string; receive: Receive; receiveOn: string; pickupAddress: string; addressPhone: string | null };
+
+/** «Хонь, залуу ирэг · 2 толгой», «Үхрийн мах · 20 кг»: what was bought, as the order says it. */
+export function whatOf(f: { title: string; unit: Unit; qty: number }): string {
+  return `${f.title} · ${f.qty} ${f.unit === 'kg' ? 'кг' : 'толгой'}`;
+}
+
+/** «Өнөөдөр», «Маргааш», «10-р сарын 18-нд» — when, from where the guest stands today. */
+function whenOf(day: string, today: string): string {
+  if (day <= today) return 'Өнөөдөр';
+  const next = new Date(`${today}T12:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  if (day === next.toISOString().slice(0, 10)) return 'Маргааш';
+  return `${dayLabel(day)}-нд`;
+}
+
+/**
+ * The message for the step an order has just reached: its title is the code
+ * and the step's word, so a glance at the lock screen says which order and
+ * where it is; its body says what happened, when the meat changes hands, and
+ * what comes next. The one place these words are written — the steps and
+ * the desk's «say it again» both use it.
+ */
+export function stepMessage(
+  f: StepFacts,
+  state: IdeshState,
+  today: string,
+): { template: string; channel: 'push' | 'sms'; title: string; body: string } | null {
+  const title = `№${f.code} · ${STEP_WORD[state]}`;
+  const what = whatOf(f);
+  const when = whenOf(f.receiveOn, today);
+  const delivery = f.receive === 'delivery';
+  switch (state) {
+    case 'PAID':
+      return {
+        template: 'idesh.paid', channel: 'push', title,
+        body: `${what}. ${f.supplier} захиалгыг тань хүлээж авлаа. ${when} ${delivery ? 'хаягаар тань хүргэнэ' : 'бэлэн байлгана'}. Бэлтгэж эхлэхэд мэдэгдэнэ.`,
+      };
+    case 'PREPARING':
+      return {
+        template: 'idesh.preparing', channel: 'push', title,
+        body: `${f.supplier} бэлтгэж эхэллээ: ${what}. ${when} ${delivery ? 'хүргэнэ' : 'бэлэн болно'}. Бэлэн болоход мэдэгдэнэ.`,
+      };
+    case 'READY':
+      return {
+        template: 'idesh.ready', channel: 'sms', title,
+        body: delivery
+          ? `${what} бэлэн боллоо. ${when} хаягаар тань хүргэнэ. Замд гарахад мэдэгдэнэ. Код №${f.code}.`
+          : `${what} бэлэн боллоо. ${when} ${f.pickupAddress} хаягаас авна уу. Авахдаа кодоо хэлээрэй: №${f.code}.`,
+      };
+    case 'DISPATCHED':
+      return {
+        template: 'idesh.dispatched', channel: 'sms', title,
+        body: `${what} замд гарлаа. Хүргэгч ${f.addressPhone ?? 'таны'} дугаар руу залгана. Хүлээн авахдаа кодоо хэлээрэй: №${f.code}.`,
+      };
+    case 'HANDED':
+      return {
+        template: 'idesh.handed', channel: 'push', title,
+        body: `${what} гар дээр чинь очлоо. Захиалга дууслаа. Сайхан өвөлжөөрэй.`,
+      };
+    default:
+      return null;
+  }
+}
+
+/** Tell the guest the step their order has just reached. */
+async function tellStep(ctx: Ctx, orderId: string, guestId: string, f: StepFacts, state: IdeshState, extra?: string): Promise<void> {
+  const m = stepMessage(f, state, dayOf(ctx.clock.now()));
+  if (!m) return;
+  await enqueue(ctx, { guestId, subject: 'idesh', subjectId: orderId, template: m.template, channel: m.channel, title: m.title, body: extra ? `${m.body} ${extra}` : m.body });
+}
+
+/** «Гэрчилгээ №… (олгосон газар)» — the certificate an order is under, said in a line. */
+async function certificateLine(certificateId: string | null | undefined, db: Db = getPool()): Promise<string | null> {
+  if (!certificateId) return null;
+  const { rows } = await db.query<{ number: string; issuer: string }>('SELECT number, issuer FROM idesh.certificate WHERE id = $1', [certificateId]);
+  return rows[0] ? `Мал эмнэлгийн гэрчилгээ №${rows[0].number}, ${rows[0].issuer}.` : null;
+}
+
 /* ── the guest ─────────────────────────────────────────────────────── */
 
 export interface CreateIdeshInput {
@@ -357,17 +451,7 @@ export async function payIdesh(
     amountMnt: facts.totalMnt,
   });
 
-  await enqueue(ctx, {
-    guestId: facts.guestId,
-    subject: 'idesh',
-    subjectId: orderId,
-    template: 'idesh.paid',
-    channel: 'push',
-    title: 'Идэш баталгаажлаа',
-    body:
-      `${facts.title} · №${facts.code}. ${facts.supplier} ${dayLabel(facts.receiveOn)}-нд ` +
-      (facts.receive === 'delivery' ? 'хүргэнэ.' : 'бэлэн байлгана.'),
-  });
+  await tellStep(ctx, orderId, facts.guestId, facts, 'PAID');
 
   // The supplier is told too, both ways: a screen nobody is looking at is
   // not a notification, and an order they never heard of is the one that
@@ -497,16 +581,7 @@ export async function startPreparing(ctx: Ctx, orderId: string, actor: string): 
 
   const facts = await billingFacts(orderId);
   if (!facts) return;
-  await enqueue(ctx, {
-    guestId: facts.guestId,
-    subject: 'idesh',
-    subjectId: orderId,
-    template: 'idesh.preparing',
-    channel: 'push',
-    title: 'Мал бэлтгэгдэж байна',
-    // The guest is told what changed, the way dine says it at the fire.
-    body: `${facts.title} №${facts.code} бэлтгэгдэж эхэллээ.`,
-  });
+  await tellStep(ctx, orderId, facts.guestId, facts, 'PREPARING');
 }
 
 /**
@@ -526,18 +601,8 @@ export async function markReady(ctx: Ctx, orderId: string, actor: string, certif
 
   const facts = await billingFacts(orderId);
   if (!facts) return;
-  await enqueue(ctx, {
-    guestId: facts.guestId,
-    subject: 'idesh',
-    subjectId: orderId,
-    template: 'idesh.ready',
-    channel: 'sms',
-    title: 'Идэш бэлэн боллоо',
-    body:
-      facts.receive === 'pickup'
-        ? `Таны идэш бэлэн боллоо. ${facts.pickupAddress} хаягаас авна уу. Код №${facts.code}.`
-        : `Таны идэш бэлэн боллоо. ${dayLabel(facts.receiveOn)}-нд хүргэнэ.`,
-  });
+  // The certificate, when the supplier named it as they marked the meat ready, is said with it.
+  await tellStep(ctx, orderId, facts.guestId, facts, 'READY', (await certificateLine(certificateId)) ?? undefined);
 }
 
 /** Point an order at a certificate of its own supplier's. */
@@ -554,7 +619,7 @@ async function putCertificate(db: Db, orderId: string, certificateId: string): P
  * while the order is still the supplier's to work on; once it is closed the
  * order is a record, and stays as it was handed over.
  */
-export async function certifyIdesh(orderId: string, actor: string, certificateId: string): Promise<void> {
+export async function certifyIdesh(orderId: string, actor: string, certificateId: string, ctx?: Ctx): Promise<void> {
   await tx(async (client) => {
     const { rows } = await client.query<{ state: IdeshState }>('SELECT state FROM idesh.idesh_order WHERE id = $1 FOR UPDATE', [orderId]);
     const state = rows[0]?.state;
@@ -565,6 +630,17 @@ export async function certifyIdesh(orderId: string, actor: string, certificateId
     await putCertificate(client, orderId, certificateId);
     await appendEvent(client, orderId, 'CERTIFIED', actor, { certificateId });
   });
+  // The guest hears that their meat now has its paper — once per certificate, so a correction is said too.
+  const facts = ctx ? await billingFacts(orderId) : null;
+  const line = facts ? await certificateLine(certificateId) : null;
+  if (ctx && facts && line) {
+    await enqueue(ctx, {
+      guestId: facts.guestId, subject: 'idesh', subjectId: orderId, template: 'idesh.certified', channel: 'push',
+      dedupeKey: `${orderId}:idesh.certified:${certificateId}`,
+      title: `№${facts.code} · Гэрчилгээ`,
+      body: `${facts.supplier} таны идэшний ${line.charAt(0).toLowerCase()}${line.slice(1)}`,
+    });
+  }
 }
 
 /** «Замд гаргах» — only a delivery goes anywhere. */
@@ -581,15 +657,7 @@ export async function markDispatched(ctx: Ctx, orderId: string, actor: string): 
     await appendEvent(client, orderId, 'DISPATCHED', actor);
   });
 
-  await enqueue(ctx, {
-    guestId: facts.guestId,
-    subject: 'idesh',
-    subjectId: orderId,
-    template: 'idesh.dispatched',
-    channel: 'sms',
-    title: 'Идэш замд гарлаа',
-    body: `Таны идэш №${facts.code} замд гарлаа. Хүргэгч ${facts.addressPhone ?? 'таны'} дугаар руу залгана.`,
-  });
+  await tellStep(ctx, orderId, facts.guestId, facts, 'DISPATCHED');
 }
 
 /** «Хүлээлгэн өгсөн» — read against the code the guest shows. */
@@ -613,15 +681,7 @@ export async function markHanded(ctx: Ctx, orderId: string, actor: string): Prom
     await appendEvent(client, orderId, 'HANDED', actor, { commissionMnt, payoutMnt });
   });
 
-  await enqueue(ctx, {
-    guestId: facts.guestId,
-    subject: 'idesh',
-    subjectId: orderId,
-    template: 'idesh.handed',
-    channel: 'push',
-    title: 'Идэш хүлээлгэн өглөө',
-    body: `${facts.title} №${facts.code} гар дээр чинь очлоо. Сайхан өвөлжөөрэй.`,
-  });
+  await tellStep(ctx, orderId, facts.guestId, facts, 'HANDED');
 }
 
 /* ── the scheduler ─────────────────────────────────────────────────── */
@@ -854,7 +914,7 @@ async function arrangeRefund(
     subjectId: orderId,
     template: 'idesh.cancelled',
     channel: 'sms',
-    title: 'Идэш цуцлагдлаа',
+    title: `№${facts.code} · ${STEP_WORD.CANCELLED}`,
     body:
       `Идэш №${facts.code} цуцлагдлаа (${REASON_LABEL[reason].toLowerCase()}). ` +
       (split.forfeitMnt > 0 ? `Мал нядалсны дараа тул ${FORFEIT_PCT}% суутгав. ` : '') +
@@ -875,6 +935,7 @@ async function billingFacts(orderId: string): Promise<{
   code: string;
   state: IdeshState;
   title: string;
+  unit: Unit;
   qty: number;
   unitPriceMnt: number;
   cutFeeMnt: number;
@@ -897,6 +958,7 @@ async function billingFacts(orderId: string): Promise<{
     code: string;
     state: IdeshState;
     title: string;
+    unit: Unit;
     qty: number;
     unit_price_mnt: number;
     cut_fee_mnt: number;
@@ -912,7 +974,7 @@ async function billingFacts(orderId: string): Promise<{
     commission_pct: string;
     ledger_transfer_id: string | null;
   }>(
-    `SELECT o.guest_id, o.listing_id, o.supplier_id, o.code, o.state, o.title, o.qty,
+    `SELECT o.guest_id, o.listing_id, o.supplier_id, o.code, o.state, o.title, o.unit, o.qty,
             o.unit_price_mnt, o.cut_fee_mnt, o.delivery_fee_mnt, o.total_mnt, o.receive,
             to_char(o.receive_on, 'YYYY-MM-DD') AS receive_on, o.ready_at, o.address_phone,
             o.ledger_transfer_id, s.name AS supplier, s.pickup_address,
@@ -931,6 +993,7 @@ async function billingFacts(orderId: string): Promise<{
     code: row.code,
     state: row.state,
     title: row.title,
+    unit: row.unit,
     qty: row.qty,
     unitPriceMnt: Number(row.unit_price_mnt),
     cutFeeMnt: Number(row.cut_fee_mnt),
@@ -1101,6 +1164,43 @@ export async function ideshCardFacts(
     [orderIds],
   );
   return new Map(rows.map((r) => [r.id, { state: r.state, receiveOn: r.receive_on }]));
+}
+
+/** An order whose step is recent enough for a lock screen card, with what the card shows. */
+export interface IdeshCardStart {
+  id: string;
+  guestId: string;
+  code: string;
+  supplier: string;
+  what: string;
+  receive: Receive;
+  pickupAddress: string;
+  state: IdeshState;
+  receiveOn: string;
+  /** When the order reached the state it is in. */
+  since: Date;
+}
+
+/** Orders still going whose current step began at `since` or later: the ones a card is worth putting up for. */
+export async function ideshCardsToStart(since: Date, db: Db = getPool()): Promise<IdeshCardStart[]> {
+  const { rows } = await db.query<{
+    id: string; guest_id: string; code: string; supplier: string; title: string; unit: Unit; qty: number;
+    receive: Receive; pickup_address: string; state: IdeshState; receive_on: string; since: Date;
+  }>(
+    `SELECT * FROM (
+       SELECT o.id::text AS id, o.guest_id::text AS guest_id, o.code, s.name AS supplier, o.title, o.unit, o.qty,
+              o.receive, s.pickup_address, o.state, to_char(o.receive_on, 'YYYY-MM-DD') AS receive_on,
+              CASE o.state WHEN 'PAID' THEN o.paid_at WHEN 'PREPARING' THEN o.preparing_at
+                           WHEN 'READY' THEN o.ready_at WHEN 'DISPATCHED' THEN o.dispatched_at END AS since
+         FROM idesh.idesh_order o JOIN idesh.supplier s ON s.id = o.supplier_id
+        WHERE o.state IN ('PAID', 'PREPARING', 'READY', 'DISPATCHED')
+     ) x WHERE since >= $1`,
+    [since],
+  );
+  return rows.map((r) => ({
+    id: r.id, guestId: r.guest_id, code: r.code, supplier: r.supplier, what: whatOf(r), receive: r.receive,
+    pickupAddress: r.pickup_address, state: r.state, receiveOn: r.receive_on, since: r.since,
+  }));
 }
 
 /** Is this order this guest's? What a lock screen card may be registered against. */
@@ -1561,27 +1661,15 @@ export async function resendForOps(ctx: Ctx, orderId: string, who: string): Prom
   const again = `resend:${Date.now()}`;
   const say = (template: string, channel: 'push' | 'sms', title: string, body: string) =>
     enqueue(ctx, { guestId: facts.guestId, subject: 'idesh', subjectId: orderId, template, channel, dedupeKey: `${orderId}:${template}:${again}`, title, body });
-  switch (facts.state) {
-    case 'PAID':
-    case 'PREPARING':
-      await say('idesh.paid', 'sms', 'Идэш баталгаажлаа',
-        `Basu: ${facts.title} №${facts.code} баталгаажсан. ${facts.supplier} ${dayLabel(facts.receiveOn)}-нд ${facts.receive === 'delivery' ? 'хүргэнэ' : 'бэлэн байлгана'}.`);
-      break;
-    case 'READY':
-      await say('idesh.ready', 'sms', 'Идэш бэлэн боллоо',
-        facts.receive === 'pickup'
-          ? `Таны идэш бэлэн боллоо. ${facts.pickupAddress} хаягаас авна уу. Код №${facts.code}.`
-          : `Таны идэш бэлэн боллоо. ${dayLabel(facts.receiveOn)}-нд хүргэнэ.`);
-      break;
-    case 'DISPATCHED':
-      await say('idesh.dispatched', 'sms', 'Идэш замд гарлаа', `Таны идэш №${facts.code} замд гарлаа. Хүргэгч залгана.`);
-      break;
-    case 'CANCELLED':
-      await say('idesh.cancelled', 'sms', 'Идэш цуцлагдлаа',
-        `Идэш №${facts.code} цуцлагдсан. Буцаалтаа авахын тулд basu.burzai.cloud/orders хуудсанд эсвэл Basu аппад дансаа оруулна уу.`);
-      break;
-    default:
-      throw new IdeshError('WRONG_STATE', `nothing to say in ${facts.state}`);
+  // The same words the step said the first time: the state the order is in now.
+  const m = stepMessage(facts, facts.state, dayOf(ctx.clock.now()));
+  if (m && facts.state !== 'HANDED') {
+    await say(m.template, 'sms', m.title, m.body);
+  } else if (facts.state === 'CANCELLED') {
+    await say('idesh.cancelled', 'sms', `№${facts.code} · ${STEP_WORD.CANCELLED}`,
+      `Идэш №${facts.code} цуцлагдсан. Буцаалтаа авахын тулд basu.burzai.cloud/orders хуудсанд эсвэл Basu аппад дансаа оруулна уу.`);
+  } else {
+    throw new IdeshError('WRONG_STATE', `nothing to say in ${facts.state}`);
   }
   await tx(async (client) => {
     await appendEvent(client, orderId, 'RESENT', who, { state: facts.state });

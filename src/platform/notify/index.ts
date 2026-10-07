@@ -26,6 +26,11 @@ export {
 export {
   activityCards,
   activityTokensFor,
+  activitiesStarted,
+  activityStartTokensFor,
+  forgetActivityStartToken,
+  markActivityStarted,
+  registerActivityStartToken,
   devicesOf,
   forgetActivityToken,
   markActivityPushed,

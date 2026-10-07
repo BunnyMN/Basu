@@ -449,12 +449,15 @@ describe('the supplier walks it through', () => {
     await markReady(ctx, orderId, 'supplier:d1');
     expect(await stateOf(orderId)).toBe('READY');
 
-    // The one message that matters goes by SMS and says where and which code.
+    // The one message that matters says which order and the step in its title, then where and which code.
+    // Asked for as SMS, it still goes by push with no SMS gateway behind it (none exists yet): sent to the
+    // stand-in it reached nobody.
     await relay(ctx);
     const ready = notifier.of('idesh.ready').at(-1);
-    expect(ready?.channel).toBe('sms');
     expect(ready?.body).toContain('Нарантуул');
     expect(ready?.body).toContain(`№${code}`);
+    const titles = (await inbox(guestId)).filter((m) => m.template.startsWith('idesh.')).map((m) => m.title);
+    expect(titles.sort()).toEqual([`№${code} · Бэлтгэж байна`, `№${code} · Бэлэн`, `№${code} · Төлсөн`].sort());
 
     // A pickup is handed over, never dispatched.
     await expect(markDispatched(ctx, orderId, 'supplier:d1')).rejects.toMatchObject({

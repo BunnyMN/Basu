@@ -13,7 +13,7 @@ import {
 } from '../idesh/index.js';
 import { settleTopup, startTopup } from '../platform/ledger/index.js';
 import { startSession } from '../platform/identity/index.js';
-import { activityTokensFor, registerActivityToken } from '../platform/notify/index.js';
+import { activityTokensFor, registerActivityStartToken, registerActivityToken } from '../platform/notify/index.js';
 import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { seedGuest, seedRestaurant, truncateAll, type SeededRestaurant } from '../test/seed.js';
 import { relayActivities } from './activities.js';
@@ -67,7 +67,7 @@ describe('a card that follows the order', () => {
 
     // The first pass tells the card where the order stands.
     let report = await relayActivities(ctx);
-    expect(report).toEqual({ updated: 1, ended: 0, forgotten: 0, failed: 0 });
+    expect(report).toEqual({ updated: 1, ended: 0, forgotten: 0, failed: 0, started: 0 });
     expect(notifier.activities).toHaveLength(1);
     const first = notifier.activities[0]!;
     expect(first.token).toBe('phone-a');
@@ -219,12 +219,58 @@ describe('an идэш on the lock screen', () => {
     return orderId;
   }
 
+  it('puts a card up at each step the supplier takes, the app closed, once a step, and not over one already up', async () => {
+    const orderId = await paidSheep();
+    // Two phones of the guest's gave their push-to-start tokens; a stranger's is never used.
+    await registerActivityStartToken({ guestId, subject: 'idesh', pushToken: 'start-a', at: clock.now() });
+    await registerActivityStartToken({ guestId, subject: 'idesh', pushToken: 'start-b', at: clock.now() });
+    const stranger = await seedGuest(getPool(), 'AUTO');
+    await registerActivityStartToken({ guestId: stranger, subject: 'idesh', pushToken: 'start-x', at: clock.now() });
+
+    // Paid a moment ago: up it goes, on both phones, with what the card is about and where it stands.
+    let report = await relayActivities(ctx);
+    expect(report.started).toBe(1);
+    const starts = notifier.activities.filter((a) => a.event === 'start');
+    expect(starts.map((a) => a.token).sort()).toEqual(['start-a', 'start-b']);
+    expect(starts[0]).toMatchObject({
+      attributesType: 'IdeshActivityAttributes',
+      attributes: { orderID: orderId, supplier: 'Архангай · Дорж', what: 'Хонь, залуу ирэг · 1 толгой', receive: 'pickup', pickupAddress: 'Нарантуул, хойд хаалга' },
+      contentState: { state: 'PAID', word: 'Төлсөн', step: 1, receiveOn: '2026-09-12' },
+    });
+    expect(starts[0]!.alert?.title).toMatch(/^№\d+ · Төлсөн$/);
+
+    // Asked again with nothing new: nothing is put up twice for the same step.
+    report = await relayActivities(ctx);
+    expect(report.started).toBe(0);
+
+    // The supplier starts preparing the next day: a fresh card for the new step.
+    clock.advanceMinutes(20 * 60);
+    await startPreparing(ctx, orderId, 'supplier');
+    report = await relayActivities(ctx);
+    expect(report.started).toBe(1);
+    expect(notifier.activities.filter((a) => a.event === 'start').at(-1)!.contentState).toMatchObject({ state: 'PREPARING', step: 2 });
+
+    // The phone answers with the new card's own token: from now the card is moved, not put up again.
+    await registerActivityToken({ guestId, subject: 'idesh', subjectId: orderId, pushToken: 'card-1', at: clock.now() });
+    clock.advanceMinutes(60);
+    await markIdeshReady(ctx, orderId, 'supplier');
+    report = await relayActivities(ctx);
+    expect(report.started).toBe(0);
+    expect(notifier.activities.at(-1)).toMatchObject({ token: 'card-1', event: 'update', contentState: { state: 'READY', step: 3 } });
+
+    // A token the phone stopped answering for is dropped, never pushed to again.
+    notifier.deadTokens.add('start-b');
+    clock.advanceMinutes(13 * 60);
+    await markHanded(ctx, orderId, 'supplier');
+    expect(notifier.activities.some((a) => a.token === 'start-x')).toBe(false);
+  });
+
   it('follows the order step by step, without an alert, and ends at the handover', async () => {
     const orderId = await paidSheep();
     await registerActivityToken({ guestId, subject: 'idesh', subjectId: orderId, pushToken: 'phone-a', at: clock.now() });
 
     let report = await relayActivities(ctx);
-    expect(report).toEqual({ updated: 1, ended: 0, forgotten: 0, failed: 0 });
+    expect(report).toEqual({ updated: 1, ended: 0, forgotten: 0, failed: 0, started: 0 });
     const first = notifier.activities.at(-1)!;
     expect(first.event).toBe('update');
     // What `IdeshActivityAttributes.ContentState` decodes: four plain values.

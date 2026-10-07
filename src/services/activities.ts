@@ -1,11 +1,15 @@
 import { createHash } from 'node:crypto';
 import { getPool } from '../db/pool.js';
 import {
+  activitiesStarted,
   activityCards,
+  activityStartTokensFor,
+  forgetActivityStartToken,
   forgetActivityToken,
   markActivityPushed,
+  markActivityStarted,
 } from '../platform/notify/index.js';
-import { ideshCardFacts, type IdeshState } from '../idesh/index.js';
+import { ideshCardFacts, ideshCardsToStart, type IdeshState } from '../idesh/index.js';
 import { PushTokenGone, type ActivityPush, type Ctx } from '../ports.js';
 
 /**
@@ -28,9 +32,12 @@ import { PushTokenGone, type ActivityPush, type Ctx } from '../ports.js';
  * Three stages and their words are the app's (`OrderStage` in BasuKit); the
  * content state here is what its `ContentState` decodes.
  *
- * An идэш has a card of its own (`IdeshActivityAttributes`), up on the day
- * the meat changes hands. Same loop, its own words, and no alert: the
- * order's own messages (`idesh.ready`, `idesh.dispatched`) already say it.
+ * An идэш has a card of its own (`IdeshActivityAttributes`). The phone puts
+ * it up on the day the meat changes hands; and since an идэш takes days and a
+ * card lives eight hours, the server puts it up too, at each step the supplier
+ * takes — by a push to the phone's push-to-start token (iOS 17.2) — so
+ * «бэлтгэж байна» on Monday is on the lock screen on Monday. Same loop, its own
+ * words, and no buzz of its own: the order's own message for the step says it.
  */
 
 const STAGE: Record<string, 'waiting' | 'cooking' | 'ready'> = {
@@ -129,16 +136,24 @@ const IDESH_STEP: Record<IdeshState, number> = {
 
 const IDESH_OVER = new Set<IdeshState>(['HANDED', 'CLOSED', 'CANCELLED', 'REFUNDED']);
 
+/** The card's four values — exactly what the app's `IdeshActivityAttributes.ContentState` decodes. */
+const ideshContent = (state: IdeshState, receiveOn: string) => ({
+  state,
+  word: IDESH_WORD[state],
+  step: IDESH_STEP[state],
+  receiveOn,
+});
+
+/** A Live Activity lives eight hours; a token older than this is a card long gone. */
+const CARD_LIFE_MS = 8 * 60 * 60_000;
+/** A step this recent is worth a card; an older one has had its moment. */
+const START_WITHIN_MS = 6 * 60 * 60_000;
+
 async function ideshCardStates(orderIds: string[]): Promise<Map<string, CardState>> {
   const out = new Map<string, CardState>();
   for (const [id, fact] of await ideshCardFacts(orderIds)) {
     const over = IDESH_OVER.has(fact.state);
-    const contentState = {
-      state: fact.state,
-      word: IDESH_WORD[fact.state],
-      step: IDESH_STEP[fact.state],
-      receiveOn: fact.receiveOn,
-    };
+    const contentState = ideshContent(fact.state, fact.receiveOn);
     out.set(id, {
       over,
       contentState,
@@ -161,11 +176,13 @@ export interface ActivityRelayReport {
   ended: number;
   forgotten: number;
   failed: number;
+  /** Cards put up by the server, at a step the supplier took. */
+  started: number;
 }
 
 /** One pass over every card. Called from the scheduler's tick. */
 export async function relayActivities(ctx: Ctx): Promise<ActivityRelayReport> {
-  const report: ActivityRelayReport = { updated: 0, ended: 0, forgotten: 0, failed: 0 };
+  const report: ActivityRelayReport = { updated: 0, ended: 0, forgotten: 0, failed: 0, started: 0 };
   const now = ctx.clock.now();
 
   for (const kind of KINDS) {
@@ -174,6 +191,13 @@ export async function relayActivities(ctx: Ctx): Promise<ActivityRelayReport> {
     const states = await kind.states([...new Set(cards.map((c) => c.subjectId))]);
 
     for (const card of cards) {
+      // An идэш card the phone has not spoken for in longer than a card lives is gone from the
+      // lock screen: forgotten, so the next step can put a fresh one up.
+      if (kind.subject === 'idesh' && now.getTime() - card.updatedAt.getTime() > CARD_LIFE_MS + 4 * 60 * 60_000) {
+        await forgetActivityToken(card.pushToken, card.subjectId);
+        report.forgotten++;
+        continue;
+      }
       const state = states.get(card.subjectId);
       if (!state) {
         // The order is gone (a reseed, in practice). Nothing to say to the card.
@@ -225,5 +249,62 @@ export async function relayActivities(ctx: Ctx): Promise<ActivityRelayReport> {
       }
     }
   }
+  await startIdeshCards(ctx, report);
   return report;
+}
+
+/**
+ * A step the supplier took a moment ago, on an order with no card up: put one
+ * up, on every phone of the guest's that gave a push-to-start token. Once per
+ * order and state — a card the guest swiped away is not put back for the same
+ * step; the next step puts it up again.
+ */
+async function startIdeshCards(ctx: Ctx, report: ActivityRelayReport): Promise<void> {
+  const now = ctx.clock.now();
+  const due = await ideshCardsToStart(new Date(now.getTime() - START_WITHIN_MS));
+  if (due.length === 0) return;
+  const running = new Set(
+    (await activityCards('idesh')).filter((c) => now.getTime() - c.updatedAt.getTime() < CARD_LIFE_MS).map((c) => c.subjectId),
+  );
+  const started = await activitiesStarted('idesh', due.map((d) => ({ subjectId: d.id, state: d.state })));
+  const tokens = await activityStartTokensFor('idesh', [...new Set(due.map((d) => d.guestId))]);
+  for (const d of due) {
+    if (running.has(d.id) || started.has(`${d.id}:${d.state}`)) continue;
+    const mine = tokens.get(d.guestId) ?? [];
+    if (mine.length === 0) continue;
+    let landed = false;
+    for (const token of mine) {
+      try {
+        await ctx.notifier.pushActivity({
+          token,
+          event: 'start',
+          attributesType: 'IdeshActivityAttributes',
+          attributes: {
+            orderID: d.id,
+            code: d.code,
+            supplier: d.supplier,
+            what: d.what,
+            receive: d.receive,
+            ...(d.receive === 'pickup' ? { pickupAddress: d.pickupAddress } : {}),
+          },
+          contentState: ideshContent(d.state, d.receiveOn),
+          staleAt: new Date(Math.min(now.getTime() + CARD_LIFE_MS, new Date(`${d.receiveOn}T23:59:59+08:00`).getTime() + 86_400_000)),
+          // Apple asks a start to say something; the step's own message is the buzz.
+          alert: { title: `№${d.code} · ${IDESH_WORD[d.state]}`, body: d.what },
+        });
+        landed = true;
+      } catch (error) {
+        if (error instanceof PushTokenGone) {
+          await forgetActivityStartToken('idesh', token);
+          report.forgotten++;
+        } else {
+          report.failed++;
+        }
+      }
+    }
+    if (landed) {
+      await markActivityStarted('idesh', d.id, d.state, now);
+      report.started++;
+    }
+  }
 }

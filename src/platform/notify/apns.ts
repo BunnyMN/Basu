@@ -221,6 +221,10 @@ export class ApnsNotifier implements Notifier {
       'relevance-score': 100,
     };
     if (push.alert) aps['alert'] = push.alert;
+    if (push.event === 'start') {
+      aps['attributes-type'] = push.attributesType;
+      aps['attributes'] = push.attributes;
+    }
     if (push.staleAt) aps['stale-date'] = Math.floor(push.staleAt.getTime() / 1000);
     if (push.event === 'end' && push.dismissAt) aps['dismissal-date'] = Math.floor(push.dismissAt.getTime() / 1000);
     const providerRef = await this.client.post({

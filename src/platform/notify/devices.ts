@@ -117,6 +117,54 @@ export async function activityTokensFor(subject: string, subjectId: string): Pro
   return rows.map((r) => r.push_token);
 }
 
+/**
+ * A phone's «push to start» token for one kind of card: sending to it puts a
+ * card up without the app. A phone has one per kind, and a new one replaces it.
+ */
+export async function registerActivityStartToken(input: { guestId: string; subject: string; pushToken: string; at: Date }): Promise<void> {
+  await getPool().query(
+    `INSERT INTO notify.activity_start_token (guest_id, subject, push_token, updated_at)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (subject, push_token) DO UPDATE SET guest_id = EXCLUDED.guest_id, updated_at = EXCLUDED.updated_at`,
+    [input.guestId, input.subject, input.pushToken, input.at],
+  );
+}
+
+/** Every start token of these people for one kind of card, by person. */
+export async function activityStartTokensFor(subject: string, guestIds: string[]): Promise<Map<string, string[]>> {
+  const out = new Map<string, string[]>();
+  if (guestIds.length === 0) return out;
+  const { rows } = await getPool().query<{ guest_id: string; push_token: string }>(
+    `SELECT guest_id::text AS guest_id, push_token FROM notify.activity_start_token
+      WHERE subject = $1 AND guest_id::text = ANY($2::text[])`,
+    [subject, guestIds],
+  );
+  for (const r of rows) out.set(r.guest_id, [...(out.get(r.guest_id) ?? []), r.push_token]);
+  return out;
+}
+
+export async function forgetActivityStartToken(subject: string, pushToken: string): Promise<void> {
+  await getPool().query('DELETE FROM notify.activity_start_token WHERE subject = $1 AND push_token = $2', [subject, pushToken]);
+}
+
+/** Which of these were already put up for the state they are in. */
+export async function activitiesStarted(subject: string, keys: Array<{ subjectId: string; state: string }>): Promise<Set<string>> {
+  if (keys.length === 0) return new Set();
+  const { rows } = await getPool().query<{ subject_id: string; state: string }>(
+    `SELECT subject_id, state FROM notify.activity_started WHERE subject = $1 AND subject_id = ANY($2::text[])`,
+    [subject, keys.map((k) => k.subjectId)],
+  );
+  return new Set(rows.map((r) => `${r.subject_id}:${r.state}`));
+}
+
+export async function markActivityStarted(subject: string, subjectId: string, state: string, at: Date): Promise<void> {
+  await getPool().query(
+    `INSERT INTO notify.activity_started (subject, subject_id, state, started_at) VALUES ($1, $2, $3, $4)
+     ON CONFLICT DO NOTHING`,
+    [subject, subjectId, state, at],
+  );
+}
+
 /** One lock screen card that the server may need to move. */
 export interface ActivityCard {
   guestId: string;
@@ -124,6 +172,8 @@ export interface ActivityCard {
   pushToken: string;
   /** What this token was last told, or null if nothing has landed yet. */
   pushedHash: string | null;
+  /** When the phone last handed this token over: a card lives eight hours from its start. */
+  updatedAt: Date;
 }
 
 /** Every card out there for one subject kind — `order` — oldest first. */
@@ -133,8 +183,9 @@ export async function activityCards(subject: string): Promise<ActivityCard[]> {
     subject_id: string;
     push_token: string;
     pushed_hash: string | null;
+    updated_at: Date;
   }>(
-    `SELECT guest_id, subject_id, push_token, pushed_hash
+    `SELECT guest_id, subject_id, push_token, pushed_hash, updated_at
        FROM notify.activity_token WHERE subject = $1 ORDER BY created_at`,
     [subject],
   );
@@ -143,6 +194,7 @@ export async function activityCards(subject: string): Promise<ActivityCard[]> {
     subjectId: r.subject_id,
     pushToken: r.push_token,
     pushedHash: r.pushed_hash,
+    updatedAt: r.updated_at,
   }));
 }
 

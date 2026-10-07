@@ -32,6 +32,7 @@ import {
   inboxPage,
   markRead,
   preferences,
+  registerActivityStartToken,
   registerActivityToken,
   registerDevice,
   revokeDevice,
@@ -601,6 +602,25 @@ export async function registerPlatformRoutes(
         pushToken: token,
         at: ctx.clock.now(),
       });
+      return reply.code(204).send();
+    },
+  );
+
+  /**
+   * The phone's push-to-start token for one kind of card (`idesh`): with it the
+   * server puts a card up on the lock screen at each step the supplier takes,
+   * the app closed. One per phone and kind; a new one replaces the old.
+   */
+  app.post<{ Body: { push_token?: string; subject?: string } }>(
+    '/v1/activities/start-token',
+    guarded,
+    async (request, reply) => {
+      const token = request.body?.push_token;
+      if (!token) return badRequest(reply, 'Токен заагаагүй байна.', 'push_token is required');
+      if ((request.body?.subject ?? 'idesh') !== 'idesh') {
+        return badRequest(reply, 'Захиалгын төрөл буруу байна.', 'subject is idesh');
+      }
+      await registerActivityStartToken({ guestId: request.guestId!, subject: 'idesh', pushToken: token, at: ctx.clock.now() });
       return reply.code(204).send();
     },
   );

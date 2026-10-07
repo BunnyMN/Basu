@@ -128,8 +128,12 @@ export interface OutgoingMessage {
  */
 export interface ActivityPush {
   token: string;
-  event: 'update' | 'end';
+  /** `start` goes to a phone's push-to-start token and puts a new card up. */
+  event: 'start' | 'update' | 'end';
   contentState: Record<string, unknown>;
+  /** With `start`: the card's kind, as the app's Swift type is named, and its fixed attributes. */
+  attributesType?: string;
+  attributes?: Record<string, unknown>;
   alert?: { title: string; body: string };
   /** After this the card is greyed as out of date. */
   staleAt?: Date;
