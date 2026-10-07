@@ -62,6 +62,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import mn.basu.app.BuildConfig
 import mn.basu.app.auth.SignInSheet
+import mn.basu.app.calls.Calls
 import mn.basu.app.core.Endpoint
 import mn.basu.app.core.LocalAppModel
 import mn.basu.app.core.LocalPush
@@ -362,12 +363,19 @@ class ServicePage(context: Context) {
   private inner class Bridge {
     @JavascriptInterface
     fun postMessage(json: String) {
-      val type = runCatching { JSONObject(json).optString("type") }.getOrNull() ?: return
+      val message = runCatching { JSONObject(json) }.getOrNull() ?: return
+      val type = message.optString("type")
       main.post {
         when (type) {
           "signIn" -> signIn?.invoke()
           "orders" -> changed?.invoke()
           "home" -> home?.invoke()
+          // The order page's «Апп-аар залгах»: the shell rings, with its own call screen.
+          "call" -> {
+            val subject = message.optString("subject")
+            val subjectId = message.optString("subject_id")
+            if (subject.isNotEmpty() && subjectId.isNotEmpty()) Calls.ringOut(subject, subjectId, message.optString("peer_name"))
+          }
         }
       }
     }
@@ -456,6 +464,8 @@ class ServicePage(context: Context) {
     }
   };
 })();
+// This shell rings with its own call screen: the order page offers «Апп-аар залгах».
+window.__basuCalls = true;
 """
 
     private fun sessionScript(token: String?): String = """

@@ -1,6 +1,7 @@
 package mn.basu.app
 
 import android.app.Application
+import mn.basu.app.calls.Calls
 import mn.basu.app.core.Api
 import mn.basu.app.core.AppLock
 import mn.basu.app.core.AppModel
@@ -32,5 +33,7 @@ class BasuApplication : Application() {
     platform = Platform(api, session, this)
     lock = AppLock(this)
     push = PushRegistrar(this)
+    // Calls about an order: rung while the app is open, and placed from the order page.
+    Calls.attach(this, api) { session.token }
   }
 }

@@ -1711,8 +1711,8 @@ html[data-calling]{overflow:hidden}
 .call-about:empty{display:none}
 .call-peer{font-family:var(--display);font-size:var(--t-title);font-weight:800;line-height:1;letter-spacing:-.004em;max-width:22ch;overflow-wrap:anywhere}
 .call-status{font-family:var(--sans);font-size:var(--t-body-lg);font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums;min-height:1.5em;max-width:34ch}
-.call-acts{position:relative;z-index:1;display:flex;justify-content:center;gap:clamp(18px,7vw,44px)}
-.call-btn{display:grid;justify-items:center;gap:8px;background:none;border:0;color:var(--ink-2);font:600 .8125rem/1.2 var(--sans);cursor:pointer;min-width:72px}
+.call-acts{position:relative;z-index:1;display:flex;justify-content:center;gap:clamp(8px,4vw,44px)}
+.call-btn{display:grid;justify-items:center;gap:8px;background:none;border:0;color:var(--ink-2);font:600 .8125rem/1.2 var(--sans);cursor:pointer;width:68px;padding:0}
 .call-btn svg{width:64px;height:64px;padding:19px;border-radius:var(--r-pill);background:var(--surface-3);color:var(--ink);
   fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:background var(--dur) var(--ease)}
 .call-btn:hover svg{background:var(--line-2)}

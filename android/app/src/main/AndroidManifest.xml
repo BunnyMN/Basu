@@ -5,6 +5,17 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- A call about an order (calls/): the voice, the camera that shows the
+         animal, and the foreground service that keeps both while the app is
+         out of sight. Each asked for the first time it is used. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application
         android:name=".BasuApplication"
@@ -37,6 +48,10 @@
                 <data android:scheme="basu" />
             </intent-filter>
         </activity>
+        <service
+            android:name=".calls.CallService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|camera" />
     </application>
 
     <queries>

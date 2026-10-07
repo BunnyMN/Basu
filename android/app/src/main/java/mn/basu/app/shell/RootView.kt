@@ -71,6 +71,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import mn.basu.app.BuildConfig
 import mn.basu.app.auth.SignInScreen
+import mn.basu.app.calls.CallScreen
+import mn.basu.app.calls.Calls
 import mn.basu.app.core.AppLock
 import mn.basu.app.core.Links
 import mn.basu.app.core.LocalAppLock
@@ -101,7 +103,14 @@ import mn.basu.app.platform.WalletView
  * `screen` is one of orders|wallet|profile|inbox|food|idesh|signin|push|splash;
  * `browse` looks around signed out. Production has no such door.
  */
-data class DebugLaunch(val screen: String? = null, val demoSignIn: Boolean = false, val browse: Boolean = false, val phone: String? = null) {
+data class DebugLaunch(
+  val screen: String? = null,
+  val demoSignIn: Boolean = false,
+  val browse: Boolean = false,
+  val phone: String? = null,
+  /** `--es BASU_CALL_ORDER <id>`: rings the other side of that идэш order once signed in. */
+  val callOrder: String? = null,
+) {
   companion object {
     fun from(intent: Intent?): DebugLaunch {
       if (!BuildConfig.DEBUG || intent == null) return DebugLaunch()
@@ -110,6 +119,7 @@ data class DebugLaunch(val screen: String? = null, val demoSignIn: Boolean = fal
         demoSignIn = intent.getBooleanExtra("BASU_DEMO_SIGNIN", false),
         browse = intent.getBooleanExtra("BASU_BROWSE", false),
         phone = intent.getStringExtra("BASU_DEMO_PHONE"),
+        callOrder = intent.getStringExtra("BASU_CALL_ORDER"),
       )
     }
   }
@@ -222,7 +232,22 @@ fun RootView(debug: DebugLaunch = DebugLaunch()) {
       exit = fadeOut(),
     ) { LockView() }
 
+    // A call, over the shell and the lock alike: an answered call is a
+    // conversation already going, not a door to unlock first.
+    AnimatedVisibility(Calls.presenting, Modifier.zIndex(0.8f), enter = fadeIn(), exit = fadeOut()) { CallScreen() }
+
     AnimatedVisibility(splash, Modifier.zIndex(1f), enter = fadeIn(tween(0)), exit = fadeOut(tween(350))) { SplashView() }
+  }
+
+  // Signed out mid-call: the call is theirs, and goes with them.
+  LaunchedEffect(session.isSignedIn) {
+    if (!session.isSignedIn) Calls.hangUp()
+  }
+  LaunchedEffect(debug.callOrder, session.isSignedIn) {
+    val order = debug.callOrder ?: return@LaunchedEffect
+    if (!session.isSignedIn) return@LaunchedEffect
+    delay(3_000)
+    Calls.ringOut("idesh", order, "Туршилт")
   }
 
   val notice = model.notice

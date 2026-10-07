@@ -17,6 +17,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.CompletableDeferred
+import mn.basu.app.calls.Calls
 import mn.basu.app.core.Links
 import mn.basu.app.core.LocalAppLock
 import mn.basu.app.core.LocalAppModel
@@ -45,6 +46,8 @@ class MainActivity : FragmentActivity() {
       permissions.launch(wanted)
       answer.await()
     }
+    // The microphone and camera for a call, asked the moment one is needed.
+    Calls.request = app.push.request
     if (savedInstanceState == null) Links.route(intent?.data)
     val debug = DebugLaunch.from(intent)
 

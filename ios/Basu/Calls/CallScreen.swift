@@ -110,7 +110,8 @@ struct CallScreen: View {
       if case .ended = live.phase {
         Color.clear.frame(height: 92)
       } else {
-        HStack(alignment: .top, spacing: 18) {
+        // Four across a 375-point phone: spread over the width rather than spaced by a fixed gap.
+        HStack(alignment: .top, spacing: 0) {
           RoundButton(symbol: live.muted ? "mic.slash.fill" : "mic.fill", label: live.muted ? "Дуу нээх" : "Дуу хаах", on: live.muted) {
             center.toggleMute()
           }
@@ -159,7 +160,8 @@ private struct RoundButton: View {
           .lineLimit(1)
           .minimumScaleFactor(0.8)
       }
-      .frame(width: 72)
+      .frame(width: 68)
+      .frame(maxWidth: .infinity)
     }
     .buttonStyle(.plain)
     .accessibilityLabel(label)

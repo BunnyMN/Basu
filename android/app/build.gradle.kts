@@ -82,6 +82,10 @@ dependencies {
 
   // The rating ask, after something went right (ReviewMoment).
   implementation("com.google.android.play:review-ktx:2.0.2")
+  // Google's WebRTC, built for Android: calls between a guest and a supplier
+  // (calls/). Pinned, the same reason as iOS's: a WebRTC that moves under a
+  // release is a call that stops connecting.
+  implementation("io.getstream:stream-webrtc-android:1.3.10")
 
   testImplementation("junit:junit:4.13.2")
   testImplementation("org.json:json:20240303")
