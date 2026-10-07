@@ -350,13 +350,19 @@ data class InboxMessage(
   }
 }
 
-data class Inbox(val unread: Int, val messages: List<InboxMessage>) {
+data class Inbox(
+  val unread: Int,
+  val messages: List<InboxMessage>,
+  /** Pass back as `before` for the next page. Null when the list is done. */
+  val next: String?,
+) {
   companion object {
-    val empty = Inbox(0, emptyList())
+    val empty = Inbox(0, emptyList(), null)
 
     fun from(json: JSONObject) = Inbox(
       json.optInt("unread"),
       json.optJSONArray("messages")?.objects()?.map(InboxMessage::from) ?: emptyList(),
+      json.str("next"),
     )
   }
 }

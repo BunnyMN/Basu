@@ -71,7 +71,9 @@ suspend fun Api.startTopup(amountMnt: Int, token: String): TopupStarted =
 suspend fun Api.settleTopup(id: String, token: String): Int =
   send("/v1/wallet/topup/$id/settle", "POST", token = token).optInt("balance_mnt")
 
-suspend fun Api.inbox(token: String): Inbox = Inbox.from(send("/v1/notifications", token = token))
+/** The newest page, or with `before` — an earlier page's `next` — the one after it. */
+suspend fun Api.inbox(token: String, before: String? = null): Inbox =
+  Inbox.from(send("/v1/notifications", token = token, query = if (before != null) mapOf("before" to before) else emptyMap()))
 
 /** No id marks the whole inbox read — what opening the list means. */
 suspend fun Api.markRead(id: String?, token: String) {

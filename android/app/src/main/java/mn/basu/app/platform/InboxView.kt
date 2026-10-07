@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -153,6 +154,27 @@ fun InboxView(back: () -> Unit, open: (Destination) -> Unit) {
                     },
                   )
                 }
+              }
+            }
+
+            // The list comes a page at a time, newest first. The row below
+            // the last message asks for the next one; it is gone when there is
+            // no more.
+            if (platform.inbox.next != null) {
+              Hairline()
+              Box(
+                Modifier
+                  .fillMaxWidth()
+                  .heightIn(min = 56.dp)
+                  .plainClick(enabled = !platform.loadingMoreInbox) { telling.launch { platform.loadMoreInbox() } }
+                  .testTag("inbox.more"),
+                contentAlignment = Alignment.Center,
+              ) {
+                Text(
+                  if (platform.loadingMoreInbox) "Уншиж байна…" else "Цааш үзэх",
+                  color = BasuColor.ink,
+                  style = sans(14, FontWeight.Bold),
+                )
               }
             }
           }

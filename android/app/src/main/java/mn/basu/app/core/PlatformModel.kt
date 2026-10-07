@@ -37,6 +37,9 @@ class Platform(private val api: Api, private val session: Session, private val c
   /** Set while a page of the statement is on its way, so the button can say so. */
   var loadingMore: Boolean by mutableStateOf(false)
     private set
+  /** The same, for a page of the inbox. */
+  var loadingMoreInbox: Boolean by mutableStateOf(false)
+    private set
   /** Whether any call has actually told us the balance. Until one has, the wallet shows nothing — never a zero. */
   var walletLoaded: Boolean by mutableStateOf(false)
     private set
@@ -240,6 +243,7 @@ class Platform(private val api: Api, private val session: Session, private val c
     }
   }
 
+  /** The newest page. Whatever was paged in below it is let go: a refresh starts over. */
   suspend fun loadInbox() {
     val token = session.token ?: return
     try {
@@ -247,6 +251,25 @@ class Platform(private val api: Api, private val session: Session, private val c
       trouble = null
     } catch (error: Exception) {
       note(error)
+    }
+  }
+
+  /**
+   * The page after the last message shown. Keyed on that message, as the
+   * wallet is, so a message that arrives mid-scroll does not shift the page.
+   */
+  suspend fun loadMoreInbox() {
+    val token = session.token ?: return
+    val cursor = inbox.next ?: return
+    if (loadingMoreInbox) return
+    loadingMoreInbox = true
+    try {
+      val page = api.inbox(token, before = cursor)
+      inbox = Inbox(page.unread, inbox.messages + page.messages, page.next)
+    } catch (error: Exception) {
+      note(error)
+    } finally {
+      loadingMoreInbox = false
     }
   }
 
@@ -302,7 +325,7 @@ class Platform(private val api: Api, private val session: Session, private val c
   suspend fun delete(message: InboxMessage) {
     val token = session.token ?: return
     val kept = inbox
-    inbox = Inbox(
+    inbox = inbox.copy(
       unread = if (message.read) inbox.unread else maxOf(0, inbox.unread - 1),
       messages = inbox.messages.filter { it.id != message.id },
     )
@@ -315,6 +338,11 @@ class Platform(private val api: Api, private val session: Session, private val c
     }
   }
 
+  /**
+   * Opening a message reads it. The row is changed in place rather than the
+   * list fetched again: fetching again would be the newest page only, and
+   * drop whatever the guest had scrolled down to.
+   */
   suspend fun markRead(message: InboxMessage) {
     val token = session.token ?: return
     if (message.read) return
@@ -324,7 +352,10 @@ class Platform(private val api: Api, private val session: Session, private val c
       throw error
     } catch (_: Exception) {
     }
-    loadInbox()
+    inbox = inbox.copy(
+      unread = maxOf(0, inbox.unread - 1),
+      messages = inbox.messages.map { if (it.id == message.id) it.copy(read = true) else it },
+    )
     refresh()
   }
 
