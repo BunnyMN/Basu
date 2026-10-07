@@ -94,7 +94,9 @@ export function securityHeaders(app: FastifyInstance, webRoot: string): void {
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('X-Frame-Options', 'DENY');
     reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
-    reply.header('Permissions-Policy', 'geolocation=(self), camera=(), microphone=(), payment=()');
+    // The microphone and camera are this site's own, for a call about an order
+    // (src/web/call.js); no frame, and no other origin, ever gets them.
+    reply.header('Permissions-Policy', 'geolocation=(self), camera=(self), microphone=(self), payment=()');
   });
 }
 
@@ -108,13 +110,15 @@ export interface Limit {
   timeWindow: string;
 }
 
-export function limits(): { global: Limit; otp: Limit; verify: Limit; ops: Limit } {
+export function limits(): { global: Limit; otp: Limit; verify: Limit; ops: Limit; call: Limit } {
   const strict = mode() === 'production';
   return {
     global: { max: strict ? 600 : 3000, timeWindow: '1 minute' },
     otp: { max: strict ? 10 : 120, timeWindow: '1 minute' },
     verify: { max: strict ? 30 : 240, timeWindow: '1 minute' },
     ops: { max: strict ? 120 : 600, timeWindow: '1 minute' },
+    // Every call rings somebody's phone: a person redialling is a handful, not this.
+    call: { max: strict ? 20 : 200, timeWindow: '10 minutes' },
   };
 }
 

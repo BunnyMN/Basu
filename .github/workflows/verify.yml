@@ -103,6 +103,12 @@ jobs:
           APNS_KEY_ID: ${{ secrets.APNS_KEY_ID }}
           APNS_KEY: ${{ secrets.APNS_KEY }}
           APNS_ENV: ${{ secrets.APNS_ENV }}
+          # coturn, the relay for calls that cannot go phone to phone: a long
+          # random secret, and the host name phones reach it at
+          # (basu.burzai.cloud). Setting TURN_SECRET is what installs it, on
+          # the next deploy; «-» takes the key out and calls go direct only.
+          TURN_SECRET: ${{ secrets.TURN_SECRET }}
+          TURN_HOST: ${{ secrets.TURN_HOST }}
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
@@ -110,6 +116,6 @@ jobs:
           # The command is the commit; the server's forced command reads it
           # and refuses anything that is not on main. The keys go on stdin,
           # where scripts/deploy.sh reads them — never on the command line.
-          for key in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET SMTP_URL MAIL_FROM OPS_MEMBERS WIRE_SECRET_KEY WIRE_WEBHOOK_SECRET WIRE_RETURN_URL APNS_TEAM_ID APNS_KEY_ID APNS_KEY APNS_ENV; do
+          for key in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET SMTP_URL MAIL_FROM OPS_MEMBERS WIRE_SECRET_KEY WIRE_WEBHOOK_SECRET WIRE_RETURN_URL APNS_TEAM_ID APNS_KEY_ID APNS_KEY APNS_ENV TURN_SECRET TURN_HOST; do
             if [ -n "${!key}" ]; then printf '%s=%s\n' "$key" "${!key}"; fi
           done | ssh -i ~/.ssh/deploy -o IdentitiesOnly=yes -o BatchMode=yes "root@$DEPLOY_HOST" "${{ github.sha }}"

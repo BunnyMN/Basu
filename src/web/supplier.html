@@ -198,7 +198,8 @@
 .papers{margin-top:28px}
 .papers-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .papers-none{margin:8px 0 0;color:var(--ink-3);font-size:var(--t-body);max-width:56ch}
-.paper-act{margin-top:12px}
+.paper-act,.call-act{margin-top:12px}
+.paper-act + .call-act{margin-left:8px}
 .file-pick{display:flex;align-items:center;gap:12px;min-width:0}
 .file-pick .file-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-3);font-size:var(--t-body)}
 .ticket .rel{font-size:var(--t-cap);font-weight:600;color:var(--ink-2)}
@@ -363,6 +364,7 @@
 
 <script type="module">
 import { api, photoOf, ownPhoto, store, shell, toast, mnt, money, KIND, IDESH_STATE, ideshStage, dayLabel, dayShort, ubParts, signInDoors, accountWays, authReturn, popup, confirmPopup, passwordPopup, BANK_NAMES, phoneText, dropSession, whatWentWrong } from '/api.js';
+import { callButton, listenForCalls } from '/call.js';
 import { NAV_ICON, deskFrame, navHref } from '/sidenav.js';
 import { dataTable, dtCell } from '/datatable.js';
 
@@ -3219,6 +3221,14 @@ async function openOrder(id, from = 'orders') {
     paper.addEventListener('click', () => void certifyOrder(o, () => openOrder(id, from)));
     view.querySelector('#act').append(paper);
   }
+  // Ringing the guest through Basu: neither number changes hands, and the camera can show the animal.
+  void callButton('idesh', o.id, { className: 'btn call-act', label: 'Зочин руу залгах' }).then((button) => {
+    const act = document.getElementById('act');
+    if (button && act && !act.querySelector('[data-call]')) {
+      button.dataset.size = 'sm';
+      act.append(button);
+    }
+  });
   if (lane) onActed = () => openOrder(id, from);
 }
 
@@ -3356,6 +3366,8 @@ async function boot() {
   try {
     seat = await sup('/v1/supplier/seat');
     openModule();
+    // A guest ringing about an order rings this desk while it is open.
+    listenForCalls();
     return;
   } catch (error) {
     if (error.status === 403) {

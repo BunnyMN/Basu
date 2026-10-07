@@ -74,6 +74,7 @@ export class ApiError extends Error {
     super(body?.error?.message_mn ?? 'Алдаа гарлаа.');
     this.status = status;
     this.code = body?.error?.code ?? 'UNKNOWN';
+    this.body = body ?? null;
   }
 }
 
@@ -172,6 +173,21 @@ export const shell = {
   /** What the sheet was paying is settled — bought, let go or given back: the sheet closes. */
   paid() {
     shell.post({ type: 'paid' });
+  },
+
+  /**
+   * Whether the shell makes calls itself — the system's call screen, a ring
+   * that wakes a phone in a pocket. A build that can says so before the page
+   * runs (`__basuCalls`); in one that cannot, the page offers no call at all
+   * rather than one that rings nowhere.
+   */
+  get calls() {
+    return shell.present && globalThis.__basuCalls === true;
+  },
+
+  /** Ring the other side of this order from the shell's own call screen. */
+  call(subject, subjectId, peerName) {
+    shell.post({ type: 'call', subject, subject_id: subjectId, peer_name: peerName });
   },
 };
 

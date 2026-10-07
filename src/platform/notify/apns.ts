@@ -6,14 +6,16 @@ import {
   type ActivityPush,
   type Notifier,
   type OutgoingMessage,
+  type VoipPush,
 } from '../../ports.js';
 
 /**
  * Apple Push Notification service, spoken directly.
  *
- * Two things go through here: a notification to a device (`send`, the push
- * channel of the relay ladder) and a Live Activity update to a lock screen
- * (`pushActivity`). Both are one HTTP/2 POST with a bearer token that Apple
+ * Three things go through here: a notification to a device (`send`, the push
+ * channel of the relay ladder), a Live Activity update to a lock screen
+ * (`pushActivity`) and a call ringing (`pushVoip`). Each is one HTTP/2 POST
+ * with a bearer token that Apple
  * wants signed with the team's `.p8` key — a JWT, ES256, no older than an
  * hour. Node has HTTP/2 and ES256 built in, so there is no dependency to take
  * for it, and a library that hides the request would hide the only part that
@@ -123,7 +125,7 @@ export class ApnsClient {
   /** One POST to `/3/device/{token}`. Resolves with `apns-id`; rejects on anything but 200. */
   async post(input: {
     token: string;
-    pushType: 'alert' | 'liveactivity';
+    pushType: 'alert' | 'liveactivity' | 'voip';
     topic: string;
     payload: Record<string, unknown>;
     priority?: 5 | 10;
@@ -233,6 +235,19 @@ export class ApnsNotifier implements Notifier {
       topic: `${this.#bundleId}.push-type.liveactivity`,
       priority: 10,
       payload: { aps },
+    });
+    return { providerRef };
+  }
+
+  /** A ring, to PushKit's own topic. The key is team-wide, so it covers `.voip` too. */
+  async pushVoip(push: VoipPush): Promise<{ providerRef: string }> {
+    const providerRef = await this.client.post({
+      token: push.token,
+      pushType: 'voip',
+      topic: `${this.#bundleId}.voip`,
+      priority: 10,
+      expiresAt: push.expiresAt,
+      payload: push.payload,
     });
     return { providerRef };
   }

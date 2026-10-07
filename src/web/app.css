@@ -1694,3 +1694,41 @@ input:is([type="checkbox"],[type="radio"])[aria-invalid="true"]{border-color:var
   .popup > header{grid-template-columns:minmax(0,1fr) var(--target)}
   .popup > header .x{width:var(--target);height:var(--target);margin:-6px -8px 0 0}
 }
+
+/* ── a call (call.js) ───────────────────────────────────────────────
+   Over everything, the whole screen: the other side's name, how the call is
+   going, and round buttons along the bottom. Hanging up is the crimson one;
+   answering the off-white one — no green, as everywhere else. A camera
+   turned on over there fills the screen behind the words. */
+.call-screen{
+  position:fixed;inset:0;z-index:calc(var(--z-toast) - 1);display:flex;flex-direction:column;justify-content:space-between;
+  padding:calc(var(--safe-t) + 56px) 24px calc(var(--safe-b) + 36px);
+  background:radial-gradient(120% 70% at 50% 0%,var(--surface-2),var(--deep) 70%);color:var(--ink);
+}
+html[data-calling]{overflow:hidden}
+.call-head{position:relative;z-index:1;display:grid;justify-items:center;gap:10px;text-align:center}
+.call-about{font-family:var(--sans);font-size:.75rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
+.call-about:empty{display:none}
+.call-peer{font-family:var(--display);font-size:var(--t-title);font-weight:800;line-height:1;letter-spacing:-.004em;max-width:22ch;overflow-wrap:anywhere}
+.call-status{font-family:var(--sans);font-size:var(--t-body-lg);font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums;min-height:1.5em;max-width:34ch}
+.call-acts{position:relative;z-index:1;display:flex;justify-content:center;gap:clamp(18px,7vw,44px)}
+.call-btn{display:grid;justify-items:center;gap:8px;background:none;border:0;color:var(--ink-2);font:600 .8125rem/1.2 var(--sans);cursor:pointer;min-width:72px}
+.call-btn svg{width:64px;height:64px;padding:19px;border-radius:var(--r-pill);background:var(--surface-3);color:var(--ink);
+  fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transition:background var(--dur) var(--ease)}
+.call-btn:hover svg{background:var(--line-2)}
+.call-btn[data-on] svg{background:var(--ink);color:var(--on-light)}
+.call-btn[data-k] svg{fill:currentColor;stroke:none}
+.call-btn[data-k="end"] svg{background:var(--accent);color:var(--on-accent);box-shadow:var(--glow)}
+.call-btn[data-k="end"]:hover svg{background:var(--accent-hover)}
+.call-btn[data-k="answer"] svg{background:var(--ink);color:var(--on-light)}
+.call-btn:focus-visible{outline:none}
+.call-btn:focus-visible svg{box-shadow:0 0 0 2px var(--deep),0 0 0 4px var(--focus)}
+.call-remote{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:var(--deep)}
+.call-screen[data-video] .call-head{text-shadow:0 1px 12px rgba(0,0,0,.7)}
+.call-screen[data-video]::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(rgba(12,10,9,.55),transparent 28%,transparent 62%,rgba(12,10,9,.75))}
+.call-self{position:absolute;z-index:2;right:16px;bottom:calc(var(--safe-b) + 150px);width:96px;height:128px;object-fit:cover;
+  border-radius:var(--r-sm);border:1px solid var(--gold-line);background:var(--deep)}
+.call-audio{display:none}
+/* the button on an order that starts one */
+[data-call] svg{width:18px;height:18px;fill:currentColor;flex:none}

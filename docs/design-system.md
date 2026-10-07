@@ -377,6 +377,10 @@ Markup хэвээр; `--surface-2`, тасархай доод хүрээ, sans �
 
 Зан төлөв, markup өмнөх шиг. Google-ийн товч — Google-ийн dark загвар (#131314 дүүргэлт, #8E918F хүрээ, #E3E3E3 бичиг, дөрвөн өнгийн тэмдэг хэвээр); имэйлийн «Код авах» нь ганц primary; `.ways-say` — улааны бичиг + тэмдэг; `.or` hairline; кодын нүд `input.code` (display). `accountWays` — `[data-rows]` мөр + sm товч.
 
+### 5.27 Дуудлага — `.call-screen` (`call.js`), `[data-call]`
+
+Бүх дэлгэцийг дүүргэсэн `role=dialog`, `--z-toast`-ийн доор: дээд талд `.call-about` (алтан 12/700, том үсэг, «ИДЭШ №7001»), `.call-peer` display `--t-title`, `.call-status` 16/600 `--ink-2` (tabular — «00:42»); доор `.call-acts` дугуй товчнууд 64px `--surface-3` + 13/600 шошго. **Таслах/Татгалзах** — `[data-k=end]` час улаан + `--glow`; **Авах** — `[data-k=answer]` цайвар (`--ink` + `--on-light`), ногоон байхгүй; асаалттай төлөв (`[data-on]` — дуу хаасан, камер асаалттай) цайвар. Нөгөө талын камер асвал `.call-remote` дэлгэцийг бүтэн дүүргэж (`[data-video]`, дээр/доор бараан угаалт), өөрийн камер `.call-self` 96×128 алтан hairline-тай. Захиалга дээрх товч `[data-call]` — хуудасны өөрийн товч (`s-btn s-btn-line` вэбд, `.btn` /supplier, апп-д), дүрс 18px. Shell дотор `shell.calls` үнэн биш бол товч огт гарахгүй.
+
 ### 5.26 Хүртээмж — focus, 44px, 16px, хөдөлгөөн, шошго (r6)
 
 - **Focus ring — нэг.** `:focus-visible{outline:2px solid var(--focus); outline-offset:2px}` — `--focus` #F6F0E8, бараан бүх гадаргуу дээр (bg 17:1, surface-2 14:1). Хайчилдаг саван доторх зүйл дотогшоо (мөр −3, seg/ws-menu/хүснэгтийн мөр −2, `.dt-sort` нүдэндээ). Талбар — `--focus` хүрээ + `--ring`. Хуудас `--focus`-ийг дарж бичих шаардлагагүй болсон (хуучин `--focus:var(--accent-line)` зурвасын дүрмүүдийг area-ууд устгана).

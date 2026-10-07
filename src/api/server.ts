@@ -49,6 +49,7 @@ import { registerDishRoutes } from './dishes.js';
 import { registerRouteRoutes } from './route.js';
 import { registerPlatformRoutes } from './platform.js';
 import { registerIdeshRoutes } from './idesh.js';
+import { registerCallRoutes } from './calls.js';
 import { registerOpsRoutes } from './ops.js';
 import { registerPaymentRoutes } from './payments.js';
 import { registerAuthRoutes } from './auth.js';
@@ -193,6 +194,8 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
   // The second vertical. Its own file for the same reason platform is: when
   // идэш moves out of this process, this is the mount that goes with it.
   await registerIdeshRoutes(app, ctx, { requireGuest, dev: options.dev ?? false });
+  // Ringing each other about an order, in the app. See src/api/calls.ts.
+  await registerCallRoutes(app, ctx, requireGuest);
   // The people who sign contracts, behind one secret. See src/api/ops.ts.
   await registerOpsRoutes(app, ctx, { dev: options.dev ?? false });
   // Where the payment provider calls back. Mounted only when there is a

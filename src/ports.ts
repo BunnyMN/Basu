@@ -141,6 +141,19 @@ export interface ActivityPush {
   dismissAt?: Date;
 }
 
+/**
+ * A call ringing a phone that may be asleep: iOS's PushKit, which wakes the
+ * app straight into the system's incoming-call screen. Every one of these
+ * must be a real ring — iOS ends an app that is woken this way and shows no
+ * call, and soon stops waking it at all — so nothing else is ever sent here.
+ */
+export interface VoipPush {
+  token: string;
+  payload: Record<string, unknown>;
+  /** A ring nobody answered by then is not delivered late. */
+  expiresAt: Date;
+}
+
 export class PushTokenGone extends Error {
   constructor(readonly token: string) {
     super('the push token is no longer valid');
@@ -154,6 +167,8 @@ export interface Notifier {
    * caller can forget it rather than retry it forever.
    */
   pushActivity(push: ActivityPush): Promise<{ providerRef: string }>;
+  /** Throws `PushTokenGone` for a token the provider says is dead. */
+  pushVoip(push: VoipPush): Promise<{ providerRef: string }>;
 }
 
 /* ── email ─────────────────────────────────────────────────────────── */
@@ -368,6 +383,7 @@ export class FakeTaxProvider implements TaxProvider {
 export class FakeNotifier implements Notifier {
   readonly sent: OutgoingMessage[] = [];
   readonly activities: ActivityPush[] = [];
+  readonly rings: VoipPush[] = [];
   /** Simulates the push provider dying so traffic falls back to SMS. */
   failChannel: 'push' | 'sms' | null = null;
   /** Tokens APNs would answer 410 for. */
@@ -387,6 +403,13 @@ export class FakeNotifier implements Notifier {
     if (this.failChannel === 'push') throw new Error('push provider unavailable');
     this.activities.push(push);
     return { providerRef: `act-${++this.#seq}` };
+  }
+
+  async pushVoip(push: VoipPush): Promise<{ providerRef: string }> {
+    if (this.deadTokens.has(push.token)) throw new PushTokenGone(push.token);
+    if (this.failChannel === 'push') throw new Error('push provider unavailable');
+    this.rings.push(push);
+    return { providerRef: `ring-${++this.#seq}` };
   }
 
   of(template: string): OutgoingMessage[] {

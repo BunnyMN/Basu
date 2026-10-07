@@ -20,6 +20,7 @@ export const SETTINGS: readonly SettingSpec[] = [
   { key: 'promo_vip_mnt', label: 'VIP зарын үнэ, ₮', hint: 'Нийлүүлэгч нэг удаа төлөхөд. 0 бол үнэгүй.', kind: 'number', fallback: 50000 },
   { key: 'promo_vip_days', label: 'VIP зарын хугацаа, хоног', hint: 'Хамгийн дээр, нүүр хуудсанд хэдэн хоног гарах.', kind: 'number', fallback: 7 },
   { key: 'desk_banner', label: 'Ширээний зарлал', hint: 'Самбарын дээр бүх гишүүнд харагдана. Хоосон бол харагдахгүй.', kind: 'text', fallback: '' },
+  { key: 'calls_open', label: 'Апп доторх дуудлага', hint: '1 бол Идэшийн захиалгад «Залгах» гарна. 0 бол хаалттай, өмнө нь эхэлсэн дуудлага дуусах хүртэл үргэлжилнэ.', kind: 'number', fallback: 0 },
 ];
 
 export interface Setting extends SettingSpec {

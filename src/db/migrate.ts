@@ -59,7 +59,7 @@ export async function reset(): Promise<void> {
     throw new Error('refusing to reset the schema in production');
   }
   await getPool().query(`
-    DROP SCHEMA IF EXISTS access, org, ops, idesh, dine, notify, ledger, identity CASCADE;
+    DROP SCHEMA IF EXISTS call, access, org, ops, idesh, dine, notify, ledger, identity CASCADE;
     DROP SCHEMA public CASCADE;
     CREATE SCHEMA public;
   `);

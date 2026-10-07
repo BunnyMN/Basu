@@ -213,7 +213,7 @@ fi
 # Only these names, and a name the secrets do not set is left as it is on
 # the server: an unset secret never wipes a key. The log says which key was
 # set, never what to — it is public.
-MANAGED_KEYS=" GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET SMTP_URL MAIL_FROM OPS_MEMBERS WIRE_SECRET_KEY WIRE_WEBHOOK_SECRET WIRE_RETURN_URL APNS_TEAM_ID APNS_KEY_ID APNS_KEY APNS_ENV "
+MANAGED_KEYS=" GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET SMTP_URL MAIL_FROM OPS_MEMBERS WIRE_SECRET_KEY WIRE_WEBHOOK_SECRET WIRE_RETURN_URL APNS_TEAM_ID APNS_KEY_ID APNS_KEY APNS_ENV TURN_SECRET TURN_HOST "
 if [ -n "$incoming" ]; then
   while IFS= read -r line; do
     [ -n "$line" ] || continue
@@ -319,6 +319,12 @@ for _ in $(seq 1 30); do
           echo "  $unit: cwd $(systemctl show -p WorkingDirectory --value "$unit" 2>/dev/null || true); from systemd: ${given:-nothing}${db:+; DATABASE_URL names $db}"
         done
       fi
+    fi
+    # The relay for calls, once TURN_SECRET is among the repository's
+    # secrets. A relay that fails to come up leaves calls to go direct;
+    # it is no reason to call the deploy failed.
+    if [ "$PINNED" != demo ]; then
+      APP="$APP" bash scripts/turn-setup.sh || echo "  relay: setup failed (exit $?) — calls go direct only"
     fi
     flipped=0
     exit 0

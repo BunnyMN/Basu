@@ -186,6 +186,10 @@ async function openPage(
   // <script src> would have made, and our rendering of it inlined like the rest.
   const tables = html.includes("from '/datatable.js'") ? strip(await readFile(join(WEB, 'datatable.js'), 'utf8')) : '';
   if (tables) window.eval(await readFile(join(WEB, 'vendor', 'table-core.js'), 'utf8'));
+  // Calls in a scope of their own: call.js keeps short names (esc, ICON) the pages have too.
+  const calls = html.includes("from '/call.js'")
+    ? `const { callButton, listenForCalls } = (() => { ${strip((await readFile(join(WEB, 'call.js'), 'utf8')).replace(/^\s*import[\s\S]*?from\s*'\/[\w.]+';?$/gm, ''))}\nreturn { callButton, listenForCalls }; })();`
+    : '';
   const inline = /<script type="module">([\s\S]*?)<\/script>/.exec(html)?.[1] ?? '';
   const page = inline.replace(/^\s*import[\s\S]*?from\s*'\/[\w.]+';?$/gm, '');
 
@@ -202,7 +206,7 @@ async function openPage(
   }
   before?.(window);
   window.eval(
-    `(async () => { ${shared}\n${site}\n${mapLib}\n${sideNav}\n${tables}\n${page} })().catch(e => { window.__err = e; });`,
+    `(async () => { ${shared}\n${site}\n${mapLib}\n${sideNav}\n${tables}\n${calls}\n${page} })().catch(e => { window.__err = e; });`,
   );
   open.push(dom);
   return dom;

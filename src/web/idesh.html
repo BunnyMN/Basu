@@ -503,6 +503,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.min.js" integrity="sha512-hoXlvOdSmh58mppUyZHZsscHkR/yXl6zLpTMTNwA6IZ61DpeaCNjosRu1WJ2DeIpkfW5MsJJ9H89zjV4IBGqRw==" crossorigin="anonymous"></script>
 <script type="module">
 import { api, photoOf, store, shell, toast, mnt, money, meter, ideshStage, IDESH_STATE, IDESH_STEP, KIND, BANK_NAMES, dayLabel, dayShort, ubParts, signInSheet, passwordPopup, dropSession, whatWentWrong, ownPhoto, breakdownStart, breakdownFee, breakdownBody, breakdownWords, breakdownStep } from '/api.js';
+import { callButton } from '/call.js';
 import { mapStyle, ULAANBAATAR, MAP_LOCALE } from '/mapStyle.js';
 
 const $ = (id) => document.getElementById(id);
@@ -2313,6 +2314,10 @@ async function showStatus(force, { replace = false } = {}) {
   const paper = order.cancel_reason ? '' : paperLine(order.certificate, live ? order.unit : null);
   if (paper) who.append(el(paper));
   body.append(who);
+  // A call through the app's own call screen — offered only by a build that rings (shell.calls).
+  void callButton('idesh', order.id, { className: 'btn call-act', label: 'Апп-аар залгах' }).then((button) => {
+    if (button && who.isConnected && !who.querySelector('[data-call]')) who.append(button);
+  });
 
   /* the money */
   const pay = el('<div class="panel card"></div>');

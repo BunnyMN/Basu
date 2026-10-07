@@ -114,7 +114,7 @@ describe('a Live Activity push', () => {
   it('goes to the liveactivity topic with the content state Apple expects', async () => {
     const notifier = new ApnsNotifier(
       { teamId: 'TEAM123', keyId: 'KEY456', privateKey: privateKeyPem, bundleId: 'mn.basu.app', host: '127.0.0.1', port, scheme: 'http' },
-      { send: async () => ({ providerRef: 'sms' }), pushActivity: async () => ({ providerRef: 'x' }) },
+      { send: async () => ({ providerRef: 'sms' }), pushActivity: async () => ({ providerRef: 'x' }), pushVoip: async () => ({ providerRef: 'x' }) },
     );
     seen.length = 0;
     const seating = new Date('2026-09-05T04:30:00Z');
@@ -151,7 +151,7 @@ describe('a Live Activity push', () => {
     seen.length = 0;
     const notifier = new ApnsNotifier(
       { teamId: 'TEAM123', keyId: 'KEY456', privateKey: privateKeyPem, bundleId: 'mn.basu.app', host: '127.0.0.1', port, scheme: 'http' },
-      { send: async () => ({ providerRef: 'sms' }), pushActivity: async () => ({ providerRef: 'x' }) },
+      { send: async () => ({ providerRef: 'sms' }), pushActivity: async () => ({ providerRef: 'x' }), pushVoip: async () => ({ providerRef: 'x' }) },
     );
     const dismiss = new Date('2026-09-05T05:00:00Z');
     await notifier.pushActivity({ token: 'live1', event: 'end', contentState: { stage: 'ready' }, dismissAt: dismiss });
@@ -176,6 +176,7 @@ describe('a notification to a device', () => {
           return { providerRef: 'sms-1' };
         },
         pushActivity: async () => ({ providerRef: 'x' }),
+        pushVoip: async () => ({ providerRef: 'x' }),
       },
     );
     seen.length = 0;
@@ -188,6 +189,26 @@ describe('a notification to a device', () => {
     const ref = await notifier.send({ channel: 'sms', to: '+97699001122', template: 'auth.otp', body: '1234' });
     expect(ref.providerRef).toBe('sms-1');
     expect(sms).toEqual([{ to: '+97699001122', body: '1234' }]);
+    notifier.client.close();
+  });
+});
+
+describe('a call ringing', () => {
+  it('goes to PushKit’s own topic as a voip push, gone when nobody answered in time', async () => {
+    const notifier = new ApnsNotifier(
+      { teamId: 'TEAM123', keyId: 'KEY456', privateKey: privateKeyPem, bundleId: 'mn.basu.app', host: '127.0.0.1', port, scheme: 'http' },
+      { send: async () => ({ providerRef: 'sms' }), pushActivity: async () => ({ providerRef: 'x' }), pushVoip: async () => ({ providerRef: 'x' }) },
+    );
+    seen.length = 0;
+    const expiresAt = new Date('2026-10-07T05:00:45Z');
+    await notifier.pushVoip({ token: 'voip1', expiresAt, payload: { call_id: 'c1', caller_name: 'Архангай · Дорж' } });
+    const push = seen[0]!;
+    expect(push.path).toBe('/3/device/voip1');
+    expect(push.headers['apns-push-type']).toBe('voip');
+    expect(push.headers['apns-topic']).toBe('mn.basu.app.voip');
+    expect(push.headers['apns-priority']).toBe('10');
+    expect(push.headers['apns-expiration']).toBe(String(Math.floor(expiresAt.getTime() / 1000)));
+    expect(push.body).toEqual({ call_id: 'c1', caller_name: 'Архангай · Дорж' });
     notifier.client.close();
   });
 });

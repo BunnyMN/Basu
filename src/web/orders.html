@@ -136,6 +136,7 @@
 <script type="module">
 import { store, mnt, dayLabel, dayShort, ubParts, IDESH_LIVE, BANK_NAMES, popup, passwordPopup, whatWentWrong } from '/api.js';
 import { mountFrame, requireSignIn, authed, esc, el, say, me, siteEmpty, howToBuy, statePill, tugrik, phoneShown, meatPhoto, stillGoing, refundPill } from '/site.js';
+import { callButton, listenForCalls } from '/call.js';
 
 /**
  * Back from QPay's page (`?paying=1`, the address Wire sends a person to once
@@ -146,6 +147,8 @@ import { mountFrame, requireSignIn, authed, esc, el, say, me, siteEmpty, howToBu
 const payingBack = new URLSearchParams(location.search).has('paying');
 const token = payingBack && !store.guestToken ? null : requireSignIn();
 void mountFrame('orders');
+// While this page is open, the supplier ringing about an order rings here.
+if (token) listenForCalls();
 const page = document.getElementById('page');
 
 const unitWord = (o) => (o.unit === 'whole' ? 'толгой' : 'кг');
@@ -330,7 +333,7 @@ async function drawOrder(id, fresh) {
             ${o.receipt ? `<div><dt>Е-баримт</dt><dd>Сугалаа <span class="digits">${esc(o.receipt.lottery ?? '')}</span></dd></div>` : ''}
           </dl>
         </div>`),
-    el(`<div class="s-card od-box">
+    el(`<div class="s-card od-box" id="od-supplier">
           <h2>Нийлүүлэгч</h2>
           <dl><div><dt>Нэр</dt><dd>${esc(o.supplier.name)}<small>Basu шалгаж, гэрээ байгуулсан</small></dd></div>${
             o.certificate && !o.cancel_reason
@@ -341,6 +344,14 @@ async function drawOrder(id, fresh) {
           ${live ? '<p class="od-note">Өөрчлөх, цуцлах бол нийлүүлэгчтэй ярина уу — цуцлахыг тэр хийнэ.</p>' : ''}
         </div>`),
   );
+  // A call without either number changing hands, while the order is one to ask about.
+  void callButton('idesh', o.id).then((button) => {
+    const box = document.getElementById('od-supplier');
+    if (!button || !box || box.querySelector('[data-call]')) return;
+    const tel = box.querySelector('a[href^="tel:"]');
+    if (tel) tel.after(button);
+    else box.querySelector('dl')?.after(button);
+  });
   return o;
 }
 
