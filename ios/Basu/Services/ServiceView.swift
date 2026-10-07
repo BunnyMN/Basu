@@ -14,7 +14,7 @@ import WebKit
  `pages.test.ts`. Writing it a second time in Swift meant every fix landing
  twice or, more often, once.
 
- Four things cross the line between the two, and only four:
+ Five things cross the line between the two, and only five:
 
  - **The session.** The shell signs the guest in and keeps the token in the
    keychain. Before the page loads, the token is put where the page already
@@ -30,6 +30,10 @@ import WebKit
    The first time something is running, it is also the moment to ask whether
    its progress may come to the lock screen (`PushAsk`) — or, for a supplier,
    the moment their counter opens.
+
+ - **Calling.** The order page's «Апп-аар залгах» hands the order over
+   (`call`), and `CallCenter` rings with the phone's own call screen. The page
+   knows the shell can by `window.__basuCalls`.
 
  - **Paying.** A page that needs QPay hands its invoice over (`pay`) — the
    QR's text and the bank apps, raised for this sheet — and the shell's own
@@ -345,6 +349,13 @@ final class ServicePage: NSObject {
       injectionTime: .atDocumentStart,
       forMainFrameOnly: true,
     ))
+    // And calls with the phone's own call screen (`call` below): the order page
+    // offers «Апп-аар залгах» only to a shell that says so.
+    controller.addUserScript(WKUserScript(
+      source: "window.__basuCalls = true;",
+      injectionTime: .atDocumentStart,
+      forMainFrameOnly: true,
+    ))
     guard let url = URL(string: path, relativeTo: base)?.absoluteURL else { return }
     prefix = url.path.isEmpty ? "/" : url.path
     var request = URLRequest(url: url)
@@ -437,6 +448,9 @@ final class ServicePage: NSObject {
     case "pay":
       if let request = Self.payRequest(message["invoice"]) { pay?(request) }
     case "paid": paid?()
+    case "call":
+      guard let subject = message["subject"] as? String, let subjectId = message["subject_id"] as? String else { return }
+      CallCenter.shared.ringOut(subject: subject, subjectId: subjectId, peerName: message["peer_name"] as? String ?? "")
     default: break
     }
   }

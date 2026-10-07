@@ -175,6 +175,8 @@ final class Platform {
    */
   func signOut() {
     let token = session.token
+    // This phone stops ringing for them — said while the token still opens the door.
+    CallCenter.shared.signedOut(token: token)
     session.signOut()
     sessions = []
     guard let token else { return }

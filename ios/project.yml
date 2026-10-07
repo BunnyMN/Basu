@@ -45,6 +45,12 @@ settings:
 packages:
   BasuKit:
     path: BasuKit
+  # Google's WebRTC, built for iOS: calls between a guest and a supplier
+  # (Basu/Calls). A binary framework; pinned, because a WebRTC that moves
+  # under a release is a call that stops connecting.
+  WebRTC:
+    url: https://github.com/stasel/WebRTC
+    exactVersion: "154.0.0"
 
 # Manrope (static 400 / 500 / 600 / 700) for words and Noto Sans Display
 # Condensed (700 / 800) for headings, money, times and codes — the web's own
@@ -69,6 +75,7 @@ targets:
         excludes: ["*.txt"]
     dependencies:
       - package: BasuKit
+      - package: WebRTC
       - target: BasuWidgets
         embed: true
     configFiles:
@@ -94,6 +101,15 @@ targets:
         NSSupportsLiveActivities: true
         # Profile → Тохиргоо: the app lock (AppLock.swift).
         NSFaceIDUsageDescription: Basu-г зөвхөн та нээх боломжтой байлгахын тулд Face ID ашиглана.
+        # A call about an order (Basu/Calls): the voice, and the camera that
+        # shows the animal. Asked the first time either is used, never before.
+        NSMicrophoneUsageDescription: Захиалгынхаа талаар нийлүүлэгч эсвэл захиалагчтайгаа ярихад микрофон хэрэгтэй.
+        NSCameraUsageDescription: Дуудлагын үеэр малаа, махаа харуулахад камер хэрэгтэй.
+        # A ring wakes the app through PushKit (voip), and the call keeps
+        # talking with the screen off (audio).
+        UIBackgroundModes:
+          - audio
+          - voip
         # basu://order/{id}, basu://wallet, basu://notifications
         CFBundleURLTypes:
           - CFBundleURLName: mn.basu.app$(BASU_ID_SUFFIX)

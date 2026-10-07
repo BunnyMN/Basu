@@ -29,6 +29,10 @@ struct BasuApp: App {
     let model = AppModel()
     _model = State(initialValue: model)
     _platform = State(initialValue: Platform(api: model.api, session: model.session))
+    // Before anything else: a ring may be what launched the app, and PushKit
+    // hands it over only to somebody already listening.
+    let session = model.session
+    CallCenter.shared.start(api: model.api) { session.token }
     // Light, dark or the phone's own was a choice until «Тансаг хар»: Basu is
     // dark now whatever the phone says, and the old answer is let go of.
     UserDefaults.standard.removeObject(forKey: "appearance")
@@ -94,6 +98,7 @@ struct RootView: View {
   @State private var splash = true
   @State private var debugPush = false
   @State private var debugPay: PayRequest?
+  @State private var calls = CallCenter.shared
 
   var body: some View {
     ZStack {
@@ -113,6 +118,14 @@ struct RootView: View {
           .zIndex(0.5)
       }
 
+      // A call, over the shell and the lock alike: answered from the lock
+      // screen, the person is mid-sentence, not at Face ID.
+      if calls.presenting {
+        CallScreen()
+          .transition(.opacity)
+          .zIndex(0.8)
+      }
+
       if splash {
         SplashView()
           .transition(.opacity)
@@ -121,6 +134,7 @@ struct RootView: View {
     }
     .animation(.easeOut(duration: 0.25), value: session.isSignedIn)
     .animation(.easeOut(duration: 0.25), value: model.browsing)
+    .animation(.easeOut(duration: 0.2), value: calls.presenting)
     // Out and back in lands on the launcher, not on whatever the last
     // person left open.
     .onChange(of: session.isSignedIn) { _, signedIn in
@@ -130,7 +144,10 @@ struct RootView: View {
         model.browsing = false
         // The token APNs gave at launch had nobody to belong to; now it has.
         Task { await PushRegistrar.shared.registerIfAllowed() }
+        // And the phone rings for them.
+        CallCenter.shared.signedIn()
       } else {
+        CallCenter.shared.signedOut(token: nil)
         tab = .home
         path = []
         // Nothing of the last person's stays on the lock screen or the widget.
@@ -198,6 +215,7 @@ struct RootView: View {
         }
       #endif
       await Self.signInForDebug(model)
+      Self.callForDebug()
       // The splash lasts as long as the launch does, within limits: the floor
       // is so a fast launch does not flash, and the cap is so a stalled
       // network is not a minute of wordmark. Past the cap the launcher draws
@@ -375,6 +393,18 @@ struct RootView: View {
       if model.session.isSignedIn, model.session.phone == phone { return }
       model.session.signOut()
       try? await model.session.demoSignIn(phone: phone)
+    #endif
+  }
+
+  /// `BASU_CALL_ORDER=<order id>` rings the other side of that идэш order once
+  /// signed in — the order page's button, without a finger in the simulator.
+  private static func callForDebug() {
+    #if DEBUG
+      guard let order = ProcessInfo.processInfo.environment["BASU_CALL_ORDER"], !order.isEmpty else { return }
+      Task {
+        try? await Task.sleep(for: .seconds(3))
+        CallCenter.shared.ringOut(subject: "idesh", subjectId: order, peerName: "Туршилт")
+      }
     #endif
   }
 
