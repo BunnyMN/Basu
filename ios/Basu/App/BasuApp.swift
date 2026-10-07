@@ -181,6 +181,10 @@ struct RootView: View {
       OrderActivity.shared.register = { subject, orderId, token in
         await platform.registerActivityToken(token, subject: subject, order: orderId)
       }
+      OrderActivity.shared.registerStart = { token in
+        await platform.registerActivityStartToken(token)
+      }
+      OrderActivity.shared.listen()
       // A phone that already said yes tells the server where it is now; one
       // that has not been asked is asked after its first order, not here.
       await PushRegistrar.shared.registerIfAllowed()

@@ -409,6 +409,15 @@ extension API {
     )
   }
 
+  /// The phone's push-to-start token for идэш cards: with it the server puts a
+  /// card up on the lock screen at each step the supplier takes.
+  func registerActivityStartToken(_ pushToken: String, token: String) async throws {
+    _ = try await send(
+      .init(path: "/v1/activities/start-token", method: "POST", body: ["push_token": pushToken, "subject": "idesh"], token: token),
+      as: API.Blank.self,
+    )
+  }
+
   func notifyPreferences(token: String) async throws -> NotifyPreferences {
     try await send(.init(path: "/v1/notifications/preferences", token: token))
   }

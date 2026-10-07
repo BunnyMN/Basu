@@ -2,14 +2,15 @@ import ActivityKit
 import Foundation
 
 /**
- An идэш on the lock screen and in the Dynamic Island, on the day it is
- received.
+ An идэш on the lock screen and in the Dynamic Island: at each step, and on
+ the day it is received.
 
- Only on the day. A Live Activity lives eight hours and lingers four more, and
- an идэш takes days — so the card does not follow the whole order: it comes
- up on the morning the meat is picked up or delivered (or the moment it goes
- out on the road) and goes once it is in the guest's hands. The days before
- are the notifications' and the launcher's.
+ A Live Activity lives eight hours and lingers four more, and an идэш takes
+ days — so the card does not follow the whole order in one. The server puts it
+ up at each step the supplier takes (a push to the phone's push-to-start
+ token), for the hours after it; the phone puts it up on the morning the meat
+ is picked up or delivered (or the moment it goes out on the road); and it goes
+ once the meat is in the guest's hands.
 
  The content state is four plain values, nothing to parse: the server's push
  (`src/services/activities.ts`) writes exactly these keys, and the app writes

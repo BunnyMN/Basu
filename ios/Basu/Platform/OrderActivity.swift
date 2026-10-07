@@ -20,7 +20,15 @@ final class OrderActivity {
   /// lunch, `idesh`), which one, and the token. Set by whoever owns the session.
   var register: ((_ subject: String, _ orderId: String, _ token: String) async -> Void)?
 
+  /// How to hand the phone's push-to-start token for идэш cards to the server.
+  /// True once it has it; false with nobody signed in, or no answer.
+  var registerStart: ((_ token: String) async -> Bool)?
+
   private var watching: Set<String> = []
+  private var listening = false
+  /// The push-to-start token, and the one the server has been given.
+  private var startToken: String?
+  private var startTokenSent: String?
 
   /// The launcher's list, for the widget: the first thing that will happen.
   /// Nothing live clears the snapshot; a failed fetch leaves it alone, which
@@ -95,6 +103,39 @@ final class OrderActivity {
 
   // MARK: - идэш
 
+  /**
+   From launch. An идэш takes days and a card lives eight hours, so the server
+   puts a card up itself at each step the supplier takes — «бэлтгэж байна» on
+   Monday is on the lock screen on Monday, the app closed — by a push to the
+   phone's push-to-start token, handed over here. And every идэш card that
+   comes up, the app's own or the server's, is watched: its own token goes to
+   the server so the card is moved from there, and a swipe is remembered.
+   */
+  func listen() {
+    guard !listening else { return }
+    listening = true
+    Task {
+      for await data in Activity<IdeshActivityAttributes>.pushToStartTokenUpdates {
+        startToken = data.map { String(format: "%02x", $0) }.joined()
+        await sendStartToken()
+      }
+    }
+    Task {
+      for await activity in Activity<IdeshActivityAttributes>.activityUpdates {
+        watch(activity)
+      }
+    }
+    for activity in Activity<IdeshActivityAttributes>.activities {
+      watch(activity)
+    }
+  }
+
+  /// Once per token and session: signed out, nobody holds it; signed in again, it is sent again.
+  private func sendStartToken() async {
+    guard let token = startToken, token != startTokenSent, let registerStart else { return }
+    if await registerStart(token) { startTokenSent = token }
+  }
+
   /// Orders whose card the guest swiped away: not put back up again.
   private static let sweptKey = "idesh.activity.swept"
 
@@ -107,6 +148,8 @@ final class OrderActivity {
    Only today's: an activity lives eight hours, and an идэш takes days.
    */
   func sync(idesh orders: [LiveIdesh]) async {
+    // Signed in by now: a push-to-start token that came before the sign-in goes to the server.
+    await sendStartToken()
     // The Home Screen's: the next one still to come, whatever its day.
     IdeshSnapshotStore.write(LiveIdesh.next(in: orders)?.widgetSnapshot)
     WidgetCenter.shared.reloadTimelines(ofKind: OrderSnapshotStore.widgetKind)
@@ -131,11 +174,13 @@ final class OrderActivity {
         if activity.activityState == .active {
           await activity.end(content, dismissalPolicy: .after(.now.addingTimeInterval(30 * 60)))
         }
-      } else if order.wantsCard(today: today) {
+      } else {
+        // Today's, or one the server put up for a step on another day: kept up, and kept true,
+        // until it ends by itself eight hours on. Ending a card that is not today's took the
+        // server's «бэлэн» off the lock screen the moment the app was opened.
+        // Its token and its swipe are already watched: `listen` sees every card, from launch.
         if activity.content.state != order.activityState { await activity.update(content) }
         up.insert(id)
-      } else {
-        await activity.end(nil, dismissalPolicy: .immediate)
       }
     }
 
@@ -232,6 +277,8 @@ final class OrderActivity {
   /// Signed out: nothing of the last person's stays on the lock screen or
   /// the Home Screen.
   func clear() async {
+    // The next person's phone gets the token again, under their own name.
+    startTokenSent = nil
     await endAll()
     for activity in Activity<IdeshActivityAttributes>.activities {
       await activity.end(nil, dismissalPolicy: .immediate)

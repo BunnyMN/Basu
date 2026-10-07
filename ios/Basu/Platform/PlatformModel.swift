@@ -481,6 +481,12 @@ final class Platform {
     try? await api.registerActivityToken(pushToken, subject: subject, order: orderId, token: session)
   }
 
+  /// The phone's push-to-start token for идэш cards. False with nobody signed in, or no answer: sent again later.
+  func registerActivityStartToken(_ pushToken: String) async -> Bool {
+    guard let session = session.token else { return false }
+    return (try? await api.registerActivityStartToken(pushToken, token: session)) != nil
+  }
+
   private func note(_ error: Error) {
     // A screen that left before its answer came has nothing to be told.
     guard !(error is CancellationError) else { return }
