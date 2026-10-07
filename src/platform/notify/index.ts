@@ -10,6 +10,8 @@ export {
   dismiss,
   enqueue,
   inbox,
+  inboxPage,
+  INBOX_PAGE_MAX,
   markRead,
   preferences,
   purgeCodes,

@@ -273,11 +273,39 @@ final class Platform {
     }
   }
 
+  /// The newest page; what opening the list or pulling it down asks for.
+  /// Older pages already scrolled past are let go and fetched again as needed.
   func loadInbox() async {
     guard let token = session.token else { return }
     do {
       inbox = try await api.inbox(token: token)
       trouble = nil
+    } catch {
+      note(error)
+    }
+  }
+
+  /// Whether the next page of the inbox is on its way.
+  private(set) var loadingMoreInbox = false
+
+  /**
+   The next page of the inbox, asked for as the last row comes into view.
+   Keyed on the last message rather than an offset, as the wallet is: one that
+   arrives while somebody scrolls goes to the top and shifts nothing here.
+   */
+  func loadMoreInbox() async {
+    guard let token = session.token, let cursor = inbox.next, !loadingMoreInbox else { return }
+    loadingMoreInbox = true
+    defer { loadingMoreInbox = false }
+    do {
+      let page = try await api.inbox(token: token, before: cursor)
+      // The list may have been reloaded meanwhile; a page that no longer
+      // follows it is dropped rather than stitched on in the wrong place.
+      guard inbox.next == cursor else { return }
+      let have = Set(inbox.messages.map(\.id))
+      inbox.messages += page.messages.filter { !have.contains($0.id) }
+      inbox.next = page.next
+      inbox.unread = page.unread
     } catch {
       note(error)
     }
@@ -385,10 +413,8 @@ final class Platform {
   func delete(_ message: InboxMessage) async {
     guard let token = session.token else { return }
     let kept = inbox
-    inbox = Inbox(
-      unread: message.read ? inbox.unread : max(0, inbox.unread - 1),
-      messages: inbox.messages.filter { $0.id != message.id },
-    )
+    inbox.unread = message.read ? inbox.unread : max(0, inbox.unread - 1)
+    inbox.messages.removeAll { $0.id == message.id }
     do {
       try await api.deleteMessage(message.id, token: token)
       await refresh()
@@ -398,10 +424,15 @@ final class Platform {
     }
   }
 
+  /// Read in place: reloading the list here would throw away the pages
+  /// somebody had scrolled down to reach this one.
   func markRead(_ message: InboxMessage) async {
     guard let token = session.token, !message.read else { return }
+    if let index = inbox.messages.firstIndex(where: { $0.id == message.id }) {
+      inbox.messages[index].read = true
+      inbox.unread = max(0, inbox.unread - 1)
+    }
     try? await api.markRead(message.id, token: token)
-    await loadInbox()
     await refresh()
   }
 

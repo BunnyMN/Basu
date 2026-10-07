@@ -204,43 +204,76 @@ export interface InboxItem {
   readAt: Date | null;
 }
 
+type InboxRow = {
+  id: string;
+  title: string | null;
+  body: string;
+  template: string;
+  subject: string | null;
+  subject_id: string | null;
+  channel: 'push' | 'sms';
+  state: string;
+  created_at: Date;
+  read_at: Date | null;
+};
+
+const itemOf = (r: InboxRow): InboxItem => ({
+  id: r.id,
+  title: r.title,
+  body: r.body,
+  template: r.template,
+  subject: r.subject,
+  subjectId: r.subject_id,
+  channel: r.channel,
+  state: r.state,
+  createdAt: r.created_at,
+  readAt: r.read_at,
+});
+
 /**
  * What the phone shows. Queued rows are included on purpose: from the guest's
  * side a message that exists is a message, and hiding it until an SMS gateway
  * has acknowledged it only makes the app look slower than it is.
  */
 export async function inbox(guestId: string, limit = 50): Promise<InboxItem[]> {
-  const { rows } = await getPool().query<{
-    id: string;
-    title: string | null;
-    body: string;
-    template: string;
-    subject: string | null;
-    subject_id: string | null;
-    channel: 'push' | 'sms';
-    state: string;
-    created_at: Date;
-    read_at: Date | null;
-  }>(
-    `SELECT id, title, body, template, subject, subject_id, channel, state, created_at, read_at
-       FROM notify.message
-      WHERE guest_id = $1 AND state <> 'failed' AND dismissed_at IS NULL
-      ORDER BY created_at DESC
+  return (await inboxPage(guestId, { limit })).items;
+}
+
+export interface InboxPage {
+  items: InboxItem[];
+  /** The last message's id, to ask for the page after it; null at the end. */
+  next: string | null;
+}
+
+/** The most a page holds, whatever is asked for. */
+export const INBOX_PAGE_MAX = 100;
+
+/**
+ * One page of the inbox, newest first.
+ *
+ * Keyed on the last message the guest already has rather than an offset: a
+ * message that arrives while they scroll lands at the top, and the page they
+ * are reading neither shifts nor repeats a row. A cursor that is not one of
+ * their messages finds nothing.
+ */
+export async function inboxPage(
+  guestId: string,
+  opts: { limit?: number; before?: string | null } = {},
+): Promise<InboxPage> {
+  const limit = Math.min(Math.max(Math.trunc(opts.limit ?? 30), 1), INBOX_PAGE_MAX);
+  const { rows } = await getPool().query<InboxRow>(
+    `SELECT m.id, m.title, m.body, m.template, m.subject, m.subject_id, m.channel, m.state,
+            m.created_at, m.read_at
+       FROM notify.message m
+      WHERE m.guest_id = $1 AND m.state <> 'failed' AND m.dismissed_at IS NULL
+        AND ($3::uuid IS NULL OR (m.created_at, m.id) <
+             (SELECT c.created_at, c.id FROM notify.message c WHERE c.id = $3 AND c.guest_id = $1))
+      ORDER BY m.created_at DESC, m.id DESC
       LIMIT $2`,
-    [guestId, limit],
+    [guestId, limit + 1, opts.before ?? null],
   );
-  return rows.map((r) => ({
-    id: r.id,
-    title: r.title,
-    body: r.body,
-    template: r.template,
-    subject: r.subject,
-    subjectId: r.subject_id,
-    channel: r.channel,
-    state: r.state,
-    createdAt: r.created_at,
-    readAt: r.read_at,
-  }));
+  const items = rows.slice(0, limit).map(itemOf);
+  return { items, next: rows.length > limit ? items[items.length - 1]!.id : null };
 }
 
 export async function unreadCount(guestId: string): Promise<number> {

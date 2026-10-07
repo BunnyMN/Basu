@@ -28,7 +28,8 @@ import { ownsIdesh } from '../idesh/index.js';
 import { liveOrderCount } from '../services/orders.js';
 import {
   dismiss,
-  inbox,
+  INBOX_PAGE_MAX,
+  inboxPage,
   markRead,
   preferences,
   registerActivityToken,
@@ -464,12 +465,30 @@ export async function registerPlatformRoutes(
 
   /* ── notifications ────────────────────────────────────────────────── */
 
-  app.get('/v1/notifications', guarded, async (request) => {
+  /**
+   * The inbox a page at a time, newest first: 30 unless `limit` says
+   * otherwise (at most 100), and `before` — the `next` of the page before —
+   * for the one after it. An app that asks without either gets the newest
+   * page, never the whole history.
+   */
+  app.get<{ Querystring: { before?: string; limit?: string } }>('/v1/notifications', guarded, async (request, reply) => {
     const guestId = request.guestId!;
-    const [items, unread] = await Promise.all([inbox(guestId), unreadCount(guestId)]);
+    const before = request.query.before || null;
+    if (before !== null && !UUID.test(before)) {
+      return badRequest(reply, 'Хуудасны заалт буруу байна.', 'before is the next of an earlier page');
+    }
+    const limit = request.query.limit === undefined ? 30 : Number.parseInt(request.query.limit, 10);
+    if (!Number.isFinite(limit) || limit < 1) {
+      return badRequest(reply, 'Тоо буруу байна.', 'limit is a whole number from 1');
+    }
+    const [page, unread] = await Promise.all([
+      inboxPage(guestId, { limit: Math.min(limit, INBOX_PAGE_MAX), before }),
+      unreadCount(guestId),
+    ]);
     return {
       unread,
-      messages: items.map((item) => ({
+      next: page.next,
+      messages: page.items.map((item) => ({
         id: item.id,
         title: item.title,
         body: item.body,

@@ -496,6 +496,61 @@ describe('one movement, in full', () => {
 });
 
 describe('the inbox', () => {
+  it('comes a page at a time, newest first, and never all at once', async () => {
+    const token = await signIn();
+    const { enqueue } = await import('../platform/notify/index.js');
+    const me = await app.inject({ method: 'GET', url: '/v1/me', headers: auth(token) });
+    for (let n = 1; n <= 45; n++) {
+      await enqueue(ctx, {
+        guestId: me.json().id,
+        template: 'welcome',
+        dedupeKey: `page-test-${n}`,
+        title: `Мэдэгдэл ${n}`,
+        body: 'Туршилт.',
+        channel: 'push',
+      });
+    }
+
+    const first = await app.inject({ method: 'GET', url: '/v1/notifications', headers: auth(token) });
+    expect(first.json().messages).toHaveLength(30);
+    expect(first.json().messages[0].title).toBe('Мэдэгдэл 45');
+    expect(first.json().unread).toBe(45);
+    expect(first.json().next).toBe(first.json().messages[29].id);
+
+    // One arriving mid-scroll goes to the top; the next page neither repeats
+    // nor skips a row.
+    await enqueue(ctx, { guestId: me.json().id, template: 'welcome', dedupeKey: 'page-test-late', title: 'Хожуу', body: '.', channel: 'push' });
+    const second = await app.inject({
+      method: 'GET',
+      url: `/v1/notifications?before=${first.json().next}`,
+      headers: auth(token),
+    });
+    expect(second.json().messages).toHaveLength(15);
+    expect(second.json().messages[0].title).toBe('Мэдэгдэл 15');
+    expect(second.json().messages.at(-1).title).toBe('Мэдэгдэл 1');
+    expect(second.json().next).toBeNull();
+    const seen = new Set([...first.json().messages, ...second.json().messages].map((m: { id: string }) => m.id));
+    expect(seen.size).toBe(45);
+
+    const small = await app.inject({ method: 'GET', url: '/v1/notifications?limit=10', headers: auth(token) });
+    expect(small.json().messages).toHaveLength(10);
+    expect(small.json().messages[0].title).toBe('Хожуу');
+    const capped = await app.inject({ method: 'GET', url: '/v1/notifications?limit=5000', headers: auth(token) });
+    expect(capped.json().messages).toHaveLength(46);
+
+    // Somebody else's message is no cursor of theirs: it finds nothing.
+    const theirs = await signIn('+97699001133');
+    const borrowed = await app.inject({
+      method: 'GET',
+      url: `/v1/notifications?before=${first.json().next}`,
+      headers: auth(theirs),
+    });
+    expect(borrowed.json().messages).toEqual([]);
+    for (const url of ['/v1/notifications?before=nope', '/v1/notifications?limit=0', '/v1/notifications?limit=abc']) {
+      expect((await app.inject({ method: 'GET', url, headers: auth(token) })).statusCode, url).toBe(400);
+    }
+  });
+
   it('shows what the guest was told, and counts what they have not read', async () => {
     const token = await signIn();
     const { enqueue } = await import('../platform/notify/index.js');

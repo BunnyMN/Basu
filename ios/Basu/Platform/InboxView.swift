@@ -46,8 +46,10 @@ struct InboxView: View {
           }
         } else {
           // One card, the rows on it divided by hairlines; the card clips, so
-          // the wash and the swipe never bleed past its corners.
-          VStack(spacing: 0) {
+          // the wash and the swipe never bleed past its corners. Lazy: a row
+          // is drawn as it comes near the screen, and the next page is asked
+          // for as the last one does — a long inbox is never one long list.
+          LazyVStack(spacing: 0) {
             ForEach(Array(platform.inbox.messages.enumerated()), id: \.element.id) { index, message in
               if index > 0 { Hairline() }
               SwipeToDelete(
@@ -62,10 +64,19 @@ struct InboxView: View {
                 }
                 .buttonStyle(.plain)
               }
+              .onAppear {
+                if message.id == platform.inbox.messages.last?.id {
+                  Task { await platform.loadMoreInbox() }
+                }
+              }
             }
           }
           .clipShape(RoundedRectangle(cornerRadius: BasuMetric.card, style: .continuous))
           .card()
+
+          if platform.inbox.next != nil {
+            more
+          }
         }
       }
       .padding(.horizontal, 16)
@@ -85,6 +96,30 @@ struct InboxView: View {
       await platform.loadInbox()
       loaded = true
     }
+  }
+
+  /// Under the card while there are older messages: a spinner while they
+  /// come, and a way to ask again if they did not.
+  private var more: some View {
+    Group {
+      if platform.loadingMoreInbox {
+        ProgressView()
+          .tint(Color.ink3)
+      } else {
+        Button {
+          Task { await platform.loadMoreInbox() }
+        } label: {
+          Text("Цааш үзэх")
+            .font(.sans(14, .bold))
+            .foregroundStyle(Color.ink2)
+            .frame(minHeight: BasuMetric.minTarget)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("inbox.more")
+      }
+    }
+    .frame(maxWidth: .infinity, minHeight: 56)
   }
 
   /// Two lines on the ground. No illustration, no card, no button — there is
@@ -246,23 +281,22 @@ struct SwipeToDelete<Content: View>: View {
         .animation(.easeOut(duration: 0.2), value: open)
     }
     .clipped()
-    // High priority, and over the button as well as the row: once a finger
-    // has moved sideways this is a swipe — the row must not also take it as a
+    // A pan that only starts when the finger moves sideways. It was a
+    // high-priority DragGesture, which took every drag that began on a row —
+    // up and down included — and the list could not be scrolled at all. Over
+    // the button as well as the row: once it is a swipe the row is not also a
     // tap, and a swipe back that starts on Устгах closes the row rather than
     // deleting it.
-    .highPriorityGesture(
-      DragGesture(minimumDistance: 12, coordinateSpace: .local)
-        .onChanged { value in
-          guard abs(value.translation.width) > abs(value.translation.height) else { return }
-          drag = value.translation.width
+    .gesture(
+      SidewaysPan { dx in
+        drag = dx
+      } ended: { dx in
+        let settled = (open ? -width : 0) + dx
+        withAnimation(.easeOut(duration: 0.2)) {
+          open = settled < -width / 2
+          drag = 0
         }
-        .onEnded { value in
-          let settled = (open ? -width : 0) + value.translation.width
-          withAnimation(.easeOut(duration: 0.2)) {
-            open = settled < -width / 2
-            drag = 0
-          }
-        },
+      },
     )
     .accessibilityAction(named: "Устгах", delete)
   }
@@ -310,4 +344,40 @@ extension InboxMessage {
     at: .now,
     read: true,
   )
+}
+
+/**
+ A horizontal pan for a row inside a scroll view. It declines to begin unless
+ the finger is moving more sideways than up or down, so a vertical drag is
+ the scroll view's from its first point.
+ */
+struct SidewaysPan: UIGestureRecognizerRepresentable {
+  let changed: (CGFloat) -> Void
+  let ended: (CGFloat) -> Void
+
+  func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+    let pan = UIPanGestureRecognizer()
+    pan.delegate = context.coordinator
+    return pan
+  }
+
+  func handleUIGestureRecognizerAction(_ pan: UIPanGestureRecognizer, context: Context) {
+    let dx = pan.translation(in: pan.view).x
+    switch pan.state {
+    case .changed: changed(dx)
+    case .ended, .cancelled, .failed: ended(dx)
+    default: break
+    }
+  }
+
+  func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+
+  @MainActor
+  final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+    func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+      guard let pan = recognizer as? UIPanGestureRecognizer else { return true }
+      let velocity = pan.velocity(in: pan.view)
+      return abs(velocity.x) > abs(velocity.y)
+    }
+  }
 }

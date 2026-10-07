@@ -210,7 +210,7 @@ struct InboxMessage: Decodable, Sendable, Identifiable, Equatable {
   let channel: String
   let state: String
   let at: Date
-  let read: Bool
+  var read: Bool
 
   enum CodingKeys: String, CodingKey {
     case id, title, body, template, subject, channel, state, at, read
@@ -218,11 +218,15 @@ struct InboxMessage: Decodable, Sendable, Identifiable, Equatable {
   }
 }
 
+/// One page of the inbox, or the pages so far put together.
 struct Inbox: Decodable, Sendable, Equatable {
-  let unread: Int
-  let messages: [InboxMessage]
+  var unread: Int
+  var messages: [InboxMessage]
+  /// The cursor for the page after these; nil when there is no more — and
+  /// from a server that predates paging, which sent everything it had.
+  var next: String?
 
-  static let empty = Inbox(unread: 0, messages: [])
+  static let empty = Inbox(unread: 0, messages: [], next: nil)
 }
 
 struct NotifyPreferences: Decodable, Sendable, Equatable {
@@ -365,8 +369,12 @@ extension API {
     return answer.balanceMnt
   }
 
-  func inbox(token: String) async throws -> Inbox {
-    try await send(.init(path: "/v1/notifications", token: token))
+  /// A page of the inbox, newest first: the first without `before`, the one
+  /// after a page with that page's `next`.
+  func inbox(token: String, before: String? = nil) async throws -> Inbox {
+    var query = [URLQueryItem(name: "limit", value: "30")]
+    if let before { query.append(.init(name: "before", value: before)) }
+    return try await send(.init(path: "/v1/notifications", query: query, token: token))
   }
 
   /// No id marks the whole inbox read — what opening the list means.
