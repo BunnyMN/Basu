@@ -56,8 +56,11 @@ fi
 
 # The relay must never become a way into this machine or the network it is
 # on: no peer on a private, loopback or link-local address, and not this
-# server's own public address, where Postgres and the API listen.
+# server's own addresses, where Postgres and the API listen. A machine behind
+# NAT has a private address of its own; then coturn is told the public one
+# phones reach it at (what TURN_HOST resolves to) as well.
 SELF=$(ip -4 route get 1.1.1.1 2>/dev/null | sed -n 's/.* src \([0-9.]*\).*/\1/p')
+PUBLIC=$(getent ahostsv4 "$HOST" 2>/dev/null | awk 'NR == 1 { print $1 }')
 
 wanted=$(mktemp)
 trap 'rm -f "$wanted"' EXIT
@@ -73,17 +76,15 @@ trap 'rm -f "$wanted"' EXIT
   if [ "$tls" = 1 ]; then
     echo "cert=$CERTS/fullchain.pem"
     echo "pkey=$CERTS/privkey.pem"
-    echo "no-tlsv1"
-    echo "no-tlsv1_1"
   else
     echo "no-tls"
     echo "no-dtls"
   fi
   echo "min-port=$MIN_PORT"
   echo "max-port=$MAX_PORT"
+  [ -n "$PUBLIC" ] && [ -n "$SELF" ] && [ "$PUBLIC" != "$SELF" ] && echo "external-ip=$PUBLIC/$SELF"
   echo "no-cli"
   echo "no-multicast-peers"
-  echo "no-loopback-peers"
   for range in 0.0.0.0-0.255.255.255 10.0.0.0-10.255.255.255 100.64.0.0-100.127.255.255 \
     127.0.0.0-127.255.255.255 169.254.0.0-169.254.255.255 172.16.0.0-172.31.255.255 \
     192.0.0.0-192.0.0.255 192.168.0.0-192.168.255.255 198.18.0.0-198.19.255.255 \
@@ -91,6 +92,7 @@ trap 'rm -f "$wanted"' EXIT
     echo "denied-peer-ip=$range"
   done
   [ -n "$SELF" ] && echo "denied-peer-ip=$SELF"
+  [ -n "$PUBLIC" ] && [ "$PUBLIC" != "$SELF" ] && echo "denied-peer-ip=$PUBLIC"
   # A call relayed both ways is four streams; this is room for fifty at once.
   echo "total-quota=200"
   echo "user-quota=8"
@@ -117,5 +119,11 @@ systemctl enable -q coturn
 if [ "$changed" = 1 ] || ! systemctl is-active --quiet coturn; then
   systemctl restart coturn
 fi
-sleep 1
-echo "  relay: coturn $(systemctl is-active coturn), tls $([ "$tls" = 1 ] && echo on || echo off), config $([ "$changed" = 1 ] && echo rewritten || echo unchanged)"
+sleep 2
+listening=$(ss -lnu 2>/dev/null | grep -c ':3478 ' || true)
+echo "  relay: coturn $(systemctl is-active coturn) $(turnserver --version 2>/dev/null | head -n 1 || true), udp 3478 $([ "$listening" -gt 0 ] && echo listening || echo silent), tls $([ "$tls" = 1 ] && echo on || echo off), config $([ "$changed" = 1 ] && echo rewritten || echo unchanged)"
+# Why it did not come up, in coturn's own words with every value cut out: this log is public.
+if ! systemctl is-active --quiet coturn; then
+  journalctl -u coturn --since '5 min ago' --no-pager -o cat 2>/dev/null | grep -iE 'error|cannot|bad|unknown' \
+    | sed -E 's/=[^ ]*/=…/g; s/[A-Za-z0-9+\/]{20,}={0,2}/…/g' | tail -n 3 | sed 's/^/    /' || true
+fi
