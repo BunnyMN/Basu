@@ -116,6 +116,12 @@ export interface OutgoingMessage {
   to: string;
   template: string;
   body: string;
+  /** With a push: which kind of phone the token is, so it goes to Apple's push or to Firebase. */
+  platform?: 'ios' | 'android' | 'web';
+  /** With a push: the heading, and what it is about, for an app that draws the notification itself. */
+  title?: string;
+  subject?: string;
+  subjectId?: string;
   /** With a push: how many of the person's messages are unread, this one counted — the number on the app's icon. */
   badge?: number;
 }
@@ -156,6 +162,17 @@ export interface VoipPush {
   expiresAt: Date;
 }
 
+/**
+ * A message for an Android phone's app to handle itself, through Firebase:
+ * a call ringing (`type: call`). Strings only, as FCM carries them.
+ */
+export interface DataPush {
+  token: string;
+  data: Record<string, string>;
+  /** A ring nobody answered by then is not delivered late. */
+  ttlSeconds: number;
+}
+
 export class PushTokenGone extends Error {
   constructor(readonly token: string) {
     super('the push token is no longer valid');
@@ -171,6 +188,8 @@ export interface Notifier {
   pushActivity(push: ActivityPush): Promise<{ providerRef: string }>;
   /** Throws `PushTokenGone` for a token the provider says is dead. */
   pushVoip(push: VoipPush): Promise<{ providerRef: string }>;
+  /** Android, through Firebase. Throws where there is no Firebase to send it. */
+  pushData(push: DataPush): Promise<{ providerRef: string }>;
 }
 
 /* ── email ─────────────────────────────────────────────────────────── */
@@ -386,6 +405,7 @@ export class FakeNotifier implements Notifier {
   readonly sent: OutgoingMessage[] = [];
   readonly activities: ActivityPush[] = [];
   readonly rings: VoipPush[] = [];
+  readonly data: DataPush[] = [];
   /** Simulates the push provider dying so traffic falls back to SMS. */
   failChannel: 'push' | 'sms' | null = null;
   /** Tokens APNs would answer 410 for. */
@@ -412,6 +432,13 @@ export class FakeNotifier implements Notifier {
     if (this.failChannel === 'push') throw new Error('push provider unavailable');
     this.rings.push(push);
     return { providerRef: `ring-${++this.#seq}` };
+  }
+
+  async pushData(push: DataPush): Promise<{ providerRef: string }> {
+    if (this.deadTokens.has(push.token)) throw new PushTokenGone(push.token);
+    if (this.failChannel === 'push') throw new Error('push provider unavailable');
+    this.data.push(push);
+    return { providerRef: `data-${++this.#seq}` };
   }
 
   of(template: string): OutgoingMessage[] {

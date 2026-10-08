@@ -96,3 +96,8 @@ suspend fun Api.setNotifyPreferences(push: Boolean?, sms: Boolean?, marketing: B
 suspend fun Api.registerPushToken(pushToken: String, label: String?, token: String) {
   send("/v1/notifications/devices", "POST", mapOf("push_token" to pushToken, "platform" to "android", "label" to label), token)
 }
+
+/** Signing out of this phone: its pushes stop going to them. */
+suspend fun Api.revokePushToken(pushToken: String, token: String) {
+  send("/v1/notifications/devices/revoke", "POST", mapOf("push_token" to pushToken), token)
+}

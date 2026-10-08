@@ -76,16 +76,19 @@ export async function devicesOf(guestId: string): Promise<Device[]> {
  * should get one notification, on the thing they last used, not one per
  * device — the message budget is per guest, not per install.
  */
-export async function pushTokensFor(guestIds: readonly string[]): Promise<Map<string, string>> {
+export async function pushTokensFor(
+  guestIds: readonly string[],
+): Promise<Map<string, { token: string; platform: Device['platform'] }>> {
   if (guestIds.length === 0) return new Map();
-  const { rows } = await getPool().query<{ guest_id: string; push_token: string }>(
-    `SELECT DISTINCT ON (guest_id) guest_id, push_token
+  const { rows } = await getPool().query<{ guest_id: string; push_token: string; platform: Device['platform'] }>(
+    `SELECT DISTINCT ON (guest_id) guest_id, push_token, platform
        FROM notify.device
       WHERE guest_id = ANY($1::uuid[]) AND revoked_at IS NULL
       ORDER BY guest_id, COALESCE(last_seen_at, created_at) DESC`,
     [[...new Set(guestIds)]],
   );
-  return new Map(rows.map((r) => [r.guest_id, r.push_token]));
+  // Which kind of phone, too: an Android token goes to Firebase, an iPhone's to Apple.
+  return new Map(rows.map((r) => [r.guest_id, { token: r.push_token, platform: r.platform }]));
 }
 
 /**

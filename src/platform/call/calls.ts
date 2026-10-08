@@ -165,30 +165,33 @@ export async function startCall(
   return call;
 }
 
-/** Wakes every phone rung that can be woken. A phone that cannot still sees the ring when its app is open. */
+/**
+ * Wakes every phone rung that can be woken: an iPhone through PushKit, an
+ * Android phone through Firebase. A phone that cannot be woken still sees
+ * the ring when its app is open.
+ */
 async function ring(ctx: Ctx, call: Call): Promise<void> {
-  const tokens = await ringTokensOf(call.callees, 'voip');
+  const [voip, fcm] = await Promise.all([ringTokensOf(call.callees, 'voip'), ringTokensOf(call.callees, 'fcm')]);
   const expiresAt = new Date(call.createdAt.getTime() + RING_SECONDS * 1000);
-  await Promise.all(
-    tokens.map(async ({ token }) => {
-      try {
-        await ctx.notifier.pushVoip({
-          token,
-          expiresAt,
-          payload: {
-            call_id: call.id,
-            caller_name: call.callerName,
-            about: call.about,
-            subject: call.subject,
-            subject_id: call.subjectId,
-          },
-        });
-      } catch (error) {
-        if (error instanceof PushTokenGone) await forgetRingToken(token);
-        else console.error('[call] ring push failed', error instanceof Error ? error.name : typeof error);
-      }
-    }),
-  );
+  const said = {
+    call_id: call.id,
+    caller_name: call.callerName,
+    about: call.about,
+    subject: call.subject,
+    subject_id: call.subjectId,
+  };
+  const attempt = async (token: string, send: () => Promise<unknown>) => {
+    try {
+      await send();
+    } catch (error) {
+      if (error instanceof PushTokenGone) await forgetRingToken(token);
+      else console.error('[call] ring push failed', error instanceof Error ? error.name : typeof error);
+    }
+  };
+  await Promise.all([
+    ...voip.map(({ token }) => attempt(token, () => ctx.notifier.pushVoip({ token, expiresAt, payload: said }))),
+    ...fcm.map(({ token }) => attempt(token, () => ctx.notifier.pushData({ token, ttlSeconds: RING_SECONDS, data: { type: 'call', ...said } }))),
+  ]);
 }
 
 /** The call, if this person is in it: its caller, or anybody it rang. */

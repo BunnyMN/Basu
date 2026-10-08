@@ -81,3 +81,12 @@ suspend fun Api.endCall(id: String, token: String): CallInfo =
 suspend fun Api.ringing(known: List<String>, wait: Int, token: String): List<CallInfo> =
   send("/v1/calls/ringing", token = token, query = mapOf("known" to known.joinToString(","), "wait" to wait.toString()))
     .getJSONArray("calls").objects().map(CallInfo::from)
+
+/** How this phone is woken for a call: its Firebase token (`fcm`). */
+suspend fun Api.registerRingToken(kind: String, ringToken: String, token: String) {
+  send("/v1/calls/tokens", "POST", mapOf("kind" to kind, "token" to ringToken), token)
+}
+
+suspend fun Api.revokeRingToken(ringToken: String, token: String) {
+  send("/v1/calls/tokens/revoke", "POST", mapOf("token" to ringToken), token)
+}

@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <!-- A call ringing a locked phone: the incoming-call screen over the lock. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
@@ -48,6 +50,17 @@
                 <data android:scheme="basu" />
             </intent-filter>
         </activity>
+        <!-- Firebase: order news and a call's ring with the app closed (push/). -->
+        <service
+            android:name=".push.Messaging"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <receiver
+            android:name=".push.DeclineReceiver"
+            android:exported="false" />
         <service
             android:name=".calls.CallService"
             android:exported="false"

@@ -24,6 +24,7 @@ import mn.basu.app.core.LocalAppModel
 import mn.basu.app.core.LocalPlatform
 import mn.basu.app.core.LocalPush
 import mn.basu.app.core.LocalSession
+import mn.basu.app.push.Rings
 import mn.basu.app.shell.DebugLaunch
 import mn.basu.app.shell.RootView
 
@@ -48,7 +49,10 @@ class MainActivity : FragmentActivity() {
     }
     // The microphone and camera for a call, asked the moment one is needed.
     Calls.request = app.push.request
-    if (savedInstanceState == null) Links.route(intent?.data)
+    if (savedInstanceState == null) {
+      Links.route(intent?.data)
+      ringFrom(intent)
+    }
     val debug = DebugLaunch.from(intent)
 
     setContent {
@@ -75,6 +79,14 @@ class MainActivity : FragmentActivity() {
     super.onNewIntent(intent)
     setIntent(intent)
     Links.route(intent.data)
+    ringFrom(intent)
+  }
+
+  /** The tray's ringing call, tapped or answered: the call screen takes it from here. */
+  private fun ringFrom(intent: Intent?) {
+    val callId = intent?.getStringExtra(Rings.EXTRA_CALL) ?: return
+    Calls.openRing(callId, answer = intent.getBooleanExtra(Rings.EXTRA_ANSWER, false))
+    intent.removeExtra(Rings.EXTRA_CALL)
   }
 
   override fun onStart() {

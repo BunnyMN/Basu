@@ -95,9 +95,10 @@ export async function relay(ctx: Ctx, limit = 100): Promise<number> {
     template: string;
     title: string | null;
     body: string;
+    subject: string | null;
     subject_id: string | null;
   }>(
-    `SELECT id, guest_id, channel, template, title, body, subject_id
+    `SELECT id, guest_id, channel, template, title, body, subject, subject_id
        FROM notify.message
       WHERE state = 'queued'
       ORDER BY created_at
@@ -164,10 +165,19 @@ export async function relay(ctx: Ctx, limit = 100): Promise<number> {
               })
             : await ctx.notifier.send({
                 channel: attempt,
-                to: attempt === 'push' ? (pushable.get(row.guest_id) ?? contact.phone ?? '') : contact.phone!,
+                to: attempt === 'push' ? (pushable.get(row.guest_id)?.token ?? contact.phone ?? '') : contact.phone!,
                 template: row.template,
                 body,
-                ...(attempt === 'push' ? { badge: unread.get(row.guest_id) ?? 1 } : {}),
+                ...(attempt === 'push'
+                  ? {
+                      badge: unread.get(row.guest_id) ?? 1,
+                      // Which phone it is, and what an app that draws its own notification needs (Android).
+                      ...(pushable.get(row.guest_id) ? { platform: pushable.get(row.guest_id)!.platform } : {}),
+                      ...(row.title ? { title: row.title } : {}),
+                      ...(row.subject ? { subject: row.subject } : {}),
+                      ...(row.subject_id ? { subjectId: row.subject_id } : {}),
+                    }
+                  : {}),
               });
         ref = result.providerRef;
         channel = attempt;

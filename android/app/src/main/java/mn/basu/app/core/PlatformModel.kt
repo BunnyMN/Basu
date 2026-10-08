@@ -10,6 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
+import mn.basu.app.push.Fcm
 
 /**
  * The shell's own state: profile, wallet, inbox.
@@ -161,6 +162,8 @@ class Platform(private val api: Api, private val session: Session, private val c
    */
   fun signOut() {
     val token = session.token
+    // This phone stops being pushed and rung for them — said while the token still opens the door.
+    Fcm.signedOut(token)
     session.signOut()
     sessions = emptyList()
     if (token == null) return

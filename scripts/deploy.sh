@@ -213,7 +213,7 @@ fi
 # Only these names, and a name the secrets do not set is left as it is on
 # the server: an unset secret never wipes a key. The log says which key was
 # set, never what to — it is public.
-MANAGED_KEYS=" GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET SMTP_URL MAIL_FROM OPS_MEMBERS WIRE_SECRET_KEY WIRE_WEBHOOK_SECRET WIRE_RETURN_URL APNS_TEAM_ID APNS_KEY_ID APNS_KEY APNS_ENV TURN_SECRET TURN_HOST "
+MANAGED_KEYS=" GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET SMTP_URL MAIL_FROM OPS_MEMBERS WIRE_SECRET_KEY WIRE_WEBHOOK_SECRET WIRE_RETURN_URL APNS_TEAM_ID APNS_KEY_ID APNS_KEY APNS_ENV TURN_SECRET TURN_HOST FCM_SERVICE_ACCOUNT "
 if [ -n "$incoming" ]; then
   while IFS= read -r line; do
     [ -n "$line" ] || continue

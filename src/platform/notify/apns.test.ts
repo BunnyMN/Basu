@@ -114,7 +114,7 @@ describe('a Live Activity push', () => {
   it('goes to the liveactivity topic with the content state Apple expects', async () => {
     const notifier = new ApnsNotifier(
       { teamId: 'TEAM123', keyId: 'KEY456', privateKey: privateKeyPem, bundleId: 'mn.basu.app', host: '127.0.0.1', port, scheme: 'http' },
-      { send: async () => ({ providerRef: 'sms' }), pushActivity: async () => ({ providerRef: 'x' }), pushVoip: async () => ({ providerRef: 'x' }) },
+      { send: async () => ({ providerRef: 'sms' }), pushActivity: async () => ({ providerRef: 'x' }), pushVoip: async () => ({ providerRef: 'x' }), pushData: async () => ({ providerRef: 'x' }) },
     );
     seen.length = 0;
     const seating = new Date('2026-09-05T04:30:00Z');
@@ -151,7 +151,7 @@ describe('a Live Activity push', () => {
     seen.length = 0;
     const notifier = new ApnsNotifier(
       { teamId: 'TEAM123', keyId: 'KEY456', privateKey: privateKeyPem, bundleId: 'mn.basu.app', host: '127.0.0.1', port, scheme: 'http' },
-      { send: async () => ({ providerRef: 'sms' }), pushActivity: async () => ({ providerRef: 'x' }), pushVoip: async () => ({ providerRef: 'x' }) },
+      { send: async () => ({ providerRef: 'sms' }), pushActivity: async () => ({ providerRef: 'x' }), pushVoip: async () => ({ providerRef: 'x' }), pushData: async () => ({ providerRef: 'x' }) },
     );
     const dismiss = new Date('2026-09-05T05:00:00Z');
     await notifier.pushActivity({ token: 'live1', event: 'end', contentState: { stage: 'ready' }, dismissAt: dismiss });
@@ -177,6 +177,7 @@ describe('a notification to a device', () => {
         },
         pushActivity: async () => ({ providerRef: 'x' }),
         pushVoip: async () => ({ providerRef: 'x' }),
+        pushData: async () => ({ providerRef: 'x' }),
       },
     );
     seen.length = 0;
@@ -197,7 +198,7 @@ describe('a call ringing', () => {
   it('goes to PushKit’s own topic as a voip push, gone when nobody answered in time', async () => {
     const notifier = new ApnsNotifier(
       { teamId: 'TEAM123', keyId: 'KEY456', privateKey: privateKeyPem, bundleId: 'mn.basu.app', host: '127.0.0.1', port, scheme: 'http' },
-      { send: async () => ({ providerRef: 'sms' }), pushActivity: async () => ({ providerRef: 'x' }), pushVoip: async () => ({ providerRef: 'x' }) },
+      { send: async () => ({ providerRef: 'sms' }), pushActivity: async () => ({ providerRef: 'x' }), pushVoip: async () => ({ providerRef: 'x' }), pushData: async () => ({ providerRef: 'x' }) },
     );
     seen.length = 0;
     const expiresAt = new Date('2026-10-07T05:00:45Z');

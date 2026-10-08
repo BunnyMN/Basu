@@ -1,5 +1,5 @@
 import { wireConfigFromEnv, WirePayments } from '../platform/ledger/index.js';
-import { apnsConfigFromEnv, ApnsNotifier, SmtpMailer, smtpConfigFromEnv, smtpHost } from '../platform/notify/index.js';
+import { apnsConfigFromEnv, ApnsNotifier, fcmConfigFromEnv, FcmNotifier, SmtpMailer, smtpConfigFromEnv, smtpHost } from '../platform/notify/index.js';
 import {
   ClosedPaymentProvider,
   FakeMailer,
@@ -57,12 +57,16 @@ export function buildProviders(log: (line: string) => void = console.log): Ctx {
       ? undefined
       : new ConsoleMailer(log);
   const sms = new FakeNotifier();
-  const notifier = apns ? new ApnsNotifier(apns, sms) : sms;
+  const apple = apns ? new ApnsNotifier(apns, sms) : sms;
+  // Android's push sits on top: a push to an Android phone goes to Firebase, the rest underneath.
+  const fcm = fcmConfigFromEnv();
+  const notifier = fcm ? new FcmNotifier(fcm, apple) : apple;
   log(
     apns
       ? `[providers] push: APNs ${apns.host} for ${apns.bundleId} (key ${apns.keyId})`
       : '[providers] push: fake (set APNS_TEAM_ID, APNS_KEY_ID, APNS_KEY_FILE to send)',
   );
+  log(fcm ? `[providers] android push: FCM for ${fcm.projectId}` : '[providers] android push: none (set FCM_SERVICE_ACCOUNT to send)');
   log(
     wire
       ? `[providers] payments: Wire → QPay (${wire.secretKey.startsWith('sk_test_') ? 'sandbox' : 'live'}${wire.webhookSecret ? ', webhook on' : ', polling only'})`

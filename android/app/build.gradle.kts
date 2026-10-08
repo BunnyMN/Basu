@@ -6,6 +6,11 @@ plugins {
   id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Firebase (push, and the ring of a call with the app closed) reads
+// app/google-services.json, which git does not see: the repository is
+// public. Without the file the app builds as before, with no push.
+if (file("google-services.json").exists()) apply(plugin = "com.google.gms.google-services")
+
 // A release is signed with the keystore named in keystore.properties, which
 // git does not see. Without the file a release build is left unsigned.
 val keystore = Properties().apply {
@@ -86,6 +91,9 @@ dependencies {
   // (calls/). Pinned, the same reason as iOS's: a WebRTC that moves under a
   // release is a call that stops connecting.
   implementation("io.getstream:stream-webrtc-android:1.3.10")
+  // Push: order news in the tray, and a call's ring with the app closed (push/).
+  implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+  implementation("com.google.firebase:firebase-messaging")
 
   testImplementation("junit:junit:4.13.2")
   testImplementation("org.json:json:20240303")

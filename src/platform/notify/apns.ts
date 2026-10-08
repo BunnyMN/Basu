@@ -5,6 +5,7 @@ import {
   PushTokenGone,
   type ActivityPush,
   type Notifier,
+  type DataPush,
   type OutgoingMessage,
   type VoipPush,
 } from '../../ports.js';
@@ -202,6 +203,9 @@ export class ApnsNotifier implements Notifier {
 
   async send(message: OutgoingMessage): Promise<{ providerRef: string }> {
     if (message.channel !== 'push') return this.#sms.send(message);
+    // An Android phone's token means nothing to Apple; without Firebase it is
+    // not pushed at all, and the message goes on down the ladder.
+    if (message.platform === 'android') throw new Error('no Firebase to push an Android phone');
     const providerRef = await this.client.post({
       token: message.to,
       pushType: 'alert',
@@ -237,6 +241,11 @@ export class ApnsNotifier implements Notifier {
       payload: { aps },
     });
     return { providerRef };
+  }
+
+  /** Android's pushes are Firebase's (fcm.ts); this notifier has none. */
+  async pushData(_push: DataPush): Promise<{ providerRef: string }> {
+    throw new Error('no Firebase to push an Android phone');
   }
 
   /** A ring, to PushKit's own topic. The key is team-wide, so it covers `.voip` too. */

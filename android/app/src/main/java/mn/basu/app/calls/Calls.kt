@@ -26,6 +26,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import mn.basu.app.core.Api
 import mn.basu.app.core.ApiError
+import mn.basu.app.push.Rings
 import org.webrtc.VideoTrack
 
 /**
@@ -172,7 +173,34 @@ object Calls {
     }
   }
 
-  private fun ringIn(call: CallInfo) {
+  /**
+   * A ring the tray showed while the app was closed, opened — or answered from
+   * the notification's own «Авах». Asked again of the server: by now it may
+   * be over, or taken by somebody else at the supplier.
+   */
+  fun openRing(callId: String, answer: Boolean) {
+    Rings.cancel(context, callId)
+    if (live != null) return
+    scope.launch {
+      val token = tokenOf() ?: return@launch
+      val call = runCatching { api.call(callId, after = -1, wait = 0, token = token) }.getOrNull() ?: return@launch
+      if (call.state != "ringing" || call.role != "callee" || live != null) return@launch
+      ringIn(call, ring = !answer)
+      if (answer) answer()
+    }
+  }
+
+  /** «Татгалзах» on the tray's ring: said to the server without opening the app. */
+  fun decline(callId: String, done: () -> Unit) {
+    scope.launch {
+      val token = tokenOf()
+      if (token != null) runCatching { api.endCall(callId, token) }
+      done()
+    }
+  }
+
+  private fun ringIn(call: CallInfo, ring: Boolean = true) {
+    Rings.cancel(context, call.id)
     live = Live(
       key = SystemClock.elapsedRealtime(),
       role = Role.CALLEE,
@@ -184,7 +212,7 @@ object Calls {
       callId = call.id,
       offer = call.offer,
     )
-    ringtone = runCatching {
+    if (ring) ringtone = runCatching {
       RingtoneManager.getRingtone(context, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE))?.apply {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) isLooping = true
         play()
@@ -353,6 +381,7 @@ object Calls {
     stopTones()
     audioOff()
     CallService.stop(context)
+    live?.callId?.let { Rings.cancel(context, it) }
     val key = live?.key ?: return
     if (words.isBlank()) {
       live = null

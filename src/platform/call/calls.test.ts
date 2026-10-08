@@ -58,6 +58,19 @@ describe('a call rung at everybody at the supplier', () => {
     expect((await endCall(ctx, call.id, cook)).state).toBe('ended');
   });
 
+  it('rings an Android phone through Firebase, as a call its app draws itself', async () => {
+    await registerRingToken(owner, 'fcm', 'owner-android', ctx.clock.now());
+    const call = await ringAll();
+    expect(notifier.data).toEqual([
+      {
+        token: 'owner-android',
+        ttlSeconds: 45,
+        data: { type: 'call', call_id: call.id, caller_name: 'Зочин', about: 'Идэш №T1', subject: 'idesh', subject_id: call.subjectId },
+      },
+    ]);
+    expect(notifier.rings).toHaveLength(0);
+  });
+
   it('forgets where the phones were once it is over', async () => {
     const call = await ringAll();
     await answerCall(ctx, call.id, owner, ANSWER);

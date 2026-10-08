@@ -97,6 +97,7 @@ import mn.basu.app.design.tracked
 import mn.basu.app.platform.InboxView
 import mn.basu.app.platform.ProfileView
 import mn.basu.app.platform.WalletView
+import mn.basu.app.push.Fcm
 
 /**
  * The design pass's doors, debug builds only: `adb shell am start -n
@@ -240,9 +241,10 @@ fun RootView(debug: DebugLaunch = DebugLaunch()) {
     AnimatedVisibility(splash, Modifier.zIndex(1f), enter = fadeIn(tween(0)), exit = fadeOut(tween(350))) { SplashView() }
   }
 
-  // Signed out mid-call: the call is theirs, and goes with them.
+  // Signed out mid-call: the call is theirs, and goes with them. Signed in,
+  // the server learns where this phone's pushes and rings go.
   LaunchedEffect(session.isSignedIn) {
-    if (!session.isSignedIn) Calls.hangUp()
+    if (session.isSignedIn) Fcm.signedIn() else Calls.hangUp()
   }
   LaunchedEffect(debug.callOrder, session.isSignedIn) {
     val order = debug.callOrder ?: return@LaunchedEffect
@@ -275,6 +277,13 @@ private fun open(uri: Uri, setTab: (ShellTab) -> Unit, path: MutableList<Destina
       setTab(ShellTab.Home)
       path.clear()
       path.add(AppCatalogue.food.destination)
+    }
+    // basu://idesh/{id} — an идэш the tray's message was about.
+    "idesh" -> {
+      setTab(ShellTab.Home)
+      path.clear()
+      val id = uri.pathSegments.firstOrNull()
+      path.add(if (id != null) AppCatalogue.idesh.destination(order = id) else AppCatalogue.idesh.destination)
     }
     "wallet" -> {
       path.clear()

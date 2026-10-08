@@ -8,6 +8,7 @@ import mn.basu.app.core.AppModel
 import mn.basu.app.core.Platform
 import mn.basu.app.core.PushRegistrar
 import mn.basu.app.core.Session
+import mn.basu.app.push.Fcm
 
 /**
  * Basu — a launcher, and the things that arrive inside it.
@@ -35,5 +36,7 @@ class BasuApplication : Application() {
     push = PushRegistrar(this)
     // Calls about an order: rung while the app is open, and placed from the order page.
     Calls.attach(this, api) { session.token }
+    // Firebase's token, told to the server whenever somebody is signed in.
+    Fcm.attach(this, api) { session.token }
   }
 }

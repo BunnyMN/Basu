@@ -165,7 +165,8 @@ export function registerSystemDesk(app: FastifyInstance, ctx: Ctx, { desk, who, 
         {
           key: 'apns',
           name: 'Push (APNs)',
-          flavour: ctx.notifier.constructor.name === 'ApnsNotifier' ? 'real' : 'fake',
+          // Apple's push, whether or not Firebase sits on top of it for Android.
+          flavour: [ctx.notifier, (ctx.notifier as { base?: object }).base].some((n) => n?.constructor.name === 'ApnsNotifier') ? 'real' : 'fake',
           ok: push.failedDay === 0,
           detail: { last_ok_at: iso(push.lastSentAt), sent_day: push.sentDay, failed_day: push.failedDay, queued: push.queued },
         },
