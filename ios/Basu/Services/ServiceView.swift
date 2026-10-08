@@ -60,6 +60,7 @@ struct ServiceView: View {
 
   @Environment(AppModel.self) private var model
   @Environment(Session.self) private var session
+  @Environment(Platform.self) private var platform
   @State private var page = ServicePage()
   @State private var signingIn = false
   @State private var askingPush = false
@@ -153,6 +154,9 @@ struct ServiceView: View {
       page.changed = {
         Task {
           await model.refreshLive()
+          // An order opened here is news seen: its dot, the tab's number,
+          // the bell and the icon all come down together.
+          await platform.ordersSeen(model.seen)
           await offerPush()
         }
       }

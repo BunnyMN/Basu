@@ -54,12 +54,15 @@ struct OrderCard: View {
 
   private var words: some View {
     VStack(alignment: .leading, spacing: 0) {
-      Text(item.headline)
-        .font(.sans(17, .bold))
-        .foregroundStyle(Color.ink)
-        .lineLimit(2)
-        .fixedSize(horizontal: false, vertical: true)
-        .multilineTextAlignment(.leading)
+      HStack(alignment: .firstTextBaseline, spacing: 8) {
+        if item.news { NewsDot() }
+        Text(item.headline)
+          .font(.sans(17, .bold))
+          .foregroundStyle(Color.ink)
+          .lineLimit(2)
+          .fixedSize(horizontal: false, vertical: true)
+          .multilineTextAlignment(.leading)
+      }
       Text(item.word)
         .font(.sans(14, .semibold))
         .foregroundStyle(tone)
@@ -106,6 +109,20 @@ struct OrderCard: View {
         Rectangle().fill(Color.line).frame(width: BasuMetric.hairline)
       }
     }
+  }
+}
+
+/// Something said about the order that the guest has not opened it to see:
+/// the web's own `.new-dot`, crimson in a faint crimson ring, sitting on the
+/// title's first line. VoiceOver hears it in the card's words instead.
+private struct NewsDot: View {
+  var body: some View {
+    Circle()
+      .fill(Color.accent)
+      .frame(width: 9, height: 9)
+      .background(Circle().fill(Color.accent.opacity(0.2)).padding(-3))
+      .alignmentGuide(.firstTextBaseline) { $0[.bottom] }
+      .accessibilityHidden(true)
   }
 }
 

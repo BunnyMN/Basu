@@ -71,20 +71,28 @@ final class Platform {
   var balanceMnt: Int { me?.wallet.balanceMnt ?? wallet.balanceMnt }
   var balanceKnown: Bool { me != nil || walletLoaded }
   var unread: Int { max(me?.unread ?? 0, inbox.unread) }
+
+  /// The number on the app icon: what is unread, once the server has said;
+  /// nought for nobody. Nil until then — the icon keeps what the last push
+  /// put there, rather than being wiped by a launch that has not heard yet.
+  var iconBadge: Int? { !isSignedIn ? 0 : me == nil ? nil : unread }
   var isSignedIn: Bool { session.isSignedIn }
 
   /// The launcher's one call. Cheap enough to make on every appearance.
-  func refresh() async {
+  /// Whether the server answered.
+  @discardableResult
+  func refresh() async -> Bool {
     guard let token = session.token else {
       me = nil
       wallet = .empty
       inbox = .empty
       walletLoaded = false
-      return
+      return false
     }
     do {
       me = try await api.me(token: token)
       trouble = nil
+      return true
     } catch let error as APIError where error.isUnauthorised {
       session.forget()
       me = nil
@@ -94,6 +102,7 @@ final class Platform {
       // saying out loud that this is stale.
       note(error)
     }
+    return false
   }
 
   func loadWallet() async {
@@ -424,6 +433,24 @@ final class Platform {
       inbox = kept
       note(error)
     }
+  }
+
+  /**
+   An order was opened inside its app, and the page told the server that what
+   was said about it is seen. The shell hears only that orders changed, so it
+   takes the orders the server now counts as seen and flips their messages
+   here in place — as `markRead` does, keeping the pages scrolled to — and
+   the count is the server's own.
+   */
+  func ordersSeen(_ seen: Set<String>) async {
+    for index in inbox.messages.indices where !inbox.messages[index].read {
+      let message = inbox.messages[index]
+      guard ["order", "idesh"].contains(message.subject ?? ""),
+        let order = message.subjectId, seen.contains(order)
+      else { continue }
+      inbox.messages[index].read = true
+    }
+    if await refresh(), let me { inbox.unread = me.unread }
   }
 
   /// Read in place: reloading the list here would throw away the pages

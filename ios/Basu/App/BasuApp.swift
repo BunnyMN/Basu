@@ -1,5 +1,6 @@
 import BasuKit
 import SwiftUI
+import UserNotifications
 import WidgetKit
 
 /**
@@ -161,12 +162,24 @@ struct RootView: View {
         lock.returned(at: .now)
         // Back from the bank app, perhaps: a top-up paid there shows now.
         Task { await platform.checkTopup() }
+        // Back from a push, perhaps: an order that moved while the phone was
+        // in a pocket wears its dot, and the tab and the icon their numbers.
+        Task {
+          await model.refreshLive()
+          await platform.ordersSeen(model.seen)
+        }
       default: break
       }
     }
     // Offline anywhere — the launcher, the way in — clears by itself once
     // the server answers again.
     .task(id: model.offline) { await model.watchWhileOffline() }
+    // The icon says what the bell says. A push sets it while the app is shut;
+    // open, the app does, so it never says more than the inbox.
+    .task(id: platform.iconBadge) {
+      guard let count = platform.iconBadge else { return }
+      try? await UNUserNotificationCenter.current().setBadgeCount(count)
+    }
     .alert(
       "Нэвтэрлээ",
       isPresented: Binding(
@@ -226,7 +239,7 @@ struct RootView: View {
         if !Task.isCancelled { lift() }
       }
       async let boot: Void = model.bootstrap()
-      async let me: Void = platform.refresh()
+      async let me = platform.refresh()
       async let floor: Void = { try? await Task.sleep(for: .milliseconds(650)) }()
       _ = await (boot, me, floor)
       cap.cancel()
@@ -285,7 +298,7 @@ struct RootView: View {
           .allowsHitTesting(false)
           .accessibilityHidden(true)
 
-          TabBar(tab: tab, bottom: outer.safeAreaInsets.bottom) { chosen in
+          TabBar(tab: tab, bottom: outer.safeAreaInsets.bottom, news: [.orders: model.withNews]) { chosen in
             // A tab always lands on its own root: from the inbox, Түрийвч
             // shows the wallet rather than the inbox over it.
             path = []
@@ -518,6 +531,9 @@ struct TabBar: View {
   let tab: ShellTab
   /// The screen's bottom safe area: the bar floats this far up, less a little.
   let bottom: CGFloat
+  /// A number on a tab's shoulder: «Захиалга» counts the orders with
+  /// something said about them that has not been opened to see.
+  var news: [ShellTab: Int] = [:]
   let select: (ShellTab) -> Void
   @Namespace private var lit
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -533,6 +549,9 @@ struct TabBar: View {
         } label: {
           VStack(spacing: 4) {
             ShellGlyph(mark: item.mark, size: 22, lineWidth: active ? 1.9 : 1.75)
+              .overlay(alignment: .topTrailing) {
+                if let count = news[item], count > 0 { NewsCount(count: count) }
+              }
             Text(item.title)
               .font(.sans(11, .bold))
               .lineLimit(1)
@@ -557,6 +576,7 @@ struct TabBar: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("tab.\(item.rawValue)")
         .accessibilityLabel(item.title)
+        .accessibilityValue((news[item] ?? 0) > 0 ? "\(news[item]!) шинэ мэдээтэй" : "")
         .accessibilityAddTraits(active ? [.isSelected] : [])
       }
     }
@@ -576,6 +596,26 @@ struct TabBar: View {
     .padding(.horizontal, 16)
     .padding(.bottom, max(bottom - 4, 14))
     .sensoryFeedback(.selection, trigger: tab)
+  }
+}
+
+/// The tab's number: white on crimson, a circle for one digit and a capsule
+/// past it, ringed in the bar so it sits on top of the mark rather than in it.
+private struct NewsCount: View {
+  let count: Int
+
+  var body: some View {
+    Text(count > 9 ? "9+" : "\(count)")
+      .font(.sans(10, .heavy))
+      .monospacedDigit()
+      .foregroundStyle(Color.onAccent)
+      .padding(.horizontal, 4)
+      .frame(minWidth: 16, minHeight: 16)
+      .background(Capsule().fill(Color.accent))
+      .overlay(Capsule().strokeBorder(Color.bg.opacity(0.9), lineWidth: 1.5).padding(-1.5))
+      .fixedSize()
+      .offset(x: 9, y: -5)
+      .accessibilityHidden(true)
   }
 }
 

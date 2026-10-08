@@ -150,4 +150,17 @@ final class AppModel {
   }
 
   func say(_ trouble: String?) { self.trouble = trouble }
+
+  /// How many orders have something said about them that the guest has not
+  /// opened them to see: the number on the «Захиалга» tab.
+  var withNews: Int {
+    live.filter { $0.news }.count + liveIdesh.filter { $0.news }.count
+  }
+
+  /// The orders whose news has all been opened, as the server last counted —
+  /// what the inbox can mark read without asking. An order from a server that
+  /// does not count is not among them: not counted is not seen.
+  var seen: Set<String> {
+    Set(live.filter { $0.unseen == 0 }.map(\.id) + liveIdesh.filter { $0.unseen == 0 }.map(\.id))
+  }
 }

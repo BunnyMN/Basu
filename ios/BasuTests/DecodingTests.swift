@@ -249,6 +249,44 @@ struct DecodingTests {
     #expect(try word("FIRED") == "Гал дээр")
   }
 
+  @Test func anOrderWithUnopenedNewsWearsADotUntilItIsOpened() throws {
+    func idesh(_ unseen: String) throws -> LiveIdesh {
+      try decode(LiveIdesh.self, """
+        {
+          "id": "i", "code": "7001", "state": "READY",
+          "supplier": { "id": "s", "name": "Улаанбаатар махны төв" }, "kind": "sheep",
+          "unit": "kg", "title": "Хонины мах, кг-аар", "qty": 10, "total_mnt": 128000,
+          "receive": "pickup", "receive_on": "2026-10-07", "paid_at": null\(unseen)
+        }
+        """)
+    }
+    func lunch(_ unseen: String) throws -> LiveOrder {
+      try decode(LiveOrder.self, """
+        {
+          "id": "o", "code": "0970", "state": "READY",
+          "restaurant": { "id": "r", "name": "Бөмбөгөр Ресторан" }, "table": null,
+          "total_mnt": 1, "slot_starts_at": "2026-09-01T04:00:00.000Z",
+          "fire_at": null, "ready_at": null\(unseen)
+        }
+        """)
+    }
+    // Two steps said and not yet opened: a dot, and VoiceOver says so last.
+    let told = try idesh(#", "unseen": 2"#)
+    #expect(told.unseen == 2)
+    #expect(told.asLiveItem().news)
+    #expect(told.asLiveItem().spoken.hasSuffix(", шинэ мэдээтэй"))
+    #expect(try lunch(#", "unseen": 1"#).asLiveItem(expanded: false).news)
+    #expect(try lunch(#", "unseen": 1"#).asLiveItem(expanded: false).spoken.hasSuffix(", шинэ мэдээтэй"))
+    // Opened: nought, no dot, nothing extra said.
+    let opened = try idesh(#", "unseen": 0"#)
+    #expect(!opened.asLiveItem().news)
+    #expect(!opened.asLiveItem().spoken.contains("шинэ"))
+    // A server that does not count is not news, and not seen either.
+    let uncounted = try lunch("")
+    #expect(uncounted.unseen == nil)
+    #expect(!uncounted.asLiveItem(expanded: false).news)
+  }
+
   @Test func anUnknownStateDoesNotBrickThePhone() throws {
     // A server that learns a new state should not take the app down with it.
     let order = try decode(LiveOrder.self, """

@@ -76,6 +76,9 @@ struct LiveItem: Identifiable, Hashable {
   /// Over: handed over, served, or ended without happening. The Захиалга
   /// tab keeps these apart from what is still on its way.
   let finished: Bool
+  /// Something was said about the order — a step, a word from the supplier —
+  /// that the guest has not opened it to see. A crimson dot until they do.
+  let news: Bool
 
   static func == (a: LiveItem, b: LiveItem) -> Bool { a.id == b.id }
   func hash(into hasher: inout Hasher) { hasher.combine(id) }
@@ -100,7 +103,8 @@ extension LiveOrder {
       timeLabel: moment.label.uppercased(),
       status: liveStatus,
       destination: AppCatalogue.food.destination(order: id),
-      spoken: "Хоол, \(restaurant.name), \(at) цагт \(said), захиалга \(code), \(detail.lowercased())",
+      spoken: "Хоол, \(restaurant.name), \(at) цагт \(said), захиалга \(code), \(detail.lowercased())"
+        + (news ? ", шинэ мэдээтэй" : ""),
       // The fire time is the product. When this is the only thing running it
       // belongs on the launcher, not one tap inside the app.
       extra: expanded && fireAt != nil && state != .fired && state != .cooking
@@ -113,8 +117,12 @@ extension LiveOrder {
       art: "food-tile",
       photo: nil,
       finished: [.served, .closed, .cancelled, .refunded, .rejected, .noShow].contains(state),
+      news: news,
     )
   }
+
+  /// Told something about it that it has not been opened to see.
+  var news: Bool { (unseen ?? 0) > 0 }
 
   private var liveStatus: LiveItem.Status {
     switch state {
@@ -157,9 +165,10 @@ extension LiveIdesh {
       timeLabel: label.uppercased(),
       status: liveStatus,
       destination: AppCatalogue.idesh.destination(order: id),
-      spoken: cancelled
+      spoken: (cancelled
         ? "Идэш, \(supplier.name), \(meat), \(amount), захиалга \(code), \(state.word.lowercased())"
-        : "Идэш, \(supplier.name), \(Format.dayWords(receiveOn))-нд \(label), \(meat), \(amount), захиалга \(code), \(state.word.lowercased())",
+        : "Идэш, \(supplier.name), \(Format.dayWords(receiveOn))-нд \(label), \(meat), \(amount), захиалга \(code), \(state.word.lowercased())")
+        + (news ? ", шинэ мэдээтэй" : ""),
       extra: nil,
       headline: what,
       word: state.word,
@@ -168,6 +177,7 @@ extension LiveIdesh {
       art: "idesh-tile",
       photo: photo,
       finished: [.handed, .closed, .cancelled, .refunded].contains(state),
+      news: news,
     )
   }
 
@@ -198,6 +208,9 @@ extension LiveIdesh {
 
   /// Along the meter — the state's own step, the lock screen's too.
   var step: Int { state.step }
+
+  /// Told something about it that it has not been opened to see.
+  var news: Bool { (unseen ?? 0) > 0 }
 
   /// The animal's photograph, from the server — the one its stall shows.
   var photo: URL? {

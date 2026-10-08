@@ -87,9 +87,12 @@ struct LiveOrder: Decodable, Sendable, Identifiable, Hashable {
   let slotStartsAt: Date
   let fireAt: Date?
   let readyAt: Date?
+  /// What the guest has been told about this order and not yet opened it to
+  /// see. Nil from a server that does not count it.
+  let unseen: Int?
 
   enum CodingKeys: String, CodingKey {
-    case id, code, state, restaurant, table
+    case id, code, state, restaurant, table, unseen
     case totalMnt = "total_mnt"
     case partySize = "party_size"
     case slotStartsAt = "slot_starts_at"
@@ -170,9 +173,12 @@ struct LiveIdesh: Decodable, Sendable, Identifiable, Hashable {
   /// The supplier's own address, for a pickup. Nil for a delivery, and from
   /// a server that predates it.
   let pickupAddress: String?
+  /// What the guest has been told about this order and not yet opened it to
+  /// see. Nil from a server that does not count it.
+  let unseen: Int?
 
   enum CodingKeys: String, CodingKey {
-    case id, code, state, supplier, kind, title, qty, unit, receive
+    case id, code, state, supplier, kind, title, qty, unit, receive, unseen
     case totalMnt = "total_mnt"
     case receiveOnDay = "receive_on"
     case pickupAddress = "pickup_address"
