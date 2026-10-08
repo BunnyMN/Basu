@@ -148,6 +148,34 @@ class ShellRulesTest {
   }
 
   @Test
+  fun `an order said something about stays news until it is opened`() {
+    val lunch = LiveOrder.from(
+      JSONObject(
+        """{"id":"o1","code":"7001","state":"READY","restaurant":{"id":"r","name":"Алтан Тавган"},
+           "slot_starts_at":"2026-10-05T04:30:00.000Z","unseen":2}""",
+      ),
+    )
+    assertEquals(2, lunch.unseen)
+    val item = lunch.asLiveItem(expanded = false)
+    assertTrue(item.news)
+    assertTrue(item.spoken.endsWith(", шинэ мэдээтэй"))
+
+    val sheep = LiveIdesh.from(
+      JSONObject(
+        """{"id":"i1","code":"9001","state":"READY","supplier":{"id":"s","name":"Хангай"},"title":"Хонь",
+           "qty":1,"unit":"whole","total_mnt":250000,"receive":"pickup","receive_on":"2026-11-03","unseen":1}""",
+      ),
+    )
+    assertEquals(1, sheep.unseen)
+    assertTrue(sheep.asLiveItem().news)
+    // An older server says nothing, and nothing is news.
+    val quiet = sheep.copy(unseen = 0).asLiveItem()
+    assertFalse(quiet.news)
+    assertFalse(quiet.spoken.contains("шинэ"))
+    assertEquals(0, LiveIdesh.from(JSONObject("""{"id":"i2","receive_on":"2026-11-03"}""")).unseen)
+  }
+
+  @Test
   fun `a refused top-up is remembered for a day`() {
     val now = 1_000_000_000_000L
     assertFalse(Platform.refusalRemembered(null, now))

@@ -65,6 +65,7 @@ import mn.basu.app.auth.SignInSheet
 import mn.basu.app.calls.Calls
 import mn.basu.app.core.Endpoint
 import mn.basu.app.core.LocalAppModel
+import mn.basu.app.core.LocalPlatform
 import mn.basu.app.core.LocalPush
 import mn.basu.app.core.LocalSession
 import mn.basu.app.core.openInBrowser
@@ -109,6 +110,7 @@ import org.json.JSONObject
 fun ServiceView(app: String, path: String, back: () -> Unit) {
   val model = LocalAppModel.current
   val session = LocalSession.current
+  val platform = LocalPlatform.current
   val push = LocalPush.current
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -139,6 +141,9 @@ fun ServiceView(app: String, path: String, back: () -> Unit) {
     page.changed = {
       scope.launch {
         model.refreshLive()
+        // Opening an order reads what was said about it: the bell and the
+        // inbox's rows catch up with the dot that just went.
+        platform.ordersSeen(model.seen)
         offerPush()
       }
     }

@@ -67,6 +67,8 @@ data class LiveOrder(
   val slotStartsAt: Instant,
   val fireAt: Instant?,
   val readyAt: Instant?,
+  /** Messages about this order the guest has not read: news until the order is opened. */
+  val unseen: Int = 0,
 ) {
   /**
    * The time worth putting in the corner of the card, and what it is called.
@@ -91,6 +93,7 @@ data class LiveOrder(
       slotStartsAt = json.date("slot_starts_at") ?: Instant.EPOCH,
       fireAt = json.date("fire_at"),
       readyAt = json.date("ready_at"),
+      unseen = json.optInt("unseen"),
     )
   }
 }
@@ -139,6 +142,8 @@ data class LiveIdesh(
   val totalMnt: Int,
   val receive: String,
   val receiveOnDay: String,
+  /** Messages about this order the guest has not read: news until the order is opened. */
+  val unseen: Int = 0,
 ) {
   /** Noon on the day, in Ulaanbaatar — an instant to sort by, never to print. */
   val receiveOn: Instant
@@ -157,6 +162,7 @@ data class LiveIdesh(
       totalMnt = json.optInt("total_mnt"),
       receive = json.optString("receive"),
       receiveOnDay = json.optString("receive_on"),
+      unseen = json.optInt("unseen"),
     )
   }
 }

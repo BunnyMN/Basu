@@ -28,6 +28,14 @@ class AppModel(val api: Api, val session: Session, context: Context) {
   var supplier: SupplierMine? by mutableStateOf(null)
     private set
 
+  /** How many orders have news the guest has not opened: the number on «Захиалга». */
+  val news: Int get() = live.count { it.unseen > 0 } + liveIdesh.count { it.unseen > 0 }
+
+  /** The orders with nothing unread about them, as the inbox names them: `order:{id}`, `idesh:{id}`. */
+  val seen: Set<String>
+    get() = live.filter { it.unseen == 0 }.map { "order:${it.id}" }.toSet() +
+      liveIdesh.filter { it.unseen == 0 }.map { "idesh:${it.id}" }
+
   private var browsingState by mutableStateOf(prefs.getBoolean("browsing", false))
 
   /**

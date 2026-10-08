@@ -46,6 +46,8 @@ data class LiveItem(
   val photo: String?,
   /** Over: handed over, served, or ended without happening. */
   val finished: Boolean,
+  /** Something happened to it that the guest has not seen yet: a dot until they open it. */
+  val news: Boolean = false,
 ) {
   /** How the state's word is set: as it is, in crimson (cancelled) or gold (money on its way back, a payment owed). */
   enum class Tone { Plain, Stop, Hold }
@@ -68,7 +70,7 @@ fun LiveOrder.asLiveItem(expanded: Boolean): LiveItem {
     whenText = at,
     timeLabel = label.uppercase(),
     destination = AppCatalogue.food.destination(order = id),
-    spoken = "Хоол, ${restaurant.name}, $at цагт $said, захиалга $code, ${detail.lowercase()}",
+    spoken = "Хоол, ${restaurant.name}, $at цагт $said, захиалга $code, ${detail.lowercase()}" + fresh(unseen),
     // The fire time is the product. When this is the only thing running it
     // belongs on the launcher, not one tap inside the app.
     extra = if (expanded && fireAt != null && state != OrderState.FIRED && state != OrderState.COOKING) "Гал тавих цаг" to fireAt else null,
@@ -79,6 +81,7 @@ fun LiveOrder.asLiveItem(expanded: Boolean): LiveItem {
     art = "food-tile",
     photo = null,
     finished = state in over + setOf(OrderState.SERVED, OrderState.CLOSED, OrderState.REFUNDED),
+    news = unseen > 0,
   )
 }
 
@@ -108,8 +111,10 @@ fun LiveIdesh.asLiveItem(): LiveItem {
     whenText = if (cancelled) "—" else Format.day(receiveOn),
     timeLabel = label.uppercase(),
     destination = AppCatalogue.idesh.destination(order = id),
-    spoken = if (cancelled) "Идэш, ${supplier.name}, $meat, $amount, захиалга $code, ${state.word.lowercase()}"
-    else "Идэш, ${supplier.name}, ${Format.dayWords(receiveOn)}-нд $label, $meat, $amount, захиалга $code, ${state.word.lowercase()}",
+    spoken = (
+      if (cancelled) "Идэш, ${supplier.name}, $meat, $amount, захиалга $code, ${state.word.lowercase()}"
+      else "Идэш, ${supplier.name}, ${Format.dayWords(receiveOn)}-нд $label, $meat, $amount, захиалга $code, ${state.word.lowercase()}"
+    ) + fresh(unseen),
     extra = null,
     headline = what,
     word = state.word,
@@ -122,8 +127,12 @@ fun LiveIdesh.asLiveItem(): LiveItem {
     art = "idesh-tile",
     photo = photo,
     finished = state in setOf(IdeshState.HANDED, IdeshState.CLOSED, IdeshState.CANCELLED, IdeshState.REFUNDED),
+    news = unseen > 0,
   )
 }
+
+/** The dot, as TalkBack says it. */
+private fun fresh(unseen: Int): String = if (unseen > 0) ", шинэ мэдээтэй" else ""
 
 /** The listing's name without what the amount already says: «Хонины мах, кг-аар» × 10 reads «Хонины мах · 10 кг». */
 val LiveIdesh.meat: String

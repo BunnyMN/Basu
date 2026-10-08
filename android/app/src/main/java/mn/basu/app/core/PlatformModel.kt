@@ -74,7 +74,11 @@ class Platform(private val api: Api, private val session: Session, private val c
       return
     }
     try {
-      me = api.me(token)
+      val fresh = api.me(token)
+      me = fresh
+      // The server's count outranks the inbox's own: an order opened in its
+      // page reads messages the inbox never saw being read.
+      if (inbox.unread != fresh.unread) inbox = inbox.copy(unread = fresh.unread)
       trouble = null
     } catch (error: Exception) {
       if (error is ApiError && error.isUnauthorised) {
@@ -356,6 +360,20 @@ class Platform(private val api: Api, private val session: Session, private val c
       unread = maxOf(0, inbox.unread - 1),
       messages = inbox.messages.map { if (it.id == message.id) it.copy(read = true) else it },
     )
+    refresh()
+  }
+
+  /**
+   * Orders were opened where the shell cannot see — an order's page reads
+   * everything said about it as it shows it. `read` names the orders with no
+   * news left, as `order:{id}` and `idesh:{id}`; their rows flip in place, as
+   * `markRead` does, and the count comes from the server.
+   */
+  suspend fun ordersSeen(read: Set<String>) {
+    fun about(message: InboxMessage) = !message.read && "${message.subject}:${message.subjectId}" in read
+    if (inbox.messages.any(::about)) {
+      inbox = inbox.copy(messages = inbox.messages.map { if (about(it)) it.copy(read = true) else it })
+    }
     refresh()
   }
 

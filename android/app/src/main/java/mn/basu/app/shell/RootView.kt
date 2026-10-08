@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -290,6 +291,9 @@ private fun open(uri: Uri, setTab: (ShellTab) -> Unit, path: MutableList<Destina
 /** The launcher and the three it shares a bar with. */
 @Composable
 private fun Shell(tab: ShellTab, path: MutableList<Destination>, setTab: (ShellTab) -> Unit) {
+  val model = LocalAppModel.current
+  val platform = LocalPlatform.current
+  val scope = rememberCoroutineScope()
   val bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
   // True while a vertical owns the screen. The shell's own pushes do not
   // count — the inbox keeps the bar, and keeps Нүүр lit under it.
@@ -298,6 +302,20 @@ private fun Shell(tab: ShellTab, path: MutableList<Destination>, setTab: (ShellT
 
   BackHandler(enabled = path.isNotEmpty() && path.last() is Destination.Inbox, onBack = pop)
   BackHandler(enabled = path.isEmpty() && tab != ShellTab.Home) { setTab(ShellTab.Home) }
+
+  // Back from elsewhere — an order opened on the website, or on another
+  // phone — the dots, the bar's number and the bell catch up. The first
+  // resume is the launch, which has just asked.
+  var away by remember { mutableStateOf(false) }
+  LifecycleResumeEffect(Unit) {
+    if (away) {
+      scope.launch {
+        model.refreshLive()
+        platform.ordersSeen(model.seen)
+      }
+    }
+    onPauseOrDispose { away = true }
+  }
 
   Box(Modifier.fillMaxSize().background(BasuColor.bg)) {
     Crossfade(tab, animationSpec = tween(150), label = "tab") { shown ->
@@ -346,7 +364,7 @@ private fun Shell(tab: ShellTab, path: MutableList<Destination>, setTab: (ShellT
               ),
             ),
         )
-        TabBar(tab, bottom) { chosen ->
+        TabBar(tab, bottom, news = model.news) { chosen ->
           // A tab always lands on its own root: from the inbox, Түрийвч shows
           // the wallet rather than the inbox over it.
           path.clear()
@@ -439,9 +457,11 @@ fun LockView() {
  *
  * It carries the shell and nothing else — the apps are tiles on the launcher,
  * never tabs. The pill slides between tabs and the phone ticks as it lands.
+ * `news` — how many orders have something the guest has not opened — sits on
+ * «Захиалга»'s shoulder in crimson until they open them.
  */
 @Composable
-fun TabBar(tab: ShellTab, bottom: Dp, select: (ShellTab) -> Unit) {
+fun TabBar(tab: ShellTab, bottom: Dp, news: Int = 0, select: (ShellTab) -> Unit) {
   val haptics = LocalHapticFeedback.current
   val tabs = ShellTab.entries
   BoxWithConstraints(
@@ -465,6 +485,7 @@ fun TabBar(tab: ShellTab, bottom: Dp, select: (ShellTab) -> Unit) {
       for (item in tabs) {
         val active = item == tab
         val colour = if (active) BasuColor.onLight else BasuColor.ink3
+        val count = if (item == ShellTab.Orders) news else 0
         Column(
           Modifier
             .weight(1f)
@@ -476,26 +497,50 @@ fun TabBar(tab: ShellTab, bottom: Dp, select: (ShellTab) -> Unit) {
             }
             .semantics {
               selected = active
-              contentDescription = item.title
+              contentDescription = if (count > 0) "${item.title}, $count шинэ" else item.title
             }
             .testTag("tab.${item.tag}"),
           horizontalAlignment = Alignment.CenterHorizontally,
           verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
         ) {
-          ShellGlyph(
-            when (item) {
-              ShellTab.Home -> ShellMark.Home
-              ShellTab.Orders -> ShellMark.Orders
-              ShellTab.Wallet -> ShellMark.Wallet
-              ShellTab.Profile -> ShellMark.Profile
-            },
-            colour,
-            size = 22.dp,
-            lineWidth = if (active) 1.9f else 1.75f,
-          )
+          Box {
+            ShellGlyph(
+              when (item) {
+                ShellTab.Home -> ShellMark.Home
+                ShellTab.Orders -> ShellMark.Orders
+                ShellTab.Wallet -> ShellMark.Wallet
+                ShellTab.Profile -> ShellMark.Profile
+              },
+              colour,
+              size = 22.dp,
+              lineWidth = if (active) 1.9f else 1.75f,
+            )
+            if (count > 0) {
+              // Ringed in whatever it sits on — the pill or the glass — so it
+              // reads as on top of the mark.
+              NewsBadge(count, if (active) BasuColor.ink else BasuColor.bar, Modifier.align(Alignment.TopEnd).offset(x = 10.dp, y = (-6).dp))
+            }
+          }
           FitText(item.title, sans(11, FontWeight.Bold), colour, minScale = 0.8f)
         }
       }
     }
+  }
+}
+
+/** A crimson count on a mark's shoulder; past nine it says «9+». */
+@Composable
+private fun NewsBadge(count: Int, ring: Color, modifier: Modifier = Modifier) {
+  Box(
+    modifier
+      .background(ring, CircleShape)
+      .padding(1.5.dp)
+      .defaultMinSize(minWidth = 16.dp, minHeight = 16.dp)
+      .background(BasuColor.accent, CircleShape)
+      .padding(horizontal = 4.dp)
+      .testTag("tab.news"),
+    contentAlignment = Alignment.Center,
+  ) {
+    Text(if (count > 9) "9+" else "$count", color = BasuColor.onAccent, style = sans(10, FontWeight.Bold), maxLines = 1)
   }
 }

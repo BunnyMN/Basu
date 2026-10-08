@@ -1,5 +1,6 @@
 package mn.basu.app.shell
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -15,20 +17,27 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import mn.basu.app.core.Format
 import mn.basu.app.design.BasuColor
@@ -71,7 +80,7 @@ fun OrderCard(item: LiveItem, modifier: Modifier = Modifier) {
     ) {
       Thumbnail(item)
       Column(Modifier.weight(1f)) {
-        Text(item.headline, color = BasuColor.ink, style = sans(17, FontWeight.Bold), maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Headline(item)
         Text(
           item.word,
           Modifier.padding(top = 6.dp),
@@ -108,6 +117,42 @@ fun OrderCard(item: LiveItem, modifier: Modifier = Modifier) {
     }
   }
 }
+
+/**
+ * What the order is, in bold — after a crimson dot when something happened to
+ * it that the guest has not opened yet, as the web's own rows have it. The dot
+ * sits in the line, so it stays with the first word however the title wraps.
+ */
+@Composable
+private fun Headline(item: LiveItem) {
+  val style = sans(17, FontWeight.Bold)
+  if (!item.news) {
+    Text(item.headline, color = BasuColor.ink, style = style, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    return
+  }
+  Text(
+    buildAnnotatedString {
+      appendInlineContent(NEWS, "•")
+      append(item.headline)
+    },
+    color = BasuColor.ink,
+    style = style,
+    maxLines = 2,
+    overflow = TextOverflow.Ellipsis,
+    inlineContent = mapOf(
+      NEWS to InlineTextContent(Placeholder(23.sp, 15.sp, PlaceholderVerticalAlign.TextCenter)) {
+        // Nine across, in a soft ring of its own crimson; eight to the word.
+        Canvas(Modifier.fillMaxSize()) {
+          val centre = Offset(7.5.dp.toPx(), size.height / 2)
+          drawCircle(BasuColor.accent.copy(alpha = 0.2f), 7.5.dp.toPx(), centre)
+          drawCircle(BasuColor.accent, 4.5.dp.toPx(), centre)
+        }
+      },
+    ),
+  )
+}
+
+private const val NEWS = "news"
 
 /**
  * The order's picture: the animal's photograph when the order names one,
