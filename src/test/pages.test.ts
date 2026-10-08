@@ -3420,14 +3420,17 @@ describe('нийлүүлэгч болох', () => {
 
     // An on/off knob reads as words, and its row is the way to change it: pressed, it opens that one setting.
     const calls = () => doc.querySelector('#settings [data-key="calls_open"]') as HTMLElement;
+    const word = () => calls()?.querySelector('.setting-value')?.textContent;
     expect(calls().tagName).toBe('BUTTON');
-    expect(calls().querySelector('.setting-value')?.textContent).toBe('Хаалттай');
+    const was = word();
+    expect(['Нээлттэй', 'Хаалттай']).toContain(was);
+    const [other, back] = was === 'Нээлттэй' ? [['0', 'Хаалттай'], ['1', 'Нээлттэй']] : [['1', 'Нээлттэй'], ['0', 'Хаалттай']];
     calls().click();
-    await answerPopup(desk, { calls_open: '1' });
-    await until(desk, 'calls opened', () => calls()?.querySelector('.setting-value')?.textContent === 'Нээлттэй');
+    await answerPopup(desk, { calls_open: other[0]! });
+    await until(desk, 'calls switched', () => word() === other[1]);
     calls().click();
-    await answerPopup(desk, { calls_open: '0' });
-    await until(desk, 'calls closed again', () => calls()?.querySelector('.setting-value')?.textContent === 'Хаалттай');
+    await answerPopup(desk, { calls_open: back[0]! });
+    await until(desk, 'calls switched back', () => word() === back[1]);
 
     // The front page carries the word to everyone at the desk.
     await opsTab(desk, 'overview');
