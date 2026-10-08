@@ -57,6 +57,7 @@ import { registerOrgRoutes } from './orgs.js';
 import { registerAccessRoutes } from './access.js';
 import { ensureRoles } from '../platform/access/index.js';
 import { FakeMailer, HostedFakePaymentProvider, type Ctx } from '../ports.js';
+import { unreadBySubject } from '../platform/notify/index.js';
 
 /**
  * The HTTP surface.
@@ -545,6 +546,8 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
       [request.guestId, LIVE_STATES],
     );
 
+    // What was said about each lunch that the guest has not seen: the dot in the apps, until it is opened.
+    const unseen = await unreadBySubject(request.guestId!, 'order');
     return reply.send({
       orders: rows.map((o) => ({
         id: o.id,
@@ -557,6 +560,7 @@ export async function buildServer(ctx: Ctx, options: ServerOptions = {}): Promis
         slot_starts_at: o.slot_starts_at.toISOString(),
         fire_at: o.fire_at?.toISOString() ?? null,
         ready_at: o.ready_at?.toISOString() ?? null,
+        unseen: unseen.get(o.id) ?? 0,
       })),
     });
   });

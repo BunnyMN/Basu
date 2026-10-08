@@ -208,7 +208,7 @@ export class ApnsNotifier implements Notifier {
       topic: this.#bundleId,
       collapseId: message.template,
       payload: {
-        aps: { alert: { body: message.body }, sound: 'default' },
+        aps: { alert: { body: message.body }, sound: 'default', ...(message.badge !== undefined ? { badge: message.badge } : {}) },
         template: message.template,
       },
     });

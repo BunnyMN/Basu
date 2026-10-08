@@ -303,6 +303,36 @@ describe('ordering', () => {
     expect(new Set(filed.map((m) => m.subject_id))).toEqual(new Set([id]));
   });
 
+  it('keeps a dot on an order until it is opened, and the number on the icon with it', async () => {
+    const token = await signIn('+97699001155');
+    await topUp(token, 1_000_000);
+    const { id } = await placeAndPay(token);
+    const screen = await atCounter(supplierId);
+    await app.inject({ method: 'POST', url: `/v1/supplier/orders/${id}/prepare`, headers: auth(screen), payload: {} });
+
+    const live = async () => (await app.inject({ method: 'GET', url: '/v1/idesh', headers: auth(token) })).json().orders as Array<{ id: string; unseen: number }>;
+    const unread = async () => (await app.inject({ method: 'GET', url: '/v1/notifications', headers: auth(token) })).json().unread as number;
+    // Paid, then the supplier started: two things said about it, neither seen.
+    expect((await live()).find((o) => o.id === id)?.unseen).toBe(2);
+    const before = await unread();
+    expect(before).toBeGreaterThanOrEqual(2);
+
+    // Opening the order sees everything said about it, and the icon's number falls by as much.
+    const seen = await app.inject({ method: 'POST', url: '/v1/notifications/read', headers: auth(token), payload: { subject: 'idesh', subject_id: id } });
+    expect(seen.json().unread).toBe(before - 2);
+    expect((await live()).find((o) => o.id === id)?.unseen).toBe(0);
+
+    // The next step brings the dot back.
+    await app.inject({ method: 'POST', url: `/v1/supplier/orders/${id}/ready`, headers: auth(screen), payload: {} });
+    expect((await live()).find((o) => o.id === id)?.unseen).toBe(1);
+
+    // Somebody else's order, or no order at all, marks nothing.
+    const other = await signIn('+97699001166');
+    await app.inject({ method: 'POST', url: '/v1/notifications/read', headers: auth(other), payload: { subject: 'idesh', subject_id: id } });
+    await app.inject({ method: 'POST', url: '/v1/notifications/read', headers: auth(token), payload: { subject: 'idesh', subject_id: 'nope' } });
+    expect((await live()).find((o) => o.id === id)?.unseen).toBe(1);
+  });
+
   it('keeps every paid order in the history, finished ones too, and never a draft', async () => {
     const token = await signIn('+97699001133');
     await topUp(token, 1_000_000);

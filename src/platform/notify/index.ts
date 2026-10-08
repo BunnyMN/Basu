@@ -13,6 +13,8 @@ export {
   inboxPage,
   INBOX_PAGE_MAX,
   markRead,
+  markSubjectRead,
+  unreadBySubject,
   preferences,
   purgeCodes,
   relay,

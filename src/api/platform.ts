@@ -31,6 +31,7 @@ import {
   INBOX_PAGE_MAX,
   inboxPage,
   markRead,
+  markSubjectRead,
   preferences,
   registerActivityStartToken,
   registerActivityToken,
@@ -507,10 +508,21 @@ export async function registerPlatformRoutes(
   /**
    * No id marks the whole inbox read — what opening the list means. An id
    * that is not a message's marks nothing, as the swipe below removes
-   * nothing, and is never Postgres's to read.
+   * nothing, and is never Postgres's to read. `subject` and `subject_id`
+   * instead mark everything said about one order read — what opening that
+   * order means: its dot in the apps goes, and the number on the icon falls.
    */
-  app.post<{ Body: { id?: unknown } }>('/v1/notifications/read', guarded, async (request) => {
-    const id = request.body?.id ?? null;
+  app.post<{ Body: { id?: unknown; subject?: unknown; subject_id?: unknown } }>('/v1/notifications/read', guarded, async (request) => {
+    const body = request.body ?? {};
+    if (body.subject !== undefined || body.subject_id !== undefined) {
+      const subject = body.subject;
+      const subjectId = body.subject_id;
+      if ((subject === 'idesh' || subject === 'order') && typeof subjectId === 'string' && UUID.test(subjectId)) {
+        await markSubjectRead(request.guestId!, subject, subjectId, ctx.clock.now());
+      }
+      return { unread: await unreadCount(request.guestId!) };
+    }
+    const id = body.id ?? null;
     if (id === null || (typeof id === 'string' && UUID.test(id))) {
       await markRead(request.guestId!, id, ctx.clock.now());
     }

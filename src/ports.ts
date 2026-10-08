@@ -116,6 +116,8 @@ export interface OutgoingMessage {
   to: string;
   template: string;
   body: string;
+  /** With a push: how many of the person's messages are unread, this one counted — the number on the app's icon. */
+  badge?: number;
 }
 
 /**

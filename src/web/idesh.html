@@ -80,6 +80,8 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 /* the name on one line, or two when it is long — its count is never cut off */
 .oc .title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:1.0625rem;font-weight:700;line-height:1.2;color:var(--ink);overflow-wrap:anywhere}
 .oc .st{display:block;margin-top:6px;line-height:1.2}
+/* something said about the order that the guest has not seen yet: there until the order is opened */
+.new-dot{display:inline-block;width:9px;height:9px;margin:0 8px 2px 0;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(210,31,60,.2);vertical-align:middle}
 #mine-list .chip{min-height:0;font-size:.875rem;font-weight:600;color:var(--ink-2)}
 #mine-list .chip::before{display:none}
 #mine-list .chip[data-strong]{color:var(--tone-ink)}
@@ -2167,6 +2169,22 @@ function refundPanel(order) {
 /** What the last render was of, so a poll that found no news changes nothing. */
 let rendered = null;
 
+/**
+ * On the screen, so seen: everything said about this order up to now. Its dot in the apps goes and the
+ * number on the icon falls — the shell is told so it redraws at once. Only while the page is in front of
+ * somebody: a step that arrives with the phone in a pocket is still news when they look.
+ */
+function seen(orderId) {
+  if (document.visibilityState !== 'visible' || !orderId) return;
+  guestApi('/v1/notifications/read', { method: 'POST', body: { subject: 'idesh', subject_id: orderId } }).then(
+    () => shell.ordersChanged(),
+    () => {},
+  );
+}
+document.addEventListener('visibilitychange', () => {
+  if (state.screen === 'status') seen(state.orderId);
+});
+
 async function showStatus(force, { replace = false } = {}) {
   if (!state.orderId) return;
   const order = await guestApi(`/v1/idesh/${state.orderId}`);
@@ -2182,6 +2200,7 @@ async function showStatus(force, { replace = false } = {}) {
   const moved = rendered !== null && signature !== rendered;
   if (moved) shell.ordersChanged();
   rendered = signature;
+  seen(order.id);
 
   const face = FACE[order.state] ?? { word: IDESH_STATE[order.state] ?? '', cap: () => '' };
   const live = !DONE.includes(order.state);
@@ -2489,7 +2508,7 @@ function mineRow(order, known) {
       <button class="card oc" type="button" data-order="${order.id}">
         <span class="ph"><img src="${PHOTO(order)}" alt="" width="64" height="64" loading="lazy"></span>
         <span class="main">
-          <span class="title">${escapeHtml(order.title)} ×${escapeHtml(order.qty)}</span>
+          <span class="title">${order.unseen ? '<i class="new-dot" role="img" aria-label="Шинэ мэдээтэй"></i>' : ''}${escapeHtml(order.title)} ×${escapeHtml(order.qty)}</span>
           ${word ? `<span class="st"><span class="chip"${tone}>${escapeHtml(word)}</span></span>` : ''}
           ${step ? meter(step) : ''}
         </span>

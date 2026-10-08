@@ -126,6 +126,9 @@ describe('the relay', () => {
     expect(notifier.sent.at(-1)).toMatchObject({ channel: 'push', to: 'phone-1', body: 'Хонь бэлэн боллоо.' });
     expect(mailer.sent).toHaveLength(0);
 
+    // The push carries the number for the app's icon: everything unread, this one counted.
+    expect(notifier.sent.at(-1)?.badge).toBe(1);
+
     // With a real gateway the SMS goes first, as the message asked.
     ctx.smsGateway = true;
     await enqueue(ctx, { guestId: id, template: 'idesh.dispatched', body: 'Замд гарлаа.', channel: 'sms', dedupeKey: 'r2' });

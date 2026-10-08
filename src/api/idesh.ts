@@ -78,7 +78,7 @@ import {
 import { setting } from '../ops/index.js';
 import { badRequest, forbidden, sendError, unauthorized } from './errors.js';
 import { confirmPassword, contactsFor, resolveGuest } from '../platform/identity/index.js';
-import { enqueue } from '../platform/notify/index.js';
+import { enqueue, unreadBySubject } from '../platform/notify/index.js';
 import { LONE_OWNER_PERMISSIONS, grants, headRoles, type Grants } from '../platform/access/index.js';
 import { accessIn, membersOf } from '../platform/org/index.js';
 import { topupsOpen, type Ctx } from '../ports.js';
@@ -377,10 +377,15 @@ export async function registerIdeshRoutes(
   /* ── the guest ─────────────────────────────────────────────────── */
 
   /** Everything of this guest's still going on — what the launcher draws. */
-  app.get<{ Querystring: { scope?: string } }>('/v1/idesh', guarded, async (request) => ({
+  app.get<{ Querystring: { scope?: string } }>('/v1/idesh', guarded, async (request) => {
     // `scope=all` is the website's order history; without it, what is still going on.
-    orders: (request.query.scope === 'all' ? await allFor(request.guestId!) : await liveFor(request.guestId!)).map(shapeSummary),
-  }));
+    const [orders, unseen] = await Promise.all([
+      request.query.scope === 'all' ? allFor(request.guestId!) : liveFor(request.guestId!),
+      unreadBySubject(request.guestId!, 'idesh'),
+    ]);
+    // `unseen`: what was said about the order that the guest has not seen — the dot, until it is opened.
+    return { orders: orders.map((o) => ({ ...shapeSummary(o), unseen: unseen.get(o.id) ?? 0 })) };
+  });
 
   app.post<{
     Body: {

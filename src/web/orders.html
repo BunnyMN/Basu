@@ -25,6 +25,8 @@
 .so-row:active{background:var(--surface-2)}
 .so-row img{width:72px;height:72px;border-radius:14px;object-fit:cover;background:var(--surface-2)}
 .so-row b{display:block;font-size:1.0625rem;font-weight:700;line-height:1.3}
+/* something said about the order that has not been seen yet: there until the order is opened */
+.new-dot{display:inline-block;width:9px;height:9px;margin:0 8px 2px 0;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(210,31,60,.2);vertical-align:middle}
 .so-row small{display:block;margin-top:4px;font-size:.875rem;font-weight:500;color:var(--ink-2)}
 .so-row small .code{font-variant-numeric:tabular-nums;font-weight:600;color:var(--ink-3)}
 .so-row .end{display:flex;flex-direction:column;align-items:flex-end;gap:10px;text-align:right}
@@ -226,7 +228,7 @@ async function drawList() {
       box.append(
         el(`<a class="so-row" href="/orders/${o.id}" data-order="${o.id}">
               <img src="${meatPhoto(o)}" alt="" loading="lazy" width="72" height="72">
-              <span><b>${esc(o.title)} × ${o.qty} ${unitWord(o)}</b><small>${esc(o.supplier.name)} · ${o.receive === 'delivery' ? 'хүргэлт' : 'очиж авна'} ${dayLabel(o.receive_on)}</small><small><span class="code">№${esc(o.code)}</span></small></span>
+              <span><b>${o.unseen ? '<i class="new-dot" role="img" aria-label="Шинэ мэдээтэй"></i>' : ''}${esc(o.title)} × ${o.qty} ${unitWord(o)}</b><small>${esc(o.supplier.name)} · ${o.receive === 'delivery' ? 'хүргэлт' : 'очиж авна'} ${dayLabel(o.receive_on)}</small><small><span class="code">№${esc(o.code)}</span></small></span>
               <span class="end"><span class="s-money">${tugrik(o.total_mnt)}</span>${going.get(o.id) ? refundPill(going.get(o.id)) : pill(o.state)}</span>
             </a>`),
       );
@@ -277,6 +279,10 @@ async function drawOrder(id, fresh) {
   const signature = `${o.state}|${o.refund?.state ?? ''}|${o.receipt ? 1 : 0}`;
   if (drawn === signature) return o;
   drawn = signature;
+  // On the screen, so seen: what was said about it no longer counts as news, here or in the app.
+  if (document.visibilityState === 'visible') {
+    authed('/v1/notifications/read', { method: 'POST', body: { subject: 'idesh', subject_id: o.id } }).catch(() => {});
+  }
   document.title = `№${o.code} — Basu`;
   const delivery = o.receive === 'delivery';
   const live = LIVE.includes(o.state);

@@ -1364,6 +1364,21 @@ const LUNCH_STEP = { PLACED: 1, ACCEPTED: 2, SCHEDULED: 2, ARMED: 2, RESLOTTED: 
 const NEGATIVE = ['CANCELLED', 'REFUNDED', 'NO_SHOW', 'REJECTED'];
 const OVER = ['SERVED', 'CLOSED', ...NEGATIVE];
 
+/**
+ * On the screen, so seen: everything said about this lunch up to now. Its dot in the apps goes and the
+ * number on the icon falls. Only while the page is in front of somebody.
+ */
+function seen(orderId) {
+  if (document.visibilityState !== 'visible' || !orderId) return;
+  guestApi('/v1/notifications/read', { method: 'POST', body: { subject: 'order', subject_id: orderId } }).then(
+    () => shell.ordersChanged(),
+    () => {},
+  );
+}
+document.addEventListener('visibilitychange', () => {
+  if (state.orderId) seen(state.orderId);
+});
+
 async function showStatus(force) {
   if (!state.orderId) return;
   const order = await guestApi(`/v1/orders/${state.orderId}`);
@@ -1387,6 +1402,7 @@ async function showStatus(force) {
   const moved = rendered !== null && signature !== rendered;
   if (moved) shell.ordersChanged();
   rendered = signature;
+  seen(order.id);
 
   // The order's place on the map, even when the list of venues has not come
   // (or no longer lists it): the route and the walk need somewhere to stand.
