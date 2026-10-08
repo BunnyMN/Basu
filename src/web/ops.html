@@ -4479,10 +4479,39 @@ const ago = (iso, nowIso) => {
 
 /** A setting's value as it reads: tugriks with their sign, days as days, an empty text as a dash. */
 function settingValue(k) {
+  if (k.kind === 'flag') return Number(k.value) ? '<b>Нээлттэй</b>' : '<span class="muted">Хаалттай</span>';
   if (String(k.value) === '') return '<span class="muted">—</span>';
   if (k.kind === 'number' && /_mnt$/.test(k.key)) return `<b>${money(Number(k.value))}</b>`;
   if (k.kind === 'number' && /_days$/.test(k.key)) return `<b><span class="mono">${esc(String(k.value))}</span> хоног</b>`;
   return `<b${k.kind === 'number' ? ' class="mono"' : ''}>${esc(String(k.value))}</b>`;
+}
+
+/** One setting as a popup field: on or off chosen from two, a number typed, words written. */
+function settingField(k, label = k.label) {
+  if (k.kind === 'flag') {
+    return { name: k.key, label, type: 'select', options: [['1', 'Нээлттэй'], ['0', 'Хаалттай']], value: String(Number(k.value) ? 1 : 0), hint: k.hint, wide: true };
+  }
+  return { name: k.key, label, type: k.kind === 'number' ? 'number' : 'text', value: String(k.value), hint: k.hint, wide: true };
+}
+
+/** A row of «Тохиргоо», pressed: that one setting, in a popup of its own. */
+function editSetting(k) {
+  popup({
+    title: k.label,
+    sub: 'Шууд үйлчилнэ; өөрчилсөн хүн нь үлдэнэ.',
+    width: 520,
+    id: 'setting-edit',
+    fields: [settingField(k, k.kind === 'flag' ? 'Төлөв' : 'Утга')],
+    onSubmit: async (v) => {
+      if (String(k.value) === v[k.key] || (k.kind === 'flag' && String(Number(k.value) ? 1 : 0) === v[k.key])) {
+        toast('Өөрчлөлт алга.', 'good');
+        return;
+      }
+      await ops(`/v1/ops/system/settings/${k.key}`, { method: 'PUT', body: { value: v[k.key] } });
+      toast('Хадгаллаа.', 'good');
+      await drawSystem();
+    },
+  });
 }
 
 async function renderSystem(view) {
@@ -4529,13 +4558,15 @@ async function drawSystem() {
         <tr><td>Ирээгүй зочин<span class="sub">мах бэлэн болсноос хойш</span></td><td class="num">${s.rules.no_show_days} хоног</td></tr>
       </tbody></table></div></div></section>
       <section class="section"><h2 class="section-label">Тохиргоо</h2><div class="card" data-rows id="settings">${s.settings
-        .map(
-          (k) => `
-        <div class="row" data-key="${esc(k.key)}">
+        .map((k) => {
+          // A row an admin can change is a button: pressed, it opens that one setting.
+          const tag = can('desk.system:manage') ? 'button type="button"' : 'div';
+          return `
+        <${tag} class="row" data-key="${esc(k.key)}">
           <div class="main"><span class="title">${esc(k.label)}</span><span class="sub">${esc(k.hint)}${k.updated_by ? ` · ${esc(k.updated_by.replace('ops:', ''))}, ${when(k.updated_at)}` : ''}</span></div>
           <div class="end setting-value">${settingValue(k)}</div>
-        </div>`,
-        )
+        </${tag.split(' ')[0]}>`;
+        })
         .join('')}</div>${can('desk.system:manage') ? '' : '<p class="page-note">Тохиргоог зөвхөн админ өөрчилнө.</p>'}</section>
     </div>
   </div>`);
@@ -4549,18 +4580,11 @@ async function drawSystem() {
             sub: 'Шууд үйлчилнэ; өөрчилсөн хүн нь үлдэнэ.',
             width: 600,
             id: 'settings-edit',
-            fields: s.settings.map((k) => ({
-              name: k.key,
-              label: k.label,
-              type: k.kind === 'number' ? 'number' : 'text',
-              value: String(k.value),
-              hint: k.hint,
-              wide: true,
-            })),
+            fields: s.settings.map((k) => settingField(k)),
             onSubmit: async (v) => {
               let changed = 0;
               for (const k of s.settings) {
-                if (String(k.value) === v[k.key]) continue;
+                if (String(k.kind === 'flag' ? (Number(k.value) ? 1 : 0) : k.value) === v[k.key]) continue;
                 await ops(`/v1/ops/system/settings/${k.key}`, { method: 'PUT', body: { value: v[k.key] } });
                 changed += 1;
               }
@@ -4571,6 +4595,10 @@ async function drawSystem() {
         'data-size="sm" id="edit-settings"',
       ),
     );
+    for (const row of page.querySelectorAll('#settings button.row')) {
+      const k = s.settings.find((x) => x.key === row.dataset.key);
+      if (k) row.addEventListener('click', () => editSetting(k));
+    }
   }
   box.replaceChildren(page);
 }

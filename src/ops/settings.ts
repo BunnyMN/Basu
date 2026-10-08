@@ -8,7 +8,8 @@ export interface SettingSpec {
   key: string;
   label: string;
   hint: string;
-  kind: 'number' | 'text';
+  /** `flag` is on or off — kept as 1 or 0, drawn and chosen as «Нээлттэй» / «Хаалттай». */
+  kind: 'number' | 'text' | 'flag';
   fallback: number | string;
 }
 
@@ -20,7 +21,7 @@ export const SETTINGS: readonly SettingSpec[] = [
   { key: 'promo_vip_mnt', label: 'VIP зарын үнэ, ₮', hint: 'Нийлүүлэгч нэг удаа төлөхөд. 0 бол үнэгүй.', kind: 'number', fallback: 50000 },
   { key: 'promo_vip_days', label: 'VIP зарын хугацаа, хоног', hint: 'Хамгийн дээр, нүүр хуудсанд хэдэн хоног гарах.', kind: 'number', fallback: 7 },
   { key: 'desk_banner', label: 'Ширээний зарлал', hint: 'Самбарын дээр бүх гишүүнд харагдана. Хоосон бол харагдахгүй.', kind: 'text', fallback: '' },
-  { key: 'calls_open', label: 'Апп доторх дуудлага', hint: '1 бол Идэшийн захиалгад «Залгах» гарна. 0 бол хаалттай, өмнө нь эхэлсэн дуудлага дуусах хүртэл үргэлжилнэ.', kind: 'number', fallback: 0 },
+  { key: 'calls_open', label: 'Апп доторх дуудлага', hint: 'Нээлттэй бол Идэшийн зочин, нийлүүлэгч хоёр төлсөн захиалгаасаа бие биедээ залгана. Хаахад явж буй дуудлага дуустлаа үргэлжилнэ.', kind: 'flag', fallback: 0 },
 ];
 
 export interface Setting extends SettingSpec {
@@ -35,7 +36,7 @@ export async function settings(db: Db = getPool()): Promise<Setting[]> {
   return SETTINGS.map((spec) => {
     const row = stored.get(spec.key);
     const raw = row?.value;
-    const value = spec.kind === 'number' ? (typeof raw === 'number' ? raw : spec.fallback) : typeof raw === 'string' ? raw : spec.fallback;
+    const value = spec.kind === 'text' ? (typeof raw === 'string' ? raw : spec.fallback) : typeof raw === 'number' ? raw : spec.fallback;
     return { ...spec, value, updatedBy: row?.updated_by ?? null, updatedAt: row?.updated_at ?? null };
   });
 }
@@ -62,6 +63,11 @@ export async function setSetting(key: string, value: unknown, by: string, db: Db
     const n = typeof value === 'number' ? value : Number(String(value ?? '').trim());
     if (!Number.isFinite(n) || n < 0) throw new SettingError('BAD_VALUE', `${key} must be a number ≥ 0`);
     clean = n;
+  } else if (spec.kind === 'flag') {
+    const said = typeof value === 'string' ? value.trim().toLowerCase() : value;
+    if (said === true || said === 1 || said === '1' || said === 'true' || said === 'on') clean = 1;
+    else if (said === false || said === 0 || said === '0' || said === 'false' || said === 'off') clean = 0;
+    else throw new SettingError('BAD_VALUE', `${key} is on (1) or off (0)`);
   } else {
     if (typeof value !== 'string' || value.length > 500) throw new SettingError('BAD_VALUE', `${key} must be text under 500 characters`);
     clean = value.trim();

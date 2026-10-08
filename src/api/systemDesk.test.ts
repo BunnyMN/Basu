@@ -129,6 +129,13 @@ describe('the machine', () => {
     expect((await app.inject({ method: 'PUT', url: '/v1/ops/system/settings/nope', headers: desk(), payload: { value: 1 } })).statusCode).toBe(400);
     expect((await app.inject({ method: 'PUT', url: '/v1/ops/system/settings/sms_unit_mnt', headers: desk(), payload: { value: -5 } })).statusCode).toBe(400);
     expect((await app.inject({ method: 'PUT', url: '/v1/ops/system/settings/sms_unit_mnt', headers: desk(), payload: { value: 'abc' } })).statusCode).toBe(400);
+    // An on/off knob is on or off: what the popup sends («1»/«0») and nothing in between.
+    expect((await app.inject({ method: 'PUT', url: '/v1/ops/system/settings/calls_open', headers: desk(), payload: { value: '2' } })).statusCode).toBe(400);
+    const opened = await app.inject({ method: 'PUT', url: '/v1/ops/system/settings/calls_open', headers: desk(), payload: { value: '1' } });
+    expect(opened.statusCode, opened.body).toBe(200);
+    const flag = (await app.inject({ method: 'GET', url: '/v1/ops/system', headers: desk() })).json().settings.find((k: { key: string }) => k.key === 'calls_open');
+    expect(flag).toMatchObject({ kind: 'flag', value: 1 });
+    expect((await app.inject({ method: 'PUT', url: '/v1/ops/system/settings/calls_open', headers: desk(), payload: { value: '0' } })).statusCode).toBe(200);
     const banner = await app.inject({ method: 'PUT', url: '/v1/ops/system/settings/desk_banner', headers: desk(), payload: { value: '  Маргааш 10:00-д QPay-тэй уулзана  ' } });
     expect(banner.json()).toMatchObject({ value: 'Маргааш 10:00-д QPay-тэй уулзана' });
     const system = (await app.inject({ method: 'GET', url: '/v1/ops/system', headers: desk() })).json();

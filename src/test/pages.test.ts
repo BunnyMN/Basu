@@ -3418,6 +3418,17 @@ describe('нийлүүлэгч болох', () => {
     await answerPopup(desk, { desk_banner: 'Маргааш ажиллахгүй' });
     await until(desk, 'the knob turned', (d) => d.querySelector('#settings')?.textContent?.includes('Демо') ?? false);
 
+    // An on/off knob reads as words, and its row is the way to change it: pressed, it opens that one setting.
+    const calls = () => doc.querySelector('#settings [data-key="calls_open"]') as HTMLElement;
+    expect(calls().tagName).toBe('BUTTON');
+    expect(calls().querySelector('.setting-value')?.textContent).toBe('Хаалттай');
+    calls().click();
+    await answerPopup(desk, { calls_open: '1' });
+    await until(desk, 'calls opened', () => calls()?.querySelector('.setting-value')?.textContent === 'Нээлттэй');
+    calls().click();
+    await answerPopup(desk, { calls_open: '0' });
+    await until(desk, 'calls closed again', () => calls()?.querySelector('.setting-value')?.textContent === 'Хаалттай');
+
     // The front page carries the word to everyone at the desk.
     await opsTab(desk, 'overview');
     await until(desk, 'the banner', (d) => Boolean(d.querySelector('#banner')));
