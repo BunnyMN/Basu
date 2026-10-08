@@ -175,7 +175,7 @@ describe('putting a listing first', () => {
 
   it('raises an invoice at the desk’s price, starts only once paid, and puts the listing first', async () => {
     // Another supplier's listing, ready sooner: on its own it would come first.
-    const paper = await addCertificate(rivalId, { number: '44070318', issuer: 'Хэнтий, Хэрлэн сумын мал эмнэлэг', issuedOn: '2026-09-01' }, clock.now(), '2026-09-01');
+    const paper = await addCertificate(rivalId, { number: '44070318', issuer: 'Хэнтий, Хэрлэн сумын мал эмнэлэг', issuedOn: '2026-09-01', origin: { aimag: 'Хэнтий', soum: 'Хэрлэн', bag: null } }, clock.now(), '2026-09-01');
     const beef = await createListing(
       rivalId,
       { kind: 'beef', unit: 'kg', title: 'Үхрийн мах', priceMnt: 14_000, minQty: 10, quantity: 300, origin: 'Хэнтий', readyFrom: '2026-09-05', certificateId: paper.id },
@@ -675,7 +675,7 @@ describe('the supplier’s screen', () => {
 
   it('lets the supplier run their own stall', async () => {
     const screen = await atCounter(supplierId);
-    const paper = await addCertificate(supplierId, { number: '65110421', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', issuedOn: '2026-09-01' }, clock.now(), '2026-09-01');
+    const paper = await addCertificate(supplierId, { number: '65110421', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', issuedOn: '2026-09-01', origin: { aimag: 'Архангай', soum: 'Их тамир', bag: null } }, clock.now(), '2026-09-01');
 
     const created = await app.inject({
       method: 'POST',
@@ -1026,7 +1026,7 @@ describe('задаргаа', () => {
 
   it('lets a supplier say what they do on a new listing, and refuses what no butcher does', async () => {
     const screen = await atCounter(supplierId);
-    const paper = await addCertificate(supplierId, { number: '65110499', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', issuedOn: '2026-09-01' }, clock.now(), '2026-09-01');
+    const paper = await addCertificate(supplierId, { number: '65110499', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', issuedOn: '2026-09-01', origin: { aimag: 'Архангай', soum: 'Их тамир', bag: null } }, clock.now(), '2026-09-01');
     const add = (more: Record<string, unknown>) =>
       app.inject({
         method: 'POST',

@@ -12,6 +12,7 @@ import {
 import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
 import { badRequest, sendError } from './errors.js';
+import { shapeCertificateDetails } from './shapes.js';
 import { UUID } from './guards.js';
 
 /**
@@ -43,6 +44,8 @@ const shape = (c: DeskCertificate) => ({
   listings: c.listings,
   orders: c.orders,
   created_at: c.createdAt.toISOString(),
+  twins: c.twins,
+  ...shapeCertificateDetails(c),
 });
 
 export function registerCertificatesDesk(app: FastifyInstance, ctx: Ctx, { desk, who, audit }: CertificateGuards): void {

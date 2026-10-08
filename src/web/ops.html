@@ -174,6 +174,11 @@ p{margin:0}
 .kv dd{margin:0;font-size:var(--t-body);line-height:20px;color:var(--ink)}
 .kv dd small{display:block;margin-top:2px;font-size:var(--t-cap);line-height:1.4;color:var(--ink-3)}
 .kv-none{color:var(--ink-3)}
+/* A certificate's paper, inside its popup: the list sits flush, and a twin is said first. */
+.cert-facts{border:1px solid var(--line);border-radius:var(--r-sm)}
+.cert-facts > div{padding:10px 14px}
+.cert-facts a{color:var(--ink);word-break:break-all}
+.cert-twins{margin:0 0 10px;color:var(--gold);font-size:var(--t-body)}
 @media (max-width:600px){.kv > div{grid-template-columns:1fr;gap:2px;padding:12px 16px}}
 
 /* a business waiting for Basu: where it stands and what comes */
@@ -2700,6 +2705,39 @@ const lastPageKey = (w) => (w.kind === 'desk' ? 'basu.ops.tab' : `basu.dash.page
 /* ── the veterinary certificates suppliers wrote in ── */
 
 const CERT_STATE = { unchecked: ['pending', 'Шалгаагүй'], genuine: ['verified', 'Жинхэнэ'], false: ['bad', 'Хүчингүй'] };
+/** «Завхан, Отгон сум, 3-р баг», or null for one written in before origins were asked. */
+const certOrigin = (c) =>
+  c.origin ? [c.origin.aimag, /(сум|дүүрэг)$/i.test(c.origin.soum) ? c.origin.soum : `${c.origin.soum} ${c.origin.aimag === 'Улаанбаатар' ? 'дүүрэг' : 'сум'}`, c.origin.bag].filter(Boolean).join(', ') : null;
+const CERT_UNIT = { piece: 'ш', head: 'толгой', kg: 'кг' };
+const CERT_KIND = { sheep: 'Хонь', goat: 'Ямаа', beef: 'Үхэр', horse: 'Адуу' };
+
+/**
+ * Everything the supplier wrote off the paper, in the paper's order — what
+ * the desk holds the photograph and the state's records against. A QR that
+ * is an address opens it; another supplier with the same number or QR is
+ * said first, as that is the first thing to look into.
+ */
+function certFacts(c) {
+  const none = '<span class="kv-none">—</span>';
+  const row = (label, html) => `<div><dt>${label}</dt><dd>${html || none}</dd></div>`;
+  const qr = c.qr
+    ? /^https?:\/\//i.test(c.qr)
+      ? `<a href="${esc(c.qr)}" target="_blank" rel="noopener noreferrer">${esc(c.qr)}</a><small>QR-ын холбоос — нээж шалгана.</small>`
+      : `<span class="mn">${esc(c.qr)}</span>`
+    : '';
+  return `${c.twins ? `<p class="cert-twins"><b>Анхаар:</b> өөр ${c.twins} нийлүүлэгч ижил дугаар эсвэл QR-тай гэрчилгээ оруулсан.</p>` : ''}
+    <dl class="kv cert-facts">
+      ${row('МЭГ-ийн дугаар', `<span class="mn">№${esc(c.number)}</span>`)}
+      ${row('Олгосон мал эмч', `${esc(c.issuer)}<small>${esc(dayLabel(c.issued_on))}${c.valid_until ? ` — ${esc(dayLabel(c.valid_until))} хүртэл хүчинтэй` : ''}</small>`)}
+      ${row('Улсын байцаагч', esc(c.inspector ?? ''))}
+      ${row('Гарал үүсэл', certOrigin(c) ? `${esc(certOrigin(c))}${c.herder ? `<small>Малчин: ${esc(c.herder)}</small>` : ''}` : '<span class="kv-none">Оруулаагүй</span>')}
+      ${row('Бүтээгдэхүүн', c.products.map((p) => `${esc(CERT_KIND[p.kind] ?? p.kind)} · ${esc(p.what)} · ${esc(p.quantity.toLocaleString('mn-MN'))} ${esc(CERT_UNIT[p.unit] ?? p.unit)}`).join('<br>'))}
+      ${row('Шинжилгээ (сөрөг)', c.tests.map((t) => `${esc(t.disease)}${t.tested_on || t.lab ? `<small>${[t.tested_on ? dayLabel(t.tested_on) : '', t.lab ?? ''].filter(Boolean).map(esc).join(' · ')}</small>` : ''}`).join(''))}
+      ${row('Маршрут', esc(c.route ?? ''))}
+      ${row('QR', qr)}
+    </dl>`;
+}
+
 /** What a certificate is on, in words. */
 const certUse = (c) => [c.listings ? `${c.listings} зар` : '', c.orders ? `${c.orders} захиалга` : ''].filter(Boolean).join(' · ') || 'Хэрэглээгүй';
 
@@ -2726,11 +2764,12 @@ async function checkCertificatePopup(c) {
   const done = await popup({
     id: 'cert-check',
     title: `Гэрчилгээ №${c.number}`,
-    sub: `${esc(c.supplier_name)} · ${esc(c.issuer)} · ${esc(dayLabel(c.issued_on))}`,
-    width: 640,
+    sub: `${esc(c.supplier_name)} · ${esc(certOrigin(c) ?? c.issuer)} · ${esc(dayLabel(c.issued_on))}`,
+    width: 680,
     fields: [
+      { type: 'static', label: 'Нийлүүлэгчийн оруулсан', html: certFacts(c) },
       { type: 'static', label: 'Зураг', html: photo.src ? `<img class="cert-photo" src="${photo.src}" alt="Гэрчилгээ №${esc(c.number)}">` : '<span class="dt-none">Зураг оруулаагүй</span>' },
-      { type: 'note', text: 'Дугаарыг «Мал эмнэлгийн гэрчилгээ» апп эсвэл МЭНС-ээр шалгаад, олдсон дүнгээ сонгоно.' },
+      { type: 'note', text: 'Зураг дээрх мэдээлэлтэй тулгаад, дугаар эсвэл QR-ыг «Мал эмнэлгийн гэрчилгээ» апп, МЭНС-ээр шалгаж, олдсон дүнгээ сонгоно.' },
       {
         name: 'found',
         label: 'Шалгалтын дүн',
@@ -2759,15 +2798,18 @@ async function checkCertificatePopup(c) {
   show('certificates');
 }
 
-/** The photograph alone, for a seat that reads and does not check. */
+/** The paper and its photograph, for a seat that reads and does not check. */
 async function showCertificate(c) {
   const photo = await certPhoto(c);
   await popup({
     id: 'cert-view',
     title: `Гэрчилгээ №${c.number}`,
-    sub: `${esc(c.supplier_name)} · ${esc(c.issuer)} · ${esc(dayLabel(c.issued_on))}`,
-    width: 640,
-    fields: [{ type: 'static', label: 'Зураг', html: photo.src ? `<img class="cert-photo" src="${photo.src}" alt="Гэрчилгээ №${esc(c.number)}">` : '<span class="dt-none">Зураг оруулаагүй</span>' }],
+    sub: `${esc(c.supplier_name)} · ${esc(certOrigin(c) ?? c.issuer)} · ${esc(dayLabel(c.issued_on))}`,
+    width: 680,
+    fields: [
+      { type: 'static', label: 'Нийлүүлэгчийн оруулсан', html: certFacts(c) },
+      { type: 'static', label: 'Зураг', html: photo.src ? `<img class="cert-photo" src="${photo.src}" alt="Гэрчилгээ №${esc(c.number)}">` : '<span class="dt-none">Зураг оруулаагүй</span>' },
+    ],
     submit: 'Хаах',
     cancel: '',
     onSubmit: async () => true,
@@ -2789,17 +2831,17 @@ async function renderCertificates(view) {
   const table = dataTable({
     columns: [
       { key: 'created_at', label: 'Оруулсан', render: (c) => whenCell(c.created_at) },
-      { key: 'number', label: 'Гэрчилгээ', value: (c) => `${c.number} ${c.issuer}`, render: (c) => dtCell.twoHtml(`<span class="mn">№${esc(c.number)}</span>`, `${esc(c.issuer)} · ${esc(dayLabel(c.issued_on))}`) },
+      { key: 'number', label: 'Гэрчилгээ', value: (c) => `${c.number} ${c.issuer} ${certOrigin(c) ?? ''} ${c.qr ?? ''}`, render: (c) => dtCell.twoHtml(`<span class="mn">№${esc(c.number)}</span>`, `${esc(certOrigin(c) ?? c.issuer)} · ${esc(dayLabel(c.issued_on))}`) },
       { key: 'supplier_name', label: 'Нийлүүлэгч', render: (c) => esc(c.supplier_name) },
       { key: 'use', label: 'Хэрэглэсэн', value: (c) => c.listings + c.orders, render: (c) => esc(certUse(c)) },
       {
         key: 'state',
         label: 'Төлөв',
         value: (c) => CERT_STATE[c.state][1],
-        render: (c) => `${dtCell.pill(...CERT_STATE[c.state])}${c.checked_by ? `<small class="dt-text">${esc(c.checked_by)}${c.check_note ? ` · ${esc(c.check_note)}` : ''}</small>` : ''}`,
+        render: (c) => `${dtCell.pill(...CERT_STATE[c.state])}${c.twins ? ' <span class="chip" data-size="sm" data-s="bad">Давхардсан</span>' : ''}${c.checked_by ? `<small class="dt-text">${esc(c.checked_by)}${c.check_note ? ` · ${esc(c.check_note)}` : ''}</small>` : ''}`,
       },
     ],
-    search: { placeholder: 'Дугаар, нийлүүлэгч, олгосон газар…' },
+    search: { placeholder: 'Дугаар, нийлүүлэгч, аймаг, сум, QR…' },
     filters: [
       {
         key: 'state',
@@ -2812,9 +2854,7 @@ async function renderCertificates(view) {
     actions: (c) =>
       checks
         ? button(c.state === 'unchecked' ? 'Шалгах' : 'Дахин шалгах', () => checkCertificatePopup(c), 'data-size="sm" data-a="check"')
-        : c.has_photo
-          ? button('Зураг', () => showCertificate(c), 'data-size="sm" data-a="photo"')
-          : null,
+        : button('Харах', () => showCertificate(c), 'data-size="sm" data-a="photo"'),
     rowAttrs: (c) => ({ 'data-certificate': c.id }),
     noun: 'гэрчилгээ',
     empty: { title: 'Гэрчилгээ алга', text: 'Нийлүүлэгч гэрчилгээ оруулахад энд гарна.' },

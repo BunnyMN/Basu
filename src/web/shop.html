@@ -805,7 +805,9 @@ function drawStall(l) {
               }</span></div></li>
               ${
                 l.certificate
-                  ? `<li>${MARK.check}<div><b>Мал эмнэлгийн гэрчилгээ №${esc(l.certificate.number)}</b><span>${esc(l.certificate.issuer)} · ${dayShort(l.certificate.issued_on)} · ${l.certificate.checked ? 'Basu шалгасан' : 'нийлүүлэгчийн оруулсан'}</span></div></li>`
+                  ? `<li>${MARK.check}<div><b>Мал эмнэлгийн гэрчилгээ №${esc(l.certificate.number)}</b>${l.certificate.origin ? `<span>Гарал үүсэл: ${esc(l.certificate.origin)}</span>` : ''}${
+                      l.certificate.tests?.length ? `<span>Шинжилгээ сөрөг: ${esc(l.certificate.tests.join(', '))}</span>` : ''
+                    }<span>${esc(l.certificate.issuer)} · ${dayShort(l.certificate.issued_on)} · ${l.certificate.checked ? 'Basu шалгасан' : 'нийлүүлэгчийн оруулсан'}</span></div></li>`
                   : whole
                     ? `<li>${MARK.check}<div><b>Мал эмнэлгийн гэрчилгээ</b><span>Нядалсны дараа гэрчилгээний дугаар захиалга дээр тань гарна.</span></div></li>`
                     : ''

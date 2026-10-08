@@ -234,7 +234,7 @@ describe('paying for an идэш', () => {
     await expect(book({ receiveOn: '2026-09-05' })).rejects.toMatchObject({ code: 'BAD_DATE' });
     await expect(book({ qty: 0 })).rejects.toMatchObject({ code: 'TOO_FEW' });
 
-    const paper = await addCertificate(supplierId, { number: '65110421', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', issuedOn: '2026-09-01' }, clock.now(), '2026-09-01');
+    const paper = await addCertificate(supplierId, { number: '65110421', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', issuedOn: '2026-09-01', origin: { aimag: 'Архангай', soum: 'Их тамир', bag: null } }, clock.now(), '2026-09-01');
     const noDelivery = await createListing(
       supplierId,
       {

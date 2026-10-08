@@ -883,9 +883,10 @@ function placeInName(l) {
 
 /**
  * The veterinary certificate the meat came with, as a guest reads it: its
- * number, who gave it and when, and whose word it is — Basu's, when the desk
- * looked the number up, the supplier's until then. A whole animal has none
- * before it is slaughtered, and the line says when it will.
+ * number, who gave it and when, where the animals came from, what the
+ * laboratory tested for and did not find, and whose word it is — Basu's,
+ * when the desk looked the number up, the supplier's until then. A whole
+ * animal has none before it is slaughtered, and the line says when it will.
  */
 function paperLine(c, unit) {
   if (!c) {
@@ -895,6 +896,8 @@ function paperLine(c, unit) {
   }
   return `<div class="line">${MARK.shield}<div><span class="lab">Мал эмнэлгийн гэрчилгээ</span><div class="v"><span class="mn">№${escapeHtml(c.number)}</span>${
     c.checked ? `<span class="badge">${MARK.check}Basu шалгасан</span>` : ''
+  }${c.origin ? `<small>Гарал үүсэл: ${escapeHtml(c.origin)}</small>` : ''}${
+    c.tests?.length ? `<small>Шинжилгээ сөрөг: ${escapeHtml(c.tests.join(', '))}</small>` : ''
   }<small>${escapeHtml(c.issuer)} · ${dayLabel(c.issued_on)}${c.checked ? '' : ' · нийлүүлэгчийн оруулсан'}</small></div></div></div>`;
 }
 

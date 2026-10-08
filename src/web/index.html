@@ -697,7 +697,7 @@ try {
     $('slip').href = `/shop/${certified.id}`;
     $('slip-no').textContent = `№${certified.certificate.number}`;
     $('slip-ok').hidden = !certified.certificate.checked;
-    $('slip-line').textContent = `${certified.title} · ${certified.certificate.issuer}`;
+    $('slip-line').textContent = `${certified.title} · ${certified.certificate.origin ?? certified.certificate.issuer}`;
     $('slip').hidden = false;
   }
 

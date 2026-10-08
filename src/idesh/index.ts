@@ -88,6 +88,8 @@ export {
 
 export {
   addCertificate,
+  updateCertificate,
+  AIMAGS,
   certificatesOf,
   certificateById,
   certificatesForDesk,
@@ -99,6 +101,9 @@ export {
   type Certificate,
   type CertificateFacts,
   type CertificateInput,
+  type CertificateDetails,
+  type CertificateProduct,
+  type CertificateTest,
   type CertificatePhoto,
   type CertificateState,
   type DeskCertificate,

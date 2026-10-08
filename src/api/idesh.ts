@@ -55,6 +55,8 @@ import {
   type Plan,
   type Promotion,
   addCertificate,
+  updateCertificate,
+  AIMAGS,
   certificatesOf,
   certificatePhoto,
   certifyIdesh,
@@ -63,6 +65,8 @@ import {
   MAX_PHOTO_BYTES,
   type Certificate,
   type CertificatePhoto,
+  type CertificateInput,
+  type CertificateProduct,
   NOTE_MAX,
   PARTS,
   PART_LABEL,
@@ -82,7 +86,7 @@ import { enqueue, unreadBySubject } from '../platform/notify/index.js';
 import { LONE_OWNER_PERMISSIONS, grants, headRoles, type Grants } from '../platform/access/index.js';
 import { accessIn, membersOf } from '../platform/org/index.js';
 import { topupsOpen, type Ctx } from '../ports.js';
-import { shapeCertificateFacts, shapeOrder, shapePhoto, shapeQpay, shapeSettlement, shapeSummary } from './shapes.js';
+import { shapeCertificateDetails, shapeCertificateFacts, shapeOrder, shapePhoto, shapeQpay, shapeSettlement, shapeSummary } from './shapes.js';
 import { FOREVER } from './webFiles.js';
 import { invoiceQpay } from '../platform/ledger/index.js';
 import { holds, knownId, need, needAny, UUID } from './guards.js';
@@ -194,7 +198,40 @@ const shapeCertificate = (c: Certificate) => ({
   listings: c.listings,
   orders: c.orders,
   created_at: c.createdAt.toISOString(),
+  ...shapeCertificateDetails(c),
 });
+
+/**
+ * The paper as the page sends it, snake case, for the module to judge. What
+ * is the wrong shape is passed on as it came and refused there, in one voice.
+ */
+function readCertificate(body: Record<string, unknown>, photo: CertificatePhoto | null): CertificateInput {
+  const o = (body['origin'] ?? {}) as Record<string, unknown>;
+  const list = (v: unknown) => (Array.isArray(v) ? (v as Record<string, unknown>[]) : v === undefined || v === null ? [] : (v as never));
+  return {
+    number: String(body['number'] ?? ''),
+    issuer: String(body['issuer'] ?? ''),
+    issuedOn: String(body['issued_on'] ?? ''),
+    photo,
+    validUntil: (body['valid_until'] as string | null | undefined) ?? null,
+    inspector: body['inspector'] as string | null,
+    origin: { aimag: o['aimag'] as string, soum: o['soum'] as string, bag: (o['bag'] as string | null) ?? null },
+    herder: body['herder'] as string | null,
+    route: body['route'] as string | null,
+    products: list(body['products']).map((p) => ({
+      kind: p?.['kind'] as CertificateProduct['kind'],
+      what: p?.['what'] as string,
+      unit: p?.['unit'] as CertificateProduct['unit'],
+      quantity: p?.['quantity'] as number,
+    })),
+    tests: list(body['tests']).map((t) => ({
+      disease: t?.['disease'] as string,
+      testedOn: (t?.['tested_on'] as string | null) ?? null,
+      lab: (t?.['lab'] as string | null) ?? null,
+    })),
+    qr: body['qr'] as string | null,
+  };
+}
 
 /**
  * The photograph the page sends: a data URL, as a canvas hands one over.
@@ -909,6 +946,7 @@ export async function registerIdeshRoutes(
   app.get('/v1/supplier/certificates', asSupplierMayAny('org.idesh.stall', 'org.idesh.today', 'org.idesh.orders'), async (request) => ({
     today: dayOf(ctx.clock.now()),
     may_add: holds(request, 'org.idesh.stall:edit'),
+    aimags: AIMAGS,
     certificates: (await certificatesOf(request.supplierSeat!.supplierId)).map(shapeCertificate),
   }));
 
@@ -922,17 +960,31 @@ export async function registerIdeshRoutes(
       try {
         const added = await addCertificate(
           request.supplierSeat!.supplierId,
-          {
-            number: String(body['number'] ?? ''),
-            issuer: String(body['issuer'] ?? ''),
-            issuedOn: String(body['issued_on'] ?? ''),
-            photo,
-            addedBy: request.supplierSeat!.person,
-          },
+          { ...readCertificate(body, photo), addedBy: request.supplierSeat!.person },
           ctx.clock.now(),
           dayOf(ctx.clock.now()),
         );
         return reply.status(201).send({ certificate: shapeCertificate(added) });
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  /** The whole paper again, corrected or completed. No photo sent keeps the one there is. */
+  app.put<{ Params: { id: string }; Body: Record<string, unknown> }>(
+    '/v1/supplier/certificates/:id',
+    { ...asSupplierMay('org.idesh.stall:edit'), bodyLimit: Math.ceil(MAX_PHOTO_BYTES * 1.4) + 4096 },
+    async (request, reply) => {
+      if (!UUID.test(request.params.id)) return sendError(reply, new IdeshError('NO_CERTIFICATE', 'no such certificate here'));
+      const body = request.body ?? {};
+      const photo = readPhoto(body['photo']);
+      if (typeof photo === 'string') return badRequest(reply, 'Зураг JPEG эсвэл PNG байх ёстой, 900 КБ-аас бага.', photo);
+      try {
+        const input = readCertificate(body, photo);
+        if (!photo) delete input.photo;
+        const changed = await updateCertificate(request.supplierSeat!.supplierId, request.params.id, input, dayOf(ctx.clock.now()));
+        return reply.send({ certificate: shapeCertificate(changed) });
       } catch (error) {
         return sendError(reply, error);
       }

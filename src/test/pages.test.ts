@@ -2906,7 +2906,7 @@ describe('өвлийн идэш', () => {
     const paper = await fetch(`${base}/v1/supplier/certificates`, {
       method: 'POST',
       headers: owner,
-      body: JSON.stringify({ number: `ТЕСТ-${code}`, issuer: 'Сонгинохайрхан дүүргийн мал эмнэлгийн тасаг', issued_on: clock.now().toISOString().slice(0, 10) }),
+      body: JSON.stringify({ number: `ТЕСТ-${code}`, issuer: 'Сонгинохайрхан дүүргийн мал эмнэлгийн тасаг', issued_on: clock.now().toISOString().slice(0, 10), origin: { aimag: 'Улаанбаатар', soum: 'Сонгинохайрхан' } }),
     });
     expect(paper.status, await paper.clone().text()).toBe(201);
     const { certificate } = (await paper.json()) as { certificate: { id: string } };
@@ -4655,6 +4655,43 @@ describe('a first password, where money is about to go', () => {
     await until(page, 'the account to be kept', (d) => d.querySelector('#refund')?.textContent?.includes('5012345678') ?? false);
   });
 
+  it('lets a supplier complete a certificate as the paper prints it: origin, tests, products, route', async () => {
+    const screen = await ownerScreen(seeded.suppliers[3]!.phone);
+    const d = screen.window.document;
+    await until(screen, 'the module', () => Boolean(d.querySelector('.tabbar button[data-tab="stall"]')));
+    (d.querySelector('.tabbar button[data-tab="stall"]') as HTMLElement).click();
+    // The seed's certificate, which says where it is from and which the desk has looked up.
+    const seededPaper = () => [...d.querySelectorAll('#papers [data-paper]')].find((r) => r.textContent?.includes('ДЕМО-11050263'));
+    await until(screen, 'its certificates', () => Boolean(seededPaper()?.querySelector('[data-a="edit"]')));
+    expect(seededPaper()!.textContent).toContain('Улаанбаатар, Сонгинохайрхан дүүрэг');
+    (seededPaper()!.querySelector('[data-a="edit"]') as HTMLElement).click();
+    await until(screen, 'the certificate form', () => Boolean(d.querySelector('#paper-edit[data-open] [name="soum"]')));
+    const form = d.querySelector('#paper-edit')!;
+    expect(form.textContent).toContain('Өөрчилбөл Basu дахин шалгана.');
+    expect((form.querySelector('[name="aimag"]') as HTMLSelectElement).value).toBe('Улаанбаатар');
+    expect((form.querySelector('[name="number"]') as HTMLInputElement).readOnly).toBe(true);
+    expect((form.querySelector('[name="test:Шүлхий"]') as HTMLInputElement).checked).toBe(true);
+    (form.querySelector('[name="test:Боом"]') as HTMLInputElement).click();
+    // A second line of the product table, and the first one filled.
+    (form.querySelector('[data-a="add-row"]') as HTMLElement).click();
+    expect(form.querySelectorAll('.paper-row')).toHaveLength(2);
+    const row = form.querySelector('.paper-row')!;
+    (row.querySelector('[data-k="what"]') as HTMLInputElement).value = 'гулууз мах';
+    (row.querySelector('[data-k="quantity"]') as HTMLInputElement).value = '40';
+    await answerPopup(screen, { bag: '5-р хороо', tests_other: 'Формалин', route: 'Сонгинохайрхан → Нарантуул' });
+    await until(screen, 'the form closed', () => !d.querySelector('#paper-edit[data-open]'));
+
+    const { rows } = await getPool().query<{ origin_bag: string; route: string; tests: { disease: string }[]; products: { what: string; quantity: number; unit: string }[]; state: string }>(
+      `SELECT c.origin_bag, c.route, c.tests, c.products, c.state
+         FROM idesh.certificate c WHERE c.number = 'ДЕМО-11050263'`,
+    );
+    expect(rows[0]).toMatchObject({ origin_bag: '5-р хороо', route: 'Сонгинохайрхан → Нарантуул', state: 'unchecked' });
+    expect(rows[0]!.tests.map((t) => t.disease)).toEqual(['Шүлхий', 'Бруцеллёз', 'Боом', 'Формалин']);
+    // The empty second line is no line.
+    expect(rows[0]!.products).toEqual([{ kind: 'sheep', what: 'гулууз мах', unit: 'piece', quantity: 40 }]);
+    await until(screen, 'the list redrawn', () => (d.querySelector('#papers')?.textContent ?? '').includes('Формалин'));
+  });
+
   it('sets the owner’s first password in front of the payout account, and goes on to the account', async () => {
     const mailer = new FakeMailer();
     ctx.mailer = mailer;
@@ -5270,7 +5307,7 @@ describe('every page, with a tag in whatever somebody could have typed', () => {
     ['idesh.settlement', ['memo', 'bank_name', 'bank_account', 'bank_holder', 'reference']],
     ['idesh.promotion', ['ended_note']],
     // The certificate a supplier wrote in, and what the desk found of it.
-    ['idesh.certificate', ['number', 'issuer']],
+    ['idesh.certificate', ['number', 'issuer', 'inspector', 'origin_aimag', 'origin_soum', 'origin_bag', 'herder', 'route', 'qr']],
     ['idesh.certificate', ['checked_by', 'check_note'], 'checked_by IS NOT NULL'],
     ['ledger.transfer', ['memo']],
     ['ledger.topup', ['provider_ref']],
@@ -5345,6 +5382,13 @@ describe('every page, with a tag in whatever somebody could have typed', () => {
       const set = columns.map((column) => `${column} = coalesce(${column}, '') || $1`).join(', ');
       await getPool().query(`UPDATE ${table} SET ${set}${which ? ` WHERE ${which}` : ''}`, [TAG]);
     }
+    // A certificate's tests and product lines are typed too, inside its JSON.
+    await getPool().query(
+      `UPDATE idesh.certificate
+          SET tests = jsonb_build_array(jsonb_build_object('disease', $1::text, 'tested_on', NULL, 'lab', $1::text)),
+              products = jsonb_build_array(jsonb_build_object('kind', 'sheep', 'what', $1::text, 'unit', 'kg', 'quantity', 1))`,
+      [TAG],
+    );
     // The desk's banner, which one seat writes for all the others to read.
     const banner = await fetch(`${base}/v1/ops/system/settings/desk_banner`, { method: 'PUT', headers: asDesk, body: JSON.stringify({ value: TAG }) });
     expect(banner.status, await banner.text()).toBe(200);
@@ -5508,6 +5552,12 @@ describe('every page, with a tag in whatever somebody could have typed', () => {
     await until(cutMeat, 'its certificates', (d) => Boolean(d.querySelector('#papers [data-paper]')));
     await settled(cutMeat, 'the stall and its certificates');
     await look(cutMeat, 'a supplier’s certificates', '#papers');
+    await step(cutMeat, 'a certificate, to correct', press(cutMeat, '#papers [data-a="edit"]'), { shows: '#paper-edit', drawn: '#paper-edit[data-open]' });
+    const form = cutMeat.window.document.querySelector('#paper-edit')!;
+    for (const name of ['issuer', 'soum', 'herder', 'route', 'qr', 'tests_other']) {
+      expect((form.querySelector(`[name="${name}"]`) as HTMLInputElement).value, `the form's ${name}, as typed`).toContain(AS_TEXT);
+    }
+    expect((form.querySelector('.paper-row [data-k="what"]') as HTMLInputElement).value).toContain(AS_TEXT);
   });
 
   it('draws the kitchen, and the guest’s pages on the website, with it as text', async () => {

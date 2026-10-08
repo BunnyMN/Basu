@@ -1,11 +1,27 @@
 import type { QPayInvoice } from '../ports.js';
-import { describe, type Breakdown, type CertificateFacts, type IdeshSummary, type Settlement, type SupplierOrder } from '../idesh/index.js';
+import { describe, type Breakdown, type CertificateDetails, type CertificateFacts, type IdeshSummary, type Settlement, type SupplierOrder } from '../idesh/index.js';
 
 /** The JSON shapes the idesh and ops routes share. Snake case on the wire, as everywhere. */
 
-/** The certificate on a listing or an order, as a guest reads it: which one, from whom, and whether Basu looked it up. */
+/**
+ * The certificate on a listing or an order, as a guest reads it: which one,
+ * from whom, where the animals came from, what the laboratory did not find,
+ * and whether Basu looked it up.
+ */
 export const shapeCertificateFacts = (c: CertificateFacts | null) =>
-  c ? { number: c.number, issuer: c.issuer, issued_on: c.issuedOn, checked: c.checked } : null;
+  c ? { number: c.number, issuer: c.issuer, issued_on: c.issuedOn, checked: c.checked, origin: c.origin, tests: c.tests } : null;
+
+/** The paper's details, for the supplier who wrote them and the desk — never a guest. */
+export const shapeCertificateDetails = (c: CertificateDetails) => ({
+  valid_until: c.validUntil,
+  inspector: c.inspector,
+  origin: c.origin,
+  herder: c.herder,
+  route: c.route,
+  products: c.products,
+  tests: c.tests.map((t) => ({ disease: t.disease, tested_on: t.testedOn, lab: t.lab })),
+  qr: c.qr,
+});
 
 /**
  * Задаргаа on an order: what was chosen, and the same in words — one wording

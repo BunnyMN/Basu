@@ -109,11 +109,11 @@ export const LISTINGS: SeedListing[] = [
 ];
 
 /** One certificate per supplier, by its place in SUPPLIERS. Invented numbers, for the demo only. */
-const CERTIFICATES: Array<{ number: string; issuer: string; daysAgo: number; checked: boolean }> = [
-  { number: 'ДЕМО-65110421', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', daysAgo: 4, checked: false },
-  { number: 'ДЕМО-44070318', issuer: 'Хэнтий, Хэрлэн сумын мал эмнэлэг', daysAgo: 6, checked: false },
-  { number: 'ДЕМО-41020977', issuer: 'Төв, Баянчандмань сумын мал эмнэлэг', daysAgo: 3, checked: false },
-  { number: 'ДЕМО-11050263', issuer: 'Сонгинохайрхан дүүргийн мал эмнэлгийн тасаг', daysAgo: 1, checked: true },
+const CERTIFICATES: Array<{ number: string; issuer: string; aimag: string; soum: string; daysAgo: number; checked: boolean }> = [
+  { number: 'ДЕМО-65110421', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', aimag: 'Архангай', soum: 'Их тамир', daysAgo: 4, checked: false },
+  { number: 'ДЕМО-44070318', issuer: 'Хэнтий, Хэрлэн сумын мал эмнэлэг', aimag: 'Хэнтий', soum: 'Хэрлэн', daysAgo: 6, checked: false },
+  { number: 'ДЕМО-41020977', issuer: 'Төв, Баянчандмань сумын мал эмнэлэг', aimag: 'Төв', soum: 'Баянчандмань', daysAgo: 3, checked: false },
+  { number: 'ДЕМО-11050263', issuer: 'Сонгинохайрхан дүүргийн мал эмнэлгийн тасаг', aimag: 'Улаанбаатар', soum: 'Сонгинохайрхан', daysAgo: 1, checked: true },
 ];
 
 /** The would-be supplier in the seed. Sign in as them to see the application. */
@@ -165,7 +165,19 @@ export async function seedIdesh(
   const certificates = new Map<number, string>();
   for (const [i, c] of CERTIFICATES.entries()) {
     if (!LISTINGS.some((l) => l.supplier === i && l.unit === 'kg')) continue;
-    const added = await addCertificate(ids[i]!, { number: c.number, issuer: c.issuer, issuedOn: plusDays(today, -c.daysAgo) }, now, today, db);
+    const added = await addCertificate(
+      ids[i]!,
+      {
+        number: c.number,
+        issuer: c.issuer,
+        issuedOn: plusDays(today, -c.daysAgo),
+        origin: { aimag: c.aimag, soum: c.soum, bag: null },
+        tests: [{ disease: 'Шүлхий', testedOn: plusDays(today, -c.daysAgo), lab: null }, { disease: 'Бруцеллёз', testedOn: null, lab: null }],
+      },
+      now,
+      today,
+      db,
+    );
     if (c.checked) await checkCertificate({ id: added.id, genuine: true, by: 'Демо', at: now }, db);
     certificates.set(i, added.id);
   }

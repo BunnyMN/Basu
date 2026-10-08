@@ -1109,6 +1109,9 @@ interface OrderRow {
   cert_issuer: string | null;
   cert_issued_on: string | null;
   cert_state: CertificateState | null;
+  cert_origin_aimag: string | null;
+  cert_origin_soum: string | null;
+  cert_tests: { disease: string }[] | null;
   photo: number | null;
   cover: string | null;
 }

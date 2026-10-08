@@ -201,6 +201,11 @@
 .paper-act,.call-act{margin-top:12px}
 .paper-act + .call-act{margin-left:8px}
 .file-pick{display:flex;align-items:center;gap:12px;min-width:0}
+/* The certificate's product table in its popup: animal, product, how many, of what. */
+.paper-rows{display:grid;gap:8px;margin-bottom:10px}
+.paper-row{display:grid;grid-template-columns:minmax(84px,1fr) minmax(0,2fr) minmax(64px,1fr) minmax(76px,1fr) auto;gap:8px;align-items:center}
+.paper-row > *{min-width:0}
+@media (max-width:520px){.paper-row{grid-template-columns:1fr 1fr}.paper-row [data-k="what"]{grid-column:1/-1;order:-1}}
 .file-pick .file-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink-3);font-size:var(--t-body)}
 .ticket .rel{font-size:var(--t-cap);font-weight:600;color:var(--ink-2)}
 .ticket .rel[data-tone="hold"]{color:var(--gold);font-weight:700}
@@ -1470,21 +1475,32 @@ async function refreshBoard() {
 
 /**
  * The veterinary certificates the meat came with. One is written in when a
- * shipment arrives — its number, who gave it, the day, a photograph — and
- * then chosen: on a listing of meat by the kilogram, and on a whole animal's
- * order when it is marked ready. Guests read the number; the photograph is
- * for this business and for Basu.
+ * shipment arrives — as the paper prints it: its МЭГ number, the vet and the
+ * inspector, the days, where the animals came from, the laboratory's tests,
+ * what it covers, the route, a photograph and its QR — and then chosen: on a
+ * listing of meat by the kilogram, and on a whole animal's order when it is
+ * marked ready. Guests read the number, the origin and the tests; the herder,
+ * the route and the photograph are for this business and for Basu.
  */
 let papers = [];
+/** The aimags a certificate's origin is chosen from, as the server names them. */
+let aimags = [];
 async function loadPapers() {
-  papers = (await sup('/v1/supplier/certificates')).certificates;
+  const got = await sup('/v1/supplier/certificates');
+  papers = got.certificates;
+  aimags = got.aimags ?? aimags;
   return papers;
 }
+/** «Завхан, Отгон сум» — or null for a certificate written in before origins were asked. */
+const paperOrigin = (c) => (c.origin ? `${c.origin.aimag}, ${/(сум|дүүрэг)$/i.test(c.origin.soum) ? c.origin.soum : `${c.origin.soum} ${c.origin.aimag === 'Улаанбаатар' ? 'дүүрэг' : 'сум'}`}` : null);
+/** The tests a paper most often lists; others are typed. */
+const PAPER_TESTS = ['Шүлхий', 'Бруцеллёз', 'Боом', 'Ям', 'Сүрьеэ', 'Цэцэг'];
+const PAPER_UNITS = [['piece', 'ш'], ['head', 'толгой'], ['kg', 'кг']];
 /** One that may still be put on meat: not one Basu found false. */
 const usablePapers = () => papers.filter((c) => c.state !== 'false');
 const PAPER_STATE = { unchecked: ['pending', 'Шалгаагүй'], genuine: ['verified', 'Basu шалгасан'], false: ['bad', 'Хүчингүй'] };
-/** «№65110421 · Архангай, Их тамир сумын мал эмнэлэг · 10/02» */
-const paperLine = (c) => `№${c.number} · ${c.issuer} · ${dayShort(c.issued_on)}`;
+/** «№0883120139 · Завхан, Отгон сум · 10/02» — who gave it, for one written in before origins were asked. */
+const paperLine = (c) => `№${c.number} · ${paperOrigin(c) ?? c.issuer} · ${dayShort(c.issued_on)}`;
 /** A choice of certificates for a popup's select: `none` is the first line, «add one» the last. */
 const paperOptions = (none) => [['', none], ...usablePapers().map((c) => [c.id, paperLine(c)]), ...(may('org.idesh.stall:edit') ? [['new', '+ Шинэ гэрчилгээ нэмэх']] : [])];
 
@@ -1631,38 +1647,204 @@ function filePick(input) {
   });
 }
 
-/** Write a certificate in. Resolves to it, or to null when the popup was closed. */
-async function addPaper() {
+/** jsQR, fetched the first time a photograph is chosen: a page that never reads a QR never loads it. */
+let qrReader = null;
+const loadQrReader = () =>
+  (qrReader ??= new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = '/vendor/jsqr.js';
+    script.onload = () => resolve(window.jsQR);
+    script.onerror = () => {
+      qrReader = null;
+      reject(new Error('QR уншигч ачаалсангүй.'));
+    };
+    document.head.append(script);
+  }));
+
+/**
+ * What the QR on a photographed certificate says, or null when none is found.
+ * The phone's own reader where the browser has one, jsQR everywhere else —
+ * on the photograph as taken, made no larger than a reader needs.
+ */
+async function readQr(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('Зургийг уншиж чадсангүй.'));
+      i.src = url;
+    });
+    if ('BarcodeDetector' in window) {
+      try {
+        const [found] = await new window.BarcodeDetector({ formats: ['qr_code'] }).detect(img);
+        if (found?.rawValue) return found.rawValue;
+      } catch {
+        // The browser has the name but not the reader: jsQR reads it below.
+      }
+    }
+    const jsQR = await loadQrReader();
+    for (const longest of [1600, 2400, 1000]) {
+      const scale = Math.min(1, longest / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.max(1, Math.round(img.naturalWidth * scale));
+      const h = Math.max(1, Math.round(img.naturalHeight * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const g = canvas.getContext('2d', { willReadFrequently: true });
+      g.drawImage(img, 0, 0, w, h);
+      const code = jsQR(g.getImageData(0, 0, w, h).data, w, h);
+      if (code?.data) return code.data;
+      if (scale === 1) break;
+    }
+    return null;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** One line of the certificate's product table, as the popup draws it. */
+const paperLineRow = (p = {}) => `
+  <div class="paper-row">
+    <select data-k="kind" aria-label="Мал">${Object.entries(KIND).map(([k, w]) => `<option value="${k}"${k === (p.kind ?? 'sheep') ? ' selected' : ''}>${w}</option>`).join('')}</select>
+    <input data-k="what" aria-label="Бүтээгдэхүүн" placeholder="гулууз мах" maxlength="60" value="${esc(p.what ?? '')}">
+    <input data-k="quantity" type="number" inputmode="decimal" min="0" step="any" aria-label="Тоо, хэмжээ" placeholder="Тоо" value="${esc(p.quantity ?? '')}">
+    <select data-k="unit" aria-label="Нэгж">${PAPER_UNITS.map(([u, w]) => `<option value="${u}"${u === (p.unit ?? 'piece') ? ' selected' : ''}>${w}</option>`).join('')}</select>
+    <button class="btn" type="button" data-size="sm" data-a="drop" aria-label="Мөрийг хасах">✕</button>
+  </div>`;
+
+/** The product table's lines as typed: an empty line is no line; half a line is asked about. */
+function readPaperRows(sheet) {
+  const out = [];
+  for (const row of sheet.querySelectorAll('.paper-row')) {
+    const get = (k) => row.querySelector(`[data-k="${k}"]`).value.trim();
+    const what = get('what');
+    const quantity = Number(get('quantity').replace(',', '.'));
+    if (!what && !get('quantity')) continue;
+    if (!what || !(quantity > 0)) throw new Error('Бүтээгдэхүүний мөр бүрт нэр, тоо хэмжээг нь бичнэ үү.');
+    out.push({ kind: get('kind'), what, quantity, unit: get('unit') });
+  }
+  return out;
+}
+
+/**
+ * Write a certificate in, or correct one — the paper's fields in its own
+ * order. Resolves to the certificate, or to null when the popup was closed.
+ */
+async function paperForm(c = null) {
   const day = await knowToday();
+  if (!aimags.length) await loadPapers().catch(() => {});
+  const id = c ? 'paper-edit' : 'paper-new';
+  // A number meat was sold under, or Basu looked up, is the record.
+  const numberFixed = Boolean(c && (c.listings || c.orders || c.state !== 'unchecked'));
+  const tested = new Set((c?.tests ?? []).map((t) => t.disease));
+  const firstTest = c?.tests?.[0] ?? {};
   const asked = popup({
-    id: 'paper-new',
-    title: 'Гэрчилгээ нэмэх',
-    sub: 'Мах ирсэн ачилтын мал эмнэлгийн гэрчилгээ',
-    width: 520,
+    id,
+    title: c ? `Гэрчилгээ №${c.number}` : 'Гэрчилгээ нэмэх',
+    sub: c?.state === 'genuine' ? 'Өөрчилбөл Basu дахин шалгана.' : 'Мах ирсэн ачилтын мал эмнэлгийн гэрчилгээ (МЭГ), цаасан дээрх дарааллаар',
+    width: 620,
     fields: [
-      { name: 'number', label: 'Гэрчилгээний дугаар', required: true, wide: true, autocomplete: 'off', attrs: { maxlength: 40 }, hint: 'Гэрчилгээн дээр хэвлэгдсэн дугаар. Зочид энэ дугаарыг харна.' },
-      { name: 'issuer', label: 'Олгосон газар', required: true, wide: true, attrs: { maxlength: 120 }, placeholder: 'Архангай, Их тамир сумын мал эмнэлэг' },
-      { name: 'issued_on', label: 'Олгосон өдөр', type: 'date', value: day ?? '', required: true, attrs: { max: day ?? null } },
-      { name: 'photo', label: 'Гэрчилгээний зураг', type: 'file', wide: true, attrs: { accept: 'image/*' }, hint: 'Зургийг зөвхөн та болон Basu харна, зочдод харагдахгүй.' },
+      { type: 'section', label: 'Гэрчилгээ' },
+      { name: 'number', label: 'МЭГ-ийн дугаар', required: true, autocomplete: 'off', value: c?.number ?? '', attrs: { maxlength: 40, readonly: numberFixed }, hint: numberFixed ? 'Хэрэглэсэн эсвэл шалгагдсан гэрчилгээний дугаар өөрчлөгдөхгүй.' : 'Маягтын улаан серийн дугаар биш, «МЭГ-ийн дугаар».' },
+      { name: 'issued_on', label: 'Олгосон өдөр', type: 'date', value: c?.issued_on ?? day ?? '', required: true, attrs: { max: day ?? null } },
+      { name: 'issuer', label: 'Олгосон мал эмч', required: true, wide: true, value: c?.issuer ?? '', attrs: { maxlength: 120 }, placeholder: 'Ч.Чимэдоолдон, Отгон сумын мал эмнэлэг', hint: 'Тодорхойлолт гаргасан эмчийн нэр эсвэл код, мал эмнэлгийн нэгж.' },
+      { name: 'inspector', label: 'Баталгаажуулсан улсын байцаагч', value: c?.inspector ?? '', attrs: { maxlength: 120 }, placeholder: 'Нэр эсвэл код' },
+      { name: 'valid_until', label: 'Хүчинтэй хугацаа (хүртэл)', type: 'date', value: c?.valid_until ?? '' },
+      { type: 'section', label: 'Гарал үүсэл', text: 'Зочид аймаг, сумыг нь харна. Малчны нэр зөвхөн танд болон Basu-д харагдана.' },
+      { name: 'aimag', label: 'Аймаг, нийслэл', type: 'select', required: true, value: c?.origin?.aimag ?? '', options: [['', 'Сонгоно уу'], ...aimags.map((a) => [a, a])] },
+      { name: 'soum', label: 'Сум, дүүрэг', required: true, value: c?.origin?.soum ?? '', attrs: { maxlength: 60 }, placeholder: 'Отгон' },
+      { name: 'bag', label: 'Баг, хороо', value: c?.origin?.bag ?? '', attrs: { maxlength: 60 } },
+      { name: 'herder', label: 'Малчин', value: c?.herder ?? '', attrs: { maxlength: 120 }, placeholder: 'Овог, нэр' },
+      { type: 'section', label: 'Лабораторийн шинжилгээ', text: 'Сөрөг гарсан шинжилгээг тэмдэглэнэ. Зочид өвчний нэрийг харна.' },
+      { type: 'checks', label: 'Шинжилсэн өвчин', options: PAPER_TESTS.map((d) => [`test:${d}`, d, tested.has(d)]) },
+      { name: 'tests_other', label: 'Бусад шинжилгээ', wide: true, value: [...tested].filter((d) => !PAPER_TESTS.includes(d)).join(', '), placeholder: 'Таслалаар: Формалин, Пероксидаз' },
+      { name: 'tested_on', label: 'Шинжилсэн өдөр', type: 'date', value: firstTest.tested_on ?? '', attrs: { max: day ?? null } },
+      { name: 'lab', label: 'Лаборатори', value: firstTest.lab ?? '', attrs: { maxlength: 120 } },
+      { type: 'section', label: 'Бүтээгдэхүүн ба тээвэр' },
+      { type: 'static', label: 'Мал, бүтээгдэхүүн', html: `<div class="paper-rows">${(c?.products?.length ? c.products : [{}]).map(paperLineRow).join('')}</div><button class="btn" type="button" data-size="sm" data-a="add-row">${ICON.plus}Мөр нэмэх</button>` },
+      { name: 'route', label: 'Маршрут', wide: true, value: c?.route ?? '', attrs: { maxlength: 200 }, placeholder: 'Завхан, Отгон → Улаанбаатар', hint: 'Зочдод харагдахгүй.' },
+      { type: 'section', label: 'Зураг ба QR' },
+      { name: 'photo', label: 'Гэрчилгээний зураг', type: 'file', wide: true, attrs: { accept: 'image/*' }, hint: c?.has_photo ? 'Шинэ зураг сонговол хуучныг нь солино. Зочдод харагдахгүй.' : 'Зургийг зөвхөн та болон Basu харна, зочдод харагдахгүй.' },
+      { name: 'qr', label: 'QR кодын агуулга', wide: true, value: c?.qr ?? '', attrs: { maxlength: 1000 }, autocomplete: 'off', hint: 'Зураг сонгоход QR-ыг нь автоматаар уншина. Хуучин цаасан маягтад QR байдаггүй.' },
     ],
-    submit: 'Нэмэх',
+    submit: c ? 'Хадгалах' : 'Нэмэх',
     onSubmit: async (v) => {
       if (v.number.replace(/\s+/g, '').length < 3) throw refuse('number', 'Гэрчилгээний дугаараа бүтнээр нь бичнэ үү.');
       if (day && v.issued_on > day) throw refuse('issued_on', 'Олгосон өдөр ирээдүйд байж болохгүй.');
-      const file = document.querySelector('#paper-new [name="photo"]')?.files?.[0];
-      if (!file) throw refuse('photo', 'Гэрчилгээнийхээ зургийг сонгоно уу.');
-      const photo = await shrinkPhoto(file);
-      const { certificate } = await sup('/v1/supplier/certificates', { method: 'POST', body: { number: v.number, issuer: v.issuer, issued_on: v.issued_on, photo } });
+      if (v.valid_until && v.valid_until < v.issued_on) throw refuse('valid_until', 'Хүчинтэй хугацаа олгосон өдрөөс өмнө дуусахгүй.');
+      if (!v.aimag) throw refuse('aimag', 'Аймгаа сонгоно уу.');
+      if (!v.soum) throw refuse('soum', 'Сум, дүүргээ бичнэ үү.');
+      const sheet = document.getElementById(id);
+      const products = readPaperRows(sheet);
+      const diseases = [
+        ...PAPER_TESTS.filter((d) => v[`test:${d}`]),
+        ...v.tests_other.split(/[,;]/).map((d) => d.trim()).filter((d) => d.length >= 2),
+      ].filter((d, i, all) => all.findIndex((x) => x.toLowerCase() === d.toLowerCase()) === i);
+      const file = sheet.querySelector('[name="photo"]')?.files?.[0];
+      if (!file && !c) throw refuse('photo', 'Гэрчилгээнийхээ зургийг сонгоно уу.');
+      const body = {
+        number: v.number,
+        issuer: v.issuer,
+        issued_on: v.issued_on,
+        valid_until: v.valid_until || null,
+        inspector: v.inspector || null,
+        origin: { aimag: v.aimag, soum: v.soum, bag: v.bag || null },
+        herder: v.herder || null,
+        route: v.route || null,
+        products,
+        tests: diseases.map((disease) => ({ disease, tested_on: v.tested_on || null, lab: v.lab || null })),
+        qr: v.qr || null,
+      };
+      if (file) body.photo = await shrinkPhoto(file);
+      const { certificate } = c
+        ? await sup(`/v1/supplier/certificates/${c.id}`, { method: 'PUT', body })
+        : await sup('/v1/supplier/certificates', { method: 'POST', body });
       return certificate;
     },
   });
-  filePick(document.querySelector('#paper-new [name="photo"]'));
-  const added = await asked;
-  if (!added) return null;
-  papers = [added, ...papers];
-  toast(`№${added.number} гэрчилгээ нэмэгдлээ.`, 'good');
-  return added;
+  const sheet = document.getElementById(id);
+  const photo = sheet.querySelector('[name="photo"]');
+  filePick(photo);
+  // The product table: a line more, a line less.
+  const rows = sheet.querySelector('.paper-rows');
+  sheet.querySelector('[data-a="add-row"]').addEventListener('click', () => {
+    if (rows.children.length >= 10) return;
+    rows.insertAdjacentHTML('beforeend', paperLineRow());
+    rows.lastElementChild.querySelector('[data-k="what"]').focus();
+  });
+  rows.addEventListener('click', (e) => {
+    const drop = e.target.closest('[data-a="drop"]');
+    if (!drop) return;
+    if (rows.children.length > 1) drop.closest('.paper-row').remove();
+    else for (const input of rows.querySelectorAll('input')) input.value = '';
+  });
+  // The photograph's QR, read as soon as it is chosen; what is read is shown, and may be corrected.
+  const qr = sheet.querySelector('[name="qr"]');
+  const qrHelp = qr.closest('.field')?.querySelector('.help');
+  photo.addEventListener('change', async () => {
+    const file = photo.files?.[0];
+    if (!file) return;
+    if (qrHelp) qrHelp.textContent = 'QR уншиж байна…';
+    try {
+      const read = await readQr(file);
+      if (read) {
+        qr.value = read.slice(0, 1000);
+        if (qrHelp) qrHelp.textContent = 'QR-ыг зурагнаас уншлаа.';
+      } else if (qrHelp) {
+        qrHelp.textContent = 'Зурагнаас QR олдсонгүй. QR байгаа бол ойроос, гэрэлтэй газар дахин зурна уу.';
+      }
+    } catch (error) {
+      if (qrHelp) qrHelp.textContent = error.message;
+    }
+  });
+  const done = await asked;
+  if (!done) return null;
+  papers = c ? papers.map((x) => (x.id === done.id ? done : x)) : [done, ...papers];
+  toast(c ? `№${done.number} гэрчилгээ хадгалагдлаа.` : `№${done.number} гэрчилгээ нэмэгдлээ.`, 'good');
+  return done;
 }
+const addPaper = () => paperForm();
 
 /**
  * A popup's certificate select: choosing «+ Шинэ гэрчилгээ нэмэх» opens the
@@ -1705,7 +1887,7 @@ async function showPaper(c) {
   await popup({
     id: 'paper-photo',
     title: `Гэрчилгээ №${c.number}`,
-    sub: `${esc(c.issuer)} · ${esc(dayLabel(c.issued_on))}`,
+    sub: `${esc(paperOrigin(c) ?? c.issuer)} · ${esc(dayLabel(c.issued_on))}`,
     width: 640,
     fields: [{ type: 'static', label: 'Зураг', html: `<img class="cert-photo" src="${src}" alt="Гэрчилгээ №${esc(c.number)}">` }],
     submit: 'Хаах',
@@ -1734,6 +1916,10 @@ async function removePaper(c) {
 /** What a certificate is on, in words: «2 зар · 5 захиалга», or that nothing uses it yet. */
 const paperUse = (c) => [c.listings ? `${c.listings} зар` : '', c.orders ? `${c.orders} захиалга` : ''].filter(Boolean).join(' · ') || 'Хэрэглээгүй';
 const paperCanGo = (c) => may('org.idesh.stall:edit') && !c.listings && !c.orders && c.state === 'unchecked';
+/** One Basu found false is not mended — a new one is written in; any other may be completed. */
+const paperCanEdit = (c) => may('org.idesh.stall:edit') && c.state !== 'false';
+/** Where the animals came from, or a nudge for a certificate written in before that was asked. */
+const paperWhere = (c) => (paperOrigin(c) ? esc(paperOrigin(c)) : '<span class="chip" data-size="sm" data-s="pending">Гарал үүсэл дутуу</span>');
 
 /** The certificates under the listings: a table at a desk, rows on a phone; adding one is a popup. */
 function renderPapers() {
@@ -1752,9 +1938,13 @@ function renderPapers() {
     return section;
   }
   const acts = (c, size = '') => {
-    const box = el(`<span>${c.has_photo ? `<button class="btn" type="button" data-a="photo"${size ? ` data-size="${size}"` : ''}>Зураг</button>` : ''}${
-      paperCanGo(c) ? `<button class="btn" type="button" data-v="danger" data-a="remove"${size ? ` data-size="${size}"` : ''}>Устгах</button>` : ''
+    const sz = size ? ` data-size="${size}"` : '';
+    const box = el(`<span>${paperCanEdit(c) ? `<button class="btn" type="button" data-a="edit"${sz}>Засах</button>` : ''}${c.has_photo ? `<button class="btn" type="button" data-a="photo"${sz}>Зураг</button>` : ''}${
+      paperCanGo(c) ? `<button class="btn" type="button" data-v="danger" data-a="remove"${sz}>Устгах</button>` : ''
     }</span>`);
+    box.querySelector('[data-a="edit"]')?.addEventListener('click', async () => {
+      if (await paperForm(c)) await reloadStall();
+    });
     box.querySelector('[data-a="photo"]')?.addEventListener('click', () => void showPaper(c));
     box.querySelector('[data-a="remove"]')?.addEventListener('click', () => void removePaper(c));
     return box;
@@ -1764,7 +1954,8 @@ function renderPapers() {
       dataTable({
         columns: [
           { key: 'number', label: 'Дугаар', render: (c) => `<span class="dt-two"><b class="mn">№${esc(c.number)}</b>${c.state === 'false' && c.check_note ? `<small>${esc(c.check_note)}</small>` : ''}</span>` },
-          { key: 'issuer', label: 'Олгосон газар', render: (c) => esc(c.issuer) },
+          { key: 'origin', label: 'Гарал үүсэл', value: (c) => paperOrigin(c) ?? '', render: (c) => `<span class="dt-two">${paperWhere(c)}<small>${esc(c.issuer)}</small></span>` },
+          { key: 'tests', label: 'Шинжилгээ', value: (c) => c.tests.map((t) => t.disease).join(', '), render: (c) => (c.tests.length ? esc(c.tests.map((t) => t.disease).join(', ')) : '—') },
           { key: 'issued_on', label: 'Олгосон өдөр', render: (c) => esc(dayLabel(c.issued_on)) },
           { key: 'use', label: 'Хэрэглэсэн', sortValue: (c) => c.listings + c.orders, render: (c) => esc(paperUse(c)) },
           { key: 'state', label: 'Төлөв', value: (c) => PAPER_STATE[c.state][1], render: (c) => dtCell.pill(...PAPER_STATE[c.state]) },
@@ -1785,7 +1976,8 @@ function renderPapers() {
       <div class="card row" data-paper="${esc(c.id)}">
         <span class="main">
           <span class="name title"><span class="mn">№${esc(c.number)}</span> <span class="chip" data-size="sm" data-s="${state}">${word}</span></span>
-          <span class="sub">${esc(c.issuer)} · ${esc(dayLabel(c.issued_on))}</span>
+          <span class="sub">${paperWhere(c)} · ${esc(dayLabel(c.issued_on))}</span>
+          ${c.tests.length ? `<span class="sub">Шинжилгээ: ${esc(c.tests.map((t) => t.disease).join(', '))}</span>` : ''}
           <span class="sub">${esc(c.state === 'false' && c.check_note ? c.check_note : paperUse(c))}</span>
         </span>
         <span class="btns"></span>

@@ -45,7 +45,14 @@ async function written(token: string, body: Record<string, unknown> = {}): Promi
     method: 'POST',
     url: '/v1/supplier/certificates',
     headers: auth(token),
-    payload: { number: ' 6511 0421 ', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', issued_on: '2026-09-01', photo, ...body },
+    payload: {
+      number: ' 6511 0421 ',
+      issuer: 'Архангай, Их тамир сумын мал эмнэлэг',
+      issued_on: '2026-09-01',
+      origin: { aimag: 'Архангай', soum: 'Их тамир' },
+      photo,
+      ...body,
+    },
   });
   expect(made.statusCode, made.body).toBe(201);
   return made.json().certificate;
@@ -114,7 +121,7 @@ describe('a supplier’s certificates', () => {
     await written(owner.token);
     const post = (payload: Record<string, unknown>) =>
       app.inject({ method: 'POST', url: '/v1/supplier/certificates', headers: auth(owner.token), payload });
-    const base = { number: '70010001', issuer: 'Төв, Баянчандмань сумын мал эмнэлэг', issued_on: '2026-09-01' };
+    const base = { number: '70010001', issuer: 'Төв, Баянчандмань сумын мал эмнэлэг', issued_on: '2026-09-01', origin: { aimag: 'Төв', soum: 'Баянчандмань' } };
 
     expect((await post({ ...base, number: '65110421' })).json().error.code).toBe('CERTIFICATE_EXISTS');
     expect((await post({ ...base, issued_on: '2026-12-01' })).json().error.code).toBe('BAD_CERTIFICATE');
@@ -141,6 +148,124 @@ describe('a supplier’s certificates', () => {
   });
 });
 
+describe('a certificate as it is printed', () => {
+  /** МЭЕГ А/67's domestic certificate, filled in as the paper from Завхан was. */
+  const PAPER = {
+    number: '0883120139',
+    issuer: 'Ч.Чимэдоолдон, Отгон сумын мал эмнэлэг',
+    issued_on: '2026-09-01',
+    valid_until: '2026-09-04',
+    inspector: 'Б.Энхтуяа (МЭУБ-0412)',
+    origin: { aimag: 'Завхан', soum: 'Отгон', bag: '3-р баг' },
+    herder: 'Зэргэр овогтой Ганбат',
+    route: 'Завхан, Отгон → Улаанбаатар, Сонгинохайрхан',
+    products: [{ kind: 'sheep', what: 'гулууз мах', unit: 'piece', quantity: 301 }],
+    tests: [
+      { disease: 'Шүлхий', tested_on: '2026-08-31', lab: 'Завхан аймгийн мал эмнэлгийн лаборатори' },
+      { disease: 'Бруцеллёз' },
+    ],
+    qr: 'https://example.mn/meg/0883120139',
+  };
+
+  it('keeps every detail for its supplier and the desk, and tells a guest only the origin and the tests', async () => {
+    const paper = await written(owner.token, PAPER);
+    const mine = (await app.inject({ method: 'GET', url: '/v1/supplier/certificates', headers: auth(owner.token) })).json();
+    expect(mine.aimags).toContain('Завхан');
+    expect(mine.certificates[0]).toMatchObject({
+      id: paper.id,
+      number: '0883120139',
+      valid_until: '2026-09-04',
+      inspector: 'Б.Энхтуяа (МЭУБ-0412)',
+      origin: { aimag: 'Завхан', soum: 'Отгон', bag: '3-р баг' },
+      herder: 'Зэргэр овогтой Ганбат',
+      products: [{ kind: 'sheep', what: 'гулууз мах', unit: 'piece', quantity: 301 }],
+      tests: [
+        { disease: 'Шүлхий', tested_on: '2026-08-31', lab: 'Завхан аймгийн мал эмнэлгийн лаборатори' },
+        { disease: 'Бруцеллёз', tested_on: null, lab: null },
+      ],
+      qr: 'https://example.mn/meg/0883120139',
+    });
+    const desk_ = (await app.inject({ method: 'GET', url: '/v1/ops/certificates', headers: desk() })).json().certificates[0];
+    expect(desk_).toMatchObject({ route: PAPER.route, herder: PAPER.herder, qr: PAPER.qr, twins: 0 });
+
+    const listed = await app.inject({ method: 'POST', url: '/v1/supplier/listings', headers: auth(owner.token), payload: beefByKg(paper.id) });
+    const stall = (await app.inject({ method: 'GET', url: `/v1/idesh/listings/${listed.json().listing.id}` })).json().listing;
+    expect(stall.certificate).toEqual({
+      number: '0883120139',
+      issuer: 'Ч.Чимэдоолдон, Отгон сумын мал эмнэлэг',
+      issued_on: '2026-09-01',
+      checked: false,
+      origin: 'Завхан, Отгон сум',
+      tests: ['Шүлхий', 'Бруцеллёз'],
+    });
+    // The herder, the route, the QR and the inspector are not a guest's.
+    const read = JSON.stringify(stall);
+    for (const secret of ['Ганбат', 'Сонгинохайрхан', 'example.mn', 'Энхтуяа']) expect(read).not.toContain(secret);
+  });
+
+  it('refuses a paper without an origin, an aimag that is none, a period before its day, and odd lines', async () => {
+    const post = (payload: Record<string, unknown>) =>
+      app.inject({ method: 'POST', url: '/v1/supplier/certificates', headers: auth(owner.token), payload: { ...PAPER, ...payload } });
+    for (const wrong of [
+      { origin: null },
+      { origin: { aimag: 'Завхан' } },
+      { origin: { aimag: 'Атлантида', soum: 'Отгон' } },
+      { valid_until: '2026-08-30' },
+      { products: [{ kind: 'camel', what: 'мах', unit: 'kg', quantity: 5 }] },
+      { products: [{ kind: 'sheep', what: 'мах', unit: 'kg', quantity: 0 }] },
+      { tests: [{ disease: 'Шүлхий' }, { disease: 'шүлхий' }] },
+      { tests: [{ disease: 'Шүлхий', tested_on: '2026-12-01' }] },
+    ]) {
+      expect((await post(wrong)).json().error?.code, JSON.stringify(wrong)).toBe('BAD_CERTIFICATE');
+    }
+    expect((await post({})).statusCode).toBe(201);
+  });
+
+  it('is completed later; a checked one is looked at again, a false one stays false, a used number stays', async () => {
+    const old = await written(owner.token, { photo: undefined });
+    const listed = (await app.inject({ method: 'POST', url: '/v1/supplier/listings', headers: auth(owner.token), payload: beefByKg(old.id) })).json().listing;
+    expect((await app.inject({ method: 'POST', url: `/v1/ops/certificates/${old.id}/check`, headers: desk(), payload: { genuine: true } })).statusCode).toBe(200);
+
+    const put = (id: string, payload: Record<string, unknown>, token = owner.token) =>
+      app.inject({ method: 'PUT', url: `/v1/supplier/certificates/${id}`, headers: auth(token), payload });
+    const same = { number: '65110421', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', issued_on: '2026-09-01' };
+
+    // The origin is asked of every paper sent; another supplier's is not theirs to touch.
+    expect((await put(old.id, same)).json().error.code).toBe('BAD_CERTIFICATE');
+    expect((await put(old.id, { ...same, origin: { aimag: 'Архангай', soum: 'Их тамир' } }, rival.token)).json().error.code).toBe('NO_CERTIFICATE');
+    const done = await put(old.id, { ...same, origin: { aimag: 'Архангай', soum: 'Их тамир' }, tests: [{ disease: 'Шүлхий' }] });
+    expect(done.statusCode, done.body).toBe(200);
+    // It says more than the desk looked up: it goes back to be looked at again, the photo kept.
+    expect(done.json().certificate).toMatchObject({ state: 'unchecked', has_photo: false, origin: { aimag: 'Архангай', soum: 'Их тамир', bag: null } });
+    const stall = (await app.inject({ method: 'GET', url: `/v1/idesh/listings/${listed.id}` })).json().listing.certificate;
+    expect(stall).toMatchObject({ origin: 'Архангай, Их тамир сум', tests: ['Шүлхий'], checked: false });
+
+    // Sent again unchanged, a checked one stays checked.
+    await app.inject({ method: 'POST', url: `/v1/ops/certificates/${old.id}/check`, headers: desk(), payload: { genuine: true } });
+    const again = await put(old.id, { ...same, origin: { aimag: 'Архангай', soum: 'Их тамир' }, tests: [{ disease: 'Шүлхий' }] });
+    expect(again.json().certificate.state).toBe('genuine');
+
+    // Meat was sold under that number: it stays.
+    expect((await put(old.id, { ...same, number: '65110422', origin: { aimag: 'Архангай', soum: 'Их тамир' } })).json().error.code).toBe('CERTIFICATE_IN_USE');
+
+    // Found false, it is not mended: a new one is written in.
+    const bad = await written(owner.token, { number: '70010001' });
+    await app.inject({ method: 'POST', url: `/v1/ops/certificates/${bad.id}/check`, headers: desk(), payload: { genuine: false, note: 'алга' } });
+    expect((await put(bad.id, { ...PAPER, number: '70010001' })).json().error.code).toBe('CERTIFICATE_FALSE');
+
+    // A photo sent with the correction replaces the one there was.
+    const fresh = await written(owner.token, { number: '70010002', photo: undefined });
+    expect((await put(fresh.id, { ...PAPER, number: '70010002', photo })).json().certificate.has_photo).toBe(true);
+  });
+
+  it('shows the desk the same number or QR written in by another supplier', async () => {
+    await written(owner.token, PAPER);
+    await written(rival.token, { ...PAPER, number: '1111111', origin: { aimag: 'Хэнтий', soum: 'Хэрлэн' } });
+    const listed = (await app.inject({ method: 'GET', url: '/v1/ops/certificates', headers: desk() })).json().certificates;
+    expect(listed.map((c: { twins: number }) => c.twins)).toEqual([1, 1]);
+  });
+});
+
 describe('meat and its certificate', () => {
   it('by the kilogram is not listed without one, nor under another supplier’s', async () => {
     const post = (token: string, payload: Record<string, unknown>) =>
@@ -156,7 +281,7 @@ describe('meat and its certificate', () => {
 
     // A guest reads which certificate — and nothing that opens its photograph.
     const stall = (await app.inject({ method: 'GET', url: `/v1/idesh/listings/${listed.json().listing.id}` })).json().listing;
-    expect(stall.certificate).toEqual({ number: '65110421', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', issued_on: '2026-09-01', checked: false });
+    expect(stall.certificate).toEqual({ number: '65110421', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', issued_on: '2026-09-01', checked: false, origin: 'Архангай, Их тамир сум', tests: [] });
     expect(JSON.stringify(stall)).not.toContain(paper.id);
     // A whole animal is listed before it has one.
     expect((await app.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}` })).json().listing.certificate).toBeNull();
@@ -191,7 +316,7 @@ describe('meat and its certificate', () => {
     expect(ready.statusCode, ready.body).toBe(200);
 
     const order = (await app.inject({ method: 'GET', url: `/v1/idesh/${orderId}`, headers: auth(guest.token) })).json();
-    expect(order.certificate).toEqual({ number: '65110421', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', issued_on: '2026-09-01', checked: false });
+    expect(order.certificate).toEqual({ number: '65110421', issuer: 'Архангай, Их тамир сумын мал эмнэлэг', issued_on: '2026-09-01', checked: false, origin: 'Архангай, Их тамир сум', tests: [] });
 
     // The wrong one was chosen: the right one is put on while the order is still being worked on.
     const right = await written(owner.token, { number: '65110999' });
