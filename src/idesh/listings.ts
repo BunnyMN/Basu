@@ -3,7 +3,8 @@ import { CERT_COLUMNS, factsOf, usableCertificate, type CertificateFacts, type C
 import { STYLES, offerOf, type BreakdownOffer, type Style } from './breakdown.js';
 import { IdeshError } from './errors.js';
 import { photoIds } from './photos.js';
-import type { Unit } from './pricing.js';
+import { dayOf, type Unit } from './pricing.js';
+import { rankListings, type SupplierRecord } from './ranking.js';
 
 /**
  * What a supplier offers.
@@ -164,20 +165,40 @@ function shape(r: ListingRow): Listing {
 }
 
 /**
- * What a guest sees: everything still on offer, soonest first. A listing that
- * has sold out stays on the page marked so, rather than vanishing — a page
- * that shrinks as people buy from it looks broken, not popular. Meat under a
- * certificate the desk found false is not on offer at all.
+ * What a guest sees: everything still on offer, in the market's own order
+ * (ranking.ts). A listing that has sold out stays on the page, last and
+ * marked so, rather than vanishing — a page that shrinks as people buy from
+ * it looks broken, not popular. Meat under a certificate the desk found
+ * false is not on offer at all.
  */
 export async function openListings(at: Date = new Date(), db: Db = getPool()): Promise<Listing[]> {
-  const { rows } = await db.query<ListingRow>(
-    `${SELECT}
-      WHERE l.active AND s.active AND s.state = 'contracted'
-        AND c.state IS DISTINCT FROM 'false'
-      ORDER BY ${TIER_FIRST}, l.ready_from, l.kind, l.price_mnt`,
+  const [{ rows }, records] = await Promise.all([
+    db.query<ListingRow>(
+      `${SELECT}
+        WHERE l.active AND s.active AND s.state = 'contracted'
+          AND c.state IS DISTINCT FROM 'false'
+        ORDER BY ${TIER_FIRST}, l.ready_from, l.kind, l.price_mnt`,
+      [at],
+    ),
+    supplierRecords(at, db),
+  ]);
+  return rankListings(rows.map(shape), records, dayOf(at));
+}
+
+/** Each supplier's record as the market weighs it: meat handed over, and paid orders failed of late. */
+async function supplierRecords(at: Date, db: Db): Promise<Map<string, SupplierRecord>> {
+  const { rows } = await db.query<{ supplier_id: string; handed: number; paid_recently: number; failed_recently: number }>(
+    `SELECT supplier_id,
+            count(*) FILTER (WHERE handed_at IS NOT NULL)::int AS handed,
+            count(*) FILTER (WHERE paid_at > $1::timestamptz - interval '90 days')::int AS paid_recently,
+            count(*) FILTER (WHERE paid_at > $1::timestamptz - interval '90 days'
+                              AND cancel_reason IN ('cannot_fulfil', 'vet'))::int AS failed_recently
+       FROM idesh.idesh_order
+      WHERE paid_at IS NOT NULL
+      GROUP BY supplier_id`,
     [at],
   );
-  return rows.map(shape);
+  return new Map(rows.map((r) => [r.supplier_id, { handed: r.handed, paidRecently: r.paid_recently, failedRecently: r.failed_recently }]));
 }
 
 export async function listingById(id: string, at: Date = new Date(), db: Db = getPool()): Promise<Listing | null> {

@@ -12,6 +12,7 @@ import { addListingPhoto, cancelIdesh, createIdesh, updateSupplierProfile, verif
 import { openSettlement } from '../idesh/settlements.js';
 import { handOff } from '../platform/identity/index.js';
 import { seedDemo } from '../seed/demo.js';
+import { SUPPLIERS } from '../seed/idesh.js';
 import {
   ClosedPaymentProvider,
   FakeMailer,
@@ -1445,9 +1446,9 @@ describe('the website', () => {
     const token = storage.getItem('basu.guest')!;
     const { listings, today } = (await (await fetch(`${base}/v1/idesh/listings`)).json()) as {
       today: string;
-      listings: Array<{ id: string; delivers: boolean; unit: string; remaining: number; ready_from: string }>;
+      listings: Array<{ id: string; supplier: { name: string }; delivers: boolean; unit: string; remaining: number; ready_from: string }>;
     };
-    const stall = listings.find((l) => l.delivers && l.unit === 'whole' && l.remaining > 0)!;
+    const stall = seedFirst(listings).find((l) => l.delivers && l.unit === 'whole' && l.remaining > 0)!;
     const headers = { authorization: `Bearer ${token}`, 'content-type': 'application/json' };
     const made = await fetch(`${base}/v1/idesh`, {
       method: 'POST',
@@ -1658,9 +1659,12 @@ describe('the website', () => {
         expect(per).toBe(`доод тал нь ${l.min_qty} кг`);
       }
     }
-    // The photo comes at the width it is shown at; the first is asked for first.
+    // The photo comes at the width it is shown at; the first is asked for first. The market's own
+    // order may put a supplier's own photographs first (src/idesh/ranking.ts): either kind of set.
     const first = d.querySelector('.sh-card img') as HTMLImageElement;
-    expect(first.getAttribute('srcset')).toMatch(/^\/brand\/meat\/(sheep|goat|beef|horse)-480\.webp 480w, \/brand\/meat\/\1-720\.webp 720w, \/brand\/meat\/\1\.webp 960w$/);
+    expect(first.getAttribute('srcset')).toMatch(
+      /^(\/brand\/meat\/(sheep|goat|beef|horse)-480\.webp 480w, \/brand\/meat\/\2-720\.webp 720w, \/brand\/meat\/\2\.webp 960w|\S+ 720w, \S+ 1600w)$/,
+    );
     expect(first.getAttribute('sizes')).toBeTruthy();
     expect(first.getAttribute('fetchpriority')).toBe('high');
     expect(d.querySelectorAll('.sh-card img[fetchpriority]')).toHaveLength(1);
@@ -1704,7 +1708,7 @@ describe('the website', () => {
     const { listings } = (await (await fetch(`${base}/v1/idesh/listings`)).json()) as {
       listings: Array<{ id: string; delivers: boolean; remaining: number }>;
     };
-    const delivering = listings.find((l) => l.delivers && l.remaining > 0)!;
+    const delivering = seedFirst(listings).find((l) => l.delivers && l.remaining > 0)!;
     const stall = await openPage('shop.html', `/${delivering.id}`);
     const s = stall.window.document;
     await until(stall, 'the order form', () => Boolean(s.getElementById('next')));
@@ -1722,6 +1726,30 @@ describe('the website', () => {
     await until(stall, 'the review', () => Boolean(s.getElementById('pay')));
     expect(s.querySelector('.sd-review')?.textContent).toContain('+976 9911 2233');
     expect(s.querySelector('.sd-review')?.textContent).not.toContain('99112233');
+  });
+
+  it('narrows the market to one supplier, from the picker or a stall’s own link, and keeps it in the address', async () => {
+    const { listings } = (await (await fetch(`${base}/v1/idesh/listings`)).json()) as {
+      listings: Array<{ id: string; supplier: { id: string; name: string } }>;
+    };
+    const farm = listings.find((l) => l.supplier.name.includes('Баянговь'))!.supplier;
+    const theirs = listings.filter((l) => l.supplier.id === farm.id).length;
+    const shop = await openPage('shop.html');
+    const d = shop.window.document;
+    await until(shop, 'the cards', () => d.querySelectorAll('.sh-card').length >= seeded.listings);
+    const pick = d.getElementById('supplier') as HTMLSelectElement;
+    expect(pick.hidden).toBe(false);
+    expect(pick.options[0]!.textContent).toBe('Бүх нийлүүлэгч');
+    expect([...pick.options].find((o) => o.value === farm.id)?.textContent).toBe(`${farm.name} (${theirs})`);
+    pick.value = farm.id;
+    pick.dispatchEvent(new shop.window.Event('change'));
+    expect(d.querySelectorAll('.sh-card')).toHaveLength(theirs);
+    expect(shop.window.location.search).toContain(`supplier=${farm.id}`);
+
+    // A stall names its supplier, and the name leads to everything they sell.
+    const stall = await openPage('shop.html', `/${listings.find((l) => l.supplier.id === farm.id)!.id}`);
+    await until(stall, 'the stall', () => Boolean(stall.window.document.querySelector('.sd-who a')));
+    expect(stall.window.document.querySelector('.sd-who a')?.getAttribute('href')).toBe(`/shop?supplier=${farm.id}`);
   });
 
   it('shows the market as cards, filters it, and orders from a stall', async () => {
@@ -2231,10 +2259,10 @@ describe('өвлийн идэш', () => {
   it('asks how the animal is taken apart where the stall offers it, charges the cutting, and tells the supplier', async () => {
     await ownGuest('+97699004077');
     const { listings } = (await (await fetch(`${base}/v1/idesh/listings`)).json()) as {
-      listings: Array<{ id: string; price_mnt: number; remaining: number; breakdown: { cut_fee_mnt: number; styles: Array<{ id: string }> } | null }>;
+      listings: Array<{ id: string; supplier: { name: string }; price_mnt: number; remaining: number; breakdown: { cut_fee_mnt: number; styles: Array<{ id: string }> } | null }>;
     };
     // A stall that offers every way, and charges for the knife.
-    const stall = listings.find((l) => l.remaining > 0 && l.breakdown?.styles.length === 3 && l.breakdown.cut_fee_mnt > 0)!;
+    const stall = seedFirst(listings).find((l) => l.remaining > 0 && l.breakdown?.styles.length === 3 && l.breakdown.cut_fee_mnt > 0)!;
     const fee = stall.breakdown!.cut_fee_mnt;
 
     const dom = await openPage('idesh.html');
@@ -2291,8 +2319,10 @@ describe('өвлийн идэш', () => {
 
     // The supplier reads it on the order, before the knife.
     const screen = await supplierScreenFor(code);
-    await until(screen, 'the order with its breakdown', (doc) => Boolean(doc.querySelector('.ticket .cutup')));
-    expect(screen.window.document.querySelector('.ticket .cutup')?.textContent).toContain('Хэсгээр');
+    // This order's own ticket: the board may hold the supplier's other orders too.
+    const ticket = (doc: Document) => [...doc.querySelectorAll('.ticket')].find((t) => t.textContent?.includes(code) && t.querySelector('.cutup'));
+    await until(screen, 'the order with its breakdown', (doc) => Boolean(ticket(doc)));
+    expect(ticket(screen.window.document)!.querySelector('.cutup')?.textContent).toContain('Хэсгээр');
   });
 
   it('shows a supplier’s own photographs of the animal in place of the example, swiped through on its stall', async () => {
@@ -3736,7 +3766,7 @@ describe('who sees what', () => {
       today: string;
       listings: Array<{ id: string; delivers: boolean; unit: string; remaining: number; ready_from: string }>;
     };
-    const stall = listings.find((l) => l.delivers && l.unit === 'whole' && l.remaining > 0)!;
+    const stall = seedFirst(listings).find((l) => l.delivers && l.unit === 'whole' && l.remaining > 0)!;
     const made = await fetch(`${base}/v1/idesh`, {
       method: 'POST',
       headers: as(buyer),
@@ -3792,7 +3822,7 @@ describe('who sees what', () => {
       today: string;
       listings: Array<{ id: string; delivers: boolean; unit: string; remaining: number; ready_from: string; supplier: { id: string } }>;
     };
-    const stall = listings.find((l) => l.delivers && l.unit === 'whole' && l.remaining > 0)!;
+    const stall = seedFirst(listings).find((l) => l.delivers && l.unit === 'whole' && l.remaining > 0)!;
     const receiveOn = stall.ready_from > today ? stall.ready_from : today;
     const made = await fetch(`${base}/v1/idesh`, {
       method: 'POST',
@@ -3954,7 +3984,7 @@ describe('who sees what', () => {
         today: string;
         listings: Array<{ id: string; unit: string; remaining: number; ready_from: string }>;
       };
-      const stall = listings.find((l) => l.unit === 'whole' && l.remaining > 0)!;
+      const stall = seedFirst(listings).find((l) => l.unit === 'whole' && l.remaining > 0)!;
       const made = await fetch(`${base}/v1/idesh`, {
         method: 'POST',
         headers: as(buyer),
@@ -5714,11 +5744,23 @@ async function supplierScreenFor(code: string): Promise<JSDOM> {
  * steps of buyOne without its checks along the way, for a block that needs
  * an order and is not about buying one. The code the guest is given.
  */
+/** The seed's own suppliers: a test picks the stall it was written for, not whatever the market's turn puts first. */
+const SEEDED_SUPPLIERS = new Set(SUPPLIERS.map((s) => s.name));
+const seeds = (l: unknown) => Number(SEEDED_SUPPLIERS.has((l as { supplier?: { name?: string } }).supplier?.name ?? ''));
+const readyOf = (l: unknown) => String((l as { ready_from?: string }).ready_from ?? '');
+/** The seed's stalls first, soonest ready first among them — the order these tests were written against. */
+const seedFirst = <T,>(list: T[]): T[] => [...list].sort((a, b) => seeds(b) - seeds(a) || readyOf(a).localeCompare(readyOf(b)));
+
 async function buyPickup(dom: JSDOM): Promise<string> {
   await until(dom, 'the stalls', (d) => d.querySelectorAll('.listing').length >= seeded.listings);
-  const whole = [...dom.window.document.querySelectorAll('.listing')].find(
-    (l) => !l.hasAttribute('data-gone') && l.textContent?.includes('бүтэн'),
-  ) as HTMLElement;
+  // The seed's own whole animal ready soonest: the market takes suppliers in turns, so the first
+  // on the page may be any test's supplier, with its own day — and the desk's lists, which a test
+  // reads this order back from, go by the day.
+  const { listings } = (await (await fetch(`${base}/v1/idesh/listings`)).json()) as {
+    listings: Array<{ id: string; unit: string; remaining: number; ready_from: string; supplier: { name: string } }>;
+  };
+  const pick = seedFirst(listings.filter((l) => l.unit === 'whole' && l.remaining > 0))[0]!;
+  const whole = dom.window.document.querySelector(`.listing[data-id="${pick.id}"]`) as HTMLElement;
   whole.click();
   await until(dom, 'the stall', (d) => Boolean(d.querySelector('#next')));
   (dom.window.document.querySelector('#next') as HTMLElement).click();

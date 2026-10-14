@@ -106,6 +106,8 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
 .kinds{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin:0 -16px 22px;padding:2px 16px}
 .kinds::-webkit-scrollbar{display:none}
 .kinds > button{flex:none}
+/* one supplier's stalls, once there are two to choose between: a pill like the chips above it */
+.who-pick{display:block;width:100%;min-height:44px;margin:-8px 0 22px;border-radius:var(--r-pill);font-size:1rem;font-weight:600;padding-left:18px}
 /* One stall to a row on a phone, two on a wider screen: the photograph
    first, then who sells it, its name and its price. */
 .listings{display:grid;grid-template-columns:minmax(0,1fr);gap:36px;margin:0;padding:0;list-style:none}
@@ -469,6 +471,7 @@ if (!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHan
   <div class="market">
   <div class="section-label" id="tally-row"><span class="tally" id="tally"></span></div>
   <div class="kinds filter" id="kinds" role="group" aria-label="Малын төрөл"></div>
+  <select class="input who-pick" id="who" aria-label="Нийлүүлэгч" hidden></select>
   <ul class="listings" id="listings" aria-busy="true">
     <li aria-hidden="true"><span class="skel-listing"><span class="skel"></span><span class="skel"></span><span class="skel"></span><span class="skel"></span></span></li>
     <li aria-hidden="true"><span class="skel-listing"><span class="skel"></span><span class="skel"></span><span class="skel"></span><span class="skel"></span></span></li>
@@ -584,6 +587,8 @@ const state = {
   today: null,
   listings: [],
   kind: 'all',
+  /** One supplier's stalls only, or null for everybody's. */
+  supplier: null,
   listing: null,
   /** The form the guest is filling in. */
   form: null,
@@ -726,6 +731,7 @@ async function loadListings() {
   await lookAtWallet();
   if (gone) return false;
   paintKinds();
+  paintSuppliers();
   paintListings();
   return true;
 }
@@ -815,6 +821,33 @@ function signOutHere() {
   paintMine([]);
 }
 $('sign-out').addEventListener('click', () => void signOutHere());
+
+/**
+ * «Бүх нийлүүлэгч» and each supplier with how many stalls they have, once
+ * there are two to choose between. The market's own order already takes the
+ * suppliers in turns; this is for a guest who knows whose meat they want.
+ */
+function paintSuppliers() {
+  const pick = $('who');
+  const counts = new Map();
+  for (const l of state.listings) {
+    const had = counts.get(l.supplier.id);
+    counts.set(l.supplier.id, { name: l.supplier.name, n: (had?.n ?? 0) + 1 });
+  }
+  if (state.supplier && !counts.has(state.supplier)) state.supplier = null;
+  pick.hidden = counts.size < 2;
+  pick.replaceChildren(
+    el('<option value="">Бүх нийлүүлэгч</option>'),
+    ...[...counts.entries()]
+      .sort((a, b) => a[1].name.localeCompare(b[1].name, 'mn'))
+      .map(([id, { name, n }]) => el(`<option value="${escapeHtml(id)}">${escapeHtml(name)} (${n})</option>`)),
+  );
+  pick.value = state.supplier ?? '';
+  pick.onchange = () => {
+    state.supplier = pick.value || null;
+    paintListings();
+  };
+}
 
 function paintKinds() {
   const box = $('kinds');
@@ -913,7 +946,7 @@ function paintListings() {
   const list = $('listings');
   list.replaceChildren();
   list.removeAttribute('aria-busy');
-  const shown = state.listings.filter((l) => state.kind === 'all' || l.kind === state.kind);
+  const shown = state.listings.filter((l) => (state.kind === 'all' || l.kind === state.kind) && (!state.supplier || l.supplier.id === state.supplier));
 
   const suppliers = new Set(state.listings.map((l) => l.supplier.id)).size;
   $('tally').textContent = state.listings.length
@@ -929,7 +962,7 @@ function paintListings() {
   }
   hideBlank();
   if (!shown.length) {
-    list.append(el(`<li class="empty">Энэ төрлийн зар одоогоор алга.</li>`));
+    list.append(el(`<li class="empty">${state.supplier ? 'Энэ нийлүүлэгчид энэ төрлийн зар одоогоор алга.' : 'Энэ төрлийн зар одоогоор алга.'}</li>`));
     return;
   }
   for (const l of shown) {

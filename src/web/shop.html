@@ -67,7 +67,10 @@
   /* 4px inside the slider, given back outside it: a chip's focus ring is not clipped, nothing moves */
   .sh-bar .s-chips{flex-wrap:nowrap;width:calc(100% + 2 * var(--s-gutter));margin:-4px calc(-1 * var(--s-gutter));padding:4px var(--s-gutter);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
   .sh-bar .s-chips::-webkit-scrollbar{display:none}
-  .sh-tools{width:100%;flex-wrap:nowrap;justify-content:space-between}
+  .sh-tools{width:100%;flex-wrap:wrap;justify-content:space-between;gap:12px}
+  /* the supplier's name can be long: a row of its own, the switch and the order sharing the next */
+  .sh-tools .sh-who{flex:1 1 100%;min-height:44px}
+  .sh-tools .sh-sort:not(.sh-who){flex:0 1 172px;min-width:0}
   /* the switch's word is shorter on a phone, so it and the order share a line; the long one is still what is read */
   .sh-long{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   .sh-short{display:inline}
@@ -413,12 +416,15 @@ const view = {
   kind: asked && Object.hasOwn(KIND, asked) ? asked : 'all',
   sort: SORTS.includes(query.get('sort')) ? query.get('sort') : 'suggested',
   delivers: query.get('delivery') === '1',
+  // One supplier's stalls only — from the picker, or «Энэ нийлүүлэгчийн бүх зар» on a stall.
+  supplier: /^[0-9a-f-]{36}$/i.test(query.get('supplier') ?? '') ? query.get('supplier') : null,
 };
 /** The market's address for what it shows, so a reload, a shared link and «‹ Бүх зар» show the same. */
 function showInAddress() {
   const q = new URLSearchParams();
   if (view.kind !== 'all') q.set('kind', view.kind);
   if (view.delivers) q.set('delivery', '1');
+  if (view.supplier) q.set('supplier', view.supplier);
   if (view.sort !== 'suggested') q.set('sort', view.sort);
   const said = q.toString();
   history.replaceState(null, '', said ? `/shop?${said}` : '/shop');
@@ -433,6 +439,7 @@ function drawMarket() {
     el(`<div class="sh-bar" id="sh-bar">
           <div class="s-chips" id="kinds" role="group" aria-label="Малын төрөл">${'<span class="s-skel" aria-hidden="true"></span>'.repeat(5)}</div>
           <div class="sh-tools">
+            <select class="sh-sort sh-who" id="supplier" aria-label="Нийлүүлэгч" hidden></select>
             <label class="sh-switch"><input type="checkbox" role="switch" id="delivers"${view.delivers ? ' checked' : ''}><span class="sh-long">Зөвхөн хүргэлттэй</span><span class="sh-short" aria-hidden="true">Хүргэлттэй</span></label>
             <select class="sh-sort" id="sort" aria-label="Эрэмбэ">
               <option value="suggested">Санал болгох</option>
@@ -456,6 +463,14 @@ function drawMarket() {
     showInAddress();
     if (loaded) paintGrid(true);
   });
+  document.getElementById('supplier').addEventListener('change', (e) => {
+    view.supplier = e.target.value || null;
+    showInAddress();
+    if (loaded) {
+      paintKinds();
+      paintGrid(true);
+    }
+  });
   const grid = document.getElementById('grid');
   // A card opened: where the market was, for the way back.
   grid.addEventListener('click', (event) => {
@@ -476,9 +491,34 @@ function paintLine() {
   line.textContent = `${market.listings.length} зар · гэрээт нийлүүлэгчээс${when}`;
 }
 
+/**
+ * «Бүх нийлүүлэгч» and each supplier with how many stalls they have — once
+ * there are two to choose between. A supplier asked for in the address who
+ * has nothing on offer now is let go of, rather than showing an empty market.
+ */
+function paintSuppliers() {
+  const pick = document.getElementById('supplier');
+  const counts = new Map();
+  for (const l of market.listings) {
+    const had = counts.get(l.supplier.id);
+    counts.set(l.supplier.id, { name: l.supplier.name, n: (had?.n ?? 0) + 1 });
+  }
+  if (view.supplier && !counts.has(view.supplier)) {
+    view.supplier = null;
+    showInAddress();
+  }
+  pick.hidden = counts.size < 2;
+  const names = [...counts.entries()].sort((a, b) => a[1].name.localeCompare(b[1].name, 'mn'));
+  pick.replaceChildren(
+    el('<option value="">Бүх нийлүүлэгч</option>'),
+    ...names.map(([id, { name, n }]) => el(`<option value="${esc(id)}">${esc(name)} (${n})</option>`)),
+  );
+  pick.value = view.supplier ?? '';
+}
+
 function paintKinds() {
   const box = document.getElementById('kinds');
-  const count = (k) => market.listings.filter((l) => k === 'all' || l.kind === k).length;
+  const count = (k) => market.listings.filter((l) => (k === 'all' || l.kind === k) && (!view.supplier || l.supplier.id === view.supplier)).length;
   box.replaceChildren();
   for (const [key, label] of [['all', 'Бүгд'], ...Object.entries(KIND)]) {
     if (key !== 'all' && key !== view.kind && !count(key)) continue;
@@ -496,16 +536,21 @@ function paintKinds() {
   }
 }
 
+/** What a kilo comes to: a whole animal's price over its rough weight, so a sheep and a kilo of beef compare. */
+const perKilo = (l) => (l.unit === 'whole' ? l.price_mnt / Math.max(1, Number(l.approx_kg) || 1) : l.price_mnt);
+
 function shown() {
-  const list = market.listings.filter((l) => (view.kind === 'all' || l.kind === view.kind) && (!view.delivers || l.delivers));
+  const list = market.listings.filter(
+    (l) => (view.kind === 'all' || l.kind === view.kind) && (!view.delivers || l.delivers) && (!view.supplier || l.supplier.id === view.supplier),
+  );
   const open = (l) => (l.remaining > 0 ? 0 : 1);
   // A tier a supplier paid for holds in every order: VIP, then Онцгой, then the rest.
   const rank = (l) => (l.tier === 'vip' ? 0 : l.tier === 'featured' ? 1 : 2);
   const first = (a, b) => open(a) - open(b) || rank(a) - rank(b);
-  if (view.sort === 'cheap') list.sort((a, b) => first(a, b) || a.price_mnt - b.price_mnt);
-  else if (view.sort === 'dear') list.sort((a, b) => first(a, b) || b.price_mnt - a.price_mnt);
+  if (view.sort === 'cheap') list.sort((a, b) => first(a, b) || perKilo(a) - perKilo(b));
+  else if (view.sort === 'dear') list.sort((a, b) => first(a, b) || perKilo(b) - perKilo(a));
   else if (view.sort === 'soon') list.sort((a, b) => first(a, b) || a.ready_from.localeCompare(b.ready_from));
-  else list.sort(first);
+  // «Санал болгох» is the server's order (src/idesh/ranking.ts) as it came.
   return list;
 }
 
@@ -547,7 +592,9 @@ function paintGrid(announce = false) {
     none.querySelector('[data-all]').addEventListener('click', () => {
       view.kind = 'all';
       view.delivers = false;
+      view.supplier = null;
       document.getElementById('delivers').checked = false;
+      document.getElementById('supplier').value = '';
       showInAddress();
       paintKinds();
       paintGrid(true);
@@ -786,7 +833,7 @@ function drawStall(l) {
                 : ''
             }
             <div class="sd-title">
-              <div class="sd-who"><span>${esc(l.supplier.name)} · ${esc(l.origin)}</span>${l.supplier.contracted ? `<span class="gold">${MARK.check}Гэрээт</span>` : ''}</div>
+              <div class="sd-who"><span><a class="s-link" href="/shop?supplier=${esc(l.supplier.id)}" aria-label="${esc(l.supplier.name)} — энэ нийлүүлэгчийн бүх зар">${esc(l.supplier.name)}</a> · ${esc(l.origin)}</span>${l.supplier.contracted ? `<span class="gold">${MARK.check}Гэрээт</span>` : ''}</div>
               <h1>${esc(l.title)}</h1>
             </div>
             <div class="sd-facts">
@@ -1209,6 +1256,7 @@ if (stallId) {
     await load();
     loaded = true;
     paintLine();
+    paintSuppliers();
     paintKinds();
     paintGrid();
     // How it goes, under the cards, its paying step said from the market's own answer — not asked for a second time.
