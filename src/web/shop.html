@@ -330,7 +330,8 @@ const OF_KIND = { sheep: 'Хонины', goat: 'Ямааны', beef: 'Үхрий
  * before anybody fills in the form or signs in: it used to be learnt at the
  * last press of «Төлөх», after signing in, five minutes in.
  */
-const pay = { open: true, wallet: null };
+/** `fee`: Basu's service fee on an order placed now (`service_fee_mnt`), its own line in every total. */
+const pay = { open: true, wallet: null, fee: 0 };
 const canPay = (amount) => pay.open || (pay.wallet !== null && pay.wallet >= amount);
 const CLOSED = 'Онлайн төлбөр одоогоор хаалттай байна.';
 
@@ -790,7 +791,7 @@ function drawStall(l) {
   form.breakdown = breakdownStart(l, kept?.breakdown);
   const step = l.unit === 'whole' ? 1 : 5;
   const cutFee = () => breakdownFee(l, form.breakdown, form.qty);
-  const total = () => l.price_mnt * form.qty + cutFee() + (form.receive === 'delivery' ? l.delivery_fee_mnt : 0);
+  const total = () => l.price_mnt * form.qty + cutFee() + (form.receive === 'delivery' ? l.delivery_fee_mnt : 0) + pay.fee;
   const gone = l.remaining === 0;
   const whole = l.unit === 'whole';
   const unit = unitWord(l);
@@ -803,7 +804,7 @@ function drawStall(l) {
    */
   const notNow = (closedWords) => {
     if (!pay.wallet || pay.wallet <= 0) return { why: closedWords, short: 'Онлайн төлбөр хаалттай' };
-    const fee = form.receive === 'delivery' ? l.delivery_fee_mnt : 0;
+    const fee = (form.receive === 'delivery' ? l.delivery_fee_mnt : 0) + pay.fee;
     // A head costs its price and, cut small, the cutting.
     const steps = Math.floor(((pay.wallet - fee) / (l.price_mnt + breakdownFee(l, form.breakdown, 1)) - l.min_qty) / step);
     const reach = steps >= 0 ? Math.min(l.min_qty + steps * step, l.remaining) : 0;
@@ -981,6 +982,7 @@ function drawStall(l) {
         <div><span>${form.qty} ${unit} × ${mnt(l.price_mnt)}</span><span class="s-money">${tugrik(l.price_mnt * form.qty)}</span></div>
         ${cutFee() ? `<div><span>Жижиглэх</span><span class="s-money">${tugrik(cutFee())}</span></div>` : ''}
         ${form.receive === 'delivery' ? `<div><span>Хүргэлт</span><span class="s-money">${tugrik(l.delivery_fee_mnt)}</span></div>` : ''}
+        ${pay.fee ? `<div id="sum-fee"><span>Үйлчилгээний хураамж</span><span class="s-money">${tugrik(pay.fee)}</span></div>` : ''}
         <div class="total"><span>Нийт</span><span class="s-money">${tugrik(total())}</span></div>`;
       // Payments closed: said at the top of the box, before anything is filled
       // in, and the button grey with its reason under it. A wallet that covers
@@ -1104,6 +1106,7 @@ function drawStall(l) {
               <div><span>${form.qty} ${unit} × ${mnt(l.price_mnt)}</span><span class="s-money">${tugrik(l.price_mnt * form.qty)}</span></div>
               ${cutFee() ? `<div><span>Жижиглэх</span><span class="s-money">${tugrik(cutFee())}</span></div>` : ''}
               ${delivery ? `<div><span>Хүргэлт</span><span class="s-money">${tugrik(l.delivery_fee_mnt)}</span></div>` : ''}
+              ${pay.fee ? `<div id="review-fee"><span>Үйлчилгээний хураамж <small>· Basu-гийн, цуцлагдвал буцна</small></span><span class="s-money">${tugrik(pay.fee)}</span></div>` : ''}
               <div class="total"><span>Нийт төлөх</span><span class="s-money">${tugrik(total())}</span></div>
             </div>
             <p class="s-error" id="pay-error" role="alert"></p>
@@ -1215,6 +1218,7 @@ function drawStall(l) {
 async function load() {
   market = await api('/v1/idesh/listings');
   pay.open = market.payments_open !== false;
+  pay.fee = Math.max(0, Number(market.service_fee_mnt) || 0);
 }
 
 /** What a page that could not be drawn says, with the way to try again. On a stall's page, where nothing else is, its title is the page's heading. */
@@ -1230,9 +1234,10 @@ if (stallId) {
   );
   try {
     // The stall's own answer says the day and whether money can be taken: the whole market is not asked for that.
-    const { listing, today, payments_open: open } = await api(`/v1/idesh/listings/${stallId}`);
+    const { listing, today, payments_open: open, service_fee_mnt: fee } = await api(`/v1/idesh/listings/${stallId}`);
     market.today = today;
     pay.open = open !== false;
+    pay.fee = Math.max(0, Number(fee) || 0);
     await lookAtWallet();
     drawStall(listing);
   } catch (error) {

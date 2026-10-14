@@ -931,6 +931,7 @@ export async function registerOpsRoutes(
     sales_mnt: t.salesMnt,
     handed: t.handed,
     commission_mnt: t.commissionMnt,
+    service_fee_mnt: t.serviceFeeMnt,
     cancelled: t.cancelled,
     supplier_fault: t.supplierFault,
     guest_fault: t.guestFault,

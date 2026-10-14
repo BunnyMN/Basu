@@ -105,6 +105,7 @@ export async function overviewAt(now: Date) {
       sales_mnt: pick(idesh, 'salesMnt'),
       handed: pick(idesh, 'handed'),
       commission_mnt: pick(idesh, 'commissionMnt'),
+      service_fee_mnt: pick(idesh, 'serviceFeeMnt'),
       cancelled: pick(idesh, 'cancelled'),
       refund_mnt: pick(idesh, 'refundMnt'),
     },

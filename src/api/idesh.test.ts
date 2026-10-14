@@ -274,6 +274,40 @@ describe('ordering', () => {
     expect(wallet.json().lines[0].memo).toContain('Идэш');
   });
 
+  it('adds the desk’s service fee as its own line: the guest pays and reads it, the supplier never sees it', async () => {
+    await setSetting('idesh_service_fee_mnt', 2_000, 'test');
+    const token = await signIn();
+    await topUp(token, 500_000);
+    // Said before anybody orders, so the page can draw the line and the total.
+    const market = (await app.inject({ method: 'GET', url: '/v1/idesh/listings' })).json();
+    expect(market.service_fee_mnt).toBe(2_000);
+    expect((await app.inject({ method: 'GET', url: `/v1/idesh/listings/${sheep.id}` })).json().service_fee_mnt).toBe(2_000);
+
+    const created = await app.inject({
+      method: 'POST',
+      url: '/v1/idesh',
+      headers: auth(token),
+      payload: { listing_id: sheep.id, qty: 1, receive: 'pickup', receive_on: '2026-09-12' },
+    });
+    expect(created.json()).toMatchObject({ total_mnt: 462_000, service_fee_mnt: 2_000 });
+    const id = created.json().id as string;
+    // The desk changes its fee: an order keeps the one it was placed with.
+    await setSetting('idesh_service_fee_mnt', 5_000, 'test');
+    expect((await app.inject({ method: 'POST', url: `/v1/idesh/${id}/pay`, headers: auth(token) })).statusCode).toBe(200);
+    const wallet = (await app.inject({ method: 'GET', url: '/v1/wallet', headers: auth(token) })).json();
+    expect(wallet.balance_mnt).toBe(500_000 - 462_000);
+
+    // The guest reads what they paid, the fee in it.
+    expect((await app.inject({ method: 'GET', url: `/v1/idesh/${id}`, headers: auth(token) })).json()).toMatchObject({ total_mnt: 462_000, service_fee_mnt: 2_000 });
+    const mine = (await app.inject({ method: 'GET', url: '/v1/idesh', headers: auth(token) })).json().orders[0];
+    expect(mine).toMatchObject({ total_mnt: 462_000, service_fee_mnt: 2_000 });
+
+    // The supplier reads their own sale: the fee is Basu's, not theirs.
+    const screen = await atCounter(supplierId);
+    const ticket = (await app.inject({ method: 'GET', url: `/v1/supplier/orders/${id}`, headers: auth(screen) })).json();
+    expect(ticket.order.total_mnt).toBe(460_000);
+  });
+
   it('files what the guest and the supplier are told under the order, so the app opens it from the inbox', async () => {
     type Message = { template: string; subject: string | null; subject_id: string | null };
     const inbox = async (token: string) =>

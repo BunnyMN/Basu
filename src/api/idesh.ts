@@ -87,7 +87,7 @@ import { enqueue, unreadBySubject } from '../platform/notify/index.js';
 import { LONE_OWNER_PERMISSIONS, grants, headRoles, type Grants } from '../platform/access/index.js';
 import { accessIn, membersOf } from '../platform/org/index.js';
 import { topupsOpen, type Ctx } from '../ports.js';
-import { shapeBatch, shapeCertificateDetails, shapeCertificateFacts, shapeOrder, shapePhoto, shapeQpay, shapeSettlement, shapeSummary } from './shapes.js';
+import { shapeBatch, shapeGuestSummary, shapeCertificateDetails, shapeCertificateFacts, shapeOrder, shapePhoto, shapeQpay, shapeSettlement, shapeSummary } from './shapes.js';
 import { FOREVER } from './webFiles.js';
 import { invoiceQpay } from '../platform/ledger/index.js';
 import { holds, knownId, need, needAny, UUID } from './guards.js';
@@ -252,7 +252,7 @@ function readPhoto(sent: unknown): CertificatePhoto | null | string {
 
 
 const shapeDetail = (o: IdeshDetail) => ({
-  ...shapeSummary(o),
+  ...shapeGuestSummary(o),
   origin: o.origin,
   unit_price_mnt: o.unitPriceMnt,
   delivery_fee_mnt: o.deliveryFeeMnt,
@@ -400,16 +400,26 @@ export async function registerIdeshRoutes(
    * press. A wallet that covers the whole order still pays for it (the
    * server allows that whatever this says); the page asks the wallet then.
    */
+  /** Basu's fee on an order placed now: the desk's setting, never below nothing. */
+  const serviceFee = async () => Math.max(0, Math.round(Number(await setting<number>('idesh_service_fee_mnt')) || 0));
+
+  // `service_fee_mnt`: what an order placed now adds for Basu — the page shows it as its own line before paying.
   app.get('/v1/idesh/listings', async () => ({
     today: dayOf(ctx.clock.now()),
     payments_open: topupsOpen(ctx.payments),
+    service_fee_mnt: await serviceFee(),
     listings: (await openListings(ctx.clock.now())).map(shapeListing),
   }));
 
   app.get<{ Params: { id: string } }>('/v1/idesh/listings/:id', { preHandler: anIdeshId }, async (request, reply) => {
     const listing = await listingById(request.params.id, ctx.clock.now());
     if (!listing) return sendError(reply, new IdeshError('NOT_FOUND', 'no such listing'));
-    return reply.send({ today: dayOf(ctx.clock.now()), payments_open: topupsOpen(ctx.payments), listing: shapeListing(listing) });
+    return reply.send({
+      today: dayOf(ctx.clock.now()),
+      payments_open: topupsOpen(ctx.payments),
+      service_fee_mnt: await serviceFee(),
+      listing: shapeListing(listing),
+    });
   });
 
   /* ── the guest ─────────────────────────────────────────────────── */
@@ -422,7 +432,7 @@ export async function registerIdeshRoutes(
       unreadBySubject(request.guestId!, 'idesh'),
     ]);
     // `unseen`: what was said about the order that the guest has not seen — the dot, until it is opened.
-    return { orders: orders.map((o) => ({ ...shapeSummary(o), unseen: unseen.get(o.id) ?? 0 })) };
+    return { orders: orders.map((o) => ({ ...shapeGuestSummary(o), unseen: unseen.get(o.id) ?? 0 })) };
   });
 
   app.post<{
@@ -458,12 +468,15 @@ export async function registerIdeshRoutes(
         addressLat: typeof body.address_lat === 'number' ? body.address_lat : undefined,
         addressLon: typeof body.address_lon === 'number' ? body.address_lon : undefined,
         breakdown: body.breakdown && typeof body.breakdown === 'object' ? body.breakdown : undefined,
+        // Basu's fee as the desk has it today; the order keeps it whatever the desk sets tomorrow.
+        serviceFeeMnt: await serviceFee(),
       });
       return reply.status(201).send({
         id: created.orderId,
         code: created.code,
         state: 'DRAFT',
         total_mnt: created.totalMnt,
+        service_fee_mnt: created.serviceFeeMnt,
       });
     } catch (error) {
       return sendError(reply, error);

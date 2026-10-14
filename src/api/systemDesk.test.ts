@@ -113,6 +113,7 @@ describe('the machine', () => {
       ['promo_vip_mnt', 50_000],
       ['promo_vip_days', 7],
       ['desk_banner', ''],
+      ['idesh_service_fee_mnt', 0],
       ['calls_open', 0],
     ]);
 

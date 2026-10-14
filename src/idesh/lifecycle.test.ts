@@ -466,6 +466,61 @@ describe('the supplier’s share', () => {
   });
 });
 
+describe('Basu’s service fee, from the guest', () => {
+  const FEE = 2_000;
+  const by = { actor: 'supplier:d1', role: 'supplier' as const };
+
+  it('is paid on top of the supplier’s total, stays out of their commission and payout, and is Basu’s', async () => {
+    const { orderId, totalMnt, serviceFeeMnt } = await book({ serviceFeeMnt: FEE });
+    expect(serviceFeeMnt).toBe(FEE);
+    expect(totalMnt).toBe(sheep.priceMnt + FEE);
+    await payIdesh(ctx, orderId);
+    // One payment, the fee in it.
+    expect(await balance(guestId)).toBe(1_000_000 - sheep.priceMnt - FEE);
+    await processReceipts(ctx);
+    // The supplier's receipt is their sale: the fee is not in it.
+    expect(tax.issued.at(-1)).toMatchObject({ kind: 'SALE', amountMnt: sheep.priceMnt });
+
+    await startPreparing(ctx, orderId, 'supplier:d1');
+    await markReady(ctx, orderId, 'supplier:d1');
+    await markHanded(ctx, orderId, 'supplier:d1');
+    clock.advanceMinutes(25 * 60);
+    await housekeeping(ctx);
+    // The commission is on the meat, the payout the supplier's total less it: the fee is in neither.
+    const commission = Math.round(sheep.priceMnt * 0.02);
+    const [payout] = await settlementsOf(supplierId);
+    expect(payout).toMatchObject({ kind: 'payout', amountMnt: sheep.priceMnt - commission });
+    expect(await owed(`supplier:${supplierId}`)).toBe(sheep.priceMnt - commission);
+    expect((await reconcileLedger()).drift).toBe(0);
+  });
+
+  it('goes back with the refund whenever the order is cancelled, outside the supplier’s receipt', async () => {
+    const { orderId } = await book({ serviceFeeMnt: FEE });
+    await payIdesh(ctx, orderId);
+    await startPreparing(ctx, orderId, 'supplier:d1');
+    // After slaughter, on the guest's word: a tenth of the meat stays with the supplier — the fee does not stay with Basu.
+    const forfeit = Math.round((sheep.priceMnt * FORFEIT_PCT) / 100);
+    const split = await cancelIdesh(ctx, orderId, by, 'guest_asked');
+    expect(split).toEqual({ refundMnt: sheep.priceMnt - forfeit + FEE, forfeitMnt: forfeit });
+    expect(await owed(`guest:${guestId}`)).toBe(sheep.priceMnt - forfeit + FEE);
+    expect((await refundOf(orderId))?.amountMnt).toBe(sheep.priceMnt - forfeit + FEE);
+    await processReceipts(ctx);
+    expect(tax.issued.map((r) => [r.kind, r.amountMnt])).toEqual([
+      ['SALE', sheep.priceMnt],
+      ['RETURN', sheep.priceMnt - forfeit],
+    ]);
+    expect((await reconcileLedger()).drift).toBe(0);
+  });
+
+  it('is nothing on an order placed while the desk has it at nothing', async () => {
+    const { orderId, totalMnt, serviceFeeMnt } = await book();
+    expect(serviceFeeMnt).toBe(0);
+    expect(totalMnt).toBe(sheep.priceMnt);
+    await payIdesh(ctx, orderId);
+    expect(await balance(guestId)).toBe(1_000_000 - sheep.priceMnt);
+  });
+});
+
 describe('a supplier is paid a day at a time', () => {
   /** An order handed over now, and closed a day on: its payout falls due on the day it closes. */
   async function handedAndClosed(): Promise<{ orderId: string; totalMnt: number }> {

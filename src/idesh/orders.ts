@@ -210,12 +210,20 @@ export interface CreateIdeshInput {
   addressLon?: number | undefined;
   /** Задаргаа: how the animal is to be taken apart, where the listing offers a choice. */
   breakdown?: BreakdownWant | null | undefined;
+  /**
+   * Basu's service fee on this order, as the desk has set it today: the
+   * guest pays it on top of the supplier's total, as a line of its own.
+   * None when left out.
+   */
+  serviceFeeMnt?: number | undefined;
 }
 
 export interface CreatedIdesh {
   orderId: string;
   code: string;
+  /** What the guest pays: the supplier's total and Basu's service fee. */
   totalMnt: number;
+  serviceFeeMnt: number;
 }
 
 /**
@@ -301,7 +309,8 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
     // provider a draft the guest's wallet does not cover could never be paid,
     // and it held its animal for half an hour all the same: a few curious
     // presses of «Төлөх» made a live stall read «Энэ зар дууссан» to everybody.
-    await assertCollectable(ctx, { guestId: input.guestId, amountMnt: priced.totalMnt }, client);
+    const serviceFeeMnt = Math.max(0, Math.round(input.serviceFeeMnt ?? 0));
+    await assertCollectable(ctx, { guestId: input.guestId, amountMnt: priced.totalMnt + serviceFeeMnt }, client);
 
     // The CHECK on the table does the enforcing; this reads the outcome.
     const taken = await client.query<{ id: string }>(
@@ -318,9 +327,9 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
          (code, supplier_id, listing_id, guest_id, state, kind, unit, title, origin, qty,
           unit_price_mnt, delivery_fee_mnt, total_mnt, receive, receive_on,
           address, address_phone, address_lat, address_lon, created_at, updated_at, certificate_id,
-          breakdown, cut_parts, breakdown_note, cut_fee_mnt)
+          breakdown, cut_parts, breakdown_note, cut_fee_mnt, service_fee_mnt)
        VALUES ($1, $2, $3, $4, 'DRAFT', $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::date,
-               $15, $16, $17, $18, $19, $19, $20, $21, $22::text[], $23, $24)
+               $15, $16, $17, $18, $19, $19, $20, $21, $22::text[], $23, $24, $25)
        RETURNING id`,
       [
         code,
@@ -348,6 +357,7 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
         chosen?.cut ?? [],
         chosen?.note ?? null,
         priced.cutFeeMnt,
+        serviceFeeMnt,
       ],
     );
     const orderId = inserted.rows[0]!.id;
@@ -358,11 +368,12 @@ export async function createIdesh(ctx: Ctx, input: CreateIdeshInput): Promise<Cr
       receive: input.receive,
       receiveOn: input.receiveOn,
       totalMnt: priced.totalMnt,
+      ...(serviceFeeMnt ? { serviceFeeMnt } : {}),
       // What was asked of the butcher, in the record nobody can edit.
       ...(chosen ? { breakdown: chosen, cutFeeMnt: priced.cutFeeMnt } : {}),
     });
 
-    return { orderId, code, totalMnt: priced.totalMnt };
+    return { orderId, code, totalMnt: priced.totalMnt + serviceFeeMnt, serviceFeeMnt };
   });
 }
 
@@ -398,14 +409,15 @@ export async function payIdesh(
     await client.query('UPDATE idesh.idesh_order SET ledger_transfer_id = $2 WHERE id = $1', [orderId, transferId]);
     const moved = await transition(client, orderId, ['DRAFT'], 'PAID', { paid_at: now });
     if (!moved) throw new IdeshError('WRONG_STATE', 'order left DRAFT while paying');
-    await appendEvent(client, orderId, 'PAID', `guest:${facts.guestId}`, { amountMnt: facts.totalMnt, ...split });
+    await appendEvent(client, orderId, 'PAID', `guest:${facts.guestId}`, { amountMnt: facts.chargeMnt, ...split });
   };
 
   let outcome;
   try {
     outcome = await collectOrInvoice(ctx, {
       guestId: facts.guestId,
-      amountMnt: facts.totalMnt,
+      // The supplier's total and Basu's fee, in one payment.
+      amountMnt: facts.chargeMnt,
       subject: 'idesh',
       subjectId: orderId,
       // What the guest reads in their statement. The ledger never learns what
@@ -524,9 +536,12 @@ export async function cancelIdesh(
   }
 
   const meatMnt = meatOf(facts);
-  const split: Split = facts.transferId
+  // Basu's fee is Basu's only on an order that went through: cancelled, for
+  // whatever reason, it goes back with the rest of the guest's refund.
+  const sale: Split = facts.transferId
     ? splitRefund({ state: facts.state, reason, meatMnt, deliveryFeeMnt: facts.deliveryFeeMnt })
     : { refundMnt: 0, forfeitMnt: 0 };
+  const split: Split = facts.transferId ? { ...sale, refundMnt: sale.refundMnt + facts.serviceFeeMnt } : sale;
 
   // Only from the state the refund above was worked out for: a draft bought in the moment between (by
   // QPay's callback, the page) is not the draft whose refund was nothing — closing it would keep the
@@ -564,7 +579,7 @@ export async function cancelIdesh(
     return split;
   }
 
-  await arrangeRefund(ctx, orderId, facts, split, reason);
+  await arrangeRefund(ctx, orderId, facts, split, reason, sale.refundMnt);
   return split;
 }
 
@@ -744,7 +759,7 @@ export async function finishInvoiceFor(
       // Unpaid, but the wallet covers the order by now (a payment that came in late): bought from there,
       // the invoice let go — rather than left out for the guest to pay a second time.
       const facts = await billingFacts(orderId);
-      const covered = facts?.state === 'DRAFT' && (await balance(facts.guestId)) >= facts.totalMnt;
+      const covered = facts?.state === 'DRAFT' && (await balance(facts.guestId)) >= facts.chargeMnt;
       if (!covered) {
         if (ctx.clock.now().getTime() - invoice.createdAt.getTime() < INVOICE_LIFETIME_MINUTES * 60_000) return 'WAITING';
         await dropInvoice(ctx, invoice.topupId);
@@ -873,6 +888,8 @@ async function arrangeRefund(
   facts: NonNullable<Awaited<ReturnType<typeof billingFacts>>>,
   split: Split,
   reason: CancelReason,
+  /** The part of the refund that is the supplier's sale undone — the receipt's; the rest is Basu's fee. */
+  saleRefundMnt: number,
 ): Promise<void> {
   if (split.refundMnt > 0) {
     const opened = await openSettlement({
@@ -884,13 +901,13 @@ async function arrangeRefund(
       memo: 'Буцаалт',
       at: ctx.clock.now(),
     });
-    if (opened) {
+    if (opened && saleRefundMnt > 0) {
       await queueReceipt({
         transferId: opened.accrualId,
         kind: 'RETURN',
         merchantTin: facts.merchantTin,
         orderCode: facts.code,
-        amountMnt: split.refundMnt,
+        amountMnt: saleRefundMnt,
       });
     }
   }
@@ -943,7 +960,12 @@ async function billingFacts(orderId: string): Promise<{
   unitPriceMnt: number;
   cutFeeMnt: number;
   deliveryFeeMnt: number;
+  /** The supplier's sale: the meat, the cutting, the delivery. */
   totalMnt: number;
+  /** Basu's service fee on top of it. */
+  serviceFeeMnt: number;
+  /** What the guest pays: the two together. */
+  chargeMnt: number;
   receive: Receive;
   receiveOn: string;
   readyAt: Date | null;
@@ -967,6 +989,7 @@ async function billingFacts(orderId: string): Promise<{
     cut_fee_mnt: number;
     delivery_fee_mnt: number;
     total_mnt: number;
+    service_fee_mnt: number;
     receive: Receive;
     receive_on: string;
     ready_at: Date | null;
@@ -978,7 +1001,7 @@ async function billingFacts(orderId: string): Promise<{
     ledger_transfer_id: string | null;
   }>(
     `SELECT o.guest_id, o.listing_id, o.supplier_id, o.code, o.state, o.title, o.unit, o.qty,
-            o.unit_price_mnt, o.cut_fee_mnt, o.delivery_fee_mnt, o.total_mnt, o.receive,
+            o.unit_price_mnt, o.cut_fee_mnt, o.delivery_fee_mnt, o.total_mnt, o.service_fee_mnt, o.receive,
             to_char(o.receive_on, 'YYYY-MM-DD') AS receive_on, o.ready_at, o.address_phone,
             o.ledger_transfer_id, s.name AS supplier, s.pickup_address,
             s.ebarimt_merchant_tin AS tin, s.commission_pct
@@ -1002,6 +1025,8 @@ async function billingFacts(orderId: string): Promise<{
     cutFeeMnt: Number(row.cut_fee_mnt),
     deliveryFeeMnt: Number(row.delivery_fee_mnt),
     totalMnt: Number(row.total_mnt),
+    serviceFeeMnt: Number(row.service_fee_mnt),
+    chargeMnt: Number(row.total_mnt) + Number(row.service_fee_mnt),
     receive: row.receive,
     receiveOn: row.receive_on,
     readyAt: row.ready_at,
@@ -1025,7 +1050,10 @@ export interface IdeshSummary {
   unit: Unit;
   title: string;
   qty: number;
+  /** The supplier's sale: the meat, the cutting, the delivery. */
   totalMnt: number;
+  /** Basu's service fee the guest paid on top of it; nothing on an order from before there was one. */
+  serviceFeeMnt: number;
   receive: Receive;
   /** `YYYY-MM-DD` */
   receiveOn: string;
@@ -1088,6 +1116,7 @@ interface OrderRow {
   unit_price_mnt: number;
   delivery_fee_mnt: number;
   total_mnt: number;
+  service_fee_mnt: number;
   receive: Receive;
   receive_on: string;
   address: string | null;
@@ -1123,7 +1152,7 @@ const ORDER_SELECT = `
   SELECT o.id, o.code, o.state, o.supplier_id, s.name AS supplier, s.phone AS supplier_phone,
          s.pickup_address, s.lat AS pickup_lat, s.lon AS pickup_lon, o.guest_id,
          o.kind, o.unit, o.title, o.origin, o.qty, o.unit_price_mnt, o.delivery_fee_mnt,
-         o.total_mnt, o.receive, to_char(o.receive_on, 'YYYY-MM-DD') AS receive_on,
+         o.total_mnt, o.service_fee_mnt, o.receive, to_char(o.receive_on, 'YYYY-MM-DD') AS receive_on,
          o.address, o.address_phone, o.address_lat, o.address_lon, o.ledger_transfer_id,
          o.paid_at, o.preparing_at, o.ready_at, o.dispatched_at, o.handed_at,
          o.cancel_reason, o.refund_mnt, o.forfeit_mnt, s.commission_pct,
@@ -1145,7 +1174,8 @@ function summary(r: OrderRow): IdeshSummary {
     unit: r.unit,
     title: r.title,
     qty: r.qty,
-    totalMnt: r.total_mnt,
+    totalMnt: Number(r.total_mnt),
+    serviceFeeMnt: Number(r.service_fee_mnt),
     receive: r.receive,
     receiveOn: r.receive_on,
     paidAt: r.paid_at,
@@ -1689,9 +1719,10 @@ export interface Tally {
   /** Orders paid for in the period, and what they came to. */
   paid: number;
   salesMnt: number;
-  /** Orders handed over in the period, and Basu's share of them. */
+  /** Orders handed over in the period, and Basu's share of them: the commission, and the guests' service fees. */
   handed: number;
   commissionMnt: number;
+  serviceFeeMnt: number;
   /** Cancelled in the period: how many, whose fault, and the money that moved back or stayed. */
   cancelled: number;
   supplierFault: number;
@@ -1731,6 +1762,7 @@ async function tally(db: Db, from: Date | null, to: Date): Promise<Tally> {
             COALESCE(sum(total_mnt) FILTER (WHERE paid_at IS NOT NULL AND paid_at >= COALESCE($1, '-infinity'::timestamptz) AND paid_at < $2), 0) AS sales,
             count(*) FILTER (WHERE handed_at IS NOT NULL AND handed_at >= COALESCE($1, '-infinity'::timestamptz) AND handed_at < $2)::int AS handed,
             COALESCE(sum(commission_mnt) FILTER (WHERE handed_at IS NOT NULL AND handed_at >= COALESCE($1, '-infinity'::timestamptz) AND handed_at < $2), 0) AS commission,
+            COALESCE(sum(service_fee_mnt) FILTER (WHERE handed_at IS NOT NULL AND handed_at >= COALESCE($1, '-infinity'::timestamptz) AND handed_at < $2), 0) AS service_fee,
             count(*) FILTER (WHERE cancelled_at IS NOT NULL AND paid_at IS NOT NULL AND cancelled_at >= COALESCE($1, '-infinity'::timestamptz) AND cancelled_at < $2)::int AS cancelled,
             count(*) FILTER (WHERE cancelled_at IS NOT NULL AND paid_at IS NOT NULL AND ${SUPPLIER_FAULT_SQL} AND cancelled_at >= COALESCE($1, '-infinity'::timestamptz) AND cancelled_at < $2)::int AS supplier_fault,
             COALESCE(sum(refund_mnt) FILTER (WHERE cancelled_at IS NOT NULL AND cancelled_at >= COALESCE($1, '-infinity'::timestamptz) AND cancelled_at < $2), 0) AS refund,
@@ -1746,6 +1778,7 @@ async function tally(db: Db, from: Date | null, to: Date): Promise<Tally> {
     salesMnt: Number(r['sales']),
     handed: Number(r['handed']),
     commissionMnt: Number(r['commission']),
+    serviceFeeMnt: Number(r['service_fee']),
     cancelled,
     supplierFault,
     guestFault: cancelled - supplierFault,

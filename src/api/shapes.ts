@@ -45,7 +45,9 @@ export const shapeSummary = (o: IdeshSummary) => ({
   unit: o.unit,
   title: o.title,
   qty: o.qty,
+  // The supplier's sale. A guest is shown what they paid — see `shapeGuestSummary`.
   total_mnt: o.totalMnt,
+  service_fee_mnt: o.serviceFeeMnt,
   receive: o.receive,
   receive_on: o.receiveOn,
   paid_at: o.paidAt?.toISOString() ?? null,
@@ -57,6 +59,9 @@ export const shapeSummary = (o: IdeshSummary) => ({
   // The listing's own cover while it has one; null, and the page draws the example `photo` names.
   cover: o.cover ? shapePhoto(o.cover) : null,
 });
+
+/** An order as its guest reads it: the total is what they paid, Basu's fee in it. */
+export const shapeGuestSummary = (o: IdeshSummary) => ({ ...shapeSummary(o), total_mnt: o.totalMnt + o.serviceFeeMnt });
 
 /** An order as the supplier's screens and the ops desk read it. */
 export const shapeOrder = (o: SupplierOrder) => ({

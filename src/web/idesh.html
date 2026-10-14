@@ -599,6 +599,8 @@ const state = {
   screen: null,
   /** Whether the server can take money now (`payments_open` on the stalls' answer). */
   paymentsOpen: true,
+  /** Basu's service fee on an order placed now (`service_fee_mnt` on the stalls' answer): its own line, in the total. */
+  serviceFee: 0,
   /** While it cannot: what the signed-in guest holds in their Basu wallet, or null for not known. */
   wallet: null,
 };
@@ -728,6 +730,7 @@ async function loadListings() {
   state.today = today;
   state.listings = listings;
   state.paymentsOpen = answer.payments_open !== false;
+  state.serviceFee = Math.max(0, Number(answer.service_fee_mnt) || 0);
   await lookAtWallet();
   if (gone) return false;
   paintKinds();
@@ -1201,7 +1204,7 @@ function hero(l) {
 function total() {
   const l = state.listing;
   const f = state.form;
-  return l.price_mnt * f.qty + breakdownFee(l, f.breakdown, f.qty) + (f.receive === 'delivery' ? l.delivery_fee_mnt : 0);
+  return l.price_mnt * f.qty + breakdownFee(l, f.breakdown, f.qty) + (f.receive === 'delivery' ? l.delivery_fee_mnt : 0) + state.serviceFee;
 }
 
 /** What still has to be answered before the order can be looked at. */
@@ -1489,7 +1492,7 @@ function renderFoot() {
   else if (needs) foot.append(el(`<p class="why" id="next-why">${MARK.warn}${needs}</p>`));
   const row = el(`
     <div class="foot-row">
-      <div class="sum"><span>Нийт · ${f.qty} ${unitWord(l)}${breakdownFee(l, f.breakdown, f.qty) ? ' + жижиглэх' : ''}${f.receive === 'delivery' ? ' + хүргэлт' : ''}</span><b>${money(total())}</b></div>
+      <div class="sum"><span>Нийт · ${f.qty} ${unitWord(l)}${breakdownFee(l, f.breakdown, f.qty) ? ' + жижиглэх' : ''}${f.receive === 'delivery' ? ' + хүргэлт' : ''}${state.serviceFee ? ' + хураамж' : ''}</span><b>${money(total())}</b></div>
       <button class="btn" data-v="primary" type="button" id="next"${needs || !able ? ' disabled aria-describedby="next-why"' : ''}>Захиалах</button>
     </div>`);
   row.querySelector('#next').addEventListener('click', () => renderReview());
@@ -1546,6 +1549,7 @@ function renderReview({ replace = false } = {}) {
           <div class="r"><span>${f.qty} ${unitWord(l)} × ${mnt(l.price_mnt)}</span><b>${money(l.price_mnt * f.qty)}</b></div>
           ${cutFee ? `<div class="r"><span>Жижиглэх</span><b>${money(cutFee)}</b></div>` : ''}
           ${delivery ? `<div class="r"><span>Хүргэлт</span><b>${money(l.delivery_fee_mnt)}</b></div>` : ''}
+          ${state.serviceFee ? `<div class="r" id="review-fee"><span>Үйлчилгээний хураамж</span><b>${money(state.serviceFee)}<small>Basu-гийн · цуцлагдвал буцна</small></b></div>` : ''}
           <div class="r total"><span>Нийт төлөх</span><b>${money(total())}</b></div>
         </div>`),
   );
@@ -2380,6 +2384,7 @@ async function showStatus(force, { replace = false } = {}) {
   const extras = [
     order.breakdown?.fee_mnt ? `жижиглэх ${mnt(order.breakdown.fee_mnt)}` : '',
     order.delivery_fee_mnt ? `хүргэлт ${mnt(order.delivery_fee_mnt)}` : '',
+    order.service_fee_mnt ? `үйлчилгээний хураамж ${mnt(order.service_fee_mnt)}` : '',
   ].filter(Boolean);
   pay.append(
     el(`<div class="line">${MARK.wallet}<div>

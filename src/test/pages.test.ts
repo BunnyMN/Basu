@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { closePool, getPool } from '../db/pool.js';
 import { DemoClock } from '../demoClock.js';
+import { setSetting } from '../ops/index.js';
 import { buildServer } from '../api/server.js';
 import { addListingPhoto, cancelIdesh, createIdesh, updateSupplierProfile, verifySupplierBank } from '../idesh/index.js';
 import { openSettlement } from '../idesh/settlements.js';
@@ -1423,6 +1424,26 @@ describe('the website', () => {
     (s.getElementById('next') as HTMLButtonElement).click();
     await until(stall, 'the review', () => Boolean(s.getElementById('pay')));
     expect(s.getElementById('pay')?.textContent).toBe('Нэвтэрч төлөх →');
+  });
+
+  it('shows Basu’s service fee as its own line on a stall, in the total and in the review', async () => {
+    await setSetting('idesh_service_fee_mnt', 2_000, 'test');
+    try {
+      const { rows } = await getPool().query<{ id: string; price_mnt: number; min_qty: number }>(
+        `SELECT id, price_mnt, min_qty FROM idesh.listing WHERE unit = 'whole' AND active AND quantity > sold ORDER BY created_at LIMIT 1`,
+      );
+      const stall = await openPage('shop.html', `/${rows[0]!.id}`);
+      const s = stall.window.document;
+      await until(stall, 'the order form', () => Boolean(s.getElementById('next')));
+      const total = Number(rows[0]!.price_mnt) * rows[0]!.min_qty + 2_000;
+      await until(stall, 'the fee in the sum', () => (s.getElementById('sum-fee')?.textContent ?? '').includes('Үйлчилгээний хураамж'));
+      expect(s.getElementById('sum')?.textContent?.replace(/\D/g, '')).toContain(String(total));
+      (s.getElementById('next') as HTMLButtonElement).click();
+      await until(stall, 'the review', () => Boolean(s.getElementById('review-fee')));
+      expect(s.getElementById('review-fee')?.textContent).toContain('2,000');
+    } finally {
+      await setSetting('idesh_service_fee_mnt', 0, 'test');
+    }
   });
 
   it('speaks of paying at the door only to whoever came from a stall’s «Нэвтэрч төлөх →»', async () => {
