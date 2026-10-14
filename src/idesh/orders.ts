@@ -851,6 +851,7 @@ export async function housekeeping(
       supplierId: row.supplier_id,
       amountMnt: payoutMnt,
       memo: 'Олголт',
+      at: now,
     });
   }
 
@@ -881,6 +882,7 @@ async function arrangeRefund(
       guestId: facts.guestId,
       amountMnt: split.refundMnt,
       memo: 'Буцаалт',
+      at: ctx.clock.now(),
     });
     if (opened) {
       await queueReceipt({
@@ -900,6 +902,7 @@ async function arrangeRefund(
       supplierId: facts.supplierId,
       amountMnt: split.forfeitMnt,
       memo: 'Суутгал',
+      at: ctx.clock.now(),
     });
   }
 

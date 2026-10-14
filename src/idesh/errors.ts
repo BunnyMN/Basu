@@ -29,7 +29,8 @@ export type IdeshErrorCode =
   | 'CERTIFICATE_IN_USE'
   | 'BAD_BREAKDOWN'
   | 'BAD_PHOTO'
-  | 'TOO_MANY_PHOTOS';
+  | 'TOO_MANY_PHOTOS'
+  | 'PAID_BY_BATCH';
 
 export class IdeshError extends Error {
   constructor(

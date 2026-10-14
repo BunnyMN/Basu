@@ -36,6 +36,7 @@ import {
   CANCEL_REASONS,
   setRefundAccount,
   settlementsOf,
+  batchesOf,
   type CancelReason,
   supplierOf,
   type SupplierRole,
@@ -86,7 +87,7 @@ import { enqueue, unreadBySubject } from '../platform/notify/index.js';
 import { LONE_OWNER_PERMISSIONS, grants, headRoles, type Grants } from '../platform/access/index.js';
 import { accessIn, membersOf } from '../platform/org/index.js';
 import { topupsOpen, type Ctx } from '../ports.js';
-import { shapeCertificateDetails, shapeCertificateFacts, shapeOrder, shapePhoto, shapeQpay, shapeSettlement, shapeSummary } from './shapes.js';
+import { shapeBatch, shapeCertificateDetails, shapeCertificateFacts, shapeOrder, shapePhoto, shapeQpay, shapeSettlement, shapeSummary } from './shapes.js';
 import { FOREVER } from './webFiles.js';
 import { invoiceQpay } from '../platform/ledger/index.js';
 import { holds, knownId, need, needAny, UUID } from './guards.js';
@@ -861,6 +862,8 @@ export async function registerIdeshRoutes(
       bank_account: me?.bankAccount ?? null,
       bank_holder: me?.bankHolder ?? null,
       settlements: (await settlementsOf(supplierId)).map(shapeSettlement),
+      // What Basu sends them a day at a time: one transfer per day's payouts.
+      batches: (await batchesOf(supplierId)).map(shapeBatch),
     };
   });
 

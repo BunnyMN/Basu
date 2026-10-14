@@ -32,6 +32,10 @@ import {
   markReady,
   approveSettlement,
   markSettled,
+  gatherPayouts,
+  listBatches,
+  approveBatch,
+  markBatchPaid,
   payIdesh,
   refundOf,
   registerSupplier,
@@ -337,8 +341,15 @@ describe('cancelling', () => {
       ['refund', 'needs_account', 'Буцаалт', totalMnt - forfeit],
       ['payout', 'due', 'Суутгал', forfeit],
     ]);
-    // The supplier has no account on file yet, so even a due line cannot be paid.
-    await expect(markSettled(ctx, open[1]!.id, 'ops:test', 'x')).rejects.toMatchObject({ code: 'NEEDS_ACCOUNT' });
+    // The forfeit is the supplier's payout: never sent on its own, but with its day, once the day is over.
+    await expect(markSettled(ctx, open[1]!.id, 'ops:test', 'x')).rejects.toMatchObject({ code: 'PAID_BY_BATCH' });
+    expect(await gatherPayouts(clock.now())).toBe(0);
+    clock.advanceMinutes(24 * 60);
+    expect(await gatherPayouts(clock.now())).toBe(1);
+    const [batch] = await listBatches();
+    expect(batch).toMatchObject({ orders: 1, amountMnt: forfeit, state: 'due' });
+    // The supplier has no account on file yet, so even the day's batch cannot be released.
+    await expect(approveBatch(batch!.id, 'ops:нэг', clock.now())).rejects.toMatchObject({ code: 'NEEDS_ACCOUNT' });
   });
 
   it('the vet: everything back even after slaughter, and the animal stays sold', async () => {
@@ -423,20 +434,95 @@ describe('the supplier’s share', () => {
     expect((await housekeeping(ctx)).closed).toBe(0);
     expect(await settlementsOf(supplierId)).toHaveLength(1);
 
+    // Not sent on its own: it waits for its day to be over, and goes with the day's batch.
+    await expect(markSettled(ctx, payout!.id, 'ops:test', 'GB-1')).rejects.toMatchObject({ code: 'PAID_BY_BATCH' });
+    await expect(approveSettlement(payout!.id, 'ops:нэг', clock.now())).rejects.toMatchObject({ code: 'PAID_BY_BATCH' });
+    expect(await gatherPayouts(clock.now())).toBe(0);
+    clock.advanceMinutes(24 * 60);
+    expect(await gatherPayouts(clock.now())).toBe(1);
+    expect(await gatherPayouts(clock.now())).toBe(0);
+    const [batch] = await listBatches();
+    expect(batch).toMatchObject({ supplier: { id: supplierId }, orders: 1, amountMnt: totalMnt - commission, state: 'due' });
+    expect(batch!.lines.map((l) => l.settlementId)).toEqual([payout!.id]);
+    expect((await settlementsOf(supplierId))[0]!.batch).toMatchObject({ id: batch!.id, day: batch!.day, state: 'due' });
+
     // No account on the contract yet: ops writes it in, then pays.
-    await expect(markSettled(ctx, payout!.id, 'ops:test', 'GB-1')).rejects.toMatchObject({ code: 'NEEDS_ACCOUNT' });
+    await expect(approveBatch(batch!.id, 'ops:нэг', clock.now())).rejects.toMatchObject({ code: 'NEEDS_ACCOUNT' });
     // The supplier types one in from their phone: on file, not yet trusted.
     await updateSupplierProfile(supplierId, { bankName: 'Голомт', bankAccount: '1105012345', bankHolder: 'Дорж' });
-    await expect(markSettled(ctx, payout!.id, 'ops:test', 'GB-1')).rejects.toMatchObject({ code: 'BANK_UNVERIFIED' });
+    await expect(approveBatch(batch!.id, 'ops:нэг', clock.now())).rejects.toMatchObject({ code: 'BANK_UNVERIFIED' });
     // Finance holds it up against the contract, and only then it pays —
     // released by one person, transferred by another.
     await verifySupplierBank(supplierId);
-    await expect(approveSettlement(payout!.id, 'ops:нэг', at('12:00'))).resolves.toMatchObject({ approvedBy: 'ops:нэг' });
-    const paid = await markSettled(ctx, payout!.id, 'ops:хоёр', 'GB-1');
-    expect(paid.state).toBe('paid');
+    await expect(markBatchPaid(ctx, batch!.id, 'ops:хоёр', 'GB-1')).rejects.toMatchObject({ code: 'NOT_APPROVED' });
+    await expect(approveBatch(batch!.id, 'ops:нэг', clock.now())).resolves.toMatchObject({ approvedBy: 'ops:нэг' });
+    const paid = await markBatchPaid(ctx, batch!.id, 'ops:хоёр', 'GB-1');
+    expect(paid).toMatchObject({ state: 'paid', reference: 'GB-1', paidBy: 'ops:хоёр', approvedBy: 'ops:нэг' });
     expect(paid.bank?.bankName).toBe('Голомт');
+    expect((await settlementsOf(supplierId))[0]).toMatchObject({ state: 'paid', reference: 'GB-1', approvedBy: 'ops:нэг' });
     expect(await owed(`supplier:${supplierId}`)).toBe(0);
     expect((await reconcileLedger()).drift).toBe(0);
+    await expect(markBatchPaid(ctx, batch!.id, 'ops:хоёр', 'again')).rejects.toMatchObject({ code: 'WRONG_STATE' });
+  });
+});
+
+describe('a supplier is paid a day at a time', () => {
+  /** An order handed over now, and closed a day on: its payout falls due on the day it closes. */
+  async function handedAndClosed(): Promise<{ orderId: string; totalMnt: number }> {
+    const { orderId, totalMnt } = await book();
+    await payIdesh(ctx, orderId);
+    await startPreparing(ctx, orderId, 'supplier:d1');
+    await markReady(ctx, orderId, 'supplier:d1');
+    await markHanded(ctx, orderId, 'supplier:d1');
+    return { orderId, totalMnt };
+  }
+
+  it('gathers a day’s payouts into one transfer, sends it once, and tells the supplier once', async () => {
+    await updateSupplierProfile(supplierId, { bankName: 'Голомт', bankAccount: '1105012345', bankHolder: 'Дорж' });
+    await verifySupplierBank(supplierId);
+    const first = await handedAndClosed();
+    const second = await handedAndClosed();
+    clock.advanceMinutes(25 * 60);
+    expect((await housekeeping(ctx)).closed).toBe(2);
+    // A third falls due the next day: it is the next day's.
+    const third = await handedAndClosed();
+    clock.advanceMinutes(25 * 60);
+    expect((await housekeeping(ctx)).closed).toBe(1);
+
+    // Both days are over by the day after: two batches, one per day.
+    clock.advanceMinutes(24 * 60);
+    expect(await gatherPayouts(clock.now())).toBe(2);
+    const batches = await listBatches();
+    const commission = Math.round(sheep.priceMnt * 0.02);
+    expect(batches.map((b) => [b.orders, b.amountMnt])).toEqual([
+      [2, first.totalMnt + second.totalMnt - 2 * commission],
+      [1, third.totalMnt - commission],
+    ]);
+    expect(batches[0]!.day < batches[1]!.day).toBe(true);
+
+    await approveBatch(batches[0]!.id, 'ops:нэг', clock.now());
+    const paid = await markBatchPaid(ctx, batches[0]!.id, 'ops:хоёр', 'GB-0915');
+    expect(paid.lines.map((l) => l.orderId).sort()).toEqual([first.orderId, second.orderId].sort());
+    // Each order is paid out in the ledger; the next day's is still owed.
+    const lines = await settlementsOf(supplierId);
+    expect(lines.filter((t) => t.state === 'paid').map((t) => t.orderId).sort()).toEqual([first.orderId, second.orderId].sort());
+    expect(await owed(`supplier:${supplierId}`)).toBe(third.totalMnt - commission);
+    expect((await reconcileLedger()).drift).toBe(0);
+
+    // One message for the day, with its total — not one per order.
+    const sent = (await inbox(ownerId)).filter((m) => m.template === 'supplier.paid');
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.body).toContain('2 захиалгын олголт');
+    expect(sent[0]!.body).toContain((first.totalMnt + second.totalMnt - 2 * commission).toLocaleString('mn-MN'));
+  });
+
+  it('leaves the payouts of a day not yet over where they are', async () => {
+    await handedAndClosed();
+    clock.advanceMinutes(25 * 60);
+    await housekeeping(ctx);
+    expect(await gatherPayouts(clock.now())).toBe(0);
+    expect(await listBatches()).toEqual([]);
+    expect((await settlementsOf(supplierId))[0]!.batch).toBeNull();
   });
 });
 

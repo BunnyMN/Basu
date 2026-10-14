@@ -2649,7 +2649,17 @@ async function changeBank(b, password = null) {
 /* ── the money ───────────────────────────────────────────────────── */
 
 const SETTLE_WORD = { paid: ['paid', 'Шилжүүлсэн'], approved: ['queued', 'Баталсан'], due: ['due', 'Хүлээгдэж байна'] };
-const settleState = (t) => SETTLE_WORD[t.state] ?? ['', t.state];
+/** An order's payout: paid, in a day's transfer on its way, or today's, gathered tonight. */
+const settleState = (t) =>
+  t.state === 'paid'
+    ? SETTLE_WORD.paid
+    : t.kind === 'payout' && t.state === 'due'
+      ? t.batch
+        ? ['queued', `${dayShort(t.batch.day)}-ний шилжүүлэгт`]
+        : ['due', 'Өнөөдрийн']
+      : SETTLE_WORD[t.state] ?? ['', t.state];
+/** A day's transfer: sent, or on its way. */
+const batchState = (b) => (b.state === 'paid' ? ['paid', 'Шилжүүлсэн'] : ['due', 'Шилжүүлэх гэж байна']);
 
 /**
  * When a handed-over order's payout appears: a day after the handover the
@@ -2719,7 +2729,7 @@ async function renderMoney(bank = false) {
       <div class="card-head"><h2>Хэрхэн олгох вэ</h2></div>
       <dl class="facts">
         <div><dt>Шимтгэл</dt><dd><span class="mn">${data.commission_pct ?? '—'}%</span><small>махны үнээс; хүргэлтийн төлбөрөөс авахгүй</small></dd></div>
-        <div><dt>Хэзээ</dt><dd>Хүлээлгэн өгснөөс хойш нэг хоногт<small>олголт үүсч, Basu ажлын өдөрт шилжүүлнэ</small></dd></div>
+        <div><dt>Хэзээ</dt><dd>Өдөрт нэг шилжүүлгээр<small>хүлээлгэн өгснөөс хойш нэг хоногт олголт үүснэ; нэг өдрийн олголтуудыг нэгтгэж, Basu нэг дор шилжүүлнэ</small></dd></div>
       </dl>
     </section>`),
   );
@@ -2766,8 +2776,48 @@ async function renderMoney(bank = false) {
       parts.push(list);
     }
   }
+  // What Basu sends, a day at a time: one transfer for each day's payouts.
+  const batches = data.batches ?? [];
+  if (batches.length) {
+    parts.push(el('<div class="section-label">Шилжүүлгүүд</div>'));
+    const dayWhat = (b) => `${b.orders} захиалгын олголт`;
+    if (wideDesk()) {
+      parts.push(
+        dataTable({
+          columns: [
+            { key: 'day', label: 'Өдөр', render: (b) => `<span class="dt-two"><b>${esc(dayLabel(b.day))}</b><small>${esc(dayWhat(b))}</small></span>` },
+            { key: 'orders_list', label: 'Захиалгууд', value: (b) => b.lines.map((l) => l.order_code).join(' '), render: (b) => `<span class="mono">${b.lines.map((l) => `№${esc(l.order_code)}`).join(', ')}</span>` },
+            { key: 'state', label: 'Төлөв', value: (b) => batchState(b)[1], render: (b) => dtCell.pill(...batchState(b)) },
+            { key: 'paid_at', label: 'Шилжүүлсэн', render: (b) => (b.paid_at ? `${dtCell.when(b.paid_at)}${b.reference ? `<span class="dt-sub">${esc(b.reference)}</span>` : ''}` : dtCell.none()) },
+            { key: 'amount_mnt', label: 'Дүн', align: 'end', numeric: true, render: (b) => money(b.amount_mnt, b.state === 'paid' ? 'credit' : undefined) },
+          ],
+          search: false,
+          rowAttrs: (b) => ({ 'data-batch': b.id }),
+          sort: { key: 'day', desc: true },
+          noun: 'шилжүүлэг',
+          rows: batches,
+        }).el,
+      );
+    } else {
+      const list = el('<div class="list settle-list" data-rows id="batches"></div>');
+      for (const b of batches) {
+        const isPaid = b.state === 'paid';
+        const [st, word] = batchState(b);
+        list.append(
+          el(`<div class="card line row" data-batch="${esc(b.id)}">
+                <span class="main">
+                  <span class="name title">${esc(dayLabel(b.day))} · ${esc(dayWhat(b))}</span>
+                  <span class="sub">${isPaid ? `Шилжүүлсэн ${when(b.paid_at)}${b.reference ? ` · ${esc(b.reference)}` : ''}` : b.lines.map((l) => `№${esc(l.order_code)}`).join(', ')}</span>
+                </span>
+                <span class="end"><span class="amt val${isPaid ? ' paid' : ''}">${money(b.amount_mnt, isPaid ? 'credit' : undefined)}</span><span class="chip" data-size="sm" data-s="${st}">${word}</span></span>
+              </div>`),
+        );
+      }
+      parts.push(list);
+    }
+  }
   // The lines Basu holds: shown when there are any — or, with nothing on its way either, what this place is for.
-  if (data.settlements.length || !coming.length) parts.push(el('<div class="section-label">Олголтууд</div>'));
+  if (data.settlements.length || !coming.length) parts.push(el('<div class="section-label">Захиалга бүрийн олголт</div>'));
   if (!data.settlements.length) {
     if (!coming.length) {
       parts.push(
@@ -3440,7 +3490,7 @@ async function renderStallTab(view, add = false) {
 }
 
 function renderMoneyTab(view, bank = false) {
-  view.append(el(pageHead('Миний мөнгө', 'Хүлээлгэн өгсөн захиалга бүрийн олголт энд.')), el('<div class="money-page" id="money"><div class="kpis kpi-band skel-kpis" role="status" aria-busy="true"><div class="kpi"><span class="skel skel-kpi"></span></div><div class="kpi"><span class="skel skel-kpi"></span></div></div></div>'));
+  view.append(el(pageHead('Миний мөнгө', 'Хүлээлгэн өгсөн захиалгын олголт өдрөөр нэгтгэгдэж, нэг шилжүүлгээр очно.')), el('<div class="money-page" id="money"><div class="kpis kpi-band skel-kpis" role="status" aria-busy="true"><div class="kpi"><span class="skel skel-kpi"></span></div><div class="kpi"><span class="skel skel-kpi"></span></div></div></div>'));
   void renderMoney(bank);
 }
 

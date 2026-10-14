@@ -7,7 +7,7 @@ import { purgeChallenges } from '../platform/identity/index.js';
 import { purgeAnswers } from '../api/idempotency.js';
 import { openTopups, processReceipts, settleTopup } from '../platform/ledger/index.js';
 import { recordTick } from '../ops/index.js';
-import { housekeeping as ideshHousekeeping } from '../idesh/index.js';
+import { gatherPayouts, housekeeping as ideshHousekeeping } from '../idesh/index.js';
 import { claimDueJobs, findOverdue, fireOne } from './fireJobs.js';
 import type { Ctx } from '../ports.js';
 import { relayActivities } from '../services/activities.js';
@@ -35,6 +35,8 @@ export interface TickReport {
   /** Idesh drafts that gave their animal back, and handovers that closed. */
   ideshExpired: number;
   ideshClosed: number;
+  /** Supplier day batches made: a day's payouts gathered into one transfer. */
+  ideshBatched: number;
   /** Идэш orders bought by an invoice paid while nobody was on the page. */
   ideshBought: number;
   /** Wallet top-ups paid at the provider while the phone was not looking, credited. */
@@ -62,6 +64,7 @@ const EMPTY: TickReport = {
   abandoned: 0,
   ideshExpired: 0,
   ideshClosed: 0,
+  ideshBatched: 0,
   ideshBought: 0,
   topups: 0,
   purged: 0,
@@ -159,6 +162,8 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
     report.ideshExpired = idesh.expired;
     report.ideshClosed = idesh.closed;
     report.ideshBought = idesh.bought;
+    // A day over, a supplier's payouts from it become one transfer to make.
+    report.ideshBatched = await gatherPayouts(now);
   } catch (error) {
     console.error('[scheduler] idesh housekeeping failed', error);
   }

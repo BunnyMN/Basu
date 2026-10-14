@@ -298,7 +298,7 @@ describe('the contract’s terms and the list to pay', () => {
 
   it('starts with nothing to pay, and refuses to pay what is not there', async () => {
     const empty = await app.inject({ method: 'GET', url: '/v1/ops/settlements', headers: auth(opsToken()!) });
-    expect(empty.json()).toEqual({ settlements: [] });
+    expect(empty.json()).toEqual({ settlements: [], batches: [] });
     const nothing = await app.inject({
       method: 'POST',
       url: '/v1/ops/settlements/00000000-0000-0000-0000-000000000000/paid',
@@ -624,56 +624,70 @@ describe('the desk’s members', () => {
     await startPreparing(ctx, id, 'supplier:d1');
     await markReady(ctx, id, 'supplier:d1');
     await markHanded(ctx, id, 'supplier:d1');
-    // A day after the handover the share is theirs and a line appears.
+    // A day after the handover the share is theirs and a line appears;
+    // a day after that, its day is over and it is gathered into the day's batch.
     clock.advanceMinutes(25 * 60);
     await housekeeping(ctx);
+    clock.advanceMinutes(24 * 60);
     return { id, supplierId };
   }
 
   it('needs two people to move money out, and says which did which half', async () => {
     await upsertMember({ phone: '+97699000014', name: 'Санхүү нэг', role: 'finance' });
     await upsertMember({ phone: '+97699000015', name: 'Санхүү хоёр', role: 'finance' });
-    await aPayout();
+    const order = await aPayout();
     // Signed in on the day the line is paid: the desk takes a sign-in from the last twelve hours.
     const one = await signIn('+97699000014');
     const two = await signIn('+97699000015');
     // From here the desk is production: two real members, and the rule holds.
     process.env['BASU_MODE'] = 'production';
 
-    const [payout] = (await app.inject({ method: 'GET', url: '/v1/ops/settlements', headers: auth(one) })).json().settlements;
-    expect(payout).toMatchObject({ kind: 'payout', state: 'due', approved_by: null, approved_at: null });
+    const page = (await app.inject({ method: 'GET', url: '/v1/ops/settlements', headers: auth(one) })).json();
+    const [payout] = page.settlements;
+    const [batch] = page.batches;
+    expect(payout).toMatchObject({ kind: 'payout', state: 'due' });
+    expect(batch).toMatchObject({ state: 'due', orders: 1, amount_mnt: payout.amount_mnt, approved_by: null, bank_account: '5012345678' });
+    expect(batch.lines.map((l: { settlement_id: string }) => l.settlement_id)).toEqual([payout.id]);
+    expect(payout.batch).toMatchObject({ id: batch.id, day: batch.day, state: 'due' });
 
-    // Nobody has released it yet.
-    const early = await app.inject({ method: 'POST', url: `/v1/ops/settlements/${payout.id}/paid`, headers: auth(one), payload: { reference: 'KB-1' } });
+    // An order's payout is never sent on its own: it goes with its day.
+    const alone = await app.inject({ method: 'POST', url: `/v1/ops/settlements/${payout.id}/approve`, headers: auth(one), payload: {} });
+    expect(alone.statusCode).toBe(409);
+    expect(alone.json().error.code).toBe('PAID_BY_BATCH');
+
+    // Nobody has released the day yet.
+    const early = await app.inject({ method: 'POST', url: `/v1/ops/batches/${batch.id}/paid`, headers: auth(one), payload: { reference: 'KB-1' } });
     expect(early.statusCode).toBe(409);
     expect(early.json().error.code).toBe('NOT_APPROVED');
 
-    const released = await app.inject({ method: 'POST', url: `/v1/ops/settlements/${payout.id}/approve`, headers: auth(one), payload: {} });
+    const released = await app.inject({ method: 'POST', url: `/v1/ops/batches/${batch.id}/approve`, headers: auth(one), payload: {} });
     expect(released.statusCode, released.body).toBe(200);
     expect(released.json()).toMatchObject({ approved_by: 'ops:Санхүү нэг', state: 'due' });
 
     // The hand that released it is not the hand that sends it.
-    const same = await app.inject({ method: 'POST', url: `/v1/ops/settlements/${payout.id}/paid`, headers: auth(one), payload: { reference: 'KB-1' } });
+    const same = await app.inject({ method: 'POST', url: `/v1/ops/batches/${batch.id}/paid`, headers: auth(one), payload: { reference: 'KB-1' } });
     expect(same.statusCode).toBe(409);
     expect(same.json().error.code).toBe('SAME_PERSON');
 
-    const paid = await app.inject({ method: 'POST', url: `/v1/ops/settlements/${payout.id}/paid`, headers: auth(two), payload: { reference: 'KB-1' } });
+    const paid = await app.inject({ method: 'POST', url: `/v1/ops/batches/${batch.id}/paid`, headers: auth(two), payload: { reference: 'KB-1' } });
     expect(paid.statusCode, paid.body).toBe(200);
-    expect(paid.json()).toMatchObject({ state: 'paid', reference: 'KB-1', approved_by: 'ops:Санхүү нэг' });
+    expect(paid.json()).toMatchObject({ state: 'paid', reference: 'KB-1', approved_by: 'ops:Санхүү нэг', paid_by: 'ops:Санхүү хоёр' });
+    const after = (await app.inject({ method: 'GET', url: `/v1/ops/orders/${order.id}`, headers: auth(one) })).json();
+    expect(after.settlements[0]).toMatchObject({ id: payout.id, state: 'paid', reference: 'KB-1', batch: { id: batch.id, state: 'paid' } });
 
     const audit = (await app.inject({ method: 'GET', url: '/v1/ops/audit', headers: auth(one) })).json().audit;
     expect(audit.slice(0, 2).map((a: { who: string; action: string }) => [a.who, a.action])).toEqual([
-      ['ops:Санхүү хоёр', 'settlement.paid'],
-      ['ops:Санхүү нэг', 'settlement.approve'],
+      ['ops:Санхүү хоёр', 'batch.paid'],
+      ['ops:Санхүү нэг', 'batch.approve'],
     ]);
     expect(audit[0].note).toContain('баталсан ops:Санхүү нэг');
   });
 
   it('lets the demo desk, which is one shared identity, do both halves', async () => {
     await aPayout();
-    const [payout] = (await app.inject({ method: 'GET', url: '/v1/ops/settlements', headers: desk() })).json().settlements;
-    expect((await app.inject({ method: 'POST', url: `/v1/ops/settlements/${payout.id}/approve`, headers: desk(), payload: {} })).statusCode).toBe(200);
-    const paid = await app.inject({ method: 'POST', url: `/v1/ops/settlements/${payout.id}/paid`, headers: desk(), payload: { reference: 'KB-2' } });
+    const [batch] = (await app.inject({ method: 'GET', url: '/v1/ops/settlements', headers: desk() })).json().batches;
+    expect((await app.inject({ method: 'POST', url: `/v1/ops/batches/${batch.id}/approve`, headers: desk(), payload: {} })).statusCode).toBe(200);
+    const paid = await app.inject({ method: 'POST', url: `/v1/ops/batches/${batch.id}/paid`, headers: desk(), payload: { reference: 'KB-2' } });
     expect(paid.statusCode, paid.body).toBe(200);
     expect(paid.json()).toMatchObject({ state: 'paid', approved_by: 'ops:Демо' });
   });
@@ -774,6 +788,8 @@ describe('an id at the desk that is not one', () => {
         ['a listing hidden', 'POST', `/v1/ops/listings/${id}/hide`, { note: 'буруу үнэ' }],
         ['a payout approved', 'POST', `/v1/ops/settlements/${id}/approve`, {}],
         ['a payout sent', 'POST', `/v1/ops/settlements/${id}/paid`, { reference: 'ХААН-1' }],
+        ['a day approved', 'POST', `/v1/ops/batches/${id}/approve`, {}],
+        ['a day sent', 'POST', `/v1/ops/batches/${id}/paid`, { reference: 'ХААН-1' }],
         ['a promotion ended', 'POST', `/v1/ops/promotions/${id}/end`, { note: 'буруу зар' }],
       ] as const;
       for (const [what, method, url, payload] of asked) {

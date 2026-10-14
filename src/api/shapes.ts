@@ -1,5 +1,5 @@
 import type { QPayInvoice } from '../ports.js';
-import { describe, type Breakdown, type CertificateDetails, type CertificateFacts, type IdeshSummary, type Settlement, type SupplierOrder } from '../idesh/index.js';
+import { describe, type Breakdown, type CertificateDetails, type CertificateFacts, type PayoutBatch, type IdeshSummary, type Settlement, type SupplierOrder } from '../idesh/index.js';
 
 /** The JSON shapes the idesh and ops routes share. Snake case on the wire, as everywhere. */
 
@@ -99,6 +99,28 @@ export const shapeSettlement = (t: Settlement) => ({
   approved_at: t.approvedAt?.toISOString() ?? null,
   paid_at: t.paidAt?.toISOString() ?? null,
   created_at: t.createdAt.toISOString(),
+  batch: t.batch,
+});
+
+/** A supplier's day of payouts, sent as one transfer: the total, the account, who signed, and the orders in it. */
+export const shapeBatch = (b: PayoutBatch) => ({
+  id: b.id,
+  supplier: b.supplier,
+  day: b.day,
+  amount_mnt: b.amountMnt,
+  orders: b.orders,
+  state: b.state,
+  bank_name: b.bank?.bankName ?? null,
+  bank_account: b.bank?.bankAccount ?? null,
+  bank_holder: b.bank?.bankHolder ?? null,
+  bank_verified: b.bankVerified,
+  approved_by: b.approvedBy,
+  approved_at: b.approvedAt?.toISOString() ?? null,
+  paid_by: b.paidBy,
+  paid_at: b.paidAt?.toISOString() ?? null,
+  reference: b.reference,
+  created_at: b.createdAt.toISOString(),
+  lines: b.lines.map((l) => ({ settlement_id: l.settlementId, order_id: l.orderId, order_code: l.orderCode, memo: l.memo, amount_mnt: l.amountMnt })),
 });
 
 /**

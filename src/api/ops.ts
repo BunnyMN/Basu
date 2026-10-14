@@ -4,6 +4,10 @@ import {
   CANCEL_REASONS,
   allOrders,
   approveSettlement,
+  approveBatch,
+  gatherPayouts,
+  listBatches,
+  markBatchPaid,
   approveSupplier,
   cancelIdesh,
   declineSupplier,
@@ -38,7 +42,7 @@ import {
 import { limits } from './hardening.js';
 import { need, needAny } from './guards.js';
 import { grantsOf, linksOf, roleOf, type Grants, type RoleShape } from '../platform/access/index.js';
-import { shapeOrder, shapeSettlement } from './shapes.js';
+import { shapeBatch, shapeOrder, shapeSettlement } from './shapes.js';
 import { overviewAt } from './overview.js';
 import { closeGuest, guestFile, guestSearch } from './guests.js';
 import { registerDineDesk } from './dineDesk.js';
@@ -1062,10 +1066,58 @@ export async function registerOpsRoutes(
 
   /* ── the list to pay ── */
 
-  /** Everything owed outside, unpaid first. */
-  app.get('/v1/ops/settlements', desk('desk.pay'), async () => ({
-    settlements: await deskSettlements(await listSettlements()),
-  }));
+  /**
+   * Everything owed outside, unpaid first: every settlement, and the day
+   * batches a supplier's payouts are sent in. A day just over is gathered
+   * here too, so the list never waits on the scheduler's tick.
+   */
+  app.get('/v1/ops/settlements', desk('desk.pay'), async () => {
+    await gatherPayouts(ctx.clock.now());
+    return {
+      settlements: await deskSettlements(await listSettlements()),
+      batches: (await listBatches()).map(shapeBatch),
+    };
+  });
+
+  /** «Батлах» on a supplier's day: this total should go to this account. Whoever presses it does not send it. */
+  app.post<{ Params: { id: string }; Body: { note?: string } }>(
+    '/v1/ops/batches/:id/approve',
+    deskOnOne('desk.pay:approve'),
+    async (request, reply) => {
+      try {
+        const released = await approveBatch(request.params.id, who(request), ctx.clock.now());
+        await audit(request, {
+          action: 'batch.approve',
+          targetKind: 'payout_batch',
+          targetId: request.params.id,
+          note: `${released.supplier.name} · ${released.day} · ${released.orders} захиалга ${released.amountMnt}₮`,
+        });
+        return reply.send(shapeBatch(released));
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
+
+  /** «Шилжүүлсэн» on a supplier's day: one bank transfer for the day; every order in it is paid out, and the supplier hears once. */
+  app.post<{ Params: { id: string }; Body: { reference?: string } }>(
+    '/v1/ops/batches/:id/paid',
+    deskOnOne('desk.pay:approve'),
+    async (request, reply) => {
+      try {
+        const paid = await markBatchPaid(ctx, request.params.id, who(request), request.body?.reference ?? '');
+        await audit(request, {
+          action: 'batch.paid',
+          targetKind: 'payout_batch',
+          targetId: request.params.id,
+          note: `${paid.supplier.name} · ${paid.day} · ${paid.orders} захиалга ${paid.amountMnt}₮ · ${paid.reference ?? 'лавлахгүй'} · баталсан ${paid.approvedBy ?? '—'}`,
+        });
+        return reply.send(shapeBatch(paid));
+      } catch (error) {
+        return sendError(reply, error);
+      }
+    },
+  );
 
   /** «Батлах»: this one should be paid. The person who presses it may not be the one who pays. */
   app.post<{ Params: { id: string }; Body: { note?: string } }>(

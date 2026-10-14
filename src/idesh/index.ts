@@ -70,6 +70,18 @@ export {
 } from './settlements.js';
 
 export {
+  gatherPayouts,
+  listBatches,
+  batchesOf,
+  batchById,
+  approveBatch,
+  markBatchPaid,
+  type PayoutBatch,
+  type BatchLine,
+  type BatchState,
+} from './batches.js';
+
+export {
   KINDS,
   UNITS,
   openListings,

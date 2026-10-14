@@ -174,6 +174,13 @@ p{margin:0}
 .kv dd{margin:0;font-size:var(--t-body);line-height:20px;color:var(--ink)}
 .kv dd small{display:block;margin-top:2px;font-size:var(--t-cap);line-height:1.4;color:var(--ink-3)}
 .kv-none{color:var(--ink-3)}
+/* A supplier's day opened up: its orders, and the total the one transfer carries. */
+.nowrap{white-space:nowrap}
+.day-lines{width:100%;border-collapse:collapse;font-size:var(--t-body)}
+.day-lines td{padding:8px 0;border-bottom:1px solid var(--line);color:var(--ink)}
+.day-lines td:nth-child(2){color:var(--ink-2);padding-left:12px}
+.day-lines .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.day-lines tfoot td{border-bottom:0;padding-top:12px;font-weight:700}
 /* A certificate's paper, inside its popup: the list sits flush, and a twin is said first. */
 .cert-facts{border:1px solid var(--line);border-radius:var(--r-sm)}
 .cert-facts > div{padding:10px 14px}
@@ -2693,7 +2700,7 @@ let nav = null;
 let tab = null;
 /** The desk seat, when the place open is the desk. */
 let me = null;
-let cache = { suppliers: [], settlements: [], orgs: [] };
+let cache = { suppliers: [], settlements: [], batches: [], orgs: [] };
 
 /** Whether the place open now lets this person do that. The server asks again; this only decides what to draw. */
 const can = (permission) => Boolean(ws?.permissions?.includes(permission));
@@ -3029,12 +3036,12 @@ function signedOut(error) {
 async function refresh() {
   if (ws?.kind === 'desk') {
     try {
-      const [suppliers, settlements, orgs] = await Promise.all([
+      const [suppliers, pay, orgs] = await Promise.all([
         (can('desk.suppliers') || can('desk.orders')) ? ops('/v1/ops/suppliers').then((r) => r.suppliers) : [],
-        can('desk.pay') ? ops('/v1/ops/settlements').then((r) => r.settlements) : [],
+        can('desk.pay') ? ops('/v1/ops/settlements') : { settlements: [], batches: [] },
         can('desk.orgs') ? ops('/v1/ops/orgs').then((r) => r.orgs) : [],
       ]);
-      cache = { suppliers, settlements, orgs };
+      cache = { suppliers, settlements: pay.settlements, batches: pay.batches ?? [], orgs };
     } catch (error) {
       // The desk wants a fresh sign-in: the refusal has brought its door up already (`refused`).
       if (error.code === 'SIGN_IN_AGAIN') return;
@@ -3075,7 +3082,7 @@ async function refresh() {
 function badges() {
   if (ws?.kind !== 'desk' || !nav) return;
   const applied = cache.suppliers.filter((s) => s.state === 'applied').length;
-  const due = cache.settlements.filter((t) => t.state === 'due').length;
+  const due = payRows(cache.batches, cache.settlements).filter(payOpen).length;
   const waitingOrgs = cache.orgs.filter((o) => o.state === 'applied').length;
   nav.badge('suppliers', applied, applied > 0);
   nav.badge('pay', due, due > 0);
@@ -5317,10 +5324,10 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
     }
 
     // What Basu owes it: the payouts the desk already holds, when there are any.
-    const payouts = hasPage('pay') ? cache.settlements.filter((t) => t.kind === 'payout' && t.supplier?.id === s.id) : [];
+    const payouts = hasPage('pay') ? payRows(cache.batches, cache.settlements, s.id) : [];
     if (payouts.length) {
       const box = el('<section class="section"><h2 class="section-label">Олголт</h2></section>');
-      box.append(settlementTable(payouts, false, 'open', { hide: ['who'] }).el);
+      box.append(payTable(payouts, { withFilters: false, hide: ['who'] }).el);
       main.append(box);
     }
 
@@ -5343,17 +5350,68 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
 
 /* ── the money ── */
 
-/** Where a payout or a refund stands, in the word and tone the desk reads it by. */
+/**
+ * Where a payout or a refund stands, in the word and tone the desk reads it by.
+ * A supplier's payout is not sent on its own: it says which day's batch it is in,
+ * or, on the day it fell due, that it will be gathered when the day is over.
+ */
 const settlementState = (t) =>
   t.state === 'paid'
     ? ['paid', 'шилжүүлсэн']
-    : t.state === 'needs_account'
-      ? ['needs_account', 'данс хүлээж байна']
-      : !t.bank_verified
-        ? ['warn', 'данс баталгаажаагүй']
-        : t.approved_at
-          ? ['due', 'шилжүүлэх']
-          : ['hold', 'батлах хүлээж байна'];
+    : t.kind === 'payout'
+      ? t.batch
+        ? ['hold', `${dayShort(t.batch.day)}-ний олголтод`]
+        : ['pending', 'өдөр дуусахад нэгтгэнэ']
+      : t.state === 'needs_account'
+        ? ['needs_account', 'данс хүлээж байна']
+        : !t.bank_verified
+          ? ['warn', 'данс баталгаажаагүй']
+          : t.approved_at
+            ? ['due', 'шилжүүлэх']
+            : ['hold', 'батлах хүлээж байна'];
+
+/**
+ * The half of the two-person release this member may press, on a day's batch
+ * or on a refund: «Батлах» while nobody has released it, «Шилжүүлсэн» once
+ * somebody has. Releasing and sending are different hands — the server holds
+ * that line in production; the button only ever offers the next half.
+ */
+function releaseButton(row, { path, title, line, told }) {
+  if (!can('desk.pay:approve')) return null;
+  if (!row.approved_at) {
+    return button(
+      'Батлах',
+      () =>
+        confirmPopup({
+          title: `${title} батлах`,
+          text: `${line}<br><br>Батласны дараа шилжүүлэхийг өөр гишүүн хийнэ.`,
+          ok: 'Батлах',
+          onConfirm: async () => {
+            await ops(`${path}/approve`, { method: 'POST', body: {} });
+            toast('Батлагдлаа. Одоо өөр гишүүн шилжүүлж тэмдэглэнэ.', 'good');
+            await refresh();
+          },
+        }),
+      'data-v="primary" data-size="sm" data-a="approve"',
+    );
+  }
+  return button(
+    'Шилжүүлсэн',
+    () =>
+      confirmPopup({
+        title: 'Шилжүүлсэн гэж тэмдэглэх',
+        text: `${line}<br><br>Basu-гийн банкаар нэг гүйлгээгээр шилжүүлсний дараа тэмдэглэнэ. ${told} мэдэгдэл очно.`,
+        ok: 'Шилжүүлсэн',
+        reason: { label: 'Банкны гүйлгээний дугаар', type: 'text', placeholder: 'Заавал биш' },
+        onConfirm: async (reference) => {
+          await ops(`${path}/paid`, { method: 'POST', body: { reference } });
+          toast('Тэмдэглэгдлээ, мэдэгдэл явлаа.', 'good');
+          await refresh();
+        },
+      }),
+    'data-v="primary" data-size="sm" data-a="paid"',
+  );
+}
 
 /**
  * Payouts and refunds as one table: who, for which order, to which account,
@@ -5419,44 +5477,15 @@ function settlementTable(rows, withFilters = true, opensOn = 'open', { hide = []
       },
     ] : [],
     actions: (t) => {
-      if (t.state !== 'due' || !t.bank_verified || !can('desk.pay:approve')) return null;
-      const who = t.kind === 'payout' ? t.supplier?.name ?? 'Нийлүүлэгч' : realName(t.guest?.name) ?? t.guest_email ?? (t.guest_phone ? phoneText(t.guest_phone) : 'Зочин');
-      const line = `<b>${mnt(t.amount_mnt)}</b> → ${esc(who)}<br>${esc(t.bank_name ?? '')} · <span class="mono">${esc(t.bank_account ?? '')}</span> · ${esc(t.bank_holder ?? '')}<br><small class="muted">№${esc(t.order_code)} · ${t.kind === 'payout' ? 'олголт' : 'буцаалт'}</small>`;
-      if (!t.approved_at) {
-        // Two people, not one: releasing the money and sending it are different
-        // hands, so the row only ever offers the half that is this member's.
-        return button(
-          'Батлах',
-          () =>
-            confirmPopup({
-              title: t.kind === 'payout' ? 'Олголт батлах' : 'Буцаалт батлах',
-              text: `${line}<br><br>Батласны дараа шилжүүлэхийг өөр гишүүн хийнэ.`,
-              ok: 'Батлах',
-              onConfirm: async () => {
-                await ops(`/v1/ops/settlements/${t.id}/approve`, { method: 'POST', body: {} });
-                toast('Батлагдлаа. Одоо өөр гишүүн шилжүүлж тэмдэглэнэ.', 'good');
-                await refresh();
-              },
-            }),
-          'data-v="primary" data-size="sm" data-a="approve"',
-        );
-      }
-      return button(
-        'Шилжүүлсэн',
-        () =>
-          confirmPopup({
-            title: 'Шилжүүлсэн гэж тэмдэглэх',
-            text: `${line}<br><br>Basu-гийн банкаар шилжүүлсний дараа тэмдэглэнэ. ${t.kind === 'payout' ? 'Нийлүүлэгч' : 'Зочин'}д мэдэгдэл очно.`,
-            ok: 'Шилжүүлсэн',
-            reason: { label: 'Банкны гүйлгээний дугаар', type: 'text', placeholder: 'Заавал биш' },
-            onConfirm: async (reference) => {
-              await ops(`/v1/ops/settlements/${t.id}/paid`, { method: 'POST', body: { reference } });
-              toast('Тэмдэглэгдлээ, мэдэгдэл явлаа.', 'good');
-              await refresh();
-            },
-          }),
-        'data-v="primary" data-size="sm" data-a="paid"',
-      );
+      // A supplier's payout is sent with its day, from «Олголт, буцаалт»; a refund here, on its own.
+      if (t.kind !== 'refund' || t.state !== 'due' || !t.bank_verified) return null;
+      const who = realName(t.guest?.name) ?? t.guest_email ?? (t.guest_phone ? phoneText(t.guest_phone) : 'Зочин');
+      return releaseButton(t, {
+        path: `/v1/ops/settlements/${t.id}`,
+        title: 'Буцаалт',
+        line: `<b>${mnt(t.amount_mnt)}</b> → ${esc(who)}<br>${esc(t.bank_name ?? '')} · <span class="mono">${esc(t.bank_account ?? '')}</span> · ${esc(t.bank_holder ?? '')}<br><small class="muted">№${esc(t.order_code)} · буцаалт</small>`,
+        told: 'Зочинд',
+      });
     },
     sort: { key: 'created_at', desc: true },
     rowAttrs: (t) => ({ 'data-kind': t.kind, 'data-settlement': t.id, 'data-paid': t.state === 'paid' }),
@@ -5568,31 +5597,228 @@ async function renderPromotions(view) {
   }
 }
 
-function renderPay(view) {
-  const due = cache.settlements.filter((t) => t.state === 'due');
-  // Only a line with an account checked against the contract can be sent; the rest of what is due waits as a
-  // refund waits for the guest's account — counted there, not here.
-  const ready = due.filter((t) => t.bank_account && t.bank_verified);
-  const unchecked = due.filter((t) => !(t.bank_account && t.bank_verified));
-  const waiting = cache.settlements.filter((t) => t.state === 'needs_account');
-  const paid = cache.settlements.filter((t) => t.state === 'paid');
-  const sum = (rows) => rows.reduce((s, t) => s + t.amount_mnt, 0);
-  const held = [
-    waiting.length ? `${waiting.length} буцаалт — зочин дансаа оруулаагүй` : '',
-    unchecked.length ? `${unchecked.length} олголт — данс баталгаажаагүй` : '',
+/**
+ * The lines «Олголт, буцаалт» is made of. A supplier is paid a day at a time:
+ * each day's batch is one line — one figure, one transfer — and what fell due
+ * today is one line per supplier that is still gathering. A refund goes to its
+ * own guest and stays a line of its own. `supplierId` narrows it to one
+ * supplier's days, for its page.
+ */
+function payRows(batches, settlements, supplierId = null) {
+  const mine = (id) => !supplierId || id === supplierId;
+  const rows = batches.filter((b) => mine(b.supplier.id)).map((b) => ({ ...b, type: 'batch' }));
+  const gathering = new Map();
+  for (const t of settlements) {
+    if (t.kind !== 'payout' || t.state === 'paid' || t.batch || !t.supplier || !mine(t.supplier.id)) continue;
+    const g = gathering.get(t.supplier.id) ?? {
+      type: 'gathering',
+      id: `today-${t.supplier.id}`,
+      supplier: t.supplier,
+      state: 'gathering',
+      amount_mnt: 0,
+      orders: 0,
+      lines: [],
+      bank_name: t.bank_name,
+      bank_account: t.bank_account,
+      bank_holder: t.bank_holder,
+      bank_verified: t.bank_verified,
+      created_at: t.created_at,
+    };
+    g.amount_mnt += t.amount_mnt;
+    g.orders += 1;
+    g.lines.push({ settlement_id: t.id, order_id: t.order_id, order_code: t.order_code, memo: t.memo, amount_mnt: t.amount_mnt });
+    gathering.set(t.supplier.id, g);
+  }
+  rows.push(...gathering.values());
+  if (!supplierId) rows.push(...settlements.filter((t) => t.kind === 'refund').map((t) => ({ ...t, type: 'refund' })));
+  return rows;
+}
+
+/** A line somebody can act on now: due, with an account checked against the contract. */
+const payOpen = (r) => r.type !== 'gathering' && r.state === 'due' && Boolean(r.bank_account) && r.bank_verified;
+/** A line held up by its account: a guest who has not given one, a supplier's not yet checked. */
+const payWaiting = (r) => (r.type === 'refund' && r.state === 'needs_account') || (r.type === 'batch' && r.state === 'due' && !(r.bank_account && r.bank_verified));
+
+const payState = (r) =>
+  r.type === 'refund'
+    ? settlementState(r)
+    : r.type === 'gathering'
+      ? ['pending', 'өнөөдөр хуримтлагдаж байна']
+      : r.state === 'paid'
+        ? ['paid', 'шилжүүлсэн']
+        : !r.bank_account
+          ? ['needs_account', 'данс алга']
+          : !r.bank_verified
+            ? ['warn', 'данс баталгаажаагүй']
+            : r.approved_at
+              ? ['due', 'шилжүүлэх']
+              : ['hold', 'батлах хүлээж байна'];
+
+/** A day's batch opened up: every order in it, the total, the account, and who signed which half. */
+function dayPopup(r) {
+  const day = r.type === 'batch' ? dayLabel(r.day) : 'Өнөөдөр';
+  const lines = r.lines
+    .map((l) => `<tr><td class="mono">№${esc(l.order_code)}</td><td>${esc(l.memo)}</td><td class="num">${mnt(l.amount_mnt)}</td></tr>`)
+    .join('');
+  const signed = [
+    r.approved_by ? `${esc(r.approved_by.replace('ops:', ''))} баталсан · ${when(r.approved_at)}` : '',
+    r.paid_by ? `${esc(r.paid_by.replace('ops:', ''))} шилжүүлсэн · ${when(r.paid_at)}${r.reference ? ` · <span class="mono">${esc(r.reference)}</span>` : ''}` : '',
   ].filter(Boolean);
-  view.append(head('Олголт, буцаалт', 'Нэг хүн батлаж, өөр хүн шилжүүлнэ'));
+  void popup({
+    id: 'pay-day',
+    title: `${r.supplier.name} · ${day}`,
+    sub: r.type === 'gathering' ? 'Өдөр дуусахад нэг олголт болж нэгтгэгдэнэ' : `${r.orders} захиалгын олголт, нэг шилжүүлгээр`,
+    width: 560,
+    fields: [
+      {
+        type: 'static',
+        label: 'Захиалгууд',
+        html: `<table class="day-lines"><tbody>${lines}</tbody><tfoot><tr><td colspan="2">Нийт · ${r.orders} захиалга</td><td class="num">${mnt(r.amount_mnt)}</td></tr></tfoot></table>`,
+      },
+      {
+        type: 'static',
+        label: 'Данс',
+        html: r.bank_account ? `${esc(r.bank_name ?? '')} · <span class="mono">${esc(r.bank_account)}</span> · ${esc(r.bank_holder ?? '')}` : '<span class="muted">Данс алга</span>',
+      },
+      ...(signed.length ? [{ type: 'static', label: 'Гарын үсэг', html: signed.join('<br>') }] : []),
+    ],
+    submit: 'Хаах',
+    cancel: '',
+    onSubmit: async () => true,
+  });
+}
+
+/**
+ * The list to pay: supplier days and refunds as one table — who, for what,
+ * to which account, where it stands — and on a line that is due, the half of
+ * the two-person release this member may press. A day opens to its orders.
+ */
+function payTable(rows, { withFilters = true, opensOn = 'open', hide = [] } = {}) {
+  const daysWord = (r) => (r.type === 'batch' ? dayLabel(r.day) : 'Өнөөдөр');
+  return dataTable({
+    columns: [
+      {
+        key: 'who',
+        label: 'Хэнд',
+        value: (r) => (r.type === 'refund' ? `${realName(r.guest?.name) ?? ''} ${r.guest_email ?? ''} ${r.guest_phone ?? ''} ${phoneText(r.guest_phone ?? '')}` : r.supplier?.name ?? ''),
+        render: (r) =>
+          dtCell.twoHtml(
+            r.type === 'refund' ? guestWho(r.guest?.name, r.guest_email, r.guest_phone) : esc(r.supplier?.name ?? ''),
+            r.type === 'refund' ? 'буцаалт · зочин' : 'олголт · нийлүүлэгч',
+          ),
+      },
+      {
+        key: 'what',
+        label: 'Юуных',
+        value: (r) => (r.type === 'refund' ? `${r.order_code} ${r.memo ?? ''}` : `${daysWord(r)} ${r.lines.map((l) => l.order_code).join(' ')}`),
+        sortValue: (r) => (r.type === 'batch' ? r.day : r.created_at),
+        render: (r) =>
+          r.type === 'refund'
+            ? dtCell.twoHtml(`<span class="mono">№${esc(r.order_code)}</span>`, esc(r.memo ?? ''))
+            : dtCell.twoHtml(esc(daysWord(r)), `${r.orders} захиалга`),
+      },
+      {
+        key: 'bank',
+        label: 'Данс',
+        value: (r) => `${r.bank_name ?? ''} ${r.bank_account ?? ''} ${r.bank_holder ?? ''}`,
+        render: (r) => (r.bank_account ? dtCell.twoHtml(`${esc(r.bank_name)} <span class="mono nowrap">${esc(r.bank_account)}</span>`, esc(r.bank_holder ?? '')) : '<span class="muted">данс алга</span>'),
+        phone: false,
+      },
+      {
+        key: 'state',
+        label: 'Төлөв',
+        value: (r) => payState(r)[1],
+        render: (r) =>
+          dtCell.twoHtml(
+            dtCell.pill(...payState(r)),
+            r.state === 'paid'
+              ? `${when(r.paid_at)}${r.reference ? ` · <span class="mono">${esc(r.reference)}</span>` : ''}`
+              : r.approved_by
+                ? `${esc(r.approved_by.replace('ops:', ''))} баталсан`
+                : '',
+          ),
+      },
+      { key: 'amount_mnt', label: 'Дүн', align: 'end', numeric: true, render: (r) => dtCell.money(r.amount_mnt) },
+    ].filter((c) => !hide.includes(c.key)),
+    search: withFilters ? { placeholder: 'Нэр, захиалга, данс…' } : false,
+    filters: withFilters
+      ? [
+          {
+            key: 'state',
+            label: 'Төлөв',
+            options: [['open', 'Хийх'], ['waiting', 'Данс хүлээж буй'], ['gathering', 'Өнөөдрийн'], ['paid', 'Шилжүүлсэн'], ['all', 'Бүгд']],
+            initial: opensOn,
+            test: (r, v) =>
+              v === 'all' ||
+              (v === 'open' ? payOpen(r) : v === 'waiting' ? payWaiting(r) : v === 'gathering' ? r.type === 'gathering' : r.state === 'paid'),
+          },
+          {
+            key: 'kind',
+            label: 'Төрөл',
+            kind: 'select',
+            options: [['', 'Олголт ба буцаалт'], ['payout', 'Олголт'], ['refund', 'Буцаалт']],
+            test: (r, v) => !v || (v === 'refund' ? r.type === 'refund' : r.type !== 'refund'),
+          },
+        ]
+      : [],
+    onRow: (r) => {
+      if (r.type !== 'refund') dayPopup(r);
+    },
+    actions: (r) => {
+      if (r.type === 'refund') {
+        if (!payOpen(r)) return null;
+        const who = realName(r.guest?.name) ?? r.guest_email ?? (r.guest_phone ? phoneText(r.guest_phone) : 'Зочин');
+        return releaseButton(r, {
+          path: `/v1/ops/settlements/${r.id}`,
+          title: 'Буцаалт',
+          line: `<b>${mnt(r.amount_mnt)}</b> → ${esc(who)}<br>${esc(r.bank_name ?? '')} · <span class="mono">${esc(r.bank_account ?? '')}</span> · ${esc(r.bank_holder ?? '')}<br><small class="muted">№${esc(r.order_code)} · буцаалт</small>`,
+          told: 'Зочинд',
+        });
+      }
+      const open = button('Задлах', (event) => {
+        event.stopPropagation();
+        dayPopup(r);
+      }, 'data-size="sm" data-a="lines"');
+      if (r.type !== 'batch' || !payOpen(r)) return open;
+      const release = releaseButton(r, {
+        path: `/v1/ops/batches/${r.id}`,
+        title: 'Өдрийн олголт',
+        line: `<b>${mnt(r.amount_mnt)}</b> → ${esc(r.supplier.name)}<br>${esc(r.bank_name ?? '')} · <span class="mono">${esc(r.bank_account ?? '')}</span> · ${esc(r.bank_holder ?? '')}<br><small class="muted">${esc(dayLabel(r.day))} · ${r.orders} захиалгын олголт нэг дор</small>`,
+        told: 'Нийлүүлэгчид',
+      });
+      return release ? [open, release] : open;
+    },
+    // The oldest day first: what has waited longest is paid first.
+    sort: { key: 'what', desc: false },
+    rowAttrs: (r) => ({ 'data-kind': r.type === 'refund' ? 'refund' : 'payout', 'data-pay': r.type, [r.type === 'refund' ? 'data-settlement' : 'data-batch']: r.id, 'data-paid': r.state === 'paid' }),
+    noun: 'мөр',
+    empty: { title: 'Шилжүүлэх зүйл алга', text: 'Нийлүүлэгчийн өдрийн олголт, цуцлагдсан захиалгын буцаалт энд гарна.' },
+    stateKey: withFilters ? 'basu.dt.pay' : null,
+    rows,
+  });
+}
+
+function renderPay(view) {
+  const rows = payRows(cache.batches, cache.settlements);
+  const ready = rows.filter(payOpen);
+  const waiting = rows.filter(payWaiting);
+  const gathering = rows.filter((r) => r.type === 'gathering');
+  const paid = rows.filter((r) => r.state === 'paid');
+  const sum = (list) => list.reduce((s, r) => s + r.amount_mnt, 0);
+  const days = ready.filter((r) => r.type === 'batch').length;
+  const refunds = ready.length - days;
+  view.append(head('Олголт, буцаалт', 'Нийлүүлэгчид өдөрт нэг шилжүүлэг · нэг хүн батлаж, өөр хүн шилжүүлнэ'));
   // Money is never coloured: the figures stay ink, whatever waits behind them.
   view.append(el(`<div class="kpis kpi-band" id="pay-sum">
-    <div class="card kpi" data-money><div class="lab">Шилжүүлэх</div><b>${money(sum(ready))}</b><span>${ready.length ? `${ready.length} олголт, буцаалт — данс бэлэн` : 'одоо шилжүүлэх зүйл алга'}</span></div>
-    <div class="card kpi"><div class="lab">Данс хүлээж буй</div><b>${money(sum(waiting) + sum(unchecked))}</b><span>${held.length ? held.join(' · ') : 'данс хүлээж буй мөр алга'}</span></div>
-    <div class="card kpi"><div class="lab">Шилжүүлсэн, 30 хоног</div><b>${money(sum(paid))}</b><span>${paid.length ? `${paid.length} удаа` : 'сүүлийн 30 хоногт шилжүүлээгүй'}</span></div>
+    <div class="card kpi" data-money><div class="lab">Шилжүүлэх</div><b>${money(sum(ready))}</b><span>${ready.length ? [days ? `${days} өдрийн олголт` : '', refunds ? `${refunds} буцаалт` : ''].filter(Boolean).join(', ') : 'одоо шилжүүлэх зүйл алга'}</span></div>
+    <div class="card kpi"><div class="lab">Өнөөдөр хуримтлагдаж буй</div><b>${money(sum(gathering))}</b><span>${gathering.length ? `${gathering.length} нийлүүлэгч · өдөр дуусахад нэгтгэнэ` : 'өнөөдөр олголт үүсээгүй'}</span></div>
+    <div class="card kpi"><div class="lab">Данс хүлээж буй</div><b>${money(sum(waiting))}</b><span>${waiting.length ? `${waiting.length} мөр — данс алга эсвэл баталгаажаагүй` : 'данс хүлээж буй мөр алга'}</span></div>
+    <div class="card kpi"><div class="lab">Шилжүүлсэн, 30 хоног</div><b>${money(sum(paid))}</b><span>${paid.length ? `${paid.length} шилжүүлэг` : 'сүүлийн 30 хоногт шилжүүлээгүй'}</span></div>
   </div>`));
   // The table opens on what is to be done; with nothing to send, on what waits, else on everything —
   // unless this person chose a view before, which the table remembers.
-  const table = settlementTable(cache.settlements, true, due.length ? 'open' : waiting.length ? 'needs_account' : 'all');
+  const table = payTable(rows, { opensOn: ready.length ? 'open' : waiting.length ? 'waiting' : 'all' });
   table.el.id = 'pay';
-  // The band above says once whether anything is due and what waits; the table opens on it.
   const section = el('<section class="section"></section>');
   section.append(table.el);
   view.append(section);
@@ -5606,6 +5832,7 @@ const ACTION = {
   'supplier.suspend': 'Нийлүүлэгчийг түр зогсоосон', 'supplier.activate': 'Нийлүүлэгчийг идэвхжүүлсэн', 'supplier.terms': 'Гэрээний нөхцөл өөрчилсөн',
   'supplier.bank_verify': 'Данс баталгаажуулсан', 'listing.hide': 'Зар нуусан',
   'settlement.approve': 'Олголт баталсан', 'settlement.paid': 'Олголт шилжүүлсэн гэж тэмдэглэсэн',
+  'batch.approve': 'Өдрийн олголт баталсан', 'batch.paid': 'Өдрийн олголт шилжүүлсэн гэж тэмдэглэсэн',
   'ledger.checks': 'Мөнгөний шалгалт ажиллуулсан', 'ledger.export': 'Мөнгөний CSV татсан', 'receipt.retry': 'Е-баримт дахин илгээсэн', 'message.retry': 'Мэдэгдэл дахин илгээсэн',
   'guest.close': 'Зочны бүртгэл хаасан', 'guest.session_revoke': 'Зочны нэвтрэлт хаасан',
   'restaurant.activate': 'Ресторан идэвхжүүлсэн', 'restaurant.suspend': 'Ресторан зогсоосон', 'menu.show': 'Хоол цэсэнд буцаасан', 'menu.hide': 'Хоол цэснээс нуусан',
@@ -5623,7 +5850,7 @@ const ACTION = {
 const TARGET_WORD = {
   order: 'Идэш', listing: 'Идэш', supplier: 'Нийлүүлэгч', settlement: 'Мөнгө', ledger: 'Мөнгө', receipt: 'Мөнгө', guest: 'Зочин',
   member: 'Гишүүд', org: 'Байгууллага', role: 'Үүрэг, цэс', menu: 'Үүрэг, цэс', restaurant: 'Хоол', device: 'Хоол', menu_item: 'Хоол',
-  message: 'Мэдэгдэл', setting: 'Систем', promotion: 'Онцлох зар', certificate: 'Гэрчилгээ',
+  message: 'Мэдэгдэл', setting: 'Систем', promotion: 'Онцлох зар', certificate: 'Гэрчилгээ', payout_batch: 'Мөнгө',
 };
 
 /**

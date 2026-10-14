@@ -16,7 +16,8 @@ import { seal, unseal } from '../secret.js';
  * one is cancelled — and the ledger sets the amount aside at the same time.
  * Paying it is a person's act: a bank transfer made by hand, then «Шилжүүлсэн»
  * pressed with the bank's reference. When a bank API arrives, only the hand
- * changes.
+ * changes. A refund is paid on its own; a supplier's payouts are paid a day
+ * at a time, gathered into that day's batch (see batches.ts).
  */
 
 export type SettlementKind = 'payout' | 'refund';
@@ -48,6 +49,8 @@ export interface Settlement {
   approvedAt: Date | null;
   paidAt: Date | null;
   createdAt: Date;
+  /** A payout's day batch, once the day it fell due is over: what it is paid with. */
+  batch: { id: string; day: string; state: 'due' | 'paid' } | null;
 }
 
 const payeeOf = (s: { kind: SettlementKind; supplierId: string | null; guestId: string | null }) =>
@@ -66,6 +69,8 @@ export async function openSettlement(
     guestId?: string | null;
     amountMnt: number;
     memo: string;
+    /** When the debt arose: the day a payout is gathered under. The database's clock when left out. */
+    at?: Date;
   },
   db: Db = getPool(),
 ): Promise<{ id: string; accrualId: string } | null> {
@@ -85,8 +90,8 @@ export async function openSettlement(
   });
   const { rows } = await db.query<{ id: string }>(
     `INSERT INTO idesh.settlement
-       (kind, order_id, supplier_id, guest_id, amount_mnt, memo, state, ledger_accrual_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       (kind, order_id, supplier_id, guest_id, amount_mnt, memo, state, ledger_accrual_id, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, now()))
      ON CONFLICT (order_id, kind) DO NOTHING
      RETURNING id`,
     [
@@ -98,6 +103,7 @@ export async function openSettlement(
       input.memo,
       input.kind === 'refund' ? 'needs_account' : 'due',
       accrual,
+      input.at ?? null,
     ],
   );
   return rows[0] ? { id: rows[0].id, accrualId: accrual } : null;
@@ -148,6 +154,9 @@ interface Row {
   approved_at: Date | null;
   paid_at: Date | null;
   created_at: Date;
+  batch_id: string | null;
+  batch_day: string | null;
+  batch_state: 'due' | 'paid' | null;
 }
 
 const SELECT = `
@@ -157,10 +166,12 @@ const SELECT = `
          COALESCE(t.bank_account, s.bank_account) AS bank_account,
          COALESCE(t.bank_holder, s.bank_holder) AS bank_holder,
          (t.kind = 'refund' OR s.bank_verified_at IS NOT NULL) AS bank_verified,
-         t.reference, t.approved_by, t.approved_at, t.paid_at, t.created_at
+         t.reference, t.approved_by, t.approved_at, t.paid_at, t.created_at,
+         t.batch_id, to_char(b.day, 'YYYY-MM-DD') AS batch_day, b.state AS batch_state
     FROM idesh.settlement t
     JOIN idesh.idesh_order o ON o.id = t.order_id
-    LEFT JOIN idesh.supplier s ON s.id = t.supplier_id`;
+    LEFT JOIN idesh.supplier s ON s.id = t.supplier_id
+    LEFT JOIN idesh.payout_batch b ON b.id = t.batch_id`;
 
 async function shape(rows: Row[]): Promise<Settlement[]> {
   const names = await displayNamesFor(rows.flatMap((r) => (r.guest_id ? [r.guest_id] : [])));
@@ -184,6 +195,7 @@ async function shape(rows: Row[]): Promise<Settlement[]> {
     approvedAt: r.approved_at,
     paidAt: r.paid_at,
     createdAt: r.created_at,
+    batch: r.batch_id && r.batch_day && r.batch_state ? { id: r.batch_id, day: r.batch_day, state: r.batch_state } : null,
   }));
 }
 
@@ -192,7 +204,7 @@ export async function listSettlements(db: Db = getPool()): Promise<Settlement[]>
   const { rows } = await db.query<Row>(
     `${SELECT}
       WHERE t.state <> 'paid' OR t.paid_at > now() - interval '30 days'
-      ORDER BY (t.state = 'paid'), t.created_at`,
+      ORDER BY (t.state = 'paid'), t.created_at, (t.kind = 'payout')`,
   );
   return shape(rows);
 }
@@ -235,6 +247,7 @@ export async function approveSettlement(settlementId: string, by: string, now: D
   const row = rows[0];
   if (!row) throw new IdeshError('NOT_FOUND', 'no such settlement');
   if (row.state === 'paid') throw new IdeshError('WRONG_STATE', 'already paid');
+  if (row.kind === 'payout') throw new IdeshError('PAID_BY_BATCH', 'a payout is approved with its day');
   if (row.state === 'needs_account' || !row.bank_account) {
     throw new IdeshError('NEEDS_ACCOUNT', 'nowhere to send it yet');
   }
@@ -253,9 +266,10 @@ export async function approveSettlement(settlementId: string, by: string, now: D
 }
 
 /**
- * «Шилжүүлсэн»: ops made the transfer. The ledger pays the payable out, the
- * row remembers who said so and the bank's reference, and the person owed is
- * told. A refund paid is what turns the order REFUNDED.
+ * «Шилжүүлсэн» on a refund: ops made the transfer. The ledger pays the
+ * payable out, the row remembers who said so and the bank's reference, and
+ * the guest is told. A refund paid is what turns the order REFUNDED. A
+ * supplier's payouts are sent a day at a time, with their batch.
  */
 export async function markSettled(
   ctx: Ctx,
@@ -268,6 +282,7 @@ export async function markSettled(
   const row = rows[0];
   if (!row) throw new IdeshError('NOT_FOUND', 'no such settlement');
   if (row.state === 'paid') throw new IdeshError('WRONG_STATE', 'already paid');
+  if (row.kind === 'payout') throw new IdeshError('PAID_BY_BATCH', 'a payout is sent with its day');
   if (row.state === 'needs_account' || !row.bank_account) {
     throw new IdeshError('NEEDS_ACCOUNT', 'nowhere to send it yet');
   }
@@ -322,24 +337,6 @@ export async function markSettled(
       title: 'Буцаалт шилжүүллээ',
       body: `Идэш №${row.order_code}: ${amount} ${row.bank_name} дахь данс руу тань шилжүүллээ.`,
     });
-  } else if (row.kind === 'payout' && row.supplier_id) {
-    const { rows: who } = await getPool().query<{ owner_guest_id: string | null }>(
-      'SELECT owner_guest_id FROM idesh.supplier WHERE id = $1',
-      [row.supplier_id],
-    );
-    const guestId = who[0]?.owner_guest_id;
-    if (guestId) {
-      await enqueue(ctx, {
-        guestId,
-        subject: 'idesh',
-        subjectId: row.order_id,
-        template: 'supplier.paid',
-        channel: 'sms',
-        dedupeKey: `settlement:${row.id}:paid`,
-        title: 'Олголт шилжүүллээ',
-        body: `Basu: №${row.order_code} — ${row.memo} ${amount} данс руу тань шилжүүллээ.`,
-      });
-    }
   }
 
   return (await shape([{ ...row, state: 'paid', paid_at: now, reference }]))[0]!;

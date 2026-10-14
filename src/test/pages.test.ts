@@ -8,7 +8,8 @@ import type { FastifyInstance } from 'fastify';
 import { closePool, getPool } from '../db/pool.js';
 import { DemoClock } from '../demoClock.js';
 import { buildServer } from '../api/server.js';
-import { addListingPhoto, cancelIdesh } from '../idesh/index.js';
+import { addListingPhoto, cancelIdesh, createIdesh, updateSupplierProfile, verifySupplierBank } from '../idesh/index.js';
+import { openSettlement } from '../idesh/settlements.js';
 import { handOff } from '../platform/identity/index.js';
 import { seedDemo } from '../seed/demo.js';
 import {
@@ -3196,6 +3197,69 @@ describe('нийлүүлэгч болох', () => {
     expect(desk.window.document.querySelector('#applied tr[data-supplier]')?.textContent).toContain('Завхан');
   });
 
+  it('pays a supplier a day at a time: one line for the day, opened to its orders, released in two halves', async () => {
+    // Two orders of one supplier whose payouts fell due yesterday: that day is one line, one transfer.
+    const made = await fetch(`${base}/v1/auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ phone: '+97699118800', password: GUEST_PASSWORD }),
+    });
+    const { guest_id: guestId } = (await made.json()) as { guest_id: string };
+    const { rows: listed } = await getPool().query<{ id: string; supplier_id: string; receive_on: string }>(
+      `SELECT id, supplier_id,
+              to_char(GREATEST(ready_from, ($1::timestamptz AT TIME ZONE 'Asia/Ulaanbaatar')::date + 1), 'YYYY-MM-DD') AS receive_on
+         FROM idesh.listing WHERE unit = 'whole' AND active AND quantity - sold >= 2 ORDER BY created_at LIMIT 1`,
+      [clock.now()],
+    );
+    const supplierId = listed[0]!.supplier_id;
+    const ids: string[] = [];
+    const codes: string[] = [];
+    for (let i = 0; i < 2; i++) {
+      const order = await createIdesh(ctx, { listingId: listed[0]!.id, guestId, qty: 1, receive: 'pickup', receiveOn: listed[0]!.receive_on });
+      ids.push(order.orderId);
+      codes.push(order.code);
+    }
+    await updateSupplierProfile(supplierId, { bankName: 'Хаан банк', bankAccount: '5012345678', bankHolder: 'Өдрийн олголт' });
+    await verifySupplierBank(supplierId);
+    const yesterday = new Date(clock.now().getTime() - 26 * 60 * 60 * 1000);
+    for (const [i, orderId] of ids.slice(0, 2).entries()) {
+      await openSettlement({ kind: 'payout', orderId, orderCode: codes[i]!, supplierId, amountMnt: 100_000 + i, memo: 'Олголт', at: yesterday });
+    }
+
+    const desk = await openPage('ops.html', '', undefined, device());
+    await until(desk, 'the secret prefilled', (d) => Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value));
+    clickText(desk, '.pair button', 'Нэвтрэх');
+    await opsTab(desk, 'pay');
+    const d = desk.window.document;
+    const day = () => [...d.querySelectorAll('#pay tr[data-batch]')].find((r) => r.textContent?.includes('Өдрийн олголт'));
+    await until(desk, 'the day', () => Boolean(day()));
+    expect(day()!.textContent).toContain('2 захиалга');
+    expect(day()!.textContent).toContain('батлах хүлээж байна');
+    expect(d.querySelector('#pay-sum')?.textContent).toContain('өдрийн олголт');
+
+    // Opened, the day lists its orders and the one total.
+    (day()!.querySelector('[data-a="lines"]') as HTMLElement).click();
+    await until(desk, 'the day opened', () => Boolean(d.querySelector('#pay-day[data-open]')));
+    const opened = d.querySelector('#pay-day')!.textContent ?? '';
+    for (const code of codes.slice(0, 2)) expect(opened).toContain(`№${code}`);
+    expect(opened).toContain('Нийт · 2 захиалга');
+    (d.querySelector('#pay-day [data-submit]') as HTMLElement).click();
+    await until(desk, 'the day closed', () => !d.querySelector('#pay-day[data-open]'));
+
+    // One half, then the other — the demo desk is one shared identity, so it may press both.
+    (day()!.querySelector('[data-a="approve"]') as HTMLElement).click();
+    await answerPopup(desk);
+    await until(desk, 'released', () => Boolean(day()?.querySelector('[data-a="paid"]')));
+    (day()!.querySelector('[data-a="paid"]') as HTMLElement).click();
+    await answerPopup(desk, { reason: 'ХААН-0914' });
+    await until(desk, 'sent', () => (day()?.textContent ?? '').includes('ХААН-0914') || !day());
+    const { rows: sent } = await getPool().query<{ state: string; reference: string; orders: number }>(
+      'SELECT state, reference, orders FROM idesh.payout_batch WHERE supplier_id = $1',
+      [supplierId],
+    );
+    expect(sent).toEqual([{ state: 'paid', reference: 'ХААН-0914', orders: 2 }]);
+  });
+
   it('says a payout account the server would refuse under its own field, before anything is sent', async () => {
     const desk = await openPage('ops.html', '', undefined, device());
     await until(desk, 'the secret prefilled', (d) => Boolean((d.querySelector('.pair input') as HTMLInputElement | null)?.value));
@@ -5308,6 +5372,7 @@ describe('every page, with a tag in whatever somebody could have typed', () => {
     ['idesh.promotion', ['ended_by'], 'ended_by IS NOT NULL'],
     // The words that ride with the money.
     ['idesh.settlement', ['memo', 'bank_name', 'bank_account', 'bank_holder', 'reference']],
+    ['idesh.payout_batch', ['reference', 'approved_by', 'paid_by'], 'paid_by IS NOT NULL'],
     ['idesh.promotion', ['ended_note']],
     // The certificate a supplier wrote in, and what the desk found of it.
     ['idesh.certificate', ['number', 'issuer', 'inspector', 'origin_aimag', 'origin_soum', 'origin_bag', 'herder', 'route', 'qr']],
