@@ -43,12 +43,12 @@ export async function guestSearch(q: string) {
   return { guests: [...found.map(shapeCard), ...more] };
 }
 
-export async function guestFile(guestId: string) {
+export async function guestFile(guestId: string, now: Date) {
   const card = await guestCard(guestId);
   if (!card) return null;
   const [statement, sessions, devices, dine, idesh, messages] = await Promise.all([
     wallet(guestId, 50),
-    sessionsOf(guestId),
+    sessionsOf(guestId, now),
     devicesOf(guestId),
     dineOrdersOf(guestId),
     allOrders({ scope: 'all', guestId }),

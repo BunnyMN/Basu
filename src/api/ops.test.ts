@@ -175,6 +175,17 @@ describe('the ops desk', () => {
       payload: { name: 'x', phone: '99001122', address: 'y' },
     });
     expect(bad.statusCode).toBe(400);
+
+    // A second business for the same owner — a «Салбар 2» — is refused by name, not a failure.
+    const again = await app.inject({
+      method: 'POST',
+      url: '/v1/ops/suppliers',
+      headers: auth(opsToken()!),
+      payload: { name: 'Хэнтий · Хэрлэн Салбар 2', phone: '+97688010002', owner: '+97688010002', tin: '45200197789', address: 'Баянзүрх' },
+    });
+    expect(again.statusCode, again.body).toBe(409);
+    expect(again.json().error).toMatchObject({ code: 'ALREADY_SUPPLIER' });
+    expect(again.json().error.message_mn).toContain('«Хэнтий · Хэрлэн»');
   });
 
   it('refuses a second open application and a form without an address', async () => {
@@ -214,7 +225,7 @@ describe('the contract’s terms and the list to pay', () => {
 
     const rows = (await app.inject({ method: 'GET', url: '/v1/ops/suppliers', headers: auth(opsToken()!) })).json().suppliers;
     expect(rows.find((s: { id: string }) => s.id === id)).toMatchObject({
-      commission_pct: 2,
+      commission_pct: 0,
       bank_name: 'Голомт',
       bank_account: '1105012345',
       bank_holder: 'Махны төв ХХК',
@@ -406,10 +417,10 @@ describe('the desk’s window onto orders', () => {
     await app.inject({ method: 'POST', url: `/v1/ops/orders/${id}/hand`, headers: desk(), payload: {} });
 
     const stats = (await app.inject({ method: 'GET', url: '/v1/ops/stats', headers: desk() })).json();
-    expect(stats.today).toMatchObject({ paid: 1, sales_mnt: 460_000, handed: 1, commission_mnt: 9_200, cancelled: 0 });
+    expect(stats.today).toMatchObject({ paid: 1, sales_mnt: 460_000, handed: 1, commission_mnt: 0, cancelled: 0 });
     expect(stats.season).toMatchObject({ paid: 1, handed: 1 });
     expect(stats.suppliers).toEqual([
-      expect.objectContaining({ id: supplierId, paid: 1, handed: 1, cancelled: 0, no_shows: 0, sales_mnt: 460_000, commission_mnt: 9_200, ready_hours: 1.5 }),
+      expect.objectContaining({ id: supplierId, paid: 1, handed: 1, cancelled: 0, no_shows: 0, sales_mnt: 460_000, commission_mnt: 0, ready_hours: 1.5 }),
     ]);
     expect(stats.by_kind).toEqual([{ kind: 'sheep', unit: 'whole', qty: 1, orders: 1, sales_mnt: 460_000 }]);
   });

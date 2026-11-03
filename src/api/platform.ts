@@ -259,7 +259,7 @@ export async function registerPlatformRoutes(
    * no waiting sixty days for a token to expire on its own.
    */
   app.get('/v1/me/sessions', guarded, async (request) => {
-    const sessions = await sessionsOf(request.guestId!, bearer(request) ?? '');
+    const sessions = await sessionsOf(request.guestId!, ctx.clock.now(), bearer(request) ?? '');
     return {
       sessions: sessions.map((s) => ({
         id: s.id,
@@ -297,7 +297,7 @@ export async function registerPlatformRoutes(
   const endingAnother = recentAtTheDesk('тэр төхөөрөмжөөс гарна уу');
   const recentUnlessHere: Guard = async (request, reply) => {
     const id = String((request.params as { id?: unknown }).id ?? '').toLowerCase();
-    const here = (await sessionsOf(request.guestId!, bearer(request) ?? '')).some((s) => s.current && s.id === id);
+    const here = (await sessionsOf(request.guestId!, ctx.clock.now(), bearer(request) ?? '')).some((s) => s.current && s.id === id);
     return here ? undefined : endingAnother(request, reply);
   };
 

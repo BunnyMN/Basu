@@ -671,6 +671,20 @@ export async function registerOpsRoutes(
         },
       });
     }
+    // One supplier per person: the owner who already holds one is told which, before anything is written.
+    const held = await openSupplierOf(owner.guestId);
+    if (held) {
+      return reply.status(409).send({
+        error: {
+          code: 'ALREADY_SUPPLIER',
+          message_mn:
+            held.state === 'contracted'
+              ? `Энэ эзэмшигч аль хэдийн «${held.name}» нийлүүлэгчийг эзэмшдэг — нэг хүн нэг л нийлүүлэгч эзэмшинэ. Өөр хүний Basu бүртгэлийг эзэмшигчээр бичнэ үү.`
+              : `Энэ эзэмшигч «${held.name}» нэрээр нийлүүлэгч болох хүсэлт гаргасан, хүлээгдэж байна — шинээр бүртгэхийн оронд тэр хүсэлтийг батална уу.`,
+          message_en: 'the owner already has an open supplier',
+        },
+      });
+    }
     try {
       const id = await registerSupplier({
         ownerId: owner.guestId,
@@ -872,7 +886,7 @@ export async function registerOpsRoutes(
 
   app.get<{ Params: { id: string } }>('/v1/ops/guests/:id', desk('desk.guests'), async (request, reply) => {
     if (!UUID.test(request.params.id)) return noSuchGuest(reply);
-    const file = await guestFile(request.params.id);
+    const file = await guestFile(request.params.id, ctx.clock.now());
     if (!file) return noSuchGuest(reply);
     return reply.send(file);
   });

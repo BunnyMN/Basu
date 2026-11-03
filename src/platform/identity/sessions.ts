@@ -23,8 +23,12 @@ export interface DeviceSession {
   current: boolean;
 }
 
-/** With no token — the desk looking in — nothing is `current`. */
-export async function sessionsOf(guestId: string, token?: string): Promise<DeviceSession[]> {
+/**
+ * With no token — the desk looking in — nothing is `current`. Still open is
+ * open at `now`, the clock's, as the token check reads it — never the
+ * database's own.
+ */
+export async function sessionsOf(guestId: string, now: Date, token?: string): Promise<DeviceSession[]> {
   const { rows } = await getPool().query<{
     id: string;
     label: string | null;
@@ -36,9 +40,9 @@ export async function sessionsOf(guestId: string, token?: string): Promise<Devic
     `SELECT id, label, created_at, last_seen_at, expires_at,
             token_hash = COALESCE($2, '') AS current
        FROM identity.guest_session
-      WHERE guest_id = $1 AND revoked_at IS NULL AND expires_at > now()
+      WHERE guest_id = $1 AND revoked_at IS NULL AND expires_at > $3
       ORDER BY COALESCE(last_seen_at, created_at) DESC`,
-    [guestId, token ? sha256(token) : null],
+    [guestId, token ? sha256(token) : null, now],
   );
   return rows.map((r) => ({
     id: r.id,
