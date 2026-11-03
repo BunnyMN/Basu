@@ -1684,7 +1684,7 @@ describe('the website', () => {
     // order may put a supplier's own photographs first (src/idesh/ranking.ts): either kind of set.
     const first = d.querySelector('.sh-card img') as HTMLImageElement;
     expect(first.getAttribute('srcset')).toMatch(
-      /^(\/brand\/meat\/(sheep|goat|beef|horse)-480\.webp 480w, \/brand\/meat\/\2-720\.webp 720w, \/brand\/meat\/\2\.webp 960w|\S+ 720w, \S+ 1600w)$/,
+      /^(\/brand\/meat\/((?:sheep|goat|beef|horse)(?:-\d+)?)-480\.webp 480w, \/brand\/meat\/\2-720\.webp 720w, \/brand\/meat\/\2\.webp 960w|\S+ 720w, \S+ 1600w)$/,
     );
     expect(first.getAttribute('sizes')).toBeTruthy();
     expect(first.getAttribute('fetchpriority')).toBe('high');
