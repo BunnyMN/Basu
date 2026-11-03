@@ -316,8 +316,8 @@ export async function applySupplier(ctx: Ctx, input: ApplicationInput): Promise<
   const address = input.pickupAddress.trim();
   if (name.length < 2) throw new IdeshError('WRONG_STATE', 'a supplier needs a name');
   if (address.length < 4) throw new IdeshError('WRONG_STATE', 'a supplier needs a pickup address');
-  if (input.merchantTin && !/^\d{7,10}$/.test(input.merchantTin)) {
-    throw new IdeshError('WRONG_STATE', 'a TIN is seven to ten digits');
+  if (input.merchantTin && !/^\d{7,12}$/.test(input.merchantTin)) {
+    throw new IdeshError('WRONG_STATE', 'a TIN is 7 to 12 digits');
   }
   const account = bankAccountOf(input.bankAccount);
 

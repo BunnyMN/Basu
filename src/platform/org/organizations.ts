@@ -35,6 +35,8 @@ export class OrgError extends Error {
   constructor(
     readonly code: 'NOT_FOUND' | 'FORBIDDEN' | 'ALREADY_MEMBER' | 'LAST_OWNER' | 'NOT_PENDING' | 'BAD_INPUT' | 'NO_SUCH_ROLE',
     message: string,
+    /** What exactly to fix, in the words the person reads — when the code alone would only say «check it». */
+    readonly mn?: string,
   ) {
     super(message);
     this.name = 'OrgError';
@@ -104,6 +106,13 @@ const shape = (r: Row): Organization => ({
   declineReason: r.decline_reason,
 });
 
+/**
+ * A taxpayer number as Mongolia writes it: a company's old seven-digit
+ * register, the eleven-digit ТТД a company is given now, or a person's
+ * twelve — e-barimt takes all of them.
+ */
+const TIN = /^\d{7,12}$/;
+
 export interface OrgInput {
   name: string;
   restaurant: boolean;
@@ -118,10 +127,10 @@ export interface OrgInput {
 
 function checked(input: OrgInput) {
   const name = input.name?.trim() ?? '';
-  if (name.length < 2 || name.length > 80) throw new OrgError('BAD_INPUT', 'an organisation needs a name');
-  if (!input.restaurant && !input.supplier) throw new OrgError('BAD_INPUT', 'a restaurant, a supplier, or both');
+  if (name.length < 2 || name.length > 80) throw new OrgError('BAD_INPUT', 'an organisation needs a name', 'Байгууллагын нэр 2–80 тэмдэгт байна.');
+  if (!input.restaurant && !input.supplier) throw new OrgError('BAD_INPUT', 'a restaurant, a supplier, or both', 'Ресторан, нийлүүлэгч хоёрын аль нэгийг сонгоно уу.');
   const tin = input.tin?.replace(/\s+/g, '') || null;
-  if (tin && !/^\d{7,10}$/.test(tin)) throw new OrgError('BAD_INPUT', 'a TIN is seven to ten digits');
+  if (tin && !TIN.test(tin)) throw new OrgError('BAD_INPUT', 'a TIN is 7 to 12 digits', 'ТТД 7–12 оронтой тоо байна.');
   return {
     name,
     restaurant: Boolean(input.restaurant),
@@ -413,7 +422,7 @@ export async function orgForExisting(input: OrgInput & { ownerId: string; now: D
     address: input.address?.trim() || null,
     lat: typeof input.lat === 'number' ? input.lat : null,
     lon: typeof input.lon === 'number' ? input.lon : null,
-    tin: tin && /^\d{7,10}$/.test(tin) ? tin : null,
+    tin: tin && TIN.test(tin) ? tin : null,
     about: input.about?.trim().slice(0, 1000) || null,
   };
   return tx(async (client) => {

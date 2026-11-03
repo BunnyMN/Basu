@@ -64,7 +64,8 @@ export function orgRefusal(reply: FastifyReply, error: unknown): FastifyReply {
     BAD_INPUT: [400, 'Мэдээллээ шалгана уу.'],
     NO_SUCH_ROLE: [400, 'Энэ байгууллагад ийм үүрэг алга.'],
   };
-  const [status, mn] = words[error.code];
+  const [status, said] = words[error.code];
+  const mn = error.mn ?? said;
   return reply.status(status).send({ error: { code: error.code, message_mn: mn, message_en: error.message } });
 }
 

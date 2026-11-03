@@ -745,7 +745,7 @@ function applyForm(needsPhone = false) {
           <label class="field"><span>Нэр</span><input name="name" autocomplete="organization"><small>Зочид таныг энэ нэрээр харна. Жишээ нь: «Архангай · Доржийн хот айл».</small></label>
           ${needsPhone ? '<label class="field"><span>Холбогдох утас</span><input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="8811 2233"><small>Зочид, Basu энэ дугаараар холбогдоно. Батлахаас өмнө Basu залгаж шалгана.</small></label>' : ''}
           <label class="field"><span>Хотод мах авах цэг</span><input name="address" autocomplete="street-address"><small>Зочин өөрөө ирж авах газар: дүүрэг, зах, хаалга.</small></label>
-          <label class="field"><span>ТТД (заавал биш)</span><input name="tin" inputmode="numeric" maxlength="10"><small>Е-баримт гаргахад хэрэгтэй, 7–10 оронтой.</small></label>
+          <label class="field"><span>ТТД (заавал биш)</span><input name="tin" inputmode="numeric" maxlength="12"><small>Е-баримт гаргахад хэрэгтэй, 7–12 оронтой.</small></label>
           <label class="field"><span>Юу зарах вэ, хаанаас (заавал биш)</span><textarea name="about"></textarea><small>Жишээ нь: Архангайн хонь, 10-р сараас, 20 толгой.</small></label>
         </div>
         <div class="form-group">
@@ -792,7 +792,7 @@ function applyForm(needsPhone = false) {
       say('phone', digits.length !== 8 ? 'Утасны 8 оронтой дугаараа бичнэ үү.' : null);
     }
     say('address', v('address').length < 4 ? 'Зочин ирж авах газраа бичнэ үү.' : null);
-    say('tin', v('tin') && !/^\d{7,10}$/.test(v('tin')) ? 'ТТД 7–10 оронтой тоо байна.' : null);
+    say('tin', v('tin') && !/^\d{7,12}$/.test(v('tin')) ? 'ТТД 7–12 оронтой тоо байна.' : null);
     say('bank_other', v('bank_name') === OTHER_BANK && !v('bank_other') ? 'Банкныхаа нэрийг бичнэ үү.' : null);
     const account = v('bank_account').replace(/\s+/g, '').toUpperCase();
     say('bank_account', account && !ACCOUNT.test(account) ? ACCOUNT_WORDS : null);

@@ -94,6 +94,26 @@ describe('registering a business', () => {
     expect((await call('POST', '/v1/orgs', owner, { name: 'Утасгүй', supplier: true, address: 'x' })).statusCode).toBe(400);
   });
 
+  it('takes a company’s eleven-digit ТТД as written, and says which field is wrong when it is not one', async () => {
+    const owner = await person('+97699110001', 'Дорж');
+    const made = await call('POST', '/v1/orgs', owner, {
+      name: 'STEPPE MEAT',
+      supplier: true,
+      phone: '+976 91059098',
+      tin: '45200197789',
+      address: 'Төв аймаг Аргалант сум 2-р баг',
+    });
+    expect(made.statusCode, made.body).toBe(201);
+    expect(made.json()).toMatchObject({ tin: '45200197789' });
+    const yes = await app.inject({ method: 'POST', url: `/v1/ops/orgs/${made.json().id}/approve`, headers: desk() });
+    expect(yes.statusCode, yes.body).toBe(200);
+
+    const other = await person('+97699110002', 'Бат');
+    const wrong = await call('POST', '/v1/orgs', other, { name: 'Буруу', supplier: true, phone: '88110002', tin: '452001', address: 'Нарантуул' });
+    expect(wrong.statusCode).toBe(400);
+    expect(wrong.json().error.message_mn).toBe('ТТД 7–12 оронтой тоо байна.');
+  });
+
   it('once approved, is a contracted supplier its owner can run', async () => {
     const owner = await person('+97699110001', 'Дорж');
     await aButcher(owner);
