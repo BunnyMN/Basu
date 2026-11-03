@@ -2728,7 +2728,7 @@ async function renderMoney(bank = false) {
     el(`<section class="card terms">
       <div class="card-head"><h2>Хэрхэн олгох вэ</h2></div>
       <dl class="facts">
-        <div><dt>Шимтгэл</dt><dd><span class="mn">${data.commission_pct ?? '—'}%</span><small>махны үнээс; хүргэлтийн төлбөрөөс авахгүй</small></dd></div>
+        <div><dt>Танд очих</dt><dd>Захиалгын дүн бүтнээрээ<small>махны үнэ, жижиглэлт, хүргэлтийн төлбөр — бүгд танд</small></dd></div>
         <div><dt>Хэзээ</dt><dd>Өдөрт нэг шилжүүлгээр<small>хүлээлгэн өгснөөс хойш нэг хоногт олголт үүснэ; нэг өдрийн олголтуудыг нэгтгэж, Basu нэг дор шилжүүлнэ</small></dd></div>
       </dl>
     </section>`),
@@ -3236,7 +3236,7 @@ async function renderHome() {
     el(`<div class="card stat kpi"><div class="lab">Энэ улиралд</div><b>${h.season.handed}</b><span>зочинд хүлээлгэн өгсөн</span></div>`),
     ...(h.season.payout_mnt === null
       ? []
-      : [el(`<div class="card stat kpi" data-money${longSum(h.season.payout_mnt)}><div class="lab">Танд очих</div><b>${money(h.season.payout_mnt)}</b><span>энэ улирлын орлого, шимтгэл хассан${h.season.forfeit_mnt ? ` · суутгал ${mnt(h.season.forfeit_mnt)}` : ''}</span></div>`)]),
+      : [el(`<div class="card stat kpi" data-money${longSum(h.season.payout_mnt)}><div class="lab">Танд очих</div><b>${money(h.season.payout_mnt)}</b><span>энэ улирлын орлого${h.season.forfeit_mnt ? ` · суутгал ${mnt(h.season.forfeit_mnt)}` : ''}</span></div>`)]),
   ];
   // Three on a phone: the work on a line of its own, the season's two under it.
   if (cells.length === 3) cells[0].setAttribute('data-span', '');
@@ -3541,10 +3541,9 @@ async function renderProfile(view, bank = false) {
       <dl class="facts" data-short>
         <div><dt>Утас</dt><dd>${p.phone ? tel(p.phone) : '—'}</dd></div>
         ${fact('ТТД', p.merchant_tin, { mono: true, none: 'Алга' })}
-        ${p.commission_pct !== null && p.commission_pct !== undefined ? `<div><dt>Шимтгэл</dt><dd><span class="mn">${esc(p.commission_pct)}%</span></dd></div>` : ''}
         ${p.contracted_at ? fact('Гэрээ байгуулсан', dayOfStamp(p.contracted_at)) : ''}
       </dl>
-      <div class="card-foot"><span class="cap">Утас, ТТД, шимтгэл нь гэрээний нөхцөл. Өөрчлөх бол Basu-д бичнэ үү: <a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a></span></div>
+      <div class="card-foot"><span class="cap">Утас, ТТД нь гэрээний нөхцөл. Өөрчлөх бол Basu-д бичнэ үү: <a href="mailto:basuappmn@gmail.com">basuappmn@gmail.com</a></span></div>
     </section>`),
   );
   if (seesBank) cards.append(bankCard(p));

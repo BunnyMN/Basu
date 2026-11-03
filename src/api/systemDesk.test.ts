@@ -104,7 +104,7 @@ describe('the machine', () => {
       ['apns', 'fake', true],
     ]);
     expect(cold.database.migrations).toBeGreaterThan(20);
-    expect(cold.rules).toEqual({ commission_pct: 2, forfeit_pct: 10, no_show_days: 3 });
+    expect(cold.rules).toEqual({ commission_pct: 0, forfeit_pct: 10, no_show_days: 3 });
     expect(cold.settings.map((s: { key: string; value: unknown }) => [s.key, s.value])).toEqual([
       ['sms_unit_mnt', 0],
       ['push_unit_mnt', 0],

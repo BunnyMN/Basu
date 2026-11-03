@@ -406,7 +406,7 @@ describe('the desk’s window onto orders', () => {
     expect(handed.json()).toEqual({ state: 'HANDED' });
     const one = await app.inject({ method: 'GET', url: `/v1/ops/orders/${id}`, headers: desk() });
     expect(one.json().events.map((e: { type: string }) => e.type)).toEqual(['CREATED', 'PAID', 'RESENT', 'PREPARING', 'READY', 'HANDED']);
-    expect(one.json().order).toMatchObject({ state: 'HANDED', payout_mnt: 450_800 });
+    expect(one.json().order).toMatchObject({ state: 'HANDED', payout_mnt: 460_000 });
   });
 
   it('reads the numbers: today, the week, the season, each supplier, each kind of meat', async () => {

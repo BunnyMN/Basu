@@ -1204,7 +1204,7 @@ async function renderOrgHome(view) {
           `<div class="card kpi"${h.overdue ? ' data-tone="warn"' : ''}><div class="lab">Хийх ажил</div><b>${todo}</b><span>${todo ? due || 'хүлээлгэн өгөөгүй захиалга' : 'одоогоор хийх захиалга алга'}</span></div>`,
           `<div class="card kpi"><div class="lab">Энэ улиралд</div><b>${h.season.handed}</b><span>зочинд хүлээлгэн өгсөн</span></div>`,
         ];
-        if (h.season.payout_mnt !== null) cells.push(`<div class="card kpi" data-money><div class="lab">Танд очих</div><b>${money(h.season.payout_mnt)}</b><span>энэ улирлын орлого, шимтгэл хассан</span></div>`);
+        if (h.season.payout_mnt !== null) cells.push(`<div class="card kpi" data-money><div class="lab">Танд очих</div><b>${money(h.season.payout_mnt)}</b><span>энэ улирлын орлого</span></div>`);
         band.innerHTML = cells.join('');
         band.hidden = false;
       })
@@ -3272,7 +3272,7 @@ async function renderOverview(view) {
       cell('Идэшний захиалга', t(v.idesh.paid), sold(t(v.idesh.paid), t(v.idesh.sales_mnt), t(v.idesh.cancelled), 'төлсөн захиалга алга')),
       cell('Хоолны захиалга', t(v.dine.placed), sold(t(v.dine.placed), t(v.dine.sales_mnt), t(v.dine.cancelled), 'захиалга алга')),
       cell('Цэнэглэлт', money(t(w.topups.settled_mnt)), t(w.topups.settled) ? `${t(w.topups.settled)} удаа${t(w.topups.failed) ? ` · ${t(w.topups.failed)} амжилтгүй` : ''}` : 'цэнэглэлт алга'),
-      cell('Орлого (Basu)', money(t(w.revenue)), `идэшний шимтгэл ${mnt(t(v.idesh.commission_mnt))} · хураамж ${mnt(t(v.idesh.service_fee_mnt))}`, ' data-money'),
+      cell('Орлого (Basu)', money(t(w.revenue)), `идэшний үйлчилгээний хураамж ${mnt(t(v.idesh.service_fee_mnt))}`, ' data-money'),
       cell('Буцаалт', money(refunds), refunds ? `түрийвчид ${t(w.refunds.count)} удаа · данс руу ${mnt(t(v.idesh.refund_mnt))}` : 'буцаалт алга'),
     );
     cross.replaceChildren(el(`<table class="table"><thead><tr><th><span class="sr-only">Үзүүлэлт</span></th><th class="num">Идэш</th><th class="num">Хоол</th></tr></thead><tbody>
@@ -4600,7 +4600,6 @@ async function drawSystem() {
         <tr><td>Асаасан</td><td class="end">${when(s.started_at)} ${clockOf(s.started_at)}</td></tr>
       </tbody></table></div></div>
       <h2 class="section-label">Идэшний дүрэм</h2><div class="card"><div class="table-wrap"><table class="table"><tbody>
-        <tr><td>Шимтгэл<span class="sub">хүлээлгэн өгсөн захиалгын махны үнээс</span></td><td class="num">${s.rules.commission_pct}%</td></tr>
         <tr><td>Суутгал<span class="sub">мал нядалсны дараа зочны буруугаас цуцлахад</span></td><td class="num">${s.rules.forfeit_pct}%</td></tr>
         <tr><td>Ирээгүй зочин<span class="sub">мах бэлэн болсноос хойш</span></td><td class="num">${s.rules.no_show_days} хоног</td></tr>
       </tbody></table></div></div></section>
@@ -4653,7 +4652,7 @@ async function drawSystem() {
 /* ── the numbers ── */
 
 async function renderStats(view) {
-  view.append(head('Тоон үзүүлэлт', 'Захиалга, борлуулалт, шимтгэл, буцаалт'));
+  view.append(head('Тоон үзүүлэлт', 'Захиалга, борлуулалт, хураамж, буцаалт'));
   view.append(busy());
   let st;
   try {
@@ -4670,7 +4669,7 @@ async function renderStats(view) {
     kpis.replaceChildren(
       el(`<div class="card kpi"><div class="lab">Төлсөн захиалга</div><b>${t.paid}</b><span>${t.handed} хүлээлгэн өгсөн</span></div>`),
       el(`<div class="card kpi"><div class="lab">Борлуулалт</div><b>${money(t.sales_mnt)}</b><span>төлөгдсөн захиалгын дүн</span></div>`),
-      el(`<div class="card kpi" data-money><div class="lab">Basu-гийн орлого</div><b>${money(t.commission_mnt + t.service_fee_mnt)}</b><span>шимтгэл ${mnt(t.commission_mnt)} · үйлчилгээний хураамж ${mnt(t.service_fee_mnt)}</span></div>`),
+      el(`<div class="card kpi" data-money><div class="lab">Basu-гийн орлого</div><b>${money(t.service_fee_mnt)}</b><span>үйлчилгээний хураамж, захиалга бүрээс</span></div>`),
       el(`<div class="card kpi"><div class="lab">Цуцлагдсан</div><b>${t.cancelled}</b><span>${t.cancelled ? `нийлүүлэгчийн буруу ${t.supplier_fault} · зочны ${t.guest_fault}` : 'цуцлалт алга'}</span></div>`),
       el(`<div class="card kpi"><div class="lab">Буцаалт</div><b>${money(t.refund_mnt)}</b><span>зочдод буцах дүн</span></div>`),
       el(`<div class="card kpi"><div class="lab">Суутгал</div><b>${money(t.forfeit_mnt)}</b><span>нийлүүлэгчид үлдсэн</span></div>`),
@@ -4693,7 +4692,6 @@ async function renderStats(view) {
       },
       { key: 'ready_hours', label: 'Бэлэн болтол, цаг', align: 'end', numeric: true, render: (r) => dtCell.num(r.ready_hours), phone: false },
       { key: 'sales_mnt', label: 'Борлуулалт', align: 'end', numeric: true, render: (r) => dtCell.money(r.sales_mnt) },
-      { key: 'commission_mnt', label: 'Шимтгэл', align: 'end', numeric: true, render: (r) => dtCell.money(r.commission_mnt) },
     ],
     search: false,
     sort: { key: 'sales_mnt', desc: true },
@@ -4866,7 +4864,7 @@ async function openOrder(id, from = { label: 'Захиалгууд', go: () => s
         <div><span class="lab">${o.receive === 'delivery' ? 'Хүргэлтээр' : 'Өөрөө очиж авна'}</span><b class="nowrap">${dayLabel(o.receive_on)}</b><span class="fact-sub">${o.receive === 'delivery' ? `${esc(o.address)} · <span class="mono nowrap">${esc(phoneText(o.address_phone))}</span>` : 'нийлүүлэгчийн авах цэгээс'}</span></div>
         <div><span class="lab">Зочин төлсөн</span><b>${money(o.total_mnt + (o.service_fee_mnt ?? 0))}</b><span class="fact-sub">${o.breakdown?.fee_mnt ? `жижиглэх ${mnt(o.breakdown.fee_mnt)} · ` : ''}${o.delivery_fee_mnt ? `хүргэлт ${mnt(o.delivery_fee_mnt)} орсон` : 'хүргэлтгүй'}${o.service_fee_mnt ? ` · Basu-гийн хураамж ${mnt(o.service_fee_mnt)}` : ''}</span></div>
         ${o.breakdown ? `<div id="order-breakdown"><span class="lab">Задаргаа</span><b>${esc(o.breakdown.label)}</b><span class="fact-sub">${esc(o.breakdown.detail)}${o.breakdown.note ? ` · «${esc(o.breakdown.note)}»` : ''}</span></div>` : ''}
-        <div><span class="lab">Нийлүүлэгчид очих</span><b>${money(o.payout_mnt)}</b><span class="fact-sub">шимтгэл хассан</span></div>
+        <div><span class="lab">Нийлүүлэгчид очих</span><b>${money(o.payout_mnt)}</b><span class="fact-sub">Basu-гийн хураамжаас бусад нь</span></div>
         ${o.cancel_reason ? `<div><span class="lab">Цуцлалт</span><b>${esc(REASON[o.cancel_reason] ?? o.cancel_reason)}</b><span class="fact-sub">буцаалт ${mnt(o.refund_mnt ?? 0)}${o.forfeit_mnt ? ` · суутгал ${mnt(o.forfeit_mnt)}` : ''}</span></div>` : ''}
       </div></div>
       ${d.settlements.length ? '<section class="section detail-wide"><h2 class="section-label">Мөнгө</h2><div id="money"></div></section>' : ''}
@@ -5096,7 +5094,6 @@ function renderSuppliers(view) {
       { key: 'name', label: 'Нийлүүлэгч', render: (s) => dtCell.two(s.name, s.pickup_address) },
       { key: 'phone', label: 'Утас', value: (s) => `${s.phone ?? ''} ${phoneText(s.phone ?? '')}`, render: (s) => dtCell.phone(s.phone) },
       { key: 'merchant_tin', label: 'ТТД', render: (s) => (s.merchant_tin ? dtCell.mono(s.merchant_tin) : '<span class="ink-stop">алга</span>'), phone: false },
-      { key: 'commission_pct', label: 'Шимтгэл', align: 'end', numeric: true, render: (s) => (s.state === 'declined' ? dtCell.none() : `<span class="dt-num">${s.commission_pct}%</span>`) },
       {
         key: 'bank',
         label: 'Данс',
@@ -5194,7 +5191,6 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
       sub: esc(s.name),
       width: 600,
       fields: [
-        { name: 'commission_pct', label: 'Шимтгэл, %', inputmode: 'decimal', value: s.commission_pct },
         { name: 'tin', label: 'ТТД', inputmode: 'numeric', placeholder: '7–14 орон', value: s.merchant_tin ?? '' },
         ...bankFields(s.bank_name ?? ''),
         bankField(s.bank_account, '6–20 оронтой дугаар, эсвэл MN-ээр эхэлсэн IBAN. Данс өөрчлөгдвөл дахин баталгаажуулах хүртэл олголт гарахгүй.'),
@@ -5210,7 +5206,6 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
           return false;
         }
         const body = { tin: v.tin, bank_name: bankOf(v), bank_account: v.bank_account, bank_holder: v.bank_holder };
-        if (v.commission_pct !== '') body.commission_pct = Number(v.commission_pct);
         await ops(`/v1/ops/suppliers/${s.id}`, { method: 'PATCH', body });
         toast('Хадгалагдлаа.', 'good');
         await again();
@@ -5223,7 +5218,6 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
     <div class="detail">
       <div class="card detail-facts"><div class="facts">
         <div><span class="lab">${s.state === 'applied' ? 'Хүсэлт ирсэн' : s.state === 'declined' ? 'Татгалзсан' : 'Гэрээ'}</span><b class="nowrap">${when(s.state === 'applied' ? s.applied_at : s.state === 'declined' ? s.decided_at : s.contracted_at)}</b>${s.state === 'declined' && s.decline_reason ? `<span class="fact-sub">${esc(s.decline_reason)}</span>` : ''}</div>
-        <div><span class="lab">Шимтгэл</span><b>${s.state === 'declined' ? '—' : `${s.commission_pct}%`}</b><span class="fact-sub">хүлээлгэн өгсөн захиалгаас</span></div>
         <div><span class="lab">ТТД</span><b class="mono">${s.merchant_tin ? esc(s.merchant_tin) : '—'}</b><span class="fact-sub">${s.merchant_tin ? 'е-баримт гарна' : '<span class="ink-stop">е-баримт гарахгүй</span>'}</span></div>
         <div><span class="lab">Олголт очих данс</span><b>${s.bank_account ? `${esc(s.bank_name ?? '')} <span class="mono">${esc(s.bank_account)}</span>` : '—'}</b><span class="fact-sub">${s.bank_account ? `${esc(s.bank_holder ?? '')} ${s.bank_verified ? dtCell.pill('verified', 'баталгаажсан') : dtCell.pill('warn', 'баталгаажаагүй')}` : 'данс оруулаагүй'}</span></div>
       </div></div>
@@ -5241,7 +5235,7 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
         asked && runs && { label: 'Батлах', attrs: 'data-v="primary" data-a="approve"', onClick: () => approveSupplier(s, again), hint: 'Хүсэлт гаргасан хүн эзэн нь болж, өөрийн бүртгэлээр зараа тавьж эхэлнэ.' },
         asked && runs && { label: 'Татгалзах', attrs: 'data-v="danger" data-a="decline"', onClick: () => declineSupplier(s, again), hint: 'Шалтгааныг нь хүсэлт гаргагч харж, засаад дахин хүсэж болно.' },
         unverified && { label: 'Данс баталгаажуулах', attrs: 'data-v="primary" data-a="bank-verify"', onClick: verifyBank, hint: 'Гэрээний данстай тулгасны дараа олголт энэ данс руу явна.' },
-        s.state !== 'declined' && signs && { label: 'Гэрээ, данс засах', attrs: 'data-a="terms"', onClick: editTerms, hint: 'Шимтгэл, ТТД, олголт очих данс.' },
+        s.state !== 'declined' && signs && { label: 'Гэрээ, данс засах', attrs: 'data-a="terms"', onClick: editTerms, hint: 'ТТД, олголт очих данс.' },
         'sep',
         contracted && runs && {
           label: s.active ? 'Түр зогсоох' : 'Идэвхжүүлэх',

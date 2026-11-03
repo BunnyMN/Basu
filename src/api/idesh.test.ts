@@ -839,7 +839,7 @@ describe('the supplier’s own module', () => {
 
     const live = await app.inject({ method: 'GET', url: '/v1/supplier/orders?scope=live', headers: auth(owner) });
     expect(live.json().orders.map((o: { id: string }) => o.id)).toEqual([id]);
-    expect(live.json().orders[0]).toMatchObject({ code, guest_phone: '+97699004004', payout_mnt: 460_000 - 9_200 });
+    expect(live.json().orders[0]).toMatchObject({ code, guest_phone: '+97699004004', payout_mnt: 460_000 });
     // Searched by the guest's number, with the spaces a person types.
     const byPhone = await app.inject({ method: 'GET', url: '/v1/supplier/orders?q=9900%204004', headers: auth(owner) });
     expect(byPhone.json().orders).toHaveLength(1);
@@ -851,12 +851,12 @@ describe('the supplier’s own module', () => {
     await app.inject({ method: 'POST', url: `/v1/supplier/orders/${id}/ready`, headers: auth(owner), payload: {} });
     await app.inject({ method: 'POST', url: `/v1/supplier/orders/${id}/hand`, headers: auth(owner), payload: {} });
     const one = await app.inject({ method: 'GET', url: `/v1/supplier/orders/${id}`, headers: auth(owner) });
-    expect(one.json().order).toMatchObject({ state: 'HANDED', payout_mnt: 450_800 });
+    expect(one.json().order).toMatchObject({ state: 'HANDED', payout_mnt: 460_000 });
     expect(one.json().events.map((e: { type: string }) => e.type)).toEqual(['CREATED', 'PAID', 'PREPARING', 'READY', 'HANDED']);
     expect(one.json().events.at(-1).actor).toMatch(/^supplier:owner:/);
 
     const after = await app.inject({ method: 'GET', url: '/v1/supplier/home', headers: auth(owner) });
-    expect(after.json().season).toMatchObject({ handed: 1, revenue_mnt: 460_000, payout_mnt: 450_800 });
+    expect(after.json().season).toMatchObject({ handed: 1, revenue_mnt: 460_000, payout_mnt: 460_000 });
     expect(after.json().season.by_kind).toEqual([{ kind: 'sheep', unit: 'whole', qty: 1, orders: 1 }]);
 
     // Another supplier's owner sees none of it.
@@ -877,7 +877,7 @@ describe('the supplier’s own module', () => {
     const changed = await app.inject({ method: 'PATCH', url: '/v1/supplier/profile', headers: auth(owner), payload: { ...edit, password: PASSWORD } });
     expect(changed.statusCode, changed.body).toBe(200);
     // …and the new account is on file but not yet trusted.
-    expect(changed.json()).toMatchObject({ pickup_address: 'Нарантуул, урд хаалга', bank_account: '5012345678', commission_pct: 2, bank_verified: false });
+    expect(changed.json()).toMatchObject({ pickup_address: 'Нарантуул, урд хаалга', bank_account: '5012345678', commission_pct: 0, bank_verified: false });
     // A name change alone asks for nothing.
     const quiet = await app.inject({ method: 'PATCH', url: '/v1/supplier/profile', headers: auth(owner), payload: { about: 'Архангайн хонь, ямаа' } });
     expect(quiet.statusCode).toBe(200);
@@ -993,7 +993,7 @@ describe('задаргаа', () => {
     });
   });
 
-  it('keeps the legs whole and cuts the ribs: the fee on every head, the choice on the supplier’s ticket, commission on all of the meat', async () => {
+  it('keeps the legs whole and cuts the ribs: the fee on every head, the choice on the supplier’s ticket, all of it the supplier’s', async () => {
     const screen = await offerEveryWay();
     const token = await signIn();
     await topUp(token, 1_000_000);
@@ -1013,15 +1013,15 @@ describe('задаргаа', () => {
     const detail = await app.inject({ method: 'GET', url: `/v1/idesh/${id}`, headers: auth(token) });
     expect(detail.json()).toMatchObject({ total_mnt: 2 * 460_000 + 30_000, breakdown: said });
 
-    // What the butcher reads while the animal is on the block; 2 % of the meat, the cutting in it.
+    // What the butcher reads while the animal is on the block: the whole of it, the cutting in it, theirs.
     const board = await app.inject({ method: 'GET', url: '/v1/supplier/board', headers: auth(screen) });
-    expect(board.json().lanes.paid[0]).toMatchObject({ breakdown: said, payout_mnt: 950_000 - 19_000 });
+    expect(board.json().lanes.paid[0]).toMatchObject({ breakdown: said, payout_mnt: 950_000 });
 
     const act = (action: string) =>
       app.inject({ method: 'POST', url: `/v1/supplier/orders/${id}/${action}`, headers: auth(screen), payload: {} });
     for (const action of ['prepare', 'ready', 'hand']) expect((await act(action)).statusCode, action).toBe(200);
     const one = await app.inject({ method: 'GET', url: `/v1/supplier/orders/${id}`, headers: auth(screen) });
-    expect(one.json().order).toMatchObject({ state: 'HANDED', payout_mnt: 931_000, breakdown: said });
+    expect(one.json().order).toMatchObject({ state: 'HANDED', payout_mnt: 950_000, breakdown: said });
     // The record nobody can edit says what was asked of the butcher.
     expect(one.json().events[0]).toMatchObject({ type: 'CREATED', payload: { breakdown: { style: 'parts', cut: ['ribs', 'neck'] }, cutFeeMnt: 30_000 } });
   });

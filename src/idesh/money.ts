@@ -27,8 +27,12 @@ export const REASON_LABEL: Record<CancelReason, string> = {
 export const FORFEIT_PCT = 10;
 /** A ready order the guest has not collected this many days after their day. */
 export const NO_SHOW_DAYS = 3;
-/** Basu's share of the meat price for a new contract. Per contract after that. */
-export const DEFAULT_COMMISSION_PCT = 2;
+/**
+ * Basu's share of the meat price for a new contract: none. The owner ended
+ * the 2% on 2026-11-03; Basu earns from the guest's service fee instead. The
+ * per-contract rate stays in the books at 0 for a contract that ever needs one.
+ */
+export const DEFAULT_COMMISSION_PCT = 0;
 
 const SUPPLIER_FAULT: readonly CancelReason[] = ['vet', 'cannot_fulfil'];
 

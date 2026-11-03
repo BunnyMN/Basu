@@ -77,7 +77,7 @@ export const PAGES: Record<Scope, PageSpec[]> = {
     { key: 'reviews', module: 'dine', name: 'Үнэлгээ', icon: 'reviews' },
     { key: 'stats', module: 'idesh', name: 'Тоон үзүүлэлт', icon: 'stats' },
     { key: 'orders', module: 'idesh', name: 'Захиалгууд', icon: 'orders', actions: { manage: 'Цуцлах, хүлээлгэн өгөх, мэдэгдэл дахин илгээх' } },
-    { key: 'suppliers', module: 'idesh', name: 'Нийлүүлэгчид', icon: 'suppliers', actions: { manage: 'Батлах, бүртгэх, зогсоох, код гаргах, зар нуух', terms: 'Шимтгэл, данс, дансны баталгаажуулалт' } },
+    { key: 'suppliers', module: 'idesh', name: 'Нийлүүлэгчид', icon: 'suppliers', actions: { manage: 'Батлах, бүртгэх, зогсоох, код гаргах, зар нуух', terms: 'ТТД, данс, дансны баталгаажуулалт' } },
     { key: 'pay', module: 'idesh', name: 'Олголт, буцаалт', icon: 'pay', actions: { approve: 'Олголт батлах, шилжүүлснийг тэмдэглэх' } },
     { key: 'promotions', module: 'idesh', name: 'Онцлох зар', icon: 'tag', actions: { manage: 'Онцлолт зогсоох' } },
     { key: 'certificates', module: 'idesh', name: 'Гэрчилгээ', icon: 'file', actions: { check: 'Гэрчилгээг шалгасан, хүчингүй гэж тэмдэглэх' } },

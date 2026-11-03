@@ -17,8 +17,10 @@ import { FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '..
 import { seedGuest, truncateAll } from '../test/seed.js';
 import { tick } from '../scheduler/runner.js';
 import {
+  DEFAULT_COMMISSION_PCT,
   FORFEIT_PCT,
   cancelIdesh,
+  commissionOf,
   createIdesh,
   addCertificate,
   createListing,
@@ -420,7 +422,7 @@ describe('the supplier’s share', () => {
     await markHanded(ctx, orderId, 'supplier:d1');
 
     // 2% of 460 000 is 9 200; the 25 000 delivery fee passes through whole.
-    const commission = Math.round(sheep.priceMnt * 0.02);
+    const commission = commissionOf(sheep.priceMnt, DEFAULT_COMMISSION_PCT);
     expect(totalMnt).toBe(sheep.priceMnt + 25_000);
     expect(await settlementsOf(supplierId)).toEqual([]);
     expect(await owed(`supplier:${supplierId}`)).toBe(0);
@@ -470,7 +472,7 @@ describe('Basu’s service fee, from the guest', () => {
   const FEE = 2_000;
   const by = { actor: 'supplier:d1', role: 'supplier' as const };
 
-  it('is paid on top of the supplier’s total, stays out of their commission and payout, and is Basu’s', async () => {
+  it('is paid on top of the supplier’s total, stays out of their payout, and is Basu’s', async () => {
     const { orderId, totalMnt, serviceFeeMnt } = await book({ serviceFeeMnt: FEE });
     expect(serviceFeeMnt).toBe(FEE);
     expect(totalMnt).toBe(sheep.priceMnt + FEE);
@@ -486,8 +488,8 @@ describe('Basu’s service fee, from the guest', () => {
     await markHanded(ctx, orderId, 'supplier:d1');
     clock.advanceMinutes(25 * 60);
     await housekeeping(ctx);
-    // The commission is on the meat, the payout the supplier's total less it: the fee is in neither.
-    const commission = Math.round(sheep.priceMnt * 0.02);
+    // The payout is the supplier's total (no commission since 057): the fee is not in it.
+    const commission = commissionOf(sheep.priceMnt, DEFAULT_COMMISSION_PCT);
     const [payout] = await settlementsOf(supplierId);
     expect(payout).toMatchObject({ kind: 'payout', amountMnt: sheep.priceMnt - commission });
     expect(await owed(`supplier:${supplierId}`)).toBe(sheep.priceMnt - commission);
@@ -548,7 +550,7 @@ describe('a supplier is paid a day at a time', () => {
     clock.advanceMinutes(24 * 60);
     expect(await gatherPayouts(clock.now())).toBe(2);
     const batches = await listBatches();
-    const commission = Math.round(sheep.priceMnt * 0.02);
+    const commission = commissionOf(sheep.priceMnt, DEFAULT_COMMISSION_PCT);
     expect(batches.map((b) => [b.orders, b.amountMnt])).toEqual([
       [2, first.totalMnt + second.totalMnt - 2 * commission],
       [1, third.totalMnt - commission],
