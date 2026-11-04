@@ -20,7 +20,8 @@ import {
   type Scope,
 } from '../platform/access/index.js';
 import { contactsFor, displayNamesFor } from '../platform/identity/index.js';
-import { membersOf, noteRolesChanged, orgById, roleCounts, setRole } from '../platform/org/index.js';
+import { enqueue } from '../platform/notify/index.js';
+import { addMember, membersOf, noteRolesChanged, orgById, removeMember, roleCounts, setRole } from '../platform/org/index.js';
 import type { Ctx } from '../ports.js';
 import { matrix } from './access.js';
 import { badRequest, forbidden, sendError } from './errors.js';
@@ -297,6 +298,53 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
     return reply.send({ chosen });
   });
 
+  /** Who, by the name their account chose (else the address or number it signs in with) — what the desk's record says. */
+  const personWord = async (guestId: string): Promise<string> => {
+    const [names, contacts] = await Promise.all([displayNamesFor([guestId]), contactsFor([guestId])]);
+    const phone = contacts.get(guestId)?.phone?.replace(/^\+976(\d{4})(\d{4})$/, '+976 $1 $2');
+    return names.get(guestId) ?? contacts.get(guestId)?.email ?? phone ?? 'нэргүй хүн';
+  };
+
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  /**
+   * The desk seats somebody at a business — its head too — for people who
+   * do not know Basu yet: an account that signed in once, chosen from
+   * Basu's users, in a role the business may hand out. Nobody's address is
+   * typed in; the person is told they are there.
+   */
+  app.post<{ Params: { id: string }; Body: { guest_id?: string; role?: string } }>(
+    '/v1/ops/orgs/:id/members',
+    desk('desk.orgs:access'),
+    async (request, reply) => {
+      const { guest_id: guestId, role } = request.body ?? {};
+      if (typeof guestId !== 'string' || !UUID.test(guestId) || typeof role !== 'string' || !role) {
+        return badRequest(reply, 'Хүн, үүргээ сонгоно уу.', 'guest_id and role are required');
+      }
+      if (!(await contactsFor([guestId])).has(guestId)) {
+        return reply.status(404).send({ error: { code: 'NOT_FOUND', message_mn: 'Ийм хэрэглэгч олдсонгүй.', message_en: 'no such account' } });
+      }
+      try {
+        await addMember({ orgId: request.params.id, guestId, role, by: who(request), desk: who(request), now: ctx.clock.now() });
+        const [person, roleName, org] = await Promise.all([personWord(guestId), roleNames('org'), orgById(request.params.id)]);
+        await enqueue(ctx, {
+          guestId,
+          template: 'org.member',
+          title: org?.name ?? 'Байгууллага',
+          body: `Таныг «${org?.name ?? ''}» байгууллагад нэмлээ — үүрэг: ${roleName(role)}. basu.burzai.cloud/dashboard-д нэвтэрнэ үү.`,
+          channel: 'push',
+          subject: 'org',
+          subjectId: request.params.id,
+          dedupeKey: `org:${request.params.id}:member:${guestId}:${ctx.clock.now().getTime()}`,
+        });
+        await audit(request, { action: 'org.member_add', targetKind: 'org', targetId: request.params.id, note: `${org ? `${org.name} · ` : ''}${person} · ${roleName(role)}` });
+        return reply.status(201).send({ guest_id: guestId, role, name: person });
+      } catch (error) {
+        return orgRefusal(reply, error);
+      }
+    },
+  );
+
   /** The desk sets somebody's role at a business — its head too — from the roles that business may hand out. */
   app.patch<{ Params: { id: string; guestId: string }; Body: { role?: string } }>(
     '/v1/ops/orgs/:id/members/:guestId',
@@ -306,11 +354,7 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
       if (typeof role !== 'string' || !role) return badRequest(reply, 'Үүргээ сонгоно уу.', 'role is required');
       try {
         await setRole({ orgId: request.params.id, guestId: request.params.guestId, role, by: who(request), desk: who(request), now: ctx.clock.now() });
-        // Who, by the name their account chose (else the address or number it signs in with), and the role by its name.
-        const guestId = request.params.guestId;
-        const [names, contacts, roleName, org] = await Promise.all([displayNamesFor([guestId]), contactsFor([guestId]), roleNames('org'), orgById(request.params.id)]);
-        const phone = contacts.get(guestId)?.phone?.replace(/^\+976(\d{4})(\d{4})$/, '+976 $1 $2');
-        const person = names.get(guestId) ?? contacts.get(guestId)?.email ?? phone ?? 'нэргүй хүн';
+        const [person, roleName, org] = await Promise.all([personWord(request.params.guestId), roleNames('org'), orgById(request.params.id)]);
         await audit(request, {
           action: 'org.member_role',
           targetKind: 'org',
@@ -318,6 +362,23 @@ export function registerAccessDesk(app: FastifyInstance, ctx: Ctx, { desk, deskA
           note: `${org ? `${org.name} · ` : ''}${person} → ${roleName(role)}`,
         });
         return reply.send({ guest_id: request.params.guestId, role });
+      } catch (error) {
+        return orgRefusal(reply, error);
+      }
+    },
+  );
+
+  /** The desk takes somebody out of a business — never its last head. */
+  app.delete<{ Params: { id: string; guestId: string } }>(
+    '/v1/ops/orgs/:id/members/:guestId',
+    desk('desk.orgs:access'),
+    async (request, reply) => {
+      try {
+        const person = await personWord(request.params.guestId);
+        await removeMember({ orgId: request.params.id, guestId: request.params.guestId, by: who(request), desk: who(request), now: ctx.clock.now() });
+        const org = await orgById(request.params.id);
+        await audit(request, { action: 'org.member_remove', targetKind: 'org', targetId: request.params.id, note: `${org ? `${org.name} · ` : ''}${person}` });
+        return reply.status(204).send();
       } catch (error) {
         return orgRefusal(reply, error);
       }

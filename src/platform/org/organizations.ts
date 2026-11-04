@@ -251,19 +251,39 @@ async function mayHandle(org: Organization, grants: Grants, role: Role | null, d
   return mayHandOut(grants, role, org, await linksOf('org', db));
 }
 
-/** Bring somebody in, in one of the roles this business may hand out. They must have signed in to Basu once — that is who they are. */
-export async function addMember(input: { orgId: string; guestId: string; role: OrgRole; by: string; now: Date }): Promise<void> {
+/**
+ * Bring somebody in, in one of the roles this business may hand out. They
+ * must have signed in to Basu once — that is who they are. The desk,
+ * setting a business up for people who do not know Basu yet, may seat
+ * anybody in any role the business has, its head too, once it is approved.
+ */
+export async function addMember(input: { orgId: string; guestId: string; role: OrgRole; by: string; now: Date; desk?: string }): Promise<void> {
   await tx(async (client) => {
-    const { org, grants } = await actorAt(input.orgId, input.by, client);
+    if (input.desk) {
+      const org = await orgById(input.orgId, client);
+      if (!org) throw new OrgError('NOT_FOUND', 'no such organisation');
+      if (org.state !== 'active') throw new OrgError('FORBIDDEN', 'the business is not approved', 'Эхлээд байгууллагыг батална уу.');
+    }
     const role = await openRole(input.orgId, input.role, client);
-    if (!(await mayHandle(org, grants, role, client))) throw new OrgError('FORBIDDEN', `cannot give the role ${input.role}`);
+    if (!input.desk) {
+      const { org, grants } = await actorAt(input.orgId, input.by, client);
+      if (!(await mayHandle(org, grants, role, client))) throw new OrgError('FORBIDDEN', `cannot give the role ${input.role}`);
+    }
     const { rowCount } = await client.query(
       `INSERT INTO org.membership (org_id, guest_id, role, added_by, added_at) VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (org_id, guest_id) DO NOTHING`,
-      [input.orgId, input.guestId, role.key, input.by, input.now],
+      [input.orgId, input.guestId, role.key, input.desk ? null : input.by, input.now],
     );
     if (!rowCount) throw new OrgError('ALREADY_MEMBER', 'already a member here');
-    await note(client, { orgId: input.orgId, by: input.by, action: 'added', guestId: input.guestId, role: role.key, roleName: role.name, at: input.now });
+    await note(client, {
+      orgId: input.orgId,
+      ...(input.desk ? { desk: input.desk } : { by: input.by }),
+      action: 'added',
+      guestId: input.guestId,
+      role: role.key,
+      roleName: role.name,
+      at: input.now,
+    });
   });
 }
 
@@ -307,8 +327,11 @@ export async function setRole(input: { orgId: string; guestId: string; role: Org
   });
 }
 
-/** Take somebody out. Anybody may leave; a business never loses its last head. */
-export async function removeMember(input: { orgId: string; guestId: string; by: string; now: Date }): Promise<void> {
+/**
+ * Take somebody out. Anybody may leave; the desk may take out anybody;
+ * a business never loses its last head.
+ */
+export async function removeMember(input: { orgId: string; guestId: string; by: string; now: Date; desk?: string }): Promise<void> {
   await tx(async (client) => {
     const current = await client.query<{ role: OrgRole }>(
       'SELECT role FROM org.membership WHERE org_id = $1 AND guest_id = $2 FOR UPDATE',
@@ -317,14 +340,22 @@ export async function removeMember(input: { orgId: string; guestId: string; by: 
     const was = current.rows[0]?.role;
     if (!was) throw new OrgError('NOT_FOUND', 'not a member here');
     const wasRole = await roleOf('org', was, client);
-    const leaving = input.guestId === input.by;
-    if (!leaving) {
+    const leaving = !input.desk && input.guestId === input.by;
+    if (!leaving && !input.desk) {
       const { org, grants } = await actorAt(input.orgId, input.by, client);
       if (!(await mayHandle(org, grants, wasRole, client))) throw new OrgError('FORBIDDEN', `cannot remove a ${was}`);
     }
     await client.query('DELETE FROM org.membership WHERE org_id = $1 AND guest_id = $2', [input.orgId, input.guestId]);
     await keepAHead(client, input.orgId);
-    await note(client, { orgId: input.orgId, by: input.by, action: leaving ? 'left' : 'removed', guestId: input.guestId, was, wasName: wasRole?.name ?? was, at: input.now });
+    await note(client, {
+      orgId: input.orgId,
+      ...(input.desk ? { desk: input.desk } : { by: input.by }),
+      action: leaving ? 'left' : 'removed',
+      guestId: input.guestId,
+      was,
+      wasName: wasRole?.name ?? was,
+      at: input.now,
+    });
   });
 }
 

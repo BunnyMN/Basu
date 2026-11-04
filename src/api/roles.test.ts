@@ -252,6 +252,50 @@ describe('a business role Basu writes', () => {
     const audit = (await call('GET', '/v1/ops/audit', DESK())).json().audit as Array<{ action: string; note: string | null }>;
     expect(audit.find((a) => a.action === 'org.member_role')?.note).toBe('Хэрлэн мах · Бат → Эзэн');
   });
+
+  it('lets the desk seat and take out a business’s people for them, from accounts that signed in once', async () => {
+    const owner = await person('+97699130051', 'Дорж');
+    const cook = await person('+97699130052', 'Сараа');
+    const heir = await person('+97699130053', 'Тулга');
+    const saraa = (await call('GET', '/v1/access', cook)).json().account.id as string;
+    const tulga = (await call('GET', '/v1/access', heir)).json().account.id as string;
+
+    // Not before Basu has approved the business.
+    const applied = await call('POST', '/v1/orgs', owner, { name: 'Онон мах', supplier: true, phone: '8811 0001', address: 'Нарантуул' });
+    expect((await call('POST', `/v1/ops/orgs/${applied.json().id}/members`, DESK(), { guest_id: saraa, role: 'staff' })).statusCode).toBe(403);
+
+    const orgId = await aBusiness(owner, 'Туул мах', { supplier: true });
+    // The people the desk picks from: Basu's users, found by name.
+    const found = (await call('GET', '/v1/ops/people?q=%D0%A1%D0%B0%D1%80%D0%B0%D0%B0', DESK())).json().people as Array<{ id: string }>;
+    expect(found.map((p) => p.id)).toContain(saraa);
+
+    const added = await call('POST', `/v1/ops/orgs/${orgId}/members`, DESK(), { guest_id: saraa, role: 'staff' });
+    expect(added.statusCode, added.body).toBe(201);
+    expect(added.json().name).toBe('Сараа');
+    // Its head too, which the business's own manager could not give.
+    expect((await call('POST', `/v1/ops/orgs/${orgId}/members`, DESK(), { guest_id: tulga, role: 'owner' })).statusCode).toBe(201);
+    expect((await call('POST', `/v1/ops/orgs/${orgId}/members`, DESK(), { guest_id: saraa, role: 'manager' })).json().error.code).toBe('ALREADY_MEMBER');
+    expect((await call('POST', `/v1/ops/orgs/${orgId}/members`, DESK(), { guest_id: '00000000-0000-4000-8000-000000000000', role: 'staff' })).statusCode).toBe(404);
+    expect((await call('POST', `/v1/ops/orgs/${orgId}/members`, DESK(), { guest_id: saraa, role: 'no-such' })).statusCode).toBe(400);
+
+    // Seated at once: the cook's own dashboard has the business.
+    const seats = (await call('GET', '/v1/access', cook)).json().workspaces as Array<{ id: string; role: string | null }>;
+    expect(seats.find((w) => w.id === orgId)?.role).toBe('staff');
+
+    // Taken out again, and never the last head.
+    expect((await call('DELETE', `/v1/ops/orgs/${orgId}/members/${saraa}`, DESK())).statusCode).toBe(204);
+    const dorj = (await call('GET', `/v1/orgs/${orgId}`, owner)).json().members.find((m: { you: boolean }) => m.you).guest_id;
+    expect((await call('DELETE', `/v1/ops/orgs/${orgId}/members/${dorj}`, DESK())).statusCode).toBe(204);
+    expect((await call('DELETE', `/v1/ops/orgs/${orgId}/members/${tulga}`, DESK())).json().error.code).toBe('LAST_OWNER');
+
+    // The business's record says Basu did it; the desk's names the person and the role.
+    const log = (await call('GET', `/v1/orgs/${orgId}/log`, heir)).json().log as Array<{ action: string; by: string | null; who: string | null }>;
+    expect(log.filter((e) => e.action === 'added').map((e) => [e.who, e.by?.startsWith('Basu')])).toEqual([['Тулга', true], ['Сараа', true]]);
+    expect(log.find((e) => e.action === 'removed' && e.who === 'Сараа')?.by?.startsWith('Basu')).toBe(true);
+    const audit = (await call('GET', '/v1/ops/audit', DESK())).json().audit as Array<{ action: string; note: string | null }>;
+    expect(audit.filter((a) => a.action === 'org.member_add').map((a) => a.note)).toEqual(['Туул мах · Тулга · Эзэн', 'Туул мах · Сараа · Ажилтан']);
+    expect(audit.filter((a) => a.action === 'org.member_remove').map((a) => a.note)).toEqual(['Туул мах · Дорж', 'Туул мах · Сараа']);
+  });
 });
 
 describe('a fresh server', () => {
