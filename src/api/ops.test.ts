@@ -176,16 +176,23 @@ describe('the ops desk', () => {
     });
     expect(bad.statusCode).toBe(400);
 
-    // A second business for the same owner — a «Салбар 2» — is refused by name, not a failure.
+    // A second business for the same owner — a «Салбар 2» — is a supplier of its own, with its own organisation.
     const again = await app.inject({
       method: 'POST',
       url: '/v1/ops/suppliers',
       headers: auth(opsToken()!),
       payload: { name: 'Хэнтий · Хэрлэн Салбар 2', phone: '+97688010002', owner: '+97688010002', tin: '45200197789', address: 'Баянзүрх' },
     });
-    expect(again.statusCode, again.body).toBe(409);
-    expect(again.json().error).toMatchObject({ code: 'ALREADY_SUPPLIER' });
-    expect(again.json().error.message_mn).toContain('«Хэнтий · Хэрлэн»');
+    expect(again.statusCode, again.body).toBe(201);
+    expect(again.json().id).not.toBe(made.json().id);
+    const orgs = (await app.inject({ method: 'GET', url: '/v1/orgs/mine', headers: auth(owner) })).json().orgs as { name: string; role: string; tin: string | null }[];
+    expect(orgs.map((o) => [o.name, o.role, o.tin])).toHaveLength(2);
+    expect(orgs.map((o) => [o.name, o.role, o.tin])).toEqual(
+      expect.arrayContaining([
+        ['Хэнтий · Хэрлэн', 'owner', '6502345678'],
+        ['Хэнтий · Хэрлэн Салбар 2', 'owner', '45200197789'],
+      ]),
+    );
   });
 
   it('refuses a second open application and a form without an address', async () => {

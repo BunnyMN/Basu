@@ -37,7 +37,6 @@ import {
   type SupplierRow,
   type Tally,
   supplierForOrg,
-  openSupplierOf,
 } from '../idesh/index.js';
 import { limits } from './hardening.js';
 import { need, needAny } from './guards.js';
@@ -417,17 +416,6 @@ export async function registerOpsRoutes(
       if (pending?.supplier && pending.state === 'applied' && (!pending.phone || !pending.address)) {
         return badRequest(reply, 'Нийлүүлэгчид утас, хаяг заавал хэрэгтэй.', 'a supplier needs a phone and an address');
       }
-      // One supplier per person: one who already runs one is told so before anything is approved — never a
-      // business made active with no supplier behind it. (An application still waiting is taken over below.)
-      if (pending?.supplier && pending.state === 'applied' && (await openSupplierOf(pending.appliedBy))?.state === 'contracted') {
-        return reply.status(409).send({
-          error: {
-            code: 'ALREADY_SUPPLIER',
-            message_mn: 'Бүртгүүлсэн хүн аль хэдийн нийлүүлэгч ажиллуулж байна — нэг хүн нэг л нийлүүлэгч эзэмшинэ. Энэ бүртгэлийг татгалзана уу.',
-            message_en: 'the registrant already runs a contracted supplier',
-          },
-        });
-      }
       const org = await approveOrg({ id: request.params.id, by: who(request), now: ctx.clock.now() });
       if (org.supplier) {
         await supplierForOrg({
@@ -668,20 +656,6 @@ export async function registerOpsRoutes(
           code: 'NO_ACCOUNT',
           message_mn: 'Эзэмшигч Basu-д бүртгэлгүй байна. Тэр хүн эхлээд Basu-д нэвтэрч бүртгүүлнэ, дараа нь түүний утас эсвэл имэйлээр энд бүртгэнэ.',
           message_en: 'the owner has no Basu account',
-        },
-      });
-    }
-    // One supplier per person: the owner who already holds one is told which, before anything is written.
-    const held = await openSupplierOf(owner.guestId);
-    if (held) {
-      return reply.status(409).send({
-        error: {
-          code: 'ALREADY_SUPPLIER',
-          message_mn:
-            held.state === 'contracted'
-              ? `Энэ эзэмшигч аль хэдийн «${held.name}» нийлүүлэгчийг эзэмшдэг — нэг хүн нэг л нийлүүлэгч эзэмшинэ. Өөр хүний Basu бүртгэлийг эзэмшигчээр бичнэ үү.`
-              : `Энэ эзэмшигч «${held.name}» нэрээр нийлүүлэгч болох хүсэлт гаргасан, хүлээгдэж байна — шинээр бүртгэхийн оронд тэр хүсэлтийг батална уу.`,
-          message_en: 'the owner already has an open supplier',
         },
       });
     }

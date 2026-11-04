@@ -139,18 +139,35 @@ describe('registering a business', () => {
     expect(suppliers.map((x) => [x.name, x.state])).toEqual([['Хэрлэн мах', 'contracted']]);
   });
 
-  it('is refused before anything is approved when its owner already runs a supplier', async () => {
+  it('makes a second business of an owner who already runs one its own supplier, opened from its own workspace', async () => {
+    // A company with a branch and a brand: one account owns them all, each a supplier of its own.
     const owner = await person('+97699110001', 'Дорж');
-    await aButcher(owner);
-    const second = await call('POST', '/v1/orgs', owner, { name: 'Хоёр дахь мах', supplier: true, phone: '88110002', address: 'Бөмбөгөр' });
+    const first = await aButcher(owner);
+    const second = await call('POST', '/v1/orgs', owner, { name: 'STEPPE MEAT', supplier: true, phone: '+976 91059098', tin: '45200197789', address: 'Төв аймаг Аргалант сум 2-р баг' });
     expect(second.statusCode, second.body).toBe(201);
-    const no = await app.inject({ method: 'POST', url: `/v1/ops/orgs/${second.json().id}/approve`, headers: desk() });
-    expect(no.statusCode, no.body).toBe(409);
-    expect(no.json().error.code).toBe('ALREADY_SUPPLIER');
-    // Still waiting, for the desk to decline — nothing made active with no supplier behind it.
-    const mine = (await call('GET', '/v1/orgs/mine', owner)).json().orgs as { name: string; state: string }[];
-    expect(mine.find((o) => o.name === 'Хоёр дахь мах')).toMatchObject({ state: 'applied' });
-    expect((await app.inject({ method: 'POST', url: `/v1/ops/orgs/${second.json().id}/decline`, headers: desk(), payload: { reason: 'Давхар' } })).statusCode).toBe(200);
+    const yes = await app.inject({ method: 'POST', url: `/v1/ops/orgs/${second.json().id}/approve`, headers: desk() });
+    expect(yes.statusCode, yes.body).toBe(200);
+
+    const mine = (await call('GET', '/v1/orgs/mine', owner)).json().orgs as { name: string; state: string; role: string }[];
+    expect(mine).toHaveLength(2);
+    expect(mine.map((o) => [o.name, o.state, o.role])).toEqual(
+      expect.arrayContaining([
+        ['STEPPE MEAT', 'active', 'owner'],
+        ['Хэрлэн мах', 'active', 'owner'],
+      ]),
+    );
+    // Each workspace opens its own supplier.
+    const at = (orgId: string) => app.inject({ method: 'GET', url: '/v1/supplier/me', headers: { ...bearer(owner), 'x-basu-org': orgId } });
+    expect((await at(first)).json().supplier).toMatchObject({ name: 'Хэрлэн мах', state: 'contracted' });
+    expect((await at(second.json().id)).json().supplier).toMatchObject({ name: 'STEPPE MEAT', state: 'contracted' });
+    const suppliers = (await app.inject({ method: 'GET', url: '/v1/ops/suppliers', headers: desk() })).json().suppliers as { name: string; state: string }[];
+    expect(suppliers).toHaveLength(2);
+    expect(suppliers.map((x) => [x.name, x.state])).toEqual(
+      expect.arrayContaining([
+        ['STEPPE MEAT', 'contracted'],
+        ['Хэрлэн мах', 'contracted'],
+      ]),
+    );
   });
 
   it('can be declined with a reason, which the registrant sees', async () => {

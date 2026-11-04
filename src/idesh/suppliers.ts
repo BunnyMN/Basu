@@ -72,8 +72,7 @@ export async function registerSupplier(input: SupplierInput & { ownerId: string 
 
 async function insertContracted(input: SupplierInput & { ownerId: string }, db: Db): Promise<string> {
   const account = bankAccountOf(input.bankAccount);
-  const { rows } = await db
-    .query<{ id: string }>(
+  const { rows } = await db.query<{ id: string }>(
     `INSERT INTO idesh.supplier
        (name, phone, ebarimt_merchant_tin, pickup_address, lat, lon, state, contracted_at,
         bank_name, bank_account, bank_holder, owner_guest_id, bank_verified_at)
@@ -90,12 +89,7 @@ async function insertContracted(input: SupplierInput & { ownerId: string }, db: 
       seal(input.bankHolder?.trim()),
       input.ownerId,
     ],
-  )
-    .catch((error: unknown) => {
-      // One open supplier per person (supplier_applicant_open_idx): a second is refused, never a failure.
-      if ((error as { code?: string }).code === '23505') throw new IdeshError('ALREADY_APPLIED', 'this person already owns a supplier');
-      throw error;
-    });
+  );
   return rows[0]!.id;
 }
 
@@ -144,23 +138,6 @@ async function giveOrganisation(supplierId: string, db: Db = getPool()): Promise
     now: new Date(),
   });
   await db.query('UPDATE idesh.supplier SET org_id = $2 WHERE id = $1 AND org_id IS NULL', [supplierId, org.id]);
-}
-
-/**
- * The supplier row this person owns that is still open — an application
- * waiting, or a contract — if any. One per person (supplier_applicant_open_idx):
- * what the desk asks before it approves a supplier business, so a second
- * contract is refused before anything is approved, never half-way through.
- */
-export async function openSupplierOf(
-  guestId: string,
-): Promise<{ id: string; name: string; state: 'applied' | 'contracted'; orgId: string | null } | null> {
-  const { rows } = await getPool().query<{ id: string; name: string; state: 'applied' | 'contracted'; org_id: string | null }>(
-    `SELECT id, name, state, org_id FROM idesh.supplier WHERE owner_guest_id = $1 AND state IN ('applied', 'contracted') LIMIT 1`,
-    [guestId],
-  );
-  const r = rows[0];
-  return r ? { id: r.id, name: r.name, state: r.state, orgId: r.org_id } : null;
 }
 
 /**
