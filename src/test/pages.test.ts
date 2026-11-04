@@ -5216,6 +5216,39 @@ describe('Basu decides who may do what', () => {
     const now = (await (await fetch(`${base}/v1/orgs/${made.id}`, { headers: as(owner) })).json()) as { members: Array<{ guest_id: string; role: string }> };
     expect(now.members.find((m) => m.guest_id === found.guest_id)?.role).toBe('accountant');
   });
+
+  it('adds somebody to a supplier right on its page, from Basu’s users, in the role the desk gives', async () => {
+    const reg = async (phone: string, name: string) =>
+      ((await (await fetch(`${base}/v1/auth/register`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ phone, password: GUEST_PASSWORD, name }) })).json()) as { token: string }).token;
+    const owner = await reg('+97688040011', 'Эзэн · нийлүүлэгч');
+    const cook = await reg('+97688040012', 'Шинэ ажилтан · нийлүүлэгч');
+    const as = (t: string) => ({ 'content-type': 'application/json', authorization: `Bearer ${t}` });
+    const made = (await (await fetch(`${base}/v1/orgs`, { method: 'POST', headers: as(owner), body: JSON.stringify({ name: 'Хүнтэй мах · тест', supplier: true, phone: '8811 0001', address: 'Нарантуул' }) })).json()) as { id: string };
+    await fetch(`${base}/v1/ops/orgs/${made.id}/approve`, { method: 'POST', headers: { authorization: `Bearer ${await deskToken()}` } });
+
+    const desk = await theDesk();
+    await opsTab(desk, 'suppliers');
+    await until(desk, 'the supplier', (d) => [...d.querySelectorAll('#all tr[data-supplier]')].some((r) => r.textContent?.includes('Хүнтэй мах · тест')));
+    ([...desk.window.document.querySelectorAll('#all tr[data-supplier]')].find((r) => r.textContent?.includes('Хүнтэй мах · тест')) as HTMLElement).click();
+    // Its people are on the supplier's own page, with the way to add one.
+    await until(desk, 'its people', (d) => d.querySelectorAll('[data-people] tr[data-member]').length === 1 && Boolean(d.querySelector('#org-member-add')));
+    const doc = desk.window.document;
+    (doc.querySelector('#org-member-add') as HTMLElement).click();
+    await until(desk, 'the picker', (d) => Boolean(d.querySelector('#org-member-new .popup-pick input[type="search"]')));
+    const search = doc.querySelector('#org-member-new .popup-pick input[type="search"]') as HTMLInputElement;
+    search.value = 'Шинэ ажилтан';
+    search.dispatchEvent(new desk.window.Event('input', { bubbles: true }));
+    await until(desk, 'the one looked for', (d) => {
+      const rows = [...d.querySelectorAll('#org-member-new .popup-pick-row')];
+      return rows.length === 1 && Boolean(rows[0]!.textContent?.includes('Шинэ ажилтан'));
+    });
+    (doc.querySelector('#org-member-new .popup-pick-row input') as HTMLInputElement).click();
+    (doc.querySelector('#org-member-new [name="role"]') as HTMLSelectElement).value = 'manager';
+    (doc.querySelector('#org-member-new [data-submit]') as HTMLElement).click();
+    await until(desk, 'the new person on the page', (d) => [...d.querySelectorAll('[data-people] tr[data-member]')].some((r) => r.textContent?.includes('+976 8804 0012') && r.textContent.includes('Менежер')));
+    const seats = (await (await fetch(`${base}/v1/access`, { headers: as(cook) })).json()) as { workspaces: Array<{ id: string; role: string | null }> };
+    expect(seats.workspaces.find((w) => w.id === made.id)?.role).toBe('manager');
+  });
 });
 
 describe('a stranger’s words render as text, never as markup', () => {

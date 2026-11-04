@@ -1654,7 +1654,7 @@ async function renderOrgsDesk(view) {
         ];
       }
       if (o.state === 'active') {
-        const access = el('<button class="btn" data-size="sm" type="button" data-a="access">Үүрэг, эрх</button>');
+        const access = el('<button class="btn" data-size="sm" type="button" data-a="access">Хүмүүс, үүрэг</button>');
         access.addEventListener('click', () => openOrgAccess(o.id));
         return access;
       }
@@ -2476,6 +2476,123 @@ async function renderMenus(view) {
 }
 
 /**
+ * A business's people and their roles, as the desk sees them: on the
+ * business's own page and on its supplier's. Whoever decides for it adds
+ * somebody — an account that signed in once, chosen from Basu's users, as
+ * for the desk's own seats — changes a role, takes somebody out; the
+ * desk sets a business up for people who do not know Basu yet.
+ */
+function orgPeople(orgId, data, refresh) {
+  const deciding = can('desk.orgs:access');
+  const open = data.roles.filter((r) => r.open);
+  const nameOf = (key) => data.roles.find((r) => r.key === key)?.name ?? key;
+  const people = dataTable({
+    columns: [
+      { key: 'name', label: 'Нэр', value: (m) => m.name ?? '', render: (m) => personName(m.name) },
+      { key: 'contact', label: 'Утас, имэйл', render: (m) => contactCell(m.contact) },
+      { key: 'role', label: 'Үүрэг', value: (m) => m.role_name ?? nameOf(m.role) },
+    ],
+    search: data.members.length > 8 ? { placeholder: 'Нэр, утас, имэйл…' } : false,
+    actions: deciding
+      ? (m) => [
+          button(
+            'Үүрэг солих',
+            () => {
+              void popup({
+                title: 'Үүрэг солих',
+                sub: `${esc(m.name ?? '')} · ${esc(data.org.name)}`,
+                width: 480,
+                id: 'org-member-role',
+                fields: [{ name: 'role', label: 'Үүрэг', type: 'select', options: open.map((r) => [r.key, r.name]), value: m.role, wide: true, hint: open.find((r) => r.key === m.role)?.description || ' ' }],
+                onSubmit: async (v) => {
+                  if (v.role === m.role) return true;
+                  await ops(`/v1/ops/orgs/${orgId}/members/${m.guest_id}`, { method: 'PATCH', body: { role: v.role } });
+                  toast(`${m.name ?? 'Хүн'}: ${nameOf(v.role)}`, 'good');
+                  await refresh();
+                },
+              });
+              roleHint(document.getElementById('org-member-role'), open);
+            },
+            'data-size="sm" data-a="role"',
+          ),
+          button(
+            'Хасах',
+            () =>
+              confirmPopup({
+                title: 'Байгууллагаас хасах',
+                text: `<b>${esc(m.name ?? 'Энэ хүн')}</b> <b>${esc(data.org.name)}</b>-д ажиллахаа болино. Дараа нь дахин нэмж болно.`,
+                ok: 'Хасах',
+                danger: true,
+                onConfirm: async () => {
+                  await ops(`/v1/ops/orgs/${orgId}/members/${m.guest_id}`, { method: 'DELETE' });
+                  toast(`${m.name ?? 'Хүн'} хасагдлаа.`, 'good');
+                  await refresh();
+                },
+              }),
+            'data-v="danger" data-size="sm" data-a="remove"',
+          ),
+        ]
+      : null,
+    rowAttrs: (m) => ({ 'data-member': m.guest_id }),
+    noun: 'хүн',
+    empty: { title: 'Хүн алга', text: data.org.state === 'active' && deciding ? '«Хүн нэмэх»-ээр Basu-гийн хэрэглэгчээс сонгож нэмнэ.' : 'Батлагдсаны дараа эзэн нь ажилтнуудаа нэмнэ.' },
+    rows: data.members,
+  });
+  people.el.setAttribute('data-people', '');
+  const who = el('<section class="section"><h2 class="section-label">Хүмүүс, үүрэг</h2></section>');
+  // The desk sets a business up for people who do not know Basu yet: it chooses accounts that signed in once, as it
+  // does for its own seats, and gives each a role the business may hand out — its head too.
+  if (deciding && data.org.state === 'active') {
+    const seated = new Set(data.members.map((m) => m.guest_id));
+    const first = open.find((r) => !r.head) ?? open[0];
+    who.querySelector('.section-label').append(
+      button(
+        `${NAV_ICON.plus}Хүн нэмэх`,
+        () => {
+          void popup({
+            title: 'Хүн нэмэх',
+            sub: `<b>${esc(data.org.name)}</b>-д Basu-гийн хэрэглэгчээс сонгоод үүрэг өгнө.`,
+            width: 600,
+            id: 'org-member-new',
+            fields: [
+              {
+                type: 'pick',
+                name: 'guest_id',
+                label: 'Хэрэглэгч',
+                placeholder: 'Нэр, утас, имэйлээр хайх…',
+                empty: 'Ийм хэрэглэгч олдсонгүй. Хүн эхлээд Basu-д нэг удаа нэвтэрсэн байх ёстой.',
+                // Its email leads, as at the desk's own seats: a number a password sign-up typed proves nothing.
+                search: async (q) =>
+                  (await ops(`/v1/ops/people?q=${encodeURIComponent(q)}`)).people.map((p) => ({
+                    value: p.id,
+                    title: p.email || p.name || (p.phone && phoneText(p.phone)) || 'Нэргүй',
+                    sub: [p.email ? p.name : null, (p.email || p.name) && p.phone ? phoneText(p.phone) : null].filter(Boolean).join(' · '),
+                    flag: p.phone && !p.phone_verified ? 'баталгаагүй' : null,
+                    note: seated.has(p.id) ? 'Энд ажилладаг' : '',
+                    disabled: seated.has(p.id),
+                  })),
+              },
+              { name: 'role', label: 'Үүрэг', type: 'select', options: open.map((r) => [r.key, r.name]), value: first?.key, wide: true, hint: first?.description || ' ' },
+            ],
+            submit: 'Нэмэх',
+            onSubmit: async (v) => {
+              if (!v.guest_id) throw new Error('Хэрэглэгчээ жагсаалтаас сонгоно уу.');
+              const added = await ops(`/v1/ops/orgs/${orgId}/members`, { method: 'POST', body: { guest_id: v.guest_id, role: v.role } });
+              toast(`${added.name}: ${nameOf(added.role)} үүрэгтэй нэмэгдлээ.`, 'good');
+              await refresh();
+            },
+          });
+          roleHint(document.getElementById('org-member-new'), open);
+        },
+        'data-size="sm" id="org-member-add"',
+      ),
+    );
+  }
+  who.append(people.el);
+  return who;
+}
+
+/**
  * One business, from the desk: the people in it and their roles — any of
  * them the desk may change, its head too — and which roles, beyond those
  * open to every business, it may hand out. Both read here, changed in a popup.
@@ -2567,113 +2684,8 @@ async function openOrgAccess(orgId, from = { label: 'Байгууллагууд'
   ]);
   if (links) rail.append(links);
   view.append(page);
+  main.append(orgPeople(orgId, data, () => openOrgAccess(orgId, from)));
   const open = data.roles.filter((r) => r.open);
-  const nameOf = (key) => data.roles.find((r) => r.key === key)?.name ?? key;
-
-  const people = dataTable({
-    columns: [
-      { key: 'name', label: 'Нэр', value: (m) => m.name ?? '', render: (m) => personName(m.name) },
-      { key: 'contact', label: 'Утас, имэйл', render: (m) => contactCell(m.contact) },
-      { key: 'role', label: 'Үүрэг', value: (m) => m.role_name ?? nameOf(m.role) },
-    ],
-    search: data.members.length > 8 ? { placeholder: 'Нэр, утас, имэйл…' } : false,
-    actions: deciding
-      ? (m) => [
-          button(
-            'Үүрэг солих',
-            () => {
-              void popup({
-                title: 'Үүрэг солих',
-                sub: `${esc(m.name ?? '')} · ${esc(data.org.name)}`,
-                width: 480,
-                id: 'org-member-role',
-                fields: [{ name: 'role', label: 'Үүрэг', type: 'select', options: open.map((r) => [r.key, r.name]), value: m.role, wide: true, hint: open.find((r) => r.key === m.role)?.description || ' ' }],
-                onSubmit: async (v) => {
-                  if (v.role === m.role) return true;
-                  await ops(`/v1/ops/orgs/${orgId}/members/${m.guest_id}`, { method: 'PATCH', body: { role: v.role } });
-                  toast(`${m.name ?? 'Хүн'}: ${nameOf(v.role)}`, 'good');
-                  await openOrgAccess(orgId, from);
-                },
-              });
-              roleHint(document.getElementById('org-member-role'), open);
-            },
-            'data-size="sm" data-a="role"',
-          ),
-          button(
-            'Хасах',
-            () =>
-              confirmPopup({
-                title: 'Байгууллагаас хасах',
-                text: `<b>${esc(m.name ?? 'Энэ хүн')}</b> <b>${esc(data.org.name)}</b>-д ажиллахаа болино. Дараа нь дахин нэмж болно.`,
-                ok: 'Хасах',
-                danger: true,
-                onConfirm: async () => {
-                  await ops(`/v1/ops/orgs/${orgId}/members/${m.guest_id}`, { method: 'DELETE' });
-                  toast(`${m.name ?? 'Хүн'} хасагдлаа.`, 'good');
-                  await openOrgAccess(orgId, from);
-                },
-              }),
-            'data-v="danger" data-size="sm" data-a="remove"',
-          ),
-        ]
-      : null,
-    rowAttrs: (m) => ({ 'data-member': m.guest_id }),
-    noun: 'хүн',
-    empty: { title: 'Хүн алга', text: org.state === 'active' && deciding ? '«Хүн нэмэх»-ээр Basu-гийн хэрэглэгчээс сонгож нэмнэ.' : 'Батлагдсаны дараа эзэн нь ажилтнуудаа нэмнэ.' },
-    rows: data.members,
-  });
-  people.el.setAttribute('data-people', '');
-  const who = el('<section class="section"><h2 class="section-label">Хүмүүс, үүрэг</h2></section>');
-  // The desk sets a business up for people who do not know Basu yet: it chooses accounts that signed in once, as it
-  // does for its own seats, and gives each a role the business may hand out — its head too.
-  if (deciding && org.state === 'active') {
-    const seated = new Set(data.members.map((m) => m.guest_id));
-    const first = open.find((r) => !r.head) ?? open[0];
-    who.querySelector('.section-label').append(
-      button(
-        `${NAV_ICON.plus}Хүн нэмэх`,
-        () => {
-          void popup({
-            title: 'Хүн нэмэх',
-            sub: `<b>${esc(data.org.name)}</b>-д Basu-гийн хэрэглэгчээс сонгоод үүрэг өгнө.`,
-            width: 600,
-            id: 'org-member-new',
-            fields: [
-              {
-                type: 'pick',
-                name: 'guest_id',
-                label: 'Хэрэглэгч',
-                placeholder: 'Нэр, утас, имэйлээр хайх…',
-                empty: 'Ийм хэрэглэгч олдсонгүй. Хүн эхлээд Basu-д нэг удаа нэвтэрсэн байх ёстой.',
-                // Its email leads, as at the desk's own seats: a number a password sign-up typed proves nothing.
-                search: async (q) =>
-                  (await ops(`/v1/ops/people?q=${encodeURIComponent(q)}`)).people.map((p) => ({
-                    value: p.id,
-                    title: p.email || p.name || (p.phone && phoneText(p.phone)) || 'Нэргүй',
-                    sub: [p.email ? p.name : null, (p.email || p.name) && p.phone ? phoneText(p.phone) : null].filter(Boolean).join(' · '),
-                    flag: p.phone && !p.phone_verified ? 'баталгаагүй' : null,
-                    note: seated.has(p.id) ? 'Энд ажилладаг' : '',
-                    disabled: seated.has(p.id),
-                  })),
-              },
-              { name: 'role', label: 'Үүрэг', type: 'select', options: open.map((r) => [r.key, r.name]), value: first?.key, wide: true, hint: first?.description || ' ' },
-            ],
-            submit: 'Нэмэх',
-            onSubmit: async (v) => {
-              if (!v.guest_id) throw new Error('Хэрэглэгчээ жагсаалтаас сонгоно уу.');
-              const added = await ops(`/v1/ops/orgs/${orgId}/members`, { method: 'POST', body: { guest_id: v.guest_id, role: v.role } });
-              toast(`${added.name}: ${nameOf(added.role)} үүрэгтэй нэмэгдлээ.`, 'good');
-              await openOrgAccess(orgId, from);
-            },
-          });
-          roleHint(document.getElementById('org-member-new'), open);
-        },
-        'data-size="sm" id="org-member-add"',
-      ),
-    );
-  }
-  who.append(people.el);
-  main.append(who);
 
   const roles = el(`
     <section class="section"><h2 class="section-label">Энэ байгууллагад нээлттэй үүрэг</h2>
@@ -5315,6 +5327,14 @@ async function openSupplier(id, from = { label: 'Нийлүүлэгчид', go: 
   // The business this supplier is the идэш side of: its people and their roles are kept there.
   const links = related([s.org_id && hasPage('orgs') ? { label: 'Байгууллагын хуудас', sub: 'Хүмүүс, тэдний үүрэг, бүртгэлийн мэдээлэл', go: () => openOrgAccess(s.org_id, here) } : null]);
   if (links) rail.append(links);
+  // Who works there, on this page itself: the desk adds them and gives their roles here, not a page away.
+  if (s.org_id && hasPage('orgs')) {
+    const slot = el('<div data-supplier-people></div>');
+    main.append(slot);
+    ops(`/v1/ops/orgs/${s.org_id}/access`)
+      .then((data) => slot.replaceWith(orgPeople(s.org_id, data, () => openSupplier(id, from))))
+      .catch(() => slot.remove());
+  }
   if (s.about) main.append(el(`<section class="section"><h2 class="section-label">Тухай</h2><div class="card"><div class="card-body">${esc(s.about)}</div></div></section>`));
   view.append(page);
 
