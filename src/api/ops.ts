@@ -39,9 +39,9 @@ import {
   supplierForOrg,
 } from '../idesh/index.js';
 import { limits } from './hardening.js';
-import { need, needAny } from './guards.js';
+import { holds, need, needAny } from './guards.js';
 import { grantsOf, linksOf, roleOf, type Grants, type RoleShape } from '../platform/access/index.js';
-import { shapeBatch, shapeOrder, shapeSettlement } from './shapes.js';
+import { accountFor, shapeBatch, shapeOrder, shapeSettlement, type AccountView } from './shapes.js';
 import { overviewAt } from './overview.js';
 import { closeGuest, guestFile, guestSearch } from './guests.js';
 import { registerDineDesk } from './dineDesk.js';
@@ -248,7 +248,17 @@ export function actingAs(request: Pick<FastifyRequest, 'guestId' | 'sessionId' |
   };
 }
 
-const shape = (s: SupplierRow) => ({
+/**
+ * Whether this desk seat reads account numbers whole. A payout's or a
+ * refund's account goes whole only to the seats that send money; a
+ * supplier's contract account also to the seats that hold it up against the
+ * contract. Everybody else on the desk sees the bank and the last four digits.
+ */
+const sendsMoney = (request: FastifyRequest): AccountView => (holds(request, 'desk.pay:approve') ? 'full' : 'masked');
+const checksAccounts = (request: FastifyRequest): AccountView =>
+  holds(request, 'desk.suppliers:terms') ? 'full' : sendsMoney(request);
+
+const shape = (s: SupplierRow, sees: AccountView) => ({
   id: s.id,
   name: s.name,
   phone: s.phone,
@@ -264,7 +274,7 @@ const shape = (s: SupplierRow) => ({
   decline_reason: s.declineReason,
   commission_pct: s.commissionPct,
   bank_name: s.bankName,
-  bank_account: s.bankAccount,
+  bank_account: accountFor(s.bankAccount, sees),
   bank_holder: s.bankHolder,
   bank_verified: s.bankVerified,
   bank_changed_at: s.bankChangedAt?.toISOString() ?? null,
@@ -614,9 +624,10 @@ export async function registerOpsRoutes(
   });
 
   /** Everybody who is, or asked to be, a supplier. Applications first. */
-  app.get('/v1/ops/suppliers', deskAny('desk.suppliers', 'desk.orders'), async () => ({
-    suppliers: (await listSuppliers()).map(shape),
-  }));
+  app.get('/v1/ops/suppliers', deskAny('desk.suppliers', 'desk.orders'), async (request) => {
+    const sees = checksAccounts(request);
+    return { suppliers: (await listSuppliers()).map((s) => shape(s, sees)) };
+  });
 
   /**
    * Ops writes a contracted supplier straight in, as the script does. Its
@@ -736,7 +747,7 @@ export async function registerOpsRoutes(
       });
       await audit(request, { action: 'supplier.terms', targetKind: 'supplier', targetId: request.params.id, note: body.commission_pct !== undefined ? `шимтгэл ${body.commission_pct}%` : null });
       const row = (await listSuppliers()).find((s) => s.id === request.params.id);
-      return reply.send(row ? shape(row) : { id: request.params.id });
+      return reply.send(row ? shape(row, checksAccounts(request)) : { id: request.params.id });
     } catch (error) {
       return sendError(reply, error);
     }
@@ -760,11 +771,11 @@ export async function registerOpsRoutes(
    * refund the address and the number its account signs in with — what tells
    * two refunds to people who gave no name apart, as the guests' list does.
    */
-  const deskSettlements = async (list: Settlement[]) => {
+  const deskSettlements = async (list: Settlement[], sees: AccountView) => {
     const guests = await guestCards(list.flatMap((t) => (t.guest ? [t.guest.id] : [])));
     return list.map((t) => {
       const card = t.guest ? guests.get(t.guest.id) : undefined;
-      return { ...shapeSettlement(t), guest_email: card?.email ?? null, guest_phone: card?.phone ?? null };
+      return { ...shapeSettlement(t, sees), guest_email: card?.email ?? null, guest_phone: card?.phone ?? null };
     });
   };
 
@@ -793,7 +804,7 @@ export async function registerOpsRoutes(
     return reply.send({
       order: deskOrder(found.order, await guestCards([found.order.guestId])),
       events: found.events.map((e) => ({ seq: e.seq, type: e.type, actor: e.actor, payload: e.payload, at: e.at.toISOString() })),
-      settlements: await deskSettlements(found.settlements),
+      settlements: await deskSettlements(found.settlements, sendsMoney(request)),
     });
   });
 
@@ -981,7 +992,7 @@ export async function registerOpsRoutes(
         await setSupplierActive(request.params.id, active);
         await audit(request, { action: active ? 'supplier.activate' : 'supplier.suspend', targetKind: 'supplier', targetId: request.params.id, note: request.body?.note ?? null });
         const row = (await listSuppliers()).find((s) => s.id === request.params.id);
-        return reply.send(row ? shape(row) : { id: request.params.id, active });
+        return reply.send(row ? shape(row, checksAccounts(request)) : { id: request.params.id, active });
       } catch (error) {
         return sendError(reply, error);
       }
@@ -994,7 +1005,7 @@ export async function registerOpsRoutes(
       await verifySupplierBank(request.params.id);
       await audit(request, { action: 'supplier.bank_verify', targetKind: 'supplier', targetId: request.params.id, note: request.body?.note ?? null });
       const row = (await listSuppliers()).find((s) => s.id === request.params.id);
-      return reply.send(row ? shape(row) : { id: request.params.id, bank_verified: true });
+      return reply.send(row ? shape(row, checksAccounts(request)) : { id: request.params.id, bank_verified: true });
     } catch (error) {
       return sendError(reply, error);
     }
@@ -1061,11 +1072,12 @@ export async function registerOpsRoutes(
    * batches a supplier's payouts are sent in. A day just over is gathered
    * here too, so the list never waits on the scheduler's tick.
    */
-  app.get('/v1/ops/settlements', desk('desk.pay'), async () => {
+  app.get('/v1/ops/settlements', desk('desk.pay'), async (request) => {
     await gatherPayouts(ctx.clock.now());
+    const sees = sendsMoney(request);
     return {
-      settlements: await deskSettlements(await listSettlements()),
-      batches: (await listBatches()).map(shapeBatch),
+      settlements: await deskSettlements(await listSettlements(), sees),
+      batches: (await listBatches()).map((b) => shapeBatch(b, sees)),
     };
   });
 
@@ -1082,7 +1094,7 @@ export async function registerOpsRoutes(
           targetId: request.params.id,
           note: `${released.supplier.name} · ${released.day} · ${released.orders} захиалга ${released.amountMnt}₮`,
         });
-        return reply.send(shapeBatch(released));
+        return reply.send(shapeBatch(released, sendsMoney(request)));
       } catch (error) {
         return sendError(reply, error);
       }
@@ -1102,7 +1114,7 @@ export async function registerOpsRoutes(
           targetId: request.params.id,
           note: `${paid.supplier.name} · ${paid.day} · ${paid.orders} захиалга ${paid.amountMnt}₮ · ${paid.reference ?? 'лавлахгүй'} · баталсан ${paid.approvedBy ?? '—'}`,
         });
-        return reply.send(shapeBatch(paid));
+        return reply.send(shapeBatch(paid, sendsMoney(request)));
       } catch (error) {
         return sendError(reply, error);
       }
@@ -1122,7 +1134,7 @@ export async function registerOpsRoutes(
           targetId: request.params.id,
           note: request.body?.note ?? `${released.memo} ${released.amountMnt}₮`,
         });
-        return reply.send(shapeSettlement(released));
+        return reply.send(shapeSettlement(released, sendsMoney(request)));
       } catch (error) {
         return sendError(reply, error);
       }
@@ -1142,7 +1154,7 @@ export async function registerOpsRoutes(
           targetId: request.params.id,
           note: `${paid.memo} ${paid.amountMnt}₮ · ${paid.reference ?? 'лавлахгүй'} · баталсан ${paid.approvedBy ?? '—'}`,
         });
-        return reply.send(shapeSettlement(paid));
+        return reply.send(shapeSettlement(paid, sendsMoney(request)));
       } catch (error) {
         return sendError(reply, error);
       }

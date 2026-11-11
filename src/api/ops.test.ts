@@ -701,6 +701,29 @@ describe('the desk’s members', () => {
     expect(audit[0].note).toContain('баталсан ops:Санхүү нэг');
   });
 
+  it('shows an account number whole only to the seats that send money or check it against the contract', async () => {
+    await upsertMember({ phone: '+97699000016', name: 'Харагч хоёр', role: 'viewer' });
+    await upsertMember({ phone: '+97699000017', name: 'Ажилтан хоёр', role: 'ops' });
+    await upsertMember({ phone: '+97699000018', name: 'Санхүү гурав', role: 'finance' });
+    const { supplierId } = await aPayout();
+    const viewer = await signIn('+97699000016');
+    const worker = await signIn('+97699000017');
+    const finance = await signIn('+97699000018');
+
+    const batchAs = async (token: string) =>
+      (await app.inject({ method: 'GET', url: '/v1/ops/settlements', headers: auth(token) })).json().batches[0];
+    expect(await batchAs(viewer)).toMatchObject({ bank_name: 'Хаан банк', bank_account: '…5678', bank_holder: 'Д. Дорж' });
+    expect(await batchAs(finance)).toMatchObject({ bank_account: '5012345678' });
+
+    const supplierAs = async (token: string) =>
+      (await app.inject({ method: 'GET', url: '/v1/ops/suppliers', headers: auth(token) }))
+        .json()
+        .suppliers.find((s: { id: string }) => s.id === supplierId);
+    expect(await supplierAs(worker)).toMatchObject({ bank_account: '…5678', bank_verified: true });
+    expect(await supplierAs(viewer)).toMatchObject({ bank_account: '…5678' });
+    expect(await supplierAs(finance)).toMatchObject({ bank_account: '5012345678' });
+  });
+
   it('lets the demo desk, which is one shared identity, do both halves', async () => {
     await aPayout();
     const [batch] = (await app.inject({ method: 'GET', url: '/v1/ops/settlements', headers: desk() })).json().batches;

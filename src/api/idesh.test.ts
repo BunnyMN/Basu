@@ -4,7 +4,19 @@ import { closePool } from '../db/pool.js';
 import { at } from '../domain/fixtures.js';
 import { VirtualClock } from '../domain/time.js';
 import { buildServer } from './server.js';
-import { addCertificate, createListing, housekeeping, registerSupplier, supplierById, type Listing } from '../idesh/index.js';
+import {
+  addCertificate,
+  approveSettlement,
+  createListing,
+  eraseRefundAccounts,
+  housekeeping,
+  markSettled,
+  refundOf,
+  registerSupplier,
+  supplierById,
+  type Listing,
+} from '../idesh/index.js';
+import { closeAccount } from '../platform/identity/index.js';
 import { ClosedPaymentProvider, FakeNotifier, FakePaymentProvider, FakeTaxProvider, type Ctx } from '../ports.js';
 import { truncateAll } from '../test/seed.js';
 import { setSetting } from '../ops/index.js';
@@ -610,7 +622,9 @@ describe('ordering', () => {
       payload: { ...account, password: PASSWORD },
     });
     expect(named.statusCode, named.body).toBe(200);
-    expect(named.json().refund).toMatchObject({ state: 'due', bank_account: '5012345678', amount_mnt: 460_000 });
+    // Back to the guest as its bank and last four digits: theirs to recognise, nobody's to copy.
+    expect(named.json().refund).toMatchObject({ state: 'due', bank_name: 'Хаан банк', bank_account: '…5678', bank_holder: 'Бат', amount_mnt: 460_000 });
+    expect((await refundOf(id))?.bank?.bankAccount).toBe('5012345678');
   });
 
   it('takes a refund’s account in the forms a supplier’s account takes: the number, or the IBAN with MN', async () => {
@@ -640,7 +654,72 @@ describe('ordering', () => {
     // Read aloud in groups, in either case: the spaces go, the MN stays.
     const iban = await name('mn12 0005 0050 1234 5678');
     expect(iban.statusCode, iban.body).toBe(200);
-    expect(iban.json().refund).toMatchObject({ state: 'due', bank_account: 'MN120005005012345678' });
+    expect(iban.json().refund).toMatchObject({ state: 'due', bank_account: '…5678' });
+    expect((await refundOf(id))?.bank?.bankAccount).toBe('MN120005005012345678');
+  });
+
+  /** A cancelled order whose guest has named an account: the refund is due, waiting for finance. */
+  async function aRefundDue(phone: string): Promise<{ id: string; guestId: string; token: string }> {
+    const made = await app.inject({ method: 'POST', url: '/v1/auth/register', payload: { phone, password: PASSWORD } });
+    expect(made.statusCode, made.body).toBe(201);
+    const token = made.json().token as string;
+    await topUp(token, 500_000);
+    const { id } = await placeAndPay(token);
+    const cancelled = await app.inject({
+      method: 'POST',
+      url: `/v1/supplier/orders/${id}/cancel`,
+      headers: auth(await atCounter(supplierId)),
+      payload: { reason: 'guest_asked' },
+    });
+    expect(cancelled.statusCode, cancelled.body).toBe(200);
+    const named = await app.inject({
+      method: 'POST',
+      url: `/v1/idesh/${id}/refund-account`,
+      headers: auth(token),
+      payload: { bank_name: 'Хаан банк', bank_account: '5012 3456 78', bank_holder: 'Бат', password: PASSWORD },
+    });
+    expect(named.statusCode, named.body).toBe(200);
+    return { id, guestId: made.json().guest_id as string, token };
+  }
+
+  /** Finance sends it: one person releases, another marks it sent. */
+  async function sendRefund(orderId: string): Promise<void> {
+    const refund = await refundOf(orderId);
+    await approveSettlement(refund!.id, 'ops:Санхүү нэг', clock.now());
+    await markSettled(ctx, refund!.id, 'ops:Санхүү хоёр', 'KB-30');
+  }
+
+  it('forgets the refund account thirty days after the money went, keeping the bank and the last four digits', async () => {
+    const { id } = await aRefundDue('+97699003344');
+    // Not before it is paid, however long finance takes: the money has nowhere else to go.
+    clock.advanceMinutes(40 * 24 * 60);
+    expect(await eraseRefundAccounts(clock.now())).toBe(0);
+    await sendRefund(id);
+    expect(await eraseRefundAccounts(clock.now())).toBe(0);
+
+    // A month for a «it never came» to be checked against the bank, then it goes.
+    clock.advanceMinutes(30 * 24 * 60 - 1);
+    expect(await eraseRefundAccounts(clock.now())).toBe(0);
+    clock.advanceMinutes(1);
+    expect(await eraseRefundAccounts(clock.now())).toBe(1);
+    expect(await refundOf(id)).toMatchObject({ state: 'paid', bank: null, erased: { bankName: 'Хаан банк', tail: '5678' } });
+    expect(await eraseRefundAccounts(clock.now())).toBe(0);
+
+    // The guest still reads where it went.
+    // Signed in afresh: seventy days on, the first session has run out.
+    const page = await app.inject({ method: 'GET', url: `/v1/idesh/${id}`, headers: auth(await signIn('+97699003344')) });
+    expect(page.json().refund).toMatchObject({ state: 'paid', bank_name: 'Хаан банк', bank_account: '…5678', bank_holder: null });
+  });
+
+  it('forgets a closed account’s refund account as soon as nothing is owed to it', async () => {
+    const { id, guestId } = await aRefundDue('+97699004455');
+    await closeAccount({ guestId, at: clock.now(), balanceMnt: 0, liveWork: 0 });
+    // Closed, but still owed: the account stays until the money is sent.
+    expect(await eraseRefundAccounts(clock.now())).toBe(0);
+    expect((await refundOf(id))?.bank).toMatchObject({ bankAccount: '5012345678', bankHolder: 'Бат' });
+    await sendRefund(id);
+    expect(await eraseRefundAccounts(clock.now())).toBe(1);
+    expect(await refundOf(id)).toMatchObject({ bank: null, erased: { bankName: 'Хаан банк', tail: '5678' } });
   });
 });
 

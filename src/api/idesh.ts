@@ -87,7 +87,7 @@ import { enqueue, unreadBySubject } from '../platform/notify/index.js';
 import { LONE_OWNER_PERMISSIONS, grants, headRoles, type Grants } from '../platform/access/index.js';
 import { accessIn, membersOf } from '../platform/org/index.js';
 import { topupsOpen, type Ctx } from '../ports.js';
-import { shapeBatch, shapeGuestSummary, shapeCertificateDetails, shapeCertificateFacts, shapeOrder, shapePhoto, shapeQpay, shapeSettlement, shapeSummary } from './shapes.js';
+import { accountFor, shapeBatch, shapeGuestSummary, shapeCertificateDetails, shapeCertificateFacts, shapeOrder, shapePhoto, shapeQpay, shapeSettlement, shapeSummary } from './shapes.js';
 import { FOREVER } from './webFiles.js';
 import { invoiceQpay } from '../platform/ledger/index.js';
 import { holds, knownId, need, needAny, UUID } from './guards.js';
@@ -271,12 +271,14 @@ const shapeDetail = (o: IdeshDetail) => ({
   cancel_reason: o.cancelReason,
   refund_mnt: o.refundMnt,
   forfeit_mnt: o.forfeitMnt,
+  // The guest's own account comes back as its bank and last four digits:
+  // enough to recognise, nothing for whoever looks over their shoulder.
   refund: o.refund
     ? {
         state: o.refund.state,
         amount_mnt: o.refund.amountMnt,
-        bank_name: o.refund.bank?.bankName ?? null,
-        bank_account: o.refund.bank?.bankAccount ?? null,
+        bank_name: o.refund.bank?.bankName ?? o.refund.erased?.bankName ?? null,
+        bank_account: o.refund.bank ? accountFor(o.refund.bank.bankAccount, 'masked') : o.refund.erased ? `…${o.refund.erased.tail}` : null,
         bank_holder: o.refund.bank?.bankHolder ?? null,
         paid_at: o.refund.paidAt?.toISOString() ?? null,
       }
@@ -874,9 +876,10 @@ export async function registerIdeshRoutes(
       bank_name: me?.bankName ?? null,
       bank_account: me?.bankAccount ?? null,
       bank_holder: me?.bankHolder ?? null,
-      settlements: (await settlementsOf(supplierId)).map(shapeSettlement),
+      // Their own account, whole: they gave it, and they are the ones to notice it is wrong.
+      settlements: (await settlementsOf(supplierId)).map((t) => shapeSettlement(t, 'full')),
       // What Basu sends them a day at a time: one transfer per day's payouts.
-      batches: (await batchesOf(supplierId)).map(shapeBatch),
+      batches: (await batchesOf(supplierId)).map((b) => shapeBatch(b, 'full')),
     };
   });
 

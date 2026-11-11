@@ -1,5 +1,5 @@
 import { getPool, tx, type Db } from '../db/pool.js';
-import { displayNamesFor } from '../platform/identity/index.js';
+import { displayNamesFor, openAccounts } from '../platform/identity/index.js';
 import { accrue, payOut } from '../platform/ledger/index.js';
 import { enqueue } from '../platform/notify/index.js';
 import type { Ctx } from '../ports.js';
@@ -29,6 +29,16 @@ export interface BankAccount {
   bankHolder: string;
 }
 
+/** The last four digits of an account: all anybody but the person who sends the money needs to see. */
+export const accountTail = (account: string): string => account.replace(/\s+/g, '').slice(-4);
+
+/**
+ * How long a guest's refund account outlives the refund. Long enough to
+ * check a «the money never came» against the bank; after that the number is
+ * no use to anybody, and a number kept is a number that can leak.
+ */
+export const REFUND_ACCOUNT_DAYS = 30;
+
 export interface Settlement {
   id: string;
   kind: SettlementKind;
@@ -43,6 +53,8 @@ export interface Settlement {
   bank: BankAccount | null;
   /** A supplier's account finance has checked; a guest's own, once typed at their phone. */
   bankVerified: boolean;
+  /** What is left of a refund's account once the number and the name on it are erased. */
+  erased: { bankName: string; tail: string } | null;
   reference: string | null;
   /** Who released it to be paid, and when. Never the person who pays it. */
   approvedBy: string | null;
@@ -149,6 +161,8 @@ interface Row {
   bank_account: string | null;
   bank_holder: string | null;
   bank_verified: boolean;
+  bank_tail: string | null;
+  bank_erased_at: Date | null;
   reference: string | null;
   approved_by: string | null;
   approved_at: Date | null;
@@ -166,6 +180,7 @@ const SELECT = `
          COALESCE(t.bank_account, s.bank_account) AS bank_account,
          COALESCE(t.bank_holder, s.bank_holder) AS bank_holder,
          (t.kind = 'refund' OR s.bank_verified_at IS NOT NULL) AS bank_verified,
+         t.bank_tail, t.bank_erased_at,
          t.reference, t.approved_by, t.approved_at, t.paid_at, t.created_at,
          t.batch_id, to_char(b.day, 'YYYY-MM-DD') AS batch_day, b.state AS batch_state
     FROM idesh.settlement t
@@ -190,6 +205,7 @@ async function shape(rows: Row[]): Promise<Settlement[]> {
         ? { bankName: r.bank_name, bankAccount: unseal(r.bank_account)!, bankHolder: unseal(r.bank_holder)! }
         : null,
     bankVerified: r.bank_verified,
+    erased: r.bank_erased_at && r.bank_name ? { bankName: r.bank_name, tail: r.bank_tail ?? '' } : null,
     reference: r.reference,
     approvedBy: r.approved_by,
     approvedAt: r.approved_at,
@@ -340,4 +356,40 @@ export async function markSettled(
   }
 
   return (await shape([{ ...row, state: 'paid', paid_at: now, reference }]))[0]!;
+}
+
+/**
+ * Erase the refund accounts nobody needs any more: the number and the name
+ * on it, kept only as the bank and the last four digits.
+ *
+ * A guest gives an account for one reason, to get one refund back, and the
+ * privacy page promises it is used for that and nothing else. Once the money
+ * has gone and REFUND_ACCOUNT_DAYS have passed, the number goes too. A guest
+ * who closed their account does not wait: theirs goes as soon as nothing is
+ * owed to it. A refund still waiting to be sent keeps its account, closed or
+ * not, because the money has nowhere else to go.
+ *
+ * Run by the scheduler. Answers how many it erased.
+ */
+export async function eraseRefundAccounts(now: Date, db: Db = getPool()): Promise<number> {
+  const { rows } = await db.query<{ id: string; guest_id: string | null; bank_account: string; paid_at: Date }>(
+    `SELECT id, guest_id, bank_account, paid_at FROM idesh.settlement
+      WHERE kind = 'refund' AND state = 'paid' AND bank_account IS NOT NULL`,
+  );
+  if (rows.length === 0) return 0;
+  const open = await openAccounts(rows.flatMap((r) => (r.guest_id ? [r.guest_id] : [])), db);
+  const cutoff = now.getTime() - REFUND_ACCOUNT_DAYS * 24 * 60 * 60_000;
+  let erased = 0;
+  for (const row of rows) {
+    const closed = row.guest_id !== null && !open.has(row.guest_id);
+    if (!closed && row.paid_at.getTime() > cutoff) continue;
+    const { rowCount } = await db.query(
+      `UPDATE idesh.settlement
+          SET bank_account = NULL, bank_holder = NULL, bank_tail = $2, bank_erased_at = $3
+        WHERE id = $1 AND state = 'paid' AND bank_account IS NOT NULL`,
+      [row.id, accountTail(unseal(row.bank_account) ?? ''), now],
+    );
+    erased += rowCount ?? 0;
+  }
+  return erased;
 }

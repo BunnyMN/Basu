@@ -2087,7 +2087,7 @@ describe('the website', () => {
 
     // The right one keeps the account, and the order says where the money goes.
     await answerPopup(page, { password: GUEST_PASSWORD });
-    await until(page, 'the account on the order', () => !d.querySelector('[data-account]') && (d.querySelector('.od-refund')?.textContent ?? '').includes('5012345678'));
+    await until(page, 'the account on the order', () => !d.querySelector('[data-account]') && (d.querySelector('.od-refund')?.textContent ?? '').includes('Хаан банк …5678'));
     expect(storage.getItem('basu.guest')).toBe(token);
   });
 });
@@ -2871,7 +2871,7 @@ describe('өвлийн идэш', () => {
     await until(guest, 'the confirm step', (d) => !(d.querySelector('#otp-step') as HTMLElement | null)?.hidden);
     type('otp', GUEST_PASSWORD);
     send.click();
-    await until(guest, 'the account to be kept', (d) => d.querySelector('#refund')?.textContent?.includes('5012345678') ?? false);
+    await until(guest, 'the account to be kept', (d) => d.querySelector('#refund')?.textContent?.includes('…5678') ?? false);
     expect(guest.window.document.querySelector('#refund')?.textContent).toContain('Basu ажлын өдөрт');
 
     /* the desk: one line to pay, then paid */
@@ -4685,7 +4685,7 @@ describe('a first password, where money is about to go', () => {
       await until(page, 'the account popup', () => Boolean(popupOnTop(page)?.querySelector('[name="bank"]')));
       expect(popupOnTop(page)!.querySelector('[name="password"]')).toBeNull();
       await answerPopup(page, { bank: 'Хаан банк', account: '5012345678', holder: 'Сараа Бат' });
-      await until(page, 'the account on the order', () => !d.querySelector('[data-account]') && (d.querySelector('.od-refund')?.textContent ?? '').includes('5012345678'));
+      await until(page, 'the account on the order', () => !d.querySelector('[data-account]') && (d.querySelector('.od-refund')?.textContent ?? '').includes('…5678'));
       // One word at the end for both — not the password's toast left standing under the account's.
       expect(d.querySelector('.s-toast')?.textContent).toBe('Нууц үг, данс хоёулаа хадгалагдлаа. Шилжүүлмэгц мэдэгдэл ирнэ.');
       expect(d.getElementById('toast')?.hasAttribute('data-show') ?? false).toBe(false);
@@ -4724,7 +4724,7 @@ describe('a first password, where money is about to go', () => {
       await answerPopup(page);
       await until(page, 'the letter', () => passwordLetters(mailer, 'tsetseg@example.mn') === 1);
       await answerPopup(page, { code: mailer.codeFor('tsetseg@example.mn')!, next: 'цэцэгийн нууц үг' });
-      await until(page, 'the account to be kept', (d) => d.querySelector('#refund')?.textContent?.includes('5098765432') ?? false);
+      await until(page, 'the account to be kept', (d) => d.querySelector('#refund')?.textContent?.includes('…5432') ?? false);
       // One word at the end for both: no toast of the password's own stacked under it.
       expect(page.window.document.getElementById('toast')?.textContent).toBe('Нууц үг, данс хоёулаа хадгалагдлаа. Шилжүүлмэгц мэдэгдэл ирнэ.');
       expect(page.window.document.querySelector('.toast-old')).toBeNull();
@@ -4770,7 +4770,7 @@ describe('a first password, where money is about to go', () => {
     expect(send.disabled).toBe(false);
     expect((form.querySelector('#refund-why') as HTMLElement).hidden).toBe(true);
     send.click();
-    await until(page, 'the account to be kept', (d) => d.querySelector('#refund')?.textContent?.includes('5012345678') ?? false);
+    await until(page, 'the account to be kept', (d) => d.querySelector('#refund')?.textContent?.includes('…5678') ?? false);
   });
 
   it('lets a supplier complete a certificate as the paper prints it: origin, tests, products, route', async () => {

@@ -7,7 +7,7 @@ import { purgeChallenges } from '../platform/identity/index.js';
 import { purgeAnswers } from '../api/idempotency.js';
 import { openTopups, processReceipts, settleTopup } from '../platform/ledger/index.js';
 import { recordTick } from '../ops/index.js';
-import { gatherPayouts, housekeeping as ideshHousekeeping } from '../idesh/index.js';
+import { eraseRefundAccounts, gatherPayouts, housekeeping as ideshHousekeeping } from '../idesh/index.js';
 import { claimDueJobs, findOverdue, fireOne } from './fireJobs.js';
 import type { Ctx } from '../ports.js';
 import { relayActivities } from '../services/activities.js';
@@ -42,8 +42,9 @@ export interface TickReport {
   /** Wallet top-ups paid at the provider while the phone was not looking, credited. */
   topups: number;
   /**
-   * Yesterday's one-time codes swept out of both tables, and the answers
-   * kept for retries that can no longer come.
+   * Yesterday's one-time codes swept out of both tables, the answers kept
+   * for retries that can no longer come, and the refund accounts whose
+   * refund is long paid or whose guest has gone.
    */
   purged: number;
   /** Lock screen cards moved by push, and cards taken down. */
@@ -175,6 +176,13 @@ export async function tick(ctx: Ctx, opts: TickOptions = {}): Promise<TickReport
   // Secrets past their use: yesterday's codes and the rows that carried them,
   // and the answers kept for a retry that can no longer come.
   report.purged = (await purgeChallenges(now)) + (await purgeCodes(now)) + (await purgeAnswers(now));
+  // A guest's bank account, once nobody needs it. Its failure is logged and
+  // tried again next tick: the number staying a little longer harms less
+  // than a stuck tick.
+  report.purged += await eraseRefundAccounts(now).catch((error: unknown) => {
+    console.error('[scheduler] refund account erasure failed', error);
+    return 0;
+  });
 
   /* 8. The lock screens. After everything above, so one push carries the
    *    tick's whole result rather than each step's. */

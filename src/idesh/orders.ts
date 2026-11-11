@@ -1093,7 +1093,7 @@ export interface IdeshDetail extends IdeshSummary {
   refundMnt: number | null;
   forfeitMnt: number | null;
   /** The refund on its way, once cancelled and paid for: where it stands. */
-  refund: Pick<Settlement, 'state' | 'bank' | 'paidAt' | 'amountMnt'> | null;
+  refund: Pick<Settlement, 'state' | 'bank' | 'erased' | 'paidAt' | 'amountMnt'> | null;
   receipt: { qr: string; lottery: string | null } | null;
 }
 
@@ -1325,7 +1325,7 @@ export async function detailFor(
     refundMnt: r.refund_mnt === null ? null : Number(r.refund_mnt),
     forfeitMnt: r.forfeit_mnt === null ? null : Number(r.forfeit_mnt),
     refund: refund
-      ? { state: refund.state, bank: refund.bank, paidAt: refund.paidAt, amountMnt: refund.amountMnt }
+      ? { state: refund.state, bank: refund.bank, erased: refund.erased, paidAt: refund.paidAt, amountMnt: refund.amountMnt }
       : null,
     receipt: receipt?.qrPayload ? { qr: receipt.qrPayload, lottery: receipt.lottery } : null,
   };

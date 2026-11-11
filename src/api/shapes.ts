@@ -1,5 +1,5 @@
 import type { QPayInvoice } from '../ports.js';
-import { describe, type Breakdown, type CertificateDetails, type CertificateFacts, type PayoutBatch, type IdeshSummary, type Settlement, type SupplierOrder } from '../idesh/index.js';
+import { accountTail, describe, type Breakdown, type CertificateDetails, type CertificateFacts, type PayoutBatch, type IdeshSummary, type Settlement, type SupplierOrder } from '../idesh/index.js';
 
 /** The JSON shapes the idesh and ops routes share. Snake case on the wire, as everywhere. */
 
@@ -84,8 +84,20 @@ export const shapeOrder = (o: SupplierOrder) => ({
   created_at: o.createdAt.toISOString(),
 });
 
-/** A settlement as the ops page and the supplier's screen read it. */
-export const shapeSettlement = (t: Settlement) => ({
+/**
+ * Who reads an account number whole: the person who sends the money or holds
+ * it up against the contract, and a supplier reading its own. Everybody else
+ * gets the bank and the last four digits — enough to tell two accounts
+ * apart, nothing to send money with.
+ */
+export type AccountView = 'full' | 'masked';
+
+/** An account number as this reader may see it. */
+export const accountFor = (account: string | null | undefined, sees: AccountView): string | null =>
+  account ? (sees === 'full' ? account : `…${accountTail(account)}`) : null;
+
+/** A settlement as the ops page and the supplier's screen read it. A refund's erased account is its bank and last four digits, for everybody. */
+export const shapeSettlement = (t: Settlement, sees: AccountView) => ({
   id: t.id,
   kind: t.kind,
   state: t.state,
@@ -95,10 +107,11 @@ export const shapeSettlement = (t: Settlement) => ({
   amount_mnt: t.amountMnt,
   supplier: t.supplier,
   guest: t.guest,
-  bank_name: t.bank?.bankName ?? null,
-  bank_account: t.bank?.bankAccount ?? null,
+  bank_name: t.bank?.bankName ?? t.erased?.bankName ?? null,
+  bank_account: t.bank ? accountFor(t.bank.bankAccount, sees) : t.erased ? `…${t.erased.tail}` : null,
   bank_holder: t.bank?.bankHolder ?? null,
   bank_verified: t.bankVerified,
+  bank_erased: t.erased !== null,
   reference: t.reference,
   approved_by: t.approvedBy,
   approved_at: t.approvedAt?.toISOString() ?? null,
@@ -108,7 +121,7 @@ export const shapeSettlement = (t: Settlement) => ({
 });
 
 /** A supplier's day of payouts, sent as one transfer: the total, the account, who signed, and the orders in it. */
-export const shapeBatch = (b: PayoutBatch) => ({
+export const shapeBatch = (b: PayoutBatch, sees: AccountView) => ({
   id: b.id,
   supplier: b.supplier,
   day: b.day,
@@ -116,7 +129,7 @@ export const shapeBatch = (b: PayoutBatch) => ({
   orders: b.orders,
   state: b.state,
   bank_name: b.bank?.bankName ?? null,
-  bank_account: b.bank?.bankAccount ?? null,
+  bank_account: accountFor(b.bank?.bankAccount, sees),
   bank_holder: b.bank?.bankHolder ?? null,
   bank_verified: b.bankVerified,
   approved_by: b.approvedBy,
